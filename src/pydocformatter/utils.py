@@ -3,7 +3,9 @@ import re
 
 
 def should_format_file(
-    file_path: str, compiled_include: re.Pattern, compiled_exclude: re.Pattern
+    file_path: str,
+    compiled_include: re.Pattern[str],
+    compiled_exclude: re.Pattern[str] | None,
 ) -> bool:
     """Determine if the file should be formatted.
 
@@ -12,8 +14,9 @@ def should_format_file(
 
     Args:
         file_path (str): The path to the file.
-        compiled_include (re.Pattern): Compiled regex pattern for files to include.
-        compiled_exclude (re.Pattern): Compiled regex pattern for files to exclude.
+        compiled_include (re.Pattern[str]): Compiled regex pattern for files to include.
+        compiled_exclude (re.Pattern[str] | None): Compiled regex pattern for files to
+            exclude, or None to disable exclusion filtering.
 
     Returns:
         bool: True if the file should be formatted, False otherwise.
@@ -30,7 +33,7 @@ def should_format_file(
 
 
 def collect_files(
-    paths: list[str], include: re.Pattern, exclude: re.Pattern
+    paths: list[str], include: re.Pattern[str], exclude: re.Pattern[str] | None
 ) -> list[str]:
     """Collect files that should be formatted based on include and exclude patterns.
 
@@ -39,8 +42,9 @@ def collect_files(
 
     Args:
         paths (list[str]): List of file paths to check.
-        include (re.Pattern): Compiled regex pattern for files to include.
-        exclude (re.Pattern): Compiled regex pattern for files to exclude.
+        include (re.Pattern[str]): Compiled regex pattern for files to include.
+        exclude (re.Pattern[str] | None): Compiled regex pattern for files to exclude,
+            or None to disable exclusion filtering.
 
     Returns:
         list[str]: List of file paths that should be formatted.

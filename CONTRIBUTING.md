@@ -1,6 +1,6 @@
-# Contributing to pyformatter
+# Contributing to pydocformatter
 
-Thank you for your interest in contributing to pyformatter! We welcome contributions from everyone and are grateful for every pull request, bug report, and feature suggestion.
+Thank you for your interest in contributing to pydocformatter! We welcome contributions from everyone and are grateful for every pull request, bug report, and feature suggestion.
 
 ## Table of Contents
 
@@ -30,12 +30,12 @@ This project adheres to a code of conduct that we expect all contributors to fol
 
 We welcome several types of contributions:
 
-- **🐛 Bug Reports**: Help us identify and fix issues
-- **✨ Feature Requests**: Suggest new functionality
-- **📝 Documentation**: Improve or add documentation
-- **🔧 Code**: Fix bugs or implement features
-- **🧪 Tests**: Add or improve test coverage
-- **🎨 Examples**: Provide usage examples
+- **Bug Reports**: Help us identify and fix issues
+- **Feature Requests**: Suggest new functionality
+- **Documentation**: Improve or add documentation
+- **Code**: Fix bugs or implement features
+- **Tests**: Add or improve test coverage
+- **Examples**: Provide usage examples
 
 ## Development Setup
 
@@ -43,8 +43,8 @@ We welcome several types of contributions:
 
 ```bash
 # Fork the repository on GitHub, then:
-git clone https://github.com/YOUR-USERNAME/pyformatter.git
-cd pyformatter
+git clone https://github.com/YOUR-USERNAME/pydocformatter.git
+cd pydocformatter
 ```
 
 ### 2. Set Up Development Environment
@@ -60,7 +60,7 @@ python -m venv .venv
 source .venv/bin/activate
 
 # Install development dependencies
-pip install -e .[dev]
+pip install -e . --dependency-groups dev
 ```
 
 ### 3. Set Up Pre-commit Hooks
@@ -73,7 +73,7 @@ pre-commit install
 pre-commit run --all-files
 ```
 
-**Note**: During development, the pre-commit hooks use the local version of pyformatter. External users will use the published version from the repository.
+**Note**: During development, the pre-commit hooks use the local version of pydocformatter. External users will use the published version from the repository.
 
 ### 4. Verify Installation
 
@@ -142,7 +142,7 @@ git checkout -b bugfix/issue-description
 python -m unittest discover -s tests -v
 
 # Run tests with coverage
-python -m pytest tests/ --cov=pyformatter --cov-report=html
+python -m pytest tests/ --cov=pydocformatter --cov-report=html
 
 # Run specific test file
 python -m unittest tests.test_pydocfmt -v
@@ -158,7 +158,7 @@ python -m unittest tests.test_pydocfmt -v
 #### Test File Structure
 ```python
 import unittest
-from pyformatter.formatters.your_module import your_function
+from pydocformatter.formatters.your_module import your_function
 
 class TestYourFunction(unittest.TestCase):
     def test_normal_case(self):
@@ -192,7 +192,7 @@ We use several tools to maintain code quality:
 - **pycommentfmt**: Comment formatting (our own tool!)
 
 ### Code Quality
-- **MyPy**: Type checking (when available)
+- **MyPy**: Type checking
 - **Pre-commit**: Automated checks
 
 ### Running Style Checks
@@ -206,9 +206,12 @@ pycommentfmt .
 
 # Check formatting without changes
 black --check .
-isort --check-only .
+isort --check .
 pydocfmt --check .
 pycommentfmt --check .
+
+# Type checking
+mypy
 ```
 
 ## Submitting Changes
@@ -316,12 +319,13 @@ We follow [Semantic Versioning](https://semver.org/):
 ## Project Structure
 
 ```
-pyformatter/
-├── pyformatter/           # Main package
-│   ├── cli/              # Command-line interfaces
-│   ├── formatters/       # Core formatting logic
-│   ├── config.py         # Configuration handling
-│   └── utils.py          # Utility functions
+pydocformatter/
+├── src/
+│   └── pydocformatter/   # Main package
+│       ├── cli/          # Command-line interfaces
+│       ├── formatters/   # Core formatting logic
+│       ├── config.py     # Configuration handling
+│       └── utils.py      # Utility functions
 ├── tests/                # Test suite
 ├── docs/                 # Documentation (if needed)
 ├── .github/              # GitHub workflows
@@ -367,15 +371,6 @@ pyformatter/
 - [Semantic Versioning](https://semver.org/)
 - [Keep a Changelog](https://keepachangelog.com/)
 
-## Recognition
-
-Contributors will be recognized in:
-- Release notes
-- GitHub contributors list
-- Special thanks for significant contributions
-
-Thank you for contributing to pyformatter! 🎉
-
 ---
 
 ## Quick Reference
@@ -383,7 +378,7 @@ Thank you for contributing to pyformatter! 🎉
 ### Common Commands
 ```bash
 # Development setup
-pip install -e .[dev]
+pip install -e . --dependency-groups dev
 pre-commit install
 
 # Testing
@@ -393,11 +388,14 @@ python -m unittest discover -s tests -v
 black . && isort . && pydocfmt . && pycommentfmt .
 
 # Check formatting
-black --check . && isort --check-only . && pydocfmt --check . && pycommentfmt --check .
+black --check . && isort --check . && pydocfmt --check . && pycommentfmt --check .
+
+# Type checking
+mypy
 ```
 
 ### Need Help?
-- 📖 Read the [README](README.md)
-- 🐛 [Report a bug](https://github.com/RikGhosh487/pyformatter/issues/new)
-- 💡 [Request a feature](https://github.com/RikGhosh487/pyformatter/issues/new)
-- 💬 [Start a discussion](https://github.com/RikGhosh487/pyformatter/discussions)
+- Read the [README](README.md)
+- [Report a bug](https://github.com/pallgeuer/pydocformatter/issues/new)
+- [Request a feature](https://github.com/pallgeuer/pydocformatter/issues/new)
+- [Start a discussion](https://github.com/pallgeuer/pydocformatter/discussions)

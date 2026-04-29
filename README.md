@@ -1,11 +1,11 @@
-# pyformatter
+# pydocformatter
 
-[![CI](https://github.com/RikGhosh487/pyformatter/actions/workflows/unit-tests.yml/badge.svg)](https://github.com/RikGhosh487/pyformatter/actions)
-[![CI](https://github.com/RikGhosh487/pyformatter/actions/workflows/pre-commit-checks.yml/badge.svg)](https://github.com/RikGhosh487/pyformatter/actions)
+[![CI](https://github.com/pallgeuer/pydocformatter/actions/workflows/unit-tests.yml/badge.svg)](https://github.com/pallgeuer/pydocformatter/actions)
+[![CI](https://github.com/pallgeuer/pydocformatter/actions/workflows/pre-commit-checks.yml/badge.svg)](https://github.com/pallgeuer/pydocformatter/actions)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/release/python-3110/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**pyformatter** is a suite of Python formatting tools that automatically formats your docstrings and comments according to configurable style guidelines. It consists of two powerful formatters:
+**pydocformatter** is a suite of Python formatting tools that automatically formats your docstrings and comments according to configurable style guidelines. It consists of two powerful formatters:
 
 - **pydocfmt**: Formats Python docstrings with support for Google-style docstrings
 - **pycommentfmt**: Formats Python comments to ensure proper line length and readability
@@ -51,17 +51,17 @@
 
 ## Installation
 
-Install pyformatter via pip:
+Install pydocformatter via pip:
 
 ```bash
-pip install python-doc-formatter
+pip install pydocformatter
 ```
 
 Or install from source:
 
 ```bash
-git clone https://github.com/RikGhosh487/pyformatter.git
-cd pyformatter
+git clone https://github.com/pallgeuer/pydocformatter.git
+cd pydocformatter
 pip install -e .
 ```
 
@@ -154,16 +154,16 @@ pycommentfmt --line-length 79 src/
 
 ## Configuration
 
-pyformatter can be configured via `pyproject.toml`:
+pydocformatter can be configured via `pyproject.toml`:
 
 ```toml
 [tool.pydocfmt]
 line_length = 88
-exclude = '(^tests/data/|build/)'
+exclude = '(^|/)(\.github|\.eggs|\.git|\.hg|\.mypy_cache|\.tox|\.venv|htmlcov|__pycache__|_build|buck-out|build|dist|tests/data)(/|$)'
 
 [tool.pycommentfmt]
 line_length = 88
-exclude = '(^tests/data/|build/)'
+exclude = '(^|/)(\.github|\.eggs|\.git|\.hg|\.mypy_cache|\.tox|\.venv|htmlcov|__pycache__|_build|buck-out|build|dist|tests/data)(/|$)'
 ```
 
 **Configuration Options:**
@@ -217,12 +217,12 @@ x = 42
 
 ### Pre-commit
 
-Add pyformatter to your `.pre-commit-config.yaml`:
+Add pydocformatter to your `.pre-commit-config.yaml`:
 
 ```yaml
 repos:
-  - repo: https://github.com/RikGhosh487/pyformatter
-    rev: v0.1.0  # Use the ref you want to point at
+  - repo: https://github.com/pallgeuer/pydocformatter
+    rev: v0.2.0  # Use the ref you want to point at
     hooks:
       - id: pydocfmt
         args: [--line-length=88]
@@ -257,14 +257,14 @@ repos:
 
 ### Editor Integration
 
-pyformatter works great with:
+pydocformatter works great with:
 - **VS Code**: Use with the Python extension
 - **PyCharm**: Configure as an external tool
 - **Vim/Neovim**: Integrate with formatting plugins
 
 ---
 
-## Why pyformatter?
+## Why pydocformatter?
 
 - **Uncompromising**: Consistent formatting across your entire codebase
 - **Fast**: Efficiently processes large codebases
@@ -276,12 +276,10 @@ pyformatter works great with:
 
 ## Security
 
-Security is important to us. If you discover a security vulnerability, please report it responsibly by following our [Security Policy](SECURITY.md).
-
-For general security best practices when using pyformatter:
-- Always review changes made by pyformatter before committing
-- Keep pyformatter updated to the latest version
-- When processing untrusted code, consider running pyformatter in an isolated environment
+For general security best practices when using pydocformatter:
+- Always review changes made by pydocformatter before committing
+- Keep pydocformatter updated to the latest version
+- When processing untrusted code, consider running pydocformatter in an isolated environment
 
 ---
 
@@ -293,13 +291,13 @@ For detailed information on how to contribute, please see our [Contributing Guid
 
 **Quick Start for Contributors:**
 1. Fork the repository and clone your fork
-2. Set up the development environment: `pip install -e .[dev]`
+2. Set up the development environment: `pip install -e . --dependency-groups dev`
 3. Install pre-commit hooks: `pre-commit install`
 4. Make your changes and add tests
 5. Run the test suite: `python -m unittest discover -s tests -v`
 6. Submit a pull request
 
-For bug reports and feature requests, please [open an issue](https://github.com/RikGhosh487/pyformatter/issues).
+For bug reports and feature requests, please [open an issue](https://github.com/pallgeuer/pydocformatter/issues).
 
 ---
 
@@ -317,5 +315,3 @@ Inspired by the excellent work of:
 - [docformatter](https://github.com/PyCQA/docformatter) - Formats docstrings to follow conventions
 
 ---
-
-*pyformatter: Because every comment and docstring deserves to be beautiful.*

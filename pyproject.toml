@@ -3,16 +3,17 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "python-doc-formatter"
-version = "0.1.1"
+name = "pydocformatter"
+version = "0.2.0"
 description = "A Python annotation formatter for line-wrapping and formatting python comments and docstrings"
 readme = "README.md"
 license = {text = "MIT"}
 authors = [
-    {name = "Rik Ghosh", email = "rikghosh487@gmail.com"}
+    {name = "Rik Ghosh", email = "rikghosh487@gmail.com"},
+    {name = "Philipp Allgeuer"},
 ]
 maintainers = [
-    {name = "Rik Ghosh", email = "rikghosh487@gmail.com"}
+    {name = "Philipp Allgeuer"},
 ]
 keywords = ["formatter", "docstring", "comment", "python", "code-quality", "linting"]
 classifiers = [
@@ -31,64 +32,63 @@ classifiers = [
     "Topic :: Software Development :: Quality Assurance",
     "Topic :: Utilities",
 ]
-dependencies = []
 requires-python = ">=3.11"
+dependencies = []
 
 [project.urls]
-Homepage = "https://github.com/RikGhosh487/pyformatter"
-Repository = "https://github.com/RikGhosh487/pyformatter"
-Issues = "https://github.com/RikGhosh487/pyformatter/issues"
-Changelog = "https://github.com/RikGhosh487/pyformatter/blob/main/CHANGELOG.md"
-Contributing = "https://github.com/RikGhosh487/pyformatter/blob/main/CONTRIBUTING.md"
-Security = "https://github.com/RikGhosh487/pyformatter/blob/main/SECURITY.md"
-
-[project.optional-dependencies]
-dev = [
-    "pytest>=7.0",
-    "pytest-cov>=4.0",
-    "black>=23.0",
-    "isort>=5.0",
-    "mypy>=1.0",
-    "pre-commit>=3.0",
-]
-test = [
-    "pytest>=7.0",
-    "pytest-cov>=4.0",
-]
+Homepage = "https://github.com/pallgeuer/pydocformatter"
+Repository = "https://github.com/pallgeuer/pydocformatter"
+Issues = "https://github.com/pallgeuer/pydocformatter/issues"
+Changelog = "https://github.com/pallgeuer/pydocformatter/blob/main/CHANGELOG.md"
+Contributing = "https://github.com/pallgeuer/pydocformatter/blob/main/CONTRIBUTING.md"
 
 [project.scripts]
-pydocfmt = "pyformatter.cli.pydocfmt_main:main"
-pycommentfmt = "pyformatter.cli.pycommentfmt_main:main"
+pydocfmt = "pydocformatter.cli.pydocfmt_main:main"
+pycommentfmt = "pydocformatter.cli.pycommentfmt_main:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[dependency-groups]
+test = [
+    "pytest==9.0.3",
+    "pytest-cov==7.1.0",
+]
+dev = [
+    {include-group = "test"},
+    "black==26.3.1",
+    "isort==8.0.1",
+    "mypy==1.20.2",
+    "pre-commit==4.6.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
 
 [tool.black]
 line-length = 88
 target-version = ["py311"]
-exclude = '''
-/(
-    \.eggs
-  | \.git
-  | \.hg
-  | \.mypy_cache
-  | \.tox
-  | \.venv
-  | _build
-  | buck-out
-  | build
-  | dist
-  | tests/data
-)/
-'''
+exclude = '/(\.github|\.eggs|\.git|\.hg|\.mypy_cache|\.tox|\.venv|htmlcov|__pycache__|_build|buck-out|build|dist|tests/data)/'
 
 [tool.isort]
 profile = "black"
 line_length = 88
-known_third_party = ["pyformatter"]
-skip = ["build", "dist", "tests"]
+known_first_party = ["pydocformatter"]
+skip = [".github", ".eggs", ".git", ".hg", ".mypy_cache", ".tox", ".venv", "htmlcov", "__pycache__", "_build", "buck-out", "build", "dist", "tests/data"]
 
 [tool.pycommentfmt]
 line_length = 88
-exclude = '(^tests/data/|build/)'
+exclude = '(^|/)(\.github|\.eggs|\.git|\.hg|\.mypy_cache|\.tox|\.venv|htmlcov|__pycache__|_build|buck-out|build|dist|tests/data)(/|$)'
 
 [tool.pydocfmt]
 line_length = 88
-exclude = '(^tests/data/|build/)'
+exclude = '(^|/)(\.github|\.eggs|\.git|\.hg|\.mypy_cache|\.tox|\.venv|htmlcov|__pycache__|_build|buck-out|build|dist|tests/data)(/|$)'
+
+[tool.mypy]
+files = ["src/pydocformatter", "tests"]
+show_error_codes = true
+pretty = true
+strict = true

@@ -29,10 +29,10 @@ def _format_param_section(
 
     entry_re = re.compile(r"^\s*([a-zA-Z_][a-zA-Z0-9_]*)(?:\s*\(([^)]+)\))?:\s*(.*)$")
 
-    current_arg = None
-    desc_lines = []
+    current_arg: tuple[str, str | None] | None = None
+    desc_lines: list[str] = []
 
-    def flush():
+    def flush() -> None:
         if current_arg is not None:
             name, type_ = current_arg
             desc = " ".join(desc_lines).strip()
@@ -149,10 +149,10 @@ def format_raises_section(
 
     entry_re = re.compile(r"^\s*`?([a-zA-Z_][a-zA-Z0-9_\.]*)`?:\s*(.*)$")
 
-    current_exc = None
-    desc_lines = []
+    current_exc: str | None = None
+    desc_lines: list[str] = []
 
-    def flush():
+    def flush() -> None:
         if current_exc is not None:
             exc = current_exc
             desc = " ".join(desc_lines).strip()
@@ -209,13 +209,13 @@ def format_examples_section(
     """
     result = [f"\n{indent}Examples:"]
     param_indent = indent + " " * 4
-    block = []
+    block: list[str] = []
 
     def is_fenced_block(lines: list[str]) -> bool:
         """Check if the block is a fenced code block."""
-        return lines and lines[0].strip() == "```" and lines[-1].strip() == "```"
+        return bool(lines) and lines[0].strip() == "```" and lines[-1].strip() == "```"
 
-    def flush_block():
+    def flush_block() -> None:
         if not block:
             return
 
@@ -319,9 +319,12 @@ def _extract_lists(paragraph: list[str]) -> list[list[str]]:
     if not paragraph:
         return []
 
-    result = []
-    current_group = []
-    is_list_item = lambda line: line.strip().startswith("-")
+    result: list[list[str]] = []
+    current_group: list[str] = []
+
+    def is_list_item(line: str) -> bool:
+        return line.strip().startswith("-")
+
     current_is_list = is_list_item(paragraph[0])
 
     for line in paragraph:
@@ -358,16 +361,16 @@ def reflow(docstring: str, line_length: int, indent: str) -> list[str]:
         list[str]: The reflowed docstring as a list of lines.
     """
     lines = docstring.strip().splitlines()
-    result = []
-    buffer = []
-    current_section = None
-    sections = []
+    result: list[str] = []
+    buffer: list[str] = []
+    current_section: str | None = None
+    sections: list[tuple[str, list[str]]] = []
     section_re = re.compile(
         r"^(Arg(s)?|Return(s)?|Raise(s)?|Yield(s)?|Example(s)?|Attribute(s)?):\s*$",
         re.IGNORECASE,
     )
 
-    def add_section(name: str, lines: list[str]):
+    def add_section(name: str, lines: list[str]) -> None:
         # Normalize section names to plural forms to match SECTION_HANDLERS
         normalized_name = name.capitalize()
         if normalized_name in [
@@ -383,8 +386,8 @@ def reflow(docstring: str, line_length: int, indent: str) -> list[str]:
 
     # Step 1: Parse summary + description + sections
     i = 0
-    summary_lines = []
-    description_lines = []
+    summary_lines: list[str] = []
+    description_lines: list[str] = []
 
     # Parse summary (consecutive non-empty lines from the start)
     while i < len(lines) and lines[i].strip():
@@ -442,7 +445,7 @@ def reflow(docstring: str, line_length: int, indent: str) -> list[str]:
 
     if description_lines:
         result.append("\n")
-        paragraph = []
+        paragraph: list[str] = []
         for line in description_lines + [""]:
             if line.strip():
                 paragraph.append(line.strip())
@@ -474,8 +477,8 @@ def reflow(docstring: str, line_length: int, indent: str) -> list[str]:
         result.pop()
 
     # Step 3: Format sections
-    for section, content in sections:
-        formatter = SECTION_HANDLERS.get(section)
+    for section_name, content in sections:
+        formatter = SECTION_HANDLERS.get(section_name)
         if formatter:
             result.extend(formatter(content, indent, line_length))
 

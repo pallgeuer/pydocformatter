@@ -1,19 +1,19 @@
-# Code Owners for python-doc-formatter
+# Code Owners for pydocformatter
 
-# Global ownership - Rik Ghosh owns all files by default
-* @RikGhosh487
+# Global ownership - Philipp Allgeuer owns all files by default
+* @pallgeuer
 
 # Core formatter modules require extra review
-/pyformatter/formatters/ @RikGhosh487
+/src/pydocformatter/formatters/ @pallgeuer
 
 # Configuration and build files
-/pyproject.toml @RikGhosh487
-/.github/ @RikGhosh487
+/pyproject.toml @pallgeuer
+/.github/ @pallgeuer
 
 # Documentation
-/README.md @RikGhosh487
-/CHANGELOG.md @RikGhosh487
-/CONTRIBUTING.md @RikGhosh487
+/README.md @pallgeuer
+/CHANGELOG.md @pallgeuer
+/CONTRIBUTING.md @pallgeuer
 
 # Test files
-/tests/ @RikGhosh487
+/tests/ @pallgeuer

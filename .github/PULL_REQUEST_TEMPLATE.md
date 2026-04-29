@@ -22,28 +22,32 @@ Please delete options that are not relevant.
 Please provide a clear list of changes made:
 
 - 
-- 
-- 
 
 ## Testing
 
 ### Test Coverage
+
 - [ ] New tests added for new functionality
 - [ ] All existing tests pass
 - [ ] Test coverage maintained or improved
 
 ### Manual Testing
+
 - [ ] Tested locally with various Python files
 - [ ] Tested edge cases and error conditions
 - [ ] Verified CLI functionality works as expected
 
 ### Test Commands Run
+
 ```bash
 # Add the commands you used to test your changes
 python -m unittest discover -s tests -v
-# python -m pytest tests/ --cov=pyformatter
+# python -m pytest tests/ --cov=pydocformatter
+# black --check .
+# isort --check .
 # pydocfmt --check .
 # pycommentfmt --check .
+# mypy
 ```
 
 ## Formatting and Style
@@ -53,6 +57,7 @@ python -m unittest discover -s tests -v
 - [ ] `isort` import sorting applied
 - [ ] `pydocfmt` docstring formatting applied
 - [ ] `pycommentfmt` comment formatting applied
+- [ ] `mypy` type checks pass
 - [ ] Pre-commit hooks pass
 
 ## Documentation
@@ -72,7 +77,6 @@ python -m unittest discover -s tests -v
 
 ## Security Considerations
 
-- [ ] No new security vulnerabilities introduced
 - [ ] Input validation added where appropriate
 - [ ] File path handling is secure
 - [ ] No sensitive information exposed in logs or output
@@ -111,14 +115,13 @@ If this is a breaking change, please describe:
 Any additional information, considerations, or context that reviewers should know:
 
 - 
-- 
-- 
 
 ## Reviewer Checklist
 
 *For the reviewer - please check these items during review:*
 
 ### Code Quality
+
 - [ ] Code is readable and well-structured
 - [ ] Appropriate error handling is in place
 - [ ] No code duplication
@@ -126,24 +129,27 @@ Any additional information, considerations, or context that reviewers should kno
 - [ ] Variable and function names are descriptive
 
 ### Testing
+
 - [ ] Tests cover the new functionality
 - [ ] Tests include edge cases
 - [ ] All tests pass locally and in CI
 - [ ] Test names are descriptive
 
 ### Documentation
+
 - [ ] Code is self-documenting or well-commented
 - [ ] Public APIs are documented
 - [ ] Examples are provided where helpful
 
 ### Performance
+
 - [ ] No obvious performance regressions
 - [ ] Efficient algorithms used
 - [ ] Memory usage is reasonable
 
 ### Security
+
 - [ ] Input validation is appropriate
-- [ ] No security vulnerabilities introduced
 - [ ] File operations are safe
 
 ## Post-Merge Checklist

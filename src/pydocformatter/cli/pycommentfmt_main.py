@@ -3,12 +3,12 @@ import logging
 import re
 import sys
 
-from pyformatter.config import load_config
-from pyformatter.formatters.pycommentfmt import format_comments
-from pyformatter.utils import collect_files
+from pydocformatter.config import load_config
+from pydocformatter.formatters.pycommentfmt import format_comments
+from pydocformatter.utils import collect_files
 
 
-def main():
+def main() -> None:
     """Main entry point for the script."""
 
     logging.basicConfig(level=logging.INFO)
@@ -31,7 +31,7 @@ def main():
     )
     parser.add_argument(
         "--include",
-        default=config.get("include", r"\.py"),
+        default=config.get("include", r"\.pyi?$"),
         help="Regex pattern for files to include.",
     )
     parser.add_argument(

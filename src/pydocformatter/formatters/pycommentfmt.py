@@ -29,21 +29,20 @@ def format_comments(path: str, line_length: int, check: bool = False) -> bool:
     SPECIAL_COMMENT_RE = re.compile(
         r"#\s*(noqa|type:\s*ignore|pylint|fmt:|pragma)", re.IGNORECASE
     )
-    changed_lines = set()
+    changed_lines: set[int] = set()
 
-    comment_block = []
+    comment_block: list[tuple[int, str]] = []
     last_srow = -2
-    indent = None
 
     def is_code_comment(text: str) -> bool:
         """Check if the comment is a code-style comment."""
-        return text.startswith("    ") or re.match(
-            r"\s*(if|for|while|def|class|try|except|print|return)\b", text
+        return text.startswith("    ") or bool(
+            re.match(r"\s*(if|for|while|def|class|try|except|print|return)\b", text)
         )
 
-    def flush_comment_block():
+    def flush_comment_block() -> None:
         """Flush the current comment block to the output lines."""
-        nonlocal comment_block, indent
+        nonlocal comment_block
         if not comment_block:
             return
 
@@ -75,7 +74,6 @@ def format_comments(path: str, line_length: int, check: bool = False) -> bool:
             output_lines[srow] = ""
         output_lines[srows[0]] = "".join(new_lines)
         comment_block.clear()
-        indent = None
 
     for tok_type, tok_str, (srow, scol), _, line in tokens:
         if tok_type != tokenize.COMMENT:

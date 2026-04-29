@@ -4,12 +4,14 @@ import unittest
 from contextlib import redirect_stdout
 from io import StringIO
 
-from pyformatter.formatters.pycommentfmt import format_comments
+from pydocformatter.formatters.pycommentfmt import format_comments
 
 
 class TestPyCommentFmt(unittest.TestCase):
 
-    def _write_and_readback(self, content, line_length=88, check=False):
+    def _write_and_readback(
+        self, content: str, line_length: int = 88, check: bool = False
+    ) -> tuple[bool, str, str]:
         with tempfile.NamedTemporaryFile(
             mode="w+", delete=False, suffix=".py", encoding="utf-8"
         ) as tf:
@@ -27,46 +29,46 @@ class TestPyCommentFmt(unittest.TestCase):
 
         return result, final, output.getvalue()
 
-    def test_basic_rewrap(self):
+    def test_basic_rewrap(self) -> None:
         source = "# This is a really long comment that should be wrapped properly by the formatter tool to multiple lines.\n"
         result, final, _ = self._write_and_readback(source, line_length=60)
         self.assertTrue(result)
         self.assertIn("# This is a really long comment that should be", final)
         self.assertIn("# properly by the formatter tool to multiple lines.\n", final)
 
-    def test_noop_if_already_formatted(self):
+    def test_noop_if_already_formatted(self) -> None:
         source = "# A short comment.\n"
         result, final, _ = self._write_and_readback(source)
         self.assertFalse(result)
         self.assertEqual(final, source)
 
-    def test_inline_comment_spacing(self):
+    def test_inline_comment_spacing(self) -> None:
         source = "x = 1  #bad spacing\n"
         expected = "x = 1  # bad spacing\n"
         result, final, _ = self._write_and_readback(source)
         self.assertTrue(result)
         self.assertEqual(expected, final)
 
-    def test_inline_comment_wrapping(self):
+    def test_inline_comment_wrapping(self) -> None:
         source = "x = 1  # This is an inline comment that is way too long and must be wrapped above the code.\n"
         result, final, _ = self._write_and_readback(source, line_length=60)
         self.assertTrue(result)
         self.assertTrue("# This is an inline comment" in final)
         self.assertTrue("x = 1" in final.splitlines()[-1])
 
-    def test_check_mode_outputs_lines(self):
+    def test_check_mode_outputs_lines(self) -> None:
         source = "# This is a long comment that should be wrapped because it exceeds the given line length.\n"
         result, _, stdout = self._write_and_readback(source, line_length=60, check=True)
         self.assertTrue(result)
         self.assertIn(":1: comment needs formatting", stdout)
 
-    def test_check_mode_no_changes(self):
+    def test_check_mode_no_changes(self) -> None:
         source = "# All good.\n"
         result, _, stdout = self._write_and_readback(source, check=True)
         self.assertFalse(result)
         self.assertEqual(stdout, "")
 
-    def test_shebang_and_encoding_ignored(self):
+    def test_shebang_and_encoding_ignored(self) -> None:
         source = "#!/usr/bin/env python\n# -*- coding: utf-8 -*-\n#Comment that needs wrapping because it is long.\n"
         result, final, _ = self._write_and_readback(source, line_length=60)
         self.assertTrue(result)
@@ -74,7 +76,7 @@ class TestPyCommentFmt(unittest.TestCase):
             final.startswith("#!/usr/bin/env python\n# -*- coding: utf-8 -*-\n")
         )
 
-    def test_special_comments_skipped(self):
+    def test_special_comments_skipped(self) -> None:
         for comment in [
             "# noqa",
             "# type: ignore",
@@ -86,13 +88,13 @@ class TestPyCommentFmt(unittest.TestCase):
             self.assertFalse(result)
             self.assertEqual(comment + "\n", final)
 
-    def test_code_comment_block_preserved(self):
+    def test_code_comment_block_preserved(self) -> None:
         source = "#     if x == y:\n#         print('match')\n"
         result, final, _ = self._write_and_readback(source, line_length=40)
         self.assertFalse(result)
         self.assertEqual(final, source)
 
-    def test_mixed_comments(self):
+    def test_mixed_comments(self) -> None:
         source = (
             "# This is fine.\n"
             "x = 42  #bad spacing\n"

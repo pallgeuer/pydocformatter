@@ -1,6 +1,6 @@
 import ast
 
-from pyformatter.formatters.google_docstrings import reflow
+from pydocformatter.formatters.google_docstrings import reflow
 
 
 def process_docstring_node(
@@ -19,6 +19,11 @@ def process_docstring_node(
     Returns:
         bool: True if the output_lines were modified, False otherwise.
     """
+    if not isinstance(
+        node, (ast.Module, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
+    ):
+        return False
+
     docstring = ast.get_docstring(node)
     if not docstring:
         return False
@@ -27,6 +32,8 @@ def process_docstring_node(
     if not isinstance(doc_node, ast.Expr) or not isinstance(
         getattr(doc_node, "value", None), ast.Constant
     ):
+        return False
+    if doc_node.end_lineno is None:
         return False
 
     # Get raw string token bounds
@@ -79,12 +86,8 @@ def format_docstrings(path: str, line_length: int, check: bool) -> bool:
 
     # AST walk to find docstrings
     for node in [tree] + list(ast.walk(tree)):
-        if isinstance(
-            node,
-            ast.Module | ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef,
-        ):
-            if process_docstring_node(node, output_lines, line_length):
-                modified = True
+        if process_docstring_node(node, output_lines, line_length):
+            modified = True
 
     if check:
         if modified:

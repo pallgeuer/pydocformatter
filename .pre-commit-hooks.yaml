@@ -4,7 +4,6 @@
   entry: pydocfmt
   language: python
   types: [python]
-  require_serial: true
   minimum_pre_commit_version: '0.15.0'
   additional_dependencies: []
 
@@ -15,7 +14,6 @@
   args: ['--check']
   language: python
   types: [python]
-  require_serial: true
   minimum_pre_commit_version: '0.15.0'
   additional_dependencies: []
 
@@ -25,7 +23,6 @@
   entry: pycommentfmt
   language: python
   types: [python]
-  require_serial: true
   minimum_pre_commit_version: '0.15.0'
   additional_dependencies: []
 
@@ -36,6 +33,5 @@
   args: ['--check']
   language: python
   types: [python]
-  require_serial: true
   minimum_pre_commit_version: '0.15.0'
   additional_dependencies: []

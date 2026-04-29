@@ -1,9 +1,10 @@
 import logging
 import os
 import tomllib
+from typing import Any
 
 
-def load_config(tool_name: str, logger: logging.Logger) -> dict:
+def load_config(tool_name: str, logger: logging.Logger) -> dict[str, Any]:
     """Load configuration for the specified tool from pyproject.toml.
 
     This function reads the configuration for a given tool from the pyproject.toml file.
@@ -15,7 +16,7 @@ def load_config(tool_name: str, logger: logging.Logger) -> dict:
         logger (logging.Logger): Logger instance for logging messages.
 
     Returns:
-        dict: The configuration dictionary for the specified tool.
+        dict[str, Any]: The configuration dictionary for the specified tool.
 
     Raises:
         `TypeError`: If `tool_name` is not a string.
@@ -33,4 +34,12 @@ def load_config(tool_name: str, logger: logging.Logger) -> dict:
             logger.warning(f"Failed to decode pyproject.toml: {e}")
             return {}
 
-    return config.get("tool", {}).get(tool_name, {})
+    tool_config = config.get("tool", {})
+    if not isinstance(tool_config, dict):
+        return {}
+
+    selected_config = tool_config.get(tool_name, {})
+    if not isinstance(selected_config, dict):
+        return {}
+
+    return {str(key): value for key, value in selected_config.items()}
