@@ -24,9 +24,7 @@
 ### GitHub Setup
 - [x] .pre-commit-hooks.yaml for external consumption
 - [x] Pull request template
-- [x] Dependabot configuration
 - [x] GitHub Actions workflows
-- [x] Issue templates (optional for initial release)
 
 ## Release Process
 
@@ -134,7 +132,6 @@ After release, verify:
    ```
 
 3. **GitHub Features**:
-   - [ ] Dependabot is active
    - [ ] Actions run successfully
    - [ ] Pre-commit hooks work for external users
 

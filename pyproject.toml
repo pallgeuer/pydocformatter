@@ -7,7 +7,7 @@ name = "pydocformatter"
 version = "0.2.0"
 description = "A Python annotation formatter for line-wrapping and formatting python comments and docstrings"
 readme = "README.md"
-license = {text = "MIT"}
+license = "MIT"
 authors = [
     {name = "Rik Ghosh", email = "rikghosh487@gmail.com"},
     {name = "Philipp Allgeuer"},
@@ -17,7 +17,7 @@ maintainers = [
 ]
 keywords = ["formatter", "docstring", "comment", "python", "code-quality", "linting"]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Environment :: Console",
     "Intended Audience :: Developers",
     "Operating System :: OS Independent",
@@ -59,6 +59,8 @@ test = [
 ]
 dev = [
     {include-group = "test"},
+    "build==1.5.0",
+    "twine==6.2.0",
     "black==26.3.1",
     "isort==8.0.1",
     "mypy==1.20.2",

@@ -8,11 +8,14 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 
 ## Unreleased
 
+## v0.2.0 (2026-05-01)
+
 ### Changed
 
 - **Fork:**
   - Moved from `pyformatter` and `python-doc-formatter` to `pydocformatter` in both cases
   - Many files and directories were renamed and subject to find-replace
+  - Updated project architecture and bug fixes
 
 ## v0.1.1 (2025-07-31)
 
