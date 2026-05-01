@@ -61,11 +61,7 @@ with open(fname) as f: print(f.read())
 git add .
 
 # Final commit
-git commit -m "feat: prepare for v0.2.0 release
-
-- Complete project documentation
-- Add comprehensive release infrastructure
-- Ready for initial public release"
+git commit -m "feat: prepare for v0.2.0 release"
 
 # Push to main
 git push origin main
@@ -92,7 +88,7 @@ python -m twine upload --repository testpypi dist/*
 pip install --index-url https://test.pypi.org/simple/ pydocformatter
 
 # If everything works, upload to real PyPI
-python -m twine upload dist/*
+python -m twine upload dist/*  # --username __token__ --password pypi-YOUR_TOKEN
 ```
 
 ### Step 5: Post-Release Tasks
@@ -167,5 +163,5 @@ git commit -m "feat: prepare for v0.2.0 release"
 git push origin main
 
 # Tag and upload (after GitHub release)
-python -m twine upload dist/*
+python -m twine upload dist/*  # --username __token__ --password pypi-YOUR_TOKEN
 ```
