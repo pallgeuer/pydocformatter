@@ -19,6 +19,7 @@ jobs:
         uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b  # v8.1.0
         with:
           enable-cache: true
+          cache-suffix: dev
 
       - name: Sync dev dependencies
         run: uv sync --locked --no-default-groups --group dev
