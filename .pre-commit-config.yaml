@@ -24,6 +24,11 @@ repos:
 
   - repo: local
     hooks:
+      - id: dependency-pin-check
+        name: dependency pin/version consistency check
+        entry: uv run python tools/check_dependency_pins.py
+        language: system
+        pass_filenames: false
       - id: pydocfmt
         name: pydocfmt (formatter)
         entry: uv run pydocfmt

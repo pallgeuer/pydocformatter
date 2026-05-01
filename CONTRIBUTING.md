@@ -75,6 +75,10 @@ pre-commit run --all-files
 
 **Note**: During development, the pre-commit hooks use the local version of pydocformatter. External users will use the published version from the repository.
 
+**Dependency pinning note**:
+- All dependencies in `dependency-groups.test` and `dependency-groups.dev` in `pyproject.toml` must use exact pins (`name==version`).
+- The `black`, `isort`, and `mypy` versions in `dependency-groups.dev` must exactly match the corresponding `rev` values in `.pre-commit-config.yaml` (ignoring an optional `v` prefix).
+
 ### 4. Verify Installation
 
 ```bash
