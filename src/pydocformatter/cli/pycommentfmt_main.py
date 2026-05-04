@@ -65,7 +65,11 @@ def main() -> None:
     target_files = [decision.path for decision in decisions if decision.accepted]
 
     for path in target_files:
-        changed = format_comments(path, args.line_length, args.check)
+        try:
+            changed = format_comments(path, args.line_length, args.check)
+        except UnicodeDecodeError as error:
+            print(f"{path} ignored WARNING: failed to decode as UTF-8 ({error})")
+            continue
         if changed:
             modified = True
 

@@ -21,6 +21,11 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 - **pycommentfmt:**
   - `--check` output is now emitted once per file, with line numbers compressed into consecutive ranges (e.g. `223-224`) for lower-noise, more token-efficient diagnostics.
 
+### Fixed
+
+- **CLI:**
+  - `pydocfmt` and `pycommentfmt` now skip files that fail UTF-8 decoding, emit a warning to stdout, and continue processing remaining files instead of crashing.
+
 ## v0.2.0 (2026-05-01)
 
 ### Changed
