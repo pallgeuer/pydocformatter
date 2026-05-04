@@ -12,4 +12,5 @@
 
 ## Workflows
 
+- When changing function signatures or class attributes, update all affected docstrings in the same change.
 - Concisely document significant completed work in CHANGELOG.md; use Added/Changed/Fixed/Removed subheadings of the Unreleased section, and use nested bullets for clear organization under bolded categories.
