@@ -1,5 +1,9 @@
 # AGENTS.md
 
+## Code Style
+
+- Do not manually wrap code/comments/docstrings; let formatters enforce line length.
+
 ## Commands
 
 - Use uv for venv management and all Python execution.
