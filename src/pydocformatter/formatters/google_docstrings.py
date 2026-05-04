@@ -190,6 +190,7 @@ def format_yields_section(
     return _format_single_item_section(buffer, indent, line_length, "Yields")
 
 
+# noinspection PyUnusedLocal
 def format_examples_section(
     buffer: list[str], indent: str, line_length: int
 ) -> list[str]:

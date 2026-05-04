@@ -25,6 +25,7 @@ class TestCliVerbose(unittest.TestCase):
             stdout = StringIO()
             called_paths: list[str] = []
 
+            # noinspection PyUnusedLocal
             def fake_format(path: str, line_length: int, check: bool) -> bool:
                 called_paths.append(path)
                 return False
@@ -62,6 +63,7 @@ class TestCliVerbose(unittest.TestCase):
             stdout = StringIO()
             called_paths: list[str] = []
 
+            # noinspection PyUnusedLocal
             def fake_format(path: str, line_length: int, check: bool) -> bool:
                 called_paths.append(path)
                 return False
