@@ -51,11 +51,20 @@ def classify_file(
 
 
 def collect_file_decisions(
-    paths: list[str], include: re.Pattern[str], exclude: re.Pattern[str] | None
+    paths: list[str],
+    include: re.Pattern[str],
+    exclude: re.Pattern[str] | None,
+    respect_gitignore: bool = True,
 ) -> list[FileDecision]:
     """Collect decision metadata for each considered file path.
 
     Directory traversal is deterministic to keep output stable between runs.
+
+    Args:
+        paths (list[str]): List of files and directories to consider.
+        include (re.Pattern[str]): Compiled regex pattern for files to include.
+        exclude (re.Pattern[str] | None): Compiled regex pattern for files to exclude.
+        respect_gitignore (bool): Whether to respect .gitignore during discovery.
     """
     decisions: list[FileDecision] = []
     for path in paths:
@@ -72,7 +81,10 @@ def collect_file_decisions(
 
 
 def collect_files(
-    paths: list[str], include: re.Pattern[str], exclude: re.Pattern[str] | None
+    paths: list[str],
+    include: re.Pattern[str],
+    exclude: re.Pattern[str] | None,
+    respect_gitignore: bool = True,
 ) -> list[str]:
     """Collect files that should be formatted based on include and exclude patterns.
 
@@ -84,11 +96,14 @@ def collect_files(
         include (re.Pattern[str]): Compiled regex pattern for files to include.
         exclude (re.Pattern[str] | None): Compiled regex pattern for files to exclude,
             or None to disable exclusion filtering.
+        respect_gitignore (bool): Whether to respect .gitignore during discovery.
 
     Returns:
         list[str]: List of file paths that should be formatted.
     """
-    decisions = collect_file_decisions(paths, include, exclude)
+    decisions = collect_file_decisions(
+        paths, include, exclude, respect_gitignore=respect_gitignore
+    )
     return [decision.path for decision in decisions if decision.accepted]
 
 

@@ -45,6 +45,12 @@ def main() -> None:
         action="store_true",
         help="Emit messages about included and ignored files.",
     )
+    parser.add_argument(
+        "--respect-gitignore",
+        action=argparse.BooleanOptionalAction,
+        default=config.get("respect_gitignore", True),
+        help="Respect .gitignore when discovering files (default: enabled).",
+    )
 
     args = parser.parse_args()
     modified = False
@@ -53,7 +59,12 @@ def main() -> None:
     compiled_exclude = re.compile(args.exclude) if args.exclude else None
 
     # Expand all files from directories, and apply filters
-    decisions = collect_file_decisions(args.files, compiled_include, compiled_exclude)
+    decisions = collect_file_decisions(
+        args.files,
+        compiled_include,
+        compiled_exclude,
+        respect_gitignore=args.respect_gitignore,
+    )
 
     if args.verbose:
         for decision in decisions:

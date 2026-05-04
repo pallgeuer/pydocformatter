@@ -105,6 +105,7 @@ pydocfmt [OPTIONS] [FILES/DIRECTORIES]
 - `--include TEXT`: Regex pattern for files to include
 - `--exclude TEXT`: Regex pattern for files to exclude
 - `-v, --verbose`: Show included and ignored files during file discovery
+- `--respect-gitignore`, `--no-respect-gitignore`: Toggle .gitignore-aware discovery (default: enabled)
 - `--help`: Show help message and exit
 
 **Examples:**
@@ -139,6 +140,7 @@ pycommentfmt [OPTIONS] [FILES/DIRECTORIES]
 - `--include TEXT`: Regex pattern for files to include
 - `--exclude TEXT`: Regex pattern for files to exclude
 - `-v, --verbose`: Show included and ignored files during file discovery
+- `--respect-gitignore`, `--no-respect-gitignore`: Toggle .gitignore-aware discovery (default: enabled)
 - `--help`: Show help message and exit
 
 **Examples:**
@@ -165,15 +167,18 @@ pydocformatter can be configured via `pyproject.toml`:
 ```toml
 [tool.pydocfmt]
 line_length = 88
+respect_gitignore = true
 exclude = '(^|/)(\.github|\.eggs|\.git|\.hg|\.mypy_cache|\.tox|\.venv|htmlcov|__pycache__|_build|buck-out|build|dist|tests/data)(/|$)'
 
 [tool.pycommentfmt]
 line_length = 88
+respect_gitignore = true
 exclude = '(^|/)(\.github|\.eggs|\.git|\.hg|\.mypy_cache|\.tox|\.venv|htmlcov|__pycache__|_build|buck-out|build|dist|tests/data)(/|$)'
 ```
 
 **Configuration Options:**
 - `line_length`: Maximum line length (default: 88)
+- `respect_gitignore`: Respect `.gitignore` during file discovery (default: `true`)
 - `exclude`: Regex pattern for files/directories to exclude
 
 ---

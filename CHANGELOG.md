@@ -12,6 +12,10 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 
 - **CLI:**
   - Added `-v` / `--verbose` to `pydocfmt` and `pycommentfmt` to report all considered files during discovery, including included files and ignored files with include/exclude regex reasons.
+  - Added `--respect-gitignore` / `--no-respect-gitignore` to `pydocfmt` and `pycommentfmt`, with enabled-by-default behavior and matching `pyproject.toml` configuration.
+
+- **Configuration:**
+  - Added `respect_gitignore` for `[tool.pydocfmt]` and `[tool.pycommentfmt]`, defaulting to `true`.
 
 ### Changed
 

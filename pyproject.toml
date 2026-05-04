@@ -83,10 +83,12 @@ skip = [".github", ".eggs", ".git", ".hg", ".mypy_cache", ".tox", ".venv", "html
 
 [tool.pycommentfmt]
 line_length = 88
+respect_gitignore = true
 exclude = '(^|/)(\.github|\.eggs|\.git|\.hg|\.mypy_cache|\.tox|\.venv|htmlcov|__pycache__|_build|buck-out|build|dist|tests/data)(/|$)'
 
 [tool.pydocfmt]
 line_length = 88
+respect_gitignore = true
 exclude = '(^|/)(\.github|\.eggs|\.git|\.hg|\.mypy_cache|\.tox|\.venv|htmlcov|__pycache__|_build|buck-out|build|dist|tests/data)(/|$)'
 
 [tool.mypy]
