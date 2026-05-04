@@ -1,5 +1,7 @@
 import os
 import re
+import subprocess
+from collections import defaultdict
 from dataclasses import dataclass
 
 
@@ -77,7 +79,129 @@ def collect_file_decisions(
                     decisions.append(classify_file(full_path, include, exclude))
         else:
             decisions.append(classify_file(path, include, exclude))
-    return decisions
+
+    if not respect_gitignore:
+        return decisions
+
+    accepted_paths = [decision.path for decision in decisions if decision.accepted]
+    if not accepted_paths:
+        return decisions
+
+    accepted_paths_by_git_root = _group_paths_by_git_root(accepted_paths)
+    gitignored_absolute_paths = _collect_gitignored_absolute_paths(
+        accepted_paths_by_git_root
+    )
+
+    return [
+        (
+            FileDecision(
+                path=decision.path, accepted=False, reason="matches .gitignore"
+            )
+            if decision.accepted
+            and os.path.abspath(decision.path) in gitignored_absolute_paths
+            else decision
+        )
+        for decision in decisions
+    ]
+
+
+def _group_paths_by_git_root(paths: list[str]) -> dict[str, list[str]]:
+    """Group absolute file paths by containing git root as repo-relative paths."""
+    root_cache: dict[str, str | None] = {}
+    grouped_paths: dict[str, list[str]] = defaultdict(list)
+
+    for path in paths:
+        absolute_path = os.path.abspath(path)
+        git_root = _find_git_root_for_path(absolute_path, root_cache)
+        if git_root is None:
+            continue
+        relative_path = os.path.relpath(absolute_path, git_root).replace(os.sep, "/")
+        grouped_paths[git_root].append(relative_path)
+
+    return dict(grouped_paths)
+
+
+def _find_git_root_for_path(
+    absolute_path: str, root_cache: dict[str, str | None]
+) -> str | None:
+    """Find the git repository root that contains the path, if any."""
+    start_dir = (
+        absolute_path
+        if os.path.isdir(absolute_path)
+        else os.path.dirname(absolute_path)
+    )
+    if start_dir in root_cache:
+        return root_cache[start_dir]
+
+    current_dir = os.path.abspath(start_dir)
+    git_root: str | None = None
+    while True:
+        if os.path.exists(os.path.join(current_dir, ".git")):
+            git_root = current_dir
+            break
+        parent_dir = os.path.dirname(current_dir)
+        if parent_dir == current_dir:
+            break
+        current_dir = parent_dir
+
+    root_cache[start_dir] = git_root
+    return root_cache[start_dir]
+
+
+def _collect_gitignored_absolute_paths(
+    paths_by_git_root: dict[str, list[str]],
+) -> set[str]:
+    """Return all absolute paths matched by gitignore semantics across git roots."""
+    gitignored_paths: set[str] = set()
+
+    for git_root, relative_paths in paths_by_git_root.items():
+        ignored_relative_paths, error = _query_git_ignored_paths(
+            git_root, relative_paths
+        )
+        if error is not None:
+            print(
+                f"{git_root} WARNING: unable to apply gitignore filtering ({error}); "
+                f"continuing without gitignore filtering for this repository root"
+            )
+            continue
+        gitignored_paths.update(
+            os.path.abspath(os.path.join(git_root, path))
+            for path in ignored_relative_paths
+        )
+
+    return gitignored_paths
+
+
+def _query_git_ignored_paths(
+    git_root: str, relative_paths: list[str]
+) -> tuple[set[str], str | None]:
+    """Query git for ignored repo-relative paths using pattern-based semantics."""
+    unique_relative_paths = list(dict.fromkeys(relative_paths))
+    if not unique_relative_paths:
+        return set(), None
+
+    stdin_bytes = ("\0".join(unique_relative_paths) + "\0").encode("utf-8")
+    try:
+        process = subprocess.run(
+            ["git", "-C", git_root, "check-ignore", "--stdin", "--no-index", "-z"],
+            input=stdin_bytes,
+            capture_output=True,
+            check=False,
+        )
+    except OSError as error:
+        return set(), str(error)
+
+    if process.returncode not in {0, 1}:
+        error_message = process.stderr.decode("utf-8", errors="replace").strip()
+        return (
+            set(),
+            error_message
+            or f"git check-ignore exited with status {process.returncode}",
+        )
+
+    stdout = process.stdout.decode("utf-8", errors="surrogateescape")
+    ignored_paths = {path for path in stdout.split("\0") if path}
+    return ignored_paths, None
 
 
 def collect_files(

@@ -19,6 +19,9 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 
 ### Changed
 
+- **File discovery:**
+  - `pydocfmt` and `pycommentfmt` now apply gitignore-based filtering when `respect_gitignore` is enabled, and emit one warning per git root if gitignore checks cannot be executed.
+
 - **pydocfmt:**
   - `--check` output now includes docstring line locations, emitted once per file with compressed consecutive ranges.
 
