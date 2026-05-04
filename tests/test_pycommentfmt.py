@@ -9,8 +9,9 @@ from pydocformatter.formatters.pycommentfmt import format_comments
 
 class TestPyCommentFmt(unittest.TestCase):
 
+    @staticmethod
     def _write_and_readback(
-        self, content: str, line_length: int = 88, check: bool = False
+        content: str, line_length: int = 88, check: bool = False
     ) -> tuple[bool, str, str]:
         with tempfile.NamedTemporaryFile(
             mode="w+", delete=False, suffix=".py", encoding="utf-8"

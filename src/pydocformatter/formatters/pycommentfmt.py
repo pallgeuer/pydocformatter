@@ -48,7 +48,7 @@ def format_comments(path: str, line_length: int, check: bool = False) -> bool:
         if not comment_block:
             return
 
-        srows = [srow for srow, _ in comment_block]
+        srows = [block_row for block_row, _ in comment_block]
         base_line = lines[srows[0]]
         base_indent = base_line[: len(base_line) - len(base_line.lstrip())]
 
@@ -56,24 +56,28 @@ def format_comments(path: str, line_length: int, check: bool = False) -> bool:
         if any(is_code_comment(c.lstrip("#")) for _, c in comment_block):
             return
 
-        comment_text = " ".join(line.lstrip("#").strip() for _, line in comment_block)
-        available = line_length - len(base_indent) - 2
-        wrapped = textwrap.wrap(
-            comment_text,
-            width=available,
+        block_comment_text = " ".join(
+            block_line.lstrip("#").strip() for _, block_line in comment_block
+        )
+        available_width = line_length - len(base_indent) - 2
+        wrapped_lines = textwrap.wrap(
+            block_comment_text,
+            width=available_width,
             break_long_words=False,
             break_on_hyphens=False,
         )
-        new_lines = [f"{base_indent}# {line}\n" for line in wrapped]
+        new_lines = [
+            f"{base_indent}# {wrapped_line}\n" for wrapped_line in wrapped_lines
+        ]
 
         if any(
-            lines[srow] != new_lines[i]
-            for i, srow in enumerate(srows[: len(new_lines)])
+            lines[block_row] != new_lines[i]
+            for i, block_row in enumerate(srows[: len(new_lines)])
         ):
             changed_lines.update(srows)
 
-        for srow in srows:
-            output_lines[srow] = ""
+        for block_row in srows:
+            output_lines[block_row] = ""
         output_lines[srows[0]] = "".join(new_lines)
         comment_block.clear()
 

@@ -46,19 +46,19 @@ def _format_param_section(
                 break_long_words=False,
                 break_on_hyphens=False,
             )
-            for line in wrapped:
-                result.append(f"{line}")
+            for wrapped_line in wrapped:
+                result.append(f"{wrapped_line}")
 
-    for line in buffer:
-        if not line.strip():
+    for buffer_line in buffer:
+        if not buffer_line.strip():
             continue
-        match = entry_re.match(line.strip())
+        match = entry_re.match(buffer_line.strip())
         if match:
             flush()
             current_arg = (match.group(1), match.group(2))
             desc_lines = [match.group(3)]
         elif current_arg:
-            desc_lines.append(line.strip())
+            desc_lines.append(buffer_line.strip())
 
     flush()
     return [line + "\n" for line in result]
@@ -108,8 +108,8 @@ def _format_single_item_section(
         break_long_words=False,
         break_on_hyphens=False,
     )
-    for line in wrapped:
-        result.append(f"{line}")
+    for wrapped_line in wrapped:
+        result.append(f"{wrapped_line}")
 
     return [line + "\n" for line in result]
 
@@ -165,19 +165,19 @@ def format_raises_section(
                 break_long_words=False,
                 break_on_hyphens=False,
             )
-            for line in wrapped:
-                result.append(f"{line}")
+            for wrapped_line in wrapped:
+                result.append(f"{wrapped_line}")
 
-    for line in buffer:
-        if not line.strip():
+    for buffer_line in buffer:
+        if not buffer_line.strip():
             continue
-        match = entry_re.match(line.strip())
+        match = entry_re.match(buffer_line.strip())
         if match:
             flush()
             current_exc = match.group(1)
             desc_lines = [match.group(2)]
         elif current_exc:
-            desc_lines.append(line.strip())
+            desc_lines.append(buffer_line.strip())
 
     flush()
     return [line + "\n" for line in result]
@@ -225,20 +225,23 @@ def format_examples_section(
 
             # Find minimum indentation of non-empty lines between fences
             content_lines = block[1:-1]  # Exclude opening and closing ```
-            non_empty_lines = [line for line in content_lines if line.strip()]
+            non_empty_lines = [
+                content_line for content_line in content_lines if content_line.strip()
+            ]
 
             if non_empty_lines:
                 min_indent = min(
-                    len(line) - len(line.lstrip()) for line in non_empty_lines
+                    len(content_line) - len(content_line.lstrip())
+                    for content_line in non_empty_lines
                 )
 
-                for line in content_lines:
-                    if line.strip():
+                for content_line in content_lines:
+                    if content_line.strip():
                         # Remove minimum indentation and add param_indent
                         relative_content = (
-                            line[min_indent:]
-                            if len(line) > min_indent
-                            else line.lstrip()
+                            content_line[min_indent:]
+                            if len(content_line) > min_indent
+                            else content_line.lstrip()
                         )
                         result.append(f"{param_indent}{relative_content}")
                     else:
@@ -250,20 +253,21 @@ def format_examples_section(
             result.append(f"{param_indent}```")
 
             # Find minimum indentation of non-empty lines
-            non_empty_lines = [line for line in block if line.strip()]
+            non_empty_lines = [block_line for block_line in block if block_line.strip()]
 
             if non_empty_lines:
                 min_indent = min(
-                    len(line) - len(line.lstrip()) for line in non_empty_lines
+                    len(block_line) - len(block_line.lstrip())
+                    for block_line in non_empty_lines
                 )
 
-                for line in block:
-                    if line.strip():
+                for block_line in block:
+                    if block_line.strip():
                         # Remove minimum indentation and add param_indent
                         relative_content = (
-                            line[min_indent:]
-                            if len(line) > min_indent
-                            else line.lstrip()
+                            block_line[min_indent:]
+                            if len(block_line) > min_indent
+                            else block_line.lstrip()
                         )
                         result.append(f"{param_indent}{relative_content}")
                     else:
@@ -322,8 +326,8 @@ def _extract_lists(paragraph: list[str]) -> list[list[str]]:
     result: list[list[str]] = []
     current_group: list[str] = []
 
-    def is_list_item(line: str) -> bool:
-        return line.strip().startswith("-")
+    def is_list_item(item_line: str) -> bool:
+        return item_line.strip().startswith("-")
 
     current_is_list = is_list_item(paragraph[0])
 
@@ -370,7 +374,7 @@ def reflow(docstring: str, line_length: int, indent: str) -> list[str]:
         re.IGNORECASE,
     )
 
-    def add_section(name: str, lines: list[str]) -> None:
+    def add_section(name: str, section_lines: list[str]) -> None:
         # Normalize section names to plural forms to match SECTION_HANDLERS
         normalized_name = name.capitalize()
         if normalized_name in [
@@ -382,7 +386,7 @@ def reflow(docstring: str, line_length: int, indent: str) -> list[str]:
             "Attribute",
         ]:
             normalized_name += "s"
-        sections.append((normalized_name, list(lines)))
+        sections.append((normalized_name, list(section_lines)))
 
     # Step 1: Parse summary + description + sections
     i = 0

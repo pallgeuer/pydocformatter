@@ -10,7 +10,8 @@ from pydocformatter.cli.pydocfmt_main import main as pydocfmt_main
 
 
 class TestCliVerbose(unittest.TestCase):
-    def _make_sample_tree(self) -> tempfile.TemporaryDirectory[str]:
+    @staticmethod
+    def _make_sample_tree() -> tempfile.TemporaryDirectory[str]:
         temp_dir = tempfile.TemporaryDirectory()
         root = Path(temp_dir.name)
         (root / "a.py").write_text("x = 1\n", encoding="utf-8")
