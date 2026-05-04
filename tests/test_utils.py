@@ -3,7 +3,11 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from pydocformatter.utils import classify_file, collect_file_decisions
+from pydocformatter.utils import (
+    classify_file,
+    collect_file_decisions,
+    format_line_ranges,
+)
 
 
 class TestUtils(unittest.TestCase):
@@ -48,6 +52,11 @@ class TestUtils(unittest.TestCase):
             Path(decision.path).relative_to(root).as_posix() for decision in decisions
         ]
         self.assertEqual(collected, ["a.py", "b.py", "a_dir/d.py", "z_dir/c.py"])
+
+    def test_format_line_ranges(self) -> None:
+        self.assertEqual(format_line_ranges([7]), "7")
+        self.assertEqual(format_line_ranges([3, 4, 5]), "3-5")
+        self.assertEqual(format_line_ranges([1, 2, 4, 6, 7, 8, 10]), "1-2, 4, 6-8, 10")
 
 
 if __name__ == "__main__":

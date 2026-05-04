@@ -1,6 +1,9 @@
+import re
 import tempfile
 import textwrap
 import unittest
+from contextlib import redirect_stdout
+from io import StringIO
 from pathlib import Path
 
 from pydocformatter.formatters.google_docstrings import reflow
@@ -298,6 +301,45 @@ Examples:
         Path(path).unlink()
         self.assertFalse(
             modified, "The file should not be modified if already formatted."
+        )
+
+    def test_check_mode_reports_single_line_location(self) -> None:
+        with tempfile.NamedTemporaryFile(mode="w+", suffix=".py", delete=False) as tf:
+            tf.write(
+                'def foo():\n    """This is a very long single-line docstring that should be reflowed by the formatter due to line length."""\n    pass\n'
+            )
+            tf.flush()
+            path = tf.name
+
+        output = StringIO()
+        with redirect_stdout(output):
+            needs_fixing = format_docstrings(path, line_length=72, check=True)
+        Path(path).unlink()
+
+        self.assertTrue(needs_fixing, "The docstring should need formatting.")
+        self.assertRegex(
+            output.getvalue().strip(),
+            rf"^{re.escape(path)}: Needs docstring formatting on line 2$",
+        )
+
+    def test_check_mode_reports_compressed_ranges(self) -> None:
+        with tempfile.NamedTemporaryFile(mode="w+", suffix=".py", delete=False) as tf:
+            tf.write(
+                'def foo():\n    """Does something.\n\nArgs:\n    x (int): some parameter.\n    """\n    pass\n\n\n'
+                'def bar():\n    """Another long summary that should be wrapped because it is intentionally too long for the selected line length."""\n    pass\n'
+            )
+            tf.flush()
+            path = tf.name
+
+        output = StringIO()
+        with redirect_stdout(output):
+            needs_fixing = format_docstrings(path, line_length=72, check=True)
+        Path(path).unlink()
+
+        self.assertTrue(needs_fixing, "Docstrings should need formatting.")
+        self.assertRegex(
+            output.getvalue().strip(),
+            rf"^{re.escape(path)}: Needs docstring formatting on lines 2-6, 11$",
         )
 
 

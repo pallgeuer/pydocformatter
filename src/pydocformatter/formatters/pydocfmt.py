@@ -1,10 +1,11 @@
 import ast
 
 from pydocformatter.formatters.google_docstrings import reflow
+from pydocformatter.utils import format_needs_formatting_message
 
 
 def process_docstring_node(
-    node: ast.AST, output_lines: list[str], line_length: int
+    node: ast.AST, output_lines: list[str], line_length: int, changed_lines: set[int]
 ) -> bool:
     """Process a docstring node in the AST.
 
@@ -15,6 +16,8 @@ def process_docstring_node(
         node (ast.AST): The AST node to process.
         output_lines (list[str]): The list of output lines to modify.
         line_length (int): The maximum line length for formatting.
+        changed_lines (set[int]): Set of 1-based line numbers whose docstring spans
+            require formatting.
 
     Returns:
         bool: True if the output_lines were modified, False otherwise.
@@ -55,6 +58,7 @@ def process_docstring_node(
 
     for i in range(srow, erow + 1):
         output_lines[i] = ""
+    changed_lines.update(range(srow + 1, erow + 2))
 
     # Insert the new docstring
     output_lines[srow] = new_docstring
@@ -83,15 +87,20 @@ def format_docstrings(path: str, line_length: int, check: bool) -> bool:
     tree = ast.parse(source)
     output_lines = list(source_lines)
     modified = False
+    changed_lines: set[int] = set()
 
     # AST walk to find docstrings
     for node in [tree] + list(ast.walk(tree)):
-        if process_docstring_node(node, output_lines, line_length):
+        if process_docstring_node(node, output_lines, line_length, changed_lines):
             modified = True
 
     if check:
         if modified:
-            print(f"Docstrings in {path} need formatting.")
+            print(
+                format_needs_formatting_message(
+                    path, "docstring", sorted(changed_lines)
+                )
+            )
         return modified
     else:
         if modified:

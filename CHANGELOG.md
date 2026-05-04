@@ -15,6 +15,9 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 
 ### Changed
 
+- **pydocfmt:**
+  - `--check` output now includes docstring line locations, emitted once per file with compressed consecutive ranges.
+
 - **pycommentfmt:**
   - `--check` output is now emitted once per file, with line numbers compressed into consecutive ranges (e.g. `223-224`) for lower-noise, more token-efficient diagnostics.
 
