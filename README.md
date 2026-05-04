@@ -104,6 +104,7 @@ pydocfmt [OPTIONS] [FILES/DIRECTORIES]
 - `--check`: Check if files are formatted correctly without modifying them
 - `--include TEXT`: Regex pattern for files to include
 - `--exclude TEXT`: Regex pattern for files to exclude
+- `-v, --verbose`: Show included and ignored files during file discovery
 - `--help`: Show help message and exit
 
 **Examples:**
@@ -137,6 +138,7 @@ pycommentfmt [OPTIONS] [FILES/DIRECTORIES]
 - `--check`: Check if files are formatted correctly without modifying them
 - `--include TEXT`: Regex pattern for files to include
 - `--exclude TEXT`: Regex pattern for files to exclude
+- `-v, --verbose`: Show included and ignored files during file discovery
 - `--help`: Show help message and exit
 
 **Examples:**

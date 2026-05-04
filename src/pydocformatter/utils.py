@@ -1,13 +1,23 @@
 import os
 import re
+from dataclasses import dataclass
 
 
-def should_format_file(
+@dataclass(frozen=True)
+class FileDecision:
+    """Result of evaluating whether a file path should be formatted."""
+
+    path: str
+    accepted: bool
+    reason: str
+
+
+def classify_file(
     file_path: str,
     compiled_include: re.Pattern[str],
     compiled_exclude: re.Pattern[str] | None,
-) -> bool:
-    """Determine if the file should be formatted.
+) -> FileDecision:
+    """Determine if the file should be formatted and why.
 
     This function checks if the file matches the include pattern and does not match the
     exclude pattern.
@@ -19,17 +29,46 @@ def should_format_file(
             exclude, or None to disable exclusion filtering.
 
     Returns:
-        bool: True if the file should be formatted, False otherwise.
+        FileDecision: Classification of the file path.
     """
     # Check if the file matches the include pattern
     if not compiled_include.search(file_path):
-        return False
+        return FileDecision(
+            path=file_path,
+            accepted=False,
+            reason="does not match the --include regular expression",
+        )
 
     # Check if the file matches the exclude pattern
     if compiled_exclude and compiled_exclude.search(file_path):
-        return False
+        return FileDecision(
+            path=file_path,
+            accepted=False,
+            reason="matches the --exclude regular expression",
+        )
 
-    return True
+    return FileDecision(path=file_path, accepted=True, reason="included")
+
+
+def collect_file_decisions(
+    paths: list[str], include: re.Pattern[str], exclude: re.Pattern[str] | None
+) -> list[FileDecision]:
+    """Collect decision metadata for each considered file path.
+
+    Directory traversal is deterministic to keep output stable between runs.
+    """
+    decisions: list[FileDecision] = []
+    for path in paths:
+        if os.path.isdir(path):
+            for root, dirs, files in os.walk(path):
+                dirs.sort()
+                files.sort()
+                for name in files:
+                    full_path = os.path.join(root, name)
+                    decisions.append(classify_file(full_path, include, exclude))
+        else:
+            decisions.append(classify_file(path, include, exclude))
+    return decisions
 
 
 def collect_files(
@@ -49,16 +88,5 @@ def collect_files(
     Returns:
         list[str]: List of file paths that should be formatted.
     """
-    matched_files = []
-    for path in paths:
-        if os.path.isdir(path):
-            for root, _, files in os.walk(path):
-                for name in files:
-                    full_path = os.path.join(root, name)
-                    if should_format_file(full_path, include, exclude):
-                        matched_files.append(full_path)
-        else:
-            if should_format_file(path, include, exclude):
-                matched_files.append(path)
-
-    return matched_files
+    decisions = collect_file_decisions(paths, include, exclude)
+    return [decision.path for decision in decisions if decision.accepted]

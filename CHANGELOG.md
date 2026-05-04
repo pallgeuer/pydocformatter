@@ -2,11 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
-The format is based on the ideas of [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+The format is based on the ideas of [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) (e.g. Added, Changed, Removed, Fixed headings), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
 ## Unreleased
+
+### Added
+
+- **CLI:**
+  - Added `-v` / `--verbose` to `pydocfmt` and `pycommentfmt` to report all considered files during discovery, including included files and ignored files with include/exclude regex reasons.
 
 ## v0.2.0 (2026-05-01)
 

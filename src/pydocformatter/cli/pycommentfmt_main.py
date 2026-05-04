@@ -5,7 +5,7 @@ import sys
 
 from pydocformatter.config import load_config
 from pydocformatter.formatters.pycommentfmt import format_comments
-from pydocformatter.utils import collect_files
+from pydocformatter.utils import collect_file_decisions
 
 
 def main() -> None:
@@ -39,6 +39,12 @@ def main() -> None:
         default=config.get("exclude", ""),
         help="Regex pattern for files to exclude.",
     )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="Emit messages about included and ignored files.",
+    )
 
     args = parser.parse_args()
     modified = False
@@ -47,7 +53,16 @@ def main() -> None:
     compiled_exclude = re.compile(args.exclude) if args.exclude else None
 
     # Expand all files from directories, and apply filters
-    target_files = collect_files(args.files, compiled_include, compiled_exclude)
+    decisions = collect_file_decisions(args.files, compiled_include, compiled_exclude)
+
+    if args.verbose:
+        for decision in decisions:
+            if decision.accepted:
+                print(f"{decision.path} included")
+            else:
+                print(f"{decision.path} ignored: {decision.reason}")
+
+    target_files = [decision.path for decision in decisions if decision.accepted]
 
     for path in target_files:
         changed = format_comments(path, args.line_length, args.check)
