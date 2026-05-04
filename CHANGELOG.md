@@ -15,12 +15,15 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added `--respect-gitignore` / `--no-respect-gitignore` to `pydocfmt` and `pycommentfmt`, with enabled-by-default behavior and matching `pyproject.toml` configuration.
 
 - **Configuration:**
-  - Added `respect_gitignore` for `[tool.pydocfmt]` and `[tool.pycommentfmt]`, defaulting to `true`.
+  - Added `respect-gitignore` for `[tool.pydocfmt]` and `[tool.pycommentfmt]`, defaulting to `true`.
 
 ### Changed
 
 - **File discovery:**
-  - `pydocfmt` and `pycommentfmt` now apply gitignore-based filtering when `respect_gitignore` is enabled, and emit one warning per git root if gitignore checks cannot be executed.
+  - `pydocfmt` and `pycommentfmt` now apply gitignore-based filtering when `respect-gitignore` is enabled, and emit one warning per git root if gitignore checks cannot be executed.
+
+- **Configuration:**
+  - `pydocfmt` and `pycommentfmt` now use hyphenated pyproject setting names (`line-length`, `respect-gitignore`) in examples and config lookup.
 
 - **pydocfmt:**
   - `--check` output now includes docstring line locations, emitted once per file with compressed consecutive ranges.

@@ -1,3 +1,4 @@
+import os
 import subprocess
 import tempfile
 import unittest
@@ -263,6 +264,76 @@ class TestCliVerbose(unittest.TestCase):
             ]
             self.assertEqual(stdout.getvalue().splitlines(), expected_lines)
             self.assertEqual(called_paths, [str(root / "a.py"), str(root / "skip.py")])
+
+    def test_pydocfmt_hyphenated_pyproject_settings_are_applied(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / ".git").mkdir()
+            (root / "a.py").write_text("x = 1\n", encoding="utf-8")
+            (root / "pyproject.toml").write_text(
+                "[tool.pydocfmt]\nline-length = 72\nrespect-gitignore = false\n",
+                encoding="utf-8",
+            )
+            called_args: list[tuple[str, int, bool]] = []
+
+            # noinspection PyUnusedLocal
+            def fake_format(path: str, line_length: int, check: bool) -> bool:
+                called_args.append((path, line_length, check))
+                return False
+
+            argv = ["pydocfmt", str(root)]
+            previous_cwd = os.getcwd()
+            os.chdir(root)
+            try:
+                with (
+                    patch("sys.argv", argv),
+                    patch("pydocformatter.utils.subprocess.run") as run_mock,
+                    patch(
+                        "pydocformatter.cli.pydocfmt_main.format_docstrings",
+                        side_effect=fake_format,
+                    ),
+                ):
+                    pydocfmt_main()
+            finally:
+                os.chdir(previous_cwd)
+
+            self.assertFalse(run_mock.called)
+            self.assertEqual(called_args, [(str(root / "a.py"), 72, False)])
+
+    def test_pycommentfmt_hyphenated_pyproject_settings_are_applied(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / ".git").mkdir()
+            (root / "a.py").write_text("x = 1\n", encoding="utf-8")
+            (root / "pyproject.toml").write_text(
+                "[tool.pycommentfmt]\nline-length = 72\nrespect-gitignore = false\n",
+                encoding="utf-8",
+            )
+            called_args: list[tuple[str, int, bool]] = []
+
+            # noinspection PyUnusedLocal
+            def fake_format(path: str, line_length: int, check: bool) -> bool:
+                called_args.append((path, line_length, check))
+                return False
+
+            argv = ["pycommentfmt", str(root)]
+            previous_cwd = os.getcwd()
+            os.chdir(root)
+            try:
+                with (
+                    patch("sys.argv", argv),
+                    patch("pydocformatter.utils.subprocess.run") as run_mock,
+                    patch(
+                        "pydocformatter.cli.pycommentfmt_main.format_comments",
+                        side_effect=fake_format,
+                    ),
+                ):
+                    pycommentfmt_main()
+            finally:
+                os.chdir(previous_cwd)
+
+            self.assertFalse(run_mock.called)
+            self.assertEqual(called_args, [(str(root / "a.py"), 72, False)])
 
     def test_pydocfmt_warns_once_when_gitignore_check_fails(self) -> None:
         with self._make_git_tree() as td:

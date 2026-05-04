@@ -166,19 +166,19 @@ pydocformatter can be configured via `pyproject.toml`:
 
 ```toml
 [tool.pydocfmt]
-line_length = 88
-respect_gitignore = true
+line-length = 88
+respect-gitignore = true
 exclude = '(^|/)(\.github|\.eggs|\.git|\.hg|\.mypy_cache|\.tox|\.venv|htmlcov|__pycache__|_build|buck-out|build|dist|tests/data)(/|$)'
 
 [tool.pycommentfmt]
-line_length = 88
-respect_gitignore = true
+line-length = 88
+respect-gitignore = true
 exclude = '(^|/)(\.github|\.eggs|\.git|\.hg|\.mypy_cache|\.tox|\.venv|htmlcov|__pycache__|_build|buck-out|build|dist|tests/data)(/|$)'
 ```
 
 **Configuration Options:**
-- `line_length`: Maximum line length (default: 88)
-- `respect_gitignore`: Respect `.gitignore` during file discovery (default: `true`)
+- `line-length`: Maximum line length (default: 88)
+- `respect-gitignore`: Respect `.gitignore` during file discovery (default: `true`)
 - `exclude`: Regex pattern for files/directories to exclude
 
 ---

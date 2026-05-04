@@ -21,7 +21,7 @@ def main() -> None:
     parser.add_argument(
         "--line-length",
         type=int,
-        default=config.get("line_length", 88),
+        default=config.get("line-length", 88),
         help="Maximum line length for docstrings (default: 88).",
     )
     parser.add_argument(
@@ -48,7 +48,7 @@ def main() -> None:
     parser.add_argument(
         "--respect-gitignore",
         action=argparse.BooleanOptionalAction,
-        default=config.get("respect_gitignore", True),
+        default=config.get("respect-gitignore", True),
         help="Respect .gitignore when discovering files (default: enabled).",
     )
 
