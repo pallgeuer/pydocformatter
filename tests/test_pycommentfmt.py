@@ -60,7 +60,10 @@ class TestPyCommentFmt(unittest.TestCase):
         source = "# This is a long comment that should be wrapped because it exceeds the given line length.\n"
         result, _, stdout = self._write_and_readback(source, line_length=60, check=True)
         self.assertTrue(result)
-        self.assertIn(":1: comment needs formatting", stdout)
+        self.assertRegex(
+            stdout.strip(),
+            r"^.+: Needs comment formatting on line 1$",
+        )
 
     def test_check_mode_no_changes(self) -> None:
         source = "# All good.\n"
@@ -104,10 +107,24 @@ class TestPyCommentFmt(unittest.TestCase):
         )
         result, _, stdout = self._write_and_readback(source, line_length=60, check=True)
         self.assertTrue(result)
-        self.assertIn(":2: comment needs formatting", stdout)
-        self.assertIn(":3: comment needs formatting", stdout)
-        self.assertNotIn(":4:", stdout)  # code comment block preserved
-        self.assertNotIn(":5:", stdout)
+        self.assertRegex(
+            stdout.strip(),
+            r"^.+: Needs comment formatting on lines 2-3$",
+        )
+
+    def test_check_mode_compresses_non_consecutive_line_ranges(self) -> None:
+        source = (
+            "# This first comment line is very long and should be wrapped by formatting.\n"
+            "x = 1\n"
+            "x = 2\n"
+            "# This second comment line is also very long and should be wrapped by formatting.\n"
+        )
+        result, _, stdout = self._write_and_readback(source, line_length=60, check=True)
+        self.assertTrue(result)
+        self.assertRegex(
+            stdout.strip(),
+            r"^.+: Needs comment formatting on lines 1, 4$",
+        )
 
 
 if __name__ == "__main__":

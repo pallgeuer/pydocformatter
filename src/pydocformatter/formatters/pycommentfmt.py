@@ -34,6 +34,26 @@ def format_comments(path: str, line_length: int, check: bool = False) -> bool:
     comment_block: list[tuple[int, str]] = []
     last_srow = -2
 
+    def format_line_ranges(line_numbers: list[int]) -> str:
+        """Format sorted line numbers as compressed ranges like 1-3, 7, 9-10."""
+        if not line_numbers:
+            return ""
+
+        ranges: list[str] = []
+        start = line_numbers[0]
+        end = line_numbers[0]
+
+        for current in line_numbers[1:]:
+            if current == end + 1:
+                end = current
+                continue
+            ranges.append(f"{start}-{end}" if start != end else str(start))
+            start = current
+            end = current
+
+        ranges.append(f"{start}-{end}" if start != end else str(start))
+        return ", ".join(ranges)
+
     def is_code_comment(text: str) -> bool:
         """Check if the comment is a code-style comment."""
         return text.startswith("    ") or bool(
@@ -127,8 +147,10 @@ def format_comments(path: str, line_length: int, check: bool = False) -> bool:
 
     if check:
         if changed_lines:
-            for i in sorted(changed_lines):
-                print(f"{path}:{i + 1}: comment needs formatting.")
+            line_numbers = sorted(i + 1 for i in changed_lines)
+            formatted_ranges = format_line_ranges(line_numbers)
+            label = "lines" if len(line_numbers) > 1 else "line"
+            print(f"{path}: Needs comment formatting on {label} {formatted_ranges}")
             return True
         return False
     else:

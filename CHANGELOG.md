@@ -13,6 +13,11 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 - **CLI:**
   - Added `-v` / `--verbose` to `pydocfmt` and `pycommentfmt` to report all considered files during discovery, including included files and ignored files with include/exclude regex reasons.
 
+### Changed
+
+- **pycommentfmt:**
+  - `--check` output is now emitted once per file, with line numbers compressed into consecutive ranges (e.g. `223-224`) for lower-noise, more token-efficient diagnostics.
+
 ## v0.2.0 (2026-05-01)
 
 ### Changed
