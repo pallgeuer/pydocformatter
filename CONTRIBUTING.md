@@ -23,6 +23,7 @@ This project adheres to a code of conduct that we expect all contributors to fol
 ### Prerequisites
 
 - Python 3.11 or higher
+- [uv](https://docs.astral.sh/uv/)
 - Git
 - A GitHub account
 
@@ -30,12 +31,12 @@ This project adheres to a code of conduct that we expect all contributors to fol
 
 We welcome several types of contributions:
 
-- **Bug Reports**: Help us identify and fix issues
-- **Feature Requests**: Suggest new functionality
-- **Documentation**: Improve or add documentation
-- **Code**: Fix bugs or implement features
-- **Tests**: Add or improve test coverage
-- **Examples**: Provide usage examples
+- **Bug Reports:** Help us identify and fix issues
+- **Feature Requests:** Suggest new functionality
+- **Documentation:** Improve or add documentation
+- **Code:** Fix bugs or implement features
+- **Tests:** Add or improve test coverage
+- **Examples:** Provide usage examples
 
 ## Development Setup
 
@@ -50,32 +51,22 @@ cd pydocformatter
 ### 2. Set Up Development Environment
 
 ```bash
-# Create a virtual environment
-python -m venv .venv
-
-# Activate it (Windows)
-.venv\Scripts\activate
-
-# Activate it (macOS/Linux)
-source .venv/bin/activate
-
-# Install development dependencies
-pip install -e . --dependency-groups dev
+uv sync --group dev
 ```
 
 ### 3. Set Up Pre-commit Hooks
 
 ```bash
 # Install pre-commit hooks
-pre-commit install
+uv run pre-commit install
 
 # Test the hooks (this will use the local development version)
-pre-commit run --all-files
+uv run pre-commit run --all-files
 ```
 
-**Note**: During development, the pre-commit hooks use the local version of pydocformatter. External users will use the published version from the repository.
+**Note:** During development, the pre-commit hooks use the local version of pydocformatter. External users will use the published version from the repository.
 
-**Dependency pinning note**:
+**Dependency pinning note:**
 - All dependencies in `dependency-groups.test` and `dependency-groups.dev` in `pyproject.toml` must use exact pins (`name==version`).
 - The `black`, `isort`, and `mypy` versions in `dependency-groups.dev` must exactly match the corresponding `rev` values in `.pre-commit-config.yaml` (ignoring an optional `v` prefix).
 
@@ -83,11 +74,11 @@ pre-commit run --all-files
 
 ```bash
 # Test the CLI tools
-pydocfmt --help
-pycommentfmt --help
+uv run pydocfmt --help
+uv run pycommentfmt --help
 
 # Run tests
-python -m unittest discover -s tests -v
+uv run pytest -q
 ```
 
 ## Making Changes
@@ -102,10 +93,10 @@ git checkout -b bugfix/issue-description
 
 ### Branch Naming Convention
 
-- **Features**: `feature/description-of-feature`
-- **Bug fixes**: `bugfix/issue-description`
-- **Documentation**: `docs/what-you-are-documenting`
-- **Tests**: `test/what-you-are-testing`
+- **Features:** `feature/description-of-feature`
+- **Bug fixes:** `bugfix/issue-description`
+- **Documentation:** `docs/what-you-are-documenting`
+- **Tests:** `test/what-you-are-testing`
 
 ### 2. Make Your Changes
 
@@ -143,13 +134,13 @@ git checkout -b bugfix/issue-description
 
 ```bash
 # Run all tests
-python -m unittest discover -s tests -v
+uv run pytest -q
 
 # Run tests with coverage
-python -m pytest tests/ --cov=pydocformatter --cov-report=html
+uv run pytest -q --cov=pydocformatter --cov-report=html
 
 # Run specific test file
-python -m unittest tests.test_pydocfmt -v
+uv run pytest -q tests/test_pydocfmt.py
 ```
 
 ### Writing Tests
@@ -161,28 +152,20 @@ python -m unittest tests.test_pydocfmt -v
 
 #### Test File Structure
 ```python
-import unittest
-from pydocformatter.formatters.your_module import your_function
+from pydocformatter.formatters.your_module import your_function  # noqa
 
-class TestYourFunction(unittest.TestCase):
-    def test_normal_case(self):
-        """Test the normal expected behavior."""
-        # Arrange
-        input_data = "test input"
-        expected = "expected output"
-        
-        # Act
-        result = your_function(input_data)
-        
-        # Assert
-        self.assertEqual(result, expected)
+def test_normal_case() -> None:
+    """Test the normal expected behavior."""
+    input_data = "test input"
+    expected = "expected output"
 
-    def test_edge_case(self):
-        """Test edge cases."""
-        pass
+    result = your_function(input_data)
 
-if __name__ == "__main__":
-    unittest.main()
+    assert result == expected
+
+
+def test_edge_case() -> None:
+    """Test edge cases."""
 ```
 
 ## Code Style
@@ -190,32 +173,35 @@ if __name__ == "__main__":
 We use several tools to maintain code quality:
 
 ### Automated Formatting
-- **Black**: Code formatting
-- **isort**: Import sorting
-- **pydocfmt**: Docstring formatting (our own tool!)
-- **pycommentfmt**: Comment formatting (our own tool!)
+- **Black:** Code formatting
+- **isort:** Import sorting
+- **pydocfmt:** Docstring formatting (our own tool!)
+- **pycommentfmt:** Comment formatting (our own tool!)
 
 ### Code Quality
-- **MyPy**: Type checking
-- **Pre-commit**: Automated checks
+- **MyPy:** Type checking
+- **Pre-commit:** Automated checks
 
 ### Running Style Checks
 
 ```bash
 # Format code
-black .
-isort .
-pydocfmt .
-pycommentfmt .
+uv run black .
+uv run isort .
+uv run pydocfmt
+uv run pycommentfmt
 
 # Check formatting without changes
-black --check .
-isort --check .
-pydocfmt --check .
-pycommentfmt --check .
+uv run black --check .
+uv run isort --check .
+uv run pydocfmt --check
+uv run pycommentfmt --check
 
 # Type checking
-mypy
+uv run mypy
+
+# Run the full local hook suite
+uv run pre-commit run --all-files
 ```
 
 ## Submitting Changes
@@ -307,11 +293,13 @@ Fixes #(issue number)
 ### Versioning
 
 We follow [Semantic Versioning](https://semver.org/):
-- **MAJOR**: Breaking changes
-- **MINOR**: New features (backward compatible)
-- **PATCH**: Bug fixes (backward compatible)
+- **MAJOR:** Breaking changes
+- **MINOR:** New features (backward compatible)
+- **PATCH:** Bug fixes (backward compatible)
 
 ### Release Steps (for maintainers)
+
+Follow the detailed [release checklist](RELEASE.md). At a high level:
 
 1. Update version in `pyproject.toml`
 2. Update `CHANGELOG.md`
@@ -320,29 +308,10 @@ We follow [Semantic Versioning](https://semver.org/):
 5. Create GitHub release
 6. Publish to PyPI
 
-## Project Structure
-
-```
-pydocformatter/
-├── src/
-│   └── pydocformatter/   # Main package
-│       ├── cli/          # Command-line interfaces
-│       ├── formatters/   # Core formatting logic
-│       ├── config.py     # Configuration handling
-│       └── utils.py      # Utility functions
-├── tests/                # Test suite
-├── docs/                 # Documentation (if needed)
-├── .github/              # GitHub workflows
-├── pyproject.toml        # Project configuration
-├── README.md             # Project overview
-├── CHANGELOG.md          # Change history
-└── CONTRIBUTING.md       # This file
-```
-
 ## Development Tips
 
 ### Debugging
-- Use `python -m pdb` for debugging
+- Use `uv run python -m pdb` for debugging
 - Add print statements or logging for complex issues
 - Test with various Python files to ensure compatibility
 
@@ -359,9 +328,9 @@ pydocformatter/
 ## Getting Help
 
 ### Communication Channels
-- **GitHub Issues**: Bug reports and feature requests
-- **GitHub Discussions**: General questions and ideas
-- **Pull Request Comments**: Code-specific discussions
+- **GitHub Issues:** Bug reports and feature requests
+- **GitHub Discussions:** General questions and ideas
+- **Pull Request Comments:** Code-specific discussions
 
 ### Asking Good Questions
 1. **Search existing issues** first
@@ -376,27 +345,6 @@ pydocformatter/
 - [Keep a Changelog](https://keepachangelog.com/)
 
 ---
-
-## Quick Reference
-
-### Common Commands
-```bash
-# Development setup
-pip install -e . --dependency-groups dev
-pre-commit install
-
-# Testing
-python -m unittest discover -s tests -v
-
-# Formatting
-black . && isort . && pydocfmt . && pycommentfmt .
-
-# Check formatting
-black --check . && isort --check . && pydocfmt --check . && pycommentfmt --check .
-
-# Type checking
-mypy
-```
 
 ### Need Help?
 - Read the [README](README.md)

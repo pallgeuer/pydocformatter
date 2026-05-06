@@ -46,6 +46,9 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 
 ### Fixed
 
+- **Documentation:**
+  - Updated README, contributing, release, and pull request docs for the current uv-based workflow and latest file-selection behavior.
+
 - **CLI:**
   - `pydocfmt` and `pycommentfmt` now skip files that fail UTF-8 decoding, emit a warning to stdout, and continue processing remaining files instead of crashing.
   - Invalid include glob patterns now report configuration or argument errors instead of crashing with a traceback.

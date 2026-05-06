@@ -41,13 +41,13 @@ Please provide a clear list of changes made:
 
 ```bash
 # Add the commands you used to test your changes
-python -m unittest discover -s tests -v
-# python -m pytest tests/ --cov=pydocformatter
-# black --check .
-# isort --check .
-# pydocfmt --check .
-# pycommentfmt --check .
-# mypy
+# uv run pytest -q
+# uv run black --check .
+# uv run isort --check .
+# uv run pydocfmt --check
+# uv run pycommentfmt --check
+# uv run mypy
+# uv run pre-commit run --all-files
 ```
 
 ## Formatting and Style
@@ -63,8 +63,8 @@ python -m unittest discover -s tests -v
 ## Documentation
 
 - [ ] Docstrings added/updated for new functions and classes
-- [ ] README.md updated if needed
-- [ ] CHANGELOG.md updated (for significant changes)
+- [ ] [README.md](../README.md) updated if needed
+- [ ] [CHANGELOG.md](../CHANGELOG.md) updated for significant changes
 - [ ] Comments added for complex logic
 - [ ] Type hints added for new functions
 
@@ -74,6 +74,7 @@ python -m unittest discover -s tests -v
 - [ ] Compatible with Python 3.11+
 - [ ] Cross-platform compatibility maintained (Windows, macOS, Linux)
 - [ ] Memory usage is reasonable for large files
+- [ ] All tests pass
 
 ## Security Considerations
 

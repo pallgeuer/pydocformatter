@@ -3,15 +3,16 @@
 ## Pre-Release Validation
 
 ### Code Quality
-- [x] All tests pass (`python -m unittest discover -s tests -v`)
-- [x] Package builds successfully (`python -m build`)
-- [x] No linting errors (black, isort, pycommentfmt, pydocfmt, mypy)
-- [x] Pre-commit hooks pass
+- [x] All tests pass (`uv run pytest -q`)
+- [x] Package builds successfully (`uv build`)
+- [x] No linting errors (`uv run black --check .`, `uv run isort --check .`, `uv run mypy`, `uv run pydocfmt --check`, `uv run pycommentfmt --check`)
+- [x] Pre-commit hooks pass (`uv run pre-commit run --all-files`)
 
 ### Documentation
-- [x] README.md is comprehensive and up-to-date
-- [x] CHANGELOG.md is complete for new version
-- [x] CONTRIBUTING.md provides clear guidelines
+- [x] [README.md](README.md) is comprehensive and up-to-date
+- [x] [CHANGELOG.md](CHANGELOG.md) is complete for new version
+- [x] [RELEASE.md](RELEASE.md) is up-to-date with current uv-based commands
+- [x] [CONTRIBUTING.md](CONTRIBUTING.md) provides clear guidelines
 - [x] All docstrings are properly formatted
 
 ### Project Configuration
@@ -28,30 +29,35 @@
 
 ## Release Process
 
+Set the release version once and use it consistently in the commands below:
+
+```bash
+VERSION=0.2.0
+```
+
 ### Step 1: Final Validation
 ```bash
 # Run tests one more time
-python -m unittest discover -s tests -v
+uv run pytest -q
 
 # Test build
-python -m build
-
-# Test installation from built package
-pip install dist/pydocformatter-0.2.0-py3-none-any.whl
+uv build
 
 # Test CLI tools
-pydocfmt --help
-pycommentfmt --help
+uv run pydocfmt --help
+uv run pycommentfmt --help
 
 # Test functionality
-echo 'def test(): """Test function."""' | python -c "
+uv run python -c "
 import tempfile
+from pathlib import Path
+
 with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
     f.write('def test(): \"\"\"Test function.\"\"\"')
     fname = f.name
 import subprocess
-subprocess.run(['pydocfmt', fname])
-with open(fname) as f: print(f.read())
+subprocess.run(['uv', 'run', 'pydocfmt', fname], check=True)
+print(Path(fname).read_text())
 "
 ```
 
@@ -61,7 +67,7 @@ with open(fname) as f: print(f.read())
 git add .
 
 # Final commit
-git commit -m "feat: prepare for v0.2.0 release"
+git commit -m "feat: prepare for v${VERSION} release"
 
 # Push to main
 git push origin main
@@ -70,25 +76,18 @@ git push origin main
 ### Step 3: Create GitHub Release
 1. Go to https://github.com/pallgeuer/pydocformatter/releases
 2. Click "Create a new release"
-3. Tag: `v0.2.0`
-4. Title: `pydocformatter v0.2.0 release`
-5. Description: Use the content from CHANGELOG.md for v0.2.0
-6. Upload built packages: `dist/pydocformatter-0.2.0.tar.gz` and `dist/pydocformatter-0.2.0-py3-none-any.whl`
+3. Tag: `v${VERSION}`
+4. Title: `pydocformatter v${VERSION} release`
+5. Description: Use the content from CHANGELOG.md for this release. For the next release, move the current `Unreleased` entries under the new version heading before tagging.
+6. Upload built packages: `dist/pydocformatter-${VERSION}.tar.gz` and `dist/pydocformatter-${VERSION}-py3-none-any.whl`
 7. Click "Publish release"
 
 ### Step 4: Publish to PyPI
 ```bash
-# Install twine for uploading
-pip install twine
-
-# Upload to Test PyPI first (optional but recommended)
-python -m twine upload --repository testpypi dist/*
-
-# Test installation from Test PyPI
-pip install --index-url https://test.pypi.org/simple/ pydocformatter
-
-# If everything works, upload to real PyPI
-python -m twine upload dist/*  # --username __token__ --password pypi-YOUR_TOKEN
+rm -rf dist/*
+uv build
+uv publish --token pypi-...           # <-- Option A
+UV_PUBLISH_TOKEN=pypi-... uv publish  # <-- Option B
 ```
 
 ### Step 5: Post-Release Tasks
@@ -101,39 +100,39 @@ python -m twine upload dist/*  # --username __token__ --password pypi-YOUR_TOKEN
 
 The following files will be created and distributed:
 
-1. **Source Distribution**: `pydocformatter-0.2.0.tar.gz`
-2. **Wheel Distribution**: `pydocformatter-0.2.0-py3-none-any.whl`
-3. **GitHub Release**: With release notes and assets
-4. **PyPI Package**: Available via `pip install pydocformatter`
+1. **Source Distribution:** `pydocformatter-${VERSION}.tar.gz`
+2. **Wheel Distribution:** `pydocformatter-${VERSION}-py3-none-any.whl`
+3. **GitHub Release:** With release notes and assets
+4. **PyPI Package:** Available via `pip install pydocformatter`
 
 ## Post-Release Validation
 
 After release, verify:
 
-1. **PyPI Installation**:
+1. **PyPI Installation:**
    ```bash
    pip install pydocformatter
-   pydocfmt --version
-   pycommentfmt --version
+   pydocfmt --help
+   pycommentfmt --help
    ```
 
-2. **Pre-commit Hook Usage**:
+2. **Pre-commit Hook Usage:**
    ```yaml
    repos:
      - repo: https://github.com/pallgeuer/pydocformatter
-       rev: v0.2.0
+       rev: v${VERSION}
        hooks:
          - id: pydocfmt
          - id: pycommentfmt
    ```
 
-3. **GitHub Features**:
+3. **GitHub Features:**
    - [ ] Actions run successfully
    - [ ] Pre-commit hooks work for external users
 
 ## Success Criteria
 
-**Release is successful when**:
+**Release is successful when:**
 - Package installs cleanly from PyPI
 - CLI tools work correctly
 - Pre-commit hooks are usable by external projects
@@ -145,23 +144,3 @@ After release, verify:
 After release, users can get help via:
 - GitHub Issues: Bug reports and feature requests
 - GitHub Discussions: Questions and community support
-
----
-
-## Quick Release Commands
-
-For convenience, here are the key commands:
-
-```bash
-# Final validation
-python -m unittest discover -s tests -v
-python -m build
-
-# Release
-git add .
-git commit -m "feat: prepare for v0.2.0 release"
-git push origin main
-
-# Tag and upload (after GitHub release)
-python -m twine upload dist/*  # --username __token__ --password pypi-YOUR_TOKEN
-```

@@ -7,26 +7,32 @@
 
 **pydocformatter** is a fork of [pyformatter](https://github.com/RikGhosh487/pyformatter), and provides Python formatting tools that automatically format your docstrings and comments according to configurable style guidelines. It consists of two formatters:
 
-- **pydocfmt**: Formats Python docstrings with support for Google-style docstrings
-- **pycommentfmt**: Formats Python comments to ensure proper line length and readability
+- **pydocfmt:** Formats Python docstrings with support for Google-style docstrings
+- **pycommentfmt:** Formats Python comments to ensure proper line length and readability
 
 ---
 
 ## Key Features
 
 ### pydocfmt
-- **Google-style docstring formatting**: Complete support for Google docstring conventions
-- **Multi-line summary handling**: Intelligently formats long summaries that span multiple lines
-- **Smart section parsing**: Properly handles Args, Returns, Raises, Examples, and other sections
-- **Code block preservation**: Maintains formatting within Examples sections with automatic fencing
-- **Type annotation support**: Handles parameter type annotations gracefully
-- **Blank line management**: Ensures proper spacing between summary, description, and sections
+- **Google-style docstring formatting:** Complete support for Google docstring conventions
+- **Multi-line summary handling:** Intelligently formats long summaries that span multiple lines
+- **Smart section parsing:** Properly handles Args, Returns, Raises, Examples, and other sections
+- **Code block preservation:** Maintains formatting within Examples sections with automatic fencing
+- **Type annotation support:** Handles parameter type annotations gracefully
+- **Blank line management:** Ensures proper spacing between summary, description, and sections
 
 ### pycommentfmt
-- **Intelligent comment wrapping**: Respects line length while preserving meaning
-- **Inline vs block comment handling**: Different formatting strategies for different comment types
-- **Special comment preservation**: Maintains pylint, mypy, and other tool directives
-- **Smart spacing**: Ensures consistent spacing between code and comments
+- **Intelligent comment wrapping:** Respects line length while preserving meaning
+- **Inline vs block comment handling:** Different formatting strategies for different comment types
+- **Special comment preservation:** Maintains pylint, mypy, and other tool directives
+- **Smart spacing:** Ensures consistent spacing between code and comments
+
+### File Selection and Configuration
+- **Ruff-style file selection:** Supports glob-based include/exclude rules, default excludes, `force-exclude`, and `.gitignore`-aware discovery
+- **Shared and tool-specific config:** Reads `[tool.pydocformatter]` plus per-tool overrides from `pyproject.toml`
+- **Verbose discovery output:** Reports included and ignored files, including excluded directories and gitignored paths
+- **Line-aware check diagnostics:** Reports affected files with line numbers and compressed line ranges in check mode
 
 ## Key Improvements over pyformatter
 
@@ -46,7 +52,6 @@
 - [Examples](#examples)
 - [Integration](#integration)
   - [Pre-commit](#pre-commit)
-  - [Editor Integration](#editor-integration)
 - [Security](#security)
 - [Contributing](#contributing)
 - [License](#license)
@@ -59,14 +64,6 @@ Install pydocformatter via pip:
 
 ```bash
 pip install pydocformatter
-```
-
-Or install from source:
-
-```bash
-git clone https://github.com/pallgeuer/pydocformatter.git
-cd pydocformatter
-pip install -e .
 ```
 
 ---
@@ -138,6 +135,12 @@ pydocfmt src/ --include "*.py" "*.pyi"
 
 # Option values before positional paths
 pydocfmt --include "*.py" "*.pyi" -- src/
+
+# Show included and ignored files
+pydocfmt -v src/
+
+# Apply include, exclude, and gitignore rules to explicit files too
+pydocfmt --force-exclude generated.py src/
 ```
 
 ### pycommentfmt
@@ -178,6 +181,9 @@ pycommentfmt --check src/
 
 # Custom line length
 pycommentfmt --line-length 79 src/
+
+# Include/exclude patterns and verbose file discovery
+pycommentfmt -v src/ --include "*.py" "*.pyi" --exclude "generated"
 ```
 
 ---
@@ -299,22 +305,15 @@ repos:
   args: [--exclude, tests]
 ```
 
-### Editor Integration
-
-pydocformatter works great with:
-- **VS Code**: Use with the Python extension
-- **PyCharm**: Configure as an external tool
-- **Vim/Neovim**: Integrate with formatting plugins
-
 ---
 
 ## Why pydocformatter?
 
-- **Uncompromising**: Consistent formatting across your entire codebase
-- **Fast**: Efficiently processes large codebases
-- **Configurable**: Adapt to your team's style preferences
-- **Reliable**: Extensively tested with comprehensive test suite
-- **Simple**: Easy to integrate into existing workflows
+- **Uncompromising:** Consistent formatting across your entire codebase
+- **Fast:** Efficiently processes large codebases
+- **Configurable:** Adapt to your team's style preferences
+- **Reliable:** Extensively tested with comprehensive test suite
+- **Simple:** Easy to integrate into existing workflows
 
 ---
 
@@ -332,11 +331,12 @@ For general security best practices when using pydocformatter:
 Contributions are welcome! We appreciate bug reports, feature requests, documentation improvements, and code contributions.
 
 For detailed information on how to contribute, please see our [Contributing Guide](CONTRIBUTING.md).
+For release history, see the [Changelog](CHANGELOG.md).
 
 **Quick Start for Contributors:**
 1. Fork the repository and clone your fork
-2. Set up the development environment: `pip install -e . --dependency-groups dev`
-3. Install pre-commit hooks: `pre-commit install`
+2. Set up the development environment: `uv sync --group dev`
+3. Install pre-commit hooks: `uv run pre-commit install`
 4. Make your changes and add tests
 5. Run the test suite: `uv run pytest -q`
 6. Submit a pull request
@@ -358,5 +358,3 @@ Inspired by the excellent work of:
 - [Black](https://github.com/psf/black) - The uncompromising Python code formatter
 - [isort](https://github.com/PyCQA/isort) - A Python utility to sort imports
 - [docformatter](https://github.com/PyCQA/docformatter) - Formats docstrings to follow conventions
-
----
