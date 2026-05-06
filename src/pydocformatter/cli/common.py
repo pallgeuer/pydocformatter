@@ -31,7 +31,12 @@ def add_common_arguments(
     line_length_subject: str,
 ) -> None:
     """Add shared CLI arguments for pydocformatter tools."""
-    parser.add_argument("files", nargs="+", help="Python files to format.")
+    parser.add_argument(
+        "files",
+        nargs="*",
+        default=["."],
+        help="Python files to format (default: current directory).",
+    )
     parser.add_argument(
         "--line-length",
         type=int,

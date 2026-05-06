@@ -55,7 +55,7 @@ Only hyphenated keys are valid. Legacy `[tool.pydocfmt]` and `[tool.pycommentfmt
 
 ## File Selection Algorithm
 
-Given positional CLI paths:
+Given positional CLI paths, defaulting to `.` when no paths are specified:
 
 1. Treat direct file arguments as explicit file inputs.
 2. Recursively discover files under directory arguments.

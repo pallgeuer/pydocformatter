@@ -97,6 +97,36 @@ class TestCliVerbose(unittest.TestCase):
             self.assertEqual(stdout.getvalue().splitlines(), expected_lines)
             self.assertEqual(called_paths, [str(root / "a.py")])
 
+    def test_pydocfmt_defaults_to_current_directory_without_files(self) -> None:
+        with self._make_sample_tree() as td:
+            root = Path(td)
+            called_paths: list[str] = []
+
+            # noinspection PyUnusedLocal
+            def fake_format(path: str, line_length: int, check: bool) -> bool:
+                called_paths.append(os.path.abspath(path))
+                return False
+
+            previous_cwd = os.getcwd()
+            os.chdir(root)
+            try:
+                argv = ["pydocfmt", "--no-respect-gitignore"]
+                with (
+                    patch("sys.argv", argv),
+                    patch(
+                        "pydocformatter.cli.pydocfmt_main.format_docstrings",
+                        side_effect=fake_format,
+                    ),
+                ):
+                    pydocfmt_main()
+            finally:
+                os.chdir(previous_cwd)
+
+            self.assertEqual(
+                [Path(path) for path in called_paths],
+                [root / "a.py", root / "skip.py"],
+            )
+
     def test_pydocfmt_verbose_lists_pruned_directories(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
@@ -166,6 +196,36 @@ class TestCliVerbose(unittest.TestCase):
             ]
             self.assertEqual(stdout.getvalue().splitlines(), expected_lines)
             self.assertEqual(called_paths, [str(root / "a.py")])
+
+    def test_pycommentfmt_defaults_to_current_directory_without_files(self) -> None:
+        with self._make_sample_tree() as td:
+            root = Path(td)
+            called_paths: list[str] = []
+
+            # noinspection PyUnusedLocal
+            def fake_format(path: str, line_length: int, check: bool) -> bool:
+                called_paths.append(os.path.abspath(path))
+                return False
+
+            previous_cwd = os.getcwd()
+            os.chdir(root)
+            try:
+                argv = ["pycommentfmt", "--no-respect-gitignore"]
+                with (
+                    patch("sys.argv", argv),
+                    patch(
+                        "pydocformatter.cli.pycommentfmt_main.format_comments",
+                        side_effect=fake_format,
+                    ),
+                ):
+                    pycommentfmt_main()
+            finally:
+                os.chdir(previous_cwd)
+
+            self.assertEqual(
+                [Path(path) for path in called_paths],
+                [root / "a.py", root / "skip.py"],
+            )
 
     def test_pydocfmt_multiple_globs_per_include_and_exclude_option(self) -> None:
         with self._make_sample_tree() as td:

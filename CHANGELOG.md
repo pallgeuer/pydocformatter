@@ -33,6 +33,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 
 - **CLI:**
   - `--include`, `--extend-include`, `--exclude`, and `--extend-exclude` now accept multiple glob values in one option usage (e.g. `--include *.py *.pyi`).
+  - `pydocfmt` and `pycommentfmt` now default to formatting the current directory when no files or directories are specified.
 
 - **File discovery:**
   - `force-exclude` now consistently applies `.gitignore` filtering to explicitly passed file paths.

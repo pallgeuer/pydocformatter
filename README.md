@@ -77,14 +77,14 @@ Format all Python files in your project:
 
 ```bash
 # Format docstrings
-pydocfmt src/
+pydocfmt
 
-# Format comments  
-pycommentfmt src/
+# Format comments
+pycommentfmt
 
 # Check formatting without making changes
-pydocfmt --check src/
-pycommentfmt --check src/
+pydocfmt --check
+pycommentfmt --check
 ```
 
 ---
@@ -98,6 +98,8 @@ Format Python docstrings with intelligent Google-style docstring support.
 ```bash
 pydocfmt [OPTIONS] [FILES/DIRECTORIES]
 ```
+
+If no files or directories are specified, `pydocfmt` formats the current directory.
 
 **Options:**
 - `--line-length INTEGER`: Maximum line length for docstrings (default: 88)
@@ -118,6 +120,9 @@ pydocfmt myfile.py another_file.py
 
 # Format entire directory
 pydocfmt src/
+
+# Format current directory
+pydocfmt
 
 # Check formatting without changes
 pydocfmt --check src/
@@ -143,6 +148,8 @@ Format Python comments to ensure proper line length and readability.
 pycommentfmt [OPTIONS] [FILES/DIRECTORIES]
 ```
 
+If no files or directories are specified, `pycommentfmt` formats the current directory.
+
 **Options:**
 - `--line-length INTEGER`: Maximum line length for comments (default: 88)
 - `--check`: Check if files are formatted correctly without modifying them
@@ -162,6 +169,9 @@ pycommentfmt myfile.py
 
 # Format entire directory
 pycommentfmt src/
+
+# Format current directory
+pycommentfmt
 
 # Check formatting without changes
 pycommentfmt --check src/
