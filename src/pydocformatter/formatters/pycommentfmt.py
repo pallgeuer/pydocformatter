@@ -20,6 +20,11 @@ def format_comments(path: str, line_length: int, check: bool = False) -> bool:
 
     Returns:
         bool: True if the file was modified, False otherwise.
+
+    Raises:
+        `OSError`: If the file cannot be read or written.
+        `tokenize.TokenError`: If Python tokenization fails.
+        `UnicodeDecodeError`: If the file cannot be decoded as UTF-8.
     """
     with open(path, encoding="utf-8") as f:
         source = f.read()

@@ -115,14 +115,33 @@ def _format_single_item_section(
 
 
 def format_args_section(buffer: list[str], indent: str, line_length: int) -> list[str]:
-    """Format the Args section of a Google style docstring."""
+    """Format the Args section of a Google style docstring.
+
+    Args:
+        buffer (list[str]): Raw lines belonging to the Args section.
+        indent (str): Indentation to place before the section header.
+        line_length (int): Maximum line length used when wrapping entries.
+
+    Returns:
+        list[str]: Formatted section lines, each ending with a newline.
+    """
     return _format_param_section(buffer, indent, line_length, "Args")
 
 
 def format_returns_section(
     buffer: list[str], indent: str, line_length: int
 ) -> list[str]:
-    """Format the Returns section of a Google style docstring."""
+    """Format the Returns section of a Google style docstring.
+
+    Args:
+        buffer (list[str]): Raw lines belonging to the Returns section.
+        indent (str): Indentation to place before the section header.
+        line_length (int): Maximum line length used when wrapping the return
+            description.
+
+    Returns:
+        list[str]: Formatted section lines, each ending with a newline.
+    """
     return _format_single_item_section(buffer, indent, line_length, "Returns")
 
 
@@ -186,7 +205,17 @@ def format_raises_section(
 def format_yields_section(
     buffer: list[str], indent: str, line_length: int
 ) -> list[str]:
-    """Format the Yields section of a Google style docstring."""
+    """Format the Yields section of a Google style docstring.
+
+    Args:
+        buffer (list[str]): Raw lines belonging to the Yields section.
+        indent (str): Indentation to place before the section header.
+        line_length (int): Maximum line length used when wrapping the yielded-value
+            description.
+
+    Returns:
+        list[str]: Formatted section lines, each ending with a newline.
+    """
     return _format_single_item_section(buffer, indent, line_length, "Yields")
 
 
@@ -294,7 +323,16 @@ def format_examples_section(
 def format_attributes_section(
     buffer: list[str], indent: str, line_length: int
 ) -> list[str]:
-    """Format the Attributes section of a Google style docstring."""
+    """Format the Attributes section of a Google style docstring.
+
+    Args:
+        buffer (list[str]): Raw lines belonging to the Attributes section.
+        indent (str): Indentation to place before the section header.
+        line_length (int): Maximum line length used when wrapping entries.
+
+    Returns:
+        list[str]: Formatted section lines, each ending with a newline.
+    """
     return _format_param_section(buffer, indent, line_length, "Attributes")
 
 

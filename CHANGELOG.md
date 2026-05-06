@@ -19,6 +19,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 
 - **Documentation:**
   - Added a Ruff file-selection compatibility specification at `docs/file-selection-spec.md`, including exact defaults, precedence rules, force-exclude behavior, and explicit pydocformatter deviations.
+  - Added docstrings for public glob matching methods, the dependency-pin check tool, and important configuration, CLI, and file-selection helpers.
 
 ### Changed
 

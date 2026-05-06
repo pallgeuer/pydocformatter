@@ -53,12 +53,34 @@ _ALLOWED_SETTING_KEYS = frozenset(_KEY_TO_FIELD)
 
 
 class ConfigError(ValueError):
-    """Raised when pydocformatter configuration is invalid."""
+    """Raised when pydocformatter configuration cannot be resolved or validated.
+
+    This exception represents user-facing configuration failures, including malformed
+    TOML, unsupported table shapes, unknown setting keys, invalid tool names, and
+    invalid setting values.
+    """
 
 
 @dataclass(frozen=True)
 class FormatterSettings:
-    """Resolved settings shared by pydocfmt and pycommentfmt."""
+    """Resolved formatter settings shared by pydocfmt and pycommentfmt.
+
+    Attributes:
+        line_length (int): Maximum line length used when wrapping docstrings or
+            comments.
+        respect_gitignore (bool): Whether discovered files are filtered through
+            `.gitignore`.
+        force_exclude (bool): Whether include, exclude, and gitignore rules apply to
+            explicitly passed paths.
+        include (tuple[str, ...]): Base glob patterns that identify format-eligible
+            files.
+        extend_include (tuple[str, ...]): Additional include glob patterns appended to
+            `include`.
+        exclude (tuple[str, ...]): Base glob patterns for files or directories to
+            ignore.
+        extend_exclude (tuple[str, ...]): Additional exclude glob patterns appended to
+            `exclude`.
+    """
 
     line_length: int = 88
     respect_gitignore: bool = True
@@ -70,18 +92,40 @@ class FormatterSettings:
 
     @property
     def include_patterns(self) -> tuple[str, ...]:
-        """Return final include patterns used by file selection."""
+        """Return the final include patterns used by file selection.
+
+        Returns:
+            tuple[str, ...]: The base include patterns followed by any extension
+                patterns.
+        """
         return self.include + self.extend_include
 
     @property
     def exclude_patterns(self) -> tuple[str, ...]:
-        """Return final exclude patterns used by file selection."""
+        """Return the final exclude patterns used by file selection.
+
+        Returns:
+            tuple[str, ...]: The base exclude patterns followed by any extension
+                patterns.
+        """
         return self.exclude + self.extend_exclude
 
 
 @dataclass(frozen=True)
 class SettingsOverrides:
-    """Optional settings from one precedence layer."""
+    """Optional formatter settings from one precedence layer.
+
+    Attributes:
+        line_length (int | None): Optional maximum line length override.
+        respect_gitignore (bool | None): Optional gitignore filtering override.
+        force_exclude (bool | None): Optional force-exclude override.
+        include (tuple[str, ...] | None): Optional replacement include patterns.
+        extend_include (tuple[str, ...] | None): Optional replacement include
+            extensions.
+        exclude (tuple[str, ...] | None): Optional replacement exclude patterns.
+        extend_exclude (tuple[str, ...] | None): Optional replacement exclude
+            extensions.
+    """
 
     line_length: int | None = None
     respect_gitignore: bool | None = None
@@ -93,7 +137,18 @@ class SettingsOverrides:
 
 
 def load_config(tool_name: ToolName) -> FormatterSettings:
-    """Load resolved pyproject configuration for one formatter tool."""
+    """Load resolved pyproject configuration for one formatter tool.
+
+    Args:
+        tool_name (ToolName): Formatter tool whose shared and tool-specific settings
+            should be loaded.
+
+    Returns:
+        FormatterSettings: Settings resolved from defaults and `pyproject.toml`.
+
+    Raises:
+        `ConfigError`: If the tool name or configuration file contents are invalid.
+    """
     return resolve_settings(tool_name)
 
 
@@ -101,7 +156,23 @@ def resolve_settings(
     tool_name: ToolName,
     cli_overrides: SettingsOverrides | None = None,
 ) -> FormatterSettings:
-    """Resolve settings from defaults, pyproject config, and CLI overrides."""
+    """Resolve settings from defaults, pyproject config, and optional CLI overrides.
+
+    Shared `[tool.pydocformatter]` settings are applied before the selected tool's
+    nested table, and `cli_overrides` has the highest precedence.
+
+    Args:
+        tool_name (ToolName): Formatter tool to resolve settings for.
+        cli_overrides (SettingsOverrides | None): Optional command-line settings to
+            apply last.
+
+    Returns:
+        FormatterSettings: Fully resolved settings for the requested tool.
+
+    Raises:
+        `ConfigError`: If the tool name, TOML structure, setting names, or setting
+                values are invalid.
+    """
     _validate_tool_name(tool_name)
     settings = FormatterSettings()
 
@@ -141,11 +212,25 @@ def apply_cli_overrides(
     settings: FormatterSettings,
     cli_overrides: SettingsOverrides,
 ) -> FormatterSettings:
-    """Apply command-line overrides to already-resolved config settings."""
+    """Apply command-line overrides to already-resolved config settings.
+
+    Args:
+        settings (FormatterSettings): Settings resolved from defaults and configuration
+            files.
+        cli_overrides (SettingsOverrides): Command-line values to apply where not
+            `None`.
+
+    Returns:
+        FormatterSettings: A new settings object with CLI overrides applied.
+
+    Raises:
+        `ConfigError`: If any override value is invalid.
+    """
     return _apply_overrides(settings, cli_overrides, "command line")
 
 
 def _load_pyproject_config() -> dict[str, Any]:
+    """Load pyproject.toml from the current directory, returning an empty config if absent."""
     if not os.path.exists("pyproject.toml"):
         return {}
 
@@ -161,6 +246,7 @@ def _load_pyproject_config() -> dict[str, Any]:
 
 
 def _validate_tool_name(tool_name: str) -> None:
+    """Reject unknown formatter tool names before resolving configuration."""
     if tool_name not in TOOL_NAMES:
         raise ConfigError("tool_name must be either 'pydocfmt' or 'pycommentfmt'")
 
@@ -172,6 +258,7 @@ def _apply_config_section(
     *,
     allow_tool_tables: bool,
 ) -> FormatterSettings:
+    """Apply one TOML configuration section after validating allowed keys."""
     allowed_keys = set(_ALLOWED_SETTING_KEYS)
     if allow_tool_tables:
         allowed_keys.update(TOOL_NAMES)
@@ -192,6 +279,7 @@ def _apply_overrides(
     overrides: SettingsOverrides | None,
     context: str,
 ) -> FormatterSettings:
+    """Apply non-None values from an override layer to formatter settings."""
     if overrides is None:
         return settings
 
@@ -208,6 +296,7 @@ def _apply_field_values(
     values: dict[str, Any],
     context: str,
 ) -> FormatterSettings:
+    """Validate raw field values and return settings with those fields replaced."""
     updates = {
         field: _SETTING_VALIDATORS[field](
             value,
@@ -219,6 +308,7 @@ def _apply_field_values(
 
 
 def _validate_line_length(value: Any, context: str) -> int:
+    """Validate and return a configured maximum line length."""
     if isinstance(value, bool) or not isinstance(value, int):
         raise ConfigError(f"{context} must be an integer")
     if not 0 < value <= 320:
@@ -229,12 +319,14 @@ def _validate_line_length(value: Any, context: str) -> int:
 
 
 def _validate_bool(value: Any, context: str) -> bool:
+    """Validate and return a boolean setting value."""
     if not isinstance(value, bool):
         raise ConfigError(f"{context} must be a boolean")
     return value
 
 
 def _validate_string_list(value: Any, context: str) -> tuple[str, ...]:
+    """Validate and return a tuple of string list values."""
     if not isinstance(value, (list, tuple)):
         raise ConfigError(f"{context} must be a list of strings")
     if not all(isinstance(item, str) for item in value):
@@ -243,6 +335,7 @@ def _validate_string_list(value: Any, context: str) -> tuple[str, ...]:
 
 
 def _validate_include_string_list(value: Any, context: str) -> tuple[str, ...]:
+    """Validate include glob settings and return them as a tuple."""
     patterns = _validate_string_list(value, context)
     try:
         validate_include_patterns(patterns)
@@ -252,6 +345,7 @@ def _validate_include_string_list(value: Any, context: str) -> tuple[str, ...]:
 
 
 def _validate_exclude_string_list(value: Any, context: str) -> tuple[str, ...]:
+    """Validate exclude glob settings and return them as a tuple."""
     patterns = _validate_string_list(value, context)
     try:
         validate_exclude_patterns(patterns)

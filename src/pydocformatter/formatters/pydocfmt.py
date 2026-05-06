@@ -79,6 +79,11 @@ def format_docstrings(path: str, line_length: int, check: bool) -> bool:
 
     Returns:
         bool: True if the file was modified, False otherwise.
+
+    Raises:
+        `OSError`: If the file cannot be read or written.
+        `SyntaxError`: If the file cannot be parsed as Python source.
+        `UnicodeDecodeError`: If the file cannot be decoded as UTF-8.
     """
     with open(path, encoding="utf-8") as f:
         source = f.read()

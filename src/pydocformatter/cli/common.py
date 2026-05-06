@@ -16,7 +16,17 @@ FormatFile = Callable[[str, int, bool], bool]
 
 
 def load_settings_or_exit(tool_name: ToolName) -> FormatterSettings:
-    """Load pyproject settings or exit with a command-line error."""
+    """Load pyproject settings or exit with a command-line error.
+
+    Args:
+        tool_name (ToolName): Formatter tool whose configuration should be loaded.
+
+    Returns:
+        FormatterSettings: Resolved settings for the requested tool.
+
+    Raises:
+        `SystemExit`: If configuration loading fails.
+    """
     try:
         return load_config(tool_name)
     except ConfigError as error:
@@ -30,7 +40,18 @@ def add_common_arguments(
     *,
     line_length_subject: str,
 ) -> None:
-    """Add shared CLI arguments for pydocformatter tools."""
+    """Add shared CLI arguments for pydocformatter tools.
+
+    Args:
+        parser (argparse.ArgumentParser): Parser to mutate.
+        settings (FormatterSettings): Settings used for displaying default values in
+            help text.
+        line_length_subject (str): Human-readable subject controlled by `--line-length`,
+            such as `docstrings` or `comments`.
+
+    Returns:
+        None: The parser is modified in place.
+    """
     parser.add_argument(
         "files",
         nargs="*",
@@ -108,7 +129,17 @@ def resolve_cli_settings(
     settings: FormatterSettings,
     args: argparse.Namespace,
 ) -> FormatterSettings:
-    """Apply parsed command-line settings to resolved config settings."""
+    """Apply parsed command-line settings to resolved config settings.
+
+    Args:
+        parser (argparse.ArgumentParser): Parser used to report argument validation
+            errors.
+        settings (FormatterSettings): Settings resolved before CLI overrides.
+        args (argparse.Namespace): Parsed arguments containing optional override values.
+
+    Returns:
+        FormatterSettings: Settings with command-line overrides applied.
+    """
     overrides = SettingsOverrides(
         line_length=args.line_length,
         respect_gitignore=args.respect_gitignore,
@@ -131,7 +162,24 @@ def run_formatter(
     line_length_subject: str,
     format_file: FormatFile,
 ) -> None:
-    """Run a formatter CLI with shared argument and file-selection behavior."""
+    """Run a formatter CLI with shared argument and file-selection behavior.
+
+    Args:
+        tool_name (ToolName): Formatter tool name used for configuration lookup and
+            diagnostics.
+        description (str): Argument parser description.
+        line_length_subject (str): Human-readable subject controlled by `--line-length`.
+        format_file (FormatFile): Callable that formats or checks one file and reports
+            whether it changed or would change.
+
+    Returns:
+        None: The function processes files and may terminate the process in check mode
+            when changes are needed.
+
+    Raises:
+        `SystemExit`: If argument parsing fails, configuration is invalid, or check mode
+                detects required formatting changes.
+    """
     parser = argparse.ArgumentParser(description=description)
     add_common_arguments(
         parser,
@@ -165,7 +213,15 @@ def run_formatter(
 
 
 def print_verbose_decisions(decisions: tuple[FileDecision, ...]) -> None:
-    """Print file-selection decisions in verbose mode."""
+    """Print file-selection decisions in verbose mode.
+
+    Args:
+        decisions (tuple[FileDecision, ...]): Decisions to emit in their original
+            evaluation order.
+
+    Returns:
+        None: Messages are written to standard output.
+    """
     for decision in decisions:
         if decision.accepted:
             print(f"{decision.path} included")
@@ -174,10 +230,12 @@ def print_verbose_decisions(decisions: tuple[FileDecision, ...]) -> None:
 
 
 def _flatten_option_groups(groups: list[list[str]] | None) -> tuple[str, ...] | None:
+    """Flatten repeated CLI option groups while preserving an omitted option as None."""
     if groups is None:
         return None
     return tuple(value for group in groups for value in group)
 
 
 def _enabled_label(value: bool) -> str:
+    """Return a human-readable enabled state for help text."""
     return "enabled" if value else "disabled"

@@ -25,10 +25,27 @@ REV_RE = re.compile(r"^\s*rev:\s*(\S+)\s*$")
 
 
 def normalize_name(name: str) -> str:
+    """Return a canonical package name for dependency comparisons.
+
+    Args:
+        name (str): Raw dependency package name.
+
+    Returns:
+        str: Lowercase package name with runs of `.`, `_`, and `-` collapsed to `-`.
+    """
     return re.sub(r"[-_.]+", "-", name).lower()
 
 
 def normalize_version(version: str) -> str:
+    """Return a normalized version string for cross-file comparisons.
+
+    Args:
+        version (str): Raw version or pre-commit revision string.
+
+    Returns:
+        str: Version with surrounding quotes stripped and a leading `v` removed when
+            followed by a digit.
+    """
     version = version.strip().strip("'\"")
     if len(version) > 1 and version.startswith("v") and version[1].isdigit():
         return version[1:]
@@ -36,6 +53,15 @@ def normalize_version(version: str) -> str:
 
 
 def parse_exact_pin(requirement: str) -> tuple[str, str] | None:
+    """Parse a dependency requirement if it is pinned with an exact == version.
+
+    Args:
+        requirement (str): Dependency requirement string from `pyproject.toml`.
+
+    Returns:
+        tuple[str, str] | None: Normalized package name and pinned version, or `None`
+            when the requirement is not an exact, concrete pin.
+    """
     req = requirement.split(";", 1)[0].strip()
     if "===" in req or req.count("==") != 1:
         return None
@@ -51,11 +77,29 @@ def parse_exact_pin(requirement: str) -> tuple[str, str] | None:
 
 
 def load_pyproject() -> dict[str, Any]:
+    """Load the repository pyproject.toml file.
+
+    Returns:
+        dict[str, Any]: Parsed TOML data from `pyproject.toml`.
+
+    Raises:
+        `OSError`: If `pyproject.toml` cannot be read.
+        `tomllib.TOMLDecodeError`: If `pyproject.toml` contains invalid TOML.
+    """
     with PYPROJECT_PATH.open("rb") as f:
         return tomllib.load(f)
 
 
 def load_precommit_repo_revs() -> dict[str, str]:
+    """Return first configured revision for each pre-commit repository.
+
+    Returns:
+        dict[str, str]: Mapping of pre-commit repository URLs to their configured `rev`
+            values.
+
+    Raises:
+        `OSError`: If `.pre-commit-config.yaml` cannot be read.
+    """
     revs: dict[str, str] = {}
     current_repo: str | None = None
 
@@ -75,6 +119,12 @@ def load_precommit_repo_revs() -> dict[str, str]:
 
 
 def main() -> int:
+    """Check pinned dev dependency versions against pre-commit hook revisions.
+
+    Returns:
+        int: Zero when dependency pins match, otherwise one after printing validation
+            errors.
+    """
     errors: list[str] = []
     pyproject = load_pyproject()
     dependency_groups = pyproject.get("dependency-groups")
