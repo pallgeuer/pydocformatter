@@ -11,11 +11,14 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 ### Added
 
 - **CLI:**
-  - Added `-v` / `--verbose` to `pydocfmt` and `pycommentfmt` to report all considered files during discovery, including included files and ignored files with include/exclude regex reasons.
+  - Added `-v` / `--verbose` to `pydocfmt` and `pycommentfmt` to report all considered files during discovery, including included files and ignored files with include/exclude reasons.
   - Added `--respect-gitignore` / `--no-respect-gitignore` to `pydocfmt` and `pycommentfmt`, with enabled-by-default behavior and matching `pyproject.toml` configuration.
 
 - **Configuration:**
-  - Added `respect-gitignore` for `[tool.pydocfmt]` and `[tool.pycommentfmt]`, defaulting to `true`.
+  - Added `respect-gitignore` for shared formatter configuration, defaulting to `true`.
+
+- **Documentation:**
+  - Added a Ruff file-selection compatibility specification at `docs/file-selection-spec.md`, including exact defaults, precedence rules, force-exclude behavior, and explicit pydocformatter deviations.
 
 ### Changed
 
@@ -23,7 +26,15 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - `pydocfmt` and `pycommentfmt` now apply gitignore-based filtering when `respect-gitignore` is enabled, and emit one warning per git root if gitignore checks cannot be executed.
 
 - **Configuration:**
-  - `pydocfmt` and `pycommentfmt` now use hyphenated pyproject setting names (`line-length`, `respect-gitignore`) in examples and config lookup.
+  - `pydocfmt` and `pycommentfmt` now resolve shared settings from `[tool.pydocformatter]` with per-tool overrides in `[tool.pydocformatter.pydocfmt]` and `[tool.pydocformatter.pycommentfmt]`.
+  - File-selection settings now use Ruff-style glob lists (`include`, `extend-include`, `exclude`, `extend-exclude`) and `force-exclude`.
+  - For each setting key, the highest-priority value wins (`command line > tool-specific config > shared config > defaults`), including `extend-include` and `extend-exclude`.
+
+- **CLI:**
+  - `--include`, `--extend-include`, `--exclude`, and `--extend-exclude` now accept multiple glob values in one option usage (e.g. `--include *.py *.pyi`).
+
+- **File discovery:**
+  - `force-exclude` now consistently applies `.gitignore` filtering to explicitly passed file paths.
 
 - **pydocfmt:**
   - `--check` output now includes docstring line locations, emitted once per file with compressed consecutive ranges.
@@ -35,6 +46,25 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 
 - **CLI:**
   - `pydocfmt` and `pycommentfmt` now skip files that fail UTF-8 decoding, emit a warning to stdout, and continue processing remaining files instead of crashing.
+  - Invalid include glob patterns now report configuration or argument errors instead of crashing with a traceback.
+  - `--help` now works even when the current `pyproject.toml` contains invalid pydocformatter configuration.
+  - Missing or unreadable files now emit a warning and processing continues instead of crashing.
+
+- **File discovery:**
+  - Empty exclude glob patterns are now rejected as invalid configuration or arguments.
+  - Slash-containing exclude patterns that name directories now exclude descendant files when the directory is passed directly or a child file is force-filtered.
+  - Gitignore filtering now handles paths containing surrogate-escaped bytes.
+
+- **Configuration:**
+  - Malformed pydocformatter config tables are now consistently rejected, including falsy non-table values.
+
+### Removed
+
+- **Breaking configuration migration:**
+  - Removed legacy top-level config tables (`[tool.pydocfmt]`, `[tool.pycommentfmt]`) from settings resolution.
+  - Removed underscore aliases for settings such as `line_length`; only hyphenated keys are valid.
+  - Removed regex include/exclude semantics in favor of glob-list file selection.
+  - Removed legacy utility file-selection wrappers from `pydocformatter.utils`; use `pydocformatter.file_selection.select_files` directly.
 
 ## v0.2.0 (2026-05-01)
 

@@ -102,10 +102,13 @@ pydocfmt [OPTIONS] [FILES/DIRECTORIES]
 **Options:**
 - `--line-length INTEGER`: Maximum line length for docstrings (default: 88)
 - `--check`: Check if files are formatted correctly without modifying them
-- `--include TEXT`: Regex pattern for files to include
-- `--exclude TEXT`: Regex pattern for files to exclude
+- `--include GLOB [GLOB ...]`: Glob pattern(s) for files to include
+- `--extend-include GLOB [GLOB ...]`: Additional glob pattern(s) for files to include
+- `--exclude GLOB [GLOB ...]`: Glob pattern(s) for files to exclude
+- `--extend-exclude GLOB [GLOB ...]`: Additional glob pattern(s) for files to exclude
 - `-v, --verbose`: Show included and ignored files during file discovery
 - `--respect-gitignore`, `--no-respect-gitignore`: Toggle .gitignore-aware discovery (default: enabled)
+- `--force-exclude`, `--no-force-exclude`: Apply include/exclude rules even to explicitly listed files
 - `--help`: Show help message and exit
 
 **Examples:**
@@ -123,7 +126,13 @@ pydocfmt --check src/
 pydocfmt --line-length 100 src/
 
 # Include/exclude patterns
-pydocfmt --include ".*\.py$" --exclude "test_.*\.py$" src/
+pydocfmt src/ --include "*.py" --exclude "test_*.py"
+
+# Multiple include globs in one option
+pydocfmt src/ --include "*.py" "*.pyi"
+
+# Option values before positional paths
+pydocfmt --include "*.py" "*.pyi" -- src/
 ```
 
 ### pycommentfmt
@@ -137,10 +146,13 @@ pycommentfmt [OPTIONS] [FILES/DIRECTORIES]
 **Options:**
 - `--line-length INTEGER`: Maximum line length for comments (default: 88)
 - `--check`: Check if files are formatted correctly without modifying them
-- `--include TEXT`: Regex pattern for files to include
-- `--exclude TEXT`: Regex pattern for files to exclude
+- `--include GLOB [GLOB ...]`: Glob pattern(s) for files to include
+- `--extend-include GLOB [GLOB ...]`: Additional glob pattern(s) for files to include
+- `--exclude GLOB [GLOB ...]`: Glob pattern(s) for files to exclude
+- `--extend-exclude GLOB [GLOB ...]`: Additional glob pattern(s) for files to exclude
 - `-v, --verbose`: Show included and ignored files during file discovery
 - `--respect-gitignore`, `--no-respect-gitignore`: Toggle .gitignore-aware discovery (default: enabled)
+- `--force-exclude`, `--no-force-exclude`: Apply include/exclude rules even to explicitly listed files
 - `--help`: Show help message and exit
 
 **Examples:**
@@ -165,21 +177,32 @@ pycommentfmt --line-length 79 src/
 pydocformatter can be configured via `pyproject.toml`:
 
 ```toml
-[tool.pydocfmt]
+[tool.pydocformatter]
 line-length = 88
 respect-gitignore = true
-exclude = '(^|/)(\.github|\.eggs|\.git|\.hg|\.mypy_cache|\.tox|\.venv|htmlcov|__pycache__|_build|buck-out|build|dist|tests/data)(/|$)'
+force-exclude = false
+include = ["*.py", "*.pyi", "*.pyw"]
+extend-exclude = ["generated"]
 
-[tool.pycommentfmt]
-line-length = 88
-respect-gitignore = true
-exclude = '(^|/)(\.github|\.eggs|\.git|\.hg|\.mypy_cache|\.tox|\.venv|htmlcov|__pycache__|_build|buck-out|build|dist|tests/data)(/|$)'
+[tool.pydocformatter.pydocfmt]
+line-length = 100
+
+[tool.pydocformatter.pycommentfmt]
+extend-exclude = ["legacy_comments.py"]
 ```
 
 **Configuration Options:**
 - `line-length`: Maximum line length (default: 88)
 - `respect-gitignore`: Respect `.gitignore` during file discovery (default: `true`)
-- `exclude`: Regex pattern for files/directories to exclude
+- `force-exclude`: Apply include/exclude rules to explicitly listed files (default: `false`)
+- `include`: Glob patterns for files to include
+- `extend-include`: Additional include glob patterns
+- `exclude`: Glob patterns for files/directories to exclude
+- `extend-exclude`: Additional exclude glob patterns
+
+Settings are resolved as defaults, then shared table, then tool-specific table, then command-line options. The highest-precedence specified value wins for each key, including `extend-include` and `extend-exclude`.
+
+For the full file-selection contract, including Ruff compatibility deltas and explicit file behavior, see [File Selection Compatibility Specification](docs/file-selection-spec.md).
 
 ---
 
@@ -263,7 +286,7 @@ repos:
 
 # With file exclusions
 - id: pydocfmt
-  args: [--exclude=tests/.*]
+  args: [--exclude, tests]
 ```
 
 ### Editor Integration
@@ -305,7 +328,7 @@ For detailed information on how to contribute, please see our [Contributing Guid
 2. Set up the development environment: `pip install -e . --dependency-groups dev`
 3. Install pre-commit hooks: `pre-commit install`
 4. Make your changes and add tests
-5. Run the test suite: `python -m unittest discover -s tests -v`
+5. Run the test suite: `uv run pytest -q`
 6. Submit a pull request
 
 For bug reports and feature requests, please [open an issue](https://github.com/pallgeuer/pydocformatter/issues).

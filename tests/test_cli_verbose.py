@@ -2,7 +2,7 @@ import os
 import subprocess
 import tempfile
 import unittest
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
 from pathlib import Path
 from typing import Callable
@@ -26,7 +26,7 @@ class TestCliVerbose(unittest.TestCase):
     def _make_git_tree() -> tempfile.TemporaryDirectory[str]:
         temp_dir = tempfile.TemporaryDirectory()
         root = Path(temp_dir.name)
-        (root / ".git").mkdir()
+        (root / ".git").write_text("gitdir: .git-test\n", encoding="utf-8")
         (root / "a.py").write_text("x = 1\n", encoding="utf-8")
         (root / "skip.py").write_text("x = 2\n", encoding="utf-8")
         return temp_dir
@@ -72,12 +72,12 @@ class TestCliVerbose(unittest.TestCase):
 
             argv = [
                 "pydocfmt",
+                str(root),
                 "--verbose",
                 "--include",
-                r"\.py$",
+                "*.py",
                 "--exclude",
-                r"skip\.py$",
-                str(root),
+                "skip.py",
             ]
             with (
                 patch("sys.argv", argv),
@@ -91,8 +91,8 @@ class TestCliVerbose(unittest.TestCase):
 
             expected_lines = [
                 f"{root / 'a.py'} included",
-                f"{root / 'b.txt'} ignored: does not match the --include regular expression",
-                f"{root / 'skip.py'} ignored: matches the --exclude regular expression",
+                f"{root / 'b.txt'} ignored: does not match include patterns",
+                f"{root / 'skip.py'} ignored: matches exclude patterns",
             ]
             self.assertEqual(stdout.getvalue().splitlines(), expected_lines)
             self.assertEqual(called_paths, [str(root / "a.py")])
@@ -110,12 +110,12 @@ class TestCliVerbose(unittest.TestCase):
 
             argv = [
                 "pycommentfmt",
+                str(root),
                 "--verbose",
                 "--include",
-                r"\.py$",
+                "*.py",
                 "--exclude",
-                r"skip\.py$",
-                str(root),
+                "skip.py",
             ]
             with (
                 patch("sys.argv", argv),
@@ -129,11 +129,93 @@ class TestCliVerbose(unittest.TestCase):
 
             expected_lines = [
                 f"{root / 'a.py'} included",
-                f"{root / 'b.txt'} ignored: does not match the --include regular expression",
-                f"{root / 'skip.py'} ignored: matches the --exclude regular expression",
+                f"{root / 'b.txt'} ignored: does not match include patterns",
+                f"{root / 'skip.py'} ignored: matches exclude patterns",
             ]
             self.assertEqual(stdout.getvalue().splitlines(), expected_lines)
             self.assertEqual(called_paths, [str(root / "a.py")])
+
+    def test_pydocfmt_multiple_globs_per_include_and_exclude_option(self) -> None:
+        with self._make_sample_tree() as td:
+            root = Path(td)
+            stdout = StringIO()
+            called_paths: list[str] = []
+
+            # noinspection PyUnusedLocal
+            def fake_format(path: str, line_length: int, check: bool) -> bool:
+                called_paths.append(path)
+                return False
+
+            argv = [
+                "pydocfmt",
+                str(root),
+                "--verbose",
+                "--include",
+                "*.py",
+                "*.txt",
+                "--exclude",
+                "skip.py",
+                "b.txt",
+            ]
+            with (
+                patch("sys.argv", argv),
+                patch(
+                    "pydocformatter.cli.pydocfmt_main.format_docstrings",
+                    side_effect=fake_format,
+                ),
+                redirect_stdout(stdout),
+            ):
+                pydocfmt_main()
+
+            expected_lines = [
+                f"{root / 'a.py'} included",
+                f"{root / 'b.txt'} ignored: matches exclude patterns",
+                f"{root / 'skip.py'} ignored: matches exclude patterns",
+            ]
+            self.assertEqual(stdout.getvalue().splitlines(), expected_lines)
+            self.assertEqual(called_paths, [str(root / "a.py")])
+
+    def test_pydocfmt_multiple_globs_before_positional_path_after_separator(
+        self,
+    ) -> None:
+        with self._make_sample_tree() as td:
+            root = Path(td)
+            stdout = StringIO()
+            called_paths: list[str] = []
+
+            # noinspection PyUnusedLocal
+            def fake_format(path: str, line_length: int, check: bool) -> bool:
+                called_paths.append(path)
+                return False
+
+            argv = [
+                "pydocfmt",
+                "--verbose",
+                "--include",
+                "*.py",
+                "*.txt",
+                "--exclude",
+                "skip.py",
+                "--",
+                str(root),
+            ]
+            with (
+                patch("sys.argv", argv),
+                patch(
+                    "pydocformatter.cli.pydocfmt_main.format_docstrings",
+                    side_effect=fake_format,
+                ),
+                redirect_stdout(stdout),
+            ):
+                pydocfmt_main()
+
+            expected_lines = [
+                f"{root / 'a.py'} included",
+                f"{root / 'b.txt'} included",
+                f"{root / 'skip.py'} ignored: matches exclude patterns",
+            ]
+            self.assertEqual(stdout.getvalue().splitlines(), expected_lines)
+            self.assertEqual(called_paths, [str(root / "a.py"), str(root / "b.txt")])
 
     def test_pydocfmt_default_respects_gitignore(self) -> None:
         with self._make_git_tree() as td:
@@ -150,7 +232,7 @@ class TestCliVerbose(unittest.TestCase):
             with (
                 patch("sys.argv", argv),
                 patch(
-                    "pydocformatter.utils.subprocess.run",
+                    "pydocformatter.file_selection.subprocess.run",
                     side_effect=self._fake_git_check_ignore_for_root(root, {"skip.py"}),
                 ),
                 patch(
@@ -182,7 +264,7 @@ class TestCliVerbose(unittest.TestCase):
             argv = ["pydocfmt", "--verbose", "--no-respect-gitignore", str(root)]
             with (
                 patch("sys.argv", argv),
-                patch("pydocformatter.utils.subprocess.run") as run_mock,
+                patch("pydocformatter.file_selection.subprocess.run") as run_mock,
                 patch(
                     "pydocformatter.cli.pydocfmt_main.format_docstrings",
                     side_effect=fake_format,
@@ -214,7 +296,7 @@ class TestCliVerbose(unittest.TestCase):
             with (
                 patch("sys.argv", argv),
                 patch(
-                    "pydocformatter.utils.subprocess.run",
+                    "pydocformatter.file_selection.subprocess.run",
                     side_effect=self._fake_git_check_ignore_for_root(root, {"skip.py"}),
                 ),
                 patch(
@@ -248,7 +330,7 @@ class TestCliVerbose(unittest.TestCase):
             argv = ["pycommentfmt", "--verbose", "--no-respect-gitignore", str(root)]
             with (
                 patch("sys.argv", argv),
-                patch("pydocformatter.utils.subprocess.run") as run_mock,
+                patch("pydocformatter.file_selection.subprocess.run") as run_mock,
                 patch(
                     "pydocformatter.cli.pycommentfmt_main.format_comments",
                     side_effect=fake_format,
@@ -271,7 +353,7 @@ class TestCliVerbose(unittest.TestCase):
             (root / ".git").mkdir()
             (root / "a.py").write_text("x = 1\n", encoding="utf-8")
             (root / "pyproject.toml").write_text(
-                "[tool.pydocfmt]\nline-length = 72\nrespect-gitignore = false\n",
+                "[tool.pydocformatter.pydocfmt]\nline-length = 72\nrespect-gitignore = false\n",
                 encoding="utf-8",
             )
             called_args: list[tuple[str, int, bool]] = []
@@ -287,7 +369,7 @@ class TestCliVerbose(unittest.TestCase):
             try:
                 with (
                     patch("sys.argv", argv),
-                    patch("pydocformatter.utils.subprocess.run") as run_mock,
+                    patch("pydocformatter.file_selection.subprocess.run") as run_mock,
                     patch(
                         "pydocformatter.cli.pydocfmt_main.format_docstrings",
                         side_effect=fake_format,
@@ -306,7 +388,7 @@ class TestCliVerbose(unittest.TestCase):
             (root / ".git").mkdir()
             (root / "a.py").write_text("x = 1\n", encoding="utf-8")
             (root / "pyproject.toml").write_text(
-                "[tool.pycommentfmt]\nline-length = 72\nrespect-gitignore = false\n",
+                "[tool.pydocformatter.pycommentfmt]\nline-length = 72\nrespect-gitignore = false\n",
                 encoding="utf-8",
             )
             called_args: list[tuple[str, int, bool]] = []
@@ -322,7 +404,7 @@ class TestCliVerbose(unittest.TestCase):
             try:
                 with (
                     patch("sys.argv", argv),
-                    patch("pydocformatter.utils.subprocess.run") as run_mock,
+                    patch("pydocformatter.file_selection.subprocess.run") as run_mock,
                     patch(
                         "pydocformatter.cli.pycommentfmt_main.format_comments",
                         side_effect=fake_format,
@@ -334,6 +416,325 @@ class TestCliVerbose(unittest.TestCase):
 
             self.assertFalse(run_mock.called)
             self.assertEqual(called_args, [(str(root / "a.py"), 72, False)])
+
+    def test_shared_settings_are_overridden_by_tool_specific_settings(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "a.py").write_text("x = 1\n", encoding="utf-8")
+            (root / "pyproject.toml").write_text(
+                "[tool.pydocformatter]\nline-length = 70\n"
+                "[tool.pydocformatter.pydocfmt]\nline-length = 72\n",
+                encoding="utf-8",
+            )
+            called_args: list[tuple[str, int, bool]] = []
+
+            # noinspection PyUnusedLocal
+            def fake_format(path: str, line_length: int, check: bool) -> bool:
+                called_args.append((path, line_length, check))
+                return False
+
+            argv = ["pydocfmt", str(root)]
+            previous_cwd = os.getcwd()
+            os.chdir(root)
+            try:
+                with (
+                    patch("sys.argv", argv),
+                    patch(
+                        "pydocformatter.cli.pydocfmt_main.format_docstrings",
+                        side_effect=fake_format,
+                    ),
+                ):
+                    pydocfmt_main()
+            finally:
+                os.chdir(previous_cwd)
+
+            self.assertEqual(called_args, [(str(root / "a.py"), 72, False)])
+
+    def test_force_exclude_filters_explicit_file_when_enabled(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            target = root / "skip.py"
+            target.write_text("x = 1\n", encoding="utf-8")
+            stdout = StringIO()
+            called_paths: list[str] = []
+
+            # noinspection PyUnusedLocal
+            def fake_format(path: str, line_length: int, check: bool) -> bool:
+                called_paths.append(path)
+                return False
+
+            argv = [
+                "pydocfmt",
+                str(target),
+                "--verbose",
+                "--force-exclude",
+                "--exclude",
+                "skip.py",
+            ]
+            with (
+                patch("sys.argv", argv),
+                patch(
+                    "pydocformatter.cli.pydocfmt_main.format_docstrings",
+                    side_effect=fake_format,
+                ),
+                redirect_stdout(stdout),
+            ):
+                pydocfmt_main()
+
+            self.assertEqual(
+                stdout.getvalue().splitlines(),
+                [f"{target} ignored: matches exclude patterns"],
+            )
+            self.assertEqual(called_paths, [])
+
+    def test_force_exclude_filters_explicit_file_by_gitignore(self) -> None:
+        with self._make_git_tree() as td:
+            root = Path(td)
+            target = root / "skip.py"
+            stdout = StringIO()
+            called_paths: list[str] = []
+
+            # noinspection PyUnusedLocal
+            def fake_format(path: str, line_length: int, check: bool) -> bool:
+                called_paths.append(path)
+                return False
+
+            argv = ["pydocfmt", "--verbose", "--force-exclude", str(target)]
+            with (
+                patch("sys.argv", argv),
+                patch(
+                    "pydocformatter.file_selection.subprocess.run",
+                    side_effect=self._fake_git_check_ignore_for_root(root, {"skip.py"}),
+                ),
+                patch(
+                    "pydocformatter.cli.pydocfmt_main.format_docstrings",
+                    side_effect=fake_format,
+                ),
+                redirect_stdout(stdout),
+            ):
+                pydocfmt_main()
+
+            self.assertEqual(
+                stdout.getvalue().splitlines(),
+                [f"{target} ignored: matches .gitignore"],
+            )
+            self.assertEqual(called_paths, [])
+
+    def test_command_line_extend_exclude_overrides_config_extend_exclude(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            target = root / "skip.py"
+            target.write_text("x = 1\n", encoding="utf-8")
+            (root / "pyproject.toml").write_text(
+                "[tool.pydocformatter.pydocfmt]\n"
+                'include = ["*.py"]\n'
+                "exclude = []\n"
+                'extend-exclude = ["skip.py"]\n',
+                encoding="utf-8",
+            )
+            called_paths: list[str] = []
+
+            # noinspection PyUnusedLocal
+            def fake_format(path: str, line_length: int, check: bool) -> bool:
+                called_paths.append(path)
+                return False
+
+            argv = [
+                "pydocfmt",
+                str(target),
+                "--force-exclude",
+                "--extend-exclude",
+                "other.py",
+            ]
+            previous_cwd = os.getcwd()
+            os.chdir(root)
+            try:
+                with (
+                    patch("sys.argv", argv),
+                    patch(
+                        "pydocformatter.cli.pydocfmt_main.format_docstrings",
+                        side_effect=fake_format,
+                    ),
+                ):
+                    pydocfmt_main()
+            finally:
+                os.chdir(previous_cwd)
+
+            self.assertEqual(called_paths, [str(target)])
+
+    def _assert_help_ignores_invalid_config(
+        self,
+        main: Callable[[], None],
+        program: str,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "pyproject.toml").write_text(
+                '[tool.pydocformatter]\ninclude = ["src/"]\n',
+                encoding="utf-8",
+            )
+            stdout = StringIO()
+            stderr = StringIO()
+            argv = [program, "--help"]
+            previous_cwd = os.getcwd()
+            os.chdir(root)
+            try:
+                with (
+                    patch("sys.argv", argv),
+                    redirect_stdout(stdout),
+                    redirect_stderr(stderr),
+                    self.assertRaises(SystemExit) as cm,
+                ):
+                    main()
+            finally:
+                os.chdir(previous_cwd)
+
+        self.assertEqual(cm.exception.code, 0)
+        self.assertIn("usage:", stdout.getvalue())
+        self.assertEqual(stderr.getvalue(), "")
+
+    def test_pydocfmt_help_ignores_invalid_config(self) -> None:
+        self._assert_help_ignores_invalid_config(pydocfmt_main, "pydocfmt")
+
+    def test_pycommentfmt_help_ignores_invalid_config(self) -> None:
+        self._assert_help_ignores_invalid_config(pycommentfmt_main, "pycommentfmt")
+
+    def _assert_invalid_command_line_include_reports_argument_error(
+        self,
+        main: Callable[[], None],
+        program: str,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "a.py").write_text("x = 1\n", encoding="utf-8")
+            stderr = StringIO()
+            argv = [program, str(root), "--include", ""]
+            previous_cwd = os.getcwd()
+            os.chdir(root)
+            try:
+                with patch("sys.argv", argv), redirect_stderr(stderr):
+                    with self.assertRaises(SystemExit) as cm:
+                        main()
+            finally:
+                os.chdir(previous_cwd)
+
+        self.assertEqual(cm.exception.code, 2)
+        self.assertIn("include patterns must not be empty", stderr.getvalue())
+        self.assertNotIn("Traceback", stderr.getvalue())
+
+    def test_pydocfmt_invalid_command_line_exclude_reports_argument_error(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "a.py").write_text("x = 1\n", encoding="utf-8")
+            stderr = StringIO()
+            argv = ["pydocfmt", str(root), "--exclude", ""]
+            previous_cwd = os.getcwd()
+            os.chdir(root)
+            try:
+                with patch("sys.argv", argv), redirect_stderr(stderr):
+                    with self.assertRaises(SystemExit) as cm:
+                        pydocfmt_main()
+            finally:
+                os.chdir(previous_cwd)
+
+        self.assertEqual(cm.exception.code, 2)
+        self.assertIn("exclude patterns must not be empty", stderr.getvalue())
+        self.assertNotIn("Traceback", stderr.getvalue())
+
+    def test_pydocfmt_invalid_command_line_include_reports_argument_error(
+        self,
+    ) -> None:
+        self._assert_invalid_command_line_include_reports_argument_error(
+            pydocfmt_main,
+            "pydocfmt",
+        )
+
+    def test_pycommentfmt_invalid_command_line_include_reports_argument_error(
+        self,
+    ) -> None:
+        self._assert_invalid_command_line_include_reports_argument_error(
+            pycommentfmt_main,
+            "pycommentfmt",
+        )
+
+    def _assert_invalid_config_include_reports_config_error(
+        self,
+        main: Callable[[], None],
+        program: str,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "pyproject.toml").write_text(
+                '[tool.pydocformatter]\ninclude = ["src/"]\n',
+                encoding="utf-8",
+            )
+            stderr = StringIO()
+            argv = [program, str(root)]
+            previous_cwd = os.getcwd()
+            os.chdir(root)
+            try:
+                with patch("sys.argv", argv), redirect_stderr(stderr):
+                    with self.assertRaises(SystemExit) as cm:
+                        main()
+            finally:
+                os.chdir(previous_cwd)
+
+        self.assertEqual(cm.exception.code, 2)
+        self.assertIn(f"{program}: configuration error", stderr.getvalue())
+        self.assertIn("include pattern must target files", stderr.getvalue())
+        self.assertNotIn("Traceback", stderr.getvalue())
+
+    def test_pydocfmt_invalid_config_include_reports_config_error(self) -> None:
+        self._assert_invalid_config_include_reports_config_error(
+            pydocfmt_main,
+            "pydocfmt",
+        )
+
+    def test_pycommentfmt_invalid_config_include_reports_config_error(self) -> None:
+        self._assert_invalid_config_include_reports_config_error(
+            pycommentfmt_main,
+            "pycommentfmt",
+        )
+
+    def test_pydocfmt_invalid_toml_reports_config_error(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "pyproject.toml").write_text(
+                "[tool.pydocformatter\n",
+                encoding="utf-8",
+            )
+            stderr = StringIO()
+            argv = ["pydocfmt", str(root)]
+            previous_cwd = os.getcwd()
+            os.chdir(root)
+            try:
+                with patch("sys.argv", argv), redirect_stderr(stderr):
+                    with self.assertRaises(SystemExit) as cm:
+                        pydocfmt_main()
+            finally:
+                os.chdir(previous_cwd)
+
+        self.assertEqual(cm.exception.code, 2)
+        self.assertIn("pydocfmt: configuration error", stderr.getvalue())
+        self.assertIn("failed to decode pyproject.toml", stderr.getvalue())
+        self.assertNotIn("Traceback", stderr.getvalue())
+
+    def test_pydocfmt_missing_explicit_file_reports_warning(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            target = root / "missing.py"
+            stdout = StringIO()
+            argv = ["pydocfmt", str(target)]
+            with patch("sys.argv", argv), redirect_stdout(stdout):
+                pydocfmt_main()
+
+        self.assertIn(
+            f"{target} ignored WARNING: failed to read or write file",
+            stdout.getvalue(),
+        )
+        self.assertNotIn("Traceback", stdout.getvalue())
 
     def test_pydocfmt_warns_once_when_gitignore_check_fails(self) -> None:
         with self._make_git_tree() as td:
@@ -350,7 +751,7 @@ class TestCliVerbose(unittest.TestCase):
             with (
                 patch("sys.argv", argv),
                 patch(
-                    "pydocformatter.utils.subprocess.run",
+                    "pydocformatter.file_selection.subprocess.run",
                     return_value=subprocess.CompletedProcess(
                         ["git"], 128, stdout=b"", stderr=b"fatal: broken git"
                     ),

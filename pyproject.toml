@@ -81,15 +81,9 @@ line_length = 88
 known_first_party = ["pydocformatter"]
 skip = [".github", ".eggs", ".git", ".hg", ".mypy_cache", ".tox", ".venv", "htmlcov", "__pycache__", "_build", "buck-out", "build", "dist", "tests/data"]
 
-[tool.pycommentfmt]
+[tool.pydocformatter]
 line-length = 88
 respect-gitignore = true
-exclude = '(^|/)(\.github|\.eggs|\.git|\.hg|\.mypy_cache|\.tox|\.venv|htmlcov|__pycache__|_build|buck-out|build|dist|tests/data)(/|$)'
-
-[tool.pydocfmt]
-line-length = 88
-respect-gitignore = true
-exclude = '(^|/)(\.github|\.eggs|\.git|\.hg|\.mypy_cache|\.tox|\.venv|htmlcov|__pycache__|_build|buck-out|build|dist|tests/data)(/|$)'
 
 [tool.mypy]
 files = ["src/pydocformatter", "tests"]
