@@ -23,6 +23,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 ### Changed
 
 - **File discovery:**
+  - Verbose mode now reports directories pruned by exclude patterns, such as `.venv`.
   - `pydocfmt` and `pycommentfmt` now apply gitignore-based filtering when `respect-gitignore` is enabled, and emit one warning per git root if gitignore checks cannot be executed.
 
 - **Configuration:**

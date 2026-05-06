@@ -227,7 +227,28 @@ class TestFileSelection(unittest.TestCase):
             selection = select_files([str(root / "src" / "generated")], settings)
 
         self.assertEqual(selection.accepted_files, ())
-        self.assertEqual(selection.decisions, ())
+        self.assertEqual(selection.decisions[0].path, str(root / "src" / "generated"))
+        self.assertEqual(selection.decisions[0].reason, DecisionReason.EXCLUDED)
+
+    def test_pruned_excluded_directory_is_reported_as_decision(self) -> None:
+        settings = FormatterSettings(
+            respect_gitignore=False,
+            exclude=("generated",),
+        )
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "a.py").write_text("", encoding="utf-8")
+            (root / "generated").mkdir()
+            (root / "generated" / "ignored.py").write_text("", encoding="utf-8")
+
+            selection = select_files([str(root)], settings)
+
+        decisions_by_name = {
+            Path(decision.path).name: decision for decision in selection.decisions
+        }
+        self.assertEqual(selection.accepted_files, (str(root / "a.py"),))
+        self.assertEqual(decisions_by_name["generated"].reason, DecisionReason.EXCLUDED)
+        self.assertNotIn("ignored.py", decisions_by_name)
 
     def test_ruff_0_15_12_spec_slash_directory_exclude_filters_descendant_file(
         self,

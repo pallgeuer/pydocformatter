@@ -60,7 +60,7 @@ Given positional CLI paths:
 1. Treat direct file arguments as explicit file inputs.
 2. Recursively discover files under directory arguments.
 3. Keep deterministic traversal order by sorting directory and file names.
-4. Prune excluded directories during discovery.
+4. Prune excluded directories during discovery and record ignored decisions for them.
 5. For discovered files, require a match against `include` or `extend-include`.
 6. Reject files matching `exclude` or `extend-exclude`.
 7. If `respect-gitignore = true`, reject files matched by the gitignore filter.

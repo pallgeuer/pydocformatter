@@ -29,7 +29,7 @@ _REASON_MESSAGES = {
 
 @dataclass(frozen=True)
 class FileDecision:
-    """Result of evaluating whether one file path should be formatted."""
+    """Result of evaluating whether one path should be formatted."""
 
     path: str
     accepted: bool
@@ -56,6 +56,9 @@ class _Candidate:
     explicit: bool
 
 
+_CollectedPath = _Candidate | FileDecision
+
+
 def select_files(paths: list[str], settings: FormatterSettings) -> SelectionResult:
     """Select files from CLI paths using resolved formatter settings."""
     include_matcher = GlobPatternSet.compile(
@@ -72,14 +75,18 @@ def select_files(paths: list[str], settings: FormatterSettings) -> SelectionResu
     root_cache: dict[str, str | None] = {}
 
     evaluated = tuple(
-        _evaluate_candidate(
-            candidate,
-            settings,
-            include_matcher,
-            exclude_matcher,
-            root_cache,
+        (
+            collected
+            if isinstance(collected, FileDecision)
+            else _evaluate_candidate(
+                collected,
+                settings,
+                include_matcher,
+                exclude_matcher,
+                root_cache,
+            )
         )
-        for candidate in _collect_candidates(paths, exclude_matcher, root_cache)
+        for collected in _collect_candidates(paths, exclude_matcher, root_cache)
     )
 
     if not settings.respect_gitignore:
@@ -102,20 +109,26 @@ def _collect_candidates(
     paths: list[str],
     exclude_matcher: GlobPatternSet,
     root_cache: dict[str, str | None],
-) -> tuple[_Candidate, ...]:
-    candidates: list[_Candidate] = []
+) -> tuple[_CollectedPath, ...]:
+    candidates: list[_CollectedPath] = []
     for path in paths:
         if os.path.isdir(path):
             if exclude_matcher.matches(_normalized_posix_path(path, root_cache)):
+                candidates.append(_excluded_directory_decision(path, explicit=True))
                 continue
             for root, dirs, files in os.walk(path):
-                dirs[:] = [
-                    name
-                    for name in sorted(dirs)
-                    if not exclude_matcher.matches(
-                        _normalized_posix_path(os.path.join(root, name), root_cache)
-                    )
-                ]
+                kept_dirs = []
+                for name in sorted(dirs):
+                    directory = os.path.join(root, name)
+                    if exclude_matcher.matches(
+                        _normalized_posix_path(directory, root_cache)
+                    ):
+                        candidates.append(
+                            _excluded_directory_decision(directory, explicit=False)
+                        )
+                    else:
+                        kept_dirs.append(name)
+                dirs[:] = kept_dirs
                 files.sort()
                 candidates.extend(
                     _Candidate(path=os.path.join(root, name), explicit=False)
@@ -125,6 +138,15 @@ def _collect_candidates(
         else:
             candidates.append(_Candidate(path=path, explicit=True))
     return tuple(candidates)
+
+
+def _excluded_directory_decision(path: str, explicit: bool) -> FileDecision:
+    return FileDecision(
+        path=path,
+        accepted=False,
+        reason=DecisionReason.EXCLUDED,
+        explicit=explicit,
+    )
 
 
 def _evaluate_candidate(

@@ -97,6 +97,38 @@ class TestCliVerbose(unittest.TestCase):
             self.assertEqual(stdout.getvalue().splitlines(), expected_lines)
             self.assertEqual(called_paths, [str(root / "a.py")])
 
+    def test_pydocfmt_verbose_lists_pruned_directories(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "a.py").write_text("x = 1\n", encoding="utf-8")
+            (root / ".venv").mkdir()
+            (root / ".venv" / "ignored.py").write_text("x = 2\n", encoding="utf-8")
+            stdout = StringIO()
+            called_paths: list[str] = []
+
+            # noinspection PyUnusedLocal
+            def fake_format(path: str, line_length: int, check: bool) -> bool:
+                called_paths.append(path)
+                return False
+
+            argv = ["pydocfmt", str(root), "--verbose"]
+            with (
+                patch("sys.argv", argv),
+                patch(
+                    "pydocformatter.cli.pydocfmt_main.format_docstrings",
+                    side_effect=fake_format,
+                ),
+                redirect_stdout(stdout),
+            ):
+                pydocfmt_main()
+
+            expected_lines = [
+                f"{root / '.venv'} ignored: matches exclude patterns",
+                f"{root / 'a.py'} included",
+            ]
+            self.assertEqual(stdout.getvalue().splitlines(), expected_lines)
+            self.assertEqual(called_paths, [str(root / "a.py")])
+
     def test_pycommentfmt_verbose_lists_included_and_ignored_files(self) -> None:
         with self._make_sample_tree() as td:
             root = Path(td)
