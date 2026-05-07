@@ -127,7 +127,7 @@ class GlobPatternSet:
 
         Raises:
             `GlobPatternError`: If any pattern is invalid for its include or exclude
-                    role.
+                role.
         """
         if include_patterns:
             validate_include_patterns(patterns)
