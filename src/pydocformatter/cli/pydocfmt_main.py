@@ -1,5 +1,17 @@
 from pydocformatter.cli.common import run_formatter
+from pydocformatter.config import FormatterSettings
 from pydocformatter.formatters.pydocfmt import format_docstrings
+
+
+def _format_docstrings(path: str, settings: FormatterSettings, check: bool) -> bool:
+    """Format one path using resolved pydocfmt settings."""
+    return format_docstrings(
+        path,
+        settings.line_length,
+        check,
+        indent_style=settings.indent_style,
+        indent_width=settings.indent_width,
+    )
 
 
 def main() -> None:
@@ -13,5 +25,5 @@ def main() -> None:
         tool_name="pydocfmt",
         description="Format Python docstrings.",
         line_length_subject="docstrings",
-        format_file=format_docstrings,
+        format_file=_format_docstrings,
     )

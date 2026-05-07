@@ -24,6 +24,8 @@ class TestConfig(unittest.TestCase):
                 os.chdir(previous_cwd)
 
         self.assertEqual(config.line_length, 88)
+        self.assertEqual(config.indent_style, "space")
+        self.assertEqual(config.indent_width, 4)
         self.assertTrue(config.respect_gitignore)
         self.assertFalse(config.force_exclude)
         self.assertEqual(config.include, DEFAULT_INCLUDE)
@@ -39,6 +41,8 @@ class TestConfig(unittest.TestCase):
             (root / "pyproject.toml").write_text(
                 "[tool.pydocformatter]\n"
                 "line-length = 90\n"
+                'indent-style = "tab"\n'
+                "indent-width = 2\n"
                 'include = ["*.pyi"]\n'
                 'extend-include = ["*.py"]\n'
                 'exclude = ["build"]\n'
@@ -46,6 +50,8 @@ class TestConfig(unittest.TestCase):
                 "force-exclude = true\n"
                 "[tool.pydocformatter.pydocfmt]\n"
                 "line-length = 77\n"
+                'indent-style = "space"\n'
+                "indent-width = 3\n"
                 'extend-include = ["*.pyw"]\n',
                 encoding="utf-8",
             )
@@ -57,6 +63,8 @@ class TestConfig(unittest.TestCase):
                 os.chdir(previous_cwd)
 
         self.assertEqual(config.line_length, 77)
+        self.assertEqual(config.indent_style, "space")
+        self.assertEqual(config.indent_width, 3)
         self.assertEqual(config.include, ("*.pyi",))
         self.assertEqual(config.extend_include, ("*.pyw",))
         self.assertEqual(config.exclude, ("build",))
@@ -78,6 +86,92 @@ class TestConfig(unittest.TestCase):
         self.assertEqual(config.extend_include, ("*.pyw",))
         self.assertEqual(config.exclude, ())
         self.assertEqual(config.extend_exclude, ("generated.py",))
+
+    def test_cli_overrides_replace_pydocfmt_indent_settings(self) -> None:
+        config = apply_cli_overrides(
+            load_config("pydocfmt"),
+            SettingsOverrides(indent_style="tab", indent_width=2),
+        )
+
+        self.assertEqual(config.indent_style, "tab")
+        self.assertEqual(config.indent_width, 2)
+
+    def test_shared_pydocfmt_indent_settings_are_ignored_by_pycommentfmt(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "pyproject.toml").write_text(
+                "[tool.pydocformatter]\n" 'indent-style = "tab"\n' "indent-width = 2\n",
+                encoding="utf-8",
+            )
+            previous_cwd = os.getcwd()
+            os.chdir(root)
+            try:
+                config = load_config("pycommentfmt")
+            finally:
+                os.chdir(previous_cwd)
+
+        self.assertEqual(config.indent_style, "space")
+        self.assertEqual(config.indent_width, 4)
+
+    def test_pycommentfmt_specific_indent_style_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "pyproject.toml").write_text(
+                "[tool.pydocformatter.pycommentfmt]\n" 'indent-style = "tab"\n',
+                encoding="utf-8",
+            )
+            previous_cwd = os.getcwd()
+            os.chdir(root)
+            try:
+                with self.assertRaisesRegex(ConfigError, "indent-style"):
+                    load_config("pycommentfmt")
+            finally:
+                os.chdir(previous_cwd)
+
+    def test_pycommentfmt_specific_indent_width_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "pyproject.toml").write_text(
+                "[tool.pydocformatter.pycommentfmt]\n" "indent-width = 2\n",
+                encoding="utf-8",
+            )
+            previous_cwd = os.getcwd()
+            os.chdir(root)
+            try:
+                with self.assertRaisesRegex(ConfigError, "indent-width"):
+                    load_config("pycommentfmt")
+            finally:
+                os.chdir(previous_cwd)
+
+    def test_unselected_tool_table_unknown_key_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "pyproject.toml").write_text(
+                "[tool.pydocformatter.pycommentfmt]\nunknown-key = true\n",
+                encoding="utf-8",
+            )
+            previous_cwd = os.getcwd()
+            os.chdir(root)
+            try:
+                with self.assertRaisesRegex(ConfigError, "unknown-key"):
+                    load_config("pydocfmt")
+            finally:
+                os.chdir(previous_cwd)
+
+    def test_unselected_tool_table_invalid_value_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "pyproject.toml").write_text(
+                "[tool.pydocformatter.pydocfmt]\nindent-width = 0\n",
+                encoding="utf-8",
+            )
+            previous_cwd = os.getcwd()
+            os.chdir(root)
+            try:
+                with self.assertRaisesRegex(ConfigError, "indent-width"):
+                    load_config("pycommentfmt")
+            finally:
+                os.chdir(previous_cwd)
 
     def test_legacy_top_level_tool_table_is_ignored(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -136,6 +230,36 @@ class TestConfig(unittest.TestCase):
             os.chdir(root)
             try:
                 with self.assertRaisesRegex(ConfigError, "line-length"):
+                    load_config("pydocfmt")
+            finally:
+                os.chdir(previous_cwd)
+
+    def test_invalid_indent_style_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "pyproject.toml").write_text(
+                '[tool.pydocformatter]\nindent-style = "spaces"\n',
+                encoding="utf-8",
+            )
+            previous_cwd = os.getcwd()
+            os.chdir(root)
+            try:
+                with self.assertRaisesRegex(ConfigError, "indent-style"):
+                    load_config("pydocfmt")
+            finally:
+                os.chdir(previous_cwd)
+
+    def test_invalid_indent_width_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "pyproject.toml").write_text(
+                "[tool.pydocformatter]\nindent-width = 0\n",
+                encoding="utf-8",
+            )
+            previous_cwd = os.getcwd()
+            os.chdir(root)
+            try:
+                with self.assertRaisesRegex(ConfigError, "indent-width"):
                     load_config("pydocfmt")
             finally:
                 os.chdir(previous_cwd)

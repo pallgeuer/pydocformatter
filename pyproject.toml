@@ -83,7 +83,6 @@ skip = [".github", ".eggs", ".git", ".hg", ".mypy_cache", ".tox", ".venv", "html
 
 [tool.pydocformatter]
 line-length = 88
-respect-gitignore = true
 
 [tool.mypy]
 files = ["src/pydocformatter", "tests"]

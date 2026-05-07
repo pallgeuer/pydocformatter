@@ -1,11 +1,18 @@
 import ast
 
+from pydocformatter.config import IndentStyle
 from pydocformatter.formatters.google_docstrings import reflow
 from pydocformatter.utils import format_needs_formatting_message
 
 
 def process_docstring_node(
-    node: ast.AST, output_lines: list[str], line_length: int, changed_lines: set[int]
+    node: ast.AST,
+    output_lines: list[str],
+    line_length: int,
+    changed_lines: set[int],
+    *,
+    indent_style: IndentStyle = "space",
+    indent_width: int = 4,
 ) -> bool:
     """Process a docstring node in the AST.
 
@@ -18,6 +25,10 @@ def process_docstring_node(
         line_length (int): The maximum line length for formatting.
         changed_lines (set[int]): Set of 1-based line numbers whose docstring spans
             require formatting.
+        indent_style (IndentStyle): Indentation style for generated docstring section
+            levels. The base indentation from the opening quote line is preserved.
+        indent_width (int): Width of one generated docstring indentation level, and the
+            visual width used when measuring tabs.
 
     Returns:
         bool: True if the output_lines were modified, False otherwise.
@@ -47,7 +58,9 @@ def process_docstring_node(
     indent = quote_line[: len(quote_line) - len(quote_line.lstrip())]
     docstring_content = docstring.strip()
 
-    new_lines = reflow(docstring_content, line_length, indent)
+    new_lines = reflow(
+        docstring_content, line_length, indent, indent_style, indent_width
+    )
     new_docstring = "".join(new_lines)
 
     # Get original docstring
@@ -65,7 +78,14 @@ def process_docstring_node(
     return True
 
 
-def format_docstrings(path: str, line_length: int, check: bool) -> bool:
+def format_docstrings(
+    path: str,
+    line_length: int,
+    check: bool,
+    *,
+    indent_style: IndentStyle = "space",
+    indent_width: int = 4,
+) -> bool:
     """Format docstrings in a Python file.
 
     This function reads a Python file, formats its docstrings to ensure they comply with
@@ -76,6 +96,10 @@ def format_docstrings(path: str, line_length: int, check: bool) -> bool:
         path (str): The path to the Python file.
         line_length (int): The maximum line length for docstrings.
         check (bool): If True, only check if the file is formatted correctly.
+        indent_style (IndentStyle): Indentation style for generated docstring section
+            levels. The base indentation from each opening quote line is preserved.
+        indent_width (int): Width of one generated docstring indentation level, and the
+            visual width used when measuring tabs.
 
     Returns:
         bool: True if the file was modified, False otherwise.
@@ -96,7 +120,14 @@ def format_docstrings(path: str, line_length: int, check: bool) -> bool:
 
     # AST walk to find docstrings
     for node in [tree] + list(ast.walk(tree)):
-        if process_docstring_node(node, output_lines, line_length, changed_lines):
+        if process_docstring_node(
+            node,
+            output_lines,
+            line_length,
+            changed_lines,
+            indent_style=indent_style,
+            indent_width=indent_width,
+        ):
             modified = True
 
     if check:

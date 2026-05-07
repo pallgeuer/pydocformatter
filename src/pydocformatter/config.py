@@ -11,6 +11,7 @@ from pydocformatter.glob_matcher import (
 )
 
 ToolName = Literal["pydocfmt", "pycommentfmt"]
+IndentStyle = Literal["space", "tab"]
 
 DEFAULT_EXCLUDE = (
     ".bzr",
@@ -41,6 +42,8 @@ TOOL_NAMES = ("pydocfmt", "pycommentfmt")
 
 _KEY_TO_FIELD = {
     "line-length": "line_length",
+    "indent-style": "indent_style",
+    "indent-width": "indent_width",
     "respect-gitignore": "respect_gitignore",
     "force-exclude": "force_exclude",
     "include": "include",
@@ -49,7 +52,23 @@ _KEY_TO_FIELD = {
     "extend-exclude": "extend_exclude",
 }
 _FIELD_TO_KEY = {field: key for key, field in _KEY_TO_FIELD.items()}
-_ALLOWED_SETTING_KEYS = frozenset(_KEY_TO_FIELD)
+_COMMON_SETTING_KEYS = frozenset(
+    {
+        "line-length",
+        "respect-gitignore",
+        "force-exclude",
+        "include",
+        "extend-include",
+        "exclude",
+        "extend-exclude",
+    }
+)
+_PYDOCFMT_SETTING_KEYS = _COMMON_SETTING_KEYS | {"indent-style", "indent-width"}
+_TOOL_SETTING_KEYS = {
+    "pydocfmt": _PYDOCFMT_SETTING_KEYS,
+    "pycommentfmt": _COMMON_SETTING_KEYS,
+}
+_SHARED_SETTING_KEYS = _PYDOCFMT_SETTING_KEYS
 
 
 class ConfigError(ValueError):
@@ -63,11 +82,16 @@ class ConfigError(ValueError):
 
 @dataclass(frozen=True)
 class FormatterSettings:
-    """Resolved formatter settings shared by pydocfmt and pycommentfmt.
+    """Resolved formatter settings for pydocformatter tools.
 
     Attributes:
         line_length (int): Maximum line length used when wrapping docstrings or
             comments.
+        indent_style (IndentStyle): Indentation style used by `pydocfmt` for generated
+            docstring section indentation. This setting is not used by `pycommentfmt`.
+        indent_width (int): Number of spaces per generated `pydocfmt` docstring
+            indentation level, or the visual width of a tab. This setting is not used by
+            `pycommentfmt`.
         respect_gitignore (bool): Whether discovered files are filtered through
             `.gitignore`.
         force_exclude (bool): Whether include, exclude, and gitignore rules apply to
@@ -83,6 +107,8 @@ class FormatterSettings:
     """
 
     line_length: int = 88
+    indent_style: IndentStyle = "space"
+    indent_width: int = 4
     respect_gitignore: bool = True
     force_exclude: bool = False
     include: tuple[str, ...] = DEFAULT_INCLUDE
@@ -117,6 +143,10 @@ class SettingsOverrides:
 
     Attributes:
         line_length (int | None): Optional maximum line length override.
+        indent_style (IndentStyle | None): Optional `pydocfmt` generated docstring
+            indentation style override.
+        indent_width (int | None): Optional `pydocfmt` generated docstring indentation
+            width override.
         respect_gitignore (bool | None): Optional gitignore filtering override.
         force_exclude (bool | None): Optional force-exclude override.
         include (tuple[str, ...] | None): Optional replacement include patterns.
@@ -128,6 +158,8 @@ class SettingsOverrides:
     """
 
     line_length: int | None = None
+    indent_style: IndentStyle | None = None
+    indent_width: int | None = None
     respect_gitignore: bool | None = None
     force_exclude: bool | None = None
     include: tuple[str, ...] | None = None
@@ -159,7 +191,10 @@ def resolve_settings(
     """Resolve settings from defaults, pyproject config, and optional CLI overrides.
 
     Shared `[tool.pydocformatter]` settings are applied before the selected tool's
-    nested table, and `cli_overrides` has the highest precedence.
+    nested table, and `cli_overrides` has the highest precedence. `pydocfmt`-only
+    indentation settings are accepted in the shared table but ignored when resolving
+    `pycommentfmt`. Known nested tool tables are validated even when they are not the
+    selected tool.
 
     Args:
         tool_name (ToolName): Formatter tool to resolve settings for.
@@ -171,7 +206,7 @@ def resolve_settings(
 
     Raises:
         `ConfigError`: If the tool name, TOML structure, setting names, or setting
-                values are invalid.
+            values are invalid.
     """
     _validate_tool_name(tool_name)
     settings = FormatterSettings()
@@ -191,17 +226,38 @@ def resolve_settings(
             settings,
             formatter_config,
             "tool.pydocformatter",
+            allowed_setting_keys=_SHARED_SETTING_KEYS,
+            applied_setting_keys=_TOOL_SETTING_KEYS[tool_name],
             allow_tool_tables=True,
         )
 
+        for nested_tool_name in TOOL_NAMES:
+            if nested_tool_name not in formatter_config:
+                continue
+            nested_tool_config = formatter_config[nested_tool_name]
+            if not isinstance(nested_tool_config, dict):
+                raise ConfigError(
+                    f"tool.pydocformatter.{nested_tool_name} must be a table"
+                )
+            _validate_config_section_keys(
+                nested_tool_config,
+                f"tool.pydocformatter.{nested_tool_name}",
+                _TOOL_SETTING_KEYS[nested_tool_name],
+            )
+            _validate_config_section_values(
+                nested_tool_config,
+                f"tool.pydocformatter.{nested_tool_name}",
+                _TOOL_SETTING_KEYS[nested_tool_name],
+            )
+
         if tool_name in formatter_config:
             tool_specific = formatter_config[tool_name]
-            if not isinstance(tool_specific, dict):
-                raise ConfigError(f"tool.pydocformatter.{tool_name} must be a table")
             settings = _apply_config_section(
                 settings,
                 tool_specific,
                 f"tool.pydocformatter.{tool_name}",
+                allowed_setting_keys=_TOOL_SETTING_KEYS[tool_name],
+                applied_setting_keys=_TOOL_SETTING_KEYS[tool_name],
                 allow_tool_tables=False,
             )
 
@@ -230,7 +286,9 @@ def apply_cli_overrides(
 
 
 def _load_pyproject_config() -> dict[str, Any]:
-    """Load pyproject.toml from the current directory, returning an empty config if absent."""
+    """Load pyproject.toml from the current directory, returning an empty config if
+    absent.
+    """
     if not os.path.exists("pyproject.toml"):
         return {}
 
@@ -256,22 +314,48 @@ def _apply_config_section(
     section: dict[str, Any],
     context: str,
     *,
+    allowed_setting_keys: frozenset[str],
+    applied_setting_keys: frozenset[str],
     allow_tool_tables: bool,
 ) -> FormatterSettings:
     """Apply one TOML configuration section after validating allowed keys."""
-    allowed_keys = set(_ALLOWED_SETTING_KEYS)
+    allowed_keys = set(allowed_setting_keys)
     if allow_tool_tables:
         allowed_keys.update(TOOL_NAMES)
 
+    _validate_config_section_keys(section, context, frozenset(allowed_keys))
+    _validate_config_section_values(section, context, allowed_setting_keys)
+
+    values = {
+        _KEY_TO_FIELD[key]: section[key]
+        for key in applied_setting_keys
+        if key in section
+    }
+    return _apply_field_values(settings, values, context)
+
+
+def _validate_config_section_keys(
+    section: dict[str, Any],
+    context: str,
+    allowed_keys: frozenset[str],
+) -> None:
+    """Reject unknown keys in one TOML configuration section."""
     unknown_keys = sorted(str(key) for key in section if key not in allowed_keys)
     if unknown_keys:
         joined_keys = ", ".join(unknown_keys)
         raise ConfigError(f"{context} contains unknown setting(s): {joined_keys}")
 
+
+def _validate_config_section_values(
+    section: dict[str, Any],
+    context: str,
+    setting_keys: frozenset[str],
+) -> None:
+    """Validate known setting values in one TOML configuration section."""
     values = {
-        _KEY_TO_FIELD[key]: section[key] for key in _KEY_TO_FIELD if key in section
+        _KEY_TO_FIELD[key]: section[key] for key in setting_keys if key in section
     }
-    return _apply_field_values(settings, values, context)
+    _apply_field_values(FormatterSettings(), values, context)
 
 
 def _apply_overrides(
@@ -318,6 +402,26 @@ def _validate_line_length(value: Any, context: str) -> int:
     return int(value)
 
 
+def _validate_indent_style(value: Any, context: str) -> IndentStyle:
+    """Validate and return a configured indentation style."""
+    if value == "space":
+        return "space"
+    if value == "tab":
+        return "tab"
+    raise ConfigError(f"{context} must be either 'space' or 'tab'")
+
+
+def _validate_indent_width(value: Any, context: str) -> int:
+    """Validate and return a configured indentation width."""
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ConfigError(f"{context} must be an integer")
+    if not 0 < value <= 255:
+        raise ConfigError(
+            f"{context} must be greater than 0 and less than or equal to 255"
+        )
+    return int(value)
+
+
 def _validate_bool(value: Any, context: str) -> bool:
     """Validate and return a boolean setting value."""
     if not isinstance(value, bool):
@@ -356,6 +460,8 @@ def _validate_exclude_string_list(value: Any, context: str) -> tuple[str, ...]:
 
 _SETTING_VALIDATORS: dict[str, Callable[[Any, str], Any]] = {
     "line_length": _validate_line_length,
+    "indent_style": _validate_indent_style,
+    "indent_width": _validate_indent_width,
     "respect_gitignore": _validate_bool,
     "force_exclude": _validate_bool,
     "include": _validate_include_string_list,

@@ -100,6 +100,8 @@ If no files or directories are specified, `pydocfmt` formats the current directo
 
 **Options:**
 - `--line-length INTEGER`: Maximum line length for docstrings (default: 88)
+- `--indent-style {space,tab}`: Indentation style for generated docstring sections (default: space)
+- `--indent-width INTEGER`: Indentation width for generated docstring sections (default: 4)
 - `--check`: Check if files are formatted correctly without modifying them
 - `--include GLOB [GLOB ...]`: Glob pattern(s) for files to include
 - `--extend-include GLOB [GLOB ...]`: Additional glob pattern(s) for files to include
@@ -126,6 +128,9 @@ pydocfmt --check src/
 
 # Custom line length
 pydocfmt --line-length 100 src/
+
+# Custom generated docstring indentation
+pydocfmt --indent-style tab --indent-width 4 src/
 
 # Include/exclude patterns
 pydocfmt src/ --include "*.py" --exclude "test_*.py"
@@ -195,6 +200,8 @@ pydocformatter can be configured via `pyproject.toml`:
 ```toml
 [tool.pydocformatter]
 line-length = 88
+indent-style = "space"
+indent-width = 4
 respect-gitignore = true
 force-exclude = false
 include = ["*.py", "*.pyi", "*.pyw"]
@@ -209,6 +216,8 @@ extend-exclude = ["legacy_comments.py"]
 
 **Configuration Options:**
 - `line-length`: Maximum line length (default: 88)
+- `indent-style`: Generated docstring section indentation style for `pydocfmt`; one of `"space"` or `"tab"` (default: `"space"`)
+- `indent-width`: Generated docstring section indentation width for `pydocfmt` (default: 4)
 - `respect-gitignore`: Respect `.gitignore` during file discovery (default: `true`)
 - `force-exclude`: Apply include/exclude rules to explicitly listed files (default: `false`)
 - `include`: Glob patterns for files to include
@@ -217,6 +226,8 @@ extend-exclude = ["legacy_comments.py"]
 - `extend-exclude`: Additional exclude glob patterns
 
 Settings are resolved as defaults, then shared table, then tool-specific table, then command-line options. The highest-precedence specified value wins for each key, including `extend-include` and `extend-exclude`.
+
+`indent-style` and `indent-width` are used by `pydocfmt` only. They may be configured in the shared table or `[tool.pydocformatter.pydocfmt]`; `pycommentfmt` does not accept them as CLI options or in `[tool.pydocformatter.pycommentfmt]`.
 
 For the full file-selection contract, including Ruff compatibility deltas and explicit file behavior, see [File Selection Compatibility Specification](docs/file-selection-spec.md).
 

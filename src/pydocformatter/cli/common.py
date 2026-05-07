@@ -12,7 +12,7 @@ from pydocformatter.config import (
 )
 from pydocformatter.file_selection import FileDecision, select_files
 
-FormatFile = Callable[[str, int, bool], bool]
+FormatFile = Callable[[str, FormatterSettings, bool], bool]
 
 
 def load_settings_or_exit(tool_name: ToolName) -> FormatterSettings:
@@ -38,14 +38,19 @@ def add_common_arguments(
     parser: argparse.ArgumentParser,
     settings: FormatterSettings,
     *,
+    tool_name: ToolName,
     line_length_subject: str,
 ) -> None:
-    """Add shared CLI arguments for pydocformatter tools.
+    """Add CLI arguments for one pydocformatter tool.
+
+    Most arguments are shared by both tools. `pydocfmt` additionally receives docstring
+    indentation options that `pycommentfmt` does not accept.
 
     Args:
         parser (argparse.ArgumentParser): Parser to mutate.
         settings (FormatterSettings): Settings used for displaying default values in
             help text.
+        tool_name (ToolName): Formatter tool whose arguments should be added.
         line_length_subject (str): Human-readable subject controlled by `--line-length`,
             such as `docstrings` or `comments`.
 
@@ -64,6 +69,19 @@ def add_common_arguments(
         default=None,
         help=f"Maximum line length for {line_length_subject} (default: {settings.line_length}).",
     )
+    if tool_name == "pydocfmt":
+        parser.add_argument(
+            "--indent-style",
+            choices=("space", "tab"),
+            default=None,
+            help=f"Indentation style for generated docstring sections (default: {settings.indent_style}).",
+        )
+        parser.add_argument(
+            "--indent-width",
+            type=int,
+            default=None,
+            help=f"Indentation width for generated docstring sections (default: {settings.indent_width}).",
+        )
     parser.add_argument(
         "--check",
         action="store_true",
@@ -142,6 +160,8 @@ def resolve_cli_settings(
     """
     overrides = SettingsOverrides(
         line_length=args.line_length,
+        indent_style=getattr(args, "indent_style", None),
+        indent_width=getattr(args, "indent_width", None),
         respect_gitignore=args.respect_gitignore,
         force_exclude=args.force_exclude,
         include=_flatten_option_groups(args.include),
@@ -178,12 +198,13 @@ def run_formatter(
 
     Raises:
         `SystemExit`: If argument parsing fails, configuration is invalid, or check mode
-                detects required formatting changes.
+            detects required formatting changes.
     """
     parser = argparse.ArgumentParser(description=description)
     add_common_arguments(
         parser,
         FormatterSettings(),
+        tool_name=tool_name,
         line_length_subject=line_length_subject,
     )
     args = parser.parse_args()
@@ -198,7 +219,7 @@ def run_formatter(
     modified = False
     for path in selection.accepted_files:
         try:
-            changed = format_file(path, settings.line_length, args.check)
+            changed = format_file(path, settings, args.check)
         except UnicodeDecodeError as error:
             print(f"{path} ignored WARNING: failed to decode as UTF-8 ({error})")
             continue

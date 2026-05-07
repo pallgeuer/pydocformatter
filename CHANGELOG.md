@@ -16,6 +16,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 
 - **Configuration:**
   - Added `respect-gitignore` for shared formatter configuration, defaulting to `true`.
+  - Added `indent-style` and `indent-width` for `pydocfmt` generated docstring section indentation, with Ruff-style defaults of `"space"` and `4`.
 
 - **Documentation:**
   - Added a Ruff file-selection compatibility specification at `docs/file-selection-spec.md`, including exact defaults, precedence rules, force-exclude behavior, and explicit pydocformatter deviations.
@@ -31,6 +32,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - `pydocfmt` and `pycommentfmt` now resolve shared settings from `[tool.pydocformatter]` with per-tool overrides in `[tool.pydocformatter.pydocfmt]` and `[tool.pydocformatter.pycommentfmt]`.
   - File-selection settings now use Ruff-style glob lists (`include`, `extend-include`, `exclude`, `extend-exclude`) and `force-exclude`.
   - For each setting key, the highest-priority value wins (`command line > tool-specific config > shared config > defaults`), including `extend-include` and `extend-exclude`.
+  - Known nested tool tables are now validated for unknown or invalid settings even when running the other formatter.
 
 - **CLI:**
   - `--include`, `--extend-include`, `--exclude`, and `--extend-exclude` now accept multiple glob values in one option usage (e.g. `--include *.py *.pyi`).
@@ -40,6 +42,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - `force-exclude` now consistently applies `.gitignore` filtering to explicitly passed file paths.
 
 - **pydocfmt:**
+  - Generated Google-style docstring section indentation is now configurable while preserving the existing base docstring indentation.
   - `--check` output now includes docstring line locations, emitted once per file with compressed consecutive ranges.
 
 - **pycommentfmt:**

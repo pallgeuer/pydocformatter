@@ -66,7 +66,9 @@ class TestCliVerbose(unittest.TestCase):
             called_paths: list[str] = []
 
             # noinspection PyUnusedLocal
-            def fake_format(path: str, line_length: int, check: bool) -> bool:
+            def fake_format(
+                path: str, line_length: int, check: bool, **kwargs: object
+            ) -> bool:
                 called_paths.append(path)
                 return False
 
@@ -103,7 +105,9 @@ class TestCliVerbose(unittest.TestCase):
             called_paths: list[str] = []
 
             # noinspection PyUnusedLocal
-            def fake_format(path: str, line_length: int, check: bool) -> bool:
+            def fake_format(
+                path: str, line_length: int, check: bool, **kwargs: object
+            ) -> bool:
                 called_paths.append(os.path.abspath(path))
                 return False
 
@@ -137,7 +141,9 @@ class TestCliVerbose(unittest.TestCase):
             called_paths: list[str] = []
 
             # noinspection PyUnusedLocal
-            def fake_format(path: str, line_length: int, check: bool) -> bool:
+            def fake_format(
+                path: str, line_length: int, check: bool, **kwargs: object
+            ) -> bool:
                 called_paths.append(path)
                 return False
 
@@ -166,7 +172,9 @@ class TestCliVerbose(unittest.TestCase):
             called_paths: list[str] = []
 
             # noinspection PyUnusedLocal
-            def fake_format(path: str, line_length: int, check: bool) -> bool:
+            def fake_format(
+                path: str, line_length: int, check: bool, **kwargs: object
+            ) -> bool:
                 called_paths.append(path)
                 return False
 
@@ -203,7 +211,9 @@ class TestCliVerbose(unittest.TestCase):
             called_paths: list[str] = []
 
             # noinspection PyUnusedLocal
-            def fake_format(path: str, line_length: int, check: bool) -> bool:
+            def fake_format(
+                path: str, line_length: int, check: bool, **kwargs: object
+            ) -> bool:
                 called_paths.append(os.path.abspath(path))
                 return False
 
@@ -234,7 +244,9 @@ class TestCliVerbose(unittest.TestCase):
             called_paths: list[str] = []
 
             # noinspection PyUnusedLocal
-            def fake_format(path: str, line_length: int, check: bool) -> bool:
+            def fake_format(
+                path: str, line_length: int, check: bool, **kwargs: object
+            ) -> bool:
                 called_paths.append(path)
                 return False
 
@@ -276,7 +288,9 @@ class TestCliVerbose(unittest.TestCase):
             called_paths: list[str] = []
 
             # noinspection PyUnusedLocal
-            def fake_format(path: str, line_length: int, check: bool) -> bool:
+            def fake_format(
+                path: str, line_length: int, check: bool, **kwargs: object
+            ) -> bool:
                 called_paths.append(path)
                 return False
 
@@ -316,7 +330,9 @@ class TestCliVerbose(unittest.TestCase):
             called_paths: list[str] = []
 
             # noinspection PyUnusedLocal
-            def fake_format(path: str, line_length: int, check: bool) -> bool:
+            def fake_format(
+                path: str, line_length: int, check: bool, **kwargs: object
+            ) -> bool:
                 called_paths.append(path)
                 return False
 
@@ -349,7 +365,9 @@ class TestCliVerbose(unittest.TestCase):
             called_paths: list[str] = []
 
             # noinspection PyUnusedLocal
-            def fake_format(path: str, line_length: int, check: bool) -> bool:
+            def fake_format(
+                path: str, line_length: int, check: bool, **kwargs: object
+            ) -> bool:
                 called_paths.append(path)
                 return False
 
@@ -380,7 +398,9 @@ class TestCliVerbose(unittest.TestCase):
             called_paths: list[str] = []
 
             # noinspection PyUnusedLocal
-            def fake_format(path: str, line_length: int, check: bool) -> bool:
+            def fake_format(
+                path: str, line_length: int, check: bool, **kwargs: object
+            ) -> bool:
                 called_paths.append(path)
                 return False
 
@@ -415,7 +435,9 @@ class TestCliVerbose(unittest.TestCase):
             called_paths: list[str] = []
 
             # noinspection PyUnusedLocal
-            def fake_format(path: str, line_length: int, check: bool) -> bool:
+            def fake_format(
+                path: str, line_length: int, check: bool, **kwargs: object
+            ) -> bool:
                 called_paths.append(path)
                 return False
 
@@ -451,7 +473,9 @@ class TestCliVerbose(unittest.TestCase):
             called_args: list[tuple[str, int, bool]] = []
 
             # noinspection PyUnusedLocal
-            def fake_format(path: str, line_length: int, check: bool) -> bool:
+            def fake_format(
+                path: str, line_length: int, check: bool, **kwargs: object
+            ) -> bool:
                 called_args.append((path, line_length, check))
                 return False
 
@@ -474,6 +498,55 @@ class TestCliVerbose(unittest.TestCase):
             self.assertFalse(run_mock.called)
             self.assertEqual(called_args, [(str(root / "a.py"), 72, False)])
 
+    def test_pydocfmt_indent_cli_settings_are_applied(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "a.py").write_text("x = 1\n", encoding="utf-8")
+            called_kwargs: list[dict[str, object]] = []
+
+            # noinspection PyUnusedLocal
+            def fake_format(
+                path: str, line_length: int, check: bool, **kwargs: object
+            ) -> bool:
+                called_kwargs.append(kwargs)
+                return False
+
+            argv = [
+                "pydocfmt",
+                "--indent-style",
+                "tab",
+                "--indent-width",
+                "2",
+                str(root / "a.py"),
+            ]
+            with (
+                patch("sys.argv", argv),
+                patch(
+                    "pydocformatter.cli.pydocfmt_main.format_docstrings",
+                    side_effect=fake_format,
+                ),
+            ):
+                pydocfmt_main()
+
+            self.assertEqual(
+                called_kwargs,
+                [{"indent_style": "tab", "indent_width": 2}],
+            )
+
+    def test_pycommentfmt_rejects_unused_indent_cli_settings(self) -> None:
+        stderr = StringIO()
+        argv = ["pycommentfmt", "--indent-style", "tab", "a.py"]
+
+        with (
+            patch("sys.argv", argv),
+            redirect_stderr(stderr),
+            self.assertRaises(SystemExit) as cm,
+        ):
+            pycommentfmt_main()
+
+        self.assertEqual(cm.exception.code, 2)
+        self.assertIn("unrecognized arguments: --indent-style", stderr.getvalue())
+
     def test_pycommentfmt_hyphenated_pyproject_settings_are_applied(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
@@ -486,7 +559,9 @@ class TestCliVerbose(unittest.TestCase):
             called_args: list[tuple[str, int, bool]] = []
 
             # noinspection PyUnusedLocal
-            def fake_format(path: str, line_length: int, check: bool) -> bool:
+            def fake_format(
+                path: str, line_length: int, check: bool, **kwargs: object
+            ) -> bool:
                 called_args.append((path, line_length, check))
                 return False
 
@@ -521,7 +596,9 @@ class TestCliVerbose(unittest.TestCase):
             called_args: list[tuple[str, int, bool]] = []
 
             # noinspection PyUnusedLocal
-            def fake_format(path: str, line_length: int, check: bool) -> bool:
+            def fake_format(
+                path: str, line_length: int, check: bool, **kwargs: object
+            ) -> bool:
                 called_args.append((path, line_length, check))
                 return False
 
@@ -551,7 +628,9 @@ class TestCliVerbose(unittest.TestCase):
             called_paths: list[str] = []
 
             # noinspection PyUnusedLocal
-            def fake_format(path: str, line_length: int, check: bool) -> bool:
+            def fake_format(
+                path: str, line_length: int, check: bool, **kwargs: object
+            ) -> bool:
                 called_paths.append(path)
                 return False
 
@@ -587,7 +666,9 @@ class TestCliVerbose(unittest.TestCase):
             called_paths: list[str] = []
 
             # noinspection PyUnusedLocal
-            def fake_format(path: str, line_length: int, check: bool) -> bool:
+            def fake_format(
+                path: str, line_length: int, check: bool, **kwargs: object
+            ) -> bool:
                 called_paths.append(path)
                 return False
 
@@ -627,7 +708,9 @@ class TestCliVerbose(unittest.TestCase):
             called_paths: list[str] = []
 
             # noinspection PyUnusedLocal
-            def fake_format(path: str, line_length: int, check: bool) -> bool:
+            def fake_format(
+                path: str, line_length: int, check: bool, **kwargs: object
+            ) -> bool:
                 called_paths.append(path)
                 return False
 
@@ -835,7 +918,9 @@ class TestCliVerbose(unittest.TestCase):
             called_paths: list[str] = []
 
             # noinspection PyUnusedLocal
-            def fake_format(path: str, line_length: int, check: bool) -> bool:
+            def fake_format(
+                path: str, line_length: int, check: bool, **kwargs: object
+            ) -> bool:
                 called_paths.append(path)
                 return False
 

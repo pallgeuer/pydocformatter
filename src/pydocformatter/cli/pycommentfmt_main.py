@@ -1,5 +1,11 @@
 from pydocformatter.cli.common import run_formatter
+from pydocformatter.config import FormatterSettings
 from pydocformatter.formatters.pycommentfmt import format_comments
+
+
+def _format_comments(path: str, settings: FormatterSettings, check: bool) -> bool:
+    """Format one path using resolved pycommentfmt settings."""
+    return format_comments(path, settings.line_length, check)
 
 
 def main() -> None:
@@ -13,5 +19,5 @@ def main() -> None:
         tool_name="pycommentfmt",
         description="Format Python comments.",
         line_length_subject="comments",
-        format_file=format_comments,
+        format_file=_format_comments,
     )

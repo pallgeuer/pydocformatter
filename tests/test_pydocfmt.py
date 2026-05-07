@@ -109,6 +109,91 @@ Args:
         """)
         self._format_and_check(doc, expected)
 
+    def test_args_section_with_two_space_indent_width(self) -> None:
+        doc = """Does something.
+
+Args:
+    foo (str): the foo param which is very long and needs to be wrapped to fit within the line length limit."""
+        expected = textwrap.dedent("""\
+            \"\"\"Does something.
+            
+            Args:
+              foo (str): the foo param which is very long and needs to be wrapped to fit
+                within the line length limit.
+            \"\"\"
+        """)
+        formatted = reflow(doc.strip(), 78, "", indent_style="space", indent_width=2)
+
+        self.assertEqual("".join(formatted).strip(), expected.strip())
+
+    def test_args_section_with_tab_indent_style(self) -> None:
+        doc = """Does something.
+
+Args:
+    foo (str): the foo param which is very long and needs to be wrapped to fit within the line length limit."""
+        expected = textwrap.dedent("""\
+            \"\"\"Does something.
+            
+            Args:
+            \tfoo (str): the foo param which is very long and needs to be wrapped to fit
+            \t\twithin the line length limit.
+            \"\"\"
+        """)
+        formatted = reflow(doc.strip(), 78, "", indent_style="tab", indent_width=4)
+
+        self.assertEqual("".join(formatted).strip(), expected.strip())
+
+    def test_tab_line_length_uses_non_standard_indent_width(self) -> None:
+        doc = """Does.
+
+Args:
+    foo: one two three four five six seven"""
+        expected = textwrap.dedent("""\
+            \"\"\"Does.
+            
+            Args:
+            \tfoo: one two three
+            \t\tfour five six seven
+            \"\"\"
+        """)
+        formatted = reflow(doc.strip(), 24, "", indent_style="tab", indent_width=2)
+
+        self.assertEqual("".join(formatted).strip(), expected.strip())
+        for line in formatted:
+            visual_width = sum(2 if char == "\t" else 1 for char in line.rstrip("\n"))
+            self.assertLessEqual(visual_width, 24)
+
+    def test_tab_indent_preserves_space_base_indent(self) -> None:
+        doc = """Does something.
+
+Args:
+    foo: a parameter that should be normalized."""
+        expected = (
+            '    """Does something.\n'
+            "\n"
+            "    Args:\n"
+            "    \tfoo: a parameter that should be normalized.\n"
+            '    """'
+        )
+        formatted = reflow(doc.strip(), 88, "    ", indent_style="tab", indent_width=4)
+
+        self.assertEqual("".join(formatted).strip(), expected.strip())
+
+    def test_description_preserves_single_base_indent(self) -> None:
+        doc = """Does something.
+
+This description should keep exactly one base indentation level after wrapping."""
+        expected = (
+            '    """Does something.\n'
+            "\n"
+            "    This description should keep exactly one base indentation level after\n"
+            "    wrapping.\n"
+            '    """'
+        )
+        formatted = reflow(doc.strip(), 76, "    ")
+
+        self.assertEqual("".join(formatted).strip(), expected.strip())
+
     def test_returns_section(self) -> None:
         doc = """Returns a result.
         
