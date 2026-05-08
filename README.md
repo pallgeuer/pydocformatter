@@ -5,7 +5,7 @@
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/release/python-3110/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**pydocformatter** is a fork of [pyformatter](https://github.com/RikGhosh487/pyformatter), and provides Python formatting tools that automatically format your docstrings and comments according to configurable style guidelines. It consists of two formatters:
+**pydocformatter** is a fork of [pyformatter](https://github.com/RikGhosh487/pyformatter) (with very significant subsequent changes), and provides Python formatting tools that automatically format your docstrings and comments according to configurable style guidelines. It consists of two formatters:
 
 - **pydocfmt:** Formats Python docstrings with support for Google-style docstrings
 - **pycommentfmt:** Formats Python comments to ensure proper line length and readability
@@ -365,7 +365,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## Acknowledgments
 
 Inspired by the excellent work of:
-- [pyformatter](https://github.com/RikGhosh487/pyformatter) - Forked
+- [pyformatter](https://github.com/RikGhosh487/pyformatter) - Forked with very significant subsequent changes
 - [Black](https://github.com/psf/black) - The uncompromising Python code formatter
 - [isort](https://github.com/PyCQA/isort) - A Python utility to sort imports
 - [docformatter](https://github.com/PyCQA/docformatter) - Formats docstrings to follow conventions
