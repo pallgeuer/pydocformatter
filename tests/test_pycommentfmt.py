@@ -1,7 +1,7 @@
+import contextlib
 import os
 import tempfile
 import unittest
-from contextlib import redirect_stdout
 from io import StringIO
 
 import pydocformatter.formatters.pycommentfmt as pycommentfmt
@@ -22,7 +22,7 @@ class TestPyCommentFmt(unittest.TestCase):
 
         try:
             output = StringIO()
-            with redirect_stdout(output):
+            with contextlib.redirect_stdout(output):
                 result = pycommentfmt.format_comments(
                     filename, FormatterSettings(line_length=line_length), check=check
                 )

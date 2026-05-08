@@ -1,7 +1,7 @@
+import dataclasses
 import os
 import tomllib
 from collections.abc import Callable
-from dataclasses import dataclass, fields, replace
 from typing import Any, Literal
 
 import pydocformatter.glob_matcher as glob_matcher
@@ -112,7 +112,7 @@ class ConfigError(ValueError):
     """
 
 
-@dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True)
 class FormatterSettings:
     """Resolved formatter settings for pydocformatter tools.
 
@@ -175,7 +175,7 @@ class FormatterSettings:
         return self.exclude + self.extend_exclude
 
 
-@dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True)
 class SettingsOverrides:
     """Optional formatter settings from one precedence layer."""
 
@@ -350,7 +350,7 @@ def _apply_overrides(
 
     values = {
         field.name: value
-        for field in fields(SettingsOverrides)
+        for field in dataclasses.fields(SettingsOverrides)
         if (value := getattr(overrides, field.name)) is not None
     }
     return _apply_field_values(settings, values, context, selector_tool_name)
@@ -371,7 +371,7 @@ def _apply_field_values(
         for field, value in values.items()
     }
     _validate_rule_selectors(updates, context, selector_tool_name)
-    return replace(settings, **updates)
+    return dataclasses.replace(settings, **updates)
 
 
 def _validate_line_length(value: Any, context: str) -> int:

@@ -1,8 +1,8 @@
+import contextlib
 import re
 import tempfile
 import textwrap
 import unittest
-from contextlib import redirect_stdout
 from io import StringIO
 from pathlib import Path
 
@@ -412,7 +412,7 @@ Examples:
             path = tf.name
 
         output = StringIO()
-        with redirect_stdout(output):
+        with contextlib.redirect_stdout(output):
             needs_fixing = pydocfmt.format_docstrings(
                 path, FormatterSettings(line_length=72), check=True
             )
@@ -434,7 +434,7 @@ Examples:
             path = tf.name
 
         output = StringIO()
-        with redirect_stdout(output):
+        with contextlib.redirect_stdout(output):
             needs_fixing = pydocfmt.format_docstrings(
                 path, FormatterSettings(line_length=72), check=True
             )

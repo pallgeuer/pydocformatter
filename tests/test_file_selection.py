@@ -1,12 +1,12 @@
+import contextlib
 import os
 import subprocess
 import tempfile
 import unittest
-from contextlib import redirect_stdout
+import unittest.mock
 from io import StringIO
 from pathlib import Path
 from typing import Callable
-from unittest.mock import patch
 
 import pydocformatter.file_selection as file_selection
 from pydocformatter.config import FormatterSettings
@@ -114,7 +114,9 @@ class TestFileSelection(unittest.TestCase):
             self._write_git_marker(root)
             (root / "a.py").write_text("", encoding="utf-8")
 
-            with patch("pydocformatter.file_selection.subprocess.run") as run_mock:
+            with unittest.mock.patch(
+                "pydocformatter.file_selection.subprocess.run"
+            ) as run_mock:
                 selection = file_selection.select_files([str(root)], settings)
 
         self.assertFalse(run_mock.called)
@@ -128,7 +130,7 @@ class TestFileSelection(unittest.TestCase):
             (root / "keep.py").write_text("", encoding="utf-8")
             (root / "skip.py").write_text("", encoding="utf-8")
 
-            with patch(
+            with unittest.mock.patch(
                 "pydocformatter.file_selection.subprocess.run",
                 side_effect=self._fake_git_check_ignore_for_root(root, {"skip.py"}),
             ):
@@ -148,8 +150,10 @@ class TestFileSelection(unittest.TestCase):
             stdout = StringIO()
 
             with (
-                patch("pydocformatter.file_selection.subprocess.run") as run_mock,
-                redirect_stdout(stdout),
+                unittest.mock.patch(
+                    "pydocformatter.file_selection.subprocess.run"
+                ) as run_mock,
+                contextlib.redirect_stdout(stdout),
             ):
                 selection = file_selection.select_files([str(root)], settings)
 
@@ -167,7 +171,7 @@ class TestFileSelection(unittest.TestCase):
             stdout = StringIO()
 
             with (
-                patch(
+                unittest.mock.patch(
                     "pydocformatter.file_selection.subprocess.run",
                     return_value=subprocess.CompletedProcess(
                         ["git"],
@@ -176,7 +180,7 @@ class TestFileSelection(unittest.TestCase):
                         stderr=b"fatal: no such command",
                     ),
                 ),
-                redirect_stdout(stdout),
+                contextlib.redirect_stdout(stdout),
             ):
                 selection = file_selection.select_files([str(root)], settings)
 
@@ -304,7 +308,7 @@ class TestFileSelection(unittest.TestCase):
                     stderr=b"",
                 )
 
-            with patch(
+            with unittest.mock.patch(
                 "pydocformatter.file_selection.subprocess.run", side_effect=fake_run
             ):
                 selection = file_selection.select_files([str(root)], settings)

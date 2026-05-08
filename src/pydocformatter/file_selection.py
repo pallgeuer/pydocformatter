@@ -1,7 +1,7 @@
+import dataclasses
 import os
 import subprocess
 from collections import defaultdict
-from dataclasses import dataclass
 from enum import Enum
 
 from pydocformatter.config import FormatterSettings
@@ -39,7 +39,7 @@ _REASON_MESSAGES = {
 }
 
 
-@dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True)
 class FileDecision:
     """Result of evaluating whether one path should be formatted.
 
@@ -66,7 +66,7 @@ class FileDecision:
         return _REASON_MESSAGES[self.reason]
 
 
-@dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True)
 class SelectionResult:
     """Accepted files and all file-selection decisions.
 
@@ -80,7 +80,7 @@ class SelectionResult:
     decisions: tuple[FileDecision, ...]
 
 
-@dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True)
 class _Candidate:
     """A discovered path that still needs include, exclude, and gitignore checks."""
 

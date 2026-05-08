@@ -285,7 +285,10 @@ def _parse_per_file_options(groups: list[str] | None) -> config.RuleSelectorMap 
                     "per-file ignore CLI selectors must be lists of strings"
                 )
             merged[pattern] = tuple(selectors)
-    return tuple((pattern, selectors) for pattern, selectors in merged.items())
+    result: config.RuleSelectorMap = tuple(
+        (pattern, selectors) for pattern, selectors in merged.items()
+    )
+    return result
 
 
 def _enabled_label(value: bool) -> str:

@@ -1,12 +1,12 @@
+import contextlib
 import os
 import subprocess
 import tempfile
 import unittest
-from contextlib import redirect_stderr, redirect_stdout
+import unittest.mock
 from io import StringIO
 from pathlib import Path
 from typing import Callable
-from unittest.mock import patch
 
 import pydocformatter.cli.pycommentfmt_main as pycommentfmt_main
 import pydocformatter.cli.pydocfmt_main as pydocfmt_main
@@ -85,12 +85,12 @@ class TestCliVerbose(unittest.TestCase):
                 "skip.py",
             ]
             with (
-                patch("sys.argv", argv),
-                patch(
+                unittest.mock.patch("sys.argv", argv),
+                unittest.mock.patch(
                     "pydocformatter.cli.pydocfmt_main.pydocfmt.format_docstrings",
                     side_effect=fake_format,
                 ),
-                redirect_stdout(stdout),
+                contextlib.redirect_stdout(stdout),
             ):
                 pydocfmt_main.main()
 
@@ -119,8 +119,8 @@ class TestCliVerbose(unittest.TestCase):
             try:
                 argv = ["pydocfmt", "--no-respect-gitignore"]
                 with (
-                    patch("sys.argv", argv),
-                    patch(
+                    unittest.mock.patch("sys.argv", argv),
+                    unittest.mock.patch(
                         "pydocformatter.cli.pydocfmt_main.pydocfmt.format_docstrings",
                         side_effect=fake_format,
                     ),
@@ -152,12 +152,12 @@ class TestCliVerbose(unittest.TestCase):
 
             argv = ["pydocfmt", str(root), "--verbose"]
             with (
-                patch("sys.argv", argv),
-                patch(
+                unittest.mock.patch("sys.argv", argv),
+                unittest.mock.patch(
                     "pydocformatter.cli.pydocfmt_main.pydocfmt.format_docstrings",
                     side_effect=fake_format,
                 ),
-                redirect_stdout(stdout),
+                contextlib.redirect_stdout(stdout),
             ):
                 pydocfmt_main.main()
 
@@ -191,12 +191,12 @@ class TestCliVerbose(unittest.TestCase):
                 "skip.py",
             ]
             with (
-                patch("sys.argv", argv),
-                patch(
+                unittest.mock.patch("sys.argv", argv),
+                unittest.mock.patch(
                     "pydocformatter.cli.pycommentfmt_main.pycommentfmt.format_comments",
                     side_effect=fake_format,
                 ),
-                redirect_stdout(stdout),
+                contextlib.redirect_stdout(stdout),
             ):
                 pycommentfmt_main.main()
 
@@ -225,8 +225,8 @@ class TestCliVerbose(unittest.TestCase):
             try:
                 argv = ["pycommentfmt", "--no-respect-gitignore"]
                 with (
-                    patch("sys.argv", argv),
-                    patch(
+                    unittest.mock.patch("sys.argv", argv),
+                    unittest.mock.patch(
                         "pydocformatter.cli.pycommentfmt_main.pycommentfmt.format_comments",
                         side_effect=fake_format,
                     ),
@@ -265,12 +265,12 @@ class TestCliVerbose(unittest.TestCase):
                 "b.txt",
             ]
             with (
-                patch("sys.argv", argv),
-                patch(
+                unittest.mock.patch("sys.argv", argv),
+                unittest.mock.patch(
                     "pydocformatter.cli.pydocfmt_main.pydocfmt.format_docstrings",
                     side_effect=fake_format,
                 ),
-                redirect_stdout(stdout),
+                contextlib.redirect_stdout(stdout),
             ):
                 pydocfmt_main.main()
 
@@ -309,12 +309,12 @@ class TestCliVerbose(unittest.TestCase):
                 str(root),
             ]
             with (
-                patch("sys.argv", argv),
-                patch(
+                unittest.mock.patch("sys.argv", argv),
+                unittest.mock.patch(
                     "pydocformatter.cli.pydocfmt_main.pydocfmt.format_docstrings",
                     side_effect=fake_format,
                 ),
-                redirect_stdout(stdout),
+                contextlib.redirect_stdout(stdout),
             ):
                 pydocfmt_main.main()
 
@@ -341,16 +341,16 @@ class TestCliVerbose(unittest.TestCase):
 
             argv = ["pydocfmt", "--verbose", str(root)]
             with (
-                patch("sys.argv", argv),
-                patch(
+                unittest.mock.patch("sys.argv", argv),
+                unittest.mock.patch(
                     "pydocformatter.file_selection.subprocess.run",
                     side_effect=self._fake_git_check_ignore_for_root(root, {"skip.py"}),
                 ),
-                patch(
+                unittest.mock.patch(
                     "pydocformatter.cli.pydocfmt_main.pydocfmt.format_docstrings",
                     side_effect=fake_format,
                 ),
-                redirect_stdout(stdout),
+                contextlib.redirect_stdout(stdout),
             ):
                 pydocfmt_main.main()
 
@@ -376,13 +376,15 @@ class TestCliVerbose(unittest.TestCase):
 
             argv = ["pydocfmt", "--verbose", "--no-respect-gitignore", str(root)]
             with (
-                patch("sys.argv", argv),
-                patch("pydocformatter.file_selection.subprocess.run") as run_mock,
-                patch(
+                unittest.mock.patch("sys.argv", argv),
+                unittest.mock.patch(
+                    "pydocformatter.file_selection.subprocess.run"
+                ) as run_mock,
+                unittest.mock.patch(
                     "pydocformatter.cli.pydocfmt_main.pydocfmt.format_docstrings",
                     side_effect=fake_format,
                 ),
-                redirect_stdout(stdout),
+                contextlib.redirect_stdout(stdout),
             ):
                 pydocfmt_main.main()
 
@@ -409,16 +411,16 @@ class TestCliVerbose(unittest.TestCase):
 
             argv = ["pycommentfmt", "--verbose", str(root)]
             with (
-                patch("sys.argv", argv),
-                patch(
+                unittest.mock.patch("sys.argv", argv),
+                unittest.mock.patch(
                     "pydocformatter.file_selection.subprocess.run",
                     side_effect=self._fake_git_check_ignore_for_root(root, {"skip.py"}),
                 ),
-                patch(
+                unittest.mock.patch(
                     "pydocformatter.cli.pycommentfmt_main.pycommentfmt.format_comments",
                     side_effect=fake_format,
                 ),
-                redirect_stdout(stdout),
+                contextlib.redirect_stdout(stdout),
             ):
                 pycommentfmt_main.main()
 
@@ -446,13 +448,15 @@ class TestCliVerbose(unittest.TestCase):
 
             argv = ["pycommentfmt", "--verbose", "--no-respect-gitignore", str(root)]
             with (
-                patch("sys.argv", argv),
-                patch("pydocformatter.file_selection.subprocess.run") as run_mock,
-                patch(
+                unittest.mock.patch("sys.argv", argv),
+                unittest.mock.patch(
+                    "pydocformatter.file_selection.subprocess.run"
+                ) as run_mock,
+                unittest.mock.patch(
                     "pydocformatter.cli.pycommentfmt_main.pycommentfmt.format_comments",
                     side_effect=fake_format,
                 ),
-                redirect_stdout(stdout),
+                contextlib.redirect_stdout(stdout),
             ):
                 pycommentfmt_main.main()
 
@@ -487,9 +491,11 @@ class TestCliVerbose(unittest.TestCase):
             os.chdir(root)
             try:
                 with (
-                    patch("sys.argv", argv),
-                    patch("pydocformatter.file_selection.subprocess.run") as run_mock,
-                    patch(
+                    unittest.mock.patch("sys.argv", argv),
+                    unittest.mock.patch(
+                        "pydocformatter.file_selection.subprocess.run"
+                    ) as run_mock,
+                    unittest.mock.patch(
                         "pydocformatter.cli.pydocfmt_main.pydocfmt.format_docstrings",
                         side_effect=fake_format,
                     ),
@@ -523,8 +529,8 @@ class TestCliVerbose(unittest.TestCase):
                 str(root / "a.py"),
             ]
             with (
-                patch("sys.argv", argv),
-                patch(
+                unittest.mock.patch("sys.argv", argv),
+                unittest.mock.patch(
                     "pydocformatter.cli.pydocfmt_main.pydocfmt.format_docstrings",
                     side_effect=fake_format,
                 ),
@@ -541,8 +547,8 @@ class TestCliVerbose(unittest.TestCase):
         argv = ["pycommentfmt", "--indent-style", "tab", "a.py"]
 
         with (
-            patch("sys.argv", argv),
-            redirect_stderr(stderr),
+            unittest.mock.patch("sys.argv", argv),
+            contextlib.redirect_stderr(stderr),
             self.assertRaises(SystemExit) as cm,
         ):
             pycommentfmt_main.main()
@@ -573,9 +579,11 @@ class TestCliVerbose(unittest.TestCase):
             os.chdir(root)
             try:
                 with (
-                    patch("sys.argv", argv),
-                    patch("pydocformatter.file_selection.subprocess.run") as run_mock,
-                    patch(
+                    unittest.mock.patch("sys.argv", argv),
+                    unittest.mock.patch(
+                        "pydocformatter.file_selection.subprocess.run"
+                    ) as run_mock,
+                    unittest.mock.patch(
                         "pydocformatter.cli.pycommentfmt_main.pycommentfmt.format_comments",
                         side_effect=fake_format,
                     ),
@@ -610,8 +618,8 @@ class TestCliVerbose(unittest.TestCase):
             os.chdir(root)
             try:
                 with (
-                    patch("sys.argv", argv),
-                    patch(
+                    unittest.mock.patch("sys.argv", argv),
+                    unittest.mock.patch(
                         "pydocformatter.cli.pydocfmt_main.pydocfmt.format_docstrings",
                         side_effect=fake_format,
                     ),
@@ -651,8 +659,8 @@ class TestCliVerbose(unittest.TestCase):
                 '{"tests/*.py" = ["PCF001"]}',
             ]
             with (
-                patch("sys.argv", argv),
-                patch(
+                unittest.mock.patch("sys.argv", argv),
+                unittest.mock.patch(
                     "pydocformatter.cli.pycommentfmt_main.pycommentfmt.format_comments",
                     side_effect=fake_format,
                 ),
@@ -675,7 +683,10 @@ class TestCliVerbose(unittest.TestCase):
             target.write_text("x = 1\n", encoding="utf-8")
             stderr = StringIO()
             argv = ["pycommentfmt", str(target), "--select", "RD"]
-            with patch("sys.argv", argv), redirect_stderr(stderr):
+            with (
+                unittest.mock.patch("sys.argv", argv),
+                contextlib.redirect_stderr(stderr),
+            ):
                 exit_code = pycommentfmt_main.main()
 
         self.assertEqual(exit_code, 2)
@@ -706,12 +717,12 @@ class TestCliVerbose(unittest.TestCase):
                 "skip.py",
             ]
             with (
-                patch("sys.argv", argv),
-                patch(
+                unittest.mock.patch("sys.argv", argv),
+                unittest.mock.patch(
                     "pydocformatter.cli.pydocfmt_main.pydocfmt.format_docstrings",
                     side_effect=fake_format,
                 ),
-                redirect_stdout(stdout),
+                contextlib.redirect_stdout(stdout),
             ):
                 pydocfmt_main.main()
 
@@ -737,16 +748,16 @@ class TestCliVerbose(unittest.TestCase):
 
             argv = ["pydocfmt", "--verbose", "--force-exclude", str(target)]
             with (
-                patch("sys.argv", argv),
-                patch(
+                unittest.mock.patch("sys.argv", argv),
+                unittest.mock.patch(
                     "pydocformatter.file_selection.subprocess.run",
                     side_effect=self._fake_git_check_ignore_for_root(root, {"skip.py"}),
                 ),
-                patch(
+                unittest.mock.patch(
                     "pydocformatter.cli.pydocfmt_main.pydocfmt.format_docstrings",
                     side_effect=fake_format,
                 ),
-                redirect_stdout(stdout),
+                contextlib.redirect_stdout(stdout),
             ):
                 pydocfmt_main.main()
 
@@ -788,8 +799,8 @@ class TestCliVerbose(unittest.TestCase):
             os.chdir(root)
             try:
                 with (
-                    patch("sys.argv", argv),
-                    patch(
+                    unittest.mock.patch("sys.argv", argv),
+                    unittest.mock.patch(
                         "pydocformatter.cli.pydocfmt_main.pydocfmt.format_docstrings",
                         side_effect=fake_format,
                     ),
@@ -818,9 +829,9 @@ class TestCliVerbose(unittest.TestCase):
             os.chdir(root)
             try:
                 with (
-                    patch("sys.argv", argv),
-                    redirect_stdout(stdout),
-                    redirect_stderr(stderr),
+                    unittest.mock.patch("sys.argv", argv),
+                    contextlib.redirect_stdout(stdout),
+                    contextlib.redirect_stderr(stderr),
                     self.assertRaises(SystemExit) as cm,
                 ):
                     main()
@@ -850,7 +861,10 @@ class TestCliVerbose(unittest.TestCase):
             previous_cwd = os.getcwd()
             os.chdir(root)
             try:
-                with patch("sys.argv", argv), redirect_stderr(stderr):
+                with (
+                    unittest.mock.patch("sys.argv", argv),
+                    contextlib.redirect_stderr(stderr),
+                ):
                     exit_code = main()
             finally:
                 os.chdir(previous_cwd)
@@ -870,7 +884,10 @@ class TestCliVerbose(unittest.TestCase):
             previous_cwd = os.getcwd()
             os.chdir(root)
             try:
-                with patch("sys.argv", argv), redirect_stderr(stderr):
+                with (
+                    unittest.mock.patch("sys.argv", argv),
+                    contextlib.redirect_stderr(stderr),
+                ):
                     exit_code = pydocfmt_main.main()
             finally:
                 os.chdir(previous_cwd)
@@ -911,7 +928,10 @@ class TestCliVerbose(unittest.TestCase):
             previous_cwd = os.getcwd()
             os.chdir(root)
             try:
-                with patch("sys.argv", argv), redirect_stderr(stderr):
+                with (
+                    unittest.mock.patch("sys.argv", argv),
+                    contextlib.redirect_stderr(stderr),
+                ):
                     exit_code = main()
             finally:
                 os.chdir(previous_cwd)
@@ -945,7 +965,10 @@ class TestCliVerbose(unittest.TestCase):
             previous_cwd = os.getcwd()
             os.chdir(root)
             try:
-                with patch("sys.argv", argv), redirect_stderr(stderr):
+                with (
+                    unittest.mock.patch("sys.argv", argv),
+                    contextlib.redirect_stderr(stderr),
+                ):
                     exit_code = pydocfmt_main.main()
             finally:
                 os.chdir(previous_cwd)
@@ -961,7 +984,10 @@ class TestCliVerbose(unittest.TestCase):
             target = root / "missing.py"
             stdout = StringIO()
             argv = ["pydocfmt", str(target)]
-            with patch("sys.argv", argv), redirect_stdout(stdout):
+            with (
+                unittest.mock.patch("sys.argv", argv),
+                contextlib.redirect_stdout(stdout),
+            ):
                 pydocfmt_main.main()
 
         self.assertIn(
@@ -985,18 +1011,18 @@ class TestCliVerbose(unittest.TestCase):
 
             argv = ["pydocfmt", "--verbose", str(root)]
             with (
-                patch("sys.argv", argv),
-                patch(
+                unittest.mock.patch("sys.argv", argv),
+                unittest.mock.patch(
                     "pydocformatter.file_selection.subprocess.run",
                     return_value=subprocess.CompletedProcess(
                         ["git"], 128, stdout=b"", stderr=b"fatal: broken git"
                     ),
                 ),
-                patch(
+                unittest.mock.patch(
                     "pydocformatter.cli.pydocfmt_main.pydocfmt.format_docstrings",
                     side_effect=fake_format,
                 ),
-                redirect_stdout(stdout),
+                contextlib.redirect_stdout(stdout),
             ):
                 pydocfmt_main.main()
 
@@ -1022,7 +1048,10 @@ class TestCliVerbose(unittest.TestCase):
             root = Path(td)
             stdout = StringIO()
             argv = ["pydocfmt", str(root)]
-            with patch("sys.argv", argv), redirect_stdout(stdout):
+            with (
+                unittest.mock.patch("sys.argv", argv),
+                contextlib.redirect_stdout(stdout),
+            ):
                 pydocfmt_main.main()
 
             output = stdout.getvalue()
@@ -1036,7 +1065,10 @@ class TestCliVerbose(unittest.TestCase):
             root = Path(td)
             stdout = StringIO()
             argv = ["pycommentfmt", str(root)]
-            with patch("sys.argv", argv), redirect_stdout(stdout):
+            with (
+                unittest.mock.patch("sys.argv", argv),
+                contextlib.redirect_stdout(stdout),
+            ):
                 pycommentfmt_main.main()
 
             output = stdout.getvalue()
@@ -1058,7 +1090,10 @@ class TestCliVerbose(unittest.TestCase):
 
             stdout = StringIO()
             argv = ["pydocfmt", "--check", "--line-length", "72", str(root)]
-            with patch("sys.argv", argv), redirect_stdout(stdout):
+            with (
+                unittest.mock.patch("sys.argv", argv),
+                contextlib.redirect_stdout(stdout),
+            ):
                 exit_code = pydocfmt_main.main()
 
             self.assertEqual(exit_code, 1)

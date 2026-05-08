@@ -1,5 +1,5 @@
-from dataclasses import dataclass
-from fnmatch import fnmatchcase
+import dataclasses
+import fnmatch
 
 
 class GlobPatternError(ValueError):
@@ -10,7 +10,7 @@ class GlobPatternError(ValueError):
     """
 
 
-@dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True)
 class CompiledGlobPattern:
     """A single compiled glob pattern.
 
@@ -68,11 +68,12 @@ class CompiledGlobPattern:
             return False
 
         if not self.has_slash:
-            if fnmatchcase(path_segments[-1], self.pattern):
+            if fnmatch.fnmatchcase(path_segments[-1], self.pattern):
                 return True
             if match_parent_segments_for_bare:
                 return any(
-                    fnmatchcase(segment, self.pattern) for segment in path_segments[:-1]
+                    fnmatch.fnmatchcase(segment, self.pattern)
+                    for segment in path_segments[:-1]
                 )
             return False
 
@@ -85,7 +86,7 @@ class CompiledGlobPattern:
         )
 
 
-@dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True)
 class GlobPatternSet:
     """A compile-once set of glob patterns.
 
@@ -236,7 +237,7 @@ def _match_segment_glob(
 
     if path_index >= len(path_segments):
         return False
-    if not fnmatchcase(path_segments[path_index], current_pattern):
+    if not fnmatch.fnmatchcase(path_segments[path_index], current_pattern):
         return False
     return _match_segment_glob(
         path_segments,
