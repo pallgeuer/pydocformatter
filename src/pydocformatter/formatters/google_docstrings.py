@@ -465,6 +465,7 @@ def format_attributes_section(
     )
 
 
+# noinspection PyTypeChecker
 SECTION_HANDLERS: dict[str, SectionFormatter] = {
     "Args": format_args_section,
     "Returns": format_returns_section,

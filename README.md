@@ -112,6 +112,7 @@ If no files or directories are specified, `pydocfmt` formats the current directo
 - `--extend-exclude GLOB [GLOB ...]`: Additional glob pattern(s) for files to exclude
 - `--respect-gitignore`, `--no-respect-gitignore`: Toggle .gitignore-aware discovery (default: enabled)
 - `--force-exclude`, `--no-force-exclude`: Apply include/exclude rules even to explicitly listed files
+- `--experimental`, `--no-experimental`: Toggle the experimental rule-based formatter implementation (default: disabled)
 
 **Examples:**
 ```bash
@@ -174,6 +175,7 @@ If no files or directories are specified, `pycommentfmt` formats the current dir
 - `--extend-exclude GLOB [GLOB ...]`: Additional glob pattern(s) for files to exclude
 - `--respect-gitignore`, `--no-respect-gitignore`: Toggle .gitignore-aware discovery (default: enabled)
 - `--force-exclude`, `--no-force-exclude`: Apply include/exclude rules even to explicitly listed files
+- `--experimental`, `--no-experimental`: Toggle the experimental rule-based formatter implementation (default: disabled)
 
 **Examples:**
 ```bash
@@ -211,10 +213,11 @@ line-length = 88
 line-ending = "auto"
 indent-style = "space"
 indent-width = 4
-respect-gitignore = true
-force-exclude = false
 include = ["*.py", "*.pyi", "*.pyw"]
 extend-exclude = ["generated"]
+respect-gitignore = true
+force-exclude = false
+experimental = false
 select = ["ALL"]
 ignore = []
 fixable = ["ALL"]
@@ -237,12 +240,13 @@ extend-per-file-ignores = {"generated/*.py" = ["PCF002"]}
 - `line-ending`: Line ending to use when rewriting files; one of `"auto"`, `"lf"`, `"cr-lf"`, or `"native"` (default: `"auto"`)
 - `indent-style`: Generated docstring section indentation style for `pydocfmt`; one of `"space"` or `"tab"` (default: `"space"`)
 - `indent-width`: Generated docstring section indentation width for `pydocfmt` (default: 4)
-- `respect-gitignore`: Respect `.gitignore` during file discovery (default: `true`)
-- `force-exclude`: Apply include/exclude rules to explicitly listed files (default: `false`)
 - `include`: Glob patterns for files to include
 - `extend-include`: Additional include glob patterns
 - `exclude`: Glob patterns for files/directories to exclude
 - `extend-exclude`: Additional exclude glob patterns
+- `respect-gitignore`: Respect `.gitignore` during file discovery (default: `true`)
+- `force-exclude`: Apply include/exclude rules to explicitly listed files (default: `false`)
+- `experimental`: Use the experimental rule-based formatter implementation (default: `false`)
 - `select`: Rule selectors to enable (default: `["ALL"]`)
 - `extend-select`: Additional rule selectors to enable
 - `ignore`: Rule selectors to ignore

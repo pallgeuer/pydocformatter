@@ -14,12 +14,14 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added `--line-ending` to `pydocfmt` and `pycommentfmt` to control line endings used when rewriting files.
   - Added `-v` / `--verbose` to `pydocfmt` and `pycommentfmt` to report all considered files during discovery, including included files and ignored files with include/exclude reasons.
   - Added `--respect-gitignore` / `--no-respect-gitignore` to `pydocfmt` and `pycommentfmt`, with enabled-by-default behavior and matching `pyproject.toml` configuration.
+  - Added `--experimental` / `--no-experimental` to `pydocfmt` and `pycommentfmt` for opting into the experimental formatter path.
 
 - **Configuration:**
   - Added Ruff-style `line-ending` configuration with `"auto"`, `"lf"`, `"cr-lf"`, and `"native"` values.
-  - Added Ruff-style rule settings under `[tool.pydocformatter]` and tool-specific override tables: `select`, `extend-select`, `ignore`, `fixable`, `extend-fixable`, `unfixable`, `per-file-ignores`, and `extend-per-file-ignores`.
-  - Added `respect-gitignore` for shared formatter configuration, defaulting to `true`.
   - Added `indent-style` and `indent-width` for `pydocfmt` generated docstring section indentation, with Ruff-style defaults of `"space"` and `4`.
+  - Added `respect-gitignore` for shared formatter configuration, defaulting to `true`.
+  - Added `experimental` for shared formatter configuration, defaulting to `false`.
+  - Added Ruff-style rule settings under `[tool.pydocformatter]` and tool-specific override tables: `select`, `extend-select`, `ignore`, `fixable`, `extend-fixable`, `unfixable`, `per-file-ignores`, and `extend-per-file-ignores`.
 
 - **Documentation:**
   - Added a Ruff file-selection compatibility specification at `docs/file-selection-spec.md`, including exact defaults, precedence rules, force-exclude behavior, and explicit pydocformatter deviations.

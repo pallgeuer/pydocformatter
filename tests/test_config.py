@@ -26,12 +26,13 @@ class TestConfig(unittest.TestCase):
         self.assertEqual(config.line_ending, "auto")
         self.assertEqual(config.indent_style, "space")
         self.assertEqual(config.indent_width, 4)
-        self.assertTrue(config.respect_gitignore)
-        self.assertFalse(config.force_exclude)
         self.assertEqual(config.include, DEFAULT_INCLUDE)
         self.assertEqual(config.extend_include, ())
         self.assertEqual(config.exclude, DEFAULT_EXCLUDE)
         self.assertEqual(config.extend_exclude, ())
+        self.assertTrue(config.respect_gitignore)
+        self.assertFalse(config.force_exclude)
+        self.assertFalse(config.experimental)
         self.assertEqual(config.select, ("ALL",))
         self.assertEqual(config.extend_select, ())
         self.assertEqual(config.ignore, ())
@@ -105,6 +106,47 @@ class TestConfig(unittest.TestCase):
         self.assertEqual(config.select, ("PCF",))
         self.assertEqual(config.ignore, ("PCF002",))
         self.assertEqual(config.per_file_ignores, (("tests/*.py", ("PCF001",)),))
+
+    def test_experimental_setting_is_shared_and_tool_specific(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "pyproject.toml").write_text(
+                "[tool.pydocformatter]\nexperimental = true\n[tool.pydocformatter.pycommentfmt]\nexperimental = false\n",
+                encoding="utf-8",
+            )
+            previous_cwd = os.getcwd()
+            os.chdir(root)
+            try:
+                pydocfmt_config = pydocformatter_config.load_config("pydocfmt")
+                pycommentfmt_config = pydocformatter_config.load_config("pycommentfmt")
+            finally:
+                os.chdir(previous_cwd)
+
+        self.assertTrue(pydocfmt_config.experimental)
+        self.assertFalse(pycommentfmt_config.experimental)
+
+    def test_experimental_cli_override_is_applied(self) -> None:
+        config = pydocformatter_config.load_config(
+            "pycommentfmt",
+            SettingsOverrides(experimental=True),
+        )
+
+        self.assertTrue(config.experimental)
+
+    def test_experimental_setting_must_be_boolean(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "pyproject.toml").write_text(
+                '[tool.pydocformatter]\nexperimental = "yes"\n',
+                encoding="utf-8",
+            )
+            previous_cwd = os.getcwd()
+            os.chdir(root)
+            try:
+                with self.assertRaisesRegex(ConfigError, "experimental"):
+                    pydocformatter_config.load_config("pydocfmt")
+            finally:
+                os.chdir(previous_cwd)
 
     def test_shared_and_tool_specific_overrides_replace_independent_list_keys(
         self,

@@ -93,6 +93,24 @@ def add_common_arguments(
         help="Additional glob pattern(s) for files to exclude.",
     )
     parser.add_argument(
+        "--respect-gitignore",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help=f"Respect .gitignore when discovering files (default: {_enabled_label(settings.respect_gitignore)}).",
+    )
+    parser.add_argument(
+        "--force-exclude",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help=f"Apply include/exclude/gitignore rules even to files passed explicitly (default: {_enabled_label(settings.force_exclude)}).",
+    )
+    parser.add_argument(
+        "--experimental",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help=f"Use the experimental rule-based formatter implementation (default: {_enabled_label(settings.experimental)}).",
+    )
+    parser.add_argument(
         "--select",
         action="append",
         default=None,
@@ -153,18 +171,6 @@ def add_common_arguments(
         default=None,
         metavar="TOML",
         help="TOML inline table mapping file patterns to additional ignored rule selectors.",
-    )
-    parser.add_argument(
-        "--respect-gitignore",
-        action=argparse.BooleanOptionalAction,
-        default=None,
-        help=f"Respect .gitignore when discovering files (default: {_enabled_label(settings.respect_gitignore)}).",
-    )
-    parser.add_argument(
-        "--force-exclude",
-        action=argparse.BooleanOptionalAction,
-        default=None,
-        help=f"Apply include/exclude/gitignore rules even to files passed explicitly (default: {_enabled_label(settings.force_exclude)}).",
     )
 
 
@@ -244,12 +250,13 @@ def _settings_overrides_from_args(args: argparse.Namespace) -> config.SettingsOv
         line_ending=args.line_ending,
         indent_style=getattr(args, "indent_style", None),
         indent_width=getattr(args, "indent_width", None),
-        respect_gitignore=args.respect_gitignore,
-        force_exclude=args.force_exclude,
         include=_flatten_option_groups(args.include),
         extend_include=_flatten_option_groups(args.extend_include),
         exclude=_flatten_option_groups(args.exclude),
         extend_exclude=_flatten_option_groups(args.extend_exclude),
+        respect_gitignore=args.respect_gitignore,
+        force_exclude=args.force_exclude,
+        experimental=args.experimental,
         select=_flatten_option_groups(args.select),
         extend_select=_flatten_option_groups(args.extend_select),
         ignore=_flatten_option_groups(args.ignore),

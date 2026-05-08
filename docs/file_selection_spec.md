@@ -8,11 +8,11 @@ The compatibility surface is intentionally limited to:
 - `line-ending`
 - `indent-style` (`pydocfmt` only)
 - `indent-width` (`pydocfmt` only)
-- `respect-gitignore`
 - `include`
 - `extend-include`
 - `exclude`
 - `extend-exclude`
+- `respect-gitignore`
 - `force-exclude`
 
 Settings outside this list are not part of the Ruff compatibility contract.
@@ -30,12 +30,12 @@ Settings outside this list are not part of the Ruff compatibility contract.
 - `line-ending = "auto"`
 - `indent-style = "space"` (`pydocfmt` only)
 - `indent-width = 4` (`pydocfmt` only)
-- `respect-gitignore = true`
-- `force-exclude = false`
 - `include = ["*.py", "*.pyi", "*.pyw"]`
 - `extend-include = []`
 - `exclude = [".bzr", ".direnv", ".eggs", ".git", ".git-rewrite", ".hg", ".mypy_cache", ".nox", ".pants.d", ".pytype", ".ruff_cache", ".svn", ".tox", ".venv", "__pypackages__", "_build", "buck-out", "dist", "node_modules", "venv"]`
 - `extend-exclude = []`
+- `respect-gitignore = true`
+- `force-exclude = false`
 
 The `exclude` default is kept aligned with Ruff's current documented top-level default.
 

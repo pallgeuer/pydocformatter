@@ -440,14 +440,14 @@ class TestCliVerbose(unittest.TestCase):
             (root / ".git").mkdir()
             (root / "a.py").write_text("x = 1\n", encoding="utf-8")
             (root / "pyproject.toml").write_text(
-                "[tool.pydocformatter.pydocfmt]\nline-length = 72\nrespect-gitignore = false\n",
+                "[tool.pydocformatter.pydocfmt]\nline-length = 72\nrespect-gitignore = false\nexperimental = true\n",
                 encoding="utf-8",
             )
-            called_args: list[tuple[str, int, bool]] = []
+            called_args: list[tuple[str, int, bool, bool]] = []
 
             # noinspection PyUnusedLocal
             def fake_format(path: str, settings: FormatterSettings, check: bool) -> bool:
-                called_args.append((path, settings.line_length, check))
+                called_args.append((path, settings.line_length, check, settings.experimental))
                 return False
 
             argv = ["pydocfmt", str(root)]
@@ -467,7 +467,7 @@ class TestCliVerbose(unittest.TestCase):
                 os.chdir(previous_cwd)
 
             self.assertFalse(run_mock.called)
-            self.assertEqual(called_args, [(str(root / "a.py"), 72, False)])
+            self.assertEqual(called_args, [(str(root / "a.py"), 72, False, True)])
 
     def test_pydocfmt_indent_cli_settings_are_applied(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -622,6 +622,7 @@ class TestCliVerbose(unittest.TestCase):
             argv = [
                 "pycommentfmt",
                 str(target),
+                "--experimental",
                 "--select",
                 "PCF",
                 "--ignore",
@@ -648,6 +649,7 @@ class TestCliVerbose(unittest.TestCase):
             self.assertEqual(called_settings[0].fixable, ("ALL",))
             self.assertEqual(called_settings[0].unfixable, ("PCF001",))
             self.assertEqual(called_settings[0].per_file_ignores, (("tests/*.py", ("PCF001",)),))
+            self.assertTrue(called_settings[0].experimental)
 
     def test_invalid_rule_cli_selector_reports_configuration_error(self) -> None:
         with tempfile.TemporaryDirectory() as td:

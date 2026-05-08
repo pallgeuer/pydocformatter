@@ -44,12 +44,13 @@ _KEY_TO_FIELD = {
     "line-ending": "line_ending",
     "indent-style": "indent_style",
     "indent-width": "indent_width",
-    "respect-gitignore": "respect_gitignore",
-    "force-exclude": "force_exclude",
     "include": "include",
     "extend-include": "extend_include",
     "exclude": "exclude",
     "extend-exclude": "extend_exclude",
+    "respect-gitignore": "respect_gitignore",
+    "force-exclude": "force_exclude",
+    "experimental": "experimental",
     "select": "select",
     "extend-select": "extend_select",
     "ignore": "ignore",
@@ -88,12 +89,13 @@ _COMMON_SETTING_KEYS = (
         {
             "line-length",
             "line-ending",
-            "respect-gitignore",
-            "force-exclude",
             "include",
             "extend-include",
             "exclude",
             "extend-exclude",
+            "respect-gitignore",
+            "force-exclude",
+            "experimental",
         }
     )
     | _RULE_SETTING_KEYS
@@ -125,12 +127,13 @@ class FormatterSettings:
             This setting is not used by `pycommentfmt`.
         indent_width (int): Number of spaces per generated `pydocfmt` docstring indentation level, or the visual width
             of a tab. This setting is not used by `pycommentfmt`.
-        respect_gitignore (bool): Whether discovered files are filtered through `.gitignore`.
-        force_exclude (bool): Whether include, exclude, and gitignore rules apply to explicitly passed paths.
         include (tuple[str, ...]): Base glob patterns that identify format-eligible files.
         extend_include (tuple[str, ...]): Additional include glob patterns appended to `include`.
         exclude (tuple[str, ...]): Base glob patterns for files or directories to ignore.
         extend_exclude (tuple[str, ...]): Additional exclude glob patterns appended to `exclude`.
+        respect_gitignore (bool): Whether discovered files are filtered through `.gitignore`.
+        force_exclude (bool): Whether include, exclude, and gitignore rules apply to explicitly passed paths.
+        experimental (bool): Whether to use the experimental rule-based formatter implementation.
         select (tuple[str, ...]): Base selected pydocformatter rule selectors.
         extend_select (tuple[str, ...]): Additional selected rule selectors.
         ignore (tuple[str, ...]): Rule selectors to ignore.
@@ -145,12 +148,13 @@ class FormatterSettings:
     line_ending: LineEnding = "auto"
     indent_style: IndentStyle = "space"
     indent_width: int = 4
-    respect_gitignore: bool = True
-    force_exclude: bool = False
     include: tuple[str, ...] = DEFAULT_INCLUDE
     extend_include: tuple[str, ...] = ()
     exclude: tuple[str, ...] = DEFAULT_EXCLUDE
     extend_exclude: tuple[str, ...] = ()
+    respect_gitignore: bool = True
+    force_exclude: bool = False
+    experimental: bool = False
     select: tuple[str, ...] = DEFAULT_RULE_SELECT
     extend_select: tuple[str, ...] = ()
     ignore: tuple[str, ...] = ()
@@ -179,12 +183,13 @@ class SettingsOverrides:
     line_ending: LineEnding | None = None
     indent_style: IndentStyle | None = None
     indent_width: int | None = None
-    respect_gitignore: bool | None = None
-    force_exclude: bool | None = None
     include: tuple[str, ...] | None = None
     extend_include: tuple[str, ...] | None = None
     exclude: tuple[str, ...] | None = None
     extend_exclude: tuple[str, ...] | None = None
+    respect_gitignore: bool | None = None
+    force_exclude: bool | None = None
+    experimental: bool | None = None
     select: tuple[str, ...] | None = None
     extend_select: tuple[str, ...] | None = None
     ignore: tuple[str, ...] | None = None
@@ -476,12 +481,13 @@ _SETTING_VALIDATORS: dict[str, Callable[[Any, str], Any]] = {
     "line_ending": _validate_line_ending,
     "indent_style": _validate_indent_style,
     "indent_width": _validate_indent_width,
-    "respect_gitignore": _validate_bool,
-    "force_exclude": _validate_bool,
     "include": _validate_include_string_list,
     "extend_include": _validate_include_string_list,
     "exclude": _validate_exclude_string_list,
     "extend_exclude": _validate_exclude_string_list,
+    "respect_gitignore": _validate_bool,
+    "force_exclude": _validate_bool,
+    "experimental": _validate_bool,
     "select": _validate_selector_list,
     "extend_select": _validate_selector_list,
     "ignore": _validate_selector_list,
