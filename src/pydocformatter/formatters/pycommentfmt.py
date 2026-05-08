@@ -3,10 +3,13 @@ import re
 import textwrap
 import tokenize
 
-from pydocformatter.utils import format_needs_formatting_message
+import pydocformatter.utils as utils
+from pydocformatter.config import FormatterSettings
 
 
-def format_comments(path: str, line_length: int, check: bool = False) -> bool:
+def format_comments(
+    path: str, settings: FormatterSettings, check: bool = False
+) -> bool:
     """Format comments in a Python file.
 
     This function reads a Python file, formats its comments to ensure they comply with
@@ -15,7 +18,7 @@ def format_comments(path: str, line_length: int, check: bool = False) -> bool:
 
     Args:
         path (str): The path to the Python file.
-        line_length (int): The maximum line length for comments.
+        settings (FormatterSettings): Resolved settings for comment formatting.
         check (bool): If True, only check if the file is formatted correctly.
 
     Returns:
@@ -64,7 +67,7 @@ def format_comments(path: str, line_length: int, check: bool = False) -> bool:
         block_comment_text = " ".join(
             block_line.lstrip("#").strip() for _, block_line in comment_block
         )
-        available_width = line_length - len(base_indent) - 2
+        available_width = settings.line_length - len(base_indent) - 2
         wrapped_lines = textwrap.wrap(
             block_comment_text,
             width=available_width,
@@ -107,7 +110,7 @@ def format_comments(path: str, line_length: int, check: bool = False) -> bool:
             code = before_comment.rstrip()
             inline_length = len(code) + 4 + len(comment_text)
 
-            if inline_length <= line_length:
+            if inline_length <= settings.line_length:
                 new_line = f"{code}  # {comment_text}\n"
                 if new_line != lines[srow - 1]:
                     changed_lines.add(srow - 1)
@@ -116,7 +119,7 @@ def format_comments(path: str, line_length: int, check: bool = False) -> bool:
                 indent = before_comment[
                     : len(before_comment) - len(before_comment.lstrip())
                 ]
-                available = line_length - len(indent) - 2
+                available = settings.line_length - len(indent) - 2
                 wrapped = textwrap.wrap(
                     comment_text,
                     width=available,
@@ -139,7 +142,7 @@ def format_comments(path: str, line_length: int, check: bool = False) -> bool:
     if check:
         if changed_lines:
             line_numbers = sorted(i + 1 for i in changed_lines)
-            print(format_needs_formatting_message(path, "comment", line_numbers))
+            print(utils.format_needs_formatting_message(path, "comment", line_numbers))
             return True
         return False
     else:

@@ -206,12 +206,21 @@ respect-gitignore = true
 force-exclude = false
 include = ["*.py", "*.pyi", "*.pyw"]
 extend-exclude = ["generated"]
+select = ["ALL"]
+ignore = []
+fixable = ["ALL"]
+unfixable = []
+
+[tool.pydocformatter.per-file-ignores]
+"tests/*.py" = ["PCF001"]
 
 [tool.pydocformatter.pydocfmt]
 line-length = 100
+extend-select = ["RD"]
 
 [tool.pydocformatter.pycommentfmt]
 extend-exclude = ["legacy_comments.py"]
+extend-per-file-ignores = {"generated/*.py" = ["PCF002"]}
 ```
 
 **Configuration Options:**
@@ -224,12 +233,20 @@ extend-exclude = ["legacy_comments.py"]
 - `extend-include`: Additional include glob patterns
 - `exclude`: Glob patterns for files/directories to exclude
 - `extend-exclude`: Additional exclude glob patterns
+- `select`: Rule selectors to enable (default: `["ALL"]`)
+- `extend-select`: Additional rule selectors to enable
+- `ignore`: Rule selectors to ignore
+- `fixable`: Rule selectors eligible for automatic fixes (default: `["ALL"]`)
+- `extend-fixable`: Additional rule selectors eligible for automatic fixes
+- `unfixable`: Rule selectors ineligible for automatic fixes
+- `per-file-ignores`: File-pattern-specific ignored rule selectors
+- `extend-per-file-ignores`: Additional file-pattern-specific ignored rule selectors
 
 Settings are resolved as defaults, then shared table, then tool-specific table, then command-line options. The highest-precedence specified value wins for each key, including `extend-include` and `extend-exclude`.
 
 `indent-style` and `indent-width` are used by `pydocfmt` only. They may be configured in the shared table or `[tool.pydocformatter.pydocfmt]`; `pycommentfmt` does not accept them as CLI options or in `[tool.pydocformatter.pycommentfmt]`.
 
-For the full file-selection contract, including Ruff compatibility deltas and explicit file behavior, see [File Selection Compatibility Specification](docs/file-selection-spec.md).
+For the full file-selection contract, including Ruff compatibility deltas and explicit file behavior, see [File Selection Compatibility Specification](docs/file_selection_spec.md).
 
 ---
 

@@ -112,4 +112,4 @@ pydocfmt --include "*.py" "*.pyi" -- src/
 
 ## Validation Guidance
 
-Tests should encode this contract directly and should not invoke Ruff as an oracle. Contract tests should be named or fixture-tagged with `ruff-0.15.12-spec`.
+Tests should encode this contract directly and should not invoke Ruff as an oracle. Contract tests should be named or fixture-tagged with `ruff_spec`.

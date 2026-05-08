@@ -15,6 +15,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added `--respect-gitignore` / `--no-respect-gitignore` to `pydocfmt` and `pycommentfmt`, with enabled-by-default behavior and matching `pyproject.toml` configuration.
 
 - **Configuration:**
+  - Added Ruff-style rule settings under `[tool.pydocformatter]` and tool-specific override tables: `select`, `extend-select`, `ignore`, `fixable`, `extend-fixable`, `unfixable`, `per-file-ignores`, and `extend-per-file-ignores`.
   - Added `respect-gitignore` for shared formatter configuration, defaulting to `true`.
   - Added `indent-style` and `indent-width` for `pydocfmt` generated docstring section indentation, with Ruff-style defaults of `"space"` and `4`.
 
@@ -35,8 +36,13 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Known nested tool tables are now validated for unknown or invalid settings even when running the other formatter.
 
 - **CLI:**
+  - `pydocfmt` and `pycommentfmt` now expose command-line overrides for Ruff-style rule settings.
   - `--include`, `--extend-include`, `--exclude`, and `--extend-exclude` now accept multiple glob values in one option usage (e.g. `--include *.py *.pyi`).
   - `pydocfmt` and `pycommentfmt` now default to formatting the current directory when no files or directories are specified.
+
+- **Architecture:**
+  - `run_formatter()` now returns an exit code instead of directly exiting when check mode finds files that need formatting.
+  - Formatter functions now receive resolved `FormatterSettings` directly.
 
 - **File discovery:**
   - `force-exclude` now consistently applies `.gitignore` filtering to explicitly passed file paths.
@@ -68,6 +74,9 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Malformed pydocformatter config tables are now consistently rejected, including falsy non-table values.
 
 ### Removed
+
+- **Architecture:**
+  - Removed redundant CLI/config wrapper functions from the formatter entry points and settings resolution path.
 
 - **Breaking configuration migration:**
   - Removed legacy top-level config tables (`[tool.pydocfmt]`, `[tool.pycommentfmt]`) from settings resolution.

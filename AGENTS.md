@@ -2,7 +2,8 @@
 
 ## Code Style
 
-- Do not manually wrap code/comments/docstrings; let formatters enforce line length.
+- Never manually wrap code/comments/docstrings during code writing and edits; allow the formatters to enforce line length.
+- Avoid unqualified function imports like `from X.Y import func`; use `import X.Y` or `import X.Y as Y` and call via the module. Classes, exceptions, types, and constants may be imported directly.
 
 ## Commands
 

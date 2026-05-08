@@ -4,7 +4,8 @@ import unittest
 from contextlib import redirect_stdout
 from io import StringIO
 
-from pydocformatter.formatters.pycommentfmt import format_comments
+import pydocformatter.formatters.pycommentfmt as pycommentfmt
+from pydocformatter.config import FormatterSettings
 
 
 class TestPyCommentFmt(unittest.TestCase):
@@ -22,7 +23,9 @@ class TestPyCommentFmt(unittest.TestCase):
         try:
             output = StringIO()
             with redirect_stdout(output):
-                result = format_comments(filename, line_length=line_length, check=check)
+                result = pycommentfmt.format_comments(
+                    filename, FormatterSettings(line_length=line_length), check=check
+                )
             with open(filename, encoding="utf-8") as f:
                 final = f.read()
         finally:

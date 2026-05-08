@@ -8,7 +8,6 @@ from pydocformatter.config import (
     DEFAULT_INCLUDE,
     ConfigError,
     SettingsOverrides,
-    apply_cli_overrides,
     load_config,
 )
 
@@ -32,6 +31,88 @@ class TestConfig(unittest.TestCase):
         self.assertEqual(config.extend_include, ())
         self.assertEqual(config.exclude, DEFAULT_EXCLUDE)
         self.assertEqual(config.extend_exclude, ())
+        self.assertEqual(config.select, ("ALL",))
+        self.assertEqual(config.extend_select, ())
+        self.assertEqual(config.ignore, ())
+        self.assertEqual(config.fixable, ("ALL",))
+        self.assertEqual(config.extend_fixable, ())
+        self.assertEqual(config.unfixable, ())
+        self.assertEqual(config.per_file_ignores, ())
+        self.assertEqual(config.extend_per_file_ignores, ())
+
+    def test_shared_rule_settings_accept_all_rule_prefixes(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "pyproject.toml").write_text(
+                "[tool.pydocformatter]\n"
+                'select = ["RD", "PCF"]\n'
+                'ignore = ["PDF001"]\n'
+                'fixable = ["ALL"]\n'
+                "[tool.pydocformatter.per-file-ignores]\n"
+                '"tests/*.py" = ["PCF001"]\n',
+                encoding="utf-8",
+            )
+            previous_cwd = os.getcwd()
+            os.chdir(root)
+            try:
+                config = load_config("pydocfmt")
+            finally:
+                os.chdir(previous_cwd)
+
+        self.assertEqual(config.select, ("RD", "PCF"))
+        self.assertEqual(config.ignore, ("PDF001",))
+        self.assertEqual(config.fixable, ("ALL",))
+        self.assertEqual(config.per_file_ignores, (("tests/*.py", ("PCF001",)),))
+
+    def test_tool_specific_rule_settings_reject_other_tool_selectors(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "pyproject.toml").write_text(
+                "[tool.pydocformatter.pydocfmt]\n" 'select = ["PCF"]\n',
+                encoding="utf-8",
+            )
+            previous_cwd = os.getcwd()
+            os.chdir(root)
+            try:
+                with self.assertRaisesRegex(ConfigError, "PCF"):
+                    load_config("pydocfmt")
+            finally:
+                os.chdir(previous_cwd)
+
+    def test_inline_per_file_rule_settings_are_applied(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "pyproject.toml").write_text(
+                "[tool.pydocformatter.pycommentfmt]\n"
+                'per-file-ignores = {"tests/*.py" = ["PCF001"]}\n'
+                'extend-per-file-ignores = {"generated/*.py" = ["PCF002"]}\n',
+                encoding="utf-8",
+            )
+            previous_cwd = os.getcwd()
+            os.chdir(root)
+            try:
+                config = load_config("pycommentfmt")
+            finally:
+                os.chdir(previous_cwd)
+
+        self.assertEqual(config.per_file_ignores, (("tests/*.py", ("PCF001",)),))
+        self.assertEqual(
+            config.extend_per_file_ignores, (("generated/*.py", ("PCF002",)),)
+        )
+
+    def test_cli_rule_overrides_are_applied(self) -> None:
+        config = load_config(
+            "pycommentfmt",
+            SettingsOverrides(
+                select=("PCF",),
+                ignore=("PCF002",),
+                per_file_ignores=(("tests/*.py", ("PCF001",)),),
+            ),
+        )
+
+        self.assertEqual(config.select, ("PCF",))
+        self.assertEqual(config.ignore, ("PCF002",))
+        self.assertEqual(config.per_file_ignores, (("tests/*.py", ("PCF001",)),))
 
     def test_shared_and_tool_specific_overrides_replace_independent_list_keys(
         self,
@@ -72,8 +153,8 @@ class TestConfig(unittest.TestCase):
         self.assertTrue(config.force_exclude)
 
     def test_cli_overrides_replace_extend_lists(self) -> None:
-        config = apply_cli_overrides(
-            load_config("pydocfmt"),
+        config = load_config(
+            "pydocfmt",
             SettingsOverrides(
                 include=("*.py",),
                 extend_include=("*.pyw",),
@@ -88,8 +169,8 @@ class TestConfig(unittest.TestCase):
         self.assertEqual(config.extend_exclude, ("generated.py",))
 
     def test_cli_overrides_replace_pydocfmt_indent_settings(self) -> None:
-        config = apply_cli_overrides(
-            load_config("pydocfmt"),
+        config = load_config(
+            "pydocfmt",
             SettingsOverrides(indent_style="tab", indent_width=2),
         )
 
@@ -372,8 +453,8 @@ class TestConfig(unittest.TestCase):
                 with self.assertRaisesRegex(
                     ConfigError, "include patterns must not be empty"
                 ):
-                    apply_cli_overrides(
-                        load_config("pydocfmt"),
+                    load_config(
+                        "pydocfmt",
                         SettingsOverrides(include=("",)),
                     )
             finally:
@@ -387,8 +468,8 @@ class TestConfig(unittest.TestCase):
                 with self.assertRaisesRegex(
                     ConfigError, "exclude patterns must not be empty"
                 ):
-                    apply_cli_overrides(
-                        load_config("pydocfmt"),
+                    load_config(
+                        "pydocfmt",
                         SettingsOverrides(exclude=("",)),
                     )
             finally:

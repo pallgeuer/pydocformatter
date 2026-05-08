@@ -6,15 +6,16 @@ from contextlib import redirect_stdout
 from io import StringIO
 from pathlib import Path
 
-from pydocformatter.formatters.google_docstrings import reflow
-from pydocformatter.formatters.pydocfmt import format_docstrings
+import pydocformatter.formatters.google_docstrings as google_docstrings
+import pydocformatter.formatters.pydocfmt as pydocfmt
+from pydocformatter.config import FormatterSettings
 
 
 class TestPyDocFmt(unittest.TestCase):
     def _format_and_check(
         self, source: str, expected: str, line_length: int = 88, indent: str = ""
     ) -> None:
-        formatted = reflow(source.strip(), line_length, indent)
+        formatted = google_docstrings.reflow(source.strip(), line_length, indent)
 
         self.assertEqual("".join(formatted).strip(), expected.strip())
 
@@ -122,7 +123,9 @@ Args:
                 within the line length limit.
             \"\"\"
         """)
-        formatted = reflow(doc.strip(), 78, "", indent_style="space", indent_width=2)
+        formatted = google_docstrings.reflow(
+            doc.strip(), 78, "", indent_style="space", indent_width=2
+        )
 
         self.assertEqual("".join(formatted).strip(), expected.strip())
 
@@ -139,7 +142,9 @@ Args:
             \t\twithin the line length limit.
             \"\"\"
         """)
-        formatted = reflow(doc.strip(), 78, "", indent_style="tab", indent_width=4)
+        formatted = google_docstrings.reflow(
+            doc.strip(), 78, "", indent_style="tab", indent_width=4
+        )
 
         self.assertEqual("".join(formatted).strip(), expected.strip())
 
@@ -156,7 +161,9 @@ Args:
             \t\tfour five six seven
             \"\"\"
         """)
-        formatted = reflow(doc.strip(), 24, "", indent_style="tab", indent_width=2)
+        formatted = google_docstrings.reflow(
+            doc.strip(), 24, "", indent_style="tab", indent_width=2
+        )
 
         self.assertEqual("".join(formatted).strip(), expected.strip())
         for line in formatted:
@@ -175,7 +182,9 @@ Args:
             "    \tfoo: a parameter that should be normalized.\n"
             '    """'
         )
-        formatted = reflow(doc.strip(), 88, "    ", indent_style="tab", indent_width=4)
+        formatted = google_docstrings.reflow(
+            doc.strip(), 88, "    ", indent_style="tab", indent_width=4
+        )
 
         self.assertEqual("".join(formatted).strip(), expected.strip())
 
@@ -190,7 +199,7 @@ This description should keep exactly one base indentation level after wrapping."
             "    wrapping.\n"
             '    """'
         )
-        formatted = reflow(doc.strip(), 76, "    ")
+        formatted = google_docstrings.reflow(doc.strip(), 76, "    ")
 
         self.assertEqual("".join(formatted).strip(), expected.strip())
 
@@ -358,7 +367,9 @@ Examples:
             tf.flush()
             path = tf.name
 
-        needs_fixing = format_docstrings(path, line_length=72, check=True)
+        needs_fixing = pydocfmt.format_docstrings(
+            path, FormatterSettings(line_length=72), check=True
+        )
         Path(path).unlink()
         self.assertTrue(needs_fixing, "The docstring should need formatting.")
 
@@ -370,7 +381,9 @@ Examples:
             tf.flush()
             path = tf.name
 
-        needs_fixing = format_docstrings(path, line_length=72, check=True)
+        needs_fixing = pydocfmt.format_docstrings(
+            path, FormatterSettings(line_length=72), check=True
+        )
         Path(path).unlink()
         self.assertFalse(needs_fixing, "The docstring should not need formatting.")
 
@@ -382,7 +395,9 @@ Examples:
             tf.flush()
             path = tf.name
 
-        modified = format_docstrings(path, line_length=72, check=False)
+        modified = pydocfmt.format_docstrings(
+            path, FormatterSettings(line_length=72), check=False
+        )
         Path(path).unlink()
         self.assertFalse(
             modified, "The file should not be modified if already formatted."
@@ -398,7 +413,9 @@ Examples:
 
         output = StringIO()
         with redirect_stdout(output):
-            needs_fixing = format_docstrings(path, line_length=72, check=True)
+            needs_fixing = pydocfmt.format_docstrings(
+                path, FormatterSettings(line_length=72), check=True
+            )
         Path(path).unlink()
 
         self.assertTrue(needs_fixing, "The docstring should need formatting.")
@@ -418,7 +435,9 @@ Examples:
 
         output = StringIO()
         with redirect_stdout(output):
-            needs_fixing = format_docstrings(path, line_length=72, check=True)
+            needs_fixing = pydocfmt.format_docstrings(
+                path, FormatterSettings(line_length=72), check=True
+            )
         Path(path).unlink()
 
         self.assertTrue(needs_fixing, "Docstrings should need formatting.")

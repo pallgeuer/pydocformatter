@@ -8,8 +8,9 @@ from pathlib import Path
 from typing import Callable
 from unittest.mock import patch
 
-from pydocformatter.cli.pycommentfmt_main import main as pycommentfmt_main
-from pydocformatter.cli.pydocfmt_main import main as pydocfmt_main
+import pydocformatter.cli.pycommentfmt_main as pycommentfmt_main
+import pydocformatter.cli.pydocfmt_main as pydocfmt_main
+from pydocformatter.config import FormatterSettings
 
 
 class TestCliVerbose(unittest.TestCase):
@@ -38,8 +39,7 @@ class TestCliVerbose(unittest.TestCase):
         def fake_run(
             *args: object, **kwargs: object
         ) -> subprocess.CompletedProcess[bytes]:
-            command = args[0]
-            assert command == [
+            expected_command = [
                 "git",
                 "-C",
                 str(root),
@@ -48,6 +48,7 @@ class TestCliVerbose(unittest.TestCase):
                 "--no-index",
                 "-z",
             ]
+            assert args[0] == expected_command
             stdin_bytes = kwargs["input"]
             assert isinstance(stdin_bytes, bytes)
             provided_paths = [
@@ -55,7 +56,9 @@ class TestCliVerbose(unittest.TestCase):
             ]
             ignored = [path for path in provided_paths if path in ignored_paths]
             stdout = ("\0".join(ignored) + ("\0" if ignored else "")).encode("utf-8")
-            return subprocess.CompletedProcess(command, 0, stdout=stdout, stderr=b"")
+            return subprocess.CompletedProcess(
+                expected_command, 0, stdout=stdout, stderr=b""
+            )
 
         return fake_run
 
@@ -84,12 +87,12 @@ class TestCliVerbose(unittest.TestCase):
             with (
                 patch("sys.argv", argv),
                 patch(
-                    "pydocformatter.cli.pydocfmt_main.format_docstrings",
+                    "pydocformatter.cli.pydocfmt_main.pydocfmt.format_docstrings",
                     side_effect=fake_format,
                 ),
                 redirect_stdout(stdout),
             ):
-                pydocfmt_main()
+                pydocfmt_main.main()
 
             expected_lines = [
                 f"{root / 'a.py'} included",
@@ -118,11 +121,11 @@ class TestCliVerbose(unittest.TestCase):
                 with (
                     patch("sys.argv", argv),
                     patch(
-                        "pydocformatter.cli.pydocfmt_main.format_docstrings",
+                        "pydocformatter.cli.pydocfmt_main.pydocfmt.format_docstrings",
                         side_effect=fake_format,
                     ),
                 ):
-                    pydocfmt_main()
+                    pydocfmt_main.main()
             finally:
                 os.chdir(previous_cwd)
 
@@ -151,12 +154,12 @@ class TestCliVerbose(unittest.TestCase):
             with (
                 patch("sys.argv", argv),
                 patch(
-                    "pydocformatter.cli.pydocfmt_main.format_docstrings",
+                    "pydocformatter.cli.pydocfmt_main.pydocfmt.format_docstrings",
                     side_effect=fake_format,
                 ),
                 redirect_stdout(stdout),
             ):
-                pydocfmt_main()
+                pydocfmt_main.main()
 
             expected_lines = [
                 f"{root / '.venv'} ignored: matches exclude patterns",
@@ -190,12 +193,12 @@ class TestCliVerbose(unittest.TestCase):
             with (
                 patch("sys.argv", argv),
                 patch(
-                    "pydocformatter.cli.pycommentfmt_main.format_comments",
+                    "pydocformatter.cli.pycommentfmt_main.pycommentfmt.format_comments",
                     side_effect=fake_format,
                 ),
                 redirect_stdout(stdout),
             ):
-                pycommentfmt_main()
+                pycommentfmt_main.main()
 
             expected_lines = [
                 f"{root / 'a.py'} included",
@@ -224,11 +227,11 @@ class TestCliVerbose(unittest.TestCase):
                 with (
                     patch("sys.argv", argv),
                     patch(
-                        "pydocformatter.cli.pycommentfmt_main.format_comments",
+                        "pydocformatter.cli.pycommentfmt_main.pycommentfmt.format_comments",
                         side_effect=fake_format,
                     ),
                 ):
-                    pycommentfmt_main()
+                    pycommentfmt_main.main()
             finally:
                 os.chdir(previous_cwd)
 
@@ -264,12 +267,12 @@ class TestCliVerbose(unittest.TestCase):
             with (
                 patch("sys.argv", argv),
                 patch(
-                    "pydocformatter.cli.pydocfmt_main.format_docstrings",
+                    "pydocformatter.cli.pydocfmt_main.pydocfmt.format_docstrings",
                     side_effect=fake_format,
                 ),
                 redirect_stdout(stdout),
             ):
-                pydocfmt_main()
+                pydocfmt_main.main()
 
             expected_lines = [
                 f"{root / 'a.py'} included",
@@ -308,12 +311,12 @@ class TestCliVerbose(unittest.TestCase):
             with (
                 patch("sys.argv", argv),
                 patch(
-                    "pydocformatter.cli.pydocfmt_main.format_docstrings",
+                    "pydocformatter.cli.pydocfmt_main.pydocfmt.format_docstrings",
                     side_effect=fake_format,
                 ),
                 redirect_stdout(stdout),
             ):
-                pydocfmt_main()
+                pydocfmt_main.main()
 
             expected_lines = [
                 f"{root / 'a.py'} included",
@@ -344,12 +347,12 @@ class TestCliVerbose(unittest.TestCase):
                     side_effect=self._fake_git_check_ignore_for_root(root, {"skip.py"}),
                 ),
                 patch(
-                    "pydocformatter.cli.pydocfmt_main.format_docstrings",
+                    "pydocformatter.cli.pydocfmt_main.pydocfmt.format_docstrings",
                     side_effect=fake_format,
                 ),
                 redirect_stdout(stdout),
             ):
-                pydocfmt_main()
+                pydocfmt_main.main()
 
             expected_lines = [
                 f"{root / 'a.py'} included",
@@ -376,12 +379,12 @@ class TestCliVerbose(unittest.TestCase):
                 patch("sys.argv", argv),
                 patch("pydocformatter.file_selection.subprocess.run") as run_mock,
                 patch(
-                    "pydocformatter.cli.pydocfmt_main.format_docstrings",
+                    "pydocformatter.cli.pydocfmt_main.pydocfmt.format_docstrings",
                     side_effect=fake_format,
                 ),
                 redirect_stdout(stdout),
             ):
-                pydocfmt_main()
+                pydocfmt_main.main()
 
             self.assertFalse(run_mock.called)
             expected_lines = [
@@ -412,12 +415,12 @@ class TestCliVerbose(unittest.TestCase):
                     side_effect=self._fake_git_check_ignore_for_root(root, {"skip.py"}),
                 ),
                 patch(
-                    "pydocformatter.cli.pycommentfmt_main.format_comments",
+                    "pydocformatter.cli.pycommentfmt_main.pycommentfmt.format_comments",
                     side_effect=fake_format,
                 ),
                 redirect_stdout(stdout),
             ):
-                pycommentfmt_main()
+                pycommentfmt_main.main()
 
             expected_lines = [
                 f"{root / 'a.py'} included",
@@ -446,12 +449,12 @@ class TestCliVerbose(unittest.TestCase):
                 patch("sys.argv", argv),
                 patch("pydocformatter.file_selection.subprocess.run") as run_mock,
                 patch(
-                    "pydocformatter.cli.pycommentfmt_main.format_comments",
+                    "pydocformatter.cli.pycommentfmt_main.pycommentfmt.format_comments",
                     side_effect=fake_format,
                 ),
                 redirect_stdout(stdout),
             ):
-                pycommentfmt_main()
+                pycommentfmt_main.main()
 
             self.assertFalse(run_mock.called)
             expected_lines = [
@@ -474,9 +477,9 @@ class TestCliVerbose(unittest.TestCase):
 
             # noinspection PyUnusedLocal
             def fake_format(
-                path: str, line_length: int, check: bool, **kwargs: object
+                path: str, settings: FormatterSettings, check: bool
             ) -> bool:
-                called_args.append((path, line_length, check))
+                called_args.append((path, settings.line_length, check))
                 return False
 
             argv = ["pydocfmt", str(root)]
@@ -487,11 +490,11 @@ class TestCliVerbose(unittest.TestCase):
                     patch("sys.argv", argv),
                     patch("pydocformatter.file_selection.subprocess.run") as run_mock,
                     patch(
-                        "pydocformatter.cli.pydocfmt_main.format_docstrings",
+                        "pydocformatter.cli.pydocfmt_main.pydocfmt.format_docstrings",
                         side_effect=fake_format,
                     ),
                 ):
-                    pydocfmt_main()
+                    pydocfmt_main.main()
             finally:
                 os.chdir(previous_cwd)
 
@@ -502,13 +505,13 @@ class TestCliVerbose(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             (root / "a.py").write_text("x = 1\n", encoding="utf-8")
-            called_kwargs: list[dict[str, object]] = []
+            called_settings: list[tuple[str, int]] = []
 
             # noinspection PyUnusedLocal
             def fake_format(
-                path: str, line_length: int, check: bool, **kwargs: object
+                path: str, settings: FormatterSettings, check: bool
             ) -> bool:
-                called_kwargs.append(kwargs)
+                called_settings.append((settings.indent_style, settings.indent_width))
                 return False
 
             argv = [
@@ -522,15 +525,15 @@ class TestCliVerbose(unittest.TestCase):
             with (
                 patch("sys.argv", argv),
                 patch(
-                    "pydocformatter.cli.pydocfmt_main.format_docstrings",
+                    "pydocformatter.cli.pydocfmt_main.pydocfmt.format_docstrings",
                     side_effect=fake_format,
                 ),
             ):
-                pydocfmt_main()
+                pydocfmt_main.main()
 
             self.assertEqual(
-                called_kwargs,
-                [{"indent_style": "tab", "indent_width": 2}],
+                called_settings,
+                [("tab", 2)],
             )
 
     def test_pycommentfmt_rejects_unused_indent_cli_settings(self) -> None:
@@ -542,7 +545,7 @@ class TestCliVerbose(unittest.TestCase):
             redirect_stderr(stderr),
             self.assertRaises(SystemExit) as cm,
         ):
-            pycommentfmt_main()
+            pycommentfmt_main.main()
 
         self.assertEqual(cm.exception.code, 2)
         self.assertIn("unrecognized arguments: --indent-style", stderr.getvalue())
@@ -560,9 +563,9 @@ class TestCliVerbose(unittest.TestCase):
 
             # noinspection PyUnusedLocal
             def fake_format(
-                path: str, line_length: int, check: bool, **kwargs: object
+                path: str, settings: FormatterSettings, check: bool
             ) -> bool:
-                called_args.append((path, line_length, check))
+                called_args.append((path, settings.line_length, check))
                 return False
 
             argv = ["pycommentfmt", str(root)]
@@ -573,11 +576,11 @@ class TestCliVerbose(unittest.TestCase):
                     patch("sys.argv", argv),
                     patch("pydocformatter.file_selection.subprocess.run") as run_mock,
                     patch(
-                        "pydocformatter.cli.pycommentfmt_main.format_comments",
+                        "pydocformatter.cli.pycommentfmt_main.pycommentfmt.format_comments",
                         side_effect=fake_format,
                     ),
                 ):
-                    pycommentfmt_main()
+                    pycommentfmt_main.main()
             finally:
                 os.chdir(previous_cwd)
 
@@ -597,9 +600,9 @@ class TestCliVerbose(unittest.TestCase):
 
             # noinspection PyUnusedLocal
             def fake_format(
-                path: str, line_length: int, check: bool, **kwargs: object
+                path: str, settings: FormatterSettings, check: bool
             ) -> bool:
-                called_args.append((path, line_length, check))
+                called_args.append((path, settings.line_length, check))
                 return False
 
             argv = ["pydocfmt", str(root)]
@@ -609,15 +612,75 @@ class TestCliVerbose(unittest.TestCase):
                 with (
                     patch("sys.argv", argv),
                     patch(
-                        "pydocformatter.cli.pydocfmt_main.format_docstrings",
+                        "pydocformatter.cli.pydocfmt_main.pydocfmt.format_docstrings",
                         side_effect=fake_format,
                     ),
                 ):
-                    pydocfmt_main()
+                    pydocfmt_main.main()
             finally:
                 os.chdir(previous_cwd)
 
             self.assertEqual(called_args, [(str(root / "a.py"), 72, False)])
+
+    def test_rule_cli_settings_are_applied(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            target = root / "a.py"
+            target.write_text("x = 1\n", encoding="utf-8")
+            called_settings: list[FormatterSettings] = []
+
+            # noinspection PyUnusedLocal
+            def fake_format(
+                path: str, settings: FormatterSettings, check: bool
+            ) -> bool:
+                called_settings.append(settings)
+                return False
+
+            argv = [
+                "pycommentfmt",
+                str(target),
+                "--select",
+                "PCF",
+                "--ignore",
+                "PCF002",
+                "--fixable",
+                "ALL",
+                "--unfixable",
+                "PCF001",
+                "--per-file-ignores",
+                '{"tests/*.py" = ["PCF001"]}',
+            ]
+            with (
+                patch("sys.argv", argv),
+                patch(
+                    "pydocformatter.cli.pycommentfmt_main.pycommentfmt.format_comments",
+                    side_effect=fake_format,
+                ),
+            ):
+                exit_code = pycommentfmt_main.main()
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(called_settings[0].select, ("PCF",))
+            self.assertEqual(called_settings[0].ignore, ("PCF002",))
+            self.assertEqual(called_settings[0].fixable, ("ALL",))
+            self.assertEqual(called_settings[0].unfixable, ("PCF001",))
+            self.assertEqual(
+                called_settings[0].per_file_ignores, (("tests/*.py", ("PCF001",)),)
+            )
+
+    def test_invalid_rule_cli_selector_reports_configuration_error(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            target = root / "a.py"
+            target.write_text("x = 1\n", encoding="utf-8")
+            stderr = StringIO()
+            argv = ["pycommentfmt", str(target), "--select", "RD"]
+            with patch("sys.argv", argv), redirect_stderr(stderr):
+                exit_code = pycommentfmt_main.main()
+
+        self.assertEqual(exit_code, 2)
+        self.assertIn("unknown selector: RD", stderr.getvalue())
+        self.assertNotIn("Traceback", stderr.getvalue())
 
     def test_force_exclude_filters_explicit_file_when_enabled(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -645,12 +708,12 @@ class TestCliVerbose(unittest.TestCase):
             with (
                 patch("sys.argv", argv),
                 patch(
-                    "pydocformatter.cli.pydocfmt_main.format_docstrings",
+                    "pydocformatter.cli.pydocfmt_main.pydocfmt.format_docstrings",
                     side_effect=fake_format,
                 ),
                 redirect_stdout(stdout),
             ):
-                pydocfmt_main()
+                pydocfmt_main.main()
 
             self.assertEqual(
                 stdout.getvalue().splitlines(),
@@ -680,12 +743,12 @@ class TestCliVerbose(unittest.TestCase):
                     side_effect=self._fake_git_check_ignore_for_root(root, {"skip.py"}),
                 ),
                 patch(
-                    "pydocformatter.cli.pydocfmt_main.format_docstrings",
+                    "pydocformatter.cli.pydocfmt_main.pydocfmt.format_docstrings",
                     side_effect=fake_format,
                 ),
                 redirect_stdout(stdout),
             ):
-                pydocfmt_main()
+                pydocfmt_main.main()
 
             self.assertEqual(
                 stdout.getvalue().splitlines(),
@@ -727,11 +790,11 @@ class TestCliVerbose(unittest.TestCase):
                 with (
                     patch("sys.argv", argv),
                     patch(
-                        "pydocformatter.cli.pydocfmt_main.format_docstrings",
+                        "pydocformatter.cli.pydocfmt_main.pydocfmt.format_docstrings",
                         side_effect=fake_format,
                     ),
                 ):
-                    pydocfmt_main()
+                    pydocfmt_main.main()
             finally:
                 os.chdir(previous_cwd)
 
@@ -739,7 +802,7 @@ class TestCliVerbose(unittest.TestCase):
 
     def _assert_help_ignores_invalid_config(
         self,
-        main: Callable[[], None],
+        main: Callable[[], int],
         program: str,
     ) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -769,14 +832,14 @@ class TestCliVerbose(unittest.TestCase):
         self.assertEqual(stderr.getvalue(), "")
 
     def test_pydocfmt_help_ignores_invalid_config(self) -> None:
-        self._assert_help_ignores_invalid_config(pydocfmt_main, "pydocfmt")
+        self._assert_help_ignores_invalid_config(pydocfmt_main.main, "pydocfmt")
 
     def test_pycommentfmt_help_ignores_invalid_config(self) -> None:
-        self._assert_help_ignores_invalid_config(pycommentfmt_main, "pycommentfmt")
+        self._assert_help_ignores_invalid_config(pycommentfmt_main.main, "pycommentfmt")
 
     def _assert_invalid_command_line_include_reports_argument_error(
         self,
-        main: Callable[[], None],
+        main: Callable[[], int],
         program: str,
     ) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -788,12 +851,11 @@ class TestCliVerbose(unittest.TestCase):
             os.chdir(root)
             try:
                 with patch("sys.argv", argv), redirect_stderr(stderr):
-                    with self.assertRaises(SystemExit) as cm:
-                        main()
+                    exit_code = main()
             finally:
                 os.chdir(previous_cwd)
 
-        self.assertEqual(cm.exception.code, 2)
+        self.assertEqual(exit_code, 2)
         self.assertIn("include patterns must not be empty", stderr.getvalue())
         self.assertNotIn("Traceback", stderr.getvalue())
 
@@ -809,12 +871,11 @@ class TestCliVerbose(unittest.TestCase):
             os.chdir(root)
             try:
                 with patch("sys.argv", argv), redirect_stderr(stderr):
-                    with self.assertRaises(SystemExit) as cm:
-                        pydocfmt_main()
+                    exit_code = pydocfmt_main.main()
             finally:
                 os.chdir(previous_cwd)
 
-        self.assertEqual(cm.exception.code, 2)
+        self.assertEqual(exit_code, 2)
         self.assertIn("exclude patterns must not be empty", stderr.getvalue())
         self.assertNotIn("Traceback", stderr.getvalue())
 
@@ -822,7 +883,7 @@ class TestCliVerbose(unittest.TestCase):
         self,
     ) -> None:
         self._assert_invalid_command_line_include_reports_argument_error(
-            pydocfmt_main,
+            pydocfmt_main.main,
             "pydocfmt",
         )
 
@@ -830,13 +891,13 @@ class TestCliVerbose(unittest.TestCase):
         self,
     ) -> None:
         self._assert_invalid_command_line_include_reports_argument_error(
-            pycommentfmt_main,
+            pycommentfmt_main.main,
             "pycommentfmt",
         )
 
     def _assert_invalid_config_include_reports_config_error(
         self,
-        main: Callable[[], None],
+        main: Callable[[], int],
         program: str,
     ) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -851,25 +912,24 @@ class TestCliVerbose(unittest.TestCase):
             os.chdir(root)
             try:
                 with patch("sys.argv", argv), redirect_stderr(stderr):
-                    with self.assertRaises(SystemExit) as cm:
-                        main()
+                    exit_code = main()
             finally:
                 os.chdir(previous_cwd)
 
-        self.assertEqual(cm.exception.code, 2)
+        self.assertEqual(exit_code, 2)
         self.assertIn(f"{program}: configuration error", stderr.getvalue())
         self.assertIn("include pattern must target files", stderr.getvalue())
         self.assertNotIn("Traceback", stderr.getvalue())
 
     def test_pydocfmt_invalid_config_include_reports_config_error(self) -> None:
         self._assert_invalid_config_include_reports_config_error(
-            pydocfmt_main,
+            pydocfmt_main.main,
             "pydocfmt",
         )
 
     def test_pycommentfmt_invalid_config_include_reports_config_error(self) -> None:
         self._assert_invalid_config_include_reports_config_error(
-            pycommentfmt_main,
+            pycommentfmt_main.main,
             "pycommentfmt",
         )
 
@@ -886,12 +946,11 @@ class TestCliVerbose(unittest.TestCase):
             os.chdir(root)
             try:
                 with patch("sys.argv", argv), redirect_stderr(stderr):
-                    with self.assertRaises(SystemExit) as cm:
-                        pydocfmt_main()
+                    exit_code = pydocfmt_main.main()
             finally:
                 os.chdir(previous_cwd)
 
-        self.assertEqual(cm.exception.code, 2)
+        self.assertEqual(exit_code, 2)
         self.assertIn("pydocfmt: configuration error", stderr.getvalue())
         self.assertIn("failed to decode pyproject.toml", stderr.getvalue())
         self.assertNotIn("Traceback", stderr.getvalue())
@@ -903,7 +962,7 @@ class TestCliVerbose(unittest.TestCase):
             stdout = StringIO()
             argv = ["pydocfmt", str(target)]
             with patch("sys.argv", argv), redirect_stdout(stdout):
-                pydocfmt_main()
+                pydocfmt_main.main()
 
         self.assertIn(
             f"{target} ignored WARNING: failed to read or write file",
@@ -934,12 +993,12 @@ class TestCliVerbose(unittest.TestCase):
                     ),
                 ),
                 patch(
-                    "pydocformatter.cli.pydocfmt_main.format_docstrings",
+                    "pydocformatter.cli.pydocfmt_main.pydocfmt.format_docstrings",
                     side_effect=fake_format,
                 ),
                 redirect_stdout(stdout),
             ):
-                pydocfmt_main()
+                pydocfmt_main.main()
 
             output_lines = stdout.getvalue().splitlines()
             warning = (
@@ -964,7 +1023,7 @@ class TestCliVerbose(unittest.TestCase):
             stdout = StringIO()
             argv = ["pydocfmt", str(root)]
             with patch("sys.argv", argv), redirect_stdout(stdout):
-                pydocfmt_main()
+                pydocfmt_main.main()
 
             output = stdout.getvalue()
             self.assertIn(
@@ -978,7 +1037,7 @@ class TestCliVerbose(unittest.TestCase):
             stdout = StringIO()
             argv = ["pycommentfmt", str(root)]
             with patch("sys.argv", argv), redirect_stdout(stdout):
-                pycommentfmt_main()
+                pycommentfmt_main.main()
 
             output = stdout.getvalue()
             self.assertIn(
@@ -1000,10 +1059,9 @@ class TestCliVerbose(unittest.TestCase):
             stdout = StringIO()
             argv = ["pydocfmt", "--check", "--line-length", "72", str(root)]
             with patch("sys.argv", argv), redirect_stdout(stdout):
-                with self.assertRaises(SystemExit) as cm:
-                    pydocfmt_main()
+                exit_code = pydocfmt_main.main()
 
-            self.assertEqual(cm.exception.code, 1)
+            self.assertEqual(exit_code, 1)
             output = stdout.getvalue()
             self.assertIn(
                 f"{root / 'bad.py'} ignored WARNING: failed to decode as UTF-8",

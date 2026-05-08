@@ -4,14 +4,12 @@ from collections.abc import Callable
 from dataclasses import dataclass, fields, replace
 from typing import Any, Literal
 
-from pydocformatter.glob_matcher import (
-    GlobPatternError,
-    validate_exclude_patterns,
-    validate_include_patterns,
-)
+import pydocformatter.glob_matcher as glob_matcher
+import pydocformatter.rules as rules
+from pydocformatter.types import TOOL_NAMES, ToolName
 
-ToolName = Literal["pydocfmt", "pycommentfmt"]
 IndentStyle = Literal["space", "tab"]
+RuleSelectorMap = tuple[tuple[str, tuple[str, ...]], ...]
 
 DEFAULT_EXCLUDE = (
     ".bzr",
@@ -37,8 +35,8 @@ DEFAULT_EXCLUDE = (
 )
 
 DEFAULT_INCLUDE = ("*.py", "*.pyi", "*.pyw")
-
-TOOL_NAMES = ("pydocfmt", "pycommentfmt")
+DEFAULT_RULE_SELECT = (rules.ALL_RULE_CODE,)
+DEFAULT_RULE_FIXABLE = (rules.ALL_RULE_CODE,)
 
 _KEY_TO_FIELD = {
     "line-length": "line_length",
@@ -50,18 +48,52 @@ _KEY_TO_FIELD = {
     "extend-include": "extend_include",
     "exclude": "exclude",
     "extend-exclude": "extend_exclude",
+    "select": "select",
+    "extend-select": "extend_select",
+    "ignore": "ignore",
+    "fixable": "fixable",
+    "extend-fixable": "extend_fixable",
+    "unfixable": "unfixable",
+    "per-file-ignores": "per_file_ignores",
+    "extend-per-file-ignores": "extend_per_file_ignores",
 }
 _FIELD_TO_KEY = {field: key for key, field in _KEY_TO_FIELD.items()}
-_COMMON_SETTING_KEYS = frozenset(
+_RULE_SELECTOR_FIELDS = frozenset(
     {
-        "line-length",
-        "respect-gitignore",
-        "force-exclude",
-        "include",
-        "extend-include",
-        "exclude",
-        "extend-exclude",
+        "select",
+        "extend_select",
+        "ignore",
+        "fixable",
+        "extend_fixable",
+        "unfixable",
     }
+)
+_RULE_SELECTOR_MAP_FIELDS = frozenset({"per_file_ignores", "extend_per_file_ignores"})
+_RULE_SETTING_KEYS = frozenset(
+    {
+        "select",
+        "extend-select",
+        "ignore",
+        "fixable",
+        "extend-fixable",
+        "unfixable",
+        "per-file-ignores",
+        "extend-per-file-ignores",
+    }
+)
+_COMMON_SETTING_KEYS = (
+    frozenset(
+        {
+            "line-length",
+            "respect-gitignore",
+            "force-exclude",
+            "include",
+            "extend-include",
+            "exclude",
+            "extend-exclude",
+        }
+    )
+    | _RULE_SETTING_KEYS
 )
 _PYDOCFMT_SETTING_KEYS = _COMMON_SETTING_KEYS | {"indent-style", "indent-width"}
 _TOOL_SETTING_KEYS = {
@@ -104,6 +136,14 @@ class FormatterSettings:
             ignore.
         extend_exclude (tuple[str, ...]): Additional exclude glob patterns appended to
             `exclude`.
+        select (tuple[str, ...]): Base selected pydocformatter rule selectors.
+        extend_select (tuple[str, ...]): Additional selected rule selectors.
+        ignore (tuple[str, ...]): Rule selectors to ignore.
+        fixable (tuple[str, ...]): Rule selectors eligible for automatic fixes.
+        extend_fixable (tuple[str, ...]): Additional fixable rule selectors.
+        unfixable (tuple[str, ...]): Rule selectors ineligible for automatic fixes.
+        per_file_ignores (RuleSelectorMap): File-pattern-specific ignored selectors.
+        extend_per_file_ignores (RuleSelectorMap): Additional file-specific ignores.
     """
 
     line_length: int = 88
@@ -115,47 +155,29 @@ class FormatterSettings:
     extend_include: tuple[str, ...] = ()
     exclude: tuple[str, ...] = DEFAULT_EXCLUDE
     extend_exclude: tuple[str, ...] = ()
+    select: tuple[str, ...] = DEFAULT_RULE_SELECT
+    extend_select: tuple[str, ...] = ()
+    ignore: tuple[str, ...] = ()
+    fixable: tuple[str, ...] = DEFAULT_RULE_FIXABLE
+    extend_fixable: tuple[str, ...] = ()
+    unfixable: tuple[str, ...] = ()
+    per_file_ignores: RuleSelectorMap = ()
+    extend_per_file_ignores: RuleSelectorMap = ()
 
     @property
     def include_patterns(self) -> tuple[str, ...]:
-        """Return the final include patterns used by file selection.
-
-        Returns:
-            tuple[str, ...]: The base include patterns followed by any extension
-                patterns.
-        """
+        """Return the final include patterns used by file selection."""
         return self.include + self.extend_include
 
     @property
     def exclude_patterns(self) -> tuple[str, ...]:
-        """Return the final exclude patterns used by file selection.
-
-        Returns:
-            tuple[str, ...]: The base exclude patterns followed by any extension
-                patterns.
-        """
+        """Return the final exclude patterns used by file selection."""
         return self.exclude + self.extend_exclude
 
 
 @dataclass(frozen=True)
 class SettingsOverrides:
-    """Optional formatter settings from one precedence layer.
-
-    Attributes:
-        line_length (int | None): Optional maximum line length override.
-        indent_style (IndentStyle | None): Optional `pydocfmt` generated docstring
-            indentation style override.
-        indent_width (int | None): Optional `pydocfmt` generated docstring indentation
-            width override.
-        respect_gitignore (bool | None): Optional gitignore filtering override.
-        force_exclude (bool | None): Optional force-exclude override.
-        include (tuple[str, ...] | None): Optional replacement include patterns.
-        extend_include (tuple[str, ...] | None): Optional replacement include
-            extensions.
-        exclude (tuple[str, ...] | None): Optional replacement exclude patterns.
-        extend_exclude (tuple[str, ...] | None): Optional replacement exclude
-            extensions.
-    """
+    """Optional formatter settings from one precedence layer."""
 
     line_length: int | None = None
     indent_style: IndentStyle | None = None
@@ -166,48 +188,20 @@ class SettingsOverrides:
     extend_include: tuple[str, ...] | None = None
     exclude: tuple[str, ...] | None = None
     extend_exclude: tuple[str, ...] | None = None
+    select: tuple[str, ...] | None = None
+    extend_select: tuple[str, ...] | None = None
+    ignore: tuple[str, ...] | None = None
+    fixable: tuple[str, ...] | None = None
+    extend_fixable: tuple[str, ...] | None = None
+    unfixable: tuple[str, ...] | None = None
+    per_file_ignores: RuleSelectorMap | None = None
+    extend_per_file_ignores: RuleSelectorMap | None = None
 
 
-def load_config(tool_name: ToolName) -> FormatterSettings:
-    """Load resolved pyproject configuration for one formatter tool.
-
-    Args:
-        tool_name (ToolName): Formatter tool whose shared and tool-specific settings
-            should be loaded.
-
-    Returns:
-        FormatterSettings: Settings resolved from defaults and `pyproject.toml`.
-
-    Raises:
-        `ConfigError`: If the tool name or configuration file contents are invalid.
-    """
-    return resolve_settings(tool_name)
-
-
-def resolve_settings(
-    tool_name: ToolName,
-    cli_overrides: SettingsOverrides | None = None,
+def load_config(
+    tool_name: ToolName, cli_overrides: SettingsOverrides | None = None
 ) -> FormatterSettings:
-    """Resolve settings from defaults, pyproject config, and optional CLI overrides.
-
-    Shared `[tool.pydocformatter]` settings are applied before the selected tool's
-    nested table, and `cli_overrides` has the highest precedence. `pydocfmt`-only
-    indentation settings are accepted in the shared table but ignored when resolving
-    `pycommentfmt`. Known nested tool tables are validated even when they are not the
-    selected tool.
-
-    Args:
-        tool_name (ToolName): Formatter tool to resolve settings for.
-        cli_overrides (SettingsOverrides | None): Optional command-line settings to
-            apply last.
-
-    Returns:
-        FormatterSettings: Fully resolved settings for the requested tool.
-
-    Raises:
-        `ConfigError`: If the tool name, TOML structure, setting names, or setting
-            values are invalid.
-    """
+    """Resolve settings from defaults, pyproject config, and optional CLI overrides."""
     _validate_tool_name(tool_name)
     settings = FormatterSettings()
 
@@ -216,7 +210,7 @@ def resolve_settings(
     if not isinstance(tool_config, dict):
         if "tool" in config:
             raise ConfigError("pyproject.toml [tool] must be a table")
-        return _apply_overrides(settings, cli_overrides, "command line")
+        return _apply_overrides(settings, cli_overrides, "command line", tool_name)
 
     if "pydocformatter" in tool_config:
         formatter_config = tool_config["pydocformatter"]
@@ -229,6 +223,7 @@ def resolve_settings(
             allowed_setting_keys=_SHARED_SETTING_KEYS,
             applied_setting_keys=_TOOL_SETTING_KEYS[tool_name],
             allow_tool_tables=True,
+            selector_tool_name=None,
         )
 
         for nested_tool_name in TOOL_NAMES:
@@ -248,6 +243,7 @@ def resolve_settings(
                 nested_tool_config,
                 f"tool.pydocformatter.{nested_tool_name}",
                 _TOOL_SETTING_KEYS[nested_tool_name],
+                nested_tool_name,
             )
 
         if tool_name in formatter_config:
@@ -259,30 +255,10 @@ def resolve_settings(
                 allowed_setting_keys=_TOOL_SETTING_KEYS[tool_name],
                 applied_setting_keys=_TOOL_SETTING_KEYS[tool_name],
                 allow_tool_tables=False,
+                selector_tool_name=tool_name,
             )
 
-    return _apply_overrides(settings, cli_overrides, "command line")
-
-
-def apply_cli_overrides(
-    settings: FormatterSettings,
-    cli_overrides: SettingsOverrides,
-) -> FormatterSettings:
-    """Apply command-line overrides to already-resolved config settings.
-
-    Args:
-        settings (FormatterSettings): Settings resolved from defaults and configuration
-            files.
-        cli_overrides (SettingsOverrides): Command-line values to apply where not
-            `None`.
-
-    Returns:
-        FormatterSettings: A new settings object with CLI overrides applied.
-
-    Raises:
-        `ConfigError`: If any override value is invalid.
-    """
-    return _apply_overrides(settings, cli_overrides, "command line")
+    return _apply_overrides(settings, cli_overrides, "command line", tool_name)
 
 
 def _load_pyproject_config() -> dict[str, Any]:
@@ -317,6 +293,7 @@ def _apply_config_section(
     allowed_setting_keys: frozenset[str],
     applied_setting_keys: frozenset[str],
     allow_tool_tables: bool,
+    selector_tool_name: ToolName | None,
 ) -> FormatterSettings:
     """Apply one TOML configuration section after validating allowed keys."""
     allowed_keys = set(allowed_setting_keys)
@@ -324,14 +301,16 @@ def _apply_config_section(
         allowed_keys.update(TOOL_NAMES)
 
     _validate_config_section_keys(section, context, frozenset(allowed_keys))
-    _validate_config_section_values(section, context, allowed_setting_keys)
+    _validate_config_section_values(
+        section, context, allowed_setting_keys, selector_tool_name
+    )
 
     values = {
         _KEY_TO_FIELD[key]: section[key]
         for key in applied_setting_keys
         if key in section
     }
-    return _apply_field_values(settings, values, context)
+    return _apply_field_values(settings, values, context, selector_tool_name)
 
 
 def _validate_config_section_keys(
@@ -350,18 +329,20 @@ def _validate_config_section_values(
     section: dict[str, Any],
     context: str,
     setting_keys: frozenset[str],
+    selector_tool_name: ToolName | None,
 ) -> None:
     """Validate known setting values in one TOML configuration section."""
     values = {
         _KEY_TO_FIELD[key]: section[key] for key in setting_keys if key in section
     }
-    _apply_field_values(FormatterSettings(), values, context)
+    _apply_field_values(FormatterSettings(), values, context, selector_tool_name)
 
 
 def _apply_overrides(
     settings: FormatterSettings,
     overrides: SettingsOverrides | None,
     context: str,
+    selector_tool_name: ToolName,
 ) -> FormatterSettings:
     """Apply non-None values from an override layer to formatter settings."""
     if overrides is None:
@@ -372,13 +353,14 @@ def _apply_overrides(
         for field in fields(SettingsOverrides)
         if (value := getattr(overrides, field.name)) is not None
     }
-    return _apply_field_values(settings, values, context)
+    return _apply_field_values(settings, values, context, selector_tool_name)
 
 
 def _apply_field_values(
     settings: FormatterSettings,
     values: dict[str, Any],
     context: str,
+    selector_tool_name: ToolName | None,
 ) -> FormatterSettings:
     """Validate raw field values and return settings with those fields replaced."""
     updates = {
@@ -388,6 +370,7 @@ def _apply_field_values(
         )
         for field, value in values.items()
     }
+    _validate_rule_selectors(updates, context, selector_tool_name)
     return replace(settings, **updates)
 
 
@@ -442,8 +425,8 @@ def _validate_include_string_list(value: Any, context: str) -> tuple[str, ...]:
     """Validate include glob settings and return them as a tuple."""
     patterns = _validate_string_list(value, context)
     try:
-        validate_include_patterns(patterns)
-    except GlobPatternError as error:
+        glob_matcher.validate_include_patterns(patterns)
+    except glob_matcher.GlobPatternError as error:
         raise ConfigError(f"{context}: {error}") from error
     return patterns
 
@@ -452,10 +435,69 @@ def _validate_exclude_string_list(value: Any, context: str) -> tuple[str, ...]:
     """Validate exclude glob settings and return them as a tuple."""
     patterns = _validate_string_list(value, context)
     try:
-        validate_exclude_patterns(patterns)
-    except GlobPatternError as error:
+        glob_matcher.validate_exclude_patterns(patterns)
+    except glob_matcher.GlobPatternError as error:
         raise ConfigError(f"{context}: {error}") from error
     return patterns
+
+
+def _validate_selector_list(value: Any, context: str) -> tuple[str, ...]:
+    """Validate rule selectors and return them as a tuple."""
+    selectors = _validate_string_list(value, context)
+    if any(not selector for selector in selectors):
+        raise ConfigError(f"{context} must not contain empty selectors")
+    return selectors
+
+
+def _validate_selector_mapping(value: Any, context: str) -> RuleSelectorMap:
+    """Validate per-file rule selector mappings."""
+    if isinstance(value, tuple):
+        items = value
+    elif isinstance(value, dict):
+        items = tuple(value.items())
+    else:
+        raise ConfigError(
+            f"{context} must be a table mapping file patterns to selectors"
+        )
+
+    entries = []
+    for pattern, selectors in items:
+        if not isinstance(pattern, str):
+            raise ConfigError(f"{context} file patterns must be strings")
+        if not pattern:
+            raise ConfigError(f"{context} file patterns must not be empty")
+        entries.append(
+            (pattern, _validate_selector_list(selectors, f"{context}.{pattern}"))
+        )
+    return tuple(entries)
+
+
+def _validate_rule_selectors(
+    values: dict[str, Any],
+    context: str,
+    selector_tool_name: ToolName | None,
+) -> None:
+    """Validate rule selectors against the known shared or tool-specific rule scope."""
+    selector_values = [
+        (field, selector)
+        for field, selectors in values.items()
+        if field in _RULE_SELECTOR_FIELDS
+        for selector in selectors
+    ]
+    selector_values.extend(
+        (field, selector)
+        for field, mapping in values.items()
+        if field in _RULE_SELECTOR_MAP_FIELDS
+        for _, selectors in mapping
+        for selector in selectors
+    )
+
+    for field, selector in selector_values:
+        if not rules.selector_matches_known_rule(
+            selector, tool_name=selector_tool_name
+        ):
+            key = _FIELD_TO_KEY[field]
+            raise ConfigError(f"{context}.{key} contains unknown selector: {selector}")
 
 
 _SETTING_VALIDATORS: dict[str, Callable[[Any, str], Any]] = {
@@ -468,4 +510,12 @@ _SETTING_VALIDATORS: dict[str, Callable[[Any, str], Any]] = {
     "extend_include": _validate_include_string_list,
     "exclude": _validate_exclude_string_list,
     "extend_exclude": _validate_exclude_string_list,
+    "select": _validate_selector_list,
+    "extend_select": _validate_selector_list,
+    "ignore": _validate_selector_list,
+    "fixable": _validate_selector_list,
+    "extend_fixable": _validate_selector_list,
+    "unfixable": _validate_selector_list,
+    "per_file_ignores": _validate_selector_mapping,
+    "extend_per_file_ignores": _validate_selector_mapping,
 }
