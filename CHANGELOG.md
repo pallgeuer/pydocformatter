@@ -80,6 +80,9 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 
 ### Removed
 
+- **Developer dependencies:**
+  - Removed the unused `build` and `twine` dev dependencies now that package build and publish workflows use uv directly.
+
 - **Architecture:**
   - Removed redundant CLI/config wrapper functions from the formatter entry points and settings resolution path.
 
