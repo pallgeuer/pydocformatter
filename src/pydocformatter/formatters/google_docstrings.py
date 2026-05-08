@@ -1,12 +1,25 @@
 import re
 import textwrap
-from collections.abc import Callable
-from typing import Literal
+from typing import Literal, Protocol
 
 IndentStyle = Literal["space", "tab"]
 
 
-def _indent_unit(indent_style: IndentStyle, indent_width: int) -> str:
+class SectionFormatter(Protocol):
+    """Callable interface for Google-style docstring section formatters."""
+
+    def __call__(
+        self,
+        buffer: list[str],
+        indent: str,
+        *,
+        line_length: int,
+        indent_style: IndentStyle,
+        indent_width: int,
+    ) -> list[str]: ...
+
+
+def _indent_unit(*, indent_style: IndentStyle, indent_width: int) -> str:
     """Return one generated indentation level."""
     return "\t" if indent_style == "tab" else " " * indent_width
 
@@ -26,6 +39,7 @@ def _wrap_with_indents(
     text: str,
     first_indent: str,
     continuation_indent: str,
+    *,
     line_length: int,
     indent_width: int,
 ) -> list[str]:
@@ -55,8 +69,9 @@ def _wrap_with_indents(
 def _format_param_section(
     buffer: list[str],
     indent: str,
-    line_length: int,
     section_title: str,
+    *,
+    line_length: int,
     indent_style: IndentStyle,
     indent_width: int,
 ) -> list[str]:
@@ -80,7 +95,7 @@ def _format_param_section(
         list[str]: The formatted Args section as a list of lines.
     """
     result = [f"\n{indent}{section_title}:"]
-    unit = _indent_unit(indent_style, indent_width)
+    unit = _indent_unit(indent_style=indent_style, indent_width=indent_width)
     param_indent = indent + unit
     continuation_indent = indent + unit * 2
 
@@ -98,8 +113,8 @@ def _format_param_section(
                 f"{name}{type_str}: {desc}",
                 param_indent,
                 continuation_indent,
-                line_length,
-                indent_width,
+                line_length=line_length,
+                indent_width=indent_width,
             )
             for wrapped_line in wrapped:
                 result.append(f"{wrapped_line}")
@@ -122,8 +137,9 @@ def _format_param_section(
 def _format_single_item_section(
     buffer: list[str],
     indent: str,
-    line_length: int,
     section_title: str,
+    *,
+    line_length: int,
     indent_style: IndentStyle,
     indent_width: int,
 ) -> list[str]:
@@ -148,7 +164,7 @@ def _format_single_item_section(
         list[str]: The formatted section as a list of lines.
     """
     result = [f"\n{indent}{section_title}:"]
-    unit = _indent_unit(indent_style, indent_width)
+    unit = _indent_unit(indent_style=indent_style, indent_width=indent_width)
     param_indent = indent + unit
     continuation_indent = indent + unit * 2
 
@@ -167,8 +183,8 @@ def _format_single_item_section(
         first_line,
         param_indent,
         continuation_indent,
-        line_length,
-        indent_width,
+        line_length=line_length,
+        indent_width=indent_width,
     )
     for wrapped_line in wrapped:
         result.append(f"{wrapped_line}")
@@ -179,9 +195,10 @@ def _format_single_item_section(
 def format_args_section(
     buffer: list[str],
     indent: str,
+    *,
     line_length: int,
-    indent_style: IndentStyle = "space",
-    indent_width: int = 4,
+    indent_style: IndentStyle,
+    indent_width: int,
 ) -> list[str]:
     """Format the Args section of a Google style docstring.
 
@@ -195,15 +212,23 @@ def format_args_section(
     Returns:
         list[str]: Formatted section lines, each ending with a newline.
     """
-    return _format_param_section(buffer, indent, line_length, "Args", indent_style, indent_width)
+    return _format_param_section(
+        buffer,
+        indent,
+        "Args",
+        line_length=line_length,
+        indent_style=indent_style,
+        indent_width=indent_width,
+    )
 
 
 def format_returns_section(
     buffer: list[str],
     indent: str,
+    *,
     line_length: int,
-    indent_style: IndentStyle = "space",
-    indent_width: int = 4,
+    indent_style: IndentStyle,
+    indent_width: int,
 ) -> list[str]:
     """Format the Returns section of a Google style docstring.
 
@@ -217,15 +242,23 @@ def format_returns_section(
     Returns:
         list[str]: Formatted section lines, each ending with a newline.
     """
-    return _format_single_item_section(buffer, indent, line_length, "Returns", indent_style, indent_width)
+    return _format_single_item_section(
+        buffer,
+        indent,
+        "Returns",
+        line_length=line_length,
+        indent_style=indent_style,
+        indent_width=indent_width,
+    )
 
 
 def format_raises_section(
     buffer: list[str],
     indent: str,
+    *,
     line_length: int,
-    indent_style: IndentStyle = "space",
-    indent_width: int = 4,
+    indent_style: IndentStyle,
+    indent_width: int,
 ) -> list[str]:
     """Format the Raises section of a Google style docstring.
 
@@ -243,7 +276,7 @@ def format_raises_section(
         list[str]: The formatted section as a list of lines.
     """
     result = [f"\n{indent}Raises:"]
-    unit = _indent_unit(indent_style, indent_width)
+    unit = _indent_unit(indent_style=indent_style, indent_width=indent_width)
     param_indent = indent + unit
     continuation_indent = indent + unit * 2
 
@@ -260,8 +293,8 @@ def format_raises_section(
                 f"`{exc}`: {desc}",
                 param_indent,
                 continuation_indent,
-                line_length,
-                indent_width,
+                line_length=line_length,
+                indent_width=indent_width,
             )
             for wrapped_line in wrapped:
                 result.append(f"{wrapped_line}")
@@ -284,9 +317,10 @@ def format_raises_section(
 def format_yields_section(
     buffer: list[str],
     indent: str,
+    *,
     line_length: int,
-    indent_style: IndentStyle = "space",
-    indent_width: int = 4,
+    indent_style: IndentStyle,
+    indent_width: int,
 ) -> list[str]:
     """Format the Yields section of a Google style docstring.
 
@@ -300,16 +334,24 @@ def format_yields_section(
     Returns:
         list[str]: Formatted section lines, each ending with a newline.
     """
-    return _format_single_item_section(buffer, indent, line_length, "Yields", indent_style, indent_width)
+    return _format_single_item_section(
+        buffer,
+        indent,
+        "Yields",
+        line_length=line_length,
+        indent_style=indent_style,
+        indent_width=indent_width,
+    )
 
 
 # noinspection PyUnusedLocal
 def format_examples_section(
     buffer: list[str],
     indent: str,
+    *,
     line_length: int,
-    indent_style: IndentStyle = "space",
-    indent_width: int = 4,
+    indent_style: IndentStyle,
+    indent_width: int,
 ) -> list[str]:
     """Format the Examples section of a Google style docstring.
 
@@ -327,7 +369,7 @@ def format_examples_section(
         list[str]: The formatted section as a list of lines.
     """
     result = [f"\n{indent}Examples:"]
-    param_indent = indent + _indent_unit(indent_style, indent_width)
+    param_indent = indent + _indent_unit(indent_style=indent_style, indent_width=indent_width)
     block: list[str] = []
 
     def is_fenced_block(lines: list[str]) -> bool:
@@ -396,9 +438,10 @@ def format_examples_section(
 def format_attributes_section(
     buffer: list[str],
     indent: str,
+    *,
     line_length: int,
-    indent_style: IndentStyle = "space",
-    indent_width: int = 4,
+    indent_style: IndentStyle,
+    indent_width: int,
 ) -> list[str]:
     """Format the Attributes section of a Google style docstring.
 
@@ -412,10 +455,17 @@ def format_attributes_section(
     Returns:
         list[str]: Formatted section lines, each ending with a newline.
     """
-    return _format_param_section(buffer, indent, line_length, "Attributes", indent_style, indent_width)
+    return _format_param_section(
+        buffer,
+        indent,
+        "Attributes",
+        line_length=line_length,
+        indent_style=indent_style,
+        indent_width=indent_width,
+    )
 
 
-SECTION_HANDLERS: dict[str, Callable[[list[str], str, int, IndentStyle, int], list[str]]] = {
+SECTION_HANDLERS: dict[str, SectionFormatter] = {
     "Args": format_args_section,
     "Returns": format_returns_section,
     "Raises": format_raises_section,
@@ -469,10 +519,11 @@ def _extract_lists(paragraph: list[str]) -> list[list[str]]:
 
 def reflow(
     docstring: str,
-    line_length: int,
     indent: str,
-    indent_style: IndentStyle = "space",
-    indent_width: int = 4,
+    *,
+    line_length: int,
+    indent_style: IndentStyle,
+    indent_width: int,
 ) -> list[str]:
     """Reflow a Google style docstring to fit within the specified line length.
 
@@ -558,8 +609,8 @@ def reflow(
             summary_text,
             f'{indent}"""',
             indent,
-            line_length,
-            indent_width,
+            line_length=line_length,
+            indent_width=indent_width,
         )
 
         if wrapped_summary:
@@ -594,8 +645,8 @@ def reflow(
                             " ".join(section),
                             indent,
                             indent,
-                            line_length,
-                            indent_width,
+                            line_length=line_length,
+                            indent_width=indent_width,
                         )
                         for wline in wrapped:
                             result.append(f"{wline}\n")
@@ -611,7 +662,15 @@ def reflow(
     for section_name, content in sections:
         formatter = SECTION_HANDLERS.get(section_name)
         if formatter:
-            result.extend(formatter(content, indent, line_length, indent_style, indent_width))
+            result.extend(
+                formatter(
+                    content,
+                    indent,
+                    line_length=line_length,
+                    indent_style=indent_style,
+                    indent_width=indent_width,
+                )
+            )
 
     if result and len(result) == 1:
         result[0] = result[0].rstrip() + '"""\n'

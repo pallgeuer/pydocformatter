@@ -5,6 +5,7 @@ This document specifies how `pydocfmt` and `pycommentfmt` select files for proce
 The compatibility surface is intentionally limited to:
 
 - `line-length`
+- `line-ending`
 - `indent-style` (`pydocfmt` only)
 - `indent-width` (`pydocfmt` only)
 - `respect-gitignore`
@@ -26,6 +27,7 @@ Settings outside this list are not part of the Ruff compatibility contract.
 ## Defaults
 
 - `line-length = 88`
+- `line-ending = "auto"`
 - `indent-style = "space"` (`pydocfmt` only)
 - `indent-width = 4` (`pydocfmt` only)
 - `respect-gitignore = true`
@@ -58,6 +60,8 @@ For every setting, including `extend-include` and `extend-exclude`, the highest-
 Only hyphenated keys are valid. Legacy `[tool.pydocfmt]` and `[tool.pycommentfmt]` tables are ignored. Underscore aliases and regex include/exclude semantics are not supported.
 
 `indent-style` and `indent-width` are valid in `[tool.pydocformatter]` and `[tool.pydocformatter.pydocfmt]`. They are rejected in `[tool.pydocformatter.pycommentfmt]` because `pycommentfmt` does not use them.
+
+`line-ending` follows Ruff's formatter values: `"auto"`, `"lf"`, `"cr-lf"`, and `"native"`. `"auto"` uses the first line ending detected in the source file, defaulting to LF when the file has no line endings. The setting controls rewritten files; files that do not require formatting are not rewritten solely to normalize line endings.
 
 ## File Selection Algorithm
 

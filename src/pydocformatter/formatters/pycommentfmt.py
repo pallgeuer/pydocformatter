@@ -26,9 +26,10 @@ def format_comments(path: str, settings: FormatterSettings, check: bool = False)
         `tokenize.TokenError`: If Python tokenization fails.
         `UnicodeDecodeError`: If the file cannot be decoded as UTF-8.
     """
-    with open(path, encoding="utf-8") as f:
+    with open(path, encoding="utf-8", newline="") as f:
         source = f.read()
 
+    line_ending = utils.resolve_line_ending(source, line_ending=settings.line_ending)
     tokens = list(tokenize.generate_tokens(io.StringIO(source).readline))
     lines = source.splitlines(keepends=True)
     output_lines = list(lines)
@@ -65,7 +66,7 @@ def format_comments(path: str, settings: FormatterSettings, check: bool = False)
             break_long_words=False,
             break_on_hyphens=False,
         )
-        new_lines = [f"{base_indent}# {wrapped_line}\n" for wrapped_line in wrapped_lines]
+        new_lines = [f"{base_indent}# {wrapped_line}{line_ending}" for wrapped_line in wrapped_lines]
 
         if any(lines[block_row] != new_lines[i] for i, block_row in enumerate(srows[: len(new_lines)])):
             changed_lines.update(srows)
@@ -97,7 +98,7 @@ def format_comments(path: str, settings: FormatterSettings, check: bool = False)
             inline_length = len(code) + 4 + len(comment_text)
 
             if inline_length <= settings.line_length:
-                new_line = f"{code}  # {comment_text}\n"
+                new_line = f"{code}  # {comment_text}{line_ending}"
                 if new_line != lines[srow - 1]:
                     changed_lines.add(srow - 1)
                 output_lines[srow - 1] = new_line
@@ -110,8 +111,8 @@ def format_comments(path: str, settings: FormatterSettings, check: bool = False)
                     break_long_words=False,
                     break_on_hyphens=False,
                 )
-                new_comment_lines = [f"{indent}# {line}\n" for line in wrapped]
-                output_lines[srow - 1] = "".join(new_comment_lines) + f"{code}\n"
+                new_comment_lines = [f"{indent}# {line}{line_ending}" for line in wrapped]
+                output_lines[srow - 1] = "".join(new_comment_lines) + f"{code}{line_ending}"
                 changed_lines.add(srow - 1)
         else:
             if srow == last_srow + 1:
@@ -130,9 +131,9 @@ def format_comments(path: str, settings: FormatterSettings, check: bool = False)
             return True
         return False
     else:
-        modified_content = "".join(output_lines)
+        modified_content = utils.normalize_line_endings("".join(output_lines), line_ending=line_ending)
         if source != modified_content:
-            with open(path, "w", encoding="utf-8") as f:
+            with open(path, "w", encoding="utf-8", newline="") as f:
                 f.write(modified_content)
             return True
         return False

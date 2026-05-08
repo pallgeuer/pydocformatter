@@ -23,6 +23,7 @@ class TestConfig(unittest.TestCase):
                 os.chdir(previous_cwd)
 
         self.assertEqual(config.line_length, 88)
+        self.assertEqual(config.line_ending, "auto")
         self.assertEqual(config.indent_style, "space")
         self.assertEqual(config.indent_width, 4)
         self.assertTrue(config.respect_gitignore)
@@ -113,6 +114,7 @@ class TestConfig(unittest.TestCase):
             (root / "pyproject.toml").write_text(
                 "[tool.pydocformatter]\n"
                 "line-length = 90\n"
+                'line-ending = "lf"\n'
                 'indent-style = "tab"\n'
                 "indent-width = 2\n"
                 'include = ["*.pyi"]\n'
@@ -122,6 +124,7 @@ class TestConfig(unittest.TestCase):
                 "force-exclude = true\n"
                 "[tool.pydocformatter.pydocfmt]\n"
                 "line-length = 77\n"
+                'line-ending = "cr-lf"\n'
                 'indent-style = "space"\n'
                 "indent-width = 3\n"
                 'extend-include = ["*.pyw"]\n',
@@ -135,6 +138,7 @@ class TestConfig(unittest.TestCase):
                 os.chdir(previous_cwd)
 
         self.assertEqual(config.line_length, 77)
+        self.assertEqual(config.line_ending, "cr-lf")
         self.assertEqual(config.indent_style, "space")
         self.assertEqual(config.indent_width, 3)
         self.assertEqual(config.include, ("*.pyi",))
@@ -167,6 +171,14 @@ class TestConfig(unittest.TestCase):
 
         self.assertEqual(config.indent_style, "tab")
         self.assertEqual(config.indent_width, 2)
+
+    def test_cli_overrides_replace_line_ending(self) -> None:
+        config = pydocformatter_config.load_config(
+            "pycommentfmt",
+            SettingsOverrides(line_ending="native"),
+        )
+
+        self.assertEqual(config.line_ending, "native")
 
     def test_shared_pydocfmt_indent_settings_are_ignored_by_pycommentfmt(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -317,6 +329,21 @@ class TestConfig(unittest.TestCase):
             os.chdir(root)
             try:
                 with self.assertRaisesRegex(ConfigError, "indent-style"):
+                    pydocformatter_config.load_config("pydocfmt")
+            finally:
+                os.chdir(previous_cwd)
+
+    def test_invalid_line_ending_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "pyproject.toml").write_text(
+                '[tool.pydocformatter]\nline-ending = "crlf"\n',
+                encoding="utf-8",
+            )
+            previous_cwd = os.getcwd()
+            os.chdir(root)
+            try:
+                with self.assertRaisesRegex(ConfigError, "line-ending"):
                     pydocformatter_config.load_config("pydocfmt")
             finally:
                 os.chdir(previous_cwd)

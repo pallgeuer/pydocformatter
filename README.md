@@ -99,18 +99,19 @@ pydocfmt [OPTIONS] [FILES/DIRECTORIES]
 If no files or directories are specified, `pydocfmt` formats the current directory.
 
 **Options:**
+- `--help`: Show help message and exit
+- `--check`: Check if files are formatted correctly without modifying them
+- `-v, --verbose`: Show included and ignored files during file discovery
 - `--line-length INTEGER`: Maximum line length for docstrings (default: 88)
+- `--line-ending {auto,lf,cr-lf,native}`: Line ending to use when rewriting files (default: auto)
 - `--indent-style {space,tab}`: Indentation style for generated docstring sections (default: space)
 - `--indent-width INTEGER`: Indentation width for generated docstring sections (default: 4)
-- `--check`: Check if files are formatted correctly without modifying them
 - `--include GLOB [GLOB ...]`: Glob pattern(s) for files to include
 - `--extend-include GLOB [GLOB ...]`: Additional glob pattern(s) for files to include
 - `--exclude GLOB [GLOB ...]`: Glob pattern(s) for files to exclude
 - `--extend-exclude GLOB [GLOB ...]`: Additional glob pattern(s) for files to exclude
-- `-v, --verbose`: Show included and ignored files during file discovery
 - `--respect-gitignore`, `--no-respect-gitignore`: Toggle .gitignore-aware discovery (default: enabled)
 - `--force-exclude`, `--no-force-exclude`: Apply include/exclude rules even to explicitly listed files
-- `--help`: Show help message and exit
 
 **Examples:**
 ```bash
@@ -128,6 +129,9 @@ pydocfmt --check src/
 
 # Custom line length
 pydocfmt --line-length 100 src/
+
+# Custom rewritten line ending
+pydocfmt --line-ending lf src/
 
 # Custom generated docstring indentation
 pydocfmt --indent-style tab --indent-width 4 src/
@@ -159,16 +163,17 @@ pycommentfmt [OPTIONS] [FILES/DIRECTORIES]
 If no files or directories are specified, `pycommentfmt` formats the current directory.
 
 **Options:**
-- `--line-length INTEGER`: Maximum line length for comments (default: 88)
+- `--help`: Show help message and exit
 - `--check`: Check if files are formatted correctly without modifying them
+- `-v, --verbose`: Show included and ignored files during file discovery
+- `--line-length INTEGER`: Maximum line length for comments (default: 88)
+- `--line-ending {auto,lf,cr-lf,native}`: Line ending to use when rewriting files (default: auto)
 - `--include GLOB [GLOB ...]`: Glob pattern(s) for files to include
 - `--extend-include GLOB [GLOB ...]`: Additional glob pattern(s) for files to include
 - `--exclude GLOB [GLOB ...]`: Glob pattern(s) for files to exclude
 - `--extend-exclude GLOB [GLOB ...]`: Additional glob pattern(s) for files to exclude
-- `-v, --verbose`: Show included and ignored files during file discovery
 - `--respect-gitignore`, `--no-respect-gitignore`: Toggle .gitignore-aware discovery (default: enabled)
 - `--force-exclude`, `--no-force-exclude`: Apply include/exclude rules even to explicitly listed files
-- `--help`: Show help message and exit
 
 **Examples:**
 ```bash
@@ -187,6 +192,9 @@ pycommentfmt --check src/
 # Custom line length
 pycommentfmt --line-length 79 src/
 
+# Custom rewritten line ending
+pycommentfmt --line-ending cr-lf src/
+
 # Include/exclude patterns and verbose file discovery
 pycommentfmt -v src/ --include "*.py" "*.pyi" --exclude "generated"
 ```
@@ -200,6 +208,7 @@ pydocformatter can be configured via `pyproject.toml`:
 ```toml
 [tool.pydocformatter]
 line-length = 88
+line-ending = "auto"
 indent-style = "space"
 indent-width = 4
 respect-gitignore = true
@@ -225,6 +234,7 @@ extend-per-file-ignores = {"generated/*.py" = ["PCF002"]}
 
 **Configuration Options:**
 - `line-length`: Maximum line length (default: 88)
+- `line-ending`: Line ending to use when rewriting files; one of `"auto"`, `"lf"`, `"cr-lf"`, or `"native"` (default: `"auto"`)
 - `indent-style`: Generated docstring section indentation style for `pydocfmt`; one of `"space"` or `"tab"` (default: `"space"`)
 - `indent-width`: Generated docstring section indentation width for `pydocfmt` (default: 4)
 - `respect-gitignore`: Respect `.gitignore` during file discovery (default: `true`)

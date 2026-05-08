@@ -9,6 +9,7 @@ import pydocformatter.rules as rules
 from pydocformatter.types import TOOL_NAMES, ToolName
 
 IndentStyle = Literal["space", "tab"]
+LineEnding = Literal["auto", "lf", "cr-lf", "native"]
 RuleSelectorMap = tuple[tuple[str, tuple[str, ...]], ...]
 
 DEFAULT_EXCLUDE = (
@@ -40,6 +41,7 @@ DEFAULT_RULE_FIXABLE = (rules.ALL_RULE_CODE,)
 
 _KEY_TO_FIELD = {
     "line-length": "line_length",
+    "line-ending": "line_ending",
     "indent-style": "indent_style",
     "indent-width": "indent_width",
     "respect-gitignore": "respect_gitignore",
@@ -85,6 +87,7 @@ _COMMON_SETTING_KEYS = (
     frozenset(
         {
             "line-length",
+            "line-ending",
             "respect-gitignore",
             "force-exclude",
             "include",
@@ -117,6 +120,7 @@ class FormatterSettings:
 
     Attributes:
         line_length (int): Maximum line length used when wrapping docstrings or comments.
+        line_ending (LineEnding): Line ending used when rewriting files.
         indent_style (IndentStyle): Indentation style used by `pydocfmt` for generated docstring section indentation.
             This setting is not used by `pycommentfmt`.
         indent_width (int): Number of spaces per generated `pydocfmt` docstring indentation level, or the visual width
@@ -138,6 +142,7 @@ class FormatterSettings:
     """
 
     line_length: int = 88
+    line_ending: LineEnding = "auto"
     indent_style: IndentStyle = "space"
     indent_width: int = 4
     respect_gitignore: bool = True
@@ -171,6 +176,7 @@ class SettingsOverrides:
     """Optional formatter settings from one precedence layer."""
 
     line_length: int | None = None
+    line_ending: LineEnding | None = None
     indent_style: IndentStyle | None = None
     indent_width: int | None = None
     respect_gitignore: bool | None = None
@@ -365,6 +371,19 @@ def _validate_indent_style(value: Any, context: str) -> IndentStyle:
     raise ConfigError(f"{context} must be either 'space' or 'tab'")
 
 
+def _validate_line_ending(value: Any, context: str) -> LineEnding:
+    """Validate and return a configured line ending style."""
+    if value == "auto":
+        return "auto"
+    if value == "lf":
+        return "lf"
+    if value == "cr-lf":
+        return "cr-lf"
+    if value == "native":
+        return "native"
+    raise ConfigError(f"{context} must be one of 'auto', 'lf', 'cr-lf', or 'native'")
+
+
 def _validate_indent_width(value: Any, context: str) -> int:
     """Validate and return a configured indentation width."""
     if isinstance(value, bool) or not isinstance(value, int):
@@ -454,6 +473,7 @@ def _validate_rule_selectors(
 
 _SETTING_VALIDATORS: dict[str, Callable[[Any, str], Any]] = {
     "line_length": _validate_line_length,
+    "line_ending": _validate_line_ending,
     "indent_style": _validate_indent_style,
     "indent_width": _validate_indent_width,
     "respect_gitignore": _validate_bool,

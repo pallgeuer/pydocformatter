@@ -25,10 +25,27 @@ def add_common_arguments(
         help="Python files to format (default: current directory).",
     )
     parser.add_argument(
+        "--check",
+        action="store_true",
+        help="Check if files are formatted correctly without modifying them.",
+    )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="Emit messages about included and ignored files.",
+    )
+    parser.add_argument(
         "--line-length",
         type=int,
         default=None,
         help=f"Maximum line length for {line_length_subject} (default: {settings.line_length}).",
+    )
+    parser.add_argument(
+        "--line-ending",
+        choices=("auto", "lf", "cr-lf", "native"),
+        default=None,
+        help=f"Line ending to use when rewriting files (default: {settings.line_ending}).",
     )
     if tool_name == "pydocfmt":
         parser.add_argument(
@@ -43,11 +60,6 @@ def add_common_arguments(
             default=None,
             help=f"Indentation width for generated docstring sections (default: {settings.indent_width}).",
         )
-    parser.add_argument(
-        "--check",
-        action="store_true",
-        help="Check if files are formatted correctly without modifying them.",
-    )
     parser.add_argument(
         "--include",
         action="append",
@@ -143,12 +155,6 @@ def add_common_arguments(
         help="TOML inline table mapping file patterns to additional ignored rule selectors.",
     )
     parser.add_argument(
-        "-v",
-        "--verbose",
-        action="store_true",
-        help="Emit messages about included and ignored files.",
-    )
-    parser.add_argument(
         "--respect-gitignore",
         action=argparse.BooleanOptionalAction,
         default=None,
@@ -235,6 +241,7 @@ def _settings_overrides_from_args(args: argparse.Namespace) -> config.SettingsOv
     """Build settings overrides from parsed command-line arguments."""
     return config.SettingsOverrides(
         line_length=args.line_length,
+        line_ending=args.line_ending,
         indent_style=getattr(args, "indent_style", None),
         indent_width=getattr(args, "indent_width", None),
         respect_gitignore=args.respect_gitignore,

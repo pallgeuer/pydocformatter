@@ -12,15 +12,21 @@ from pydocformatter.config import FormatterSettings
 
 
 class TestPyDocFmt(unittest.TestCase):
-    def _format_and_check(self, source: str, expected: str, line_length: int = 88, indent: str = "") -> None:
-        formatted = google_docstrings.reflow(source.strip(), line_length, indent)
+    def _format_and_check(self, source: str, expected: str, *, line_length: int, indent: str = "") -> None:
+        formatted = google_docstrings.reflow(
+            source.strip(),
+            indent,
+            line_length=line_length,
+            indent_style="space",
+            indent_width=4,
+        )
 
         self.assertEqual("".join(formatted).strip(), expected.strip())
 
     def test_single_line_docstring(self) -> None:
         source = """Short summary."""
         expected = '''    """Short summary."""'''
-        self._format_and_check(source, expected)
+        self._format_and_check(source, expected, line_length=88)
 
     def test_summary_and_description(self) -> None:
         doc = """Short summary.
@@ -33,7 +39,7 @@ about what the function does."""
             A longer description follows this, explaining more details about what the function does.
             \"\"\"
         """)
-        self._format_and_check(doc, expected)
+        self._format_and_check(doc, expected, line_length=88)
 
     def test_description_with_multiple_paragraphs(self) -> None:
         doc = """Short summary.
@@ -49,7 +55,7 @@ This is the second paragraph with more explanation."""
             This is the second paragraph with more explanation.
             \"\"\"
         """)
-        self._format_and_check(doc, expected)
+        self._format_and_check(doc, expected, line_length=88)
 
     def test_description_with_list(self) -> None:
         doc = """Does something.
@@ -65,7 +71,7 @@ Here are the parameters:
             - bar: does bar
             \"\"\"
         """)
-        self._format_and_check(doc, expected)
+        self._format_and_check(doc, expected, line_length=88)
 
     def test_description_with_multiple_lists(self) -> None:
         doc = """Does something.
@@ -89,7 +95,7 @@ Here are some more parameters:
             - qux: does qux
             \"\"\"
         """)
-        self._format_and_check(doc, expected)
+        self._format_and_check(doc, expected, line_length=88)
 
     def test_args_section(self) -> None:
         doc = """Does something.
@@ -106,7 +112,7 @@ Args:
                 bar: the bar param.
             \"\"\"
         """)
-        self._format_and_check(doc, expected)
+        self._format_and_check(doc, expected, line_length=88)
 
     def test_args_section_with_two_space_indent_width(self) -> None:
         doc = """Does something.
@@ -121,7 +127,13 @@ Args:
                 within the line length limit.
             \"\"\"
         """)
-        formatted = google_docstrings.reflow(doc.strip(), 78, "", indent_style="space", indent_width=2)
+        formatted = google_docstrings.reflow(
+            doc.strip(),
+            "",
+            line_length=78,
+            indent_style="space",
+            indent_width=2,
+        )
 
         self.assertEqual("".join(formatted).strip(), expected.strip())
 
@@ -138,7 +150,13 @@ Args:
             \t\twithin the line length limit.
             \"\"\"
         """)
-        formatted = google_docstrings.reflow(doc.strip(), 78, "", indent_style="tab", indent_width=4)
+        formatted = google_docstrings.reflow(
+            doc.strip(),
+            "",
+            line_length=78,
+            indent_style="tab",
+            indent_width=4,
+        )
 
         self.assertEqual("".join(formatted).strip(), expected.strip())
 
@@ -155,7 +173,13 @@ Args:
             \t\tfour five six seven
             \"\"\"
         """)
-        formatted = google_docstrings.reflow(doc.strip(), 24, "", indent_style="tab", indent_width=2)
+        formatted = google_docstrings.reflow(
+            doc.strip(),
+            "",
+            line_length=24,
+            indent_style="tab",
+            indent_width=2,
+        )
 
         self.assertEqual("".join(formatted).strip(), expected.strip())
         for line in formatted:
@@ -168,7 +192,13 @@ Args:
 Args:
     foo: a parameter that should be normalized."""
         expected = '    """Does something.\n' "\n    Args:\n    \tfoo: a parameter that should be normalized.\n" '    """'
-        formatted = google_docstrings.reflow(doc.strip(), 88, "    ", indent_style="tab", indent_width=4)
+        formatted = google_docstrings.reflow(
+            doc.strip(),
+            "    ",
+            line_length=88,
+            indent_style="tab",
+            indent_width=4,
+        )
 
         self.assertEqual("".join(formatted).strip(), expected.strip())
 
@@ -177,7 +207,13 @@ Args:
 
 This description should keep exactly one base indentation level after wrapping."""
         expected = '    """Does something.\n' "\n    This description should keep exactly one base indentation level after\n    wrapping.\n" '    """'
-        formatted = google_docstrings.reflow(doc.strip(), 76, "    ")
+        formatted = google_docstrings.reflow(
+            doc.strip(),
+            "    ",
+            line_length=76,
+            indent_style="space",
+            indent_width=4,
+        )
 
         self.assertEqual("".join(formatted).strip(), expected.strip())
 
@@ -194,7 +230,7 @@ Returns:
                     the line length limit.
             \"\"\"
         """)
-        self._format_and_check(doc, expected)
+        self._format_and_check(doc, expected, line_length=88)
 
     def test_yields_section(self) -> None:
         doc = """Yields output.
@@ -209,7 +245,7 @@ Yields:
                     line length limit.
             \"\"\"
         """)
-        self._format_and_check(doc, expected)
+        self._format_and_check(doc, expected, line_length=88)
 
     def test_raises_section(self) -> None:
         doc = """Raises things.
@@ -225,7 +261,7 @@ Raises:
                 `TypeError`: if the type is wrong.
             \"\"\"
         """)
-        self._format_and_check(doc, expected)
+        self._format_and_check(doc, expected, line_length=88)
 
     def test_examples_section_fenced(self) -> None:
         doc = """Gives an example.
@@ -245,7 +281,7 @@ Examples:
                 ```
             \"\"\"
         """)
-        self._format_and_check(doc, expected)
+        self._format_and_check(doc, expected, line_length=88)
 
     def test_examples_section_unfenced(self) -> None:
         doc = """Gives an example.
@@ -264,7 +300,7 @@ Examples:
                 ```
             \"\"\"
         """)
-        self._format_and_check(doc, expected)
+        self._format_and_check(doc, expected, line_length=88)
 
     def test_examples_section_with_code_block(self) -> None:
         doc = """Gives an example.
@@ -284,7 +320,7 @@ Examples:
                 ```
             \"\"\"
         """)
-        self._format_and_check(doc, expected)
+        self._format_and_check(doc, expected, line_length=88)
 
     def test_full_docstring_all_section(self) -> None:
         doc = """Format a section with parameters.
@@ -335,7 +371,7 @@ Examples:
                 ```
             \"\"\"
         """)
-        self._format_and_check(doc, expected)
+        self._format_and_check(doc, expected, line_length=88)
 
     def test_check_mode_flags_unformatted_file(self) -> None:
         with tempfile.NamedTemporaryFile(mode="w+", suffix=".py", delete=False) as tf:
@@ -366,6 +402,32 @@ Examples:
         modified = pydocfmt.format_docstrings(path, FormatterSettings(line_length=72), check=False)
         Path(path).unlink()
         self.assertFalse(modified, "The file should not be modified if already formatted.")
+
+    def test_auto_line_ending_preserves_first_detected_crlf_when_rewriting(self) -> None:
+        with tempfile.NamedTemporaryFile(suffix=".py", delete=False) as tf:
+            path = tf.name
+        Path(path).write_bytes(b'def foo():\r\n    """Does something.\r\n\r\nArgs:\r\n    x (int): some parameter.\r\n    """\r\n    pass\r\n')
+
+        modified = pydocfmt.format_docstrings(path, FormatterSettings(line_length=72), check=False)
+        data = Path(path).read_bytes()
+        Path(path).unlink()
+
+        self.assertTrue(modified)
+        self.assertIn(b"\r\n", data)
+        self.assertNotIn(b"\n", data.replace(b"\r\n", b""))
+
+    def test_lf_line_ending_converts_rewritten_docstring_file(self) -> None:
+        with tempfile.NamedTemporaryFile(suffix=".py", delete=False) as tf:
+            path = tf.name
+        Path(path).write_bytes(b'def foo():\r\n    """Does something.\r\n\r\nArgs:\r\n    x (int): some parameter.\r\n    """\r\n    pass\r\n')
+
+        modified = pydocfmt.format_docstrings(path, FormatterSettings(line_length=72, line_ending="lf"), check=False)
+        data = Path(path).read_bytes()
+        Path(path).unlink()
+
+        self.assertTrue(modified)
+        self.assertNotIn(b"\r\n", data)
+        self.assertIn(b"\n", data)
 
     def test_check_mode_reports_single_line_location(self) -> None:
         with tempfile.NamedTemporaryFile(mode="w+", suffix=".py", delete=False) as tf:

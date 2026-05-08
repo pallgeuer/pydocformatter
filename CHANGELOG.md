@@ -11,10 +11,12 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 ### Added
 
 - **CLI:**
+  - Added `--line-ending` to `pydocfmt` and `pycommentfmt` to control line endings used when rewriting files.
   - Added `-v` / `--verbose` to `pydocfmt` and `pycommentfmt` to report all considered files during discovery, including included files and ignored files with include/exclude reasons.
   - Added `--respect-gitignore` / `--no-respect-gitignore` to `pydocfmt` and `pycommentfmt`, with enabled-by-default behavior and matching `pyproject.toml` configuration.
 
 - **Configuration:**
+  - Added Ruff-style `line-ending` configuration with `"auto"`, `"lf"`, `"cr-lf"`, and `"native"` values.
   - Added Ruff-style rule settings under `[tool.pydocformatter]` and tool-specific override tables: `select`, `extend-select`, `ignore`, `fixable`, `extend-fixable`, `unfixable`, `per-file-ignores`, and `extend-per-file-ignores`.
   - Added `respect-gitignore` for shared formatter configuration, defaulting to `true`.
   - Added `indent-style` and `indent-width` for `pydocfmt` generated docstring section indentation, with Ruff-style defaults of `"space"` and `4`.
@@ -41,6 +43,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - `pydocfmt` and `pycommentfmt` now default to formatting the current directory when no files or directories are specified.
 
 - **Architecture:**
+  - Formatter internals now require formatting controls such as line length, line endings, and indentation settings as explicit keyword-only arguments.
   - `run_formatter()` now returns an exit code instead of directly exiting when check mode finds files that need formatting.
   - Formatter functions now receive resolved `FormatterSettings` directly.
 

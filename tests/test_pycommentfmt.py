@@ -11,7 +11,7 @@ from pydocformatter.config import FormatterSettings
 class TestPyCommentFmt(unittest.TestCase):
 
     @staticmethod
-    def _write_and_readback(content: str, line_length: int = 88, check: bool = False) -> tuple[bool, str, str]:
+    def _write_and_readback(content: str, *, line_length: int, check: bool = False) -> tuple[bool, str, str]:
         with tempfile.NamedTemporaryFile(mode="w+", delete=False, suffix=".py", encoding="utf-8") as tf:
             tf.write(content)
             filename = tf.name
@@ -36,14 +36,48 @@ class TestPyCommentFmt(unittest.TestCase):
 
     def test_noop_if_already_formatted(self) -> None:
         source = "# A short comment.\n"
-        result, final, _ = self._write_and_readback(source)
+        result, final, _ = self._write_and_readback(source, line_length=88)
         self.assertFalse(result)
         self.assertEqual(final, source)
+
+    def test_auto_line_ending_preserves_first_detected_crlf_when_rewriting(self) -> None:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".py") as tf:
+            filename = tf.name
+        with open(filename, "wb") as f:
+            f.write(b"x = 1\r\n# This is a really long comment that should be wrapped properly by the formatter tool to multiple lines.\n")
+
+        try:
+            result = pycommentfmt.format_comments(filename, FormatterSettings(line_length=60), check=False)
+            with open(filename, "rb") as f:
+                final = f.read()
+        finally:
+            os.unlink(filename)
+
+        self.assertTrue(result)
+        self.assertIn(b"\r\n", final)
+        self.assertNotIn(b"\n", final.replace(b"\r\n", b""))
+
+    def test_crlf_line_ending_converts_rewritten_comment_file(self) -> None:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".py") as tf:
+            filename = tf.name
+        with open(filename, "wb") as f:
+            f.write(b"# This is a really long comment that should be wrapped properly by the formatter tool to multiple lines.\n")
+
+        try:
+            result = pycommentfmt.format_comments(filename, FormatterSettings(line_length=60, line_ending="cr-lf"), check=False)
+            with open(filename, "rb") as f:
+                final = f.read()
+        finally:
+            os.unlink(filename)
+
+        self.assertTrue(result)
+        self.assertIn(b"\r\n", final)
+        self.assertNotIn(b"\n", final.replace(b"\r\n", b""))
 
     def test_inline_comment_spacing(self) -> None:
         source = "x = 1  #bad spacing\n"
         expected = "x = 1  # bad spacing\n"
-        result, final, _ = self._write_and_readback(source)
+        result, final, _ = self._write_and_readback(source, line_length=88)
         self.assertTrue(result)
         self.assertEqual(expected, final)
 
@@ -65,7 +99,7 @@ class TestPyCommentFmt(unittest.TestCase):
 
     def test_check_mode_no_changes(self) -> None:
         source = "# All good.\n"
-        result, _, stdout = self._write_and_readback(source, check=True)
+        result, _, stdout = self._write_and_readback(source, line_length=88, check=True)
         self.assertFalse(result)
         self.assertEqual(stdout, "")
 
@@ -83,7 +117,7 @@ class TestPyCommentFmt(unittest.TestCase):
             "# fmt: off",
             "# pragma: no cover",
         ]:
-            result, final, _ = self._write_and_readback(comment + "\n")
+            result, final, _ = self._write_and_readback(comment + "\n", line_length=88)
             self.assertFalse(result)
             self.assertEqual(comment + "\n", final)
 

@@ -8,11 +8,12 @@ from pydocformatter.config import FormatterSettings, IndentStyle
 def process_docstring_node(
     node: ast.AST,
     output_lines: list[str],
-    line_length: int,
     changed_lines: set[int],
     *,
-    indent_style: IndentStyle = "space",
-    indent_width: int = 4,
+    line_length: int,
+    line_ending: str,
+    indent_style: IndentStyle,
+    indent_width: int,
 ) -> bool:
     """Process a docstring node in the AST.
 
@@ -23,6 +24,7 @@ def process_docstring_node(
         output_lines (list[str]): The list of output lines to modify.
         line_length (int): The maximum line length for formatting.
         changed_lines (set[int]): Set of 1-based line numbers whose docstring spans require formatting.
+        line_ending (str): Concrete line ending to use for generated docstring lines.
         indent_style (IndentStyle): Indentation style for generated docstring section levels. The base indentation from
             the opening quote line is preserved.
         indent_width (int): Width of one generated docstring indentation level, and the visual width used when measuring
@@ -52,8 +54,14 @@ def process_docstring_node(
     indent = quote_line[: len(quote_line) - len(quote_line.lstrip())]
     docstring_content = docstring.strip()
 
-    new_lines = google_docstrings.reflow(docstring_content, line_length, indent, indent_style, indent_width)
-    new_docstring = "".join(new_lines)
+    new_lines = google_docstrings.reflow(
+        docstring_content,
+        indent,
+        line_length=line_length,
+        indent_style=indent_style,
+        indent_width=indent_width,
+    )
+    new_docstring = utils.normalize_line_endings("".join(new_lines), line_ending=line_ending)
 
     # Get original docstring
     original_docstring = "".join(output_lines[srow : erow + 1])
@@ -94,9 +102,10 @@ def format_docstrings(
         `SyntaxError`: If the file cannot be parsed as Python source.
         `UnicodeDecodeError`: If the file cannot be decoded as UTF-8.
     """
-    with open(path, encoding="utf-8") as f:
+    with open(path, encoding="utf-8", newline="") as f:
         source = f.read()
 
+    line_ending = utils.resolve_line_ending(source, line_ending=settings.line_ending)
     source_lines = source.splitlines(keepends=True)
     tree = ast.parse(source)
     output_lines = list(source_lines)
@@ -108,8 +117,9 @@ def format_docstrings(
         if process_docstring_node(
             node,
             output_lines,
-            settings.line_length,
             changed_lines,
+            line_length=settings.line_length,
+            line_ending=line_ending,
             indent_style=settings.indent_style,
             indent_width=settings.indent_width,
         ):
@@ -121,8 +131,8 @@ def format_docstrings(
         return modified
     else:
         if modified:
-            modified_content = "".join(output_lines)
-            with open(path, "w", encoding="utf-8") as f:
+            modified_content = utils.normalize_line_endings("".join(output_lines), line_ending=line_ending)
+            with open(path, "w", encoding="utf-8", newline="") as f:
                 f.write(modified_content)
             return True
     return False
