@@ -71,18 +71,18 @@ dev = [
 testpaths = ["tests"]
 
 [tool.black]
-line-length = 88
+line-length = 200
 target-version = ["py311"]
 exclude = '/(\.github|\.eggs|\.git|\.hg|\.mypy_cache|\.tox|\.venv|htmlcov|__pycache__|_build|buck-out|build|dist|tests/data)/'
 
 [tool.isort]
 profile = "black"
-line_length = 88
+line_length = 200
 known_first_party = ["pydocformatter"]
 skip = [".github", ".eggs", ".git", ".hg", ".mypy_cache", ".tox", ".venv", "htmlcov", "__pycache__", "_build", "buck-out", "build", "dist", "tests/data"]
 
 [tool.pydocformatter]
-line-length = 88
+line-length = 120
 
 [tool.mypy]
 files = ["src/pydocformatter", "tests"]

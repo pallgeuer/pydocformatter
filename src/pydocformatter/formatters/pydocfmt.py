@@ -16,26 +16,22 @@ def process_docstring_node(
 ) -> bool:
     """Process a docstring node in the AST.
 
-    This function formats the docstring of a node (Module, FunctionDef,
-    AsyncFunctionDef, ClassDef)
+    This function formats the docstring of a node (Module, FunctionDef, AsyncFunctionDef, ClassDef)
 
     Args:
         node (ast.AST): The AST node to process.
         output_lines (list[str]): The list of output lines to modify.
         line_length (int): The maximum line length for formatting.
-        changed_lines (set[int]): Set of 1-based line numbers whose docstring spans
-            require formatting.
-        indent_style (IndentStyle): Indentation style for generated docstring section
-            levels. The base indentation from the opening quote line is preserved.
-        indent_width (int): Width of one generated docstring indentation level, and the
-            visual width used when measuring tabs.
+        changed_lines (set[int]): Set of 1-based line numbers whose docstring spans require formatting.
+        indent_style (IndentStyle): Indentation style for generated docstring section levels. The base indentation from
+            the opening quote line is preserved.
+        indent_width (int): Width of one generated docstring indentation level, and the visual width used when measuring
+            tabs.
 
     Returns:
         bool: True if the output_lines were modified, False otherwise.
     """
-    if not isinstance(
-        node, (ast.Module, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
-    ):
+    if not isinstance(node, (ast.Module, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
         return False
 
     docstring = ast.get_docstring(node)
@@ -43,9 +39,7 @@ def process_docstring_node(
         return False
 
     doc_node = node.body[0]
-    if not isinstance(doc_node, ast.Expr) or not isinstance(
-        getattr(doc_node, "value", None), ast.Constant
-    ):
+    if not isinstance(doc_node, ast.Expr) or not isinstance(getattr(doc_node, "value", None), ast.Constant):
         return False
     if doc_node.end_lineno is None:
         return False
@@ -58,9 +52,7 @@ def process_docstring_node(
     indent = quote_line[: len(quote_line) - len(quote_line.lstrip())]
     docstring_content = docstring.strip()
 
-    new_lines = google_docstrings.reflow(
-        docstring_content, line_length, indent, indent_style, indent_width
-    )
+    new_lines = google_docstrings.reflow(docstring_content, line_length, indent, indent_style, indent_width)
     new_docstring = "".join(new_lines)
 
     # Get original docstring
@@ -85,9 +77,9 @@ def format_docstrings(
 ) -> bool:
     """Format docstrings in a Python file.
 
-    This function reads a Python file, formats its docstrings to ensure they comply with
-    the specified line length. If `check` is True, it only checks if the file is
-    formatted correctly. This function can format docstrings in Google style.
+    This function reads a Python file, formats its docstrings to ensure they comply with the specified line length. If
+    `check` is True, it only checks if the file is formatted correctly. This function can format docstrings in Google
+    style.
 
     Args:
         path (str): The path to the Python file.
@@ -125,11 +117,7 @@ def format_docstrings(
 
     if check:
         if modified:
-            print(
-                utils.format_needs_formatting_message(
-                    path, "docstring", sorted(changed_lines)
-                )
-            )
+            print(utils.format_needs_formatting_message(path, "docstring", sorted(changed_lines)))
         return modified
     else:
         if modified:

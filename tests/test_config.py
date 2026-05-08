@@ -44,12 +44,7 @@ class TestConfig(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             (root / "pyproject.toml").write_text(
-                "[tool.pydocformatter]\n"
-                'select = ["RD", "PCF"]\n'
-                'ignore = ["PDF001"]\n'
-                'fixable = ["ALL"]\n'
-                "[tool.pydocformatter.per-file-ignores]\n"
-                '"tests/*.py" = ["PCF001"]\n',
+                "[tool.pydocformatter]\n" 'select = ["RD", "PCF"]\n' 'ignore = ["PDF001"]\n' 'fixable = ["ALL"]\n' "[tool.pydocformatter.per-file-ignores]\n" '"tests/*.py" = ["PCF001"]\n',
                 encoding="utf-8",
             )
             previous_cwd = os.getcwd()
@@ -83,9 +78,7 @@ class TestConfig(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             (root / "pyproject.toml").write_text(
-                "[tool.pydocformatter.pycommentfmt]\n"
-                'per-file-ignores = {"tests/*.py" = ["PCF001"]}\n'
-                'extend-per-file-ignores = {"generated/*.py" = ["PCF002"]}\n',
+                "[tool.pydocformatter.pycommentfmt]\n" 'per-file-ignores = {"tests/*.py" = ["PCF001"]}\n' 'extend-per-file-ignores = {"generated/*.py" = ["PCF002"]}\n',
                 encoding="utf-8",
             )
             previous_cwd = os.getcwd()
@@ -96,9 +89,7 @@ class TestConfig(unittest.TestCase):
                 os.chdir(previous_cwd)
 
         self.assertEqual(config.per_file_ignores, (("tests/*.py", ("PCF001",)),))
-        self.assertEqual(
-            config.extend_per_file_ignores, (("generated/*.py", ("PCF002",)),)
-        )
+        self.assertEqual(config.extend_per_file_ignores, (("generated/*.py", ("PCF002",)),))
 
     def test_cli_rule_overrides_are_applied(self) -> None:
         config = pydocformatter_config.load_config(
@@ -213,7 +204,7 @@ class TestConfig(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             (root / "pyproject.toml").write_text(
-                "[tool.pydocformatter.pycommentfmt]\n" "indent-width = 2\n",
+                "[tool.pydocformatter.pycommentfmt]\nindent-width = 2\n",
                 encoding="utf-8",
             )
             previous_cwd = os.getcwd()
@@ -355,9 +346,7 @@ class TestConfig(unittest.TestCase):
             previous_cwd = os.getcwd()
             os.chdir(root)
             try:
-                with self.assertRaisesRegex(
-                    ConfigError, "pydocformatter must be a table"
-                ):
+                with self.assertRaisesRegex(ConfigError, "pydocformatter must be a table"):
                     pydocformatter_config.load_config("pydocfmt")
             finally:
                 os.chdir(previous_cwd)
@@ -372,9 +361,7 @@ class TestConfig(unittest.TestCase):
             previous_cwd = os.getcwd()
             os.chdir(root)
             try:
-                with self.assertRaisesRegex(
-                    ConfigError, "pydocformatter.pydocfmt must be a table"
-                ):
+                with self.assertRaisesRegex(ConfigError, "pydocformatter.pydocfmt must be a table"):
                     pydocformatter_config.load_config("pydocfmt")
             finally:
                 os.chdir(previous_cwd)
@@ -404,9 +391,7 @@ class TestConfig(unittest.TestCase):
             previous_cwd = os.getcwd()
             os.chdir(root)
             try:
-                with self.assertRaisesRegex(
-                    ConfigError, "include pattern must target files"
-                ):
+                with self.assertRaisesRegex(ConfigError, "include pattern must target files"):
                     pydocformatter_config.load_config("pydocfmt")
             finally:
                 os.chdir(previous_cwd)
@@ -421,9 +406,7 @@ class TestConfig(unittest.TestCase):
             previous_cwd = os.getcwd()
             os.chdir(root)
             try:
-                with self.assertRaisesRegex(
-                    ConfigError, "include pattern must target files"
-                ):
+                with self.assertRaisesRegex(ConfigError, "include pattern must target files"):
                     pydocformatter_config.load_config("pydocfmt")
             finally:
                 os.chdir(previous_cwd)
@@ -438,9 +421,7 @@ class TestConfig(unittest.TestCase):
             previous_cwd = os.getcwd()
             os.chdir(root)
             try:
-                with self.assertRaisesRegex(
-                    ConfigError, "exclude patterns must not be empty"
-                ):
+                with self.assertRaisesRegex(ConfigError, "exclude patterns must not be empty"):
                     pydocformatter_config.load_config("pydocfmt")
             finally:
                 os.chdir(previous_cwd)
@@ -450,9 +431,7 @@ class TestConfig(unittest.TestCase):
             previous_cwd = os.getcwd()
             os.chdir(td)
             try:
-                with self.assertRaisesRegex(
-                    ConfigError, "include patterns must not be empty"
-                ):
+                with self.assertRaisesRegex(ConfigError, "include patterns must not be empty"):
                     pydocformatter_config.load_config(
                         "pydocfmt",
                         SettingsOverrides(include=("",)),
@@ -465,9 +444,7 @@ class TestConfig(unittest.TestCase):
             previous_cwd = os.getcwd()
             os.chdir(td)
             try:
-                with self.assertRaisesRegex(
-                    ConfigError, "exclude patterns must not be empty"
-                ):
+                with self.assertRaisesRegex(ConfigError, "exclude patterns must not be empty"):
                     pydocformatter_config.load_config(
                         "pydocfmt",
                         SettingsOverrides(exclude=("",)),

@@ -5,8 +5,8 @@ import fnmatch
 class GlobPatternError(ValueError):
     """Raised when a file-selection glob pattern is invalid.
 
-    This exception is used for validation failures in include or exclude glob lists
-    before those patterns are compiled for file selection.
+    This exception is used for validation failures in include or exclude glob lists before those patterns are compiled
+    for file selection.
     """
 
 
@@ -17,8 +17,8 @@ class CompiledGlobPattern:
     Attributes:
         pattern (str): Original glob pattern.
         segments (tuple[str, ...]): Non-empty slash-delimited pattern segments.
-        has_slash (bool): Whether the original pattern contains a slash and should be
-            matched against path segments instead of only a basename.
+        has_slash (bool): Whether the original pattern contains a slash and should be matched against path segments
+            instead of only a basename.
     """
 
     pattern: str
@@ -51,19 +51,16 @@ class CompiledGlobPattern:
         """Return whether this pattern matches a normalized POSIX-style path.
 
         Args:
-            normalized_path (str): Path to match, already normalized to POSIX
-                separators.
-            match_parent_segments_for_bare (bool): Whether slashless patterns can match
-                parent directory segments as well as the basename.
-            match_descendants_for_slash (bool): Whether slash-containing patterns also
-                match descendant paths after the pattern itself matches.
+            normalized_path (str): Path to match, already normalized to POSIX separators.
+            match_parent_segments_for_bare (bool): Whether slashless patterns can match parent directory segments as
+                well as the basename.
+            match_descendants_for_slash (bool): Whether slash-containing patterns also match descendant paths after the
+                pattern itself matches.
 
         Returns:
             bool: True if the normalized path matches this pattern.
         """
-        path_segments = tuple(
-            segment for segment in normalized_path.split("/") if segment
-        )
+        path_segments = tuple(segment for segment in normalized_path.split("/") if segment)
         if not path_segments or not self.segments:
             return False
 
@@ -71,10 +68,7 @@ class CompiledGlobPattern:
             if fnmatch.fnmatchcase(path_segments[-1], self.pattern):
                 return True
             if match_parent_segments_for_bare:
-                return any(
-                    fnmatch.fnmatchcase(segment, self.pattern)
-                    for segment in path_segments[:-1]
-                )
+                return any(fnmatch.fnmatchcase(segment, self.pattern) for segment in path_segments[:-1])
             return False
 
         return _match_segment_glob(
@@ -92,10 +86,8 @@ class GlobPatternSet:
 
     Attributes:
         patterns (tuple[CompiledGlobPattern, ...]): Compiled glob patterns to evaluate.
-        match_parent_segments_for_bare (bool): Whether slashless patterns can match
-            parent directory segments.
-        match_descendants_for_slash (bool): Whether slash-containing patterns match
-            descendant paths.
+        match_parent_segments_for_bare (bool): Whether slashless patterns can match parent directory segments.
+        match_descendants_for_slash (bool): Whether slash-containing patterns match descendant paths.
     """
 
     patterns: tuple[CompiledGlobPattern, ...]
@@ -115,29 +107,23 @@ class GlobPatternSet:
 
         Args:
             patterns (tuple[str, ...]): Raw glob patterns to validate and compile.
-            include_patterns (bool): Whether to validate patterns with include-pattern
-                restrictions instead of exclude-pattern restrictions.
-            match_parent_segments_for_bare (bool): Whether slashless patterns can match
-                parent directory segments.
-            match_descendants_for_slash (bool): Whether slash-containing patterns match
-                descendant paths.
+            include_patterns (bool): Whether to validate patterns with include-pattern restrictions instead of
+                exclude-pattern restrictions.
+            match_parent_segments_for_bare (bool): Whether slashless patterns can match parent directory segments.
+            match_descendants_for_slash (bool): Whether slash-containing patterns match descendant paths.
 
         Returns:
-            GlobPatternSet: Compiled pattern set configured with the requested matching
-                behavior.
+            GlobPatternSet: Compiled pattern set configured with the requested matching behavior.
 
         Raises:
-            `GlobPatternError`: If any pattern is invalid for its include or exclude
-                role.
+            `GlobPatternError`: If any pattern is invalid for its include or exclude role.
         """
         if include_patterns:
             validate_include_patterns(patterns)
         else:
             validate_exclude_patterns(patterns)
         return cls(
-            patterns=tuple(
-                CompiledGlobPattern.compile(pattern) for pattern in patterns
-            ),
+            patterns=tuple(CompiledGlobPattern.compile(pattern) for pattern in patterns),
             match_parent_segments_for_bare=match_parent_segments_for_bare,
             match_descendants_for_slash=match_descendants_for_slash,
         )
@@ -146,8 +132,7 @@ class GlobPatternSet:
         """Return whether any compiled pattern matches a normalized POSIX-style path.
 
         Args:
-            normalized_path (str): Path to match, already normalized to POSIX
-                separators.
+            normalized_path (str): Path to match, already normalized to POSIX separators.
 
         Returns:
             bool: True if at least one compiled pattern matches the path.
@@ -165,8 +150,7 @@ class GlobPatternSet:
 def validate_include_patterns(patterns: tuple[str, ...]) -> None:
     """Validate glob patterns used for file inclusion.
 
-    Include patterns must be non-empty and must target files rather than all descendants
-    or directory-only paths.
+    Include patterns must be non-empty and must target files rather than all descendants or directory-only paths.
 
     Args:
         patterns (tuple[str, ...]): Include glob patterns to validate.

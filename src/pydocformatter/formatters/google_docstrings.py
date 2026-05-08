@@ -43,9 +43,7 @@ def _wrap_with_indents(
     )
     result: list[str] = []
     for index, wrapped_line in enumerate(wrapped):
-        visual_indent = (
-            visual_first_indent if index == 0 else visual_continuation_indent
-        )
+        visual_indent = visual_first_indent if index == 0 else visual_continuation_indent
         actual_indent = first_indent if index == 0 else continuation_indent
         if wrapped_line.startswith(visual_indent):
             result.append(f"{actual_indent}{wrapped_line[len(visual_indent):]}")
@@ -64,8 +62,8 @@ def _format_param_section(
 ) -> list[str]:
     """Format a section with parameters in Google style docstrings.
 
-    This function takes a list of lines in the specified section, applies the specified
-    formatting, and returns the formatted lines.
+    This function takes a list of lines in the specified section, applies the specified formatting, and returns the
+    formatted lines.
 
     Acceptable formats include:
     - `param_name (type): Description`
@@ -131,8 +129,8 @@ def _format_single_item_section(
 ) -> list[str]:
     """Format a section with a single item in Google style docstrings.
 
-    This function formats a section that contains a single item, such as Returns or
-    Yields, and returns the formatted lines.
+    This function formats a section that contains a single item, such as Returns or Yields, and returns the formatted
+    lines.
 
     Acceptable formats include:
     - `type: Description`
@@ -197,9 +195,7 @@ def format_args_section(
     Returns:
         list[str]: Formatted section lines, each ending with a newline.
     """
-    return _format_param_section(
-        buffer, indent, line_length, "Args", indent_style, indent_width
-    )
+    return _format_param_section(buffer, indent, line_length, "Args", indent_style, indent_width)
 
 
 def format_returns_section(
@@ -214,17 +210,14 @@ def format_returns_section(
     Args:
         buffer (list[str]): Raw lines belonging to the Returns section.
         indent (str): Base indentation preserved from the docstring quote line.
-        line_length (int): Maximum line length used when wrapping the return
-            description.
+        line_length (int): Maximum line length used when wrapping the return description.
         indent_style (IndentStyle): Indentation style for generated section levels.
         indent_width (int): Width of one generated indentation level.
 
     Returns:
         list[str]: Formatted section lines, each ending with a newline.
     """
-    return _format_single_item_section(
-        buffer, indent, line_length, "Returns", indent_style, indent_width
-    )
+    return _format_single_item_section(buffer, indent, line_length, "Returns", indent_style, indent_width)
 
 
 def format_raises_section(
@@ -236,9 +229,8 @@ def format_raises_section(
 ) -> list[str]:
     """Format the Raises section of a Google style docstring.
 
-    This function formats the Raises section, which typically contains exceptions that
-    the function may raise. It applies the specified formatting and returns the
-    formatted lines.
+    This function formats the Raises section, which typically contains exceptions that the function may raise. It
+    applies the specified formatting and returns the formatted lines.
 
     Args:
         buffer (list[str]): The list of lines in the Raises section.
@@ -255,7 +247,7 @@ def format_raises_section(
     param_indent = indent + unit
     continuation_indent = indent + unit * 2
 
-    entry_re = re.compile(r"^\s*`?([a-zA-Z_][a-zA-Z0-9_\.]*)`?:\s*(.*)$")
+    entry_re = re.compile(r"^\s*`?([a-zA-Z_][a-zA-Z0-9_.]*)`?:\s*(.*)$")
 
     current_exc: str | None = None
     desc_lines: list[str] = []
@@ -301,17 +293,14 @@ def format_yields_section(
     Args:
         buffer (list[str]): Raw lines belonging to the Yields section.
         indent (str): Base indentation preserved from the docstring quote line.
-        line_length (int): Maximum line length used when wrapping the yielded-value
-            description.
+        line_length (int): Maximum line length used when wrapping the yielded-value description.
         indent_style (IndentStyle): Indentation style for generated section levels.
         indent_width (int): Width of one generated indentation level.
 
     Returns:
         list[str]: Formatted section lines, each ending with a newline.
     """
-    return _format_single_item_section(
-        buffer, indent, line_length, "Yields", indent_style, indent_width
-    )
+    return _format_single_item_section(buffer, indent, line_length, "Yields", indent_style, indent_width)
 
 
 # noinspection PyUnusedLocal
@@ -324,9 +313,8 @@ def format_examples_section(
 ) -> list[str]:
     """Format the Examples section of a Google style docstring.
 
-    This function formats the Examples section, which typically contains usage examples
-    of the function. It applies the specified formatting and returns the formatted
-    lines.
+    This function formats the Examples section, which typically contains usage examples of the function. It applies the
+    specified formatting and returns the formatted lines.
 
     Args:
         buffer (list[str]): The list of lines in the Examples section.
@@ -356,24 +344,15 @@ def format_examples_section(
 
             # Find minimum indentation of non-empty lines between fences
             content_lines = block[1:-1]  # Exclude opening and closing ```
-            non_empty_lines = [
-                content_line for content_line in content_lines if content_line.strip()
-            ]
+            non_empty_lines = [content_line for content_line in content_lines if content_line.strip()]
 
             if non_empty_lines:
-                min_indent = min(
-                    len(content_line) - len(content_line.lstrip())
-                    for content_line in non_empty_lines
-                )
+                min_indent = min(len(content_line) - len(content_line.lstrip()) for content_line in non_empty_lines)
 
                 for content_line in content_lines:
                     if content_line.strip():
                         # Remove minimum indentation and add param_indent
-                        relative_content = (
-                            content_line[min_indent:]
-                            if len(content_line) > min_indent
-                            else content_line.lstrip()
-                        )
+                        relative_content = content_line[min_indent:] if len(content_line) > min_indent else content_line.lstrip()
                         result.append(f"{param_indent}{relative_content}")
                     else:
                         result.append("")
@@ -387,19 +366,12 @@ def format_examples_section(
             non_empty_lines = [block_line for block_line in block if block_line.strip()]
 
             if non_empty_lines:
-                min_indent = min(
-                    len(block_line) - len(block_line.lstrip())
-                    for block_line in non_empty_lines
-                )
+                min_indent = min(len(block_line) - len(block_line.lstrip()) for block_line in non_empty_lines)
 
                 for block_line in block:
                     if block_line.strip():
                         # Remove minimum indentation and add param_indent
-                        relative_content = (
-                            block_line[min_indent:]
-                            if len(block_line) > min_indent
-                            else block_line.lstrip()
-                        )
+                        relative_content = block_line[min_indent:] if len(block_line) > min_indent else block_line.lstrip()
                         result.append(f"{param_indent}{relative_content}")
                     else:
                         result.append("")
@@ -440,14 +412,10 @@ def format_attributes_section(
     Returns:
         list[str]: Formatted section lines, each ending with a newline.
     """
-    return _format_param_section(
-        buffer, indent, line_length, "Attributes", indent_style, indent_width
-    )
+    return _format_param_section(buffer, indent, line_length, "Attributes", indent_style, indent_width)
 
 
-SECTION_HANDLERS: dict[
-    str, Callable[[list[str], str, int, IndentStyle, int], list[str]]
-] = {
+SECTION_HANDLERS: dict[str, Callable[[list[str], str, int, IndentStyle, int], list[str]]] = {
     "Args": format_args_section,
     "Returns": format_returns_section,
     "Raises": format_raises_section,
@@ -460,9 +428,8 @@ SECTION_HANDLERS: dict[
 def _extract_lists(paragraph: list[str]) -> list[list[str]]:
     """Extract lists from the buffer.
 
-    This function splits a paragraph into alternating sections of text and list items.
-    It returns a list of sublists where each sublist contains either text lines or list
-    item lines (starting with '-').
+    This function splits a paragraph into alternating sections of text and list items. It returns a list of sublists
+    where each sublist contains either text lines or list item lines (starting with '-').
 
     Args:
         paragraph (list[str]): The list of lines belonging to the paragraph.
@@ -509,8 +476,8 @@ def reflow(
 ) -> list[str]:
     """Reflow a Google style docstring to fit within the specified line length.
 
-    This function takes a docstring, splits it into lines, and reflows each line to fit
-    within the specified line length. It also handles indentation.
+    This function takes a docstring, splits it into lines, and reflows each line to fit within the specified line
+    length. It also handles indentation.
 
     Args:
         docstring (str): The docstring to reflow.
@@ -644,9 +611,7 @@ def reflow(
     for section_name, content in sections:
         formatter = SECTION_HANDLERS.get(section_name)
         if formatter:
-            result.extend(
-                formatter(content, indent, line_length, indent_style, indent_width)
-            )
+            result.extend(formatter(content, indent, line_length, indent_style, indent_width))
 
     if result and len(result) == 1:
         result[0] = result[0].rstrip() + '"""\n'

@@ -39,14 +39,10 @@ class TestFileSelection(unittest.TestCase):
             assert args[0] == expected_command
             stdin_bytes = kwargs["input"]
             assert isinstance(stdin_bytes, bytes)
-            provided_paths = [
-                path for path in stdin_bytes.decode("utf-8").split("\0") if path
-            ]
+            provided_paths = [path for path in stdin_bytes.decode("utf-8").split("\0") if path]
             ignored = [path for path in provided_paths if path in ignored_paths]
             stdout = ("\0".join(ignored) + ("\0" if ignored else "")).encode("utf-8")
-            return subprocess.CompletedProcess(
-                expected_command, 0, stdout=stdout, stderr=b""
-            )
+            return subprocess.CompletedProcess(expected_command, 0, stdout=stdout, stderr=b"")
 
         return fake_run
 
@@ -63,10 +59,7 @@ class TestFileSelection(unittest.TestCase):
 
             selection = file_selection.select_files([str(root)], settings)
 
-        collected = [
-            Path(decision.path).relative_to(root).as_posix()
-            for decision in selection.decisions
-        ]
+        collected = [Path(decision.path).relative_to(root).as_posix() for decision in selection.decisions]
         self.assertEqual(collected, ["a.py", "b.py", "a_dir/d.py", "z_dir/c.py"])
 
     def test_ruff_spec_explicit_file_bypasses_filters_without_force(
@@ -86,9 +79,7 @@ class TestFileSelection(unittest.TestCase):
             selection = file_selection.select_files([str(target)], settings)
 
         self.assertEqual(selection.accepted_files, (str(target),))
-        self.assertEqual(
-            selection.decisions[0].reason, DecisionReason.EXPLICIT_INCLUDED
-        )
+        self.assertEqual(selection.decisions[0].reason, DecisionReason.EXPLICIT_INCLUDED)
 
     def test_ruff_spec_force_exclude_filters_explicit_file(self) -> None:
         settings = FormatterSettings(
@@ -114,9 +105,7 @@ class TestFileSelection(unittest.TestCase):
             self._write_git_marker(root)
             (root / "a.py").write_text("", encoding="utf-8")
 
-            with unittest.mock.patch(
-                "pydocformatter.file_selection.subprocess.run"
-            ) as run_mock:
+            with unittest.mock.patch("pydocformatter.file_selection.subprocess.run") as run_mock:
                 selection = file_selection.select_files([str(root)], settings)
 
         self.assertFalse(run_mock.called)
@@ -136,9 +125,7 @@ class TestFileSelection(unittest.TestCase):
             ):
                 selection = file_selection.select_files([str(root)], settings)
 
-        decisions_by_name = {
-            Path(decision.path).name: decision for decision in selection.decisions
-        }
+        decisions_by_name = {Path(decision.path).name: decision for decision in selection.decisions}
         self.assertEqual(selection.accepted_files, (str(root / "keep.py"),))
         self.assertEqual(decisions_by_name["skip.py"].reason, DecisionReason.GITIGNORED)
 
@@ -150,9 +137,7 @@ class TestFileSelection(unittest.TestCase):
             stdout = StringIO()
 
             with (
-                unittest.mock.patch(
-                    "pydocformatter.file_selection.subprocess.run"
-                ) as run_mock,
+                unittest.mock.patch("pydocformatter.file_selection.subprocess.run") as run_mock,
                 contextlib.redirect_stdout(stdout),
             ):
                 selection = file_selection.select_files([str(root)], settings)
@@ -184,11 +169,7 @@ class TestFileSelection(unittest.TestCase):
             ):
                 selection = file_selection.select_files([str(root)], settings)
 
-        warning = (
-            f"{root} WARNING: unable to apply gitignore filtering "
-            "(fatal: no such command); continuing without gitignore filtering "
-            "for this repository root"
-        )
+        warning = f"{root} WARNING: unable to apply gitignore filtering (fatal: no such command); continuing without gitignore filtering for this repository root"
         self.assertEqual(stdout.getvalue().splitlines(), [warning])
         self.assertEqual(
             selection.accepted_files,
@@ -227,9 +208,7 @@ class TestFileSelection(unittest.TestCase):
             (root / "src" / "generated").mkdir(parents=True)
             (root / "src" / "generated" / "a.py").write_text("", encoding="utf-8")
 
-            selection = file_selection.select_files(
-                [str(root / "src" / "generated")], settings
-            )
+            selection = file_selection.select_files([str(root / "src" / "generated")], settings)
 
         self.assertEqual(selection.accepted_files, ())
         self.assertEqual(selection.decisions[0].path, str(root / "src" / "generated"))
@@ -248,9 +227,7 @@ class TestFileSelection(unittest.TestCase):
 
             selection = file_selection.select_files([str(root)], settings)
 
-        decisions_by_name = {
-            Path(decision.path).name: decision for decision in selection.decisions
-        }
+        decisions_by_name = {Path(decision.path).name: decision for decision in selection.decisions}
         self.assertEqual(selection.accepted_files, (str(root / "a.py"),))
         self.assertEqual(decisions_by_name["generated"].reason, DecisionReason.EXCLUDED)
         self.assertNotIn("ignored.py", decisions_by_name)
@@ -308,9 +285,7 @@ class TestFileSelection(unittest.TestCase):
                     stderr=b"",
                 )
 
-            with unittest.mock.patch(
-                "pydocformatter.file_selection.subprocess.run", side_effect=fake_run
-            ):
+            with unittest.mock.patch("pydocformatter.file_selection.subprocess.run", side_effect=fake_run):
                 selection = file_selection.select_files([str(root)], settings)
 
         self.assertEqual(selection.accepted_files, ())

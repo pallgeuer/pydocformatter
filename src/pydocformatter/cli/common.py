@@ -152,10 +152,7 @@ def add_common_arguments(
         "--respect-gitignore",
         action=argparse.BooleanOptionalAction,
         default=None,
-        help=(
-            "Respect .gitignore when discovering files "
-            f"(default: {_enabled_label(settings.respect_gitignore)})."
-        ),
+        help=f"Respect .gitignore when discovering files (default: {_enabled_label(settings.respect_gitignore)}).",
     )
     parser.add_argument(
         "--force-exclude",
@@ -278,16 +275,10 @@ def _parse_per_file_options(groups: list[str] | None) -> config.RuleSelectorMap 
         for pattern, selectors in value.items():
             if not isinstance(pattern, str):
                 raise config.ConfigError("per-file ignore CLI patterns must be strings")
-            if not isinstance(selectors, (list, tuple)) or not all(
-                isinstance(selector, str) for selector in selectors
-            ):
-                raise config.ConfigError(
-                    "per-file ignore CLI selectors must be lists of strings"
-                )
+            if not isinstance(selectors, (list, tuple)) or not all(isinstance(selector, str) for selector in selectors):
+                raise config.ConfigError("per-file ignore CLI selectors must be lists of strings")
             merged[pattern] = tuple(selectors)
-    result: config.RuleSelectorMap = tuple(
-        (pattern, selectors) for pattern, selectors in merged.items()
-    )
+    result: config.RuleSelectorMap = tuple((pattern, selectors) for pattern, selectors in merged.items())
     return result
 
 

@@ -12,15 +12,11 @@ class DecisionReason(str, Enum):
     """Stable reason codes for file-selection decisions.
 
     Attributes:
-        INCLUDED (DecisionReason): The path matched include rules and did not match
-            exclude rules.
-        EXPLICIT_INCLUDED (DecisionReason): The path was passed explicitly while
-            `force_exclude` was disabled.
-        NOT_INCLUDED (DecisionReason): The path did not match configured include
-            patterns.
+        INCLUDED (DecisionReason): The path matched include rules and did not match exclude rules.
+        EXPLICIT_INCLUDED (DecisionReason): The path was passed explicitly while `force_exclude` was disabled.
+        NOT_INCLUDED (DecisionReason): The path did not match configured include patterns.
         EXCLUDED (DecisionReason): The path matched configured exclude patterns.
-        GITIGNORED (DecisionReason): The path was rejected because git reported it as
-            ignored.
+        GITIGNORED (DecisionReason): The path was rejected because git reported it as ignored.
     """
 
     INCLUDED = "included"
@@ -47,8 +43,7 @@ class FileDecision:
         path (str): Original path that was evaluated.
         accepted (bool): Whether the path should be formatted.
         reason (DecisionReason): Stable machine-readable decision reason.
-        explicit (bool): Whether the path came directly from a CLI argument rather than
-            directory traversal.
+        explicit (bool): Whether the path came directly from a CLI argument rather than directory traversal.
     """
 
     path: str
@@ -72,8 +67,7 @@ class SelectionResult:
 
     Attributes:
         accepted_files (tuple[str, ...]): Ordered paths that should be formatted.
-        decisions (tuple[FileDecision, ...]): Ordered decisions for every considered
-            path or pruned directory.
+        decisions (tuple[FileDecision, ...]): Ordered decisions for every considered path or pruned directory.
     """
 
     accepted_files: tuple[str, ...]
@@ -94,18 +88,17 @@ _CollectedPath = _Candidate | FileDecision
 def select_files(paths: list[str], settings: FormatterSettings) -> SelectionResult:
     """Select files from CLI paths using resolved formatter settings.
 
-    Direct file paths are accepted without include, exclude, or gitignore filtering
-    unless `settings.force_exclude` is enabled. Directory paths are walked recursively
-    with excluded directories pruned before file candidates are evaluated.
+    Direct file paths are accepted without include, exclude, or gitignore filtering unless `settings.force_exclude` is
+    enabled. Directory paths are walked recursively with excluded directories pruned before file candidates are
+    evaluated.
 
     Args:
         paths (list[str]): CLI path arguments naming files or directories to consider.
-        settings (FormatterSettings): Resolved formatter settings controlling include,
-            exclude, force-exclude, and gitignore behavior.
+        settings (FormatterSettings): Resolved formatter settings controlling include, exclude, force-exclude, and
+            gitignore behavior.
 
     Returns:
-        SelectionResult: Accepted files plus verbose decisions for accepted and rejected
-            paths.
+        SelectionResult: Accepted files plus verbose decisions for accepted and rejected paths.
     """
     include_matcher = GlobPatternSet.compile(
         settings.include_patterns,
@@ -138,16 +131,11 @@ def select_files(paths: list[str], settings: FormatterSettings) -> SelectionResu
     if not settings.respect_gitignore:
         return _selection_result(evaluated)
 
-    gitignored_paths = _collect_gitignored_absolute_paths(
-        _accepted_paths_by_git_root(evaluated, settings.force_exclude, root_cache)
-    )
+    gitignored_paths = _collect_gitignored_absolute_paths(_accepted_paths_by_git_root(evaluated, settings.force_exclude, root_cache))
     if not gitignored_paths:
         return _selection_result(evaluated)
 
-    decisions = tuple(
-        _apply_gitignore_decision(decision, settings.force_exclude, gitignored_paths)
-        for decision in evaluated
-    )
+    decisions = tuple(_apply_gitignore_decision(decision, settings.force_exclude, gitignored_paths) for decision in evaluated)
     return _selection_result(decisions)
 
 
@@ -156,9 +144,7 @@ def _collect_candidates(
     exclude_matcher: GlobPatternSet,
     root_cache: dict[str, str | None],
 ) -> tuple[_CollectedPath, ...]:
-    """Collect explicit files and recursively discovered files, pruning excluded
-    directories.
-    """
+    """Collect explicit files and recursively discovered files, pruning excluded directories."""
     candidates: list[_CollectedPath] = []
     for path in paths:
         if os.path.isdir(path):
@@ -169,21 +155,13 @@ def _collect_candidates(
                 kept_dirs = []
                 for name in sorted(dirs):
                     directory = os.path.join(root, name)
-                    if exclude_matcher.matches(
-                        _normalized_posix_path(directory, root_cache)
-                    ):
-                        candidates.append(
-                            _excluded_directory_decision(directory, explicit=False)
-                        )
+                    if exclude_matcher.matches(_normalized_posix_path(directory, root_cache)):
+                        candidates.append(_excluded_directory_decision(directory, explicit=False))
                     else:
                         kept_dirs.append(name)
                 dirs[:] = kept_dirs
                 files.sort()
-                candidates.extend(
-                    _Candidate(path=os.path.join(root, name), explicit=False)
-                    for name in files
-                    if name != ".git"
-                )
+                candidates.extend(_Candidate(path=os.path.join(root, name), explicit=False) for name in files if name != ".git")
         else:
             candidates.append(_Candidate(path=path, explicit=True))
     return tuple(candidates)
@@ -261,9 +239,7 @@ def _apply_gitignore_decision(
 def _selection_result(decisions: tuple[FileDecision, ...]) -> SelectionResult:
     """Build a selection result from the ordered file-decision stream."""
     return SelectionResult(
-        accepted_files=tuple(
-            decision.path for decision in decisions if decision.accepted
-        ),
+        accepted_files=tuple(decision.path for decision in decisions if decision.accepted),
         decisions=decisions,
     )
 
@@ -306,11 +282,7 @@ def _find_git_root_for_path(
     root_cache: dict[str, str | None],
 ) -> str | None:
     """Find and cache the nearest containing git root for an absolute path."""
-    start_dir = (
-        absolute_path
-        if os.path.isdir(absolute_path)
-        else os.path.dirname(absolute_path)
-    )
+    start_dir = absolute_path if os.path.isdir(absolute_path) else os.path.dirname(absolute_path)
     if start_dir in root_cache:
         return root_cache[start_dir]
 
@@ -344,19 +316,11 @@ def _collect_gitignored_absolute_paths(
     gitignored_paths: set[str] = set()
 
     for git_root, relative_paths in paths_by_git_root.items():
-        ignored_relative_paths, error = _query_git_ignored_paths(
-            git_root, relative_paths
-        )
+        ignored_relative_paths, error = _query_git_ignored_paths(git_root, relative_paths)
         if error is not None:
-            print(
-                f"{git_root} WARNING: unable to apply gitignore filtering ({error}); "
-                f"continuing without gitignore filtering for this repository root"
-            )
+            print(f"{git_root} WARNING: unable to apply gitignore filtering ({error}); continuing without gitignore filtering for this repository root")
             continue
-        gitignored_paths.update(
-            os.path.abspath(os.path.join(git_root, path))
-            for path in ignored_relative_paths
-        )
+        gitignored_paths.update(os.path.abspath(os.path.join(git_root, path)) for path in ignored_relative_paths)
 
     return gitignored_paths
 
@@ -386,11 +350,7 @@ def _query_git_ignored_paths(
 
     if process.returncode not in {0, 1}:
         error_message = process.stderr.decode("utf-8", errors="replace").strip()
-        return (
-            set(),
-            error_message
-            or f"git check-ignore exited with status {process.returncode}",
-        )
+        return set(), error_message or f"git check-ignore exited with status {process.returncode}"
 
     stdout = process.stdout.decode("utf-8", errors="surrogateescape")
     return {path for path in stdout.split("\0") if path}, None

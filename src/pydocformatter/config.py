@@ -106,9 +106,8 @@ _SHARED_SETTING_KEYS = _PYDOCFMT_SETTING_KEYS
 class ConfigError(ValueError):
     """Raised when pydocformatter configuration cannot be resolved or validated.
 
-    This exception represents user-facing configuration failures, including malformed
-    TOML, unsupported table shapes, unknown setting keys, invalid tool names, and
-    invalid setting values.
+    This exception represents user-facing configuration failures, including malformed TOML, unsupported table shapes,
+    unknown setting keys, invalid tool names, and invalid setting values.
     """
 
 
@@ -117,25 +116,17 @@ class FormatterSettings:
     """Resolved formatter settings for pydocformatter tools.
 
     Attributes:
-        line_length (int): Maximum line length used when wrapping docstrings or
-            comments.
-        indent_style (IndentStyle): Indentation style used by `pydocfmt` for generated
-            docstring section indentation. This setting is not used by `pycommentfmt`.
-        indent_width (int): Number of spaces per generated `pydocfmt` docstring
-            indentation level, or the visual width of a tab. This setting is not used by
-            `pycommentfmt`.
-        respect_gitignore (bool): Whether discovered files are filtered through
-            `.gitignore`.
-        force_exclude (bool): Whether include, exclude, and gitignore rules apply to
-            explicitly passed paths.
-        include (tuple[str, ...]): Base glob patterns that identify format-eligible
-            files.
-        extend_include (tuple[str, ...]): Additional include glob patterns appended to
-            `include`.
-        exclude (tuple[str, ...]): Base glob patterns for files or directories to
-            ignore.
-        extend_exclude (tuple[str, ...]): Additional exclude glob patterns appended to
-            `exclude`.
+        line_length (int): Maximum line length used when wrapping docstrings or comments.
+        indent_style (IndentStyle): Indentation style used by `pydocfmt` for generated docstring section indentation.
+            This setting is not used by `pycommentfmt`.
+        indent_width (int): Number of spaces per generated `pydocfmt` docstring indentation level, or the visual width
+            of a tab. This setting is not used by `pycommentfmt`.
+        respect_gitignore (bool): Whether discovered files are filtered through `.gitignore`.
+        force_exclude (bool): Whether include, exclude, and gitignore rules apply to explicitly passed paths.
+        include (tuple[str, ...]): Base glob patterns that identify format-eligible files.
+        extend_include (tuple[str, ...]): Additional include glob patterns appended to `include`.
+        exclude (tuple[str, ...]): Base glob patterns for files or directories to ignore.
+        extend_exclude (tuple[str, ...]): Additional exclude glob patterns appended to `exclude`.
         select (tuple[str, ...]): Base selected pydocformatter rule selectors.
         extend_select (tuple[str, ...]): Additional selected rule selectors.
         ignore (tuple[str, ...]): Rule selectors to ignore.
@@ -198,9 +189,7 @@ class SettingsOverrides:
     extend_per_file_ignores: RuleSelectorMap | None = None
 
 
-def load_config(
-    tool_name: ToolName, cli_overrides: SettingsOverrides | None = None
-) -> FormatterSettings:
+def load_config(tool_name: ToolName, cli_overrides: SettingsOverrides | None = None) -> FormatterSettings:
     """Resolve settings from defaults, pyproject config, and optional CLI overrides."""
     _validate_tool_name(tool_name)
     settings = FormatterSettings()
@@ -231,9 +220,7 @@ def load_config(
                 continue
             nested_tool_config = formatter_config[nested_tool_name]
             if not isinstance(nested_tool_config, dict):
-                raise ConfigError(
-                    f"tool.pydocformatter.{nested_tool_name} must be a table"
-                )
+                raise ConfigError(f"tool.pydocformatter.{nested_tool_name} must be a table")
             _validate_config_section_keys(
                 nested_tool_config,
                 f"tool.pydocformatter.{nested_tool_name}",
@@ -262,9 +249,7 @@ def load_config(
 
 
 def _load_pyproject_config() -> dict[str, Any]:
-    """Load pyproject.toml from the current directory, returning an empty config if
-    absent.
-    """
+    """Load pyproject.toml from the current directory, returning an empty config if absent."""
     if not os.path.exists("pyproject.toml"):
         return {}
 
@@ -301,15 +286,9 @@ def _apply_config_section(
         allowed_keys.update(TOOL_NAMES)
 
     _validate_config_section_keys(section, context, frozenset(allowed_keys))
-    _validate_config_section_values(
-        section, context, allowed_setting_keys, selector_tool_name
-    )
+    _validate_config_section_values(section, context, allowed_setting_keys, selector_tool_name)
 
-    values = {
-        _KEY_TO_FIELD[key]: section[key]
-        for key in applied_setting_keys
-        if key in section
-    }
+    values = {_KEY_TO_FIELD[key]: section[key] for key in applied_setting_keys if key in section}
     return _apply_field_values(settings, values, context, selector_tool_name)
 
 
@@ -332,9 +311,7 @@ def _validate_config_section_values(
     selector_tool_name: ToolName | None,
 ) -> None:
     """Validate known setting values in one TOML configuration section."""
-    values = {
-        _KEY_TO_FIELD[key]: section[key] for key in setting_keys if key in section
-    }
+    values = {_KEY_TO_FIELD[key]: section[key] for key in setting_keys if key in section}
     _apply_field_values(FormatterSettings(), values, context, selector_tool_name)
 
 
@@ -348,11 +325,7 @@ def _apply_overrides(
     if overrides is None:
         return settings
 
-    values = {
-        field.name: value
-        for field in dataclasses.fields(SettingsOverrides)
-        if (value := getattr(overrides, field.name)) is not None
-    }
+    values = {field.name: value for field in dataclasses.fields(SettingsOverrides) if (value := getattr(overrides, field.name)) is not None}
     return _apply_field_values(settings, values, context, selector_tool_name)
 
 
@@ -379,9 +352,7 @@ def _validate_line_length(value: Any, context: str) -> int:
     if isinstance(value, bool) or not isinstance(value, int):
         raise ConfigError(f"{context} must be an integer")
     if not 0 < value <= 320:
-        raise ConfigError(
-            f"{context} must be greater than 0 and less than or equal to 320"
-        )
+        raise ConfigError(f"{context} must be greater than 0 and less than or equal to 320")
     return int(value)
 
 
@@ -399,9 +370,7 @@ def _validate_indent_width(value: Any, context: str) -> int:
     if isinstance(value, bool) or not isinstance(value, int):
         raise ConfigError(f"{context} must be an integer")
     if not 0 < value <= 255:
-        raise ConfigError(
-            f"{context} must be greater than 0 and less than or equal to 255"
-        )
+        raise ConfigError(f"{context} must be greater than 0 and less than or equal to 255")
     return int(value)
 
 
@@ -456,9 +425,7 @@ def _validate_selector_mapping(value: Any, context: str) -> RuleSelectorMap:
     elif isinstance(value, dict):
         items = tuple(value.items())
     else:
-        raise ConfigError(
-            f"{context} must be a table mapping file patterns to selectors"
-        )
+        raise ConfigError(f"{context} must be a table mapping file patterns to selectors")
 
     entries = []
     for pattern, selectors in items:
@@ -466,9 +433,7 @@ def _validate_selector_mapping(value: Any, context: str) -> RuleSelectorMap:
             raise ConfigError(f"{context} file patterns must be strings")
         if not pattern:
             raise ConfigError(f"{context} file patterns must not be empty")
-        entries.append(
-            (pattern, _validate_selector_list(selectors, f"{context}.{pattern}"))
-        )
+        entries.append((pattern, _validate_selector_list(selectors, f"{context}.{pattern}")))
     return tuple(entries)
 
 
@@ -478,24 +443,11 @@ def _validate_rule_selectors(
     selector_tool_name: ToolName | None,
 ) -> None:
     """Validate rule selectors against the known shared or tool-specific rule scope."""
-    selector_values = [
-        (field, selector)
-        for field, selectors in values.items()
-        if field in _RULE_SELECTOR_FIELDS
-        for selector in selectors
-    ]
-    selector_values.extend(
-        (field, selector)
-        for field, mapping in values.items()
-        if field in _RULE_SELECTOR_MAP_FIELDS
-        for _, selectors in mapping
-        for selector in selectors
-    )
+    selector_values = [(field, selector) for field, selectors in values.items() if field in _RULE_SELECTOR_FIELDS for selector in selectors]
+    selector_values.extend((field, selector) for field, mapping in values.items() if field in _RULE_SELECTOR_MAP_FIELDS for _, selectors in mapping for selector in selectors)
 
     for field, selector in selector_values:
-        if not rules.selector_matches_known_rule(
-            selector, tool_name=selector_tool_name
-        ):
+        if not rules.selector_matches_known_rule(selector, tool_name=selector_tool_name):
             key = _FIELD_TO_KEY[field]
             raise ConfigError(f"{context}.{key} contains unknown selector: {selector}")
 

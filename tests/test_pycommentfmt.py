@@ -11,21 +11,15 @@ from pydocformatter.config import FormatterSettings
 class TestPyCommentFmt(unittest.TestCase):
 
     @staticmethod
-    def _write_and_readback(
-        content: str, line_length: int = 88, check: bool = False
-    ) -> tuple[bool, str, str]:
-        with tempfile.NamedTemporaryFile(
-            mode="w+", delete=False, suffix=".py", encoding="utf-8"
-        ) as tf:
+    def _write_and_readback(content: str, line_length: int = 88, check: bool = False) -> tuple[bool, str, str]:
+        with tempfile.NamedTemporaryFile(mode="w+", delete=False, suffix=".py", encoding="utf-8") as tf:
             tf.write(content)
             filename = tf.name
 
         try:
             output = StringIO()
             with contextlib.redirect_stdout(output):
-                result = pycommentfmt.format_comments(
-                    filename, FormatterSettings(line_length=line_length), check=check
-                )
+                result = pycommentfmt.format_comments(filename, FormatterSettings(line_length=line_length), check=check)
             with open(filename, encoding="utf-8") as f:
                 final = f.read()
         finally:
@@ -79,9 +73,7 @@ class TestPyCommentFmt(unittest.TestCase):
         source = "#!/usr/bin/env python\n# -*- coding: utf-8 -*-\n#Comment that needs wrapping because it is long.\n"
         result, final, _ = self._write_and_readback(source, line_length=60)
         self.assertTrue(result)
-        self.assertTrue(
-            final.startswith("#!/usr/bin/env python\n# -*- coding: utf-8 -*-\n")
-        )
+        self.assertTrue(final.startswith("#!/usr/bin/env python\n# -*- coding: utf-8 -*-\n"))
 
     def test_special_comments_skipped(self) -> None:
         for comment in [
@@ -117,12 +109,7 @@ class TestPyCommentFmt(unittest.TestCase):
         )
 
     def test_check_mode_compresses_non_consecutive_line_ranges(self) -> None:
-        source = (
-            "# This first comment line is very long and should be wrapped by formatting.\n"
-            "x = 1\n"
-            "x = 2\n"
-            "# This second comment line is also very long and should be wrapped by formatting.\n"
-        )
+        source = "# This first comment line is very long and should be wrapped by formatting.\nx = 1\nx = 2\n# This second comment line is also very long and should be wrapped by formatting.\n"
         result, _, stdout = self._write_and_readback(source, line_length=60, check=True)
         self.assertTrue(result)
         self.assertRegex(

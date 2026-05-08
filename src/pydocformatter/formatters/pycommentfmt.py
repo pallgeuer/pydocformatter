@@ -7,14 +7,11 @@ import pydocformatter.utils as utils
 from pydocformatter.config import FormatterSettings
 
 
-def format_comments(
-    path: str, settings: FormatterSettings, check: bool = False
-) -> bool:
+def format_comments(path: str, settings: FormatterSettings, check: bool = False) -> bool:
     """Format comments in a Python file.
 
-    This function reads a Python file, formats its comments to ensure they comply with
-    the specified line length. If `check` is True, it only checks if the file is
-    formatted correctly.
+    This function reads a Python file, formats its comments to ensure they comply with the specified line length. If
+    `check` is True, it only checks if the file is formatted correctly.
 
     Args:
         path (str): The path to the Python file.
@@ -36,9 +33,7 @@ def format_comments(
     lines = source.splitlines(keepends=True)
     output_lines = list(lines)
 
-    SPECIAL_COMMENT_RE = re.compile(
-        r"#\s*(noqa|type:\s*ignore|pylint|fmt:|pragma)", re.IGNORECASE
-    )
+    SPECIAL_COMMENT_RE = re.compile(r"#\s*(noqa|type:\s*ignore|pylint|fmt:|pragma)", re.IGNORECASE)
     changed_lines: set[int] = set()
 
     comment_block: list[tuple[int, str]] = []
@@ -46,9 +41,7 @@ def format_comments(
 
     def is_code_comment(text: str) -> bool:
         """Check if the comment is a code-style comment."""
-        return text.startswith("    ") or bool(
-            re.match(r"\s*(if|for|while|def|class|try|except|print|return)\b", text)
-        )
+        return text.startswith("    ") or bool(re.match(r"\s*(if|for|while|def|class|try|except|print|return)\b", text))
 
     def flush_comment_block() -> None:
         """Flush the current comment block to the output lines."""
@@ -64,9 +57,7 @@ def format_comments(
         if any(is_code_comment(c.lstrip("#")) for _, c in comment_block):
             return
 
-        block_comment_text = " ".join(
-            block_line.lstrip("#").strip() for _, block_line in comment_block
-        )
+        block_comment_text = " ".join(block_line.lstrip("#").strip() for _, block_line in comment_block)
         available_width = settings.line_length - len(base_indent) - 2
         wrapped_lines = textwrap.wrap(
             block_comment_text,
@@ -74,14 +65,9 @@ def format_comments(
             break_long_words=False,
             break_on_hyphens=False,
         )
-        new_lines = [
-            f"{base_indent}# {wrapped_line}\n" for wrapped_line in wrapped_lines
-        ]
+        new_lines = [f"{base_indent}# {wrapped_line}\n" for wrapped_line in wrapped_lines]
 
-        if any(
-            lines[block_row] != new_lines[i]
-            for i, block_row in enumerate(srows[: len(new_lines)])
-        ):
+        if any(lines[block_row] != new_lines[i] for i, block_row in enumerate(srows[: len(new_lines)])):
             changed_lines.update(srows)
 
         for block_row in srows:
@@ -116,9 +102,7 @@ def format_comments(
                     changed_lines.add(srow - 1)
                 output_lines[srow - 1] = new_line
             else:
-                indent = before_comment[
-                    : len(before_comment) - len(before_comment.lstrip())
-                ]
+                indent = before_comment[: len(before_comment) - len(before_comment.lstrip())]
                 available = settings.line_length - len(indent) - 2
                 wrapped = textwrap.wrap(
                     comment_text,

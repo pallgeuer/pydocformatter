@@ -5,8 +5,7 @@ def format_line_ranges(line_numbers: list[int]) -> str:
         line_numbers (list[int]): Sorted 1-based line numbers to compress.
 
     Returns:
-        str: Comma-separated line ranges, such as `1-3, 7, 9-10`, or an empty string for
-            no lines.
+        str: Comma-separated line ranges, such as `1-3, 7, 9-10`, or an empty string for no lines.
     """
     if not line_numbers:
         return ""

@@ -33,12 +33,8 @@ class TestCliVerbose(unittest.TestCase):
         return temp_dir
 
     @staticmethod
-    def _fake_git_check_ignore_for_root(
-        root: Path, ignored_paths: set[str]
-    ) -> Callable[..., subprocess.CompletedProcess[bytes]]:
-        def fake_run(
-            *args: object, **kwargs: object
-        ) -> subprocess.CompletedProcess[bytes]:
+    def _fake_git_check_ignore_for_root(root: Path, ignored_paths: set[str]) -> Callable[..., subprocess.CompletedProcess[bytes]]:
+        def fake_run(*args: object, **kwargs: object) -> subprocess.CompletedProcess[bytes]:
             expected_command = [
                 "git",
                 "-C",
@@ -51,14 +47,10 @@ class TestCliVerbose(unittest.TestCase):
             assert args[0] == expected_command
             stdin_bytes = kwargs["input"]
             assert isinstance(stdin_bytes, bytes)
-            provided_paths = [
-                path for path in stdin_bytes.decode("utf-8").split("\0") if path
-            ]
+            provided_paths = [path for path in stdin_bytes.decode("utf-8").split("\0") if path]
             ignored = [path for path in provided_paths if path in ignored_paths]
             stdout = ("\0".join(ignored) + ("\0" if ignored else "")).encode("utf-8")
-            return subprocess.CompletedProcess(
-                expected_command, 0, stdout=stdout, stderr=b""
-            )
+            return subprocess.CompletedProcess(expected_command, 0, stdout=stdout, stderr=b"")
 
         return fake_run
 
@@ -69,9 +61,7 @@ class TestCliVerbose(unittest.TestCase):
             called_paths: list[str] = []
 
             # noinspection PyUnusedLocal
-            def fake_format(
-                path: str, line_length: int, check: bool, **kwargs: object
-            ) -> bool:
+            def fake_format(path: str, line_length: int, check: bool, **kwargs: object) -> bool:
                 called_paths.append(path)
                 return False
 
@@ -108,9 +98,7 @@ class TestCliVerbose(unittest.TestCase):
             called_paths: list[str] = []
 
             # noinspection PyUnusedLocal
-            def fake_format(
-                path: str, line_length: int, check: bool, **kwargs: object
-            ) -> bool:
+            def fake_format(path: str, line_length: int, check: bool, **kwargs: object) -> bool:
                 called_paths.append(os.path.abspath(path))
                 return False
 
@@ -144,9 +132,7 @@ class TestCliVerbose(unittest.TestCase):
             called_paths: list[str] = []
 
             # noinspection PyUnusedLocal
-            def fake_format(
-                path: str, line_length: int, check: bool, **kwargs: object
-            ) -> bool:
+            def fake_format(path: str, line_length: int, check: bool, **kwargs: object) -> bool:
                 called_paths.append(path)
                 return False
 
@@ -175,9 +161,7 @@ class TestCliVerbose(unittest.TestCase):
             called_paths: list[str] = []
 
             # noinspection PyUnusedLocal
-            def fake_format(
-                path: str, line_length: int, check: bool, **kwargs: object
-            ) -> bool:
+            def fake_format(path: str, line_length: int, check: bool, **kwargs: object) -> bool:
                 called_paths.append(path)
                 return False
 
@@ -214,9 +198,7 @@ class TestCliVerbose(unittest.TestCase):
             called_paths: list[str] = []
 
             # noinspection PyUnusedLocal
-            def fake_format(
-                path: str, line_length: int, check: bool, **kwargs: object
-            ) -> bool:
+            def fake_format(path: str, line_length: int, check: bool, **kwargs: object) -> bool:
                 called_paths.append(os.path.abspath(path))
                 return False
 
@@ -247,9 +229,7 @@ class TestCliVerbose(unittest.TestCase):
             called_paths: list[str] = []
 
             # noinspection PyUnusedLocal
-            def fake_format(
-                path: str, line_length: int, check: bool, **kwargs: object
-            ) -> bool:
+            def fake_format(path: str, line_length: int, check: bool, **kwargs: object) -> bool:
                 called_paths.append(path)
                 return False
 
@@ -291,9 +271,7 @@ class TestCliVerbose(unittest.TestCase):
             called_paths: list[str] = []
 
             # noinspection PyUnusedLocal
-            def fake_format(
-                path: str, line_length: int, check: bool, **kwargs: object
-            ) -> bool:
+            def fake_format(path: str, line_length: int, check: bool, **kwargs: object) -> bool:
                 called_paths.append(path)
                 return False
 
@@ -333,9 +311,7 @@ class TestCliVerbose(unittest.TestCase):
             called_paths: list[str] = []
 
             # noinspection PyUnusedLocal
-            def fake_format(
-                path: str, line_length: int, check: bool, **kwargs: object
-            ) -> bool:
+            def fake_format(path: str, line_length: int, check: bool, **kwargs: object) -> bool:
                 called_paths.append(path)
                 return False
 
@@ -368,18 +344,14 @@ class TestCliVerbose(unittest.TestCase):
             called_paths: list[str] = []
 
             # noinspection PyUnusedLocal
-            def fake_format(
-                path: str, line_length: int, check: bool, **kwargs: object
-            ) -> bool:
+            def fake_format(path: str, line_length: int, check: bool, **kwargs: object) -> bool:
                 called_paths.append(path)
                 return False
 
             argv = ["pydocfmt", "--verbose", "--no-respect-gitignore", str(root)]
             with (
                 unittest.mock.patch("sys.argv", argv),
-                unittest.mock.patch(
-                    "pydocformatter.file_selection.subprocess.run"
-                ) as run_mock,
+                unittest.mock.patch("pydocformatter.file_selection.subprocess.run") as run_mock,
                 unittest.mock.patch(
                     "pydocformatter.cli.pydocfmt_main.pydocfmt.format_docstrings",
                     side_effect=fake_format,
@@ -403,9 +375,7 @@ class TestCliVerbose(unittest.TestCase):
             called_paths: list[str] = []
 
             # noinspection PyUnusedLocal
-            def fake_format(
-                path: str, line_length: int, check: bool, **kwargs: object
-            ) -> bool:
+            def fake_format(path: str, line_length: int, check: bool, **kwargs: object) -> bool:
                 called_paths.append(path)
                 return False
 
@@ -440,18 +410,14 @@ class TestCliVerbose(unittest.TestCase):
             called_paths: list[str] = []
 
             # noinspection PyUnusedLocal
-            def fake_format(
-                path: str, line_length: int, check: bool, **kwargs: object
-            ) -> bool:
+            def fake_format(path: str, line_length: int, check: bool, **kwargs: object) -> bool:
                 called_paths.append(path)
                 return False
 
             argv = ["pycommentfmt", "--verbose", "--no-respect-gitignore", str(root)]
             with (
                 unittest.mock.patch("sys.argv", argv),
-                unittest.mock.patch(
-                    "pydocformatter.file_selection.subprocess.run"
-                ) as run_mock,
+                unittest.mock.patch("pydocformatter.file_selection.subprocess.run") as run_mock,
                 unittest.mock.patch(
                     "pydocformatter.cli.pycommentfmt_main.pycommentfmt.format_comments",
                     side_effect=fake_format,
@@ -480,9 +446,7 @@ class TestCliVerbose(unittest.TestCase):
             called_args: list[tuple[str, int, bool]] = []
 
             # noinspection PyUnusedLocal
-            def fake_format(
-                path: str, settings: FormatterSettings, check: bool
-            ) -> bool:
+            def fake_format(path: str, settings: FormatterSettings, check: bool) -> bool:
                 called_args.append((path, settings.line_length, check))
                 return False
 
@@ -492,9 +456,7 @@ class TestCliVerbose(unittest.TestCase):
             try:
                 with (
                     unittest.mock.patch("sys.argv", argv),
-                    unittest.mock.patch(
-                        "pydocformatter.file_selection.subprocess.run"
-                    ) as run_mock,
+                    unittest.mock.patch("pydocformatter.file_selection.subprocess.run") as run_mock,
                     unittest.mock.patch(
                         "pydocformatter.cli.pydocfmt_main.pydocfmt.format_docstrings",
                         side_effect=fake_format,
@@ -514,9 +476,7 @@ class TestCliVerbose(unittest.TestCase):
             called_settings: list[tuple[str, int]] = []
 
             # noinspection PyUnusedLocal
-            def fake_format(
-                path: str, settings: FormatterSettings, check: bool
-            ) -> bool:
+            def fake_format(path: str, settings: FormatterSettings, check: bool) -> bool:
                 called_settings.append((settings.indent_style, settings.indent_width))
                 return False
 
@@ -568,9 +528,7 @@ class TestCliVerbose(unittest.TestCase):
             called_args: list[tuple[str, int, bool]] = []
 
             # noinspection PyUnusedLocal
-            def fake_format(
-                path: str, settings: FormatterSettings, check: bool
-            ) -> bool:
+            def fake_format(path: str, settings: FormatterSettings, check: bool) -> bool:
                 called_args.append((path, settings.line_length, check))
                 return False
 
@@ -580,9 +538,7 @@ class TestCliVerbose(unittest.TestCase):
             try:
                 with (
                     unittest.mock.patch("sys.argv", argv),
-                    unittest.mock.patch(
-                        "pydocformatter.file_selection.subprocess.run"
-                    ) as run_mock,
+                    unittest.mock.patch("pydocformatter.file_selection.subprocess.run") as run_mock,
                     unittest.mock.patch(
                         "pydocformatter.cli.pycommentfmt_main.pycommentfmt.format_comments",
                         side_effect=fake_format,
@@ -600,16 +556,13 @@ class TestCliVerbose(unittest.TestCase):
             root = Path(td)
             (root / "a.py").write_text("x = 1\n", encoding="utf-8")
             (root / "pyproject.toml").write_text(
-                "[tool.pydocformatter]\nline-length = 70\n"
-                "[tool.pydocformatter.pydocfmt]\nline-length = 72\n",
+                "[tool.pydocformatter]\nline-length = 70\n[tool.pydocformatter.pydocfmt]\nline-length = 72\n",
                 encoding="utf-8",
             )
             called_args: list[tuple[str, int, bool]] = []
 
             # noinspection PyUnusedLocal
-            def fake_format(
-                path: str, settings: FormatterSettings, check: bool
-            ) -> bool:
+            def fake_format(path: str, settings: FormatterSettings, check: bool) -> bool:
                 called_args.append((path, settings.line_length, check))
                 return False
 
@@ -638,9 +591,7 @@ class TestCliVerbose(unittest.TestCase):
             called_settings: list[FormatterSettings] = []
 
             # noinspection PyUnusedLocal
-            def fake_format(
-                path: str, settings: FormatterSettings, check: bool
-            ) -> bool:
+            def fake_format(path: str, settings: FormatterSettings, check: bool) -> bool:
                 called_settings.append(settings)
                 return False
 
@@ -672,9 +623,7 @@ class TestCliVerbose(unittest.TestCase):
             self.assertEqual(called_settings[0].ignore, ("PCF002",))
             self.assertEqual(called_settings[0].fixable, ("ALL",))
             self.assertEqual(called_settings[0].unfixable, ("PCF001",))
-            self.assertEqual(
-                called_settings[0].per_file_ignores, (("tests/*.py", ("PCF001",)),)
-            )
+            self.assertEqual(called_settings[0].per_file_ignores, (("tests/*.py", ("PCF001",)),))
 
     def test_invalid_rule_cli_selector_reports_configuration_error(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -702,9 +651,7 @@ class TestCliVerbose(unittest.TestCase):
             called_paths: list[str] = []
 
             # noinspection PyUnusedLocal
-            def fake_format(
-                path: str, line_length: int, check: bool, **kwargs: object
-            ) -> bool:
+            def fake_format(path: str, line_length: int, check: bool, **kwargs: object) -> bool:
                 called_paths.append(path)
                 return False
 
@@ -740,9 +687,7 @@ class TestCliVerbose(unittest.TestCase):
             called_paths: list[str] = []
 
             # noinspection PyUnusedLocal
-            def fake_format(
-                path: str, line_length: int, check: bool, **kwargs: object
-            ) -> bool:
+            def fake_format(path: str, line_length: int, check: bool, **kwargs: object) -> bool:
                 called_paths.append(path)
                 return False
 
@@ -773,18 +718,13 @@ class TestCliVerbose(unittest.TestCase):
             target = root / "skip.py"
             target.write_text("x = 1\n", encoding="utf-8")
             (root / "pyproject.toml").write_text(
-                "[tool.pydocformatter.pydocfmt]\n"
-                'include = ["*.py"]\n'
-                "exclude = []\n"
-                'extend-exclude = ["skip.py"]\n',
+                "[tool.pydocformatter.pydocfmt]\n" 'include = ["*.py"]\n' "exclude = []\n" 'extend-exclude = ["skip.py"]\n',
                 encoding="utf-8",
             )
             called_paths: list[str] = []
 
             # noinspection PyUnusedLocal
-            def fake_format(
-                path: str, line_length: int, check: bool, **kwargs: object
-            ) -> bool:
+            def fake_format(path: str, line_length: int, check: bool, **kwargs: object) -> bool:
                 called_paths.append(path)
                 return False
 
@@ -1003,9 +943,7 @@ class TestCliVerbose(unittest.TestCase):
             called_paths: list[str] = []
 
             # noinspection PyUnusedLocal
-            def fake_format(
-                path: str, line_length: int, check: bool, **kwargs: object
-            ) -> bool:
+            def fake_format(path: str, line_length: int, check: bool, **kwargs: object) -> bool:
                 called_paths.append(path)
                 return False
 
@@ -1014,9 +952,7 @@ class TestCliVerbose(unittest.TestCase):
                 unittest.mock.patch("sys.argv", argv),
                 unittest.mock.patch(
                     "pydocformatter.file_selection.subprocess.run",
-                    return_value=subprocess.CompletedProcess(
-                        ["git"], 128, stdout=b"", stderr=b"fatal: broken git"
-                    ),
+                    return_value=subprocess.CompletedProcess(["git"], 128, stdout=b"", stderr=b"fatal: broken git"),
                 ),
                 unittest.mock.patch(
                     "pydocformatter.cli.pydocfmt_main.pydocfmt.format_docstrings",
@@ -1027,10 +963,7 @@ class TestCliVerbose(unittest.TestCase):
                 pydocfmt_main.main()
 
             output_lines = stdout.getvalue().splitlines()
-            warning = (
-                f"{root} WARNING: unable to apply gitignore filtering (fatal: broken git); "
-                "continuing without gitignore filtering for this repository root"
-            )
+            warning = f"{root} WARNING: unable to apply gitignore filtering (fatal: broken git); continuing without gitignore filtering for this repository root"
             self.assertIn(warning, output_lines)
             self.assertEqual(output_lines.count(warning), 1)
             self.assertEqual(called_paths, [str(root / "a.py"), str(root / "skip.py")])

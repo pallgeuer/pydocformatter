@@ -43,8 +43,7 @@ def normalize_version(version: str) -> str:
         version (str): Raw version or pre-commit revision string.
 
     Returns:
-        str: Version with surrounding quotes stripped and a leading `v` removed when
-            followed by a digit.
+        str: Version with surrounding quotes stripped and a leading `v` removed when followed by a digit.
     """
     version = version.strip().strip("'\"")
     if len(version) > 1 and version.startswith("v") and version[1].isdigit():
@@ -59,8 +58,8 @@ def parse_exact_pin(requirement: str) -> tuple[str, str] | None:
         requirement (str): Dependency requirement string from `pyproject.toml`.
 
     Returns:
-        tuple[str, str] | None: Normalized package name and pinned version, or `None`
-            when the requirement is not an exact, concrete pin.
+        tuple[str, str] | None: Normalized package name and pinned version, or `None` when the requirement is not an
+            exact, concrete pin.
     """
     req = requirement.split(";", 1)[0].strip()
     if "===" in req or req.count("==") != 1:
@@ -94,8 +93,7 @@ def load_precommit_repo_revs() -> dict[str, str]:
     """Return first configured revision for each pre-commit repository.
 
     Returns:
-        dict[str, str]: Mapping of pre-commit repository URLs to their configured `rev`
-            values.
+        dict[str, str]: Mapping of pre-commit repository URLs to their configured `rev` values.
 
     Raises:
         `OSError`: If `.pre-commit-config.yaml` cannot be read.
@@ -122,8 +120,7 @@ def main() -> int:
     """Check pinned dev dependency versions against pre-commit hook revisions.
 
     Returns:
-        int: Zero when dependency pins match, otherwise one after printing validation
-            errors.
+        int: Zero when dependency pins match, otherwise one after printing validation errors.
     """
     errors: list[str] = []
     pyproject = load_pyproject()
@@ -145,16 +142,12 @@ def main() -> int:
                 # Allow include-group entries such as {include-group = "test"}.
                 continue
             if not isinstance(entry, str):
-                errors.append(
-                    f"dependency-groups.{group_name} contains unsupported entry type: {entry!r}"
-                )
+                errors.append(f"dependency-groups.{group_name} contains unsupported entry type: {entry!r}")
                 continue
 
             parsed = parse_exact_pin(entry)
             if parsed is None:
-                errors.append(
-                    f"dependency-groups.{group_name} must use exact pins (name==version): {entry!r}"
-                )
+                errors.append(f"dependency-groups.{group_name} must use exact pins (name==version): {entry!r}")
                 continue
 
             package_name, package_version = parsed
@@ -170,16 +163,11 @@ def main() -> int:
 
         dev_version = dev_versions.get(package_name)
         if dev_version is None:
-            errors.append(
-                f"dependency-groups.dev is missing required pinned dependency for {package_name}"
-            )
+            errors.append(f"dependency-groups.dev is missing required pinned dependency for {package_name}")
             continue
 
         if normalize_version(rev) != normalize_version(dev_version):
-            errors.append(
-                f"Version mismatch for {package_name}: "
-                f"pyproject dev has {dev_version!r}, pre-commit rev is {rev!r}"
-            )
+            errors.append(f"Version mismatch for {package_name}: pyproject dev has {dev_version!r}, pre-commit rev is {rev!r}")
 
     if errors:
         print("Dependency pin/version consistency check failed:", file=sys.stderr)
