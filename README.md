@@ -28,7 +28,7 @@
 ### File Selection and Configuration
 - **Ruff-style file selection:** Supports glob-based include/exclude rules, default excludes, `force-exclude`, and `.gitignore`-aware discovery
 - **Single config table:** Reads `[tool.pydocfmt]` from `pyproject.toml`
-- **Verbose discovery output:** Reports included and ignored files, including excluded directories and gitignored paths
+- **File-selection preview:** Reports included and ignored files, including excluded directories and gitignored paths
 - **Line-aware check diagnostics:** Reports affected files with line numbers and compressed line ranges in check mode
 
 ---
@@ -72,7 +72,7 @@ If no files or directories are specified, `pydocfmt` formats the current directo
 **Options:**
 - `--help`: Show help message and exit
 - `--check`: Check if files are formatted correctly without modifying them
-- `-v`, `--verbose`: Show included and ignored files during file discovery
+- `--show-files`: Show file-selection decisions without formatting files
 - `--line-length INTEGER`: Maximum line length for docstrings and comments (default: 88)
 - `--line-ending {auto,lf,cr-lf,native}`: Line ending to use when rewriting files (default: auto)
 - `--indent-style {space,tab}`: Indentation style for generated docstring sections (default: space)
@@ -84,6 +84,7 @@ If no files or directories are specified, `pydocfmt` formats the current directo
 - `--respect-gitignore`, `--no-respect-gitignore`: Toggle .gitignore-aware discovery (default: enabled)
 - `--force-exclude`, `--no-force-exclude`: Apply include/exclude rules even to explicitly listed files
 - `--experimental`, `--no-experimental`: Toggle the experimental rule-based formatter implementation (default: disabled)
+- `--output-format {grouped}`: Output format for rule findings (default: grouped)
 
 **Examples:**
 
@@ -119,7 +120,7 @@ pydocfmt src/ --include "*.py" "*.pyi"
 pydocfmt --include "*.py" "*.pyi" -- src/
 
 # Show included and ignored files
-pydocfmt -v src/
+pydocfmt --show-files src/
 
 # Apply include, exclude, and gitignore rules to explicit files too
 pydocfmt --force-exclude generated.py src/
@@ -142,6 +143,7 @@ extend-exclude = ["generated"]
 respect-gitignore = true
 force-exclude = false
 experimental = false
+output-format = "grouped"
 select = ["ALL"]
 ignore = []
 fixable = ["ALL"]
@@ -163,6 +165,7 @@ unfixable = []
 - `respect-gitignore`: Respect `.gitignore` during file discovery (default: `true`)
 - `force-exclude`: Apply include/exclude rules to explicitly listed files (default: `false`)
 - `experimental`: Use the experimental rule-based formatter implementation (default: `false`)
+- `output-format`: Output format for rule findings; currently only `"grouped"` is supported (default: `"grouped"`)
 - `select`: Rule selectors to enable (default: `["ALL"]`)
 - `extend-select`: Additional rule selectors to enable
 - `ignore`: Rule selectors to ignore

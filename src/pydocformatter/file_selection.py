@@ -5,7 +5,11 @@ from collections import defaultdict
 from enum import Enum
 
 from pydocformatter.config import FormatterSettings
-from pydocformatter.glob_matcher import GlobPatternSet
+from pydocformatter.utils.globs import GlobPatternSet
+
+
+class FileSelectionError(ValueError):
+    """Raised when file-selection settings cannot be applied."""
 
 
 class DecisionReason(str, Enum):
@@ -53,7 +57,7 @@ class FileDecision:
 
     @property
     def message(self) -> str:
-        """Return the human-readable reason message for verbose output.
+        """Return the human-readable reason message for file-selection output.
 
         Returns:
             str: Message corresponding to the decision reason.
@@ -66,11 +70,13 @@ class SelectionResult:
     """Accepted files and all file-selection decisions.
 
     Attributes:
-        accepted_files (tuple[str, ...]): Ordered paths that should be formatted.
+        accepted_paths (tuple[str, ...]): Ordered paths that should be formatted. Paths are preserved as collected:
+            explicit paths stay as passed by the caller, and paths discovered while walking directories are joined from
+            the walked root. They are not normalized to absolute paths and are not deduplicated.
         decisions (tuple[FileDecision, ...]): Ordered decisions for every considered path or pruned directory.
     """
 
-    accepted_files: tuple[str, ...]
+    accepted_paths: tuple[str, ...]
     decisions: tuple[FileDecision, ...]
 
 
@@ -98,19 +104,13 @@ def select_files(paths: list[str], settings: FormatterSettings) -> SelectionResu
             gitignore behavior.
 
     Returns:
-        SelectionResult: Accepted files plus verbose decisions for accepted and rejected paths.
+        SelectionResult: Accepted paths plus file-selection decisions for accepted and rejected paths. Accepted paths
+            preserve their collected representation and are not deduplicated.
     """
-    include_matcher = GlobPatternSet.compile(
-        settings.include_patterns,
-        include_patterns=True,
-        match_parent_segments_for_bare=False,
-    )
-    exclude_matcher = GlobPatternSet.compile(
-        settings.exclude_patterns,
-        include_patterns=False,
-        match_parent_segments_for_bare=True,
-        match_descendants_for_slash=True,
-    )
+    validate_include_patterns(settings.include_patterns)
+    validate_exclude_patterns(settings.exclude_patterns)
+    include_matcher = GlobPatternSet.compile(settings.include_patterns, match_parent_segments_for_bare=False)
+    exclude_matcher = GlobPatternSet.compile(settings.exclude_patterns, match_parent_segments_for_bare=True, match_descendants_for_slash=True)
     root_cache: dict[str, str | None] = {}
 
     evaluated = tuple(
@@ -165,6 +165,24 @@ def _collect_candidates(
         else:
             candidates.append(_Candidate(path=path, explicit=True))
     return tuple(candidates)
+
+
+def validate_include_patterns(patterns: tuple[str, ...]) -> None:
+    """Validate glob patterns used for file inclusion."""
+    for pattern in patterns:
+        if not pattern:
+            raise FileSelectionError("include patterns must not be empty")
+        if pattern.endswith("/"):
+            raise FileSelectionError(f"include pattern must target files: {pattern}")
+        if pattern.rstrip("/") in {"**", "**/*"}:
+            raise FileSelectionError(f"include pattern must target files: {pattern}")
+
+
+def validate_exclude_patterns(patterns: tuple[str, ...]) -> None:
+    """Validate glob patterns used for file exclusion."""
+    for pattern in patterns:
+        if not pattern:
+            raise FileSelectionError("exclude patterns must not be empty")
 
 
 def _excluded_directory_decision(path: str, explicit: bool) -> FileDecision:
@@ -239,7 +257,7 @@ def _apply_gitignore_decision(
 def _selection_result(decisions: tuple[FileDecision, ...]) -> SelectionResult:
     """Build a selection result from the ordered file-decision stream."""
     return SelectionResult(
-        accepted_files=tuple(decision.path for decision in decisions if decision.accepted),
+        accepted_paths=tuple(decision.path for decision in decisions if decision.accepted),
         decisions=decisions,
     )
 

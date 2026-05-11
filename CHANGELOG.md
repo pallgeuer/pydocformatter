@@ -12,15 +12,17 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 
 - **CLI:**
   - Added `--line-ending` to control line endings used when rewriting files.
-  - Added `-v` / `--verbose` to report all considered files during discovery, including included files and ignored files with include/exclude reasons.
+  - Added `--show-files` to report all considered files during discovery, including included files and ignored files with include/exclude reasons, without formatting files.
   - Added `--respect-gitignore` / `--no-respect-gitignore`, with enabled-by-default behavior and matching `pyproject.toml` configuration.
   - Added `--experimental` / `--no-experimental` for opting into the experimental formatter path.
+  - Added `--output-format grouped` for rule findings.
 
 - **Configuration:**
   - Added Ruff-style `line-ending` configuration with `"auto"`, `"lf"`, `"cr-lf"`, and `"native"` values.
   - Added `indent-style` and `indent-width` for generated docstring section indentation, with Ruff-style defaults of `"space"` and `4`.
   - Added `respect-gitignore` for formatter configuration, defaulting to `true`.
   - Added `experimental` for formatter configuration, defaulting to `false`.
+  - Added `output-format` for formatter configuration, currently supporting only `"grouped"`.
   - Added Ruff-style rule settings under `[tool.pydocfmt]`: `select`, `extend-select`, `ignore`, `fixable`, `extend-fixable`, `unfixable`, `per-file-ignores`, and `extend-per-file-ignores`.
 
 - **Documentation:**
@@ -42,15 +44,20 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - For each setting key, the highest-priority value wins (`command line > config > defaults`), including `extend-include` and `extend-exclude`.
 
 - **File discovery:**
-  - Verbose mode now reports directories pruned by exclude patterns, such as `.venv`.
+  - `--show-files` now reports directories pruned by exclude patterns, such as `.venv`.
   - `pydocfmt` now applies gitignore-based filtering when `respect-gitignore` is enabled, and emits one warning per git root if gitignore checks cannot be executed.
   - `force-exclude` now consistently applies `.gitignore` filtering to explicitly passed file paths.
 
 - **Formatting:**
+  - Added experimental `Rule`, `RuleFinding`, and `FormatterResult` data structures for reporting remaining rule issues after fixes.
   - Formatter internals now require formatting controls such as line length, line endings, and indentation settings as explicit keyword-only arguments.
   - Formatter functions now receive resolved `FormatterSettings` directly.
   - Generated Google-style docstring section indentation is now configurable while preserving the existing base docstring indentation.
   - `--check` output now includes docstring and comment line locations, emitted once per subject per file with compressed consecutive ranges.
+
+- **Architecture:**
+  - Utility helpers now live in explicit `pydocformatter.utils` submodules for diagnostics, glob matching, and line endings.
+  - Experimental formatter interfaces now live in `pydocformatter.formatter`.
 
 ### Fixed
 

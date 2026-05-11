@@ -1,13 +1,14 @@
 import unittest
 
-from pydocformatter.glob_matcher import GlobPatternError, GlobPatternSet
+import pydocformatter.file_selection as file_selection
+from pydocformatter.file_selection import FileSelectionError
+from pydocformatter.utils.globs import GlobPatternSet
 
 
 class TestGlobMatcher(unittest.TestCase):
     def test_ruff_spec_basename_patterns(self) -> None:
         matcher = GlobPatternSet.compile(
             ("*.py", "module.p?", "file[0-9].py"),
-            include_patterns=True,
             match_parent_segments_for_bare=False,
         )
 
@@ -20,7 +21,6 @@ class TestGlobMatcher(unittest.TestCase):
     def test_ruff_spec_bare_exclude_matches_parent_segments(self) -> None:
         matcher = GlobPatternSet.compile(
             (".mypy_cache", "skip.py"),
-            include_patterns=False,
             match_parent_segments_for_bare=True,
         )
 
@@ -31,7 +31,6 @@ class TestGlobMatcher(unittest.TestCase):
     def test_ruff_spec_slash_patterns_are_project_relative(self) -> None:
         matcher = GlobPatternSet.compile(
             ("src/*.py", "tests/**/test_*.py"),
-            include_patterns=False,
             match_parent_segments_for_bare=True,
         )
 
@@ -44,7 +43,6 @@ class TestGlobMatcher(unittest.TestCase):
     def test_ruff_spec_slash_excludes_match_descendants(self) -> None:
         matcher = GlobPatternSet.compile(
             ("src/generated",),
-            include_patterns=False,
             match_parent_segments_for_bare=True,
             match_descendants_for_slash=True,
         )
@@ -57,7 +55,6 @@ class TestGlobMatcher(unittest.TestCase):
     def test_ruff_spec_double_star_matches_zero_or_more_segments(self) -> None:
         matcher = GlobPatternSet.compile(
             ("src/**/test*.py",),
-            include_patterns=True,
             match_parent_segments_for_bare=False,
         )
 
@@ -66,25 +63,19 @@ class TestGlobMatcher(unittest.TestCase):
         self.assertFalse(matcher.matches("pkg/test_a.py"))
 
     def test_invalid_include_patterns_are_rejected(self) -> None:
-        with self.assertRaises(GlobPatternError):
-            GlobPatternSet.compile(
+        with self.assertRaises(FileSelectionError):
+            file_selection.validate_include_patterns(
                 ("",),
-                include_patterns=True,
-                match_parent_segments_for_bare=False,
             )
-        with self.assertRaises(GlobPatternError):
-            GlobPatternSet.compile(
+        with self.assertRaises(FileSelectionError):
+            file_selection.validate_include_patterns(
                 ("src/",),
-                include_patterns=True,
-                match_parent_segments_for_bare=False,
             )
 
     def test_invalid_exclude_patterns_are_rejected(self) -> None:
-        with self.assertRaises(GlobPatternError):
-            GlobPatternSet.compile(
+        with self.assertRaises(FileSelectionError):
+            file_selection.validate_exclude_patterns(
                 ("",),
-                include_patterns=False,
-                match_parent_segments_for_bare=True,
             )
 
 

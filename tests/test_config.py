@@ -33,6 +33,7 @@ class TestConfig(unittest.TestCase):
         self.assertTrue(config.respect_gitignore)
         self.assertFalse(config.force_exclude)
         self.assertFalse(config.experimental)
+        self.assertEqual(config.output_format, "grouped")
         self.assertEqual(config.select, ("ALL",))
         self.assertEqual(config.extend_select, ())
         self.assertEqual(config.ignore, ())
@@ -125,6 +126,46 @@ class TestConfig(unittest.TestCase):
             os.chdir(root)
             try:
                 with self.assertRaisesRegex(ConfigError, "experimental"):
+                    pydocformatter_config.load_config()
+            finally:
+                os.chdir(previous_cwd)
+
+    def test_output_format_setting_is_applied(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "pyproject.toml").write_text(
+                '[tool.pydocfmt]\noutput-format = "grouped"\n',
+                encoding="utf-8",
+            )
+            previous_cwd = os.getcwd()
+            os.chdir(root)
+            try:
+                config = pydocformatter_config.load_config()
+            finally:
+                os.chdir(previous_cwd)
+
+        self.assertEqual(config.output_format, "grouped")
+
+    def test_output_format_cli_override_is_applied(self) -> None:
+        config = pydocformatter_config.load_config(
+            SettingsOverrides(output_format="grouped"),
+        )
+
+        self.assertEqual(config.output_format, "grouped")
+
+    def test_output_format_setting_must_be_grouped(self) -> None:
+        unsupported_output_formats = ("json",)
+        unsupported_output_format = unsupported_output_formats[0]
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "pyproject.toml").write_text(
+                f'[tool.pydocfmt]\noutput-format = "{unsupported_output_format}"\n',
+                encoding="utf-8",
+            )
+            previous_cwd = os.getcwd()
+            os.chdir(root)
+            try:
+                with self.assertRaisesRegex(ConfigError, "output-format"):
                     pydocformatter_config.load_config()
             finally:
                 os.chdir(previous_cwd)
@@ -327,7 +368,7 @@ class TestConfig(unittest.TestCase):
             finally:
                 os.chdir(previous_cwd)
 
-    def test_invalid_config_include_glob_is_rejected(self) -> None:
+    def test_config_include_pattern_shape_is_not_file_selection_validated(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             (root / "pyproject.toml").write_text(
@@ -337,12 +378,13 @@ class TestConfig(unittest.TestCase):
             previous_cwd = os.getcwd()
             os.chdir(root)
             try:
-                with self.assertRaisesRegex(ConfigError, "include pattern must target files"):
-                    pydocformatter_config.load_config()
+                config = pydocformatter_config.load_config()
             finally:
                 os.chdir(previous_cwd)
 
-    def test_invalid_config_exclude_glob_is_rejected(self) -> None:
+        self.assertEqual(config.include, ("src/",))
+
+    def test_empty_config_exclude_string_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             (root / "pyproject.toml").write_text(
@@ -352,29 +394,29 @@ class TestConfig(unittest.TestCase):
             previous_cwd = os.getcwd()
             os.chdir(root)
             try:
-                with self.assertRaisesRegex(ConfigError, "exclude patterns must not be empty"):
+                with self.assertRaisesRegex(ConfigError, "exclude.*empty strings"):
                     pydocformatter_config.load_config()
             finally:
                 os.chdir(previous_cwd)
 
-    def test_invalid_cli_include_glob_is_rejected(self) -> None:
+    def test_empty_cli_include_string_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             previous_cwd = os.getcwd()
             os.chdir(td)
             try:
-                with self.assertRaisesRegex(ConfigError, "include patterns must not be empty"):
+                with self.assertRaisesRegex(ConfigError, "include.*empty strings"):
                     pydocformatter_config.load_config(
                         SettingsOverrides(include=("",)),
                     )
             finally:
                 os.chdir(previous_cwd)
 
-    def test_invalid_cli_exclude_glob_is_rejected(self) -> None:
+    def test_empty_cli_exclude_string_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             previous_cwd = os.getcwd()
             os.chdir(td)
             try:
-                with self.assertRaisesRegex(ConfigError, "exclude patterns must not be empty"):
+                with self.assertRaisesRegex(ConfigError, "exclude.*empty strings"):
                     pydocformatter_config.load_config(
                         SettingsOverrides(exclude=("",)),
                     )

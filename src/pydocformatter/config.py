@@ -4,11 +4,11 @@ import tomllib
 from collections.abc import Callable
 from typing import Any, Literal
 
-import pydocformatter.glob_matcher as glob_matcher
 import pydocformatter.rules as rules
 
 IndentStyle = Literal["space", "tab"]
 LineEnding = Literal["auto", "lf", "cr-lf", "native"]
+OutputFormat = Literal["grouped"]
 RuleSelectorMap = tuple[tuple[str, tuple[str, ...]], ...]
 
 DEFAULT_EXCLUDE = (
@@ -50,6 +50,7 @@ _KEY_TO_FIELD = {
     "respect-gitignore": "respect_gitignore",
     "force-exclude": "force_exclude",
     "experimental": "experimental",
+    "output-format": "output_format",
     "select": "select",
     "extend-select": "extend_select",
     "ignore": "ignore",
@@ -110,6 +111,7 @@ class FormatterSettings:
         respect_gitignore (bool): Whether discovered files are filtered through `.gitignore`.
         force_exclude (bool): Whether include, exclude, and gitignore rules apply to explicitly passed paths.
         experimental (bool): Whether to use the experimental rule-based formatter implementation.
+        output_format (OutputFormat): Output format used for rule findings.
         select (tuple[str, ...]): Base selected pydocformatter rule selectors.
         extend_select (tuple[str, ...]): Additional selected rule selectors.
         ignore (tuple[str, ...]): Rule selectors to ignore.
@@ -131,6 +133,7 @@ class FormatterSettings:
     respect_gitignore: bool = True
     force_exclude: bool = False
     experimental: bool = False
+    output_format: OutputFormat = "grouped"
     select: tuple[str, ...] = DEFAULT_RULE_SELECT
     extend_select: tuple[str, ...] = ()
     ignore: tuple[str, ...] = ()
@@ -166,6 +169,7 @@ class SettingsOverrides:
     respect_gitignore: bool | None = None
     force_exclude: bool | None = None
     experimental: bool | None = None
+    output_format: OutputFormat | None = None
     select: tuple[str, ...] | None = None
     extend_select: tuple[str, ...] | None = None
     ignore: tuple[str, ...] | None = None
@@ -323,6 +327,13 @@ def _validate_bool(value: Any, context: str) -> bool:
     return value
 
 
+def _validate_output_format(value: Any, context: str) -> OutputFormat:
+    """Validate and return a configured output format."""
+    if value == "grouped":
+        return "grouped"
+    raise ConfigError(f"{context} must be 'grouped'")
+
+
 def _validate_string_list(value: Any, context: str) -> tuple[str, ...]:
     """Validate and return a tuple of string list values."""
     if not isinstance(value, (list, tuple)):
@@ -332,23 +343,11 @@ def _validate_string_list(value: Any, context: str) -> tuple[str, ...]:
     return tuple(value)
 
 
-def _validate_include_string_list(value: Any, context: str) -> tuple[str, ...]:
-    """Validate include glob settings and return them as a tuple."""
+def _validate_non_empty_string_list(value: Any, context: str) -> tuple[str, ...]:
+    """Validate and return a tuple of non-empty string list values."""
     patterns = _validate_string_list(value, context)
-    try:
-        glob_matcher.validate_include_patterns(patterns)
-    except glob_matcher.GlobPatternError as error:
-        raise ConfigError(f"{context}: {error}") from error
-    return patterns
-
-
-def _validate_exclude_string_list(value: Any, context: str) -> tuple[str, ...]:
-    """Validate exclude glob settings and return them as a tuple."""
-    patterns = _validate_string_list(value, context)
-    try:
-        glob_matcher.validate_exclude_patterns(patterns)
-    except glob_matcher.GlobPatternError as error:
-        raise ConfigError(f"{context}: {error}") from error
+    if any(not pattern for pattern in patterns):
+        raise ConfigError(f"{context} must not contain empty strings")
     return patterns
 
 
@@ -398,13 +397,14 @@ _SETTING_VALIDATORS: dict[str, Callable[[Any, str], Any]] = {
     "line_ending": _validate_line_ending,
     "indent_style": _validate_indent_style,
     "indent_width": _validate_indent_width,
-    "include": _validate_include_string_list,
-    "extend_include": _validate_include_string_list,
-    "exclude": _validate_exclude_string_list,
-    "extend_exclude": _validate_exclude_string_list,
+    "include": _validate_non_empty_string_list,
+    "extend_include": _validate_non_empty_string_list,
+    "exclude": _validate_non_empty_string_list,
+    "extend_exclude": _validate_non_empty_string_list,
     "respect_gitignore": _validate_bool,
     "force_exclude": _validate_bool,
     "experimental": _validate_bool,
+    "output_format": _validate_output_format,
     "select": _validate_selector_list,
     "extend_select": _validate_selector_list,
     "ignore": _validate_selector_list,

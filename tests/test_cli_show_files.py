@@ -10,9 +10,10 @@ from typing import Callable
 
 import pydocformatter.cli.pydocfmt_main as pydocfmt_main
 from pydocformatter.config import FormatterSettings
+from pydocformatter.formatter import FormatterResult
 
 
-class TestCliVerbose(unittest.TestCase):
+class TestCliShowFiles(unittest.TestCase):
     @staticmethod
     def _make_sample_tree() -> tempfile.TemporaryDirectory[str]:
         temp_dir = tempfile.TemporaryDirectory()
@@ -53,7 +54,7 @@ class TestCliVerbose(unittest.TestCase):
 
         return fake_run
 
-    def test_pydocfmt_verbose_lists_included_and_ignored_files(self) -> None:
+    def test_pydocfmt_show_files_lists_included_and_ignored_files(self) -> None:
         with self._make_sample_tree() as td:
             root = Path(td)
             stdout = StringIO()
@@ -67,7 +68,7 @@ class TestCliVerbose(unittest.TestCase):
             argv = [
                 "pydocfmt",
                 str(root),
-                "--verbose",
+                "--show-files",
                 "--include",
                 "*.py",
                 "--exclude",
@@ -89,7 +90,7 @@ class TestCliVerbose(unittest.TestCase):
                 f"{root / 'skip.py'} ignored: matches exclude patterns",
             ]
             self.assertEqual(stdout.getvalue().splitlines(), expected_lines)
-            self.assertEqual(called_paths, [str(root / "a.py")])
+            self.assertEqual(called_paths, [])
 
     def test_pydocfmt_defaults_to_current_directory_without_files(self) -> None:
         with self._make_sample_tree() as td:
@@ -121,7 +122,7 @@ class TestCliVerbose(unittest.TestCase):
                 [root / "a.py", root / "skip.py"],
             )
 
-    def test_pydocfmt_verbose_lists_pruned_directories(self) -> None:
+    def test_pydocfmt_show_files_lists_pruned_directories(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             (root / "a.py").write_text("x = 1\n", encoding="utf-8")
@@ -135,7 +136,7 @@ class TestCliVerbose(unittest.TestCase):
                 called_paths.append(path)
                 return False
 
-            argv = ["pydocfmt", str(root), "--verbose"]
+            argv = ["pydocfmt", str(root), "--show-files"]
             with (
                 unittest.mock.patch("sys.argv", argv),
                 unittest.mock.patch(
@@ -151,7 +152,7 @@ class TestCliVerbose(unittest.TestCase):
                 f"{root / 'a.py'} included",
             ]
             self.assertEqual(stdout.getvalue().splitlines(), expected_lines)
-            self.assertEqual(called_paths, [str(root / "a.py")])
+            self.assertEqual(called_paths, [])
 
     def test_pydocfmt_multiple_globs_per_include_and_exclude_option(self) -> None:
         with self._make_sample_tree() as td:
@@ -167,7 +168,7 @@ class TestCliVerbose(unittest.TestCase):
             argv = [
                 "pydocfmt",
                 str(root),
-                "--verbose",
+                "--show-files",
                 "--include",
                 "*.py",
                 "*.txt",
@@ -191,7 +192,7 @@ class TestCliVerbose(unittest.TestCase):
                 f"{root / 'skip.py'} ignored: matches exclude patterns",
             ]
             self.assertEqual(stdout.getvalue().splitlines(), expected_lines)
-            self.assertEqual(called_paths, [str(root / "a.py")])
+            self.assertEqual(called_paths, [])
 
     def test_pydocfmt_multiple_globs_before_positional_path_after_separator(
         self,
@@ -208,7 +209,7 @@ class TestCliVerbose(unittest.TestCase):
 
             argv = [
                 "pydocfmt",
-                "--verbose",
+                "--show-files",
                 "--include",
                 "*.py",
                 "*.txt",
@@ -233,7 +234,7 @@ class TestCliVerbose(unittest.TestCase):
                 f"{root / 'skip.py'} ignored: matches exclude patterns",
             ]
             self.assertEqual(stdout.getvalue().splitlines(), expected_lines)
-            self.assertEqual(called_paths, [str(root / "a.py"), str(root / "b.txt")])
+            self.assertEqual(called_paths, [])
 
     def test_pydocfmt_default_respects_gitignore(self) -> None:
         with self._make_git_tree() as td:
@@ -246,7 +247,7 @@ class TestCliVerbose(unittest.TestCase):
                 called_paths.append(path)
                 return False
 
-            argv = ["pydocfmt", "--verbose", str(root)]
+            argv = ["pydocfmt", "--show-files", str(root)]
             with (
                 unittest.mock.patch("sys.argv", argv),
                 unittest.mock.patch(
@@ -266,7 +267,7 @@ class TestCliVerbose(unittest.TestCase):
                 f"{root / 'skip.py'} ignored: matches .gitignore",
             ]
             self.assertEqual(stdout.getvalue().splitlines(), expected_lines)
-            self.assertEqual(called_paths, [str(root / "a.py")])
+            self.assertEqual(called_paths, [])
 
     def test_pydocfmt_no_respect_gitignore_disables_gitignore_filtering(self) -> None:
         with self._make_git_tree() as td:
@@ -279,7 +280,7 @@ class TestCliVerbose(unittest.TestCase):
                 called_paths.append(path)
                 return False
 
-            argv = ["pydocfmt", "--verbose", "--no-respect-gitignore", str(root)]
+            argv = ["pydocfmt", "--show-files", "--no-respect-gitignore", str(root)]
             with (
                 unittest.mock.patch("sys.argv", argv),
                 unittest.mock.patch("pydocformatter.file_selection.subprocess.run") as run_mock,
@@ -297,7 +298,61 @@ class TestCliVerbose(unittest.TestCase):
                 f"{root / 'skip.py'} included",
             ]
             self.assertEqual(stdout.getvalue().splitlines(), expected_lines)
-            self.assertEqual(called_paths, [str(root / "a.py"), str(root / "skip.py")])
+            self.assertEqual(called_paths, [])
+
+    def test_pydocfmt_show_files_with_check_does_not_format(self) -> None:
+        with self._make_sample_tree() as td:
+            root = Path(td)
+            stdout = StringIO()
+            format_file = unittest.mock.Mock(return_value=True)
+            argv = ["pydocfmt", "--show-files", "--check", str(root)]
+            with (
+                unittest.mock.patch("sys.argv", argv),
+                unittest.mock.patch(
+                    "pydocformatter.cli.pydocfmt_main.pydocfmt.format_file",
+                    format_file,
+                ),
+                contextlib.redirect_stdout(stdout),
+            ):
+                exit_code = pydocfmt_main.main()
+
+            self.assertEqual(exit_code, 0)
+            format_file.assert_not_called()
+            self.assertIn(f"{root / 'a.py'} included", stdout.getvalue().splitlines())
+
+    def test_pydocfmt_show_files_with_experimental_does_not_format(self) -> None:
+        with self._make_sample_tree() as td:
+            root = Path(td)
+            stdout = StringIO()
+            format_file_exp = unittest.mock.Mock(return_value=FormatterResult(path=str(root / "a.py"), modified=False, findings=()))
+            argv = ["pydocfmt", "--show-files", "--experimental", str(root)]
+            with (
+                unittest.mock.patch("sys.argv", argv),
+                unittest.mock.patch(
+                    "pydocformatter.formatter.format_file_exp",
+                    format_file_exp,
+                ),
+                contextlib.redirect_stdout(stdout),
+            ):
+                exit_code = pydocfmt_main.main()
+
+            self.assertEqual(exit_code, 0)
+            format_file_exp.assert_not_called()
+            self.assertIn(f"{root / 'a.py'} included", stdout.getvalue().splitlines())
+
+    def test_pydocfmt_removed_file_listing_option_is_rejected(self) -> None:
+        stderr = StringIO()
+        old_option = "--" + "ver" + "bose"
+        argv = ["pydocfmt", old_option]
+        with (
+            unittest.mock.patch("sys.argv", argv),
+            contextlib.redirect_stderr(stderr),
+            self.assertRaises(SystemExit) as cm,
+        ):
+            pydocfmt_main.main()
+
+        self.assertEqual(cm.exception.code, 2)
+        self.assertIn(f"unrecognized arguments: {old_option}", stderr.getvalue())
 
     def test_pydocfmt_hyphenated_pyproject_settings_are_applied(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -308,12 +363,19 @@ class TestCliVerbose(unittest.TestCase):
                 "[tool.pydocfmt]\nline-length = 72\nrespect-gitignore = false\nexperimental = true\n",
                 encoding="utf-8",
             )
-            called_args: list[tuple[str, int, bool, bool]] = []
+            legacy_called = False
+            called_args: list[tuple[str, int, bool, bool, str]] = []
 
             # noinspection PyUnusedLocal
             def fake_format(path: str, settings: FormatterSettings, check: bool) -> bool:
-                called_args.append((path, settings.line_length, check, settings.experimental))
+                nonlocal legacy_called
+                legacy_called = True
                 return False
+
+            # noinspection PyUnusedLocal
+            def fake_exp_format(path: str, settings: FormatterSettings, check: bool) -> FormatterResult:
+                called_args.append((path, settings.line_length, check, settings.experimental, settings.output_format))
+                return FormatterResult(path=path, modified=False, findings=())
 
             argv = ["pydocfmt", str(root)]
             previous_cwd = os.getcwd()
@@ -326,13 +388,18 @@ class TestCliVerbose(unittest.TestCase):
                         "pydocformatter.cli.pydocfmt_main.pydocfmt.format_file",
                         side_effect=fake_format,
                     ),
+                    unittest.mock.patch(
+                        "pydocformatter.formatter.format_file_exp",
+                        side_effect=fake_exp_format,
+                    ),
                 ):
                     pydocfmt_main.main()
             finally:
                 os.chdir(previous_cwd)
 
             self.assertFalse(run_mock.called)
-            self.assertEqual(called_args, [(str(root / "a.py"), 72, False, True)])
+            self.assertFalse(legacy_called)
+            self.assertEqual(called_args, [(str(root / "a.py"), 72, False, True, "grouped")])
 
     def test_pydocfmt_indent_cli_settings_are_applied(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -399,14 +466,16 @@ class TestCliVerbose(unittest.TestCase):
             called_settings: list[FormatterSettings] = []
 
             # noinspection PyUnusedLocal
-            def fake_format(path: str, settings: FormatterSettings, check: bool) -> bool:
+            def fake_format(path: str, settings: FormatterSettings, check: bool) -> FormatterResult:
                 called_settings.append(settings)
-                return False
+                return FormatterResult(path=path, modified=False, findings=())
 
             argv = [
                 "pydocfmt",
                 str(target),
                 "--experimental",
+                "--output-format",
+                "grouped",
                 "--select",
                 "PCF",
                 "--ignore",
@@ -421,7 +490,7 @@ class TestCliVerbose(unittest.TestCase):
             with (
                 unittest.mock.patch("sys.argv", argv),
                 unittest.mock.patch(
-                    "pydocformatter.cli.pydocfmt_main.pydocfmt.format_file",
+                    "pydocformatter.formatter.format_file_exp",
                     side_effect=fake_format,
                 ),
             ):
@@ -434,6 +503,7 @@ class TestCliVerbose(unittest.TestCase):
             self.assertEqual(called_settings[0].unfixable, ("PCF001",))
             self.assertEqual(called_settings[0].per_file_ignores, (("tests/*.py", ("PCF001",)),))
             self.assertTrue(called_settings[0].experimental)
+            self.assertEqual(called_settings[0].output_format, "grouped")
 
     def test_invalid_rule_cli_selector_reports_configuration_error(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -468,7 +538,7 @@ class TestCliVerbose(unittest.TestCase):
             argv = [
                 "pydocfmt",
                 str(target),
-                "--verbose",
+                "--show-files",
                 "--force-exclude",
                 "--exclude",
                 "skip.py",
@@ -501,7 +571,7 @@ class TestCliVerbose(unittest.TestCase):
                 called_paths.append(path)
                 return False
 
-            argv = ["pydocfmt", "--verbose", "--force-exclude", str(target)]
+            argv = ["pydocfmt", "--show-files", "--force-exclude", str(target)]
             with (
                 unittest.mock.patch("sys.argv", argv),
                 unittest.mock.patch(
@@ -617,7 +687,7 @@ class TestCliVerbose(unittest.TestCase):
                 os.chdir(previous_cwd)
 
         self.assertEqual(exit_code, 2)
-        self.assertIn("include patterns must not be empty", stderr.getvalue())
+        self.assertIn("command line.include must not contain empty strings", stderr.getvalue())
         self.assertNotIn("Traceback", stderr.getvalue())
 
     def test_pydocfmt_invalid_command_line_exclude_reports_argument_error(
@@ -640,7 +710,7 @@ class TestCliVerbose(unittest.TestCase):
                 os.chdir(previous_cwd)
 
         self.assertEqual(exit_code, 2)
-        self.assertIn("exclude patterns must not be empty", stderr.getvalue())
+        self.assertIn("command line.exclude must not contain empty strings", stderr.getvalue())
         self.assertNotIn("Traceback", stderr.getvalue())
 
     def test_pydocfmt_invalid_command_line_include_reports_argument_error(
@@ -676,7 +746,7 @@ class TestCliVerbose(unittest.TestCase):
                 os.chdir(previous_cwd)
 
         self.assertEqual(exit_code, 2)
-        self.assertIn(f"{program}: configuration error", stderr.getvalue())
+        self.assertIn(f"{program}: file selection error", stderr.getvalue())
         self.assertIn("include pattern must target files", stderr.getvalue())
         self.assertNotIn("Traceback", stderr.getvalue())
 
@@ -740,7 +810,7 @@ class TestCliVerbose(unittest.TestCase):
                 called_paths.append(path)
                 return False
 
-            argv = ["pydocfmt", "--verbose", str(root)]
+            argv = ["pydocfmt", "--show-files", str(root)]
             with (
                 unittest.mock.patch("sys.argv", argv),
                 unittest.mock.patch(
@@ -759,7 +829,7 @@ class TestCliVerbose(unittest.TestCase):
             warning = f"{root} WARNING: unable to apply gitignore filtering (fatal: broken git); continuing without gitignore filtering for this repository root"
             self.assertIn(warning, output_lines)
             self.assertEqual(output_lines.count(warning), 1)
-            self.assertEqual(called_paths, [str(root / "a.py"), str(root / "skip.py")])
+            self.assertEqual(called_paths, [])
 
     @staticmethod
     def _make_tree_with_invalid_utf8() -> tempfile.TemporaryDirectory[str]:

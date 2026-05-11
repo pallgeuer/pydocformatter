@@ -62,6 +62,36 @@ class TestFileSelection(unittest.TestCase):
         collected = [Path(decision.path).relative_to(root).as_posix() for decision in selection.decisions]
         self.assertEqual(collected, ["a.py", "b.py", "a_dir/d.py", "z_dir/c.py"])
 
+    def test_selection_preserves_relative_explicit_paths(self) -> None:
+        settings = FormatterSettings(respect_gitignore=False)
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "a.py").write_text("", encoding="utf-8")
+            previous_cwd = os.getcwd()
+            os.chdir(root)
+            try:
+                selection = file_selection.select_files(["a.py"], settings)
+            finally:
+                os.chdir(previous_cwd)
+
+        self.assertEqual(selection.accepted_paths, ("a.py",))
+        self.assertEqual(selection.decisions[0].path, "a.py")
+
+    def test_selection_does_not_deduplicate_equivalent_paths(self) -> None:
+        settings = FormatterSettings(respect_gitignore=False)
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            target = root / "a.py"
+            target.write_text("", encoding="utf-8")
+            previous_cwd = os.getcwd()
+            os.chdir(root)
+            try:
+                selection = file_selection.select_files(["a.py", str(target)], settings)
+            finally:
+                os.chdir(previous_cwd)
+
+        self.assertEqual(selection.accepted_paths, ("a.py", str(target)))
+
     def test_ruff_spec_explicit_file_bypasses_filters_without_force(
         self,
     ) -> None:
@@ -78,7 +108,7 @@ class TestFileSelection(unittest.TestCase):
 
             selection = file_selection.select_files([str(target)], settings)
 
-        self.assertEqual(selection.accepted_files, (str(target),))
+        self.assertEqual(selection.accepted_paths, (str(target),))
         self.assertEqual(selection.decisions[0].reason, DecisionReason.EXPLICIT_INCLUDED)
 
     def test_ruff_spec_force_exclude_filters_explicit_file(self) -> None:
@@ -95,7 +125,7 @@ class TestFileSelection(unittest.TestCase):
 
             selection = file_selection.select_files([str(target)], settings)
 
-        self.assertEqual(selection.accepted_files, ())
+        self.assertEqual(selection.accepted_paths, ())
         self.assertEqual(selection.decisions[0].reason, DecisionReason.EXCLUDED)
 
     def test_ruff_spec_gitignore_can_be_disabled(self) -> None:
@@ -109,7 +139,7 @@ class TestFileSelection(unittest.TestCase):
                 selection = file_selection.select_files([str(root)], settings)
 
         self.assertFalse(run_mock.called)
-        self.assertEqual(selection.accepted_files, (str(root / "a.py"),))
+        self.assertEqual(selection.accepted_paths, (str(root / "a.py"),))
 
     def test_ruff_spec_gitignore_filters_discovered_files(self) -> None:
         settings = FormatterSettings(respect_gitignore=True)
@@ -126,7 +156,7 @@ class TestFileSelection(unittest.TestCase):
                 selection = file_selection.select_files([str(root)], settings)
 
         decisions_by_name = {Path(decision.path).name: decision for decision in selection.decisions}
-        self.assertEqual(selection.accepted_files, (str(root / "keep.py"),))
+        self.assertEqual(selection.accepted_paths, (str(root / "keep.py"),))
         self.assertEqual(decisions_by_name["skip.py"].reason, DecisionReason.GITIGNORED)
 
     def test_ruff_spec_non_git_directory_does_not_warn(self) -> None:
@@ -144,7 +174,7 @@ class TestFileSelection(unittest.TestCase):
 
         self.assertFalse(run_mock.called)
         self.assertEqual(stdout.getvalue(), "")
-        self.assertEqual(selection.accepted_files, (str(root / "a.py"),))
+        self.assertEqual(selection.accepted_paths, (str(root / "a.py"),))
 
     def test_ruff_spec_warns_once_per_git_root_on_check_failure(self) -> None:
         settings = FormatterSettings(respect_gitignore=True)
@@ -172,7 +202,7 @@ class TestFileSelection(unittest.TestCase):
         warning = f"{root} WARNING: unable to apply gitignore filtering (fatal: no such command); continuing without gitignore filtering for this repository root"
         self.assertEqual(stdout.getvalue().splitlines(), [warning])
         self.assertEqual(
-            selection.accepted_files,
+            selection.accepted_paths,
             (str(root / "a.py"), str(root / "b.py")),
         )
 
@@ -194,7 +224,7 @@ class TestFileSelection(unittest.TestCase):
             finally:
                 os.chdir(previous_cwd)
 
-        self.assertEqual(selection.accepted_files, ())
+        self.assertEqual(selection.accepted_paths, ())
         self.assertEqual(selection.decisions[0].reason, DecisionReason.EXCLUDED)
 
     def test_ruff_spec_direct_excluded_directory_is_skipped(self) -> None:
@@ -210,7 +240,7 @@ class TestFileSelection(unittest.TestCase):
 
             selection = file_selection.select_files([str(root / "src" / "generated")], settings)
 
-        self.assertEqual(selection.accepted_files, ())
+        self.assertEqual(selection.accepted_paths, ())
         self.assertEqual(selection.decisions[0].path, str(root / "src" / "generated"))
         self.assertEqual(selection.decisions[0].reason, DecisionReason.EXCLUDED)
 
@@ -228,7 +258,7 @@ class TestFileSelection(unittest.TestCase):
             selection = file_selection.select_files([str(root)], settings)
 
         decisions_by_name = {Path(decision.path).name: decision for decision in selection.decisions}
-        self.assertEqual(selection.accepted_files, (str(root / "a.py"),))
+        self.assertEqual(selection.accepted_paths, (str(root / "a.py"),))
         self.assertEqual(decisions_by_name["generated"].reason, DecisionReason.EXCLUDED)
         self.assertNotIn("ignored.py", decisions_by_name)
 
@@ -249,7 +279,7 @@ class TestFileSelection(unittest.TestCase):
 
             selection = file_selection.select_files([str(target)], settings)
 
-        self.assertEqual(selection.accepted_files, ())
+        self.assertEqual(selection.accepted_paths, ())
         self.assertEqual(selection.decisions[0].reason, DecisionReason.EXCLUDED)
 
     def test_gitignore_query_encodes_surrogate_paths(self) -> None:
@@ -288,7 +318,7 @@ class TestFileSelection(unittest.TestCase):
             with unittest.mock.patch("pydocformatter.file_selection.subprocess.run", side_effect=fake_run):
                 selection = file_selection.select_files([str(root)], settings)
 
-        self.assertEqual(selection.accepted_files, ())
+        self.assertEqual(selection.accepted_paths, ())
         self.assertEqual(selection.decisions[0].reason, DecisionReason.GITIGNORED)
 
 

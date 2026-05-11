@@ -1,10 +1,21 @@
 import argparse
 import sys
 import tomllib
+from collections import defaultdict
 
 import pydocformatter.config as config
 import pydocformatter.file_selection as file_selection
+import pydocformatter.formatter as formatter
 import pydocformatter.formatters.pydocfmt as pydocfmt
+import pydocformatter.utils.diagnostics as diagnostics
+from pydocformatter.formatter import FormatterResult, Rule, RuleFinding
+
+LEGACY_CHECK_RULE = Rule(
+    rule_code="000",
+    rule_name="legacy-formatting-needed",
+    message="Needs formatting",
+    fixable=True,
+)
 
 
 def main() -> int:
@@ -17,24 +28,23 @@ def main() -> int:
     if settings is None:
         return 2
 
-    selection = file_selection.select_files(args.files, settings)
-    if args.verbose:
-        print_verbose_decisions(selection.decisions)
+    try:
+        selection = file_selection.select_files(args.files, settings)
+    except file_selection.FileSelectionError as error:
+        print(f"pydocfmt: file selection error: {error}", file=sys.stderr)
+        return 2
+    if args.show_files:
+        print_file_selection_decisions(selection.decisions)
+        return 0
 
-    modified = False
-    for path in selection.accepted_files:
-        try:
-            changed = pydocfmt.format_file(path, settings, args.check)
-        except UnicodeDecodeError as error:
-            print(f"{path} ignored WARNING: failed to decode as UTF-8 ({error})")
-            continue
-        except OSError as error:
-            print(f"{path} ignored WARNING: failed to read or write file ({error})")
-            continue
-        if changed:
-            modified = True
+    if settings.experimental:
+        results = format_files_exp(selection.accepted_paths, settings, args.check)
+    else:
+        results = format_files(selection.accepted_paths, settings, args.check)
 
-    return 1 if args.check and modified else 0
+    print_results(results, settings)
+    needs_changes = any(result.findings for result in results)
+    return 1 if args.check and needs_changes else 0
 
 
 def add_arguments(
@@ -54,10 +64,9 @@ def add_arguments(
         help="Check if files are formatted correctly without modifying them.",
     )
     parser.add_argument(
-        "-v",
-        "--verbose",
+        "--show-files",
         action="store_true",
-        help="Emit messages about included and ignored files.",
+        help="Show file-selection decisions without formatting files.",
     )
     parser.add_argument(
         "--line-length",
@@ -132,6 +141,12 @@ def add_arguments(
         action=argparse.BooleanOptionalAction,
         default=None,
         help=f"Use the experimental rule-based formatter implementation (default: {_enabled_label(settings.experimental)}).",
+    )
+    parser.add_argument(
+        "--output-format",
+        choices=("grouped",),
+        default=None,
+        help=f"Output format for experimental rule findings (default: {settings.output_format}).",
     )
     parser.add_argument(
         "--select",
@@ -213,13 +228,117 @@ def load_settings(args: argparse.Namespace) -> config.FormatterSettings | None:
         return None
 
 
-def print_verbose_decisions(decisions: tuple[file_selection.FileDecision, ...]) -> None:
-    """Print file-selection decisions in verbose mode."""
+def print_file_selection_decisions(decisions: tuple[file_selection.FileDecision, ...]) -> None:
+    """Print file-selection decisions."""
     for decision in decisions:
         if decision.accepted:
             print(f"{decision.path} included")
         else:
             print(f"{decision.path} ignored: {decision.message}")
+
+
+def format_files_exp(
+    paths: tuple[str, ...],
+    settings: config.FormatterSettings,
+    check: bool,
+) -> list[FormatterResult]:
+    """Format files with the experimental formatter path."""
+    results: list[FormatterResult] = []
+    for path in _deduplicated_paths(paths):
+        try:
+            results.append(formatter.format_file_exp(path, settings, check))
+        except UnicodeDecodeError as error:
+            print(f"{path} ignored WARNING: failed to decode as UTF-8 ({error})")
+            continue
+        except OSError as error:
+            print(f"{path} ignored WARNING: failed to read or write file ({error})")
+            continue
+    return results
+
+
+def format_files(
+    paths: tuple[str, ...],
+    settings: config.FormatterSettings,
+    check: bool,
+) -> list[FormatterResult]:
+    """Format files with the legacy formatter path."""
+    results: list[FormatterResult] = []
+    for path in _deduplicated_paths(paths):
+        try:
+            modified_or_needs_formatting = pydocfmt.format_file(path, settings, check)
+        except UnicodeDecodeError as error:
+            print(f"{path} ignored WARNING: failed to decode as UTF-8 ({error})")
+            continue
+        except OSError as error:
+            print(f"{path} ignored WARNING: failed to read or write file ({error})")
+            continue
+        if check and modified_or_needs_formatting:
+            finding = RuleFinding(rule=LEGACY_CHECK_RULE, line_numbers=(0,))
+            results.append(FormatterResult(path=path, modified=False, findings=(finding,)))
+        else:
+            results.append(FormatterResult(path=path, modified=modified_or_needs_formatting, findings=()))
+    return results
+
+
+def print_results(results: list[FormatterResult], settings: config.FormatterSettings) -> None:
+    """Print formatter results in the configured output format."""
+    if settings.output_format == "grouped":
+        print_results_grouped(results)
+        return
+    raise AssertionError(f"unknown output format: {settings.output_format}")
+
+
+def print_results_grouped(results: list[FormatterResult]) -> None:
+    """Print remaining findings grouped by file."""
+    total_findings = sum(len(result.findings) for result in results)
+    if total_findings == 0:
+        return
+
+    for result in results:
+        if not result.findings:
+            continue
+        print(f"{result.path}:")
+        for finding in _group_findings(result.findings):
+            print(f"  {_format_grouped_finding(finding)}")
+        print()
+
+    fixable_findings = sum(1 for result in results for finding in result.findings if finding.fixable)
+    print(f"Found {total_findings} errors ({fixable_findings} fixable).")
+
+
+def _group_findings(findings: tuple[RuleFinding, ...]) -> tuple[RuleFinding, ...]:
+    """Group same-rule findings while preserving first-seen order."""
+    grouped_lines: defaultdict[formatter.RuleFindingKey, set[int]] = defaultdict(set)
+    exemplars: dict[formatter.RuleFindingKey, RuleFinding] = {}
+    for finding in findings:
+        key = finding.grouping_key
+        exemplars.setdefault(key, finding)
+        grouped_lines[key].update(finding.line_numbers)
+
+    return tuple(exemplars[key].with_line_numbers(tuple(sorted(line_numbers))) for key, line_numbers in grouped_lines.items())
+
+
+def _format_grouped_finding(finding: RuleFinding) -> str:
+    """Format one grouped finding line."""
+    label = "Lines" if len(finding.line_numbers) != 1 else "Line"
+    ranges = diagnostics.format_line_ranges(list(finding.line_numbers))
+    fixable = "*" if finding.fixable else ""
+    message = finding.message
+    message_end = "" if message.endswith((".", "!", "?")) else "."
+    return f"{finding.rule.rule_code}{fixable} {message}{message_end} {label} {ranges}"
+
+
+def _deduplicated_paths(paths: tuple[str, ...]) -> tuple[str, ...]:
+    """Return paths with duplicate physical targets removed while preserving display paths."""
+    seen: set[str] = set()
+    result: list[str] = []
+    for path in paths:
+        key = formatter.path_identity_key(path)
+        if key in seen:
+            continue
+        seen.add(key)
+        result.append(path)
+    return tuple(result)
 
 
 def _settings_overrides_from_args(args: argparse.Namespace) -> config.SettingsOverrides:
@@ -236,6 +355,7 @@ def _settings_overrides_from_args(args: argparse.Namespace) -> config.SettingsOv
         respect_gitignore=args.respect_gitignore,
         force_exclude=args.force_exclude,
         experimental=args.experimental,
+        output_format=args.output_format,
         select=_flatten_option_groups(args.select),
         extend_select=_flatten_option_groups(args.extend_select),
         ignore=_flatten_option_groups(args.ignore),
