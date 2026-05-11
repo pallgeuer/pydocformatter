@@ -5,56 +5,31 @@
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/release/python-3110/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**pydocformatter** is a fork of [pyformatter](https://github.com/RikGhosh487/pyformatter) (with very significant subsequent changes), and provides Python formatting tools that automatically format your docstrings and comments according to configurable style guidelines. It consists of two formatters:
-
-- **pydocfmt:** Formats Python docstrings with support for Google-style docstrings
-- **pycommentfmt:** Formats Python comments to ensure proper line length and readability
+**pydocformatter** is a fork (with very significant subsequent rewrites and development) of [pyformatter](https://github.com/RikGhosh487/pyformatter), which provides a Python formatter, `pydocfmt`, for formatting docstrings and comments. It is designed to be maximally compatible with [Ruff](https://docs.astral.sh/ruff/).
 
 ---
 
 ## Key Features
 
-### pydocfmt
-- **Google-style docstring formatting:** Complete support for Google docstring conventions
-- **Multi-line summary handling:** Intelligently formats long summaries that span multiple lines
-- **Smart section parsing:** Properly handles Args, Returns, Raises, Examples, and other sections
+### Docstrings
+- **Google-style docstring formatting:** Support for Google docstring conventions
+- **Multi-line summary handling:** Formats long summaries that span multiple lines
+- **Smart section parsing:** Handles Args, Returns, Raises, Examples, and other sections
 - **Code block preservation:** Maintains formatting within Examples sections with automatic fencing
 - **Type annotation support:** Handles parameter type annotations gracefully
 - **Blank line management:** Ensures proper spacing between summary, description, and sections
 
-### pycommentfmt
-- **Intelligent comment wrapping:** Respects line length while preserving meaning
-- **Inline vs block comment handling:** Different formatting strategies for different comment types
-- **Special comment preservation:** Maintains pylint, mypy, and other tool directives
+### Comments
+- **Comment wrapping:** Respects line length while preserving meaning
+- **Inline and block comment handling:** Applies appropriate formatting to each comment shape
+- **Special comment preservation:** Maintains pylint, mypy, noqa, pragma, and formatter directives
 - **Smart spacing:** Ensures consistent spacing between code and comments
 
 ### File Selection and Configuration
 - **Ruff-style file selection:** Supports glob-based include/exclude rules, default excludes, `force-exclude`, and `.gitignore`-aware discovery
-- **Shared and tool-specific config:** Reads `[tool.pydocformatter]` plus per-tool overrides from `pyproject.toml`
+- **Single config table:** Reads `[tool.pydocfmt]` from `pyproject.toml`
 - **Verbose discovery output:** Reports included and ignored files, including excluded directories and gitignored paths
 - **Line-aware check diagnostics:** Reports affected files with line numbers and compressed line ranges in check mode
-
-## Key Improvements over pyformatter
-
-- Project architecture updates and bug fixes
-
----
-
-## Table of Contents
-
-- [Key Features](#key-features)
-- [Installation](#installation)
-- [Quick Start](#quick-start)
-- [Command Line Usage](#command-line-usage)
-  - [pydocfmt](#pydocfmt)
-  - [pycommentfmt](#pycommentfmt)
-- [Configuration](#configuration)
-- [Examples](#examples)
-- [Integration](#integration)
-  - [Pre-commit](#pre-commit)
-- [Security](#security)
-- [Contributing](#contributing)
-- [License](#license)
 
 ---
 
@@ -73,24 +48,20 @@ pip install pydocformatter
 Format all Python files in your project:
 
 ```bash
-# Format docstrings
 pydocfmt
+```
 
-# Format comments
-pycommentfmt
+Check formatting without making changes:
 
-# Check formatting without making changes
+```bash
 pydocfmt --check
-pycommentfmt --check
 ```
 
 ---
 
 ## Command Line Usage
 
-### pydocfmt
-
-Format Python docstrings with intelligent Google-style docstring support.
+Format Python docstrings and comments:
 
 ```bash
 pydocfmt [OPTIONS] [FILES/DIRECTORIES]
@@ -101,8 +72,8 @@ If no files or directories are specified, `pydocfmt` formats the current directo
 **Options:**
 - `--help`: Show help message and exit
 - `--check`: Check if files are formatted correctly without modifying them
-- `-v, --verbose`: Show included and ignored files during file discovery
-- `--line-length INTEGER`: Maximum line length for docstrings (default: 88)
+- `-v`, `--verbose`: Show included and ignored files during file discovery
+- `--line-length INTEGER`: Maximum line length for docstrings and comments (default: 88)
 - `--line-ending {auto,lf,cr-lf,native}`: Line ending to use when rewriting files (default: auto)
 - `--indent-style {space,tab}`: Indentation style for generated docstring sections (default: space)
 - `--indent-width INTEGER`: Indentation width for generated docstring sections (default: 4)
@@ -115,15 +86,16 @@ If no files or directories are specified, `pydocfmt` formats the current directo
 - `--experimental`, `--no-experimental`: Toggle the experimental rule-based formatter implementation (default: disabled)
 
 **Examples:**
+
 ```bash
+# Format current directory
+pydocfmt
+
 # Format specific files
 pydocfmt myfile.py another_file.py
 
-# Format entire directory
+# Format an entire directory
 pydocfmt src/
-
-# Format current directory
-pydocfmt
 
 # Check formatting without changes
 pydocfmt --check src/
@@ -153,62 +125,14 @@ pydocfmt -v src/
 pydocfmt --force-exclude generated.py src/
 ```
 
-### pycommentfmt
-
-Format Python comments to ensure proper line length and readability.
-
-```bash
-pycommentfmt [OPTIONS] [FILES/DIRECTORIES]
-```
-
-If no files or directories are specified, `pycommentfmt` formats the current directory.
-
-**Options:**
-- `--help`: Show help message and exit
-- `--check`: Check if files are formatted correctly without modifying them
-- `-v, --verbose`: Show included and ignored files during file discovery
-- `--line-length INTEGER`: Maximum line length for comments (default: 88)
-- `--line-ending {auto,lf,cr-lf,native}`: Line ending to use when rewriting files (default: auto)
-- `--include GLOB [GLOB ...]`: Glob pattern(s) for files to include
-- `--extend-include GLOB [GLOB ...]`: Additional glob pattern(s) for files to include
-- `--exclude GLOB [GLOB ...]`: Glob pattern(s) for files to exclude
-- `--extend-exclude GLOB [GLOB ...]`: Additional glob pattern(s) for files to exclude
-- `--respect-gitignore`, `--no-respect-gitignore`: Toggle .gitignore-aware discovery (default: enabled)
-- `--force-exclude`, `--no-force-exclude`: Apply include/exclude rules even to explicitly listed files
-- `--experimental`, `--no-experimental`: Toggle the experimental rule-based formatter implementation (default: disabled)
-
-**Examples:**
-```bash
-# Format specific files
-pycommentfmt myfile.py
-
-# Format entire directory
-pycommentfmt src/
-
-# Format current directory
-pycommentfmt
-
-# Check formatting without changes
-pycommentfmt --check src/
-
-# Custom line length
-pycommentfmt --line-length 79 src/
-
-# Custom rewritten line ending
-pycommentfmt --line-ending cr-lf src/
-
-# Include/exclude patterns and verbose file discovery
-pycommentfmt -v src/ --include "*.py" "*.pyi" --exclude "generated"
-```
-
 ---
 
 ## Configuration
 
-pydocformatter can be configured via `pyproject.toml`:
+pydocformatter can be configured via `pyproject.toml` (example):
 
 ```toml
-[tool.pydocformatter]
+[tool.pydocfmt]
 line-length = 88
 line-ending = "auto"
 indent-style = "space"
@@ -223,23 +147,15 @@ ignore = []
 fixable = ["ALL"]
 unfixable = []
 
-[tool.pydocformatter.per-file-ignores]
+[tool.pydocfmt.per-file-ignores]
 "tests/*.py" = ["PCF001"]
-
-[tool.pydocformatter.pydocfmt]
-line-length = 100
-extend-select = ["RD"]
-
-[tool.pydocformatter.pycommentfmt]
-extend-exclude = ["legacy_comments.py"]
-extend-per-file-ignores = {"generated/*.py" = ["PCF002"]}
 ```
 
 **Configuration Options:**
-- `line-length`: Maximum line length (default: 88)
+- `line-length`: Maximum line length for docstrings and comments (default: 88)
 - `line-ending`: Line ending to use when rewriting files; one of `"auto"`, `"lf"`, `"cr-lf"`, or `"native"` (default: `"auto"`)
-- `indent-style`: Generated docstring section indentation style for `pydocfmt`; one of `"space"` or `"tab"` (default: `"space"`)
-- `indent-width`: Generated docstring section indentation width for `pydocfmt` (default: 4)
+- `indent-style`: Generated docstring section indentation style; one of `"space"` or `"tab"` (default: `"space"`)
+- `indent-width`: Generated docstring section indentation width (default: 4)
 - `include`: Glob patterns for files to include
 - `extend-include`: Additional include glob patterns
 - `exclude`: Glob patterns for files/directories to exclude
@@ -256,51 +172,40 @@ extend-per-file-ignores = {"generated/*.py" = ["PCF002"]}
 - `per-file-ignores`: File-pattern-specific ignored rule selectors
 - `extend-per-file-ignores`: Additional file-pattern-specific ignored rule selectors
 
-Settings are resolved as defaults, then shared table, then tool-specific table, then command-line options. The highest-precedence specified value wins for each key, including `extend-include` and `extend-exclude`.
+Settings are resolved as defaults, then `[tool.pydocfmt]`, then command-line options. The highest-precedence specified value wins for each key, including `extend-include` and `extend-exclude`.
 
-`indent-style` and `indent-width` are used by `pydocfmt` only. They may be configured in the shared table or `[tool.pydocformatter.pydocfmt]`; `pycommentfmt` does not accept them as CLI options or in `[tool.pydocformatter.pycommentfmt]`.
-
-For the full file-selection contract, including Ruff compatibility deltas and explicit file behavior, see [File Selection Compatibility Specification](docs/file_selection_spec.md).
+For the full file-selection contract, see [File Selection Compatibility Specification](docs/file_selection_spec.md).
 
 ---
 
 ## Examples
 
-### Before and After: pydocfmt
+### Before
 
-**Before:**
 ```python
 def calculate_mean(numbers):
     """Calculate the arithmetic mean of a list of numbers.
     
     This function calculates the arithmetic mean of a list of numbers and returns the result as a float value."""
+    
+    # This is a very long comment that exceeds the line length limit and should be wrapped to multiple lines for better readability
     return sum(numbers) / len(numbers)
 ```
 
-**After:**
+### After
+
 ```python
 def calculate_mean(numbers):
-    """Calculate the arithmetic mean of a list of numbers.
+    """
+    Calculate the arithmetic mean of a list of numbers.
     
     This function calculates the arithmetic mean of a list of numbers and returns the
     result as a float value.
     """
+    
+    # This is a very long comment that exceeds the line length limit and should be
+    # wrapped to multiple lines for better readability
     return sum(numbers) / len(numbers)
-```
-
-### Before and After: pycommentfmt
-
-**Before:**
-```python
-# This is a very long comment that exceeds the line length limit and should be wrapped to multiple lines for better readability
-x = 42
-```
-
-**After:**
-```python
-# This is a very long comment that exceeds the line length limit and should be
-# wrapped to multiple lines for better readability
-x = 42
 ```
 
 ---
@@ -314,25 +219,21 @@ Add pydocformatter to your `.pre-commit-config.yaml`:
 ```yaml
 repos:
   - repo: https://github.com/pallgeuer/pydocformatter
-    rev: v0.2.0  # Use the ref you want to point at
+    rev: v0.3.0
     hooks:
       - id: pydocfmt
-        args: [--line-length=88]
-      - id: pycommentfmt
         args: [--line-length=88]
 ```
 
 **Available hooks:**
-- `pydocfmt`: Format docstrings (modifies files)
-- `pydocfmt-check`: Check docstring formatting (read-only)
-- `pycommentfmt`: Format comments (modifies files)
-- `pycommentfmt-check`: Check comment formatting (read-only)
+- `pydocfmt`: Format docstrings and comments (modifies files)
+- `pydocfmt-check`: Check docstring and comment formatting (read-only)
 
 **Common configurations:**
+
 ```yaml
 # Basic usage
 - id: pydocfmt
-- id: pycommentfmt
 
 # Custom line length
 - id: pydocfmt
@@ -340,7 +241,6 @@ repos:
 
 # Check only (for CI)
 - id: pydocfmt-check
-- id: pycommentfmt-check
 
 # With file exclusions
 - id: pydocfmt
@@ -351,6 +251,7 @@ repos:
 
 ## Why pydocformatter?
 
+- **Compatible:** Designed to work alongside [Ruff](https://docs.astral.sh/ruff/)
 - **Uncompromising:** Consistent formatting across your entire codebase
 - **Fast:** Efficiently processes large codebases
 - **Configurable:** Adapt to your team's style preferences
@@ -359,33 +260,9 @@ repos:
 
 ---
 
-## Security
-
-For general security best practices when using pydocformatter:
-- Always review changes made by pydocformatter before committing
-- Keep pydocformatter updated to the latest version
-- When processing untrusted code, consider running pydocformatter in an isolated environment
-
----
-
 ## Contributing
 
-Contributions are welcome! We appreciate bug reports, feature requests, documentation improvements, and code contributions.
-
-For detailed information on how to contribute, please see our [Contributing Guide](CONTRIBUTING.md).
-For release history, see the [Changelog](CHANGELOG.md).
-
-**Quick Start for Contributors:**
-1. Fork the repository and clone your fork
-2. Set up the development environment: `uv sync --group dev`
-3. Install pre-commit hooks: `uv run pre-commit install`
-4. Make your changes and add tests
-5. Run the test suite: `uv run pytest -q`
-6. Submit a pull request
-
-For bug reports and feature requests, please [open an issue](https://github.com/pallgeuer/pydocformatter/issues).
-
----
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
@@ -396,7 +273,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## Acknowledgments
 
 Inspired by the excellent work of:
-- [pyformatter](https://github.com/RikGhosh487/pyformatter) - Forked with very significant subsequent changes
+- [pyformatter](https://github.com/RikGhosh487/pyformatter) - Forked with very significant subsequent rewrites and development
 - [Black](https://github.com/psf/black) - The uncompromising Python code formatter
 - [isort](https://github.com/PyCQA/isort) - A Python utility to sort imports
 - [docformatter](https://github.com/PyCQA/docformatter) - Formats docstrings to follow conventions

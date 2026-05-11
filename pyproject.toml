@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pydocformatter"
-version = "0.2.0"
+version = "0.3.0"
 description = "A Python annotation formatter for line-wrapping and formatting python comments and docstrings"
 readme = "README.md"
 license = "MIT"
@@ -44,7 +44,6 @@ Contributing = "https://github.com/pallgeuer/pydocformatter/blob/main/CONTRIBUTI
 
 [project.scripts]
 pydocfmt = "pydocformatter.cli.pydocfmt_main:main"
-pycommentfmt = "pydocformatter.cli.pycommentfmt_main:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
@@ -79,7 +78,7 @@ line_length = 200
 known_first_party = ["pydocformatter"]
 skip = [".github", ".eggs", ".git", ".hg", ".mypy_cache", ".tox", ".venv", "htmlcov", "__pycache__", "_build", "buck-out", "build", "dist", "tests/data"]
 
-[tool.pydocformatter]
+[tool.pydocfmt]
 line-length = 120
 
 [tool.mypy]

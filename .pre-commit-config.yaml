@@ -34,17 +34,10 @@ repos:
         entry: uv run pydocfmt
         language: system
         types: [python]
-      - id: pycommentfmt
-        name: pycommentfmt (formatter)
-        entry: uv run pycommentfmt
-        language: system
-        types: [python]
 
   # Example of how external users would use pydocformatter hooks:
   # - repo: https://github.com/pallgeuer/pydocformatter
-  #   rev: v0.2.0
+  #   rev: v0.3.0
   #   hooks:
   #     - id: pydocfmt
-  #       args: [--line-length=88]
-  #     - id: pycommentfmt
   #       args: [--line-length=88]

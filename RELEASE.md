@@ -5,7 +5,7 @@
 ### Code Quality
 - [x] All tests pass (`uv run pytest -q`)
 - [x] Package builds successfully (`uv build`)
-- [x] No linting errors (`uv run black --check .`, `uv run isort --check .`, `uv run mypy`, `uv run pydocfmt --check`, `uv run pycommentfmt --check`)
+- [x] No linting errors (`uv run black --check .`, `uv run isort --check .`, `uv run mypy`, `uv run pydocfmt --check`)
 - [x] Pre-commit hooks pass (`uv run pre-commit run --all-files`)
 
 ### Documentation
@@ -32,7 +32,7 @@
 Set the release version once and use it consistently in the commands below:
 
 ```bash
-VERSION=0.2.0
+VERSION=0.3.0
 ```
 
 ### Step 1: Final Validation
@@ -45,7 +45,6 @@ uv build
 
 # Test CLI tools
 uv run pydocfmt --help
-uv run pycommentfmt --help
 
 # Test functionality
 uv run python -c "
@@ -113,17 +112,15 @@ After release, verify:
    ```bash
    pip install pydocformatter
    pydocfmt --help
-   pycommentfmt --help
    ```
 
 2. **Pre-commit Hook Usage:**
    ```yaml
    repos:
      - repo: https://github.com/pallgeuer/pydocformatter
-       rev: v${VERSION}
+       rev: v0.3.0
        hooks:
          - id: pydocfmt
-         - id: pycommentfmt
    ```
 
 3. **GitHub Features:**

@@ -403,6 +403,35 @@ Examples:
         Path(path).unlink()
         self.assertFalse(modified, "The file should not be modified if already formatted.")
 
+    def test_line_ending_only_difference_does_not_rewrite_formatted_docstring(self) -> None:
+        with tempfile.NamedTemporaryFile(suffix=".py", delete=False) as tf:
+            path = tf.name
+        source = b'def foo():\r\n    """Does something.\r\n\r\n    Args:\r\n        x (int): some parameter.\r\n    """\r\n    pass\r\n'
+        Path(path).write_bytes(source)
+
+        modified = pydocfmt.format_docstrings(path, FormatterSettings(line_length=72, line_ending="lf"), check=False)
+        data = Path(path).read_bytes()
+        Path(path).unlink()
+
+        self.assertFalse(modified)
+        self.assertEqual(source, data)
+
+    def test_check_mode_ignores_line_ending_only_difference_for_formatted_docstring(self) -> None:
+        with tempfile.NamedTemporaryFile(suffix=".py", delete=False) as tf:
+            path = tf.name
+        source = b'def foo():\r\n    """Does something.\r\n\r\n    Args:\r\n        x (int): some parameter.\r\n    """\r\n    pass\r\n'
+        Path(path).write_bytes(source)
+
+        output = StringIO()
+        with contextlib.redirect_stdout(output):
+            modified = pydocfmt.format_docstrings(path, FormatterSettings(line_length=72, line_ending="lf"), check=True)
+        data = Path(path).read_bytes()
+        Path(path).unlink()
+
+        self.assertFalse(modified)
+        self.assertEqual("", output.getvalue())
+        self.assertEqual(source, data)
+
     def test_auto_line_ending_preserves_first_detected_crlf_when_rewriting(self) -> None:
         with tempfile.NamedTemporaryFile(suffix=".py", delete=False) as tf:
             path = tf.name
@@ -426,8 +455,21 @@ Examples:
         Path(path).unlink()
 
         self.assertTrue(modified)
-        self.assertNotIn(b"\r\n", data)
-        self.assertIn(b"\n", data)
+        self.assertEqual(b'def foo():\r\n    """Does something.\n\n    Args:\n        x (int): some parameter.\n    """\n    pass\r\n', data)
+
+    def test_partial_docstring_rewrite_preserves_untouched_mixed_line_endings(self) -> None:
+        with tempfile.NamedTemporaryFile(suffix=".py", delete=False) as tf:
+            path = tf.name
+        source = b'header = 1\r\nother = 2\n\ndef foo():\r\n    """Does something.\r\n\r\nArgs:\r\n    x (int): some parameter.\r\n    """\r\n    pass\r\n'
+        expected = b'header = 1\r\nother = 2\n\ndef foo():\r\n    """Does something.\r\n\r\n    Args:\r\n        x (int): some parameter.\r\n    """\r\n    pass\r\n'
+        Path(path).write_bytes(source)
+
+        modified = pydocfmt.format_docstrings(path, FormatterSettings(line_length=72), check=False)
+        data = Path(path).read_bytes()
+        Path(path).unlink()
+
+        self.assertTrue(modified)
+        self.assertEqual(expected, data)
 
     def test_check_mode_reports_single_line_location(self) -> None:
         with tempfile.NamedTemporaryFile(mode="w+", suffix=".py", delete=False) as tf:

@@ -6,7 +6,6 @@ from typing import Any, Literal
 
 import pydocformatter.glob_matcher as glob_matcher
 import pydocformatter.rules as rules
-from pydocformatter.types import TOOL_NAMES, ToolName
 
 IndentStyle = Literal["space", "tab"]
 LineEnding = Literal["auto", "lf", "cr-lf", "native"]
@@ -61,6 +60,7 @@ _KEY_TO_FIELD = {
     "extend-per-file-ignores": "extend_per_file_ignores",
 }
 _FIELD_TO_KEY = {field: key for key, field in _KEY_TO_FIELD.items()}
+_SETTING_KEYS = frozenset(_KEY_TO_FIELD)
 _RULE_SELECTOR_FIELDS = frozenset(
     {
         "select",
@@ -84,49 +84,25 @@ _RULE_SETTING_KEYS = frozenset(
         "extend-per-file-ignores",
     }
 )
-_COMMON_SETTING_KEYS = (
-    frozenset(
-        {
-            "line-length",
-            "line-ending",
-            "include",
-            "extend-include",
-            "exclude",
-            "extend-exclude",
-            "respect-gitignore",
-            "force-exclude",
-            "experimental",
-        }
-    )
-    | _RULE_SETTING_KEYS
-)
-_PYDOCFMT_SETTING_KEYS = _COMMON_SETTING_KEYS | {"indent-style", "indent-width"}
-_TOOL_SETTING_KEYS = {
-    "pydocfmt": _PYDOCFMT_SETTING_KEYS,
-    "pycommentfmt": _COMMON_SETTING_KEYS,
-}
-_SHARED_SETTING_KEYS = _PYDOCFMT_SETTING_KEYS
 
 
 class ConfigError(ValueError):
     """Raised when pydocformatter configuration cannot be resolved or validated.
 
     This exception represents user-facing configuration failures, including malformed TOML, unsupported table shapes,
-    unknown setting keys, invalid tool names, and invalid setting values.
+    unknown setting keys, and invalid setting values.
     """
 
 
 @dataclasses.dataclass(frozen=True)
 class FormatterSettings:
-    """Resolved formatter settings for pydocformatter tools.
+    """Resolved formatter settings for pydocformatter.
 
     Attributes:
         line_length (int): Maximum line length used when wrapping docstrings or comments.
         line_ending (LineEnding): Line ending used when rewriting files.
-        indent_style (IndentStyle): Indentation style used by `pydocfmt` for generated docstring section indentation.
-            This setting is not used by `pycommentfmt`.
-        indent_width (int): Number of spaces per generated `pydocfmt` docstring indentation level, or the visual width
-            of a tab. This setting is not used by `pycommentfmt`.
+        indent_style (IndentStyle): Indentation style used for generated docstring section indentation.
+        indent_width (int): Number of spaces per generated docstring indentation level, or the visual width of a tab.
         include (tuple[str, ...]): Base glob patterns that identify format-eligible files.
         extend_include (tuple[str, ...]): Additional include glob patterns appended to `include`.
         exclude (tuple[str, ...]): Base glob patterns for files or directories to ignore.
@@ -200,9 +176,8 @@ class SettingsOverrides:
     extend_per_file_ignores: RuleSelectorMap | None = None
 
 
-def load_config(tool_name: ToolName, cli_overrides: SettingsOverrides | None = None) -> FormatterSettings:
+def load_config(cli_overrides: SettingsOverrides | None = None) -> FormatterSettings:
     """Resolve settings from defaults, pyproject config, and optional CLI overrides."""
-    _validate_tool_name(tool_name)
     settings = FormatterSettings()
 
     config = _load_pyproject_config()
@@ -210,53 +185,15 @@ def load_config(tool_name: ToolName, cli_overrides: SettingsOverrides | None = N
     if not isinstance(tool_config, dict):
         if "tool" in config:
             raise ConfigError("pyproject.toml [tool] must be a table")
-        return _apply_overrides(settings, cli_overrides, "command line", tool_name)
+        return _apply_overrides(settings, cli_overrides, "command line")
 
-    if "pydocformatter" in tool_config:
-        formatter_config = tool_config["pydocformatter"]
+    if "pydocfmt" in tool_config:
+        formatter_config = tool_config["pydocfmt"]
         if not isinstance(formatter_config, dict):
-            raise ConfigError("tool.pydocformatter must be a table")
-        settings = _apply_config_section(
-            settings,
-            formatter_config,
-            "tool.pydocformatter",
-            allowed_setting_keys=_SHARED_SETTING_KEYS,
-            applied_setting_keys=_TOOL_SETTING_KEYS[tool_name],
-            allow_tool_tables=True,
-            selector_tool_name=None,
-        )
+            raise ConfigError("tool.pydocfmt must be a table")
+        settings = _apply_config_section(settings, formatter_config, "tool.pydocfmt")
 
-        for nested_tool_name in TOOL_NAMES:
-            if nested_tool_name not in formatter_config:
-                continue
-            nested_tool_config = formatter_config[nested_tool_name]
-            if not isinstance(nested_tool_config, dict):
-                raise ConfigError(f"tool.pydocformatter.{nested_tool_name} must be a table")
-            _validate_config_section_keys(
-                nested_tool_config,
-                f"tool.pydocformatter.{nested_tool_name}",
-                _TOOL_SETTING_KEYS[nested_tool_name],
-            )
-            _validate_config_section_values(
-                nested_tool_config,
-                f"tool.pydocformatter.{nested_tool_name}",
-                _TOOL_SETTING_KEYS[nested_tool_name],
-                nested_tool_name,
-            )
-
-        if tool_name in formatter_config:
-            tool_specific = formatter_config[tool_name]
-            settings = _apply_config_section(
-                settings,
-                tool_specific,
-                f"tool.pydocformatter.{tool_name}",
-                allowed_setting_keys=_TOOL_SETTING_KEYS[tool_name],
-                applied_setting_keys=_TOOL_SETTING_KEYS[tool_name],
-                allow_tool_tables=False,
-                selector_tool_name=tool_name,
-            )
-
-    return _apply_overrides(settings, cli_overrides, "command line", tool_name)
+    return _apply_overrides(settings, cli_overrides, "command line")
 
 
 def _load_pyproject_config() -> dict[str, Any]:
@@ -275,32 +212,17 @@ def _load_pyproject_config() -> dict[str, Any]:
     return config
 
 
-def _validate_tool_name(tool_name: str) -> None:
-    """Reject unknown formatter tool names before resolving configuration."""
-    if tool_name not in TOOL_NAMES:
-        raise ConfigError("tool_name must be either 'pydocfmt' or 'pycommentfmt'")
-
-
 def _apply_config_section(
     settings: FormatterSettings,
     section: dict[str, Any],
     context: str,
-    *,
-    allowed_setting_keys: frozenset[str],
-    applied_setting_keys: frozenset[str],
-    allow_tool_tables: bool,
-    selector_tool_name: ToolName | None,
 ) -> FormatterSettings:
     """Apply one TOML configuration section after validating allowed keys."""
-    allowed_keys = set(allowed_setting_keys)
-    if allow_tool_tables:
-        allowed_keys.update(TOOL_NAMES)
+    _validate_config_section_keys(section, context, _SETTING_KEYS)
+    _validate_config_section_values(section, context)
 
-    _validate_config_section_keys(section, context, frozenset(allowed_keys))
-    _validate_config_section_values(section, context, allowed_setting_keys, selector_tool_name)
-
-    values = {_KEY_TO_FIELD[key]: section[key] for key in applied_setting_keys if key in section}
-    return _apply_field_values(settings, values, context, selector_tool_name)
+    values = {_KEY_TO_FIELD[key]: section[key] for key in _SETTING_KEYS if key in section}
+    return _apply_field_values(settings, values, context)
 
 
 def _validate_config_section_keys(
@@ -318,33 +240,29 @@ def _validate_config_section_keys(
 def _validate_config_section_values(
     section: dict[str, Any],
     context: str,
-    setting_keys: frozenset[str],
-    selector_tool_name: ToolName | None,
 ) -> None:
     """Validate known setting values in one TOML configuration section."""
-    values = {_KEY_TO_FIELD[key]: section[key] for key in setting_keys if key in section}
-    _apply_field_values(FormatterSettings(), values, context, selector_tool_name)
+    values = {_KEY_TO_FIELD[key]: section[key] for key in _SETTING_KEYS if key in section}
+    _apply_field_values(FormatterSettings(), values, context)
 
 
 def _apply_overrides(
     settings: FormatterSettings,
     overrides: SettingsOverrides | None,
     context: str,
-    selector_tool_name: ToolName,
 ) -> FormatterSettings:
     """Apply non-None values from an override layer to formatter settings."""
     if overrides is None:
         return settings
 
     values = {field.name: value for field in dataclasses.fields(SettingsOverrides) if (value := getattr(overrides, field.name)) is not None}
-    return _apply_field_values(settings, values, context, selector_tool_name)
+    return _apply_field_values(settings, values, context)
 
 
 def _apply_field_values(
     settings: FormatterSettings,
     values: dict[str, Any],
     context: str,
-    selector_tool_name: ToolName | None,
 ) -> FormatterSettings:
     """Validate raw field values and return settings with those fields replaced."""
     updates = {
@@ -354,7 +272,7 @@ def _apply_field_values(
         )
         for field, value in values.items()
     }
-    _validate_rule_selectors(updates, context, selector_tool_name)
+    _validate_rule_selectors(updates, context)
     return dataclasses.replace(settings, **updates)
 
 
@@ -464,14 +382,13 @@ def _validate_selector_mapping(value: Any, context: str) -> RuleSelectorMap:
 def _validate_rule_selectors(
     values: dict[str, Any],
     context: str,
-    selector_tool_name: ToolName | None,
 ) -> None:
-    """Validate rule selectors against the known shared or tool-specific rule scope."""
+    """Validate rule selectors against the known rule scope."""
     selector_values = [(field, selector) for field, selectors in values.items() if field in _RULE_SELECTOR_FIELDS for selector in selectors]
     selector_values.extend((field, selector) for field, mapping in values.items() if field in _RULE_SELECTOR_MAP_FIELDS for _, selectors in mapping for selector in selectors)
 
     for field, selector in selector_values:
-        if not rules.selector_matches_known_rule(selector, tool_name=selector_tool_name):
+        if not rules.selector_matches_known_rule(selector):
             key = _FIELD_TO_KEY[field]
             raise ConfigError(f"{context}.{key} contains unknown selector: {selector}")
 

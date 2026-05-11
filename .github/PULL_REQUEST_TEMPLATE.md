@@ -45,7 +45,6 @@ Please provide a clear list of changes made:
 # uv run black --check .
 # uv run isort --check .
 # uv run pydocfmt --check
-# uv run pycommentfmt --check
 # uv run mypy
 # uv run pre-commit run --all-files
 ```
@@ -55,8 +54,7 @@ Please provide a clear list of changes made:
 - [ ] Code follows the project's style guidelines
 - [ ] `black` formatting applied
 - [ ] `isort` import sorting applied
-- [ ] `pydocfmt` docstring formatting applied
-- [ ] `pycommentfmt` comment formatting applied
+- [ ] `pydocfmt` docstring and comment formatting applied
 - [ ] `mypy` type checks pass
 - [ ] Pre-commit hooks pass
 

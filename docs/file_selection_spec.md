@@ -1,13 +1,13 @@
 # File Selection Compatibility Specification
 
-This document specifies how `pydocfmt` and `pycommentfmt` select files for processing.
+This document specifies how `pydocfmt` selects files for processing.
 
 The compatibility surface is intentionally limited to:
 
 - `line-length`
 - `line-ending`
-- `indent-style` (`pydocfmt` only)
-- `indent-width` (`pydocfmt` only)
+- `indent-style`
+- `indent-width`
 - `include`
 - `extend-include`
 - `exclude`
@@ -28,8 +28,8 @@ Settings outside this list are not part of the Ruff compatibility contract.
 
 - `line-length = 88`
 - `line-ending = "auto"`
-- `indent-style = "space"` (`pydocfmt` only)
-- `indent-width = 4` (`pydocfmt` only)
+- `indent-style = "space"`
+- `indent-width = 4`
 - `include = ["*.py", "*.pyi", "*.pyw"]`
 - `extend-include = []`
 - `exclude = [".bzr", ".direnv", ".eggs", ".git", ".git-rewrite", ".hg", ".mypy_cache", ".nox", ".pants.d", ".pytype", ".ruff_cache", ".svn", ".tox", ".venv", "__pypackages__", "_build", "buck-out", "dist", "node_modules", "venv"]`
@@ -41,25 +41,15 @@ The `exclude` default is kept aligned with Ruff's current documented top-level d
 
 ## Configuration Layout
 
-Configuration is read from:
-
-- Shared table: `[tool.pydocformatter]`
-- Tool-specific tables:
-  - `[tool.pydocformatter.pydocfmt]`
-  - `[tool.pydocformatter.pycommentfmt]`
+Configuration is read from `[tool.pydocfmt]`.
 
 Resolution order:
 
 1. Start with hard-coded defaults.
-2. Apply `[tool.pydocformatter]`.
-3. Apply `[tool.pydocformatter.<tool>]`.
-4. Apply command-line options.
+2. Apply `[tool.pydocfmt]`.
+3. Apply command-line options.
 
-For every setting, including `extend-include` and `extend-exclude`, the highest-precedence specified value wins. Lists do not accumulate across shared, tool-specific, and command-line layers.
-
-Only hyphenated keys are valid. Legacy `[tool.pydocfmt]` and `[tool.pycommentfmt]` tables are ignored. Underscore aliases and regex include/exclude semantics are not supported.
-
-`indent-style` and `indent-width` are valid in `[tool.pydocformatter]` and `[tool.pydocformatter.pydocfmt]`. They are rejected in `[tool.pydocformatter.pycommentfmt]` because `pycommentfmt` does not use them.
+For every setting, including `extend-include` and `extend-exclude`, the highest-precedence specified value wins. Lists do not accumulate across configuration and command-line layers.
 
 `line-ending` follows Ruff's formatter values: `"auto"`, `"lf"`, `"cr-lf"`, and `"native"`. `"auto"` uses the first line ending detected in the source file, defaulting to LF when the file has no line endings. The setting controls rewritten files; files that do not require formatting are not rewritten solely to normalize line endings.
 

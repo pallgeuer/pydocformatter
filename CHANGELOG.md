@@ -11,61 +11,54 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 ### Added
 
 - **CLI:**
-  - Added `--line-ending` to `pydocfmt` and `pycommentfmt` to control line endings used when rewriting files.
-  - Added `-v` / `--verbose` to `pydocfmt` and `pycommentfmt` to report all considered files during discovery, including included files and ignored files with include/exclude reasons.
-  - Added `--respect-gitignore` / `--no-respect-gitignore` to `pydocfmt` and `pycommentfmt`, with enabled-by-default behavior and matching `pyproject.toml` configuration.
-  - Added `--experimental` / `--no-experimental` to `pydocfmt` and `pycommentfmt` for opting into the experimental formatter path.
+  - Added `--line-ending` to control line endings used when rewriting files.
+  - Added `-v` / `--verbose` to report all considered files during discovery, including included files and ignored files with include/exclude reasons.
+  - Added `--respect-gitignore` / `--no-respect-gitignore`, with enabled-by-default behavior and matching `pyproject.toml` configuration.
+  - Added `--experimental` / `--no-experimental` for opting into the experimental formatter path.
 
 - **Configuration:**
   - Added Ruff-style `line-ending` configuration with `"auto"`, `"lf"`, `"cr-lf"`, and `"native"` values.
-  - Added `indent-style` and `indent-width` for `pydocfmt` generated docstring section indentation, with Ruff-style defaults of `"space"` and `4`.
-  - Added `respect-gitignore` for shared formatter configuration, defaulting to `true`.
-  - Added `experimental` for shared formatter configuration, defaulting to `false`.
-  - Added Ruff-style rule settings under `[tool.pydocformatter]` and tool-specific override tables: `select`, `extend-select`, `ignore`, `fixable`, `extend-fixable`, `unfixable`, `per-file-ignores`, and `extend-per-file-ignores`.
+  - Added `indent-style` and `indent-width` for generated docstring section indentation, with Ruff-style defaults of `"space"` and `4`.
+  - Added `respect-gitignore` for formatter configuration, defaulting to `true`.
+  - Added `experimental` for formatter configuration, defaulting to `false`.
+  - Added Ruff-style rule settings under `[tool.pydocfmt]`: `select`, `extend-select`, `ignore`, `fixable`, `extend-fixable`, `unfixable`, `per-file-ignores`, and `extend-per-file-ignores`.
 
 - **Documentation:**
-  - Added a Ruff file-selection compatibility specification at `docs/file-selection-spec.md`, including exact defaults, precedence rules, force-exclude behavior, and explicit pydocformatter deviations.
+  - Added a Ruff file-selection compatibility specification at `docs/file_selection_spec.md`, including exact defaults, precedence rules, force-exclude behavior, and explicit pydocformatter deviations.
   - Added docstrings for public glob matching methods, the dependency-pin check tool, and important configuration, CLI, and file-selection helpers.
 
 ### Changed
 
-- **File discovery:**
-  - Verbose mode now reports directories pruned by exclude patterns, such as `.venv`.
-  - `pydocfmt` and `pycommentfmt` now apply gitignore-based filtering when `respect-gitignore` is enabled, and emit one warning per git root if gitignore checks cannot be executed.
+- **CLI:**
+  - `pydocfmt` now formats both docstrings and comments in one run.
+  - `pydocfmt` now exposes command-line overrides for Ruff-style rule settings.
+  - `pydocfmt` now defaults to formatting the current directory when no files or directories are specified.
+  - `--include`, `--extend-include`, `--exclude`, and `--extend-exclude` now accept multiple glob values in one option usage (e.g. `--include *.py *.pyi`).
 
 - **Configuration:**
-  - `pydocfmt` and `pycommentfmt` now resolve shared settings from `[tool.pydocformatter]` with per-tool overrides in `[tool.pydocformatter.pydocfmt]` and `[tool.pydocformatter.pycommentfmt]`.
+  - Renamed the configuration table from `[tool.pydocformatter]` to `[tool.pydocfmt]`.
+  - Settings now resolve from one `[tool.pydocfmt]` table, followed by command-line overrides.
   - File-selection settings now use Ruff-style glob lists (`include`, `extend-include`, `exclude`, `extend-exclude`) and `force-exclude`.
-  - For each setting key, the highest-priority value wins (`command line > tool-specific config > shared config > defaults`), including `extend-include` and `extend-exclude`.
-  - Known nested tool tables are now validated for unknown or invalid settings even when running the other formatter.
-
-- **CLI:**
-  - `pydocfmt` and `pycommentfmt` now expose command-line overrides for Ruff-style rule settings.
-  - `--include`, `--extend-include`, `--exclude`, and `--extend-exclude` now accept multiple glob values in one option usage (e.g. `--include *.py *.pyi`).
-  - `pydocfmt` and `pycommentfmt` now default to formatting the current directory when no files or directories are specified.
-
-- **Architecture:**
-  - Formatter internals now require formatting controls such as line length, line endings, and indentation settings as explicit keyword-only arguments.
-  - `run_formatter()` now returns an exit code instead of directly exiting when check mode finds files that need formatting.
-  - Formatter functions now receive resolved `FormatterSettings` directly.
+  - For each setting key, the highest-priority value wins (`command line > config > defaults`), including `extend-include` and `extend-exclude`.
 
 - **File discovery:**
+  - Verbose mode now reports directories pruned by exclude patterns, such as `.venv`.
+  - `pydocfmt` now applies gitignore-based filtering when `respect-gitignore` is enabled, and emits one warning per git root if gitignore checks cannot be executed.
   - `force-exclude` now consistently applies `.gitignore` filtering to explicitly passed file paths.
 
-- **pydocfmt:**
+- **Formatting:**
+  - Formatter internals now require formatting controls such as line length, line endings, and indentation settings as explicit keyword-only arguments.
+  - Formatter functions now receive resolved `FormatterSettings` directly.
   - Generated Google-style docstring section indentation is now configurable while preserving the existing base docstring indentation.
-  - `--check` output now includes docstring line locations, emitted once per file with compressed consecutive ranges.
-
-- **pycommentfmt:**
-  - `--check` output is now emitted once per file, with line numbers compressed into consecutive ranges (e.g. `223-224`) for lower-noise, more token-efficient diagnostics.
+  - `--check` output now includes docstring and comment line locations, emitted once per subject per file with compressed consecutive ranges.
 
 ### Fixed
 
 - **Documentation:**
-  - Updated README, contributing, release, and pull request docs for the current uv-based workflow and latest file-selection behavior.
+  - Updated README, contributing, release, pull request, and file-selection docs for the single-command workflow and latest file-selection behavior.
 
 - **CLI:**
-  - `pydocfmt` and `pycommentfmt` now skip files that fail UTF-8 decoding, emit a warning to stdout, and continue processing remaining files instead of crashing.
+  - `pydocfmt` now skips files that fail UTF-8 decoding, emits a warning to stdout, and continues processing remaining files instead of crashing.
   - Invalid include glob patterns now report configuration or argument errors instead of crashing with a traceback.
   - `--help` now works even when the current `pyproject.toml` contains invalid pydocformatter configuration.
   - Missing or unreadable files now emit a warning and processing continues instead of crashing.
@@ -78,16 +71,23 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 - **Configuration:**
   - Malformed pydocformatter config tables are now consistently rejected, including falsy non-table values.
 
+- **Formatting:**
+  - `--check` now reports comment formatting diagnostics against original input line numbers.
+  - Empty standalone comment separator lines are now preserved during comment formatting.
+  - Preserved untouched line endings when formatting only selected docstring or comment spans.
+
 ### Removed
+
+- **Architecture:**
+  - Removed the separate comment-formatting command and merged comment formatting into `pydocfmt`.
+  - Removed tool-specific TOML configuration tables; nested formatter tables are now configuration errors.
+  - Removed redundant shared CLI, formatter-type, and comment-command modules.
 
 - **Developer dependencies:**
   - Removed the unused `build` and `twine` dev dependencies now that package build and publish workflows use uv directly.
 
-- **Architecture:**
-  - Removed redundant CLI/config wrapper functions from the formatter entry points and settings resolution path.
-
 - **Breaking configuration migration:**
-  - Removed legacy top-level config tables (`[tool.pydocfmt]`, `[tool.pycommentfmt]`) from settings resolution.
+  - Removed the old `[tool.pydocformatter]` config table from settings resolution.
   - Removed underscore aliases for settings such as `line_length`; only hyphenated keys are valid.
   - Removed regex include/exclude semantics in favor of glob-list file selection.
   - Removed legacy utility file-selection wrappers from `pydocformatter.utils`; use `pydocformatter.file_selection.select_files` directly.

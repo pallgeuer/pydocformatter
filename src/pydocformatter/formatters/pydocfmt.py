@@ -1,8 +1,17 @@
 import ast
+import io
+import re
+import textwrap
+import tokenize
 
 import pydocformatter.formatters.google_docstrings as google_docstrings
 import pydocformatter.utils as utils
 from pydocformatter.config import FormatterSettings, IndentStyle
+
+
+def _matches_ignoring_line_endings(left: str, right: str) -> bool:
+    """Return whether two strings differ only by line-ending style."""
+    return utils.normalize_line_endings(left, line_ending="\n") == utils.normalize_line_endings(right, line_ending="\n")
 
 
 def process_docstring_node(
@@ -66,7 +75,7 @@ def process_docstring_node(
     # Get original docstring
     original_docstring = "".join(output_lines[srow : erow + 1])
 
-    if new_docstring == original_docstring:
+    if _matches_ignoring_line_endings(new_docstring, original_docstring):
         return False
 
     for i in range(srow, erow + 1):
@@ -78,34 +87,13 @@ def process_docstring_node(
     return True
 
 
-def format_docstrings(
-    path: str,
+def format_docstrings_in_source(
+    source: str,
     settings: FormatterSettings,
-    check: bool,
-) -> bool:
-    """Format docstrings in a Python file.
-
-    This function reads a Python file, formats its docstrings to ensure they comply with the specified line length. If
-    `check` is True, it only checks if the file is formatted correctly. This function can format docstrings in Google
-    style.
-
-    Args:
-        path (str): The path to the Python file.
-        settings (FormatterSettings): Resolved settings for docstring formatting.
-        check (bool): If True, only check if the file is formatted correctly.
-
-    Returns:
-        bool: True if the file was modified, False otherwise.
-
-    Raises:
-        `OSError`: If the file cannot be read or written.
-        `SyntaxError`: If the file cannot be parsed as Python source.
-        `UnicodeDecodeError`: If the file cannot be decoded as UTF-8.
-    """
-    with open(path, encoding="utf-8", newline="") as f:
-        source = f.read()
-
-    line_ending = utils.resolve_line_ending(source, line_ending=settings.line_ending)
+    *,
+    line_ending: str,
+) -> tuple[str, tuple[int, ...]]:
+    """Format docstrings in Python source and return changed line numbers."""
     source_lines = source.splitlines(keepends=True)
     tree = ast.parse(source)
     output_lines = list(source_lines)
@@ -125,14 +113,192 @@ def format_docstrings(
         ):
             modified = True
 
+    if not modified:
+        return source, ()
+
+    return "".join(output_lines), tuple(sorted(changed_lines))
+
+
+def format_comments_in_source(
+    source: str,
+    settings: FormatterSettings,
+    *,
+    line_ending: str,
+) -> tuple[str, tuple[int, ...]]:
+    """Format comments in Python source and return changed line numbers."""
+    tokens = list(tokenize.generate_tokens(io.StringIO(source).readline))
+    lines = source.splitlines(keepends=True)
+    output_lines = list(lines)
+
+    special_comment_re = re.compile(r"#\s*(noqa|type:\s*ignore|pylint|fmt:|pragma)", re.IGNORECASE)
+    changed_lines: set[int] = set()
+
+    comment_block: list[tuple[int, str]] = []
+    last_srow = -2
+
+    def is_code_comment(text: str) -> bool:
+        """Check if the comment is a code-style comment."""
+        return text.startswith("    ") or bool(re.match(r"\s*(if|for|while|def|class|try|except|print|return)\b", text))
+
+    def flush_comment_block() -> None:
+        """Flush the current comment block to the output lines."""
+        nonlocal comment_block
+        if not comment_block:
+            return
+
+        srows = [block_row for block_row, _ in comment_block]
+        base_line = lines[srows[0]]
+        base_indent = base_line[: len(base_line) - len(base_line.lstrip())]
+
+        if any(is_code_comment(c.lstrip("#")) for _, c in comment_block):
+            comment_block.clear()
+            return
+
+        block_comment_text = " ".join(block_line.lstrip("#").strip() for _, block_line in comment_block)
+        available_width = settings.line_length - len(base_indent) - 2
+        wrapped_lines = textwrap.wrap(
+            block_comment_text,
+            width=available_width,
+            break_long_words=False,
+            break_on_hyphens=False,
+        )
+        new_lines = [f"{base_indent}# {wrapped_line}{line_ending}" for wrapped_line in wrapped_lines]
+        original_block = "".join(lines[block_row] for block_row in srows)
+        new_block = "".join(new_lines)
+
+        if _matches_ignoring_line_endings(original_block, new_block):
+            comment_block.clear()
+            return
+
+        for block_row in srows:
+            output_lines[block_row] = ""
+        output_lines[srows[0]] = new_block
+        changed_lines.update(block_row + 1 for block_row in srows)
+        comment_block.clear()
+
+    for tok_type, tok_str, (srow, scol), _, line in tokens:
+        if tok_type != tokenize.COMMENT:
+            flush_comment_block()
+            continue
+
+        if srow == 1 and tok_str.startswith("#!"):
+            continue
+        if srow <= 2 and "coding" in tok_str:
+            continue
+        if special_comment_re.match(tok_str):
+            continue
+
+        before_comment = line[:scol]
+        is_inline = bool(before_comment.strip())
+        comment_text = tok_str.lstrip("#").strip()
+
+        if is_inline:
+            flush_comment_block()
+            code = before_comment.rstrip()
+            inline_length = len(code) + 4 + len(comment_text)
+
+            if inline_length <= settings.line_length:
+                new_line = f"{code}  # {comment_text}{line_ending}"
+                if not _matches_ignoring_line_endings(new_line, lines[srow - 1]):
+                    changed_lines.add(srow)
+                    output_lines[srow - 1] = new_line
+            else:
+                indent = before_comment[: len(before_comment) - len(before_comment.lstrip())]
+                available = settings.line_length - len(indent) - 2
+                wrapped = textwrap.wrap(
+                    comment_text,
+                    width=available,
+                    break_long_words=False,
+                    break_on_hyphens=False,
+                )
+                new_comment_lines = [f"{indent}# {line}{line_ending}" for line in wrapped]
+                new_line = "".join(new_comment_lines) + f"{code}{line_ending}"
+                if not _matches_ignoring_line_endings(new_line, lines[srow - 1]):
+                    output_lines[srow - 1] = new_line
+                    changed_lines.add(srow)
+        else:
+            if not comment_text:
+                flush_comment_block()
+                continue
+            if srow == last_srow + 1:
+                comment_block.append((srow - 1, tok_str))
+            else:
+                flush_comment_block()
+                comment_block.append((srow - 1, tok_str))
+            last_srow = srow
+
+    flush_comment_block()
+
+    if not changed_lines:
+        return source, ()
+    return "".join(output_lines), tuple(sorted(changed_lines))
+
+
+def format_file(
+    path: str,
+    settings: FormatterSettings,
+    check: bool,
+) -> bool:
+    """Format docstrings and comments in a Python file.
+
+    This function reads a Python file once, formats docstrings first, then formats comments. If `check` is True, it only
+    checks if the file is formatted correctly.
+
+    Args:
+        path (str): The path to the Python file.
+        settings (FormatterSettings): Resolved settings for formatting.
+        check (bool): If True, only check if the file is formatted correctly.
+
+    Returns:
+        bool: True if the file was modified or needs formatting, False otherwise.
+
+    Raises:
+        `OSError`: If the file cannot be read or written.
+        `SyntaxError`: If the file cannot be parsed as Python source.
+        `tokenize.TokenError`: If Python tokenization fails.
+        `UnicodeDecodeError`: If the file cannot be decoded as UTF-8.
+    """
+    with open(path, encoding="utf-8", newline="") as file:
+        source = file.read()
+
+    line_ending = utils.resolve_line_ending(source, line_ending=settings.line_ending)
+    docstring_source, docstring_changed_lines = format_docstrings_in_source(source, settings, line_ending=line_ending)
+
     if check:
-        if modified:
-            print(utils.format_needs_formatting_message(path, "docstring", sorted(changed_lines)))
-        return modified
-    else:
-        if modified:
-            modified_content = utils.normalize_line_endings("".join(output_lines), line_ending=line_ending)
-            with open(path, "w", encoding="utf-8", newline="") as f:
-                f.write(modified_content)
-            return True
+        _, comment_changed_lines = format_comments_in_source(source, settings, line_ending=line_ending)
+        if docstring_changed_lines:
+            print(utils.format_needs_formatting_message(path, "docstring", list(docstring_changed_lines)))
+        if comment_changed_lines:
+            print(utils.format_needs_formatting_message(path, "comment", list(comment_changed_lines)))
+        return bool(docstring_changed_lines or comment_changed_lines)
+
+    formatted_source, comment_changed_lines = format_comments_in_source(docstring_source, settings, line_ending=line_ending)
+    if docstring_changed_lines or comment_changed_lines:
+        with open(path, "w", encoding="utf-8", newline="") as file:
+            file.write(formatted_source)
+        return True
+    return False
+
+
+def format_docstrings(
+    path: str,
+    settings: FormatterSettings,
+    check: bool,
+) -> bool:
+    """Format only docstrings in a Python file."""
+    with open(path, encoding="utf-8", newline="") as file:
+        source = file.read()
+
+    line_ending = utils.resolve_line_ending(source, line_ending=settings.line_ending)
+    formatted_source, changed_lines = format_docstrings_in_source(source, settings, line_ending=line_ending)
+
+    if check:
+        if changed_lines:
+            print(utils.format_needs_formatting_message(path, "docstring", list(changed_lines)))
+        return bool(changed_lines)
+
+    if source != formatted_source:
+        with open(path, "w", encoding="utf-8", newline="") as file:
+            file.write(formatted_source)
+        return True
     return False

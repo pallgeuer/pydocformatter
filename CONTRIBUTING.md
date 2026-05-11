@@ -75,7 +75,6 @@ uv run pre-commit run --all-files
 ```bash
 # Test the CLI tools
 uv run pydocfmt --help
-uv run pycommentfmt --help
 
 # Run tests
 uv run pytest -q
@@ -175,8 +174,7 @@ We use several tools to maintain code quality:
 ### Automated Formatting
 - **Black:** Code formatting
 - **isort:** Import sorting
-- **pydocfmt:** Docstring formatting (our own tool!)
-- **pycommentfmt:** Comment formatting (our own tool!)
+- **pydocfmt:** Docstring and comment formatting (our own tool)
 
 ### Code Quality
 - **MyPy:** Type checking
@@ -189,13 +187,11 @@ We use several tools to maintain code quality:
 uv run black .
 uv run isort .
 uv run pydocfmt
-uv run pycommentfmt
 
 # Check formatting without changes
 uv run black --check .
 uv run isort --check .
 uv run pydocfmt --check
-uv run pycommentfmt --check
 
 # Type checking
 uv run mypy

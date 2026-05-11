@@ -1,32 +1,35 @@
 import re
 
-from pydocformatter.types import ToolName
-
 ALL_RULE_CODE = "ALL"
 
+# TODO: In future, the rule codes and prefixes should be automatically collected from the available defined rules in
+#       code (e.g. collected via decorator)
 RULE_CODES = frozenset(
     {
-        "RD200",
-        "RD205",
-        "RD207",
-        "RD208",
-        "PDF000",
         "PDF001",
+        "PDF002",
+        "PDF003",
+        "PDF004",
+        "PDF005",
+        "PDF006",
+        "PDF100",
+        "PDF101",
+        "PDF102",
+        "PDF103",
+        "PDF104",
+        "PDF105",
+        "PDF106",
         "PCF001",
         "PCF002",
     }
 )
-RULE_PREFIX_TO_TOOL: dict[str, ToolName] = {
-    "RD": "pydocfmt",
-    "PDF": "pydocfmt",
-    "PCF": "pycommentfmt",
-}
+RULE_PREFIXES = frozenset({"PDF", "PCF"})
 
 _SELECTOR_RE = re.compile(r"^([A-Z]+)([0-9]*)$")
 
 
-def selector_matches_known_rule(selector: str, *, tool_name: ToolName | None) -> bool:
-    """Return whether a selector matches a known rule in the requested scope."""
+def selector_matches_known_rule(selector: str) -> bool:
+    """Return whether a selector matches a known rule."""
     if selector == ALL_RULE_CODE:
         return True
 
@@ -35,8 +38,7 @@ def selector_matches_known_rule(selector: str, *, tool_name: ToolName | None) ->
         return False
 
     prefix, digits = match.groups()
-    owner_tool = RULE_PREFIX_TO_TOOL.get(prefix)
-    if owner_tool is None or (tool_name is not None and owner_tool != tool_name):
+    if prefix not in RULE_PREFIXES:
         return False
 
     if not digits:
