@@ -64,11 +64,13 @@ Given positional CLI paths, defaulting to `.` when no paths are specified:
 5. For discovered files, require a match against `include` or `extend-include`.
 6. Reject files matching `exclude` or `extend-exclude`.
 7. If `respect-gitignore = true`, reject files matched by the gitignore filter.
-8. Return accepted files and structured decisions for file-selection output.
+8. Deduplicate accepted paths that resolve to the same physical file, recording later aliases as ignored duplicate decisions.
+9. Return accepted files and structured decisions for file-selection output.
 
 Include and exclude patterns are glob patterns, not regexes. Matching uses normalized POSIX-style paths. Bare exclude patterns can match file basenames or parent directory segments. Slash-containing patterns are matched relative to the repository root when a git repository is found, otherwise relative to the current working directory.
 Slash-containing exclude patterns that match a directory path also exclude descendant files.
 Glob lists cannot contain empty strings. Include patterns must target files, so directory-only patterns such as `src/` are rejected for `include` and `extend-include`.
+Absolute accepted paths inside the current working directory are displayed as relative paths.
 
 ## Decision Table
 

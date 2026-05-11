@@ -232,9 +232,9 @@ def print_file_selection_decisions(decisions: tuple[file_selection.FileDecision,
     """Print file-selection decisions."""
     for decision in decisions:
         if decision.accepted:
-            print(f"{decision.path} included")
+            print(f"{decision.path} INCLUDED")
         else:
-            print(f"{decision.path} ignored: {decision.message}")
+            print(f"{decision.path} IGNORED: {decision.message}")
 
 
 def format_files_exp(
@@ -244,7 +244,7 @@ def format_files_exp(
 ) -> list[FormatterResult]:
     """Format files with the experimental formatter path."""
     results: list[FormatterResult] = []
-    for path in _deduplicated_paths(paths):
+    for path in paths:
         try:
             results.append(formatter.format_file_exp(path, settings, check))
         except UnicodeDecodeError as error:
@@ -263,7 +263,7 @@ def format_files(
 ) -> list[FormatterResult]:
     """Format files with the legacy formatter path."""
     results: list[FormatterResult] = []
-    for path in _deduplicated_paths(paths):
+    for path in paths:
         try:
             modified_or_needs_formatting = pydocfmt.format_file(path, settings, check)
         except UnicodeDecodeError as error:
@@ -326,19 +326,6 @@ def _format_grouped_finding(finding: RuleFinding) -> str:
     message = finding.message
     message_end = "" if message.endswith((".", "!", "?")) else "."
     return f"{finding.rule.rule_code}{fixable} {message}{message_end} {label} {ranges}"
-
-
-def _deduplicated_paths(paths: tuple[str, ...]) -> tuple[str, ...]:
-    """Return paths with duplicate physical targets removed while preserving display paths."""
-    seen: set[str] = set()
-    result: list[str] = []
-    for path in paths:
-        key = formatter.path_identity_key(path)
-        if key in seen:
-            continue
-        seen.add(key)
-        result.append(path)
-    return tuple(result)
 
 
 def _settings_overrides_from_args(args: argparse.Namespace) -> config.SettingsOverrides:

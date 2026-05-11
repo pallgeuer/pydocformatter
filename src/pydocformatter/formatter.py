@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import dataclasses
-import os
 
 from pydocformatter.config import FormatterSettings
 
@@ -63,8 +62,3 @@ def format_file_exp(path: str, settings: FormatterSettings, check: bool) -> Form
         file.read()
 
     return FormatterResult(path=path, modified=False, findings=())
-
-
-def path_identity_key(path: str) -> str:
-    """Return a stable physical-path key used to avoid formatting duplicate inputs."""
-    return os.path.normcase(os.path.realpath(path))

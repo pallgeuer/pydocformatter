@@ -21,6 +21,7 @@ class DecisionReason(str, Enum):
         NOT_INCLUDED (DecisionReason): The path did not match configured include patterns.
         EXCLUDED (DecisionReason): The path matched configured exclude patterns.
         GITIGNORED (DecisionReason): The path was rejected because git reported it as ignored.
+        DUPLICATE (DecisionReason): The path resolves to the same file as another accepted path.
     """
 
     INCLUDED = "included"
@@ -28,6 +29,7 @@ class DecisionReason(str, Enum):
     NOT_INCLUDED = "not-included"
     EXCLUDED = "excluded"
     GITIGNORED = "gitignored"
+    DUPLICATE = "duplicate"
 
 
 _REASON_MESSAGES = {
@@ -36,6 +38,7 @@ _REASON_MESSAGES = {
     DecisionReason.NOT_INCLUDED: "does not match include patterns",
     DecisionReason.EXCLUDED: "matches exclude patterns",
     DecisionReason.GITIGNORED: "matches .gitignore",
+    DecisionReason.DUPLICATE: "duplicate path to already selected file",
 }
 
 
@@ -70,9 +73,8 @@ class SelectionResult:
     """Accepted files and all file-selection decisions.
 
     Attributes:
-        accepted_paths (tuple[str, ...]): Ordered paths that should be formatted. Paths are preserved as collected:
-            explicit paths stay as passed by the caller, and paths discovered while walking directories are joined from
-            the walked root. They are not normalized to absolute paths and are not deduplicated.
+        accepted_paths (tuple[str, ...]): Ordered, deduplicated paths that should be formatted. Paths are normalized for
+            display while staying relative when possible.
         decisions (tuple[FileDecision, ...]): Ordered decisions for every considered path or pruned directory.
     """
 
@@ -105,7 +107,7 @@ def select_files(paths: list[str], settings: FormatterSettings) -> SelectionResu
 
     Returns:
         SelectionResult: Accepted paths plus file-selection decisions for accepted and rejected paths. Accepted paths
-            preserve their collected representation and are not deduplicated.
+            are deduplicated by physical file identity.
     """
     validate_include_patterns(settings.include_patterns)
     validate_exclude_patterns(settings.exclude_patterns)
@@ -256,9 +258,100 @@ def _apply_gitignore_decision(
 
 def _selection_result(decisions: tuple[FileDecision, ...]) -> SelectionResult:
     """Build a selection result from the ordered file-decision stream."""
+    decisions = _deduplicated_decisions(decisions)
     return SelectionResult(
         accepted_paths=tuple(decision.path for decision in decisions if decision.accepted),
         decisions=decisions,
+    )
+
+
+def _deduplicated_decisions(decisions: tuple[FileDecision, ...]) -> tuple[FileDecision, ...]:
+    """Return decisions with accepted file duplicates marked as rejected."""
+    result: list[FileDecision] = []
+    accepted_by_identity: dict[str, int] = {}
+
+    for decision in decisions:
+        display_decision = _with_display_path(decision)
+        if not display_decision.accepted:
+            result.append(display_decision)
+            continue
+
+        identity_key = path_identity_key(decision.path)
+        if identity_key is None:
+            result.append(display_decision)
+            continue
+
+        accepted_index = accepted_by_identity.get(identity_key)
+        if accepted_index is None:
+            accepted_by_identity[identity_key] = len(result)
+            result.append(display_decision)
+            continue
+
+        accepted_decision = result[accepted_index]
+        # noinspection PyTypeChecker
+        if _display_path_score(display_decision.path) < _display_path_score(accepted_decision.path):
+            result[accepted_index] = _duplicate_decision(accepted_decision)
+            accepted_by_identity[identity_key] = len(result)
+            result.append(display_decision)
+        else:
+            result.append(_duplicate_decision(display_decision))
+
+    return tuple(result)
+
+
+def _with_display_path(decision: FileDecision) -> FileDecision:
+    """Return a decision with its path normalized for display."""
+    return dataclasses.replace(decision, path=_display_path(decision.path))
+
+
+def _duplicate_decision(decision: FileDecision) -> FileDecision:
+    """Return a duplicate-path rejection decision."""
+    return FileDecision(
+        path=decision.path,
+        accepted=False,
+        reason=DecisionReason.DUPLICATE,
+        explicit=decision.explicit,
+    )
+
+
+def path_identity_key(path: str) -> str | None:
+    """Return a physical-path key for deduplicating existing files."""
+    if not os.path.exists(path):
+        return None
+    return os.path.normcase(os.path.realpath(path))
+
+
+def _display_path(path: str) -> str:
+    """Return the preferred path spelling for user-facing output."""
+    normalized_path = os.path.normpath(path)
+    if not os.path.isabs(normalized_path):
+        return normalized_path
+
+    absolute_path = os.path.abspath(normalized_path)
+    current_directory = os.getcwd()
+    if _is_relative_to(absolute_path, current_directory):
+        return os.path.relpath(absolute_path, current_directory)
+    return normalized_path
+
+
+def _is_relative_to(path: str, base_path: str) -> bool:
+    """Return whether a path is inside a base path."""
+    try:
+        return os.path.commonpath((path, base_path)) == base_path
+    except ValueError:
+        return False
+
+
+def _display_path_score(path: str) -> tuple[int, int, int, int, str]:
+    """Return a sortable score where lower means a clearer display path."""
+    normalized_path = os.path.normpath(path)
+    segments = tuple(segment for segment in normalized_path.split(os.sep) if segment)
+    return (
+        int(os.path.isabs(normalized_path)),
+        segments.count(".."),
+        len(segments),
+        len(normalized_path),
+        normalized_path,
     )
 
 

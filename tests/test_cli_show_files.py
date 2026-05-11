@@ -85,9 +85,9 @@ class TestCliShowFiles(unittest.TestCase):
                 pydocfmt_main.main()
 
             expected_lines = [
-                f"{root / 'a.py'} included",
-                f"{root / 'b.txt'} ignored: does not match include patterns",
-                f"{root / 'skip.py'} ignored: matches exclude patterns",
+                f"{root / 'a.py'} INCLUDED",
+                f"{root / 'b.txt'} IGNORED: does not match include patterns",
+                f"{root / 'skip.py'} IGNORED: matches exclude patterns",
             ]
             self.assertEqual(stdout.getvalue().splitlines(), expected_lines)
             self.assertEqual(called_paths, [])
@@ -148,8 +148,8 @@ class TestCliShowFiles(unittest.TestCase):
                 pydocfmt_main.main()
 
             expected_lines = [
-                f"{root / '.venv'} ignored: matches exclude patterns",
-                f"{root / 'a.py'} included",
+                f"{root / '.venv'} IGNORED: matches exclude patterns",
+                f"{root / 'a.py'} INCLUDED",
             ]
             self.assertEqual(stdout.getvalue().splitlines(), expected_lines)
             self.assertEqual(called_paths, [])
@@ -187,9 +187,9 @@ class TestCliShowFiles(unittest.TestCase):
                 pydocfmt_main.main()
 
             expected_lines = [
-                f"{root / 'a.py'} included",
-                f"{root / 'b.txt'} ignored: matches exclude patterns",
-                f"{root / 'skip.py'} ignored: matches exclude patterns",
+                f"{root / 'a.py'} INCLUDED",
+                f"{root / 'b.txt'} IGNORED: matches exclude patterns",
+                f"{root / 'skip.py'} IGNORED: matches exclude patterns",
             ]
             self.assertEqual(stdout.getvalue().splitlines(), expected_lines)
             self.assertEqual(called_paths, [])
@@ -229,9 +229,9 @@ class TestCliShowFiles(unittest.TestCase):
                 pydocfmt_main.main()
 
             expected_lines = [
-                f"{root / 'a.py'} included",
-                f"{root / 'b.txt'} included",
-                f"{root / 'skip.py'} ignored: matches exclude patterns",
+                f"{root / 'a.py'} INCLUDED",
+                f"{root / 'b.txt'} INCLUDED",
+                f"{root / 'skip.py'} IGNORED: matches exclude patterns",
             ]
             self.assertEqual(stdout.getvalue().splitlines(), expected_lines)
             self.assertEqual(called_paths, [])
@@ -263,8 +263,8 @@ class TestCliShowFiles(unittest.TestCase):
                 pydocfmt_main.main()
 
             expected_lines = [
-                f"{root / 'a.py'} included",
-                f"{root / 'skip.py'} ignored: matches .gitignore",
+                f"{root / 'a.py'} INCLUDED",
+                f"{root / 'skip.py'} IGNORED: matches .gitignore",
             ]
             self.assertEqual(stdout.getvalue().splitlines(), expected_lines)
             self.assertEqual(called_paths, [])
@@ -294,8 +294,8 @@ class TestCliShowFiles(unittest.TestCase):
 
             self.assertFalse(run_mock.called)
             expected_lines = [
-                f"{root / 'a.py'} included",
-                f"{root / 'skip.py'} included",
+                f"{root / 'a.py'} INCLUDED",
+                f"{root / 'skip.py'} INCLUDED",
             ]
             self.assertEqual(stdout.getvalue().splitlines(), expected_lines)
             self.assertEqual(called_paths, [])
@@ -318,7 +318,7 @@ class TestCliShowFiles(unittest.TestCase):
 
             self.assertEqual(exit_code, 0)
             format_file.assert_not_called()
-            self.assertIn(f"{root / 'a.py'} included", stdout.getvalue().splitlines())
+            self.assertIn(f"{root / 'a.py'} INCLUDED", stdout.getvalue().splitlines())
 
     def test_pydocfmt_show_files_with_experimental_does_not_format(self) -> None:
         with self._make_sample_tree() as td:
@@ -338,7 +338,38 @@ class TestCliShowFiles(unittest.TestCase):
 
             self.assertEqual(exit_code, 0)
             format_file_exp.assert_not_called()
-            self.assertIn(f"{root / 'a.py'} included", stdout.getvalue().splitlines())
+            self.assertIn(f"{root / 'a.py'} INCLUDED", stdout.getvalue().splitlines())
+
+    def test_pydocfmt_show_files_reports_duplicate_paths_without_formatting(self) -> None:
+        with self._make_sample_tree() as td:
+            root = Path(td)
+            stdout = StringIO()
+            format_file = unittest.mock.Mock(return_value=False)
+            argv = ["pydocfmt", "--show-files", "a.py", str(root / "a.py")]
+            previous_cwd = os.getcwd()
+            os.chdir(root)
+            try:
+                with (
+                    unittest.mock.patch("sys.argv", argv),
+                    unittest.mock.patch(
+                        "pydocformatter.cli.pydocfmt_main.pydocfmt.format_file",
+                        format_file,
+                    ),
+                    contextlib.redirect_stdout(stdout),
+                ):
+                    exit_code = pydocfmt_main.main()
+            finally:
+                os.chdir(previous_cwd)
+
+            self.assertEqual(exit_code, 0)
+            format_file.assert_not_called()
+            self.assertEqual(
+                stdout.getvalue().splitlines(),
+                [
+                    "a.py INCLUDED",
+                    "a.py IGNORED: duplicate path to already selected file",
+                ],
+            )
 
     def test_pydocfmt_removed_file_listing_option_is_rejected(self) -> None:
         stderr = StringIO()
@@ -399,7 +430,7 @@ class TestCliShowFiles(unittest.TestCase):
 
             self.assertFalse(run_mock.called)
             self.assertFalse(legacy_called)
-            self.assertEqual(called_args, [(str(root / "a.py"), 72, False, True, "grouped")])
+            self.assertEqual(called_args, [("a.py", 72, False, True, "grouped")])
 
     def test_pydocfmt_indent_cli_settings_are_applied(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -555,7 +586,7 @@ class TestCliShowFiles(unittest.TestCase):
 
             self.assertEqual(
                 stdout.getvalue().splitlines(),
-                [f"{target} ignored: matches exclude patterns"],
+                [f"{target} IGNORED: matches exclude patterns"],
             )
             self.assertEqual(called_paths, [])
 
@@ -588,7 +619,7 @@ class TestCliShowFiles(unittest.TestCase):
 
             self.assertEqual(
                 stdout.getvalue().splitlines(),
-                [f"{target} ignored: matches .gitignore"],
+                [f"{target} IGNORED: matches .gitignore"],
             )
             self.assertEqual(called_paths, [])
 
@@ -629,7 +660,7 @@ class TestCliShowFiles(unittest.TestCase):
             finally:
                 os.chdir(previous_cwd)
 
-            self.assertEqual(called_paths, [str(target)])
+            self.assertEqual(called_paths, ["skip.py"])
 
     def _assert_help_ignores_invalid_config(
         self,

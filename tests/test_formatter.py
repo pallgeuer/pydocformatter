@@ -108,7 +108,7 @@ class TestFormatterResults(unittest.TestCase):
             self.assertEqual(result.findings, ())
             self.assertEqual(target.read_text(encoding="utf-8"), "x = 1\n")
 
-    def test_format_files_exp_deduplicates_by_physical_path_and_preserves_first_display_path(self) -> None:
+    def test_format_files_exp_formats_each_received_path_without_deduplicating(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             target = root / "a.py"
@@ -131,8 +131,8 @@ class TestFormatterResults(unittest.TestCase):
             finally:
                 os.chdir(previous_cwd)
 
-        self.assertEqual(called_paths, ["a.py"])
-        self.assertEqual([result.path for result in results], ["a.py"])
+        self.assertEqual(called_paths, ["a.py", str(target)])
+        self.assertEqual([result.path for result in results], ["a.py", str(target)])
 
     def test_check_exit_status_depends_on_remaining_findings_not_modified_results(self) -> None:
         with tempfile.TemporaryDirectory() as td:

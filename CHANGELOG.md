@@ -47,6 +47,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - `--show-files` now reports directories pruned by exclude patterns, such as `.venv`.
   - `pydocfmt` now applies gitignore-based filtering when `respect-gitignore` is enabled, and emits one warning per git root if gitignore checks cannot be executed.
   - `force-exclude` now consistently applies `.gitignore` filtering to explicitly passed file paths.
+  - File selection now deduplicates paths that resolve to the same physical file and prefers relative display paths when possible.
 
 - **Formatting:**
   - Added experimental `Rule`, `RuleFinding`, and `FormatterResult` data structures for reporting remaining rule issues after fixes.

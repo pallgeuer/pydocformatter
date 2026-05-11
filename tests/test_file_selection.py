@@ -77,7 +77,7 @@ class TestFileSelection(unittest.TestCase):
         self.assertEqual(selection.accepted_paths, ("a.py",))
         self.assertEqual(selection.decisions[0].path, "a.py")
 
-    def test_selection_does_not_deduplicate_equivalent_paths(self) -> None:
+    def test_selection_deduplicates_equivalent_paths(self) -> None:
         settings = FormatterSettings(respect_gitignore=False)
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
@@ -90,7 +90,76 @@ class TestFileSelection(unittest.TestCase):
             finally:
                 os.chdir(previous_cwd)
 
-        self.assertEqual(selection.accepted_paths, ("a.py", str(target)))
+        self.assertEqual(selection.accepted_paths, ("a.py",))
+        self.assertEqual(selection.decisions[0].reason, DecisionReason.EXPLICIT_INCLUDED)
+        self.assertEqual(selection.decisions[1].reason, DecisionReason.DUPLICATE)
+        self.assertFalse(selection.decisions[1].accepted)
+
+    def test_selection_canonicalizes_lexical_path_aliases(self) -> None:
+        settings = FormatterSettings(respect_gitignore=False)
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "pkg").mkdir()
+            (root / "a.py").write_text("", encoding="utf-8")
+            previous_cwd = os.getcwd()
+            os.chdir(root)
+            try:
+                selection = file_selection.select_files(["./a.py", "pkg/../a.py"], settings)
+            finally:
+                os.chdir(previous_cwd)
+
+        self.assertEqual(selection.accepted_paths, ("a.py",))
+        self.assertEqual([decision.path for decision in selection.decisions], ["a.py", "a.py"])
+        self.assertEqual(selection.decisions[1].reason, DecisionReason.DUPLICATE)
+
+    def test_selection_converts_absolute_paths_inside_current_directory_to_relative_paths(self) -> None:
+        settings = FormatterSettings(respect_gitignore=False)
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            target = root / "a.py"
+            target.write_text("", encoding="utf-8")
+            previous_cwd = os.getcwd()
+            os.chdir(root)
+            try:
+                selection = file_selection.select_files([str(target)], settings)
+            finally:
+                os.chdir(previous_cwd)
+
+        self.assertEqual(selection.accepted_paths, ("a.py",))
+        self.assertEqual(selection.decisions[0].path, "a.py")
+
+    def test_selection_preserves_absolute_paths_outside_current_directory(self) -> None:
+        settings = FormatterSettings(respect_gitignore=False)
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            target = root / "a.py"
+            target.write_text("", encoding="utf-8")
+
+            selection = file_selection.select_files([str(target)], settings)
+
+        self.assertEqual(selection.accepted_paths, (str(target),))
+        self.assertEqual(selection.decisions[0].path, str(target))
+
+    def test_selection_deduplicates_symlink_aliases_by_physical_target(self) -> None:
+        settings = FormatterSettings(respect_gitignore=False)
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            target = root / "a.py"
+            alias = root / "alias.py"
+            target.write_text("", encoding="utf-8")
+            try:
+                alias.symlink_to(target)
+            except OSError as error:
+                self.skipTest(f"symlinks are not available: {error}")
+            previous_cwd = os.getcwd()
+            os.chdir(root)
+            try:
+                selection = file_selection.select_files(["a.py", "alias.py"], settings)
+            finally:
+                os.chdir(previous_cwd)
+
+        self.assertEqual(selection.accepted_paths, ("a.py",))
+        self.assertEqual(selection.decisions[1].reason, DecisionReason.DUPLICATE)
 
     def test_ruff_spec_explicit_file_bypasses_filters_without_force(
         self,
