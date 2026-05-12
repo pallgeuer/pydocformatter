@@ -65,6 +65,9 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Utility helpers now live in explicit `pydocformatter.utils` submodules for diagnostics, glob matching, and line endings.
   - Experimental formatter interfaces now live in `pydocformatter.formatter`.
 
+- **Developer dependencies:**
+  - Updated mypy from 1.20.2 to 2.1.0.
+
 ### Fixed
 
 - **Documentation:**
