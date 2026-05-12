@@ -369,7 +369,6 @@ class TestFileSelection(unittest.TestCase):
                 "-z",
             ]
 
-            # noinspection PyUnusedLocal
             def fake_run(
                 *args: object,
                 **kwargs: object,

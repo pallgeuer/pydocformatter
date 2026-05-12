@@ -94,16 +94,16 @@ Absolute accepted paths inside the current working directory are displayed as re
 
 ## CLI List Options
 
-The CLI accepts multiple glob values per option occurrence:
+The CLI accepts comma-separated glob values per option occurrence:
 
 ```bash
-pydocfmt src/ --include "*.py" "*.pyi" --exclude "generated" "skip.py"
+pydocfmt check --fix src/ --include "*.py,*.pyi" --exclude "generated,skip.py"
 ```
 
-When list options appear before positional paths, use `--` to end option parsing:
+Repeated option occurrences append values:
 
 ```bash
-pydocfmt --include "*.py" "*.pyi" -- src/
+pydocfmt check --fix --include "*.py" --include "*.pyi" src/
 ```
 
 ## Validation Guidance

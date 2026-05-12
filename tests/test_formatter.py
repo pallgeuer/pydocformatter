@@ -6,6 +6,7 @@ import unittest.mock
 from io import StringIO
 from pathlib import Path
 
+import pydocformatter.cli.check as check_command
 import pydocformatter.cli.pydocfmt_main as pydocfmt_main
 import pydocformatter.formatter as formatter
 from pydocformatter.config import FormatterSettings
@@ -78,7 +79,7 @@ class TestFormatterResults(unittest.TestCase):
 
         output = StringIO()
         with contextlib.redirect_stdout(output):
-            pydocfmt_main.print_results_grouped([result])
+            check_command.print_results_grouped([result])
 
         self.assertEqual(
             output.getvalue().splitlines(),
@@ -99,7 +100,7 @@ class TestFormatterResults(unittest.TestCase):
             previous_cwd = os.getcwd()
             os.chdir(root)
             try:
-                result = formatter.format_file_exp("a.py", FormatterSettings(experimental=True), check=False)
+                result = formatter.format_file_exp("a.py", FormatterSettings(experimental=True), fix=True)
             finally:
                 os.chdir(previous_cwd)
 
@@ -115,7 +116,7 @@ class TestFormatterResults(unittest.TestCase):
             target.write_text("x = 1\n", encoding="utf-8")
             called_paths: list[str] = []
 
-            def fake_format_file_exp(path: str, settings: FormatterSettings, check: bool) -> FormatterResult:
+            def fake_format_file_exp(path: str, settings: FormatterSettings, fix: bool) -> FormatterResult:
                 called_paths.append(path)
                 return FormatterResult(path=path, modified=False, findings=())
 
@@ -123,10 +124,10 @@ class TestFormatterResults(unittest.TestCase):
             os.chdir(root)
             try:
                 with unittest.mock.patch("pydocformatter.formatter.format_file_exp", side_effect=fake_format_file_exp):
-                    results = pydocfmt_main.format_files_exp(
+                    results = check_command.format_files_exp(
                         ("a.py", str(target)),
                         FormatterSettings(experimental=True),
-                        check=False,
+                        fix=True,
                     )
             finally:
                 os.chdir(previous_cwd)
@@ -140,10 +141,10 @@ class TestFormatterResults(unittest.TestCase):
             target = root / "a.py"
             target.write_text("x = 1\n", encoding="utf-8")
 
-            def fake_format_file_exp(path: str, settings: FormatterSettings, check: bool) -> FormatterResult:
+            def fake_format_file_exp(path: str, settings: FormatterSettings, fix: bool) -> FormatterResult:
                 return FormatterResult(path=path, modified=True, findings=())
 
-            argv = ["pydocfmt", "--experimental", "--check", str(target)]
+            argv = ["pydocfmt", "check", "--experimental", str(target)]
             with (
                 unittest.mock.patch("sys.argv", argv),
                 unittest.mock.patch("pydocformatter.formatter.format_file_exp", side_effect=fake_format_file_exp),
@@ -158,11 +159,11 @@ class TestFormatterResults(unittest.TestCase):
             target = root / "a.py"
             target.write_text("x = 1\n", encoding="utf-8")
 
-            with unittest.mock.patch("pydocformatter.cli.pydocfmt_main.pydocfmt.format_file", return_value=True):
-                results = pydocfmt_main.format_files(
+            with unittest.mock.patch("pydocformatter.cli.check.pydocfmt.format_file", return_value=True):
+                results = check_command.format_files(
                     (str(target),),
                     FormatterSettings(),
-                    check=True,
+                    fix=False,
                 )
 
         self.assertEqual(len(results), 1)
@@ -177,11 +178,11 @@ class TestFormatterResults(unittest.TestCase):
             target = root / "a.py"
             target.write_text("x = 1\n", encoding="utf-8")
 
-            with unittest.mock.patch("pydocformatter.cli.pydocfmt_main.pydocfmt.format_file", return_value=True):
-                results = pydocfmt_main.format_files(
+            with unittest.mock.patch("pydocformatter.cli.check.pydocfmt.format_file", return_value=True):
+                results = check_command.format_files(
                     (str(target),),
                     FormatterSettings(),
-                    check=False,
+                    fix=True,
                 )
 
         self.assertEqual(len(results), 1)

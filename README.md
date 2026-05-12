@@ -45,16 +45,16 @@ pip install pydocformatter
 
 ## Quick Start
 
-Format all Python files in your project:
-
-```bash
-pydocfmt
-```
-
 Check formatting without making changes:
 
 ```bash
-pydocfmt --check
+pydocfmt check
+```
+
+Format all Python files in your project:
+
+```bash
+pydocfmt check --fix
 ```
 
 ---
@@ -64,23 +64,30 @@ pydocfmt --check
 Format Python docstrings and comments:
 
 ```bash
-pydocfmt [OPTIONS] [FILES/DIRECTORIES]
+pydocfmt check --fix [OPTIONS] [FILES/DIRECTORIES]
 ```
 
-If no files or directories are specified, `pydocfmt` formats the current directory.
+Check Python docstrings and comments without changing files:
+
+```bash
+pydocfmt check [OPTIONS] [FILES/DIRECTORIES]
+```
+
+If no files or directories are specified, `pydocfmt check` checks the current directory.
 
 **Options:**
 - `--help`: Show help message and exit
-- `--check`: Check if files are formatted correctly without modifying them
+- `--fix`, `--no-fix`: Toggle applying fixes instead of only checking
 - `--show-files`: Show file-selection decisions without formatting files
+- `--show-settings`: Show resolved settings without formatting files
 - `--line-length INTEGER`: Maximum line length for docstrings and comments (default: 88)
 - `--line-ending {auto,lf,cr-lf,native}`: Line ending to use when rewriting files (default: auto)
 - `--indent-style {space,tab}`: Indentation style for generated docstring sections (default: space)
 - `--indent-width INTEGER`: Indentation width for generated docstring sections (default: 4)
-- `--include GLOB [GLOB ...]`: Glob pattern(s) for files to include
-- `--extend-include GLOB [GLOB ...]`: Additional glob pattern(s) for files to include
-- `--exclude GLOB [GLOB ...]`: Glob pattern(s) for files to exclude
-- `--extend-exclude GLOB [GLOB ...]`: Additional glob pattern(s) for files to exclude
+- `--include GLOB`: Comma-separated glob pattern(s) for files to include
+- `--extend-include GLOB`: Comma-separated additional glob pattern(s) for files to include
+- `--exclude GLOB`: Comma-separated glob pattern(s) for files to exclude
+- `--extend-exclude GLOB`: Comma-separated additional glob pattern(s) for files to exclude
 - `--respect-gitignore`, `--no-respect-gitignore`: Toggle .gitignore-aware discovery (default: enabled)
 - `--force-exclude`, `--no-force-exclude`: Apply include/exclude rules even to explicitly listed files
 - `--experimental`, `--no-experimental`: Toggle the experimental rule-based formatter implementation (default: disabled)
@@ -90,40 +97,40 @@ If no files or directories are specified, `pydocfmt` formats the current directo
 
 ```bash
 # Format current directory
-pydocfmt
+pydocfmt check --fix
 
 # Format specific files
-pydocfmt myfile.py another_file.py
+pydocfmt check --fix myfile.py another_file.py
 
 # Format an entire directory
-pydocfmt src/
+pydocfmt check --fix src/
 
 # Check formatting without changes
-pydocfmt --check src/
+pydocfmt check src/
 
 # Custom line length
-pydocfmt --line-length 100 src/
+pydocfmt check --fix --line-length 100 src/
 
 # Custom rewritten line ending
-pydocfmt --line-ending lf src/
+pydocfmt check --fix --line-ending lf src/
 
 # Custom generated docstring indentation
-pydocfmt --indent-style tab --indent-width 4 src/
+pydocfmt check --fix --indent-style tab --indent-width 4 src/
 
 # Include/exclude patterns
-pydocfmt src/ --include "*.py" --exclude "test_*.py"
+pydocfmt check --fix src/ --include "*.py" --exclude "test_*.py"
 
-# Multiple include globs in one option
-pydocfmt src/ --include "*.py" "*.pyi"
+# Multiple include globs in one option value
+pydocfmt check --fix src/ --include "*.py,*.pyi"
 
-# Option values before positional paths
-pydocfmt --include "*.py" "*.pyi" -- src/
+# Show resolved settings
+pydocfmt check --show-settings
 
 # Show included and ignored files
-pydocfmt --show-files src/
+pydocfmt check --show-files src/
 
 # Apply include, exclude, and gitignore rules to explicit files too
-pydocfmt --force-exclude generated.py src/
+pydocfmt check --fix --force-exclude generated.py src/
 ```
 
 ---

@@ -31,7 +31,7 @@ repos:
         pass_filenames: false
       - id: pydocfmt
         name: pydocfmt (formatter)
-        entry: uv run pydocfmt
+        entry: uv run pydocfmt check --fix
         language: system
         types: [python]
 

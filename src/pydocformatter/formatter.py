@@ -56,7 +56,7 @@ class FormatterResult:
     findings: tuple[RuleFinding, ...]
 
 
-def format_file_exp(path: str, settings: FormatterSettings, check: bool) -> FormatterResult:
+def format_file_exp(path: str, settings: FormatterSettings, fix: bool) -> FormatterResult:
     """Run the experimental formatter interface for one file."""
     with open(path, encoding="utf-8", newline="") as file:
         file.read()

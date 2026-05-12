@@ -60,13 +60,13 @@ class TestCliShowFiles(unittest.TestCase):
             stdout = StringIO()
             called_paths: list[str] = []
 
-            # noinspection PyUnusedLocal
-            def fake_format(path: str, settings: FormatterSettings, check: bool, **kwargs: object) -> bool:
+            def fake_format(path: str, settings: FormatterSettings, fix: bool, **kwargs: object) -> bool:
                 called_paths.append(path)
                 return False
 
             argv = [
                 "pydocfmt",
+                "check",
                 str(root),
                 "--show-files",
                 "--include",
@@ -77,7 +77,7 @@ class TestCliShowFiles(unittest.TestCase):
             with (
                 unittest.mock.patch("sys.argv", argv),
                 unittest.mock.patch(
-                    "pydocformatter.cli.pydocfmt_main.pydocfmt.format_file",
+                    "pydocformatter.cli.check.pydocfmt.format_file",
                     side_effect=fake_format,
                 ),
                 contextlib.redirect_stdout(stdout),
@@ -97,19 +97,18 @@ class TestCliShowFiles(unittest.TestCase):
             root = Path(td)
             called_paths: list[str] = []
 
-            # noinspection PyUnusedLocal
-            def fake_format(path: str, settings: FormatterSettings, check: bool, **kwargs: object) -> bool:
+            def fake_format(path: str, settings: FormatterSettings, fix: bool, **kwargs: object) -> bool:
                 called_paths.append(os.path.abspath(path))
                 return False
 
             previous_cwd = os.getcwd()
             os.chdir(root)
             try:
-                argv = ["pydocfmt", "--no-respect-gitignore"]
+                argv = ["pydocfmt", "check", "--fix", "--no-respect-gitignore"]
                 with (
                     unittest.mock.patch("sys.argv", argv),
                     unittest.mock.patch(
-                        "pydocformatter.cli.pydocfmt_main.pydocfmt.format_file",
+                        "pydocformatter.cli.check.pydocfmt.format_file",
                         side_effect=fake_format,
                     ),
                 ):
@@ -131,16 +130,15 @@ class TestCliShowFiles(unittest.TestCase):
             stdout = StringIO()
             called_paths: list[str] = []
 
-            # noinspection PyUnusedLocal
-            def fake_format(path: str, settings: FormatterSettings, check: bool, **kwargs: object) -> bool:
+            def fake_format(path: str, settings: FormatterSettings, fix: bool, **kwargs: object) -> bool:
                 called_paths.append(path)
                 return False
 
-            argv = ["pydocfmt", str(root), "--show-files"]
+            argv = ["pydocfmt", "check", str(root), "--show-files"]
             with (
                 unittest.mock.patch("sys.argv", argv),
                 unittest.mock.patch(
-                    "pydocformatter.cli.pydocfmt_main.pydocfmt.format_file",
+                    "pydocformatter.cli.check.pydocfmt.format_file",
                     side_effect=fake_format,
                 ),
                 contextlib.redirect_stdout(stdout),
@@ -154,32 +152,30 @@ class TestCliShowFiles(unittest.TestCase):
             self.assertEqual(stdout.getvalue().splitlines(), expected_lines)
             self.assertEqual(called_paths, [])
 
-    def test_pydocfmt_multiple_globs_per_include_and_exclude_option(self) -> None:
+    def test_pydocfmt_comma_separated_globs_per_include_and_exclude_option(self) -> None:
         with self._make_sample_tree() as td:
             root = Path(td)
             stdout = StringIO()
             called_paths: list[str] = []
 
-            # noinspection PyUnusedLocal
-            def fake_format(path: str, settings: FormatterSettings, check: bool, **kwargs: object) -> bool:
+            def fake_format(path: str, settings: FormatterSettings, fix: bool, **kwargs: object) -> bool:
                 called_paths.append(path)
                 return False
 
             argv = [
                 "pydocfmt",
+                "check",
                 str(root),
                 "--show-files",
                 "--include",
-                "*.py",
-                "*.txt",
+                "*.py,*.txt",
                 "--exclude",
-                "skip.py",
-                "b.txt",
+                "skip.py,b.txt",
             ]
             with (
                 unittest.mock.patch("sys.argv", argv),
                 unittest.mock.patch(
-                    "pydocformatter.cli.pydocfmt_main.pydocfmt.format_file",
+                    "pydocformatter.cli.check.pydocfmt.format_file",
                     side_effect=fake_format,
                 ),
                 contextlib.redirect_stdout(stdout),
@@ -202,17 +198,16 @@ class TestCliShowFiles(unittest.TestCase):
             stdout = StringIO()
             called_paths: list[str] = []
 
-            # noinspection PyUnusedLocal
-            def fake_format(path: str, settings: FormatterSettings, check: bool, **kwargs: object) -> bool:
+            def fake_format(path: str, settings: FormatterSettings, fix: bool, **kwargs: object) -> bool:
                 called_paths.append(path)
                 return False
 
             argv = [
                 "pydocfmt",
+                "check",
                 "--show-files",
                 "--include",
-                "*.py",
-                "*.txt",
+                "*.py,*.txt",
                 "--exclude",
                 "skip.py",
                 "--",
@@ -221,7 +216,7 @@ class TestCliShowFiles(unittest.TestCase):
             with (
                 unittest.mock.patch("sys.argv", argv),
                 unittest.mock.patch(
-                    "pydocformatter.cli.pydocfmt_main.pydocfmt.format_file",
+                    "pydocformatter.cli.check.pydocfmt.format_file",
                     side_effect=fake_format,
                 ),
                 contextlib.redirect_stdout(stdout),
@@ -242,12 +237,11 @@ class TestCliShowFiles(unittest.TestCase):
             stdout = StringIO()
             called_paths: list[str] = []
 
-            # noinspection PyUnusedLocal
-            def fake_format(path: str, settings: FormatterSettings, check: bool, **kwargs: object) -> bool:
+            def fake_format(path: str, settings: FormatterSettings, fix: bool, **kwargs: object) -> bool:
                 called_paths.append(path)
                 return False
 
-            argv = ["pydocfmt", "--show-files", str(root)]
+            argv = ["pydocfmt", "check", "--show-files", str(root)]
             with (
                 unittest.mock.patch("sys.argv", argv),
                 unittest.mock.patch(
@@ -255,7 +249,7 @@ class TestCliShowFiles(unittest.TestCase):
                     side_effect=self._fake_git_check_ignore_for_root(root, {"skip.py"}),
                 ),
                 unittest.mock.patch(
-                    "pydocformatter.cli.pydocfmt_main.pydocfmt.format_file",
+                    "pydocformatter.cli.check.pydocfmt.format_file",
                     side_effect=fake_format,
                 ),
                 contextlib.redirect_stdout(stdout),
@@ -275,17 +269,16 @@ class TestCliShowFiles(unittest.TestCase):
             stdout = StringIO()
             called_paths: list[str] = []
 
-            # noinspection PyUnusedLocal
-            def fake_format(path: str, settings: FormatterSettings, check: bool, **kwargs: object) -> bool:
+            def fake_format(path: str, settings: FormatterSettings, fix: bool, **kwargs: object) -> bool:
                 called_paths.append(path)
                 return False
 
-            argv = ["pydocfmt", "--show-files", "--no-respect-gitignore", str(root)]
+            argv = ["pydocfmt", "check", "--show-files", "--no-respect-gitignore", str(root)]
             with (
                 unittest.mock.patch("sys.argv", argv),
                 unittest.mock.patch("pydocformatter.file_selection.subprocess.run") as run_mock,
                 unittest.mock.patch(
-                    "pydocformatter.cli.pydocfmt_main.pydocfmt.format_file",
+                    "pydocformatter.cli.check.pydocfmt.format_file",
                     side_effect=fake_format,
                 ),
                 contextlib.redirect_stdout(stdout),
@@ -305,11 +298,11 @@ class TestCliShowFiles(unittest.TestCase):
             root = Path(td)
             stdout = StringIO()
             format_file = unittest.mock.Mock(return_value=True)
-            argv = ["pydocfmt", "--show-files", "--check", str(root)]
+            argv = ["pydocfmt", "check", "--show-files", str(root)]
             with (
                 unittest.mock.patch("sys.argv", argv),
                 unittest.mock.patch(
-                    "pydocformatter.cli.pydocfmt_main.pydocfmt.format_file",
+                    "pydocformatter.cli.check.pydocfmt.format_file",
                     format_file,
                 ),
                 contextlib.redirect_stdout(stdout),
@@ -325,7 +318,7 @@ class TestCliShowFiles(unittest.TestCase):
             root = Path(td)
             stdout = StringIO()
             format_file_exp = unittest.mock.Mock(return_value=FormatterResult(path=str(root / "a.py"), modified=False, findings=()))
-            argv = ["pydocfmt", "--show-files", "--experimental", str(root)]
+            argv = ["pydocfmt", "check", "--show-files", "--experimental", str(root)]
             with (
                 unittest.mock.patch("sys.argv", argv),
                 unittest.mock.patch(
@@ -345,14 +338,14 @@ class TestCliShowFiles(unittest.TestCase):
             root = Path(td)
             stdout = StringIO()
             format_file = unittest.mock.Mock(return_value=False)
-            argv = ["pydocfmt", "--show-files", "a.py", str(root / "a.py")]
+            argv = ["pydocfmt", "check", "--show-files", "a.py", str(root / "a.py")]
             previous_cwd = os.getcwd()
             os.chdir(root)
             try:
                 with (
                     unittest.mock.patch("sys.argv", argv),
                     unittest.mock.patch(
-                        "pydocformatter.cli.pydocfmt_main.pydocfmt.format_file",
+                        "pydocformatter.cli.check.pydocfmt.format_file",
                         format_file,
                     ),
                     contextlib.redirect_stdout(stdout),
@@ -374,7 +367,7 @@ class TestCliShowFiles(unittest.TestCase):
     def test_pydocfmt_removed_file_listing_option_is_rejected(self) -> None:
         stderr = StringIO()
         old_option = "--" + "ver" + "bose"
-        argv = ["pydocfmt", old_option]
+        argv = ["pydocfmt", "check", old_option]
         with (
             unittest.mock.patch("sys.argv", argv),
             contextlib.redirect_stderr(stderr),
@@ -397,18 +390,16 @@ class TestCliShowFiles(unittest.TestCase):
             legacy_called = False
             called_args: list[tuple[str, int, bool, bool, str]] = []
 
-            # noinspection PyUnusedLocal
-            def fake_format(path: str, settings: FormatterSettings, check: bool) -> bool:
+            def fake_format(path: str, settings: FormatterSettings, fix: bool) -> bool:
                 nonlocal legacy_called
                 legacy_called = True
                 return False
 
-            # noinspection PyUnusedLocal
-            def fake_exp_format(path: str, settings: FormatterSettings, check: bool) -> FormatterResult:
-                called_args.append((path, settings.line_length, check, settings.experimental, settings.output_format))
+            def fake_exp_format(path: str, settings: FormatterSettings, fix: bool) -> FormatterResult:
+                called_args.append((path, settings.line_length, fix, settings.experimental, settings.output_format))
                 return FormatterResult(path=path, modified=False, findings=())
 
-            argv = ["pydocfmt", str(root)]
+            argv = ["pydocfmt", "check", "--fix", str(root)]
             previous_cwd = os.getcwd()
             os.chdir(root)
             try:
@@ -416,7 +407,7 @@ class TestCliShowFiles(unittest.TestCase):
                     unittest.mock.patch("sys.argv", argv),
                     unittest.mock.patch("pydocformatter.file_selection.subprocess.run") as run_mock,
                     unittest.mock.patch(
-                        "pydocformatter.cli.pydocfmt_main.pydocfmt.format_file",
+                        "pydocformatter.cli.check.pydocfmt.format_file",
                         side_effect=fake_format,
                     ),
                     unittest.mock.patch(
@@ -430,7 +421,7 @@ class TestCliShowFiles(unittest.TestCase):
 
             self.assertFalse(run_mock.called)
             self.assertFalse(legacy_called)
-            self.assertEqual(called_args, [("a.py", 72, False, True, "grouped")])
+            self.assertEqual(called_args, [("a.py", 72, True, True, "grouped")])
 
     def test_pydocfmt_indent_cli_settings_are_applied(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -438,13 +429,14 @@ class TestCliShowFiles(unittest.TestCase):
             (root / "a.py").write_text("x = 1\n", encoding="utf-8")
             called_settings: list[tuple[str, int]] = []
 
-            # noinspection PyUnusedLocal
-            def fake_format(path: str, settings: FormatterSettings, check: bool) -> bool:
+            def fake_format(path: str, settings: FormatterSettings, fix: bool) -> bool:
                 called_settings.append((settings.indent_style, settings.indent_width))
                 return False
 
             argv = [
                 "pydocfmt",
+                "check",
+                "--fix",
                 "--indent-style",
                 "tab",
                 "--indent-width",
@@ -454,7 +446,7 @@ class TestCliShowFiles(unittest.TestCase):
             with (
                 unittest.mock.patch("sys.argv", argv),
                 unittest.mock.patch(
-                    "pydocformatter.cli.pydocfmt_main.pydocfmt.format_file",
+                    "pydocformatter.cli.check.pydocfmt.format_file",
                     side_effect=fake_format,
                 ),
             ):
@@ -472,16 +464,15 @@ class TestCliShowFiles(unittest.TestCase):
             target.write_text("x = 1\n", encoding="utf-8")
             called_settings: list[str] = []
 
-            # noinspection PyUnusedLocal
-            def fake_format(path: str, settings: FormatterSettings, check: bool) -> bool:
+            def fake_format(path: str, settings: FormatterSettings, fix: bool) -> bool:
                 called_settings.append(settings.line_ending)
                 return False
 
-            argv = ["pydocfmt", "--line-ending", "cr-lf", str(target)]
+            argv = ["pydocfmt", "check", "--fix", "--line-ending", "cr-lf", str(target)]
             with (
                 unittest.mock.patch("sys.argv", argv),
                 unittest.mock.patch(
-                    "pydocformatter.cli.pydocfmt_main.pydocfmt.format_file",
+                    "pydocformatter.cli.check.pydocfmt.format_file",
                     side_effect=fake_format,
                 ),
             ):
@@ -496,21 +487,21 @@ class TestCliShowFiles(unittest.TestCase):
             target.write_text("x = 1\n", encoding="utf-8")
             called_settings: list[FormatterSettings] = []
 
-            # noinspection PyUnusedLocal
-            def fake_format(path: str, settings: FormatterSettings, check: bool) -> FormatterResult:
+            def fake_format(path: str, settings: FormatterSettings, fix: bool) -> FormatterResult:
                 called_settings.append(settings)
                 return FormatterResult(path=path, modified=False, findings=())
 
             argv = [
                 "pydocfmt",
+                "check",
                 str(target),
                 "--experimental",
                 "--output-format",
                 "grouped",
                 "--select",
-                "PCF",
+                "PCF,PDF",
                 "--ignore",
-                "PCF002",
+                "PCF002,PDF001",
                 "--fixable",
                 "ALL",
                 "--unfixable",
@@ -528,8 +519,8 @@ class TestCliShowFiles(unittest.TestCase):
                 exit_code = pydocfmt_main.main()
 
             self.assertEqual(exit_code, 0)
-            self.assertEqual(called_settings[0].select, ("PCF",))
-            self.assertEqual(called_settings[0].ignore, ("PCF002",))
+            self.assertEqual(called_settings[0].select, ("PCF", "PDF"))
+            self.assertEqual(called_settings[0].ignore, ("PCF002", "PDF001"))
             self.assertEqual(called_settings[0].fixable, ("ALL",))
             self.assertEqual(called_settings[0].unfixable, ("PCF001",))
             self.assertEqual(called_settings[0].per_file_ignores, (("tests/*.py", ("PCF001",)),))
@@ -542,7 +533,7 @@ class TestCliShowFiles(unittest.TestCase):
             target = root / "a.py"
             target.write_text("x = 1\n", encoding="utf-8")
             stderr = StringIO()
-            argv = ["pydocfmt", str(target), "--select", "BAD"]
+            argv = ["pydocfmt", "check", str(target), "--select", "BAD"]
             with (
                 unittest.mock.patch("sys.argv", argv),
                 contextlib.redirect_stderr(stderr),
@@ -561,13 +552,13 @@ class TestCliShowFiles(unittest.TestCase):
             stdout = StringIO()
             called_paths: list[str] = []
 
-            # noinspection PyUnusedLocal
-            def fake_format(path: str, settings: FormatterSettings, check: bool, **kwargs: object) -> bool:
+            def fake_format(path: str, settings: FormatterSettings, fix: bool, **kwargs: object) -> bool:
                 called_paths.append(path)
                 return False
 
             argv = [
                 "pydocfmt",
+                "check",
                 str(target),
                 "--show-files",
                 "--force-exclude",
@@ -577,7 +568,7 @@ class TestCliShowFiles(unittest.TestCase):
             with (
                 unittest.mock.patch("sys.argv", argv),
                 unittest.mock.patch(
-                    "pydocformatter.cli.pydocfmt_main.pydocfmt.format_file",
+                    "pydocformatter.cli.check.pydocfmt.format_file",
                     side_effect=fake_format,
                 ),
                 contextlib.redirect_stdout(stdout),
@@ -597,12 +588,11 @@ class TestCliShowFiles(unittest.TestCase):
             stdout = StringIO()
             called_paths: list[str] = []
 
-            # noinspection PyUnusedLocal
-            def fake_format(path: str, settings: FormatterSettings, check: bool, **kwargs: object) -> bool:
+            def fake_format(path: str, settings: FormatterSettings, fix: bool, **kwargs: object) -> bool:
                 called_paths.append(path)
                 return False
 
-            argv = ["pydocfmt", "--show-files", "--force-exclude", str(target)]
+            argv = ["pydocfmt", "check", "--show-files", "--force-exclude", str(target)]
             with (
                 unittest.mock.patch("sys.argv", argv),
                 unittest.mock.patch(
@@ -610,7 +600,7 @@ class TestCliShowFiles(unittest.TestCase):
                     side_effect=self._fake_git_check_ignore_for_root(root, {"skip.py"}),
                 ),
                 unittest.mock.patch(
-                    "pydocformatter.cli.pydocfmt_main.pydocfmt.format_file",
+                    "pydocformatter.cli.check.pydocfmt.format_file",
                     side_effect=fake_format,
                 ),
                 contextlib.redirect_stdout(stdout),
@@ -634,13 +624,14 @@ class TestCliShowFiles(unittest.TestCase):
             )
             called_paths: list[str] = []
 
-            # noinspection PyUnusedLocal
-            def fake_format(path: str, settings: FormatterSettings, check: bool, **kwargs: object) -> bool:
+            def fake_format(path: str, settings: FormatterSettings, fix: bool, **kwargs: object) -> bool:
                 called_paths.append(path)
                 return False
 
             argv = [
                 "pydocfmt",
+                "check",
+                "--fix",
                 str(target),
                 "--force-exclude",
                 "--extend-exclude",
@@ -652,7 +643,7 @@ class TestCliShowFiles(unittest.TestCase):
                 with (
                     unittest.mock.patch("sys.argv", argv),
                     unittest.mock.patch(
-                        "pydocformatter.cli.pydocfmt_main.pydocfmt.format_file",
+                        "pydocformatter.cli.check.pydocfmt.format_file",
                         side_effect=fake_format,
                     ),
                 ):
@@ -696,6 +687,125 @@ class TestCliShowFiles(unittest.TestCase):
     def test_pydocfmt_help_ignores_invalid_config(self) -> None:
         self._assert_help_ignores_invalid_config(pydocfmt_main.main, "pydocfmt")
 
+    def test_pydocfmt_check_help_ignores_invalid_config(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "pyproject.toml").write_text(
+                '[tool.pydocfmt]\ninclude = ["src/"]\n',
+                encoding="utf-8",
+            )
+            stdout = StringIO()
+            stderr = StringIO()
+            argv = ["pydocfmt", "check", "--help"]
+            previous_cwd = os.getcwd()
+            os.chdir(root)
+            try:
+                with (
+                    unittest.mock.patch("sys.argv", argv),
+                    contextlib.redirect_stdout(stdout),
+                    contextlib.redirect_stderr(stderr),
+                    self.assertRaises(SystemExit) as cm,
+                ):
+                    pydocfmt_main.main()
+            finally:
+                os.chdir(previous_cwd)
+
+        self.assertEqual(cm.exception.code, 0)
+        self.assertIn("Rule selection:", stdout.getvalue())
+        self.assertIn("File selection:", stdout.getvalue())
+        self.assertEqual(stderr.getvalue(), "")
+
+    def test_pydocfmt_help_check_prints_check_help(self) -> None:
+        stdout = StringIO()
+        argv = ["pydocfmt", "help", "check"]
+        with (
+            unittest.mock.patch("sys.argv", argv),
+            contextlib.redirect_stdout(stdout),
+        ):
+            exit_code = pydocfmt_main.main()
+
+        self.assertEqual(exit_code, 0)
+        self.assertIn("usage: pydocfmt check", stdout.getvalue())
+
+    def test_pydocfmt_version_flag_and_command_print_version(self) -> None:
+        outputs = []
+        for argv in (["pydocfmt", "--version"], ["pydocfmt", "version"]):
+            stdout = StringIO()
+            with (
+                unittest.mock.patch("sys.argv", argv),
+                contextlib.redirect_stdout(stdout),
+            ):
+                exit_code = pydocfmt_main.main()
+            self.assertEqual(exit_code, 0)
+            outputs.append(stdout.getvalue())
+
+        self.assertEqual(outputs[0], outputs[1])
+        self.assertRegex(outputs[0], r"^pydocfmt \d+\.\d+\.\d+\n$")
+
+    def test_pydocfmt_without_command_exits_with_usage_error(self) -> None:
+        stderr = StringIO()
+        argv = ["pydocfmt"]
+        with (
+            unittest.mock.patch("sys.argv", argv),
+            contextlib.redirect_stderr(stderr),
+        ):
+            exit_code = pydocfmt_main.main()
+
+        self.assertEqual(exit_code, 2)
+        self.assertIn("usage: pydocfmt", stderr.getvalue())
+
+    def test_pydocfmt_legacy_top_level_check_flag_is_rejected(self) -> None:
+        stderr = StringIO()
+        argv = ["pydocfmt", "--check"]
+        with (
+            unittest.mock.patch("sys.argv", argv),
+            contextlib.redirect_stderr(stderr),
+            self.assertRaises(SystemExit) as cm,
+        ):
+            pydocfmt_main.main()
+
+        self.assertEqual(cm.exception.code, 2)
+        self.assertIn("unrecognized arguments: --check", stderr.getvalue())
+
+    def test_pydocfmt_check_show_settings_prints_resolved_settings(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "pyproject.toml").write_text(
+                "[tool.pydocfmt]\nline-length = 72\nrespect-gitignore = false\n",
+                encoding="utf-8",
+            )
+            stdout = StringIO()
+            argv = ["pydocfmt", "check", "--show-settings", "--line-ending", "lf"]
+            previous_cwd = os.getcwd()
+            os.chdir(root)
+            try:
+                with (
+                    unittest.mock.patch("sys.argv", argv),
+                    contextlib.redirect_stdout(stdout),
+                ):
+                    exit_code = pydocfmt_main.main()
+            finally:
+                os.chdir(previous_cwd)
+
+        self.assertEqual(exit_code, 0)
+        output = stdout.getvalue()
+        self.assertIn("[tool.pydocfmt]", output)
+        self.assertIn("line-length = 72", output)
+        self.assertIn('line-ending = "lf"', output)
+        self.assertIn("respect-gitignore = false", output)
+
+    def test_pydocfmt_check_show_files_and_show_settings_are_mutually_exclusive(self) -> None:
+        stderr = StringIO()
+        argv = ["pydocfmt", "check", "--show-files", "--show-settings"]
+        with (
+            unittest.mock.patch("sys.argv", argv),
+            contextlib.redirect_stderr(stderr),
+        ):
+            exit_code = pydocfmt_main.main()
+
+        self.assertEqual(exit_code, 2)
+        self.assertIn("--show-files and --show-settings cannot be used together", stderr.getvalue())
+
     def _assert_invalid_command_line_include_reports_argument_error(
         self,
         main: Callable[[], int],
@@ -705,7 +815,7 @@ class TestCliShowFiles(unittest.TestCase):
             root = Path(td)
             (root / "a.py").write_text("x = 1\n", encoding="utf-8")
             stderr = StringIO()
-            argv = [program, str(root), "--include", ""]
+            argv = [program, "check", str(root), "--include", ""]
             previous_cwd = os.getcwd()
             os.chdir(root)
             try:
@@ -728,7 +838,7 @@ class TestCliShowFiles(unittest.TestCase):
             root = Path(td)
             (root / "a.py").write_text("x = 1\n", encoding="utf-8")
             stderr = StringIO()
-            argv = ["pydocfmt", str(root), "--exclude", ""]
+            argv = ["pydocfmt", "check", str(root), "--exclude", ""]
             previous_cwd = os.getcwd()
             os.chdir(root)
             try:
@@ -764,7 +874,7 @@ class TestCliShowFiles(unittest.TestCase):
                 encoding="utf-8",
             )
             stderr = StringIO()
-            argv = [program, str(root)]
+            argv = [program, "check", str(root)]
             previous_cwd = os.getcwd()
             os.chdir(root)
             try:
@@ -777,7 +887,7 @@ class TestCliShowFiles(unittest.TestCase):
                 os.chdir(previous_cwd)
 
         self.assertEqual(exit_code, 2)
-        self.assertIn(f"{program}: file selection error", stderr.getvalue())
+        self.assertIn(f"{program} check: file selection error", stderr.getvalue())
         self.assertIn("include pattern must target files", stderr.getvalue())
         self.assertNotIn("Traceback", stderr.getvalue())
 
@@ -795,7 +905,7 @@ class TestCliShowFiles(unittest.TestCase):
                 encoding="utf-8",
             )
             stderr = StringIO()
-            argv = ["pydocfmt", str(root)]
+            argv = ["pydocfmt", "check", str(root)]
             previous_cwd = os.getcwd()
             os.chdir(root)
             try:
@@ -808,7 +918,7 @@ class TestCliShowFiles(unittest.TestCase):
                 os.chdir(previous_cwd)
 
         self.assertEqual(exit_code, 2)
-        self.assertIn("pydocfmt: configuration error", stderr.getvalue())
+        self.assertIn("pydocfmt check: configuration error", stderr.getvalue())
         self.assertIn("failed to decode pyproject.toml", stderr.getvalue())
         self.assertNotIn("Traceback", stderr.getvalue())
 
@@ -817,7 +927,7 @@ class TestCliShowFiles(unittest.TestCase):
             root = Path(td)
             target = root / "missing.py"
             stdout = StringIO()
-            argv = ["pydocfmt", str(target)]
+            argv = ["pydocfmt", "check", str(target)]
             with (
                 unittest.mock.patch("sys.argv", argv),
                 contextlib.redirect_stdout(stdout),
@@ -836,12 +946,11 @@ class TestCliShowFiles(unittest.TestCase):
             stdout = StringIO()
             called_paths: list[str] = []
 
-            # noinspection PyUnusedLocal
-            def fake_format(path: str, settings: FormatterSettings, check: bool, **kwargs: object) -> bool:
+            def fake_format(path: str, settings: FormatterSettings, fix: bool, **kwargs: object) -> bool:
                 called_paths.append(path)
                 return False
 
-            argv = ["pydocfmt", "--show-files", str(root)]
+            argv = ["pydocfmt", "check", "--show-files", str(root)]
             with (
                 unittest.mock.patch("sys.argv", argv),
                 unittest.mock.patch(
@@ -849,7 +958,7 @@ class TestCliShowFiles(unittest.TestCase):
                     return_value=subprocess.CompletedProcess(["git"], 128, stdout=b"", stderr=b"fatal: broken git"),
                 ),
                 unittest.mock.patch(
-                    "pydocformatter.cli.pydocfmt_main.pydocfmt.format_file",
+                    "pydocformatter.cli.check.pydocfmt.format_file",
                     side_effect=fake_format,
                 ),
                 contextlib.redirect_stdout(stdout),
@@ -874,7 +983,7 @@ class TestCliShowFiles(unittest.TestCase):
         with self._make_tree_with_invalid_utf8() as td:
             root = Path(td)
             stdout = StringIO()
-            argv = ["pydocfmt", str(root)]
+            argv = ["pydocfmt", "check", str(root)]
             with (
                 unittest.mock.patch("sys.argv", argv),
                 contextlib.redirect_stdout(stdout),
@@ -899,7 +1008,7 @@ class TestCliShowFiles(unittest.TestCase):
             (root / "bad.py").write_bytes(b"\xff")
 
             stdout = StringIO()
-            argv = ["pydocfmt", "--check", "--line-length", "72", str(root)]
+            argv = ["pydocfmt", "check", "--line-length", "72", str(root)]
             with (
                 unittest.mock.patch("sys.argv", argv),
                 contextlib.redirect_stdout(stdout),

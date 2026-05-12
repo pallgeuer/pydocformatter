@@ -344,7 +344,6 @@ def format_yields_section(
     )
 
 
-# noinspection PyUnusedLocal
 def format_examples_section(
     buffer: list[str],
     indent: str,
@@ -465,7 +464,6 @@ def format_attributes_section(
     )
 
 
-# noinspection PyTypeChecker
 SECTION_HANDLERS: dict[str, SectionFormatter] = {
     "Args": format_args_section,
     "Returns": format_returns_section,

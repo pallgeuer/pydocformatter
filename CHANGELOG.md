@@ -11,6 +11,8 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 ### Added
 
 - **CLI:**
+  - Added Ruff-style subcommands with `pydocfmt check` for read-only checks and `pydocfmt check --fix` for formatting.
+  - Added `pydocfmt help [command]`, `pydocfmt version`, `pydocfmt --version`, and `pydocfmt check --show-settings`.
   - Added `--line-ending` to control line endings used when rewriting files.
   - Added `--show-files` to report all considered files during discovery, including included files and ignored files with include/exclude reasons, without formatting files.
   - Added `--respect-gitignore` / `--no-respect-gitignore`, with enabled-by-default behavior and matching `pyproject.toml` configuration.
@@ -32,6 +34,8 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 ### Changed
 
 - **CLI:**
+  - Reorganized `pydocfmt check --help` into Ruff-inspired argument groups for options, rule selection, and file selection.
+  - Rule and file-selection list options now use comma-separated CLI values, such as `--select PDF,PCF` and `--include "*.py,*.pyi"`.
   - `pydocfmt` now formats both docstrings and comments in one run.
   - `pydocfmt` now exposes command-line overrides for Ruff-style rule settings.
   - `pydocfmt` now defaults to formatting the current directory when no files or directories are specified.
@@ -54,7 +58,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Formatter internals now require formatting controls such as line length, line endings, and indentation settings as explicit keyword-only arguments.
   - Formatter functions now receive resolved `FormatterSettings` directly.
   - Generated Google-style docstring section indentation is now configurable while preserving the existing base docstring indentation.
-  - `--check` output now includes docstring and comment line locations, emitted once per subject per file with compressed consecutive ranges.
+  - Check-mode output now includes docstring and comment line locations, emitted once per subject per file with compressed consecutive ranges.
 
 - **Architecture:**
   - Utility helpers now live in explicit `pydocformatter.utils` submodules for diagnostics, glob matching, and line endings.
@@ -80,11 +84,14 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Malformed pydocformatter config tables are now consistently rejected, including falsy non-table values.
 
 - **Formatting:**
-  - `--check` now reports comment formatting diagnostics against original input line numbers.
+  - Check mode now reports comment formatting diagnostics against original input line numbers.
   - Empty standalone comment separator lines are now preserved during comment formatting.
   - Preserved untouched line endings when formatting only selected docstring or comment spans.
 
 ### Removed
+
+- **CLI:**
+  - Removed legacy top-level formatting and check forms such as `pydocfmt` and `pydocfmt --check`; use `pydocfmt check --fix` or `pydocfmt check`.
 
 - **Architecture:**
   - Removed the separate comment-formatting command and merged comment formatting into `pydocfmt`.

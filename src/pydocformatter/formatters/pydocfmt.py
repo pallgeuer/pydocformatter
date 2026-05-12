@@ -238,17 +238,17 @@ def format_comments_in_source(
 def format_file(
     path: str,
     settings: FormatterSettings,
-    check: bool,
+    fix: bool,
 ) -> bool:
     """Format docstrings and comments in a Python file.
 
-    This function reads a Python file once, formats docstrings first, then formats comments. If `check` is True, it only
+    This function reads a Python file once, formats docstrings first, then formats comments. If `fix` is False, it only
     checks if the file is formatted correctly.
 
     Args:
         path (str): The path to the Python file.
         settings (FormatterSettings): Resolved settings for formatting.
-        check (bool): If True, only check if the file is formatted correctly.
+        fix (bool): If True, write formatting changes to the file.
 
     Returns:
         bool: True if the file was modified or needs formatting, False otherwise.
@@ -265,7 +265,7 @@ def format_file(
     line_ending = line_endings.resolve_line_ending(source, line_ending=settings.line_ending)
     docstring_source, docstring_changed_lines = format_docstrings_in_source(source, settings, line_ending=line_ending)
 
-    if check:
+    if not fix:
         _, comment_changed_lines = format_comments_in_source(source, settings, line_ending=line_ending)
         if docstring_changed_lines:
             print(diagnostics.format_needs_formatting_message(path, "docstring", list(docstring_changed_lines)))

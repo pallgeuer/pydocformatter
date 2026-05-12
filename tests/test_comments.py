@@ -18,7 +18,7 @@ class TestCommentFormatting(unittest.TestCase):
         try:
             output = StringIO()
             with contextlib.redirect_stdout(output):
-                result = pydocfmt.format_file(filename, FormatterSettings(line_length=line_length), check=check)
+                result = pydocfmt.format_file(filename, FormatterSettings(line_length=line_length), fix=not check)
             with open(filename, encoding="utf-8") as file:
                 final = file.read()
         finally:
@@ -47,7 +47,7 @@ class TestCommentFormatting(unittest.TestCase):
             file.write(source)
 
         try:
-            result = pydocfmt.format_file(filename, FormatterSettings(line_length=88, line_ending="lf"), check=False)
+            result = pydocfmt.format_file(filename, FormatterSettings(line_length=88, line_ending="lf"), fix=True)
             with open(filename, "rb") as file:
                 final = file.read()
         finally:
@@ -66,7 +66,7 @@ class TestCommentFormatting(unittest.TestCase):
         try:
             output = StringIO()
             with contextlib.redirect_stdout(output):
-                result = pydocfmt.format_file(filename, FormatterSettings(line_length=88, line_ending="lf"), check=True)
+                result = pydocfmt.format_file(filename, FormatterSettings(line_length=88, line_ending="lf"), fix=False)
             with open(filename, "rb") as file:
                 final = file.read()
         finally:
@@ -83,7 +83,7 @@ class TestCommentFormatting(unittest.TestCase):
             file.write(b"x = 1\r\n# This is a really long comment that should be wrapped properly by the formatter tool to multiple lines.\n")
 
         try:
-            result = pydocfmt.format_file(filename, FormatterSettings(line_length=60), check=False)
+            result = pydocfmt.format_file(filename, FormatterSettings(line_length=60), fix=True)
             with open(filename, "rb") as file:
                 final = file.read()
         finally:
@@ -102,7 +102,7 @@ class TestCommentFormatting(unittest.TestCase):
             file.write(source)
 
         try:
-            result = pydocfmt.format_file(filename, FormatterSettings(line_length=60), check=False)
+            result = pydocfmt.format_file(filename, FormatterSettings(line_length=60), fix=True)
             with open(filename, "rb") as file:
                 final = file.read()
         finally:
@@ -118,7 +118,7 @@ class TestCommentFormatting(unittest.TestCase):
             file.write(b"# This is a really long comment that should be wrapped properly by the formatter tool to multiple lines.\n")
 
         try:
-            result = pydocfmt.format_file(filename, FormatterSettings(line_length=60, line_ending="cr-lf"), check=False)
+            result = pydocfmt.format_file(filename, FormatterSettings(line_length=60, line_ending="cr-lf"), fix=True)
             with open(filename, "rb") as file:
                 final = file.read()
         finally:

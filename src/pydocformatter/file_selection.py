@@ -288,7 +288,6 @@ def _deduplicated_decisions(decisions: tuple[FileDecision, ...]) -> tuple[FileDe
             continue
 
         accepted_decision = result[accepted_index]
-        # noinspection PyTypeChecker
         if _display_path_score(display_decision.path) < _display_path_score(accepted_decision.path):
             result[accepted_index] = _duplicate_decision(accepted_decision)
             accepted_by_identity[identity_key] = len(result)

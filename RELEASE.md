@@ -5,7 +5,7 @@
 ### Code Quality
 - [x] All tests pass (`uv run pytest -q`)
 - [x] Package builds successfully (`uv build`)
-- [x] No linting errors (`uv run black --check .`, `uv run isort --check .`, `uv run mypy`, `uv run pydocfmt --check`)
+- [x] No linting errors (`uv run black --check .`, `uv run isort --check .`, `uv run mypy`, `uv run pydocfmt check`)
 - [x] Pre-commit hooks pass (`uv run pre-commit run --all-files`)
 
 ### Documentation
@@ -45,6 +45,7 @@ uv build
 
 # Test CLI tools
 uv run pydocfmt --help
+uv run pydocfmt check --help
 
 # Test functionality
 uv run python -c "
@@ -55,7 +56,7 @@ with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
     f.write('def test(): \"\"\"Test function.\"\"\"')
     fname = f.name
 import subprocess
-subprocess.run(['uv', 'run', 'pydocfmt', fname], check=True)
+subprocess.run(['uv', 'run', 'pydocfmt', 'check', '--fix', fname], check=True)
 print(Path(fname).read_text())
 "
 ```
@@ -112,6 +113,7 @@ After release, verify:
    ```bash
    pip install pydocformatter
    pydocfmt --help
+   pydocfmt check --help
    ```
 
 2. **Pre-commit Hook Usage:**

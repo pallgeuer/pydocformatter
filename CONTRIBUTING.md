@@ -75,6 +75,7 @@ uv run pre-commit run --all-files
 ```bash
 # Test the CLI tools
 uv run pydocfmt --help
+uv run pydocfmt check --help
 
 # Run tests
 uv run pytest -q
@@ -186,12 +187,12 @@ We use several tools to maintain code quality:
 # Format code
 uv run black .
 uv run isort .
-uv run pydocfmt
+uv run pydocfmt check --fix
 
 # Check formatting without changes
 uv run black --check .
 uv run isort --check .
-uv run pydocfmt --check
+uv run pydocfmt check
 
 # Type checking
 uv run mypy
