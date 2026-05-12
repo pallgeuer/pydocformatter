@@ -78,6 +78,8 @@ If no files or directories are specified, `pydocfmt check` checks the current di
 **Options:**
 - `--help`: Show help message and exit
 - `--fix`, `--no-fix`: Toggle applying fixes instead of only checking
+- `-e`, `--exit-zero`: Exit with status code `0`, even when formatting violations are detected
+- `--exit-non-zero-on-fix`: Exit with a non-zero status code if `--fix` modifies any files
 - `--show-files`: Show file-selection decisions without formatting files
 - `--show-settings`: Show resolved settings without formatting files
 - `--line-length INTEGER`: Maximum line length for docstrings and comments (default: 88)

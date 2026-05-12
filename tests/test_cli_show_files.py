@@ -806,6 +806,20 @@ class TestCliShowFiles(unittest.TestCase):
         self.assertEqual(exit_code, 2)
         self.assertIn("--show-files and --show-settings cannot be used together", stderr.getvalue())
 
+    def test_pydocfmt_check_exit_flags_are_mutually_exclusive(self) -> None:
+        stderr = StringIO()
+        argv = ["pydocfmt", "check", "--exit-zero", "--exit-non-zero-on-fix"]
+        with (
+            unittest.mock.patch("sys.argv", argv),
+            contextlib.redirect_stderr(stderr),
+            self.assertRaises(SystemExit) as cm,
+        ):
+            pydocfmt_main.main()
+
+        self.assertEqual(cm.exception.code, 2)
+        self.assertIn("--exit-zero", stderr.getvalue())
+        self.assertIn("--exit-non-zero-on-fix", stderr.getvalue())
+
     def _assert_invalid_command_line_include_reports_argument_error(
         self,
         main: Callable[[], int],

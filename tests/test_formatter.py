@@ -153,6 +153,67 @@ class TestFormatterResults(unittest.TestCase):
 
         self.assertEqual(exit_code, 0)
 
+    def test_exit_zero_suppresses_remaining_findings(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            target = root / "a.py"
+            target.write_text("x = 1\n", encoding="utf-8")
+            rule = Rule(rule_code="PDF105", rule_name="summary-too-long", message="Docstring summary does not fit on one line", fixable=False)
+
+            def fake_format_file_exp(path: str, settings: FormatterSettings, fix: bool) -> FormatterResult:
+                return FormatterResult(path=path, modified=False, findings=(RuleFinding(rule=rule, line_numbers=(1,)),))
+
+            argv = ["pydocfmt", "check", "--experimental", "--exit-zero", str(target)]
+            stdout = StringIO()
+            with (
+                unittest.mock.patch("sys.argv", argv),
+                unittest.mock.patch("pydocformatter.formatter.format_file_exp", side_effect=fake_format_file_exp),
+                contextlib.redirect_stdout(stdout),
+            ):
+                exit_code = pydocfmt_main.main()
+
+        self.assertEqual(exit_code, 0)
+
+    def test_fix_mode_exits_nonzero_for_remaining_findings(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            target = root / "a.py"
+            target.write_text("x = 1\n", encoding="utf-8")
+            rule = Rule(rule_code="PDF105", rule_name="summary-too-long", message="Docstring summary does not fit on one line", fixable=False)
+
+            def fake_format_file_exp(path: str, settings: FormatterSettings, fix: bool) -> FormatterResult:
+                return FormatterResult(path=path, modified=False, findings=(RuleFinding(rule=rule, line_numbers=(1,)),))
+
+            argv = ["pydocfmt", "check", "--experimental", "--fix", str(target)]
+            stdout = StringIO()
+            with (
+                unittest.mock.patch("sys.argv", argv),
+                unittest.mock.patch("pydocformatter.formatter.format_file_exp", side_effect=fake_format_file_exp),
+                contextlib.redirect_stdout(stdout),
+            ):
+                exit_code = pydocfmt_main.main()
+
+        self.assertEqual(exit_code, 1)
+
+    def test_exit_non_zero_on_fix_reports_modified_files(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            target = root / "a.py"
+            target.write_text("x = 1\n", encoding="utf-8")
+
+            def fake_format_file_exp(path: str, settings: FormatterSettings, fix: bool) -> FormatterResult:
+                return FormatterResult(path=path, modified=True, findings=())
+
+            for extra_args, expected_exit_code in ((["--fix"], 0), (["--fix", "--exit-non-zero-on-fix"], 1)):
+                argv = ["pydocfmt", "check", "--experimental", *extra_args, str(target)]
+                with (
+                    unittest.mock.patch("sys.argv", argv),
+                    unittest.mock.patch("pydocformatter.formatter.format_file_exp", side_effect=fake_format_file_exp),
+                ):
+                    exit_code = pydocfmt_main.main()
+
+                self.assertEqual(exit_code, expected_exit_code)
+
     def test_legacy_check_result_uses_synthetic_finding_for_needed_formatting(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)

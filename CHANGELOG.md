@@ -18,6 +18,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added `--respect-gitignore` / `--no-respect-gitignore`, with enabled-by-default behavior and matching `pyproject.toml` configuration.
   - Added `--experimental` / `--no-experimental` for opting into the experimental formatter path.
   - Added `--output-format grouped` for rule findings.
+  - Added Ruff-style `-e` / `--exit-zero` and `--exit-non-zero-on-fix` status controls.
 
 - **Configuration:**
   - Added Ruff-style `line-ending` configuration with `"auto"`, `"lf"`, `"cr-lf"`, and `"native"` values.

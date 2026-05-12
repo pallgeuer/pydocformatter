@@ -68,6 +68,18 @@ def add_arguments(
         action="store_true",
         help="Show resolved settings without checking or fixing files.",
     )
+    exit_options = options.add_mutually_exclusive_group()
+    exit_options.add_argument(
+        "-e",
+        "--exit-zero",
+        action="store_true",
+        help='Exit with status code "0", even upon detecting formatting violations.',
+    )
+    exit_options.add_argument(
+        "--exit-non-zero-on-fix",
+        action="store_true",
+        help="Exit with a non-zero status code if any files were modified via fix, even if no formatting violations remain.",
+    )
     options.add_argument(
         "--line-length",
         type=int,
@@ -235,8 +247,15 @@ def run(args: argparse.Namespace) -> int:
         results = format_files(selection.accepted_paths, settings, fix=args.fix)
 
     print_results(results, settings)
-    needs_changes = any(result.findings for result in results)
-    return 1 if not args.fix and needs_changes else 0
+    has_findings = any(result.findings for result in results)
+    modified = any(result.modified for result in results)
+    if args.exit_zero:
+        return 0
+    if has_findings:
+        return 1
+    if args.fix and args.exit_non_zero_on_fix and modified:
+        return 1
+    return 0
 
 
 def load_settings(args: argparse.Namespace) -> config.FormatterSettings | None:
