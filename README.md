@@ -82,6 +82,8 @@ If no files or directories are specified, `pydocfmt check` checks the current di
 - `--exit-non-zero-on-fix`: Exit with a non-zero status code if `--fix` modifies any files
 - `--show-files`: Show file-selection decisions without formatting files
 - `--show-settings`: Show resolved settings without formatting files
+- `--config CONFIG_OPTION`: Path to a TOML configuration file, or a TOML `<KEY> = <VALUE>` setting override
+- `--isolated`: Ignore auto-discovered configuration files
 - `--line-length INTEGER`: Maximum line length for docstrings and comments (default: 88)
 - `--line-ending {auto,lf,cr-lf,native}`: Line ending to use when rewriting files (default: auto)
 - `--indent-style {space,tab}`: Indentation style for generated docstring sections (default: space)
@@ -127,6 +129,15 @@ pydocfmt check --fix src/ --include "*.py,*.pyi"
 
 # Show resolved settings
 pydocfmt check --show-settings
+
+# Override one setting without editing pyproject.toml
+pydocfmt check --config "line-length = 100" src/
+
+# Use a dedicated config file
+pydocfmt check --config pydocfmt.toml src/
+
+# Ignore pyproject.toml while applying an inline override
+pydocfmt check --isolated --config "line-length = 100" src/
 
 # Show included and ignored files
 pydocfmt check --show-files src/
@@ -184,7 +195,9 @@ unfixable = []
 - `per-file-ignores`: File-pattern-specific ignored rule selectors
 - `extend-per-file-ignores`: Additional file-pattern-specific ignored rule selectors
 
-Settings are resolved as defaults, then `[tool.pydocfmt]`, then command-line options. The highest-precedence specified value wins for each key, including `extend-include` and `extend-exclude`.
+Settings are resolved as defaults, then auto-discovered `[tool.pydocfmt]`, then explicit `--config` files, then inline `--config` setting overrides, then dedicated command-line options. The highest-precedence specified value wins for each key, including `extend-include` and `extend-exclude`.
+
+`--config PATH` accepts either a pyproject-style file containing `[tool.pydocfmt]` or a dedicated config file with pydocfmt settings at top level. `--isolated` ignores auto-discovered configuration files; it can be combined with inline `--config` setting overrides but not with `--config PATH`.
 
 For the full file-selection contract, see [File Selection Compatibility Specification](docs/file_selection_spec.md).
 

@@ -794,6 +794,93 @@ class TestCliShowFiles(unittest.TestCase):
         self.assertIn('line-ending = "lf"', output)
         self.assertIn("respect-gitignore = false", output)
 
+    def test_pydocfmt_check_config_file_prints_resolved_settings(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            config_path = root / "pydocfmt.toml"
+            config_path.write_text(
+                "line-length = 97\nrespect-gitignore = false\n",
+                encoding="utf-8",
+            )
+            stdout = StringIO()
+            argv = ["pydocfmt", "check", "--show-settings", "--config", str(config_path)]
+            with (
+                unittest.mock.patch("sys.argv", argv),
+                contextlib.redirect_stdout(stdout),
+            ):
+                exit_code = pydocfmt_main.main()
+
+        self.assertEqual(exit_code, 0)
+        output = stdout.getvalue()
+        self.assertIn("line-length = 97", output)
+        self.assertIn("respect-gitignore = false", output)
+
+    def test_pydocfmt_check_config_options_work_before_and_after_command(self) -> None:
+        stdout = StringIO()
+        argv = [
+            "pydocfmt",
+            "--config",
+            "line-length = 99",
+            "check",
+            "--show-settings",
+            "--config",
+            'line-ending = "lf"',
+            "--line-length",
+            "100",
+        ]
+        with (
+            unittest.mock.patch("sys.argv", argv),
+            contextlib.redirect_stdout(stdout),
+        ):
+            exit_code = pydocfmt_main.main()
+
+        self.assertEqual(exit_code, 0)
+        output = stdout.getvalue()
+        self.assertIn("line-length = 100", output)
+        self.assertIn('line-ending = "lf"', output)
+
+    def test_pydocfmt_check_isolated_ignores_auto_discovered_pyproject(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "pyproject.toml").write_text(
+                "[tool.pydocfmt]\nline-length = 72\n",
+                encoding="utf-8",
+            )
+            stdout = StringIO()
+            argv = ["pydocfmt", "check", "--show-settings", "--isolated", "--config", "line-length = 106"]
+            previous_cwd = os.getcwd()
+            os.chdir(root)
+            try:
+                with (
+                    unittest.mock.patch("sys.argv", argv),
+                    contextlib.redirect_stdout(stdout),
+                ):
+                    exit_code = pydocfmt_main.main()
+            finally:
+                os.chdir(previous_cwd)
+
+        self.assertEqual(exit_code, 0)
+        output = stdout.getvalue()
+        self.assertIn("line-length = 106", output)
+        self.assertNotIn("line-length = 72", output)
+
+    def test_pydocfmt_check_isolated_rejects_config_file(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            config_path = root / "pydocfmt.toml"
+            config_path.write_text("line-length = 97\n", encoding="utf-8")
+            stderr = StringIO()
+            argv = ["pydocfmt", "check", "--show-settings", "--isolated", "--config", str(config_path)]
+            with (
+                unittest.mock.patch("sys.argv", argv),
+                contextlib.redirect_stderr(stderr),
+            ):
+                exit_code = pydocfmt_main.main()
+
+        self.assertEqual(exit_code, 2)
+        self.assertIn("--config=PATH", stderr.getvalue())
+        self.assertNotIn("Traceback", stderr.getvalue())
+
     def test_pydocfmt_check_show_files_and_show_settings_are_mutually_exclusive(self) -> None:
         stderr = StringIO()
         argv = ["pydocfmt", "check", "--show-files", "--show-settings"]

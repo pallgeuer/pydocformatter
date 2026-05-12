@@ -19,6 +19,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added `--experimental` / `--no-experimental` for opting into the experimental formatter path.
   - Added `--output-format grouped` for rule findings.
   - Added Ruff-style `-e` / `--exit-zero` and `--exit-non-zero-on-fix` status controls.
+  - Added Ruff-style `--config` and `--isolated` global options for explicit config files, inline setting overrides, and config-free runs.
 
 - **Configuration:**
   - Added Ruff-style `line-ending` configuration with `"auto"`, `"lf"`, `"cr-lf"`, and `"native"` values.
@@ -27,6 +28,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added `experimental` for formatter configuration, defaulting to `false`.
   - Added `output-format` for formatter configuration, currently supporting only `"grouped"`.
   - Added Ruff-style rule settings under `[tool.pydocfmt]`: `select`, `extend-select`, `ignore`, `fixable`, `extend-fixable`, `unfixable`, `per-file-ignores`, and `extend-per-file-ignores`.
+  - Added explicit config-file support for `--config PATH`, including pyproject-style `[tool.pydocfmt]` files and dedicated top-level pydocfmt TOML files.
 
 - **Documentation:**
   - Added a Ruff file-selection compatibility specification at `docs/file_selection_spec.md`, including exact defaults, precedence rules, force-exclude behavior, and explicit pydocformatter deviations.
@@ -46,7 +48,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Renamed the configuration table from `[tool.pydocformatter]` to `[tool.pydocfmt]`.
   - Settings now resolve from one `[tool.pydocfmt]` table, followed by command-line overrides.
   - File-selection settings now use Ruff-style glob lists (`include`, `extend-include`, `exclude`, `extend-exclude`) and `force-exclude`.
-  - For each setting key, the highest-priority value wins (`command line > config > defaults`), including `extend-include` and `extend-exclude`.
+  - For each setting key, the highest-priority value wins (`dedicated CLI option > inline --config > explicit --config file > auto-discovered config > defaults`), including `extend-include` and `extend-exclude`.
 
 - **File discovery:**
   - `--show-files` now reports directories pruned by exclude patterns, such as `.venv`.

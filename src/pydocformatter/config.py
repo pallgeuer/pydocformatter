@@ -10,6 +10,7 @@ IndentStyle = Literal["space", "tab"]
 LineEnding = Literal["auto", "lf", "cr-lf", "native"]
 OutputFormat = Literal["grouped"]
 RuleSelectorMap = tuple[tuple[str, tuple[str, ...]], ...]
+ConfigOptionKind = Literal["path", "inline"]
 
 DEFAULT_EXCLUDE = (
     ".bzr",
@@ -180,16 +181,42 @@ class SettingsOverrides:
     extend_per_file_ignores: RuleSelectorMap | None = None
 
 
-def load_config(cli_overrides: SettingsOverrides | None = None) -> FormatterSettings:
-    """Resolve settings from defaults, pyproject config, and optional CLI overrides."""
+def load_config(
+    cli_overrides: SettingsOverrides | None = None,
+    *,
+    config_options: tuple[str, ...] = (),
+    isolated: bool = False,
+) -> FormatterSettings:
+    """Resolve settings from defaults, config files, inline config, and optional CLI overrides."""
     settings = FormatterSettings()
 
-    config = _load_pyproject_config()
+    classified_options = tuple((_classify_config_option(option), option) for option in config_options)
+    if isolated:
+        path_options = [option for kind, option in classified_options if kind == "path"]
+        if path_options:
+            raise ConfigError("the argument --config=PATH cannot be used with --isolated")
+
+    if not isolated:
+        settings = _apply_pyproject_config(settings)
+
+    for kind, option in classified_options:
+        if kind == "path":
+            settings = _apply_explicit_config_file(settings, option)
+    for kind, option in classified_options:
+        if kind == "inline":
+            settings = _apply_inline_config_option(settings, option)
+
+    return _apply_overrides(settings, cli_overrides, "command line")
+
+
+def _apply_pyproject_config(settings: FormatterSettings) -> FormatterSettings:
+    """Apply auto-discovered pyproject.toml configuration from the current directory."""
+    config = _load_toml_file("pyproject.toml", required=False)
     tool_config = config.get("tool", {})
     if not isinstance(tool_config, dict):
         if "tool" in config:
             raise ConfigError("pyproject.toml [tool] must be a table")
-        return _apply_overrides(settings, cli_overrides, "command line")
+        return settings
 
     if "pydocfmt" in tool_config:
         formatter_config = tool_config["pydocfmt"]
@@ -197,22 +224,73 @@ def load_config(cli_overrides: SettingsOverrides | None = None) -> FormatterSett
             raise ConfigError("tool.pydocfmt must be a table")
         settings = _apply_config_section(settings, formatter_config, "tool.pydocfmt")
 
-    return _apply_overrides(settings, cli_overrides, "command line")
+    return settings
 
 
-def _load_pyproject_config() -> dict[str, Any]:
-    """Load pyproject.toml from the current directory, returning an empty config if absent."""
-    if not os.path.exists("pyproject.toml"):
+def _apply_explicit_config_file(settings: FormatterSettings, path: str) -> FormatterSettings:
+    """Apply one explicit config file from --config PATH."""
+    config = _load_toml_file(path, required=True)
+    if os.path.basename(path) == "pyproject.toml" or "tool" in config:
+        return _apply_explicit_pyproject_config(settings, config, path)
+    return _apply_config_section(settings, config, path)
+
+
+def _apply_explicit_pyproject_config(
+    settings: FormatterSettings,
+    config: dict[str, Any],
+    path: str,
+) -> FormatterSettings:
+    """Apply one explicit pyproject-style config file from --config PATH."""
+    tool_config = config.get("tool", {})
+    if not isinstance(tool_config, dict):
+        if "tool" in config:
+            raise ConfigError(f"{path} [tool] must be a table")
+        raise ConfigError(f"{path} must contain [tool.pydocfmt]")
+
+    formatter_config = tool_config.get("pydocfmt")
+    if formatter_config is None:
+        raise ConfigError(f"{path} must contain [tool.pydocfmt]")
+    if not isinstance(formatter_config, dict):
+        raise ConfigError(f"{path} tool.pydocfmt must be a table")
+    return _apply_config_section(settings, formatter_config, f"{path}.tool.pydocfmt")
+
+
+def _apply_inline_config_option(settings: FormatterSettings, option: str) -> FormatterSettings:
+    """Apply one inline TOML --config option."""
+    try:
+        section = tomllib.loads(option)
+    except tomllib.TOMLDecodeError as error:
+        raise ConfigError(f"failed to decode --config inline TOML: {error}") from error
+    return _apply_config_section(settings, section, "--config")
+
+
+def _classify_config_option(option: str) -> ConfigOptionKind:
+    """Classify a --config option as a file path or inline TOML setting."""
+    if "=" in option and not os.path.exists(option):
+        return "inline"
+    return "path"
+
+
+def _load_toml_file(path: str, *, required: bool) -> dict[str, Any]:
+    """Load a TOML file, returning an empty config if an optional file is absent."""
+    if not os.path.exists(path):
+        if required:
+            raise ConfigError(f"configuration file not found: {path}")
         return {}
 
-    with open("pyproject.toml", "rb") as file:
+    try:
+        file = open(path, "rb")
+    except OSError as error:
+        raise ConfigError(f"failed to read configuration file {path}: {error}") from error
+
+    with file:
         try:
             config = tomllib.load(file)
         except tomllib.TOMLDecodeError as error:
-            raise ConfigError(f"failed to decode pyproject.toml: {error}") from error
+            raise ConfigError(f"failed to decode {path}: {error}") from error
 
     if not isinstance(config, dict):
-        raise ConfigError("pyproject.toml must contain a TOML table")
+        raise ConfigError(f"{path} must contain a TOML table")
     return config
 
 

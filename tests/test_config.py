@@ -423,6 +423,108 @@ class TestConfig(unittest.TestCase):
             finally:
                 os.chdir(previous_cwd)
 
+    def test_explicit_pyproject_config_file_is_applied(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            config_path = root / "pyproject.toml"
+            config_path.write_text(
+                "[tool.pydocfmt]\nline-length = 99\nrespect-gitignore = false\n",
+                encoding="utf-8",
+            )
+            previous_cwd = os.getcwd()
+            os.chdir(root)
+            try:
+                config = pydocformatter_config.load_config(config_options=(str(config_path),))
+            finally:
+                os.chdir(previous_cwd)
+
+        self.assertEqual(config.line_length, 99)
+        self.assertFalse(config.respect_gitignore)
+
+    def test_explicit_dedicated_config_file_is_applied(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            config_path = root / "pydocfmt.toml"
+            config_path.write_text(
+                'line-ending = "lf"\nselect = ["PCF"]\n',
+                encoding="utf-8",
+            )
+            previous_cwd = os.getcwd()
+            os.chdir(root)
+            try:
+                config = pydocformatter_config.load_config(config_options=(str(config_path),))
+            finally:
+                os.chdir(previous_cwd)
+
+        self.assertEqual(config.line_ending, "lf")
+        self.assertEqual(config.select, ("PCF",))
+
+    def test_inline_config_option_is_applied(self) -> None:
+        config = pydocformatter_config.load_config(
+            config_options=('line-length = 101\nignore = ["PCF001"]',),
+        )
+
+        self.assertEqual(config.line_length, 101)
+        self.assertEqual(config.ignore, ("PCF001",))
+
+    def test_inline_config_options_override_config_files(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            config_path = root / "pydocfmt.toml"
+            config_path.write_text(
+                "line-length = 90\n",
+                encoding="utf-8",
+            )
+            config = pydocformatter_config.load_config(
+                config_options=(str(config_path), "line-length = 91"),
+            )
+
+        self.assertEqual(config.line_length, 91)
+
+    def test_command_line_overrides_override_inline_config_options(self) -> None:
+        config = pydocformatter_config.load_config(
+            SettingsOverrides(line_length=103),
+            config_options=("line-length = 102",),
+        )
+
+        self.assertEqual(config.line_length, 103)
+
+    def test_isolated_ignores_auto_discovered_pyproject_config(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "pyproject.toml").write_text(
+                "[tool.pydocfmt]\nline-length = 72\n",
+                encoding="utf-8",
+            )
+            previous_cwd = os.getcwd()
+            os.chdir(root)
+            try:
+                config = pydocformatter_config.load_config(isolated=True)
+            finally:
+                os.chdir(previous_cwd)
+
+        self.assertEqual(config.line_length, 88)
+
+    def test_isolated_accepts_inline_config_options(self) -> None:
+        config = pydocformatter_config.load_config(
+            config_options=("line-length = 104",),
+            isolated=True,
+        )
+
+        self.assertEqual(config.line_length, 104)
+
+    def test_isolated_rejects_explicit_config_file(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            config_path = root / "pydocfmt.toml"
+            config_path.write_text("line-length = 105\n", encoding="utf-8")
+
+            with self.assertRaisesRegex(ConfigError, "--config=PATH"):
+                pydocformatter_config.load_config(
+                    config_options=(str(config_path),),
+                    isolated=True,
+                )
+
 
 if __name__ == "__main__":
     unittest.main()

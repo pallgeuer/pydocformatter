@@ -217,6 +217,23 @@ def add_arguments(
         help=f"Apply include/exclude/gitignore rules even to files passed explicitly (default: {_enabled_label(settings.force_exclude)}).",
     )
 
+    global_options = parser.add_argument_group("Global options")
+    global_options.add_argument(
+        "--config",
+        action="append",
+        default=None,
+        dest="command_config",
+        metavar="CONFIG_OPTION",
+        help="Path to a TOML configuration file or TOML '<KEY> = <VALUE>' override.",
+    )
+    global_options.add_argument(
+        "--isolated",
+        action="store_true",
+        default=False,
+        dest="command_isolated",
+        help="Ignore all configuration files.",
+    )
+
 
 def run(args: argparse.Namespace) -> int:
     """Run the check subcommand."""
@@ -262,7 +279,11 @@ def load_settings(args: argparse.Namespace) -> config.FormatterSettings | None:
     """Load settings with command-line overrides, returning None on failure."""
     try:
         overrides = _settings_overrides_from_args(args)
-        return config.load_config(overrides)
+        return config.load_config(
+            overrides,
+            config_options=_config_options_from_args(args),
+            isolated=_isolated_from_args(args),
+        )
     except config.ConfigError as error:
         print(f"pydocfmt check: configuration error: {error}", file=sys.stderr)
         return None
@@ -416,6 +437,21 @@ def _settings_overrides_from_args(args: argparse.Namespace) -> config.SettingsOv
         per_file_ignores=_parse_per_file_options(args.per_file_ignores),
         extend_per_file_ignores=_parse_per_file_options(args.extend_per_file_ignores),
     )
+
+
+def _config_options_from_args(args: argparse.Namespace) -> tuple[str, ...]:
+    """Return --config values from the top-level and subcommand parsers."""
+    options = []
+    for name in ("global_config", "command_config"):
+        value = getattr(args, name, None)
+        if value is not None:
+            options.extend(value)
+    return tuple(options)
+
+
+def _isolated_from_args(args: argparse.Namespace) -> bool:
+    """Return whether any parser position specified --isolated."""
+    return bool(getattr(args, "global_isolated", False) or getattr(args, "command_isolated", False))
 
 
 def _parse_comma_option_groups(groups: list[str] | None) -> tuple[str, ...] | None:

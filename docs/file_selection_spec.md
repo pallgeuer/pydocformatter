@@ -46,10 +46,14 @@ Configuration is read from `[tool.pydocfmt]`.
 Resolution order:
 
 1. Start with hard-coded defaults.
-2. Apply `[tool.pydocfmt]`.
-3. Apply command-line options.
+2. Apply auto-discovered `[tool.pydocfmt]` from `pyproject.toml`, unless `--isolated` is set.
+3. Apply explicit `--config PATH` files.
+4. Apply inline `--config "<KEY> = <VALUE>"` settings.
+5. Apply dedicated command-line options.
 
 For every setting, including `extend-include` and `extend-exclude`, the highest-precedence specified value wins. Lists do not accumulate across configuration and command-line layers.
+
+`--config PATH` accepts either a pyproject-style file containing `[tool.pydocfmt]` or a dedicated config file with pydocfmt settings at top level. `--isolated` ignores auto-discovered configuration files. Inline `--config` settings can still be used with `--isolated`, but explicit config file paths cannot.
 
 `line-ending` follows Ruff's formatter values: `"auto"`, `"lf"`, `"cr-lf"`, and `"native"`. `"auto"` uses the first line ending detected in the source file, defaulting to LF when the file has no line endings. The setting controls rewritten files; files that do not require formatting are not rewritten solely to normalize line endings.
 
