@@ -79,7 +79,7 @@ class TestFormatterResults(unittest.TestCase):
 
         output = StringIO()
         with contextlib.redirect_stdout(output):
-            check_command.print_results_grouped([result])
+            check_command.print_results_grouped([result], output=None)
 
         self.assertEqual(
             output.getvalue().splitlines(),
@@ -206,10 +206,7 @@ class TestFormatterResults(unittest.TestCase):
 
             for extra_args, expected_exit_code in ((["--fix"], 0), (["--fix", "--exit-non-zero-on-fix"], 1)):
                 argv = ["pydocfmt", "check", "--experimental", *extra_args, str(target)]
-                with (
-                    unittest.mock.patch("sys.argv", argv),
-                    unittest.mock.patch("pydocformatter.formatter.format_file_exp", side_effect=fake_format_file_exp),
-                ):
+                with unittest.mock.patch("sys.argv", argv), unittest.mock.patch("pydocformatter.formatter.format_file_exp", side_effect=fake_format_file_exp):
                     exit_code = pydocfmt_main.main()
 
                 self.assertEqual(exit_code, expected_exit_code)
@@ -221,11 +218,7 @@ class TestFormatterResults(unittest.TestCase):
             target.write_text("x = 1\n", encoding="utf-8")
 
             with unittest.mock.patch("pydocformatter.cli.check.pydocfmt.format_file", return_value=True):
-                results = check_command.format_files(
-                    (str(target),),
-                    FormatterSettings(),
-                    fix=False,
-                )
+                results = check_command.format_files((str(target),), FormatterSettings(), fix=False, output=None)
 
         self.assertEqual(len(results), 1)
         self.assertFalse(results[0].modified)
@@ -240,11 +233,7 @@ class TestFormatterResults(unittest.TestCase):
             target.write_text("x = 1\n", encoding="utf-8")
 
             with unittest.mock.patch("pydocformatter.cli.check.pydocfmt.format_file", return_value=True):
-                results = check_command.format_files(
-                    (str(target),),
-                    FormatterSettings(),
-                    fix=True,
-                )
+                results = check_command.format_files((str(target),), FormatterSettings(), fix=True, output=None)
 
         self.assertEqual(len(results), 1)
         self.assertTrue(results[0].modified)

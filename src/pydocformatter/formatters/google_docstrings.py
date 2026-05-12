@@ -25,7 +25,7 @@ def _indent_unit(*, indent_style: IndentStyle, indent_width: int) -> str:
 
 
 def _visual_width(text: str, tab_width: int) -> int:
-    """Return the visual column width of text with Ruff-style tab width."""
+    """Return the visual column width of text with tab width."""
     width = 0
     for char in text:
         if char == "\t":

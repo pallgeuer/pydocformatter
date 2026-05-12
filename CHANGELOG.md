@@ -14,20 +14,22 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added Ruff-style subcommands with `pydocfmt check` for read-only checks and `pydocfmt check --fix` for formatting.
   - Added `pydocfmt help [command]`, `pydocfmt version`, `pydocfmt --version`, and `pydocfmt check --show-settings`.
   - Added `--line-ending` to control line endings used when rewriting files.
-  - Added `--show-files` to report all considered files during discovery, including included files and ignored files with include/exclude reasons, without formatting files.
-  - Added `--respect-gitignore` / `--no-respect-gitignore`, with enabled-by-default behavior and matching `pyproject.toml` configuration.
-  - Added `--experimental` / `--no-experimental` for opting into the experimental formatter path.
   - Added `--output-format grouped` for rule findings.
+  - Added `--experimental` / `--no-experimental` for opting into the experimental formatter path.
+  - Added `--show-files` to report all considered files during discovery, including included files and ignored files with include/exclude reasons, without formatting files.
+  - Added Ruff-style stdin support via `pydocfmt check -` and `--stdin-filename`.
+  - Added Ruff-style `-o` / `--output-file` for redirecting diagnostics and show output.
   - Added Ruff-style `-e` / `--exit-zero` and `--exit-non-zero-on-fix` status controls.
+  - Added `--respect-gitignore` / `--no-respect-gitignore`, with enabled-by-default behavior and matching `pyproject.toml` configuration.
   - Added Ruff-style `--config` and `--isolated` global options for explicit config files, inline setting overrides, and config-free runs.
 
 - **Configuration:**
+  - Added `output-format` for formatter configuration, currently supporting only `"grouped"`.
+  - Added `experimental` for formatter configuration, defaulting to `false`.
   - Added Ruff-style `line-ending` configuration with `"auto"`, `"lf"`, `"cr-lf"`, and `"native"` values.
   - Added `indent-style` and `indent-width` for generated docstring section indentation, with Ruff-style defaults of `"space"` and `4`.
+  - Added Ruff-style rule settings under `[tool.pydocfmt]`: `select`, `ignore`, `extend-select`, `per-file-ignores`, `extend-per-file-ignores`, `fixable`, `unfixable`, and `extend-fixable`.
   - Added `respect-gitignore` for formatter configuration, defaulting to `true`.
-  - Added `experimental` for formatter configuration, defaulting to `false`.
-  - Added `output-format` for formatter configuration, currently supporting only `"grouped"`.
-  - Added Ruff-style rule settings under `[tool.pydocfmt]`: `select`, `extend-select`, `ignore`, `fixable`, `extend-fixable`, `unfixable`, `per-file-ignores`, and `extend-per-file-ignores`.
   - Added explicit config-file support for `--config PATH`, including pyproject-style `[tool.pydocfmt]` files and dedicated top-level pydocfmt TOML files.
 
 - **Documentation:**
@@ -38,6 +40,8 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 
 - **CLI:**
   - Reorganized `pydocfmt check --help` into Ruff-inspired argument groups for options, rule selection, and file selection.
+  - Refactored parser setup to share global option definitions and isolate version/help subcommand construction.
+  - Updated `pydocfmt check --help` argument ordering and metavars to keep help, settings output, and documentation consistent.
   - Rule and file-selection list options now use comma-separated CLI values, such as `--select PDF,PCF` and `--include "*.py,*.pyi"`.
   - `pydocfmt` now formats both docstrings and comments in one run.
   - `pydocfmt` now exposes command-line overrides for Ruff-style rule settings.
@@ -66,6 +70,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 - **Architecture:**
   - Utility helpers now live in explicit `pydocformatter.utils` submodules for diagnostics, glob matching, and line endings.
   - Experimental formatter interfaces now live in `pydocformatter.formatter`.
+  - Global CLI argument definitions now live in `pydocformatter.config` and are shared by the top-level and `check` parsers.
 
 - **Developer dependencies:**
   - Updated mypy from 1.20.2 to 2.1.0.
@@ -80,6 +85,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Invalid include glob patterns now report configuration or argument errors instead of crashing with a traceback.
   - `--help` now works even when the current `pyproject.toml` contains invalid pydocformatter configuration.
   - Missing or unreadable files now emit a warning and processing continues instead of crashing.
+  - `--output-file` now creates only the direct parent directory instead of recursively creating nested output directories.
 
 - **File discovery:**
   - Empty exclude glob patterns are now rejected as invalid configuration or arguments.

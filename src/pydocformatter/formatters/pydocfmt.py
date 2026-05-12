@@ -1,13 +1,29 @@
 import ast
+import dataclasses
 import io
 import re
 import textwrap
 import tokenize
+import typing
 
 import pydocformatter.formatters.google_docstrings as google_docstrings
 import pydocformatter.utils.diagnostics as diagnostics
 import pydocformatter.utils.line_endings as line_endings
 from pydocformatter.config import FormatterSettings, IndentStyle
+
+
+@dataclasses.dataclass(frozen=True)
+class SourceFormatResult:
+    """Formatting result for Python source text."""
+
+    source: str
+    docstring_changed_lines: tuple[int, ...]
+    comment_changed_lines: tuple[int, ...]
+
+    @property
+    def modified(self) -> bool:
+        """Return whether formatting changed the source."""
+        return bool(self.docstring_changed_lines or self.comment_changed_lines)
 
 
 def _matches_ignoring_line_endings(left: str, right: str) -> bool:
@@ -235,11 +251,7 @@ def format_comments_in_source(
     return "".join(output_lines), tuple(sorted(changed_lines))
 
 
-def format_file(
-    path: str,
-    settings: FormatterSettings,
-    fix: bool,
-) -> bool:
+def format_file(path: str, settings: FormatterSettings, fix: bool, *, output: typing.TextIO | None) -> bool:
     """Format docstrings and comments in a Python file.
 
     This function reads a Python file once, formats docstrings first, then formats comments. If `fix` is False, it only
@@ -249,6 +261,7 @@ def format_file(
         path (str): The path to the Python file.
         settings (FormatterSettings): Resolved settings for formatting.
         fix (bool): If True, write formatting changes to the file.
+        output (typing.TextIO | None): Stream for check-mode diagnostics, or stdout if None.
 
     Returns:
         bool: True if the file was modified or needs formatting, False otherwise.
@@ -259,26 +272,65 @@ def format_file(
         `tokenize.TokenError`: If Python tokenization fails.
         `UnicodeDecodeError`: If the file cannot be decoded as UTF-8.
     """
+    result = format_file_source(path, settings, fix=fix)
+
+    if not fix:
+        print_source_diagnostics(path, result, output=output)
+    return result.modified
+
+
+def format_file_source(
+    path: str,
+    settings: FormatterSettings,
+    fix: bool,
+) -> SourceFormatResult:
+    """Format a Python file and return source-level formatting details."""
     with open(path, encoding="utf-8", newline="") as file:
         source = file.read()
 
+    result = format_source(source, settings, fix=fix)
+
+    if fix and result.modified:
+        with open(path, "w", encoding="utf-8", newline="") as file:
+            file.write(result.source)
+    return result
+
+
+def format_source(source: str, settings: FormatterSettings, fix: bool) -> SourceFormatResult:
+    """Format Python source text and return changed line details."""
     line_ending = line_endings.resolve_line_ending(source, line_ending=settings.line_ending)
     docstring_source, docstring_changed_lines = format_docstrings_in_source(source, settings, line_ending=line_ending)
 
     if not fix:
         _, comment_changed_lines = format_comments_in_source(source, settings, line_ending=line_ending)
-        if docstring_changed_lines:
-            print(diagnostics.format_needs_formatting_message(path, "docstring", list(docstring_changed_lines)))
-        if comment_changed_lines:
-            print(diagnostics.format_needs_formatting_message(path, "comment", list(comment_changed_lines)))
-        return bool(docstring_changed_lines or comment_changed_lines)
+        return SourceFormatResult(source=source, docstring_changed_lines=docstring_changed_lines, comment_changed_lines=comment_changed_lines)
 
     formatted_source, comment_changed_lines = format_comments_in_source(docstring_source, settings, line_ending=line_ending)
-    if docstring_changed_lines or comment_changed_lines:
-        with open(path, "w", encoding="utf-8", newline="") as file:
-            file.write(formatted_source)
-        return True
-    return False
+    return SourceFormatResult(source=formatted_source, docstring_changed_lines=docstring_changed_lines, comment_changed_lines=comment_changed_lines)
+
+
+def print_source_diagnostics(
+    path: str,
+    result: SourceFormatResult,
+    *,
+    output: typing.TextIO | None,
+) -> None:
+    """Print check-mode diagnostics for a source formatting result."""
+    for message in source_diagnostic_messages(path, result):
+        print(message, file=output)
+
+
+def source_diagnostic_messages(
+    path: str,
+    result: SourceFormatResult,
+) -> tuple[str, ...]:
+    """Return check-mode diagnostics for a source formatting result."""
+    messages: list[str] = []
+    if result.docstring_changed_lines:
+        messages.append(diagnostics.format_needs_formatting_message(path, "docstring", list(result.docstring_changed_lines)))
+    if result.comment_changed_lines:
+        messages.append(diagnostics.format_needs_formatting_message(path, "comment", list(result.comment_changed_lines)))
+    return tuple(messages)
 
 
 def format_docstrings(

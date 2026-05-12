@@ -2,6 +2,7 @@ import contextlib
 import os
 import subprocess
 import tempfile
+import typing
 import unittest
 import unittest.mock
 from io import StringIO
@@ -429,7 +430,7 @@ class TestCliShowFiles(unittest.TestCase):
             (root / "a.py").write_text("x = 1\n", encoding="utf-8")
             called_settings: list[tuple[str, int]] = []
 
-            def fake_format(path: str, settings: FormatterSettings, fix: bool) -> bool:
+            def fake_format(path: str, settings: FormatterSettings, fix: bool, *, output: typing.TextIO | None) -> bool:
                 called_settings.append((settings.indent_style, settings.indent_width))
                 return False
 
@@ -464,7 +465,7 @@ class TestCliShowFiles(unittest.TestCase):
             target.write_text("x = 1\n", encoding="utf-8")
             called_settings: list[str] = []
 
-            def fake_format(path: str, settings: FormatterSettings, fix: bool) -> bool:
+            def fake_format(path: str, settings: FormatterSettings, fix: bool, *, output: typing.TextIO | None) -> bool:
                 called_settings.append(settings.line_ending)
                 return False
 
@@ -711,8 +712,19 @@ class TestCliShowFiles(unittest.TestCase):
                 os.chdir(previous_cwd)
 
         self.assertEqual(cm.exception.code, 0)
-        self.assertIn("Rule selection:", stdout.getvalue())
-        self.assertIn("File selection:", stdout.getvalue())
+        output = stdout.getvalue()
+        self.assertIn("Rule selection:", output)
+        self.assertIn("File selection:", output)
+        self.assertLess(output.index("--output-format"), output.index("--show-files"))
+        self.assertLess(output.index("--show-files"), output.index("--show-settings"))
+        self.assertLess(output.index("File selection:"), output.index("Miscellaneous:"))
+        self.assertLess(output.index("Miscellaneous:"), output.index("Global options:"))
+        self.assertIn("--output-file FILE", output)
+        self.assertIn("--stdin-filename FILENAME", output)
+        self.assertIn("--config CONFIG", output)
+        self.assertIn("--line-length LENGTH", output)
+        self.assertIn("--indent-width WIDTH", output)
+        self.assertIn("--per-file-ignores TOML", output)
         self.assertEqual(stderr.getvalue(), "")
 
     def test_pydocfmt_help_check_prints_check_help(self) -> None:
@@ -790,6 +802,10 @@ class TestCliShowFiles(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         output = stdout.getvalue()
         self.assertIn("[tool.pydocfmt]", output)
+        self.assertLess(output.index("output-format"), output.index("experimental"))
+        self.assertLess(output.index("experimental"), output.index("line-length"))
+        self.assertLess(output.index("line-length"), output.index("select"))
+        self.assertLess(output.index("extend-fixable"), output.index("include"))
         self.assertIn("line-length = 72", output)
         self.assertIn('line-ending = "lf"', output)
         self.assertIn("respect-gitignore = false", output)
@@ -1126,6 +1142,134 @@ class TestCliShowFiles(unittest.TestCase):
                 f"{root / 'needs_fix.py'}: Needs docstring formatting on line 2",
                 output,
             )
+
+    def test_pydocfmt_check_reads_source_from_stdin(self) -> None:
+        source = 'def foo():\n    """This is a very long single-line docstring that should be reflowed by the formatter due to line length."""\n    pass\n'
+        stdout = StringIO()
+        argv = ["pydocfmt", "check", "-", "--line-length", "72"]
+
+        with (
+            unittest.mock.patch("sys.argv", argv),
+            unittest.mock.patch("sys.stdin", StringIO(source)),
+            contextlib.redirect_stdout(stdout),
+        ):
+            exit_code = pydocfmt_main.main()
+
+        self.assertEqual(exit_code, 1)
+        output = stdout.getvalue()
+        self.assertIn("-: Needs docstring formatting on line 2", output)
+        self.assertIn("Found 1 errors (1 fixable).", output)
+
+    def test_pydocfmt_stdin_filename_sets_display_path_and_ignores_paths(self) -> None:
+        source = 'def foo():\n    """This is a very long single-line docstring that should be reflowed by the formatter due to line length."""\n    pass\n'
+        stdout = StringIO()
+        stderr = StringIO()
+        argv = ["pydocfmt", "check", "ignored.py", "--stdin-filename", "virtual.py", "--line-length", "72"]
+
+        with (
+            unittest.mock.patch("sys.argv", argv),
+            unittest.mock.patch("sys.stdin", StringIO(source)),
+            contextlib.redirect_stdout(stdout),
+            contextlib.redirect_stderr(stderr),
+        ):
+            exit_code = pydocfmt_main.main()
+
+        self.assertEqual(exit_code, 1)
+        self.assertIn("virtual.py: Needs docstring formatting on line 2", stdout.getvalue())
+        self.assertIn("warning: Ignoring file ignored.py in favor of standard input.", stderr.getvalue())
+
+    def test_pydocfmt_fix_stdin_writes_formatted_source_to_stdout(self) -> None:
+        source = 'def foo():\n    """Does something.\n\nArgs:\n    x (int): some parameter.\n    """\n    pass\n'
+        stdout = StringIO()
+        argv = ["pydocfmt", "check", "--fix", "-", "--line-length", "72"]
+
+        with (
+            unittest.mock.patch("sys.argv", argv),
+            unittest.mock.patch("sys.stdin", StringIO(source)),
+            contextlib.redirect_stdout(stdout),
+        ):
+            exit_code = pydocfmt_main.main()
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(stdout.getvalue(), 'def foo():\n    """Does something.\n\n    Args:\n        x (int): some parameter.\n    """\n    pass\n')
+
+    def test_pydocfmt_output_file_redirects_check_diagnostics_and_creates_parent(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            target = root / "a.py"
+            target.write_text('def foo():\n    """This is a very long single-line docstring that should be reflowed by the formatter due to line length."""\n    pass\n', encoding="utf-8")
+            output_file = root / "reports" / "diagnostics.txt"
+            stdout = StringIO()
+            argv = ["pydocfmt", "check", str(target), "--line-length", "72", "--output-file", str(output_file)]
+
+            with (
+                unittest.mock.patch("sys.argv", argv),
+                contextlib.redirect_stdout(stdout),
+            ):
+                exit_code = pydocfmt_main.main()
+
+            self.assertEqual(exit_code, 1)
+            self.assertEqual(stdout.getvalue(), "")
+            output = output_file.read_text(encoding="utf-8")
+            self.assertIn(f"{target}: Needs docstring formatting on line 2", output)
+            self.assertIn("Found 1 errors (1 fixable).", output)
+
+    def test_pydocfmt_output_file_does_not_create_nested_parents(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            target = root / "a.py"
+            target.write_text('def foo():\n    """This is a very long single-line docstring that should be reflowed by the formatter due to line length."""\n    pass\n', encoding="utf-8")
+            output_file = root / "reports" / "nested" / "diagnostics.txt"
+            stderr = StringIO()
+            argv = ["pydocfmt", "check", str(target), "--line-length", "72", "--output-file", str(output_file)]
+
+            with (
+                unittest.mock.patch("sys.argv", argv),
+                contextlib.redirect_stderr(stderr),
+            ):
+                exit_code = pydocfmt_main.main()
+
+            self.assertEqual(exit_code, 2)
+            self.assertFalse((root / "reports").exists())
+            self.assertIn("pydocfmt check: output error:", stderr.getvalue())
+
+    def test_pydocfmt_output_file_redirects_show_output(self) -> None:
+        with self._make_sample_tree() as td:
+            root = Path(td)
+            output_file = root / "reports" / "show-files.txt"
+            stdout = StringIO()
+            argv = ["pydocfmt", "check", str(root), "--show-files", "--include", "*.py", "--exclude", "skip.py", "--output-file", str(output_file)]
+
+            with (
+                unittest.mock.patch("sys.argv", argv),
+                contextlib.redirect_stdout(stdout),
+            ):
+                exit_code = pydocfmt_main.main()
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(stdout.getvalue(), "")
+            self.assertEqual(
+                output_file.read_text(encoding="utf-8").splitlines(),
+                [
+                    f"{root / 'a.py'} INCLUDED",
+                    f"{root / 'b.txt'} IGNORED: does not match include patterns",
+                    f"{root / 'skip.py'} IGNORED: matches exclude patterns",
+                ],
+            )
+
+    def test_pydocfmt_stdin_filename_is_rejected_with_show_flags(self) -> None:
+        for show_flag in ("--show-files", "--show-settings"):
+            stderr = StringIO()
+            argv = ["pydocfmt", "check", show_flag, "--stdin-filename", "virtual.py"]
+
+            with (
+                unittest.mock.patch("sys.argv", argv),
+                contextlib.redirect_stderr(stderr),
+            ):
+                exit_code = pydocfmt_main.main()
+
+            self.assertEqual(exit_code, 2)
+            self.assertIn(f"the argument '{show_flag}' cannot be used with '--stdin-filename <FILENAME>'", stderr.getvalue())
 
 
 if __name__ == "__main__":

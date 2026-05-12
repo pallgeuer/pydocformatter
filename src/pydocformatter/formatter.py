@@ -54,6 +54,7 @@ class FormatterResult:
     path: str
     modified: bool
     findings: tuple[RuleFinding, ...]
+    diagnostic_messages: tuple[str, ...] = ()
 
 
 def format_file_exp(path: str, settings: FormatterSettings, fix: bool) -> FormatterResult:
@@ -62,3 +63,9 @@ def format_file_exp(path: str, settings: FormatterSettings, fix: bool) -> Format
         file.read()
 
     return FormatterResult(path=path, modified=False, findings=())
+
+
+def format_source_exp(source: str, path: str, settings: FormatterSettings, fix: bool) -> tuple[str, FormatterResult]:
+    """Run the experimental formatter interface for stdin source."""
+    del settings, fix
+    return source, FormatterResult(path=path, modified=False, findings=())

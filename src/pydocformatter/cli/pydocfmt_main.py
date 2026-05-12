@@ -43,11 +43,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Print version and exit.",
     )
-    add_global_arguments(parser, dest_prefix="global")
+    config.add_global_arguments(parser, dest_prefix="global")
     subparsers = parser.add_subparsers(
         title="Commands",
         dest="command",
-        metavar="<COMMAND>",
+        metavar="COMMAND",
     )
     check_parser = check.add_parser(subparsers, config.FormatterSettings(), formatter_class=WideHelpFormatter)
 
@@ -69,30 +69,11 @@ def build_parser() -> argparse.ArgumentParser:
         "topic",
         nargs="?",
         choices=("check", "version", "help"),
+        metavar="COMMAND",
         help="Subcommand to show help for.",
     )
     help_parser.set_defaults(func=lambda args: run_help(args, parser, {"check": check_parser, "version": version_parser, "help": help_parser}))
     return parser
-
-
-def add_global_arguments(parser: argparse.ArgumentParser, *, dest_prefix: str) -> None:
-    """Add Ruff-style global configuration arguments to a parser."""
-    global_options = parser.add_argument_group("Global options")
-    global_options.add_argument(
-        "--config",
-        action="append",
-        default=None,
-        dest=f"{dest_prefix}_config",
-        metavar="CONFIG_OPTION",
-        help="Path to a TOML configuration file or TOML '<KEY> = <VALUE>' override.",
-    )
-    global_options.add_argument(
-        "--isolated",
-        action="store_true",
-        default=False,
-        dest=f"{dest_prefix}_isolated",
-        help="Ignore all configuration files.",
-    )
 
 
 def run_version(args: argparse.Namespace) -> int:

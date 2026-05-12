@@ -78,24 +78,44 @@ If no files or directories are specified, `pydocfmt check` checks the current di
 **Options:**
 - `--help`: Show help message and exit
 - `--fix`, `--no-fix`: Toggle applying fixes instead of only checking
-- `-e`, `--exit-zero`: Exit with status code `0`, even when formatting violations are detected
-- `--exit-non-zero-on-fix`: Exit with a non-zero status code if `--fix` modifies any files
+- `--output-format {grouped}`: Output format for rule findings (default: grouped)
+- `-o`, `--output-file FILE`: Write diagnostics and show output to a file instead of stdout
 - `--show-files`: Show file-selection decisions without formatting files
 - `--show-settings`: Show resolved settings without formatting files
-- `--config CONFIG_OPTION`: Path to a TOML configuration file, or a TOML `<KEY> = <VALUE>` setting override
-- `--isolated`: Ignore auto-discovered configuration files
-- `--line-length INTEGER`: Maximum line length for docstrings and comments (default: 88)
+- `--experimental`, `--no-experimental`: Toggle the experimental rule-based formatter implementation (default: disabled)
+
+**Formatting:**
+- `--line-length LENGTH`: Maximum line length for docstrings and comments (default: 88)
 - `--line-ending {auto,lf,cr-lf,native}`: Line ending to use when rewriting files (default: auto)
 - `--indent-style {space,tab}`: Indentation style for generated docstring sections (default: space)
-- `--indent-width INTEGER`: Indentation width for generated docstring sections (default: 4)
+- `--indent-width WIDTH`: Indentation width for generated docstring sections (default: 4)
+
+**Rule Selection:**
+- `--select RULE`: Comma-separated rule selector(s) to enable
+- `--ignore RULE`: Comma-separated rule selector(s) to ignore
+- `--extend-select RULE`: Comma-separated additional rule selector(s) to enable
+- `--per-file-ignores TOML`: TOML inline table mapping file patterns to ignored rule selectors
+- `--extend-per-file-ignores TOML`: TOML inline table mapping file patterns to additional ignored rule selectors
+- `--fixable RULE`: Comma-separated rule selector(s) eligible for automatic fixes
+- `--unfixable RULE`: Comma-separated rule selector(s) ineligible for automatic fixes
+- `--extend-fixable RULE`: Comma-separated additional rule selector(s) eligible for automatic fixes
+
+**File Selection:**
 - `--include GLOB`: Comma-separated glob pattern(s) for files to include
 - `--extend-include GLOB`: Comma-separated additional glob pattern(s) for files to include
 - `--exclude GLOB`: Comma-separated glob pattern(s) for files to exclude
 - `--extend-exclude GLOB`: Comma-separated additional glob pattern(s) for files to exclude
 - `--respect-gitignore`, `--no-respect-gitignore`: Toggle .gitignore-aware discovery (default: enabled)
 - `--force-exclude`, `--no-force-exclude`: Apply include/exclude rules even to explicitly listed files
-- `--experimental`, `--no-experimental`: Toggle the experimental rule-based formatter implementation (default: disabled)
-- `--output-format {grouped}`: Output format for rule findings (default: grouped)
+
+**Miscellaneous:**
+- `--stdin-filename FILENAME`: File name to use when checking or fixing source from stdin
+- `-e`, `--exit-zero`: Exit with status code `0`, even when formatting violations are detected
+- `--exit-non-zero-on-fix`: Exit with a non-zero status code if `--fix` modifies any files
+
+**Global Options:**
+- `--config CONFIG`: Path to a TOML configuration file, or a TOML `<KEY> = <VALUE>` setting override
+- `--isolated`: Ignore auto-discovered configuration files
 
 **Examples:**
 
@@ -111,6 +131,12 @@ pydocfmt check --fix src/
 
 # Check formatting without changes
 pydocfmt check src/
+
+# Check source from stdin
+cat myfile.py | pydocfmt check - --stdin-filename myfile.py
+
+# Write diagnostics to a file
+pydocfmt check src/ --output-file pydocfmt.txt
 
 # Custom line length
 pydocfmt check --fix --line-length 100 src/
@@ -154,46 +180,49 @@ pydocformatter can be configured via `pyproject.toml` (example):
 
 ```toml
 [tool.pydocfmt]
+output-format = "grouped"
+experimental = false
 line-length = 88
 line-ending = "auto"
 indent-style = "space"
 indent-width = 4
+select = ["ALL"]
+ignore = []
+extend-select = []
+per-file-ignores = {"tests/*.py" = ["PCF001"]}
+extend-per-file-ignores = {}
+fixable = ["ALL"]
+unfixable = []
+extend-fixable = []
 include = ["*.py", "*.pyi", "*.pyw"]
+extend-include = []
+exclude = [".venv", "dist"]
 extend-exclude = ["generated"]
 respect-gitignore = true
 force-exclude = false
-experimental = false
-output-format = "grouped"
-select = ["ALL"]
-ignore = []
-fixable = ["ALL"]
-unfixable = []
-
-[tool.pydocfmt.per-file-ignores]
-"tests/*.py" = ["PCF001"]
 ```
 
 **Configuration Options:**
+- `output-format`: Output format for rule findings; currently only `"grouped"` is supported (default: `"grouped"`)
+- `experimental`: Use the experimental rule-based formatter implementation (default: `false`)
 - `line-length`: Maximum line length for docstrings and comments (default: 88)
 - `line-ending`: Line ending to use when rewriting files; one of `"auto"`, `"lf"`, `"cr-lf"`, or `"native"` (default: `"auto"`)
 - `indent-style`: Generated docstring section indentation style; one of `"space"` or `"tab"` (default: `"space"`)
 - `indent-width`: Generated docstring section indentation width (default: 4)
+- `select`: Rule selectors to enable (default: `["ALL"]`)
+- `ignore`: Rule selectors to ignore
+- `extend-select`: Additional rule selectors to enable
+- `per-file-ignores`: File-pattern-specific ignored rule selectors
+- `extend-per-file-ignores`: Additional file-pattern-specific ignored rule selectors
+- `fixable`: Rule selectors eligible for automatic fixes (default: `["ALL"]`)
+- `unfixable`: Rule selectors ineligible for automatic fixes
+- `extend-fixable`: Additional rule selectors eligible for automatic fixes
 - `include`: Glob patterns for files to include
 - `extend-include`: Additional include glob patterns
 - `exclude`: Glob patterns for files/directories to exclude
 - `extend-exclude`: Additional exclude glob patterns
 - `respect-gitignore`: Respect `.gitignore` during file discovery (default: `true`)
 - `force-exclude`: Apply include/exclude rules to explicitly listed files (default: `false`)
-- `experimental`: Use the experimental rule-based formatter implementation (default: `false`)
-- `output-format`: Output format for rule findings; currently only `"grouped"` is supported (default: `"grouped"`)
-- `select`: Rule selectors to enable (default: `["ALL"]`)
-- `extend-select`: Additional rule selectors to enable
-- `ignore`: Rule selectors to ignore
-- `fixable`: Rule selectors eligible for automatic fixes (default: `["ALL"]`)
-- `extend-fixable`: Additional rule selectors eligible for automatic fixes
-- `unfixable`: Rule selectors ineligible for automatic fixes
-- `per-file-ignores`: File-pattern-specific ignored rule selectors
-- `extend-per-file-ignores`: Additional file-pattern-specific ignored rule selectors
 
 Settings are resolved as defaults, then auto-discovered `[tool.pydocfmt]`, then explicit `--config` files, then inline `--config` setting overrides, then dedicated command-line options. The highest-precedence specified value wins for each key, including `extend-include` and `extend-exclude`.
 

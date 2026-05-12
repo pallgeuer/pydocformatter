@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import dataclasses
+import os
 import sys
 import tomllib
+import typing
 from collections import defaultdict
+from collections.abc import Iterator
 
 import pydocformatter.config as config
 import pydocformatter.file_selection as file_selection
@@ -47,8 +51,9 @@ def add_arguments(
     arguments.add_argument(
         "files",
         nargs="*",
-        default=["."],
-        help="Python files or directories to check (default: current directory).",
+        default=None,
+        metavar="PATH",
+        help="Python files or directories to check, or '-' to read from stdin (default: current directory).",
     )
 
     options = parser.add_argument_group("Options")
@@ -57,6 +62,19 @@ def add_arguments(
         action=argparse.BooleanOptionalAction,
         default=False,
         help="Apply fixes instead of only checking for needed changes.",
+    )
+    options.add_argument(
+        "--output-format",
+        choices=("grouped",),
+        default=None,
+        help=f"Output format for experimental rule findings (default: {settings.output_format}).",
+    )
+    options.add_argument(
+        "-o",
+        "--output-file",
+        default=None,
+        metavar="FILE",
+        help="Specify file to write diagnostics and show output to (default: stdout).",
     )
     options.add_argument(
         "--show-files",
@@ -68,53 +86,39 @@ def add_arguments(
         action="store_true",
         help="Show resolved settings without checking or fixing files.",
     )
-    exit_options = options.add_mutually_exclusive_group()
-    exit_options.add_argument(
-        "-e",
-        "--exit-zero",
-        action="store_true",
-        help='Exit with status code "0", even upon detecting formatting violations.',
-    )
-    exit_options.add_argument(
-        "--exit-non-zero-on-fix",
-        action="store_true",
-        help="Exit with a non-zero status code if any files were modified via fix, even if no formatting violations remain.",
-    )
-    options.add_argument(
-        "--line-length",
-        type=int,
-        default=None,
-        help=f"Maximum line length for docstrings and comments (default: {settings.line_length}).",
-    )
-    options.add_argument(
-        "--line-ending",
-        choices=("auto", "lf", "cr-lf", "native"),
-        default=None,
-        help=f"Line ending to use when rewriting files (default: {settings.line_ending}).",
-    )
-    options.add_argument(
-        "--indent-style",
-        choices=("space", "tab"),
-        default=None,
-        help=f"Indentation style for generated docstring sections (default: {settings.indent_style}).",
-    )
-    options.add_argument(
-        "--indent-width",
-        type=int,
-        default=None,
-        help=f"Indentation width for generated docstring sections (default: {settings.indent_width}).",
-    )
     options.add_argument(
         "--experimental",
         action=argparse.BooleanOptionalAction,
         default=None,
         help=f"Use the experimental rule-based formatter implementation (default: {_enabled_label(settings.experimental)}).",
     )
-    options.add_argument(
-        "--output-format",
-        choices=("grouped",),
+
+    formatting = parser.add_argument_group("Formatting")
+    formatting.add_argument(
+        "--line-length",
+        type=int,
         default=None,
-        help=f"Output format for experimental rule findings (default: {settings.output_format}).",
+        metavar="LENGTH",
+        help=f"Maximum line length for docstrings and comments (default: {settings.line_length}).",
+    )
+    formatting.add_argument(
+        "--line-ending",
+        choices=("auto", "lf", "cr-lf", "native"),
+        default=None,
+        help=f"Line ending to use when rewriting files (default: {settings.line_ending}).",
+    )
+    formatting.add_argument(
+        "--indent-style",
+        choices=("space", "tab"),
+        default=None,
+        help=f"Indentation style for generated docstring sections (default: {settings.indent_style}).",
+    )
+    formatting.add_argument(
+        "--indent-width",
+        type=int,
+        default=None,
+        metavar="WIDTH",
+        help=f"Indentation width for generated docstring sections (default: {settings.indent_width}).",
     )
 
     rule_selection = parser.add_argument_group("Rule selection")
@@ -217,22 +221,27 @@ def add_arguments(
         help=f"Apply include/exclude/gitignore rules even to files passed explicitly (default: {_enabled_label(settings.force_exclude)}).",
     )
 
-    global_options = parser.add_argument_group("Global options")
-    global_options.add_argument(
-        "--config",
-        action="append",
+    miscellaneous = parser.add_argument_group("Miscellaneous")
+    miscellaneous.add_argument(
+        "--stdin-filename",
         default=None,
-        dest="command_config",
-        metavar="CONFIG_OPTION",
-        help="Path to a TOML configuration file or TOML '<KEY> = <VALUE>' override.",
+        metavar="FILENAME",
+        help="The name of the file when passing it through stdin.",
     )
-    global_options.add_argument(
-        "--isolated",
+    exit_options = miscellaneous.add_mutually_exclusive_group()
+    exit_options.add_argument(
+        "-e",
+        "--exit-zero",
         action="store_true",
-        default=False,
-        dest="command_isolated",
-        help="Ignore all configuration files.",
+        help='Exit with status code "0", even upon detecting formatting violations.',
     )
+    exit_options.add_argument(
+        "--exit-non-zero-on-fix",
+        action="store_true",
+        help="Exit with a non-zero status code if any files were modified via fix, even if no formatting violations remain.",
+    )
+
+    config.add_global_arguments(parser, dest_prefix="command")
 
 
 def run(args: argparse.Namespace) -> int:
@@ -240,30 +249,89 @@ def run(args: argparse.Namespace) -> int:
     if args.show_files and args.show_settings:
         print("pydocfmt check: argument error: --show-files and --show-settings cannot be used together", file=sys.stderr)
         return 2
+    if args.stdin_filename is not None and (args.show_files or args.show_settings):
+        option = "--show-files" if args.show_files else "--show-settings"
+        print(f"pydocfmt check: argument error: the argument '{option}' cannot be used with '--stdin-filename <FILENAME>'", file=sys.stderr)
+        return 2
 
     settings = load_settings(args)
     if settings is None:
         return 2
 
-    if args.show_settings:
-        print_settings(settings)
-        return 0
-
     try:
-        selection = file_selection.select_files(args.files, settings)
-    except file_selection.FileSelectionError as error:
-        print(f"pydocfmt check: file selection error: {error}", file=sys.stderr)
-        return 2
-    if args.show_files:
-        print_file_selection_decisions(selection.decisions)
+        if args.show_settings:
+            with output_stream(args.output_file) as output:
+                print_settings(settings, output=output)
+            return 0
+
+        stdin_mode = _uses_stdin(args)
+        if stdin_mode:
+            with output_stream(args.output_file) as output:
+                if args.show_files:
+                    return 0
+                return run_stdin(args, settings, output=output)
+
+        files = typing.cast(list[str], args.files) if args.files else ["."]
+        try:
+            selection = file_selection.select_files(files, settings)
+        except file_selection.FileSelectionError as error:
+            print(f"pydocfmt check: file selection error: {error}", file=sys.stderr)
+            return 2
+
+        if args.show_files:
+            with output_stream(args.output_file) as output:
+                print_file_selection_decisions(selection.decisions, output=output)
+            return 0
+
+        if settings.experimental:
+            results = format_files_exp(selection.accepted_paths, settings, fix=args.fix)
+        else:
+            results = format_files(selection.accepted_paths, settings, fix=args.fix, output=None, collect_diagnostics=args.output_file is not None)
+
+        with output_stream(args.output_file) as output:
+            print_results(results, settings, output=output)
+
+        has_findings = any(result.findings for result in results)
+        modified = any(result.modified for result in results)
+        if args.exit_zero:
+            return 0
+        if has_findings:
+            return 1
+        if args.fix and args.exit_non_zero_on_fix and modified:
+            return 1
         return 0
+    except OSError as error:
+        print(f"pydocfmt check: output error: {error}", file=sys.stderr)
+        return 2
 
+
+def run_stdin(args: argparse.Namespace, settings: config.FormatterSettings, *, output: typing.TextIO | None) -> int:
+    """Run the check subcommand against stdin."""
+    _warn_about_ignored_stdin_paths(args)
+    display_path = args.stdin_filename if args.stdin_filename is not None else "-"
+    source = sys.stdin.read()
     if settings.experimental:
-        results = format_files_exp(selection.accepted_paths, settings, fix=args.fix)
+        formatted_source, result = formatter.format_source_exp(source, display_path, settings, fix=args.fix)
+        results = [result]
     else:
-        results = format_files(selection.accepted_paths, settings, fix=args.fix)
+        source_result = pydocfmt.format_source(source, settings, fix=args.fix)
+        if args.fix:
+            result = FormatterResult(path=display_path, modified=source_result.modified, findings=())
+        elif source_result.modified:
+            result = FormatterResult(
+                path=display_path,
+                modified=False,
+                findings=(RuleFinding(rule=LEGACY_CHECK_RULE, line_numbers=(0,)),),
+                diagnostic_messages=pydocfmt.source_diagnostic_messages(display_path, source_result),
+            )
+        else:
+            result = FormatterResult(path=display_path, modified=False, findings=())
+        formatted_source = source_result.source
+        results = [result]
 
-    print_results(results, settings)
+    print_results(results, settings, output=output)
+    if args.fix:
+        sys.stdout.write(formatted_source)
     has_findings = any(result.findings for result in results)
     modified = any(result.modified for result in results)
     if args.exit_zero:
@@ -273,6 +341,37 @@ def run(args: argparse.Namespace) -> int:
     if args.fix and args.exit_non_zero_on_fix and modified:
         return 1
     return 0
+
+
+@contextlib.contextmanager
+def output_stream(output_file: str | None) -> Iterator[typing.TextIO | None]:
+    """Yield the configured diagnostics output stream."""
+    if output_file is None:
+        yield None
+        return
+
+    parent = os.path.dirname(output_file)
+    if parent:
+        try:
+            os.mkdir(parent)
+        except FileExistsError:
+            pass
+    with open(output_file, "w", encoding="utf-8", newline="") as file:
+        yield file
+
+
+def _uses_stdin(args: argparse.Namespace) -> bool:
+    """Return whether parsed arguments request stdin input."""
+    return args.stdin_filename is not None or (args.files is not None and "-" in args.files)
+
+
+def _warn_about_ignored_stdin_paths(args: argparse.Namespace) -> None:
+    """Warn when stdin mode ignores explicitly supplied file paths."""
+    if args.files is None:
+        return
+    ignored_paths = [path for path in args.files if path != "-"]
+    for path in ignored_paths:
+        print(f"warning: Ignoring file {path} in favor of standard input.", file=sys.stderr)
 
 
 def load_settings(args: argparse.Namespace) -> config.FormatterSettings | None:
@@ -288,38 +387,35 @@ def load_settings(args: argparse.Namespace) -> config.FormatterSettings | None:
         print(f"pydocfmt check: configuration error: {error}", file=sys.stderr)
         return None
     except tomllib.TOMLDecodeError as error:
-        print(
-            f"pydocfmt check: configuration error: invalid TOML inline table: {error}",
-            file=sys.stderr,
-        )
+        print(f"pydocfmt check: configuration error: invalid TOML inline table: {error}", file=sys.stderr)
         return None
 
 
-def print_file_selection_decisions(decisions: tuple[file_selection.FileDecision, ...]) -> None:
+def print_file_selection_decisions(decisions: tuple[file_selection.FileDecision, ...], *, output: typing.TextIO | None) -> None:
     """Print file-selection decisions."""
     for decision in decisions:
         if decision.accepted:
-            print(f"{decision.path} INCLUDED")
+            print(f"{decision.path} INCLUDED", file=output)
         else:
-            print(f"{decision.path} IGNORED: {decision.message}")
+            print(f"{decision.path} IGNORED: {decision.message}", file=output)
 
 
-def print_settings(settings: config.FormatterSettings) -> None:
+def print_settings(settings: config.FormatterSettings, *, output: typing.TextIO | None) -> None:
     """Print resolved settings in a stable TOML-like form."""
-    print("[tool.pydocfmt]")
+    print("[tool.pydocfmt]", file=output)
     for field in dataclasses.fields(config.FormatterSettings):
         key = field.name.replace("_", "-")
         value = getattr(settings, field.name)
         if field.name in {"per_file_ignores", "extend_per_file_ignores"}:
-            print(f"{key} = {_format_rule_selector_map(value)}")
+            print(f"{key} = {_format_rule_selector_map(value)}", file=output)
         elif isinstance(value, tuple):
-            print(f"{key} = {_format_string_list(value)}")
+            print(f"{key} = {_format_string_list(value)}", file=output)
         elif isinstance(value, str):
-            print(f'{key} = "{value}"')
+            print(f'{key} = "{value}"', file=output)
         elif isinstance(value, bool):
-            print(f"{key} = {str(value).lower()}")
+            print(f"{key} = {str(value).lower()}", file=output)
         else:
-            print(f"{key} = {value}")
+            print(f"{key} = {value}", file=output)
 
 
 def format_files_exp(
@@ -345,12 +441,21 @@ def format_files(
     paths: tuple[str, ...],
     settings: config.FormatterSettings,
     fix: bool,
+    *,
+    output: typing.TextIO | None,
+    collect_diagnostics: bool = False,
 ) -> list[FormatterResult]:
     """Format files with the legacy formatter path."""
     results: list[FormatterResult] = []
     for path in paths:
         try:
-            modified_or_needs_formatting = pydocfmt.format_file(path, settings, fix=fix)
+            if collect_diagnostics:
+                source_result = pydocfmt.format_file_source(path, settings, fix=fix)
+                modified_or_needs_formatting = source_result.modified
+                diagnostic_messages = pydocfmt.source_diagnostic_messages(path, source_result) if not fix else ()
+            else:
+                modified_or_needs_formatting = pydocfmt.format_file(path, settings, fix=fix, output=output)
+                diagnostic_messages = ()
         except UnicodeDecodeError as error:
             print(f"{path} ignored WARNING: failed to decode as UTF-8 ({error})")
             continue
@@ -359,36 +464,43 @@ def format_files(
             continue
         if not fix and modified_or_needs_formatting:
             finding = RuleFinding(rule=LEGACY_CHECK_RULE, line_numbers=(0,))
-            results.append(FormatterResult(path=path, modified=False, findings=(finding,)))
+            results.append(FormatterResult(path=path, modified=False, findings=(finding,), diagnostic_messages=diagnostic_messages))
         else:
             results.append(FormatterResult(path=path, modified=modified_or_needs_formatting, findings=()))
     return results
 
 
-def print_results(results: list[FormatterResult], settings: config.FormatterSettings) -> None:
+def print_results(results: list[FormatterResult], settings: config.FormatterSettings, *, output: typing.TextIO | None) -> None:
     """Print formatter results in the configured output format."""
     if settings.output_format == "grouped":
-        print_results_grouped(results)
+        print_results_grouped(results, output=output)
         return
     raise AssertionError(f"unknown output format: {settings.output_format}")
 
 
-def print_results_grouped(results: list[FormatterResult]) -> None:
+def print_results_grouped(results: list[FormatterResult], *, output: typing.TextIO | None) -> None:
     """Print remaining findings grouped by file."""
     total_findings = sum(len(result.findings) for result in results)
+    total_diagnostic_messages = sum(len(result.diagnostic_messages) for result in results)
+    if total_findings == 0 and total_diagnostic_messages == 0:
+        return
+
+    for result in results:
+        for message in result.diagnostic_messages:
+            print(message, file=output)
     if total_findings == 0:
         return
 
     for result in results:
         if not result.findings:
             continue
-        print(f"{result.path}:")
+        print(f"{result.path}:", file=output)
         for finding in _group_findings(result.findings):
-            print(f"  {_format_grouped_finding(finding)}")
-        print()
+            print(f"  {_format_grouped_finding(finding)}", file=output)
+        print(file=output)
 
     fixable_findings = sum(1 for result in results for finding in result.findings if finding.fixable)
-    print(f"Found {total_findings} errors ({fixable_findings} fixable).")
+    print(f"Found {total_findings} errors ({fixable_findings} fixable).", file=output)
 
 
 def _group_findings(findings: tuple[RuleFinding, ...]) -> tuple[RuleFinding, ...]:
@@ -416,26 +528,26 @@ def _format_grouped_finding(finding: RuleFinding) -> str:
 def _settings_overrides_from_args(args: argparse.Namespace) -> config.SettingsOverrides:
     """Build settings overrides from parsed command-line arguments."""
     return config.SettingsOverrides(
+        output_format=args.output_format,
+        experimental=args.experimental,
         line_length=args.line_length,
         line_ending=args.line_ending,
         indent_style=args.indent_style,
         indent_width=args.indent_width,
+        select=_parse_comma_option_groups(args.select),
+        ignore=_parse_comma_option_groups(args.ignore),
+        extend_select=_parse_comma_option_groups(args.extend_select),
+        per_file_ignores=_parse_per_file_options(args.per_file_ignores),
+        extend_per_file_ignores=_parse_per_file_options(args.extend_per_file_ignores),
+        fixable=_parse_comma_option_groups(args.fixable),
+        unfixable=_parse_comma_option_groups(args.unfixable),
+        extend_fixable=_parse_comma_option_groups(args.extend_fixable),
         include=_parse_comma_option_groups(args.include),
         extend_include=_parse_comma_option_groups(args.extend_include),
         exclude=_parse_comma_option_groups(args.exclude),
         extend_exclude=_parse_comma_option_groups(args.extend_exclude),
         respect_gitignore=args.respect_gitignore,
         force_exclude=args.force_exclude,
-        experimental=args.experimental,
-        output_format=args.output_format,
-        select=_parse_comma_option_groups(args.select),
-        extend_select=_parse_comma_option_groups(args.extend_select),
-        ignore=_parse_comma_option_groups(args.ignore),
-        fixable=_parse_comma_option_groups(args.fixable),
-        extend_fixable=_parse_comma_option_groups(args.extend_fixable),
-        unfixable=_parse_comma_option_groups(args.unfixable),
-        per_file_ignores=_parse_per_file_options(args.per_file_ignores),
-        extend_per_file_ignores=_parse_per_file_options(args.extend_per_file_ignores),
     )
 
 

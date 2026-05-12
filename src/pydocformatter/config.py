@@ -1,3 +1,4 @@
+import argparse
 import dataclasses
 import os
 import tomllib
@@ -39,53 +40,48 @@ DEFAULT_INCLUDE = ("*.py", "*.pyi", "*.pyw")
 DEFAULT_RULE_SELECT = (rules.ALL_RULE_CODE,)
 DEFAULT_RULE_FIXABLE = (rules.ALL_RULE_CODE,)
 
-_KEY_TO_FIELD = {
-    "line-length": "line_length",
-    "line-ending": "line_ending",
-    "indent-style": "indent_style",
-    "indent-width": "indent_width",
-    "include": "include",
-    "extend-include": "extend_include",
-    "exclude": "exclude",
-    "extend-exclude": "extend_exclude",
-    "respect-gitignore": "respect_gitignore",
-    "force-exclude": "force_exclude",
-    "experimental": "experimental",
-    "output-format": "output_format",
-    "select": "select",
-    "extend-select": "extend_select",
-    "ignore": "ignore",
-    "fixable": "fixable",
-    "extend-fixable": "extend_fixable",
-    "unfixable": "unfixable",
-    "per-file-ignores": "per_file_ignores",
-    "extend-per-file-ignores": "extend_per_file_ignores",
-}
-_FIELD_TO_KEY = {field: key for key, field in _KEY_TO_FIELD.items()}
-_SETTING_KEYS = frozenset(_KEY_TO_FIELD)
+
+def add_global_arguments(parser: argparse.ArgumentParser, *, dest_prefix: str) -> None:
+    """Add global configuration arguments to a parser."""
+    global_options = parser.add_argument_group("Global options")
+    global_options.add_argument(
+        "--config",
+        action="append",
+        default=None,
+        dest=f"{dest_prefix}_config",
+        metavar="CONFIG",
+        help="Path to a TOML configuration file or TOML '<KEY> = <VALUE>' override.",
+    )
+    global_options.add_argument(
+        "--isolated",
+        action="store_true",
+        default=False,
+        dest=f"{dest_prefix}_isolated",
+        help="Ignore all configuration files.",
+    )
+
+
+def _key_to_field(key: str) -> str:
+    """Return the settings field name for a TOML setting key."""
+    return key.replace("-", "_")
+
+
+def _field_to_key(field: str) -> str:
+    """Return the TOML setting key for a settings field name."""
+    return field.replace("_", "-")
+
+
 _RULE_SELECTOR_FIELDS = frozenset(
     {
         "select",
-        "extend_select",
         "ignore",
+        "extend_select",
         "fixable",
-        "extend_fixable",
         "unfixable",
+        "extend_fixable",
     }
 )
 _RULE_SELECTOR_MAP_FIELDS = frozenset({"per_file_ignores", "extend_per_file_ignores"})
-_RULE_SETTING_KEYS = frozenset(
-    {
-        "select",
-        "extend-select",
-        "ignore",
-        "fixable",
-        "extend-fixable",
-        "unfixable",
-        "per-file-ignores",
-        "extend-per-file-ignores",
-    }
-)
 
 
 class ConfigError(ValueError):
@@ -101,48 +97,48 @@ class FormatterSettings:
     """Resolved formatter settings for pydocformatter.
 
     Attributes:
+        output_format (OutputFormat): Output format used for rule findings.
+        experimental (bool): Whether to use the experimental rule-based formatter implementation.
         line_length (int): Maximum line length used when wrapping docstrings or comments.
         line_ending (LineEnding): Line ending used when rewriting files.
         indent_style (IndentStyle): Indentation style used for generated docstring section indentation.
         indent_width (int): Number of spaces per generated docstring indentation level, or the visual width of a tab.
+        select (tuple[str, ...]): Base selected pydocformatter rule selectors.
+        ignore (tuple[str, ...]): Rule selectors to ignore.
+        extend_select (tuple[str, ...]): Additional selected rule selectors.
+        per_file_ignores (RuleSelectorMap): File-pattern-specific ignored selectors.
+        extend_per_file_ignores (RuleSelectorMap): Additional file-specific ignores.
+        fixable (tuple[str, ...]): Rule selectors eligible for automatic fixes.
+        unfixable (tuple[str, ...]): Rule selectors ineligible for automatic fixes.
+        extend_fixable (tuple[str, ...]): Additional fixable rule selectors.
         include (tuple[str, ...]): Base glob patterns that identify format-eligible files.
         extend_include (tuple[str, ...]): Additional include glob patterns appended to `include`.
         exclude (tuple[str, ...]): Base glob patterns for files or directories to ignore.
         extend_exclude (tuple[str, ...]): Additional exclude glob patterns appended to `exclude`.
         respect_gitignore (bool): Whether discovered files are filtered through `.gitignore`.
         force_exclude (bool): Whether include, exclude, and gitignore rules apply to explicitly passed paths.
-        experimental (bool): Whether to use the experimental rule-based formatter implementation.
-        output_format (OutputFormat): Output format used for rule findings.
-        select (tuple[str, ...]): Base selected pydocformatter rule selectors.
-        extend_select (tuple[str, ...]): Additional selected rule selectors.
-        ignore (tuple[str, ...]): Rule selectors to ignore.
-        fixable (tuple[str, ...]): Rule selectors eligible for automatic fixes.
-        extend_fixable (tuple[str, ...]): Additional fixable rule selectors.
-        unfixable (tuple[str, ...]): Rule selectors ineligible for automatic fixes.
-        per_file_ignores (RuleSelectorMap): File-pattern-specific ignored selectors.
-        extend_per_file_ignores (RuleSelectorMap): Additional file-specific ignores.
     """
 
+    output_format: OutputFormat = "grouped"
+    experimental: bool = False
     line_length: int = 88
     line_ending: LineEnding = "auto"
     indent_style: IndentStyle = "space"
     indent_width: int = 4
+    select: tuple[str, ...] = DEFAULT_RULE_SELECT
+    ignore: tuple[str, ...] = ()
+    extend_select: tuple[str, ...] = ()
+    per_file_ignores: RuleSelectorMap = ()
+    extend_per_file_ignores: RuleSelectorMap = ()
+    fixable: tuple[str, ...] = DEFAULT_RULE_FIXABLE
+    unfixable: tuple[str, ...] = ()
+    extend_fixable: tuple[str, ...] = ()
     include: tuple[str, ...] = DEFAULT_INCLUDE
     extend_include: tuple[str, ...] = ()
     exclude: tuple[str, ...] = DEFAULT_EXCLUDE
     extend_exclude: tuple[str, ...] = ()
     respect_gitignore: bool = True
     force_exclude: bool = False
-    experimental: bool = False
-    output_format: OutputFormat = "grouped"
-    select: tuple[str, ...] = DEFAULT_RULE_SELECT
-    extend_select: tuple[str, ...] = ()
-    ignore: tuple[str, ...] = ()
-    fixable: tuple[str, ...] = DEFAULT_RULE_FIXABLE
-    extend_fixable: tuple[str, ...] = ()
-    unfixable: tuple[str, ...] = ()
-    per_file_ignores: RuleSelectorMap = ()
-    extend_per_file_ignores: RuleSelectorMap = ()
 
     @property
     def include_patterns(self) -> tuple[str, ...]:
@@ -159,26 +155,29 @@ class FormatterSettings:
 class SettingsOverrides:
     """Optional formatter settings from one precedence layer."""
 
+    output_format: OutputFormat | None = None
+    experimental: bool | None = None
     line_length: int | None = None
     line_ending: LineEnding | None = None
     indent_style: IndentStyle | None = None
     indent_width: int | None = None
+    select: tuple[str, ...] | None = None
+    ignore: tuple[str, ...] | None = None
+    extend_select: tuple[str, ...] | None = None
+    per_file_ignores: RuleSelectorMap | None = None
+    extend_per_file_ignores: RuleSelectorMap | None = None
+    fixable: tuple[str, ...] | None = None
+    unfixable: tuple[str, ...] | None = None
+    extend_fixable: tuple[str, ...] | None = None
     include: tuple[str, ...] | None = None
     extend_include: tuple[str, ...] | None = None
     exclude: tuple[str, ...] | None = None
     extend_exclude: tuple[str, ...] | None = None
     respect_gitignore: bool | None = None
     force_exclude: bool | None = None
-    experimental: bool | None = None
-    output_format: OutputFormat | None = None
-    select: tuple[str, ...] | None = None
-    extend_select: tuple[str, ...] | None = None
-    ignore: tuple[str, ...] | None = None
-    fixable: tuple[str, ...] | None = None
-    extend_fixable: tuple[str, ...] | None = None
-    unfixable: tuple[str, ...] | None = None
-    per_file_ignores: RuleSelectorMap | None = None
-    extend_per_file_ignores: RuleSelectorMap | None = None
+
+
+_SETTING_KEYS = tuple(_field_to_key(field.name) for field in dataclasses.fields(FormatterSettings))
 
 
 def load_config(
@@ -303,14 +302,14 @@ def _apply_config_section(
     _validate_config_section_keys(section, context, _SETTING_KEYS)
     _validate_config_section_values(section, context)
 
-    values = {_KEY_TO_FIELD[key]: section[key] for key in _SETTING_KEYS if key in section}
+    values = {_key_to_field(key): section[key] for key in _SETTING_KEYS if key in section}
     return _apply_field_values(settings, values, context)
 
 
 def _validate_config_section_keys(
     section: dict[str, Any],
     context: str,
-    allowed_keys: frozenset[str],
+    allowed_keys: tuple[str, ...],
 ) -> None:
     """Reject unknown keys in one TOML configuration section."""
     unknown_keys = sorted(str(key) for key in section if key not in allowed_keys)
@@ -324,7 +323,7 @@ def _validate_config_section_values(
     context: str,
 ) -> None:
     """Validate known setting values in one TOML configuration section."""
-    values = {_KEY_TO_FIELD[key]: section[key] for key in _SETTING_KEYS if key in section}
+    values = {_key_to_field(key): section[key] for key in _SETTING_KEYS if key in section}
     _apply_field_values(FormatterSettings(), values, context)
 
 
@@ -350,7 +349,7 @@ def _apply_field_values(
     updates = {
         field: _SETTING_VALIDATORS[field](
             value,
-            f"{context}.{_FIELD_TO_KEY[field]}",
+            f"{context}.{_field_to_key(field)}",
         )
         for field, value in values.items()
     }
@@ -466,29 +465,29 @@ def _validate_rule_selectors(
 
     for field, selector in selector_values:
         if not rules.selector_matches_known_rule(selector):
-            key = _FIELD_TO_KEY[field]
+            key = _field_to_key(field)
             raise ConfigError(f"{context}.{key} contains unknown selector: {selector}")
 
 
 _SETTING_VALIDATORS: dict[str, Callable[[Any, str], Any]] = {
+    "output_format": _validate_output_format,
+    "experimental": _validate_bool,
     "line_length": _validate_line_length,
     "line_ending": _validate_line_ending,
     "indent_style": _validate_indent_style,
     "indent_width": _validate_indent_width,
+    "select": _validate_selector_list,
+    "ignore": _validate_selector_list,
+    "extend_select": _validate_selector_list,
+    "per_file_ignores": _validate_selector_mapping,
+    "extend_per_file_ignores": _validate_selector_mapping,
+    "fixable": _validate_selector_list,
+    "unfixable": _validate_selector_list,
+    "extend_fixable": _validate_selector_list,
     "include": _validate_non_empty_string_list,
     "extend_include": _validate_non_empty_string_list,
     "exclude": _validate_non_empty_string_list,
     "extend_exclude": _validate_non_empty_string_list,
     "respect_gitignore": _validate_bool,
     "force_exclude": _validate_bool,
-    "experimental": _validate_bool,
-    "output_format": _validate_output_format,
-    "select": _validate_selector_list,
-    "extend_select": _validate_selector_list,
-    "ignore": _validate_selector_list,
-    "fixable": _validate_selector_list,
-    "extend_fixable": _validate_selector_list,
-    "unfixable": _validate_selector_list,
-    "per_file_ignores": _validate_selector_mapping,
-    "extend_per_file_ignores": _validate_selector_mapping,
 }
