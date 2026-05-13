@@ -508,6 +508,23 @@ Examples:
             rf"^{re.escape(path)}: Needs docstring formatting on lines 2-6, 11$",
         )
 
+    def test_format_file_source_returns_original_and_formatted_source(self) -> None:
+        with tempfile.NamedTemporaryFile(mode="w+", suffix=".py", delete=False) as tf:
+            tf.write('def foo():\n    """Does something.\n\nArgs:\n    x (int): some parameter.\n    """\n    pass\n')
+            tf.flush()
+            path = tf.name
+
+        try:
+            original_source = Path(path).read_text(encoding="utf-8")
+            result = pydocfmt.format_file_source(path, FormatterSettings(line_length=72), fix=True)
+            written_source = Path(path).read_text(encoding="utf-8")
+        finally:
+            Path(path).unlink()
+
+        self.assertEqual(original_source, result.original_source)
+        self.assertEqual(written_source, result.source)
+        self.assertNotEqual(result.original_source, result.source)
+
 
 if __name__ == "__main__":
     unittest.main()

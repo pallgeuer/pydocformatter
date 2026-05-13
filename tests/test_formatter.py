@@ -9,14 +9,15 @@ from pathlib import Path
 import pydocformatter.cli.check as check_command
 import pydocformatter.cli.pydocfmt_main as pydocfmt_main
 import pydocformatter.formatter as formatter
+import pydocformatter.formatters.pydocfmt as pydocfmt
 from pydocformatter.config import FormatterSettings
 from pydocformatter.formatter import FormatterResult, Rule, RuleFinding
 
 
 class TestFormatterResults(unittest.TestCase):
     def test_formatter_result_tracks_modified_and_findings_explicitly(self) -> None:
-        clean = FormatterResult(path="a.py", modified=False, findings=())
-        modified = FormatterResult(path="a.py", modified=True, findings=())
+        clean = FormatterResult(path="a.py", source="", modified=False, findings=(), errors=())
+        modified = FormatterResult(path="a.py", source="", modified=True, findings=(), errors=())
         finding = RuleFinding(
             rule=Rule(
                 rule_code="PDF105",
@@ -26,7 +27,7 @@ class TestFormatterResults(unittest.TestCase):
             ),
             line_numbers=(3,),
         )
-        with_findings = FormatterResult(path="a.py", modified=False, findings=(finding,))
+        with_findings = FormatterResult(path="a.py", source="", modified=False, findings=(finding,), errors=())
 
         self.assertFalse(clean.modified)
         self.assertEqual(clean.findings, ())
@@ -69,17 +70,19 @@ class TestFormatterResults(unittest.TestCase):
         )
         result = FormatterResult(
             path="a.py",
+            source="",
             modified=False,
             findings=(
                 RuleFinding(rule=reflow_rule, line_numbers=(2, 2, 3)),
                 RuleFinding(rule=summary_rule, line_numbers=(5,)),
                 RuleFinding(rule=reflow_rule, line_numbers=(8,)),
             ),
+            errors=(),
         )
 
         output = StringIO()
         with contextlib.redirect_stdout(output):
-            check_command.print_results_grouped([result], output=None)
+            check_command.print_results_grouped([], [result], output=None)
 
         self.assertEqual(
             output.getvalue().splitlines(),
@@ -88,9 +91,41 @@ class TestFormatterResults(unittest.TestCase):
                 "  PDF001* Docstring chunk needs reflow. Lines 2-3, 8",
                 "  PDF105 Docstring summary does not fit on one line. Line 5",
                 "",
-                "Found 3 errors (2 fixable).",
+                "Found 3 rule check errors (2 fixable).",
             ],
         )
+
+    def test_grouped_output_prints_success_message_for_clean_results(self) -> None:
+        output = StringIO()
+        with contextlib.redirect_stdout(output):
+            check_command.print_results_grouped([], [FormatterResult(path="a.py", source="", modified=False, findings=(), errors=())], output=None)
+
+        self.assertEqual(output.getvalue(), "All checks passed!\n")
+
+    def test_grouped_output_prints_errors_without_success_message(self) -> None:
+        result = FormatterResult(path="a.py", source=None, modified=False, findings=(), errors=("Failed to read file a.py",))
+
+        output = StringIO()
+        with contextlib.redirect_stdout(output):
+            check_command.print_results_grouped(["Using standard input instead of input path: b.py"], [result], output=None)
+
+        self.assertEqual(
+            output.getvalue().splitlines(),
+            [
+                "ERROR: Using standard input instead of input path: b.py",
+                "ERROR: Failed to read file a.py",
+                "",
+                "Found 0 rule check errors (0 fixable).",
+            ],
+        )
+
+    def test_output_stream_does_not_convert_body_os_errors(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            output_file = str(Path(td) / "errors.txt")
+
+            with self.assertRaisesRegex(OSError, "Body failed"):
+                with check_command.output_stream(output_file):
+                    raise OSError("Body failed")
 
     def test_experimental_formatter_interface_is_noop_and_preserves_display_path(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -100,14 +135,62 @@ class TestFormatterResults(unittest.TestCase):
             previous_cwd = os.getcwd()
             os.chdir(root)
             try:
-                result = formatter.format_file_exp("a.py", FormatterSettings(experimental=True), fix=True)
+                result = formatter.format_file_exp("a.py", settings=FormatterSettings(experimental=True), fix=True)
             finally:
                 os.chdir(previous_cwd)
 
             self.assertEqual(result.path, "a.py")
+            self.assertEqual(result.source, "x = 1\n")
             self.assertFalse(result.modified)
             self.assertEqual(result.findings, ())
             self.assertEqual(target.read_text(encoding="utf-8"), "x = 1\n")
+
+    def test_experimental_file_formatter_delegates_to_source_formatter(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            target = root / "a.py"
+            target.write_text("x = 1\n", encoding="utf-8")
+            called_args: list[tuple[str, str, bool]] = []
+
+            def fake_format_source_exp(source: str, path: str, settings: FormatterSettings, fix: bool) -> FormatterResult:
+                called_args.append((source, path, fix))
+                return FormatterResult(path=path, source=source, modified=False, findings=(), errors=())
+
+            with unittest.mock.patch("pydocformatter.formatter.format_source_exp", side_effect=fake_format_source_exp):
+                result = formatter.format_file_exp(str(target), settings=FormatterSettings(experimental=True), fix=False)
+
+        self.assertEqual(called_args, [("x = 1\n", str(target), False)])
+        self.assertEqual(result.path, str(target))
+        self.assertEqual(result.source, "x = 1\n")
+        self.assertFalse(result.modified)
+
+    def test_experimental_file_formatter_writes_modified_fix_result(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            target = root / "a.py"
+            target.write_text("x = 1\n", encoding="utf-8")
+
+            def fake_format_source_exp(source: str, path: str, settings: FormatterSettings, fix: bool) -> FormatterResult:
+                del source
+                return FormatterResult(path=path, source="x = 2\n", modified=True, findings=(), errors=())
+
+            with unittest.mock.patch("pydocformatter.formatter.format_source_exp", side_effect=fake_format_source_exp):
+                result = formatter.format_file_exp(str(target), settings=FormatterSettings(experimental=True), fix=True)
+
+            self.assertEqual(result.source, "x = 2\n")
+            self.assertTrue(result.modified)
+            self.assertEqual(target.read_text(encoding="utf-8"), "x = 2\n")
+
+    def test_experimental_file_formatter_reports_file_io_errors(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            missing = str(Path(td) / "missing.py")
+            result = formatter.format_file_exp(missing, settings=FormatterSettings(experimental=True), fix=False)
+
+        self.assertIsNone(result.source)
+        self.assertFalse(result.modified)
+        self.assertEqual(result.findings, ())
+        self.assertEqual(len(result.errors), 1)
+        self.assertIn(f"Failed to read file {missing}", result.errors[0])
 
     def test_format_files_exp_formats_each_received_path_without_deduplicating(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -116,19 +199,16 @@ class TestFormatterResults(unittest.TestCase):
             target.write_text("x = 1\n", encoding="utf-8")
             called_paths: list[str] = []
 
-            def fake_format_file_exp(path: str, settings: FormatterSettings, fix: bool) -> FormatterResult:
+            def fake_format_source_exp(source: str, path: str, settings: FormatterSettings, fix: bool) -> FormatterResult:
+                del source, settings, fix
                 called_paths.append(path)
-                return FormatterResult(path=path, modified=False, findings=())
+                return FormatterResult(path=path, source="", modified=False, findings=(), errors=())
 
             previous_cwd = os.getcwd()
             os.chdir(root)
             try:
-                with unittest.mock.patch("pydocformatter.formatter.format_file_exp", side_effect=fake_format_file_exp):
-                    results = check_command.format_files_exp(
-                        ("a.py", str(target)),
-                        FormatterSettings(experimental=True),
-                        fix=True,
-                    )
+                with unittest.mock.patch("pydocformatter.formatter.format_source_exp", side_effect=fake_format_source_exp):
+                    results = [formatter.format_file_exp(path, settings=FormatterSettings(experimental=True), fix=True) for path in ("a.py", str(target))]
             finally:
                 os.chdir(previous_cwd)
 
@@ -141,8 +221,9 @@ class TestFormatterResults(unittest.TestCase):
             target = root / "a.py"
             target.write_text("x = 1\n", encoding="utf-8")
 
-            def fake_format_file_exp(path: str, settings: FormatterSettings, fix: bool) -> FormatterResult:
-                return FormatterResult(path=path, modified=True, findings=())
+            def fake_format_file_exp(path: str, *, file: object = None, settings: FormatterSettings, fix: bool) -> FormatterResult:
+                del file, settings, fix
+                return FormatterResult(path=path, source="", modified=True, findings=(), errors=())
 
             argv = ["pydocfmt", "check", "--experimental", str(target)]
             with (
@@ -160,8 +241,9 @@ class TestFormatterResults(unittest.TestCase):
             target.write_text("x = 1\n", encoding="utf-8")
             rule = Rule(rule_code="PDF105", rule_name="summary-too-long", message="Docstring summary does not fit on one line", fixable=False)
 
-            def fake_format_file_exp(path: str, settings: FormatterSettings, fix: bool) -> FormatterResult:
-                return FormatterResult(path=path, modified=False, findings=(RuleFinding(rule=rule, line_numbers=(1,)),))
+            def fake_format_file_exp(path: str, *, file: object = None, settings: FormatterSettings, fix: bool) -> FormatterResult:
+                del file, settings, fix
+                return FormatterResult(path=path, source="", modified=False, findings=(RuleFinding(rule=rule, line_numbers=(1,)),), errors=())
 
             argv = ["pydocfmt", "check", "--experimental", "--exit-zero", str(target)]
             stdout = StringIO()
@@ -174,6 +256,29 @@ class TestFormatterResults(unittest.TestCase):
 
         self.assertEqual(exit_code, 0)
 
+    def test_errors_affect_exit_status_without_findings(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            target = root / "a.py"
+            target.write_text("x = 1\n", encoding="utf-8")
+
+            def fake_format_file_exp(path: str, *, file: object = None, settings: FormatterSettings, fix: bool) -> FormatterResult:
+                del file, settings, fix
+                return FormatterResult(path=path, source=None, modified=False, findings=(), errors=("Failed to read file",))
+
+            for extra_args, expected_exit_code in (([], 1), (["--exit-zero"], 0)):
+                argv = ["pydocfmt", "check", "--experimental", *extra_args, str(target)]
+                stdout = StringIO()
+                with (
+                    unittest.mock.patch("sys.argv", argv),
+                    unittest.mock.patch("pydocformatter.formatter.format_file_exp", side_effect=fake_format_file_exp),
+                    contextlib.redirect_stdout(stdout),
+                ):
+                    exit_code = pydocfmt_main.main()
+
+                self.assertEqual(exit_code, expected_exit_code)
+                self.assertNotIn("All checks passed!", stdout.getvalue())
+
     def test_fix_mode_exits_nonzero_for_remaining_findings(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
@@ -181,8 +286,9 @@ class TestFormatterResults(unittest.TestCase):
             target.write_text("x = 1\n", encoding="utf-8")
             rule = Rule(rule_code="PDF105", rule_name="summary-too-long", message="Docstring summary does not fit on one line", fixable=False)
 
-            def fake_format_file_exp(path: str, settings: FormatterSettings, fix: bool) -> FormatterResult:
-                return FormatterResult(path=path, modified=False, findings=(RuleFinding(rule=rule, line_numbers=(1,)),))
+            def fake_format_file_exp(path: str, *, file: object = None, settings: FormatterSettings, fix: bool) -> FormatterResult:
+                del file, settings, fix
+                return FormatterResult(path=path, source="", modified=False, findings=(RuleFinding(rule=rule, line_numbers=(1,)),), errors=())
 
             argv = ["pydocfmt", "check", "--experimental", "--fix", str(target)]
             stdout = StringIO()
@@ -201,8 +307,9 @@ class TestFormatterResults(unittest.TestCase):
             target = root / "a.py"
             target.write_text("x = 1\n", encoding="utf-8")
 
-            def fake_format_file_exp(path: str, settings: FormatterSettings, fix: bool) -> FormatterResult:
-                return FormatterResult(path=path, modified=True, findings=())
+            def fake_format_file_exp(path: str, *, file: object = None, settings: FormatterSettings, fix: bool) -> FormatterResult:
+                del file, settings, fix
+                return FormatterResult(path=path, source="", modified=True, findings=(), errors=())
 
             for extra_args, expected_exit_code in ((["--fix"], 0), (["--fix", "--exit-non-zero-on-fix"], 1)):
                 argv = ["pydocfmt", "check", "--experimental", *extra_args, str(target)]
@@ -217,13 +324,29 @@ class TestFormatterResults(unittest.TestCase):
             target = root / "a.py"
             target.write_text("x = 1\n", encoding="utf-8")
 
-            with unittest.mock.patch("pydocformatter.cli.check.pydocfmt.format_file", return_value=True):
-                results = check_command.format_files((str(target),), FormatterSettings(), fix=False, output=None)
+            source_result = pydocfmt.SourceFormatResult(source="x = 1\n", docstring_changed_lines=(3, 1), comment_changed_lines=(5, 3))
+            with unittest.mock.patch("pydocformatter.cli.check.pydocfmt.format_file_source", return_value=source_result):
+                results = check_command.format_files((str(target),), settings=FormatterSettings(), fix=False)
 
         self.assertEqual(len(results), 1)
         self.assertFalse(results[0].modified)
         self.assertEqual(len(results[0].findings), 1)
         self.assertEqual(results[0].findings[0].rule.rule_code, "000")
+        self.assertEqual(results[0].findings[0].line_numbers, (1, 3, 5))
+
+    def test_legacy_check_result_uses_zero_line_fallback_for_missing_changed_lines(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            target = root / "a.py"
+            target.write_text("x = 1\n", encoding="utf-8")
+
+            source_result = pydocfmt.SourceFormatResult(source="x = 1\n", docstring_changed_lines=(), comment_changed_lines=())
+            with unittest.mock.patch.object(type(source_result), "modified", new_callable=unittest.mock.PropertyMock, return_value=True):
+                with unittest.mock.patch("pydocformatter.cli.check.pydocfmt.format_file_source", return_value=source_result):
+                    results = check_command.format_files((str(target),), settings=FormatterSettings(), fix=False)
+
+        self.assertEqual(len(results), 1)
+        self.assertEqual(len(results[0].findings), 1)
         self.assertEqual(results[0].findings[0].line_numbers, (0,))
 
     def test_legacy_format_result_uses_modified_for_actual_writes(self) -> None:
@@ -232,8 +355,9 @@ class TestFormatterResults(unittest.TestCase):
             target = root / "a.py"
             target.write_text("x = 1\n", encoding="utf-8")
 
-            with unittest.mock.patch("pydocformatter.cli.check.pydocfmt.format_file", return_value=True):
-                results = check_command.format_files((str(target),), FormatterSettings(), fix=True, output=None)
+            source_result = pydocfmt.SourceFormatResult(source="x = 1\n", docstring_changed_lines=(1,), comment_changed_lines=())
+            with unittest.mock.patch("pydocformatter.cli.check.pydocfmt.format_file_source", return_value=source_result):
+                results = check_command.format_files((str(target),), settings=FormatterSettings(), fix=True)
 
         self.assertEqual(len(results), 1)
         self.assertTrue(results[0].modified)

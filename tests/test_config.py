@@ -8,6 +8,7 @@ from pydocformatter.config import (
     DEFAULT_EXCLUDE,
     DEFAULT_INCLUDE,
     ConfigError,
+    FormatterSettings,
     SettingsOverrides,
 )
 
@@ -91,6 +92,22 @@ class TestConfig(unittest.TestCase):
         self.assertEqual(config.select, ("PCF",))
         self.assertEqual(config.ignore, ("PCF002",))
         self.assertEqual(config.per_file_ignores, (("tests/*.py", ("PCF001",)),))
+
+    def test_format_settings_returns_stable_toml_output(self) -> None:
+        settings = FormatterSettings(
+            line_ending="lf",
+            select=("PDF", "PCF"),
+            per_file_ignores=(('tests/"quoted"/*.py', ("PCF001",)),),
+        )
+
+        output = pydocformatter_config.format_settings(settings)
+
+        self.assertIn("[tool.pydocfmt]\n", output)
+        self.assertLess(output.index("output-format"), output.index("experimental"))
+        self.assertLess(output.index("experimental"), output.index("line-length"))
+        self.assertIn('line-ending = "lf"\n', output)
+        self.assertIn('select = ["PDF", "PCF"]\n', output)
+        self.assertIn('per-file-ignores = {"tests/\\"quoted\\"/*.py" = ["PCF001"]}\n', output)
 
     def test_experimental_setting_is_applied(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -333,7 +350,7 @@ class TestConfig(unittest.TestCase):
             previous_cwd = os.getcwd()
             os.chdir(root)
             try:
-                with self.assertRaisesRegex(ConfigError, "pydocfmt must be a table"):
+                with self.assertRaisesRegex(ConfigError, r"\[tool\.pydocfmt\] section must be a table"):
                     pydocformatter_config.load_config()
             finally:
                 os.chdir(previous_cwd)

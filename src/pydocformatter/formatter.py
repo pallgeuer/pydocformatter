@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
+import typing
 
 from pydocformatter.config import FormatterSettings
 
@@ -49,23 +50,46 @@ class RuleFinding:
 
 @dataclasses.dataclass(frozen=True)
 class FormatterResult:
-    """Formatter result for one display path."""
+    """Formatter result, including the possibly now-formatted source, for one display path."""
 
     path: str
+    source: str | None
     modified: bool
     findings: tuple[RuleFinding, ...]
-    diagnostic_messages: tuple[str, ...] = ()
+    errors: tuple[str, ...]
 
 
-def format_file_exp(path: str, settings: FormatterSettings, fix: bool) -> FormatterResult:
+def format_file_exp(path: str, *, file: typing.TextIO | None = None, settings: FormatterSettings, fix: bool) -> FormatterResult:
     """Run the experimental formatter interface for one file."""
-    with open(path, encoding="utf-8", newline="") as file:
-        file.read()
+    try:
+        if file is None:
+            with open(path, encoding="utf-8", newline="") as path_file:
+                source = path_file.read()
+        else:
+            source = file.read()
+    except UnicodeDecodeError as error:
+        return FormatterResult(path=path, source=None, modified=False, findings=(), errors=(f"Failed to decode {path} as UTF-8: {error}",))
+    except OSError as error:
+        return FormatterResult(path=path, source=None, modified=False, findings=(), errors=(f"Failed to read file {path}: {error}",))
 
-    return FormatterResult(path=path, modified=False, findings=())
+    result = format_source_exp(source, path, settings=settings, fix=fix)
+    if result.source is None:
+        raise AssertionError("format_source_exp() must return a valid source state")
+
+    if file is None and fix and result.modified:
+        try:
+            with open(path, "w", encoding="utf-8", newline="") as path_file:
+                path_file.write(result.source)
+        except OSError as error:
+            return FormatterResult(path=path, source=source, modified=False, findings=(), errors=(f"Failed to write file {path}: {error}",))
+
+    return result
 
 
-def format_source_exp(source: str, path: str, settings: FormatterSettings, fix: bool) -> tuple[str, FormatterResult]:
-    """Run the experimental formatter interface for stdin source."""
+def format_source_exp(source: str, path: str, *, settings: FormatterSettings, fix: bool) -> FormatterResult:
+    """Run the experimental formatter interface for source text."""
     del settings, fix
-    return source, FormatterResult(path=path, modified=False, findings=())
+    # TODO: Temporary placeholder code that must produce a non-None new_source (can just be source if nothing was or
+    #       should be fixed, otherwise it should represent the new formatted source)
+    new_source = source
+    return FormatterResult(path=path, source=new_source, modified=(new_source != source), findings=(), errors=())

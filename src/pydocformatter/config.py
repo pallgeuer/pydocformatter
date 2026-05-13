@@ -1,5 +1,6 @@
 import argparse
 import dataclasses
+import json
 import os
 import tomllib
 from collections.abc import Callable
@@ -69,6 +70,11 @@ def _key_to_field(key: str) -> str:
 def _field_to_key(field: str) -> str:
     """Return the TOML setting key for a settings field name."""
     return field.replace("_", "-")
+
+
+def _enabled_label(value: bool) -> str:
+    """Return a human-readable enabled state."""
+    return "enabled" if value else "disabled"
 
 
 _RULE_SELECTOR_FIELDS = frozenset(
@@ -193,7 +199,7 @@ def load_config(
     if isolated:
         path_options = [option for kind, option in classified_options if kind == "path"]
         if path_options:
-            raise ConfigError("the argument --config=PATH cannot be used with --isolated")
+            raise ConfigError("The argument --config=PATH cannot be used with --isolated")
 
     if not isolated:
         settings = _apply_pyproject_config(settings)
@@ -208,19 +214,56 @@ def load_config(
     return _apply_overrides(settings, cli_overrides, "command line")
 
 
+def format_settings(settings: FormatterSettings) -> str:
+    """Return resolved settings in a stable TOML-like form."""
+    lines = ["[tool.pydocfmt]"]
+    for field in dataclasses.fields(FormatterSettings):
+        key = _field_to_key(field.name)
+        value = getattr(settings, field.name)
+        if field.name in _RULE_SELECTOR_MAP_FIELDS:
+            rendered = _format_rule_selector_map(value)
+        elif isinstance(value, tuple):
+            rendered = _format_string_list(value)
+        elif isinstance(value, str):
+            rendered = _format_string(value)
+        elif isinstance(value, bool):
+            rendered = str(value).lower()
+        else:
+            rendered = str(value)
+        lines.append(f"{key} = {rendered}")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def _format_rule_selector_map(value: RuleSelectorMap) -> str:
+    """Format a rule selector mapping as a TOML inline table."""
+    entries = [f"{_format_string(pattern)} = {_format_string_list(selectors)}" for pattern, selectors in value]
+    return "{" + ", ".join(entries) + "}"
+
+
+def _format_string_list(values: tuple[str, ...]) -> str:
+    """Format string values as a TOML list."""
+    return "[" + ", ".join(_format_string(value) for value in values) + "]"
+
+
+def _format_string(value: str) -> str:
+    """Format a string value for TOML output."""
+    return json.dumps(value)
+
+
 def _apply_pyproject_config(settings: FormatterSettings) -> FormatterSettings:
     """Apply auto-discovered pyproject.toml configuration from the current directory."""
     config = _load_toml_file("pyproject.toml", required=False)
     tool_config = config.get("tool", {})
     if not isinstance(tool_config, dict):
         if "tool" in config:
-            raise ConfigError("pyproject.toml [tool] must be a table")
+            raise ConfigError("The [tool] section of pyproject.toml must be a table")
         return settings
 
     if "pydocfmt" in tool_config:
         formatter_config = tool_config["pydocfmt"]
         if not isinstance(formatter_config, dict):
-            raise ConfigError("tool.pydocfmt must be a table")
+            raise ConfigError("The [tool.pydocfmt] section must be a table")
         settings = _apply_config_section(settings, formatter_config, "tool.pydocfmt")
 
     return settings
@@ -243,14 +286,14 @@ def _apply_explicit_pyproject_config(
     tool_config = config.get("tool", {})
     if not isinstance(tool_config, dict):
         if "tool" in config:
-            raise ConfigError(f"{path} [tool] must be a table")
-        raise ConfigError(f"{path} must contain [tool.pydocfmt]")
+            raise ConfigError(f"{path}: The [tool] section must be a table")
+        raise ConfigError(f"{path}: Must contain [tool.pydocfmt]")
 
     formatter_config = tool_config.get("pydocfmt")
     if formatter_config is None:
-        raise ConfigError(f"{path} must contain [tool.pydocfmt]")
+        raise ConfigError(f"{path}: Must contain [tool.pydocfmt]")
     if not isinstance(formatter_config, dict):
-        raise ConfigError(f"{path} tool.pydocfmt must be a table")
+        raise ConfigError(f"{path}: The [tool.pydocfmt] section must be a table")
     return _apply_config_section(settings, formatter_config, f"{path}.tool.pydocfmt")
 
 
@@ -259,7 +302,7 @@ def _apply_inline_config_option(settings: FormatterSettings, option: str) -> For
     try:
         section = tomllib.loads(option)
     except tomllib.TOMLDecodeError as error:
-        raise ConfigError(f"failed to decode --config inline TOML: {error}") from error
+        raise ConfigError(f"Failed to decode --config inline TOML: {error}") from error
     return _apply_config_section(settings, section, "--config")
 
 
@@ -274,22 +317,22 @@ def _load_toml_file(path: str, *, required: bool) -> dict[str, Any]:
     """Load a TOML file, returning an empty config if an optional file is absent."""
     if not os.path.exists(path):
         if required:
-            raise ConfigError(f"configuration file not found: {path}")
+            raise ConfigError(f"Configuration file not found: {path}")
         return {}
 
     try:
         file = open(path, "rb")
     except OSError as error:
-        raise ConfigError(f"failed to read configuration file {path}: {error}") from error
+        raise ConfigError(f"Failed to read configuration file {path}: {error}") from error
 
     with file:
         try:
             config = tomllib.load(file)
         except tomllib.TOMLDecodeError as error:
-            raise ConfigError(f"failed to decode {path}: {error}") from error
+            raise ConfigError(f"Failed to decode {path}: {error}") from error
 
     if not isinstance(config, dict):
-        raise ConfigError(f"{path} must contain a TOML table")
+        raise ConfigError(f"{path}: Must contain a TOML table")
     return config
 
 

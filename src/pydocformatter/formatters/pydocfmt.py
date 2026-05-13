@@ -12,13 +12,27 @@ import pydocformatter.utils.line_endings as line_endings
 from pydocformatter.config import FormatterSettings, IndentStyle
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True, init=False)
 class SourceFormatResult:
     """Formatting result for Python source text."""
 
+    original_source: str
     source: str
     docstring_changed_lines: tuple[int, ...]
     comment_changed_lines: tuple[int, ...]
+
+    def __init__(
+        self,
+        source: str,
+        docstring_changed_lines: tuple[int, ...],
+        comment_changed_lines: tuple[int, ...],
+        original_source: str | None = None,
+    ) -> None:
+        """Initialize source formatting details."""
+        object.__setattr__(self, "original_source", source if original_source is None else original_source)
+        object.__setattr__(self, "source", source)
+        object.__setattr__(self, "docstring_changed_lines", docstring_changed_lines)
+        object.__setattr__(self, "comment_changed_lines", comment_changed_lines)
 
     @property
     def modified(self) -> bool:
@@ -303,10 +317,10 @@ def format_source(source: str, settings: FormatterSettings, fix: bool) -> Source
 
     if not fix:
         _, comment_changed_lines = format_comments_in_source(source, settings, line_ending=line_ending)
-        return SourceFormatResult(source=source, docstring_changed_lines=docstring_changed_lines, comment_changed_lines=comment_changed_lines)
+        return SourceFormatResult(original_source=source, source=source, docstring_changed_lines=docstring_changed_lines, comment_changed_lines=comment_changed_lines)
 
     formatted_source, comment_changed_lines = format_comments_in_source(docstring_source, settings, line_ending=line_ending)
-    return SourceFormatResult(source=formatted_source, docstring_changed_lines=docstring_changed_lines, comment_changed_lines=comment_changed_lines)
+    return SourceFormatResult(original_source=source, source=formatted_source, docstring_changed_lines=docstring_changed_lines, comment_changed_lines=comment_changed_lines)
 
 
 def print_source_diagnostics(

@@ -51,6 +51,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 - **Configuration:**
   - Renamed the configuration table from `[tool.pydocformatter]` to `[tool.pydocfmt]`.
   - Settings now resolve from one `[tool.pydocfmt]` table, followed by command-line overrides.
+  - Resolved settings output is now formatted by the configuration layer.
   - File-selection settings now use Ruff-style glob lists (`include`, `extend-include`, `exclude`, `extend-exclude`) and `force-exclude`.
   - For each setting key, the highest-priority value wins (`dedicated CLI option > inline --config > explicit --config file > auto-discovered config > defaults`), including `extend-include` and `extend-exclude`.
 
@@ -62,6 +63,8 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 
 - **Formatting:**
   - Added experimental `Rule`, `RuleFinding`, and `FormatterResult` data structures for reporting remaining rule issues after fixes.
+  - Experimental formatter results now carry the formatted source alongside path, modification, finding, and error data.
+  - `SourceFormatResult` now carries the original source alongside the possibly formatted source.
   - Formatter internals now require formatting controls such as line length, line endings, and indentation settings as explicit keyword-only arguments.
   - Formatter functions now receive resolved `FormatterSettings` directly.
   - Generated Google-style docstring section indentation is now configurable while preserving the existing base docstring indentation.
@@ -71,6 +74,8 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Utility helpers now live in explicit `pydocformatter.utils` submodules for diagnostics, glob matching, and line endings.
   - Experimental formatter interfaces now live in `pydocformatter.formatter`.
   - Global CLI argument definitions now live in `pydocformatter.config` and are shared by the top-level and `check` parsers.
+  - Moved enabled-state help text formatting into the configuration layer.
+  - Moved experimental file I/O diagnostics into the formatter layer.
 
 - **Developer dependencies:**
   - Updated mypy from 1.20.2 to 2.1.0.
@@ -81,6 +86,12 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Updated README, contributing, release, pull request, and file-selection docs for the single-command workflow and latest file-selection behavior.
 
 - **CLI:**
+  - Legacy formatter findings now report the original changed source lines instead of a synthetic line number.
+  - Formatter read, decode, and write errors now affect check exit status without being reported as rule findings.
+  - `pydocfmt check` now prints `All checks passed!` to the configured output when no diagnostics are found.
+  - `pydocfmt check --output-file` remains supported with the legacy formatter, while stdin input is limited to the experimental formatter path.
+  - Operational errors no longer produce an `All checks passed!` success message.
+  - Output-file setup errors are now reported without converting unrelated `OSError`s raised while producing diagnostics.
   - `pydocfmt` now skips files that fail UTF-8 decoding, emits a warning to stdout, and continues processing remaining files instead of crashing.
   - Invalid include glob patterns now report configuration or argument errors instead of crashing with a traceback.
   - `--help` now works even when the current `pyproject.toml` contains invalid pydocformatter configuration.

@@ -173,18 +173,18 @@ def validate_include_patterns(patterns: tuple[str, ...]) -> None:
     """Validate glob patterns used for file inclusion."""
     for pattern in patterns:
         if not pattern:
-            raise FileSelectionError("include patterns must not be empty")
+            raise FileSelectionError("Include patterns must not be empty")
         if pattern.endswith("/"):
-            raise FileSelectionError(f"include pattern must target files: {pattern}")
+            raise FileSelectionError(f"Include pattern must target files: {pattern}")
         if pattern.rstrip("/") in {"**", "**/*"}:
-            raise FileSelectionError(f"include pattern must target files: {pattern}")
+            raise FileSelectionError(f"Include pattern must target files: {pattern}")
 
 
 def validate_exclude_patterns(patterns: tuple[str, ...]) -> None:
     """Validate glob patterns used for file exclusion."""
     for pattern in patterns:
         if not pattern:
-            raise FileSelectionError("exclude patterns must not be empty")
+            raise FileSelectionError("Exclude patterns must not be empty")
 
 
 def _excluded_directory_decision(path: str, explicit: bool) -> FileDecision:
@@ -428,7 +428,7 @@ def _collect_gitignored_absolute_paths(
     for git_root, relative_paths in paths_by_git_root.items():
         ignored_relative_paths, error = _query_git_ignored_paths(git_root, relative_paths)
         if error is not None:
-            print(f"{git_root} WARNING: unable to apply gitignore filtering ({error}); continuing without gitignore filtering for this repository root")
+            print(f"WARNING: {git_root}: Unable to apply gitignore filtering ({error}): Continuing without gitignore filtering for this repository root")
             continue
         gitignored_paths.update(os.path.abspath(os.path.join(git_root, path)) for path in ignored_relative_paths)
 

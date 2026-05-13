@@ -268,7 +268,7 @@ class TestFileSelection(unittest.TestCase):
             ):
                 selection = file_selection.select_files([str(root)], settings)
 
-        warning = f"{root} WARNING: unable to apply gitignore filtering (fatal: no such command); continuing without gitignore filtering for this repository root"
+        warning = f"WARNING: {root}: Unable to apply gitignore filtering (fatal: no such command): Continuing without gitignore filtering for this repository root"
         self.assertEqual(stdout.getvalue().splitlines(), [warning])
         self.assertEqual(
             selection.accepted_paths,
