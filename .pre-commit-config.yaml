@@ -15,6 +15,14 @@ repos:
         language_version: python3
         exclude: ^(build|dist|\.git|__pycache__|\.egg|doc|version)/
 
+  - repo: local
+    hooks:
+      - id: pydocfmt
+        name: pydocfmt (formatter)
+        entry: uv run pydocfmt check --fix
+        language: system
+        types: [python]
+
   - repo: https://github.com/pre-commit/mirrors-mypy
     rev: v2.1.0
     hooks:
@@ -24,16 +32,16 @@ repos:
 
   - repo: local
     hooks:
+      - id: pytest
+        name: pytest (test suite)
+        entry: uv run pytest
+        language: system
+        pass_filenames: false
       - id: dependency-pin-check
         name: dependency pin/version consistency check
         entry: uv run python tools/check_dependency_pins.py
         language: system
         pass_filenames: false
-      - id: pydocfmt
-        name: pydocfmt (formatter)
-        entry: uv run pydocfmt check --fix
-        language: system
-        types: [python]
 
   # Example of how external users would use pydocformatter hooks:
   # - repo: https://github.com/pallgeuer/pydocformatter
