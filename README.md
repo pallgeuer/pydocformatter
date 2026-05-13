@@ -222,7 +222,9 @@ force-exclude = false
 - `exclude`: Glob patterns for files/directories to exclude
 - `extend-exclude`: Additional exclude glob patterns
 - `respect-gitignore`: Respect `.gitignore` during file discovery (default: `true`)
-- `force-exclude`: Apply include/exclude rules to explicitly listed files (default: `false`)
+- `force-exclude`: Apply include/exclude/gitignore rules to explicitly listed files (default: `false`)
+
+When `respect-gitignore` is enabled, pydocfmt aborts if gitignore filtering cannot be checked, because continuing without that filter could format files that should stay ignored.
 
 Settings are resolved as defaults, then auto-discovered `[tool.pydocfmt]`, then explicit `--config` files, then inline `--config` setting overrides, then dedicated command-line options. The highest-precedence specified value wins for each key, including `extend-include` and `extend-exclude`.
 

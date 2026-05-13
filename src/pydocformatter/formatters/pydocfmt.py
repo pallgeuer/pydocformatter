@@ -7,8 +7,7 @@ import tokenize
 import typing
 
 import pydocformatter.formatters.google_docstrings as google_docstrings
-import pydocformatter.utils.diagnostics as diagnostics
-import pydocformatter.utils.line_endings as line_endings
+import pydocformatter.utils.misc as misc
 from pydocformatter.config import FormatterSettings, IndentStyle
 
 
@@ -42,7 +41,7 @@ class SourceFormatResult:
 
 def _matches_ignoring_line_endings(left: str, right: str) -> bool:
     """Return whether two strings differ only by line-ending style."""
-    return line_endings.normalize_line_endings(left, line_ending="\n") == line_endings.normalize_line_endings(right, line_ending="\n")
+    return misc.normalize_line_endings(left, line_ending="\n") == misc.normalize_line_endings(right, line_ending="\n")
 
 
 def process_docstring_node(
@@ -101,7 +100,7 @@ def process_docstring_node(
         indent_style=indent_style,
         indent_width=indent_width,
     )
-    new_docstring = line_endings.normalize_line_endings("".join(new_lines), line_ending=line_ending)
+    new_docstring = misc.normalize_line_endings("".join(new_lines), line_ending=line_ending)
 
     # Get original docstring
     original_docstring = "".join(output_lines[srow : erow + 1])
@@ -312,7 +311,7 @@ def format_file_source(
 
 def format_source(source: str, settings: FormatterSettings, fix: bool) -> SourceFormatResult:
     """Format Python source text and return changed line details."""
-    line_ending = line_endings.resolve_line_ending(source, line_ending=settings.line_ending)
+    line_ending = misc.resolve_line_ending(source, line_ending=settings.line_ending)
     docstring_source, docstring_changed_lines = format_docstrings_in_source(source, settings, line_ending=line_ending)
 
     if not fix:
@@ -341,9 +340,9 @@ def source_diagnostic_messages(
     """Return check-mode diagnostics for a source formatting result."""
     messages: list[str] = []
     if result.docstring_changed_lines:
-        messages.append(diagnostics.format_needs_formatting_message(path, "docstring", list(result.docstring_changed_lines)))
+        messages.append(misc.format_needs_formatting_message(path, "docstring", list(result.docstring_changed_lines)))
     if result.comment_changed_lines:
-        messages.append(diagnostics.format_needs_formatting_message(path, "comment", list(result.comment_changed_lines)))
+        messages.append(misc.format_needs_formatting_message(path, "comment", list(result.comment_changed_lines)))
     return tuple(messages)
 
 
@@ -356,12 +355,12 @@ def format_docstrings(
     with open(path, encoding="utf-8", newline="") as file:
         source = file.read()
 
-    line_ending = line_endings.resolve_line_ending(source, line_ending=settings.line_ending)
+    line_ending = misc.resolve_line_ending(source, line_ending=settings.line_ending)
     formatted_source, changed_lines = format_docstrings_in_source(source, settings, line_ending=line_ending)
 
     if check:
         if changed_lines:
-            print(diagnostics.format_needs_formatting_message(path, "docstring", list(changed_lines)))
+            print(misc.format_needs_formatting_message(path, "docstring", list(changed_lines)))
         return bool(changed_lines)
 
     if source != formatted_source:

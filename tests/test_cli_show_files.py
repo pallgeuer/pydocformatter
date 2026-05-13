@@ -1041,7 +1041,7 @@ class TestCliShowFiles(unittest.TestCase):
         self.assertIn("Failed to decode pyproject.toml", stderr.getvalue())
         self.assertNotIn("Traceback", stderr.getvalue())
 
-    def test_pydocfmt_missing_explicit_file_reports_warning(self) -> None:
+    def test_pydocfmt_missing_explicit_file_reports_operational_error(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             target = root / "missing.py"
@@ -1056,10 +1056,11 @@ class TestCliShowFiles(unittest.TestCase):
         self.assertIn(f"ERROR: Failed to read or write file {target}", stdout.getvalue())
         self.assertNotIn("Traceback", stdout.getvalue())
 
-    def test_pydocfmt_warns_once_when_gitignore_check_fails(self) -> None:
+    def test_pydocfmt_aborts_when_gitignore_check_fails(self) -> None:
         with self._make_git_tree() as td:
             root = Path(td)
             stdout = StringIO()
+            stderr = StringIO()
             called_paths: list[str] = []
 
             def fake_format(path: str, settings: FormatterSettings, fix: bool, **kwargs: object) -> bool:
@@ -1078,13 +1079,13 @@ class TestCliShowFiles(unittest.TestCase):
                     side_effect=fake_format,
                 ),
                 contextlib.redirect_stdout(stdout),
+                contextlib.redirect_stderr(stderr),
             ):
-                pydocfmt_main.main()
+                exit_code = pydocfmt_main.main()
 
-            output_lines = stdout.getvalue().splitlines()
-            warning = f"WARNING: {root}: Unable to apply gitignore filtering (fatal: broken git): Continuing without gitignore filtering for this repository root"
-            self.assertIn(warning, output_lines)
-            self.assertEqual(output_lines.count(warning), 1)
+            self.assertEqual(exit_code, 2)
+            self.assertEqual(stdout.getvalue(), "")
+            self.assertIn(f"pydocfmt check: File selection error: {root}: Unable to apply gitignore filtering: fatal: broken git", stderr.getvalue())
             self.assertEqual(called_paths, [])
 
     @staticmethod
@@ -1095,7 +1096,7 @@ class TestCliShowFiles(unittest.TestCase):
         (root / "bad.py").write_bytes(b"\xff")
         return temp_dir
 
-    def test_pydocfmt_skips_undecodable_utf8_file_with_stdout_warning(self) -> None:
+    def test_pydocfmt_skips_undecodable_utf8_file_with_operational_error(self) -> None:
         with self._make_tree_with_invalid_utf8() as td:
             root = Path(td)
             stdout = StringIO()
@@ -1302,6 +1303,38 @@ class TestCliShowFiles(unittest.TestCase):
         self.assertEqual(stdout.getvalue(), formatted_source)
         self.assertEqual(stderr.getvalue(), "All checks passed!\n")
 
+    def test_pydocfmt_fix_stdin_with_output_file_writes_diagnostics_to_file(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            output_file = root / "reports" / "errors.txt"
+            source = 'def foo():\n    """Does something."""\n    pass\n'
+            formatted_source = 'def foo():\n    """Does something better."""\n    pass\n'
+            stdout = StringIO()
+            stderr = StringIO()
+
+            def fake_format(path: str, *, file: TextIO | None = None, settings: FormatterSettings, fix: bool) -> FormatterResult:
+                del path, settings
+                assert fix
+                assert file is not None
+                assert file.read() == source
+                return FormatterResult(path="-", source=formatted_source, modified=True, findings=(), errors=())
+
+            argv = ["pydocfmt", "check", "--fix", "-", "--line-length", "72", "--experimental", "--output-file", str(output_file)]
+
+            with (
+                unittest.mock.patch("sys.argv", argv),
+                unittest.mock.patch("sys.stdin", StringIO(source)),
+                unittest.mock.patch("pydocformatter.formatter.format_file_exp", side_effect=fake_format),
+                contextlib.redirect_stdout(stdout),
+                contextlib.redirect_stderr(stderr),
+            ):
+                exit_code = pydocfmt_main.main()
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(stdout.getvalue(), formatted_source)
+            self.assertEqual(stderr.getvalue(), "")
+            self.assertEqual(output_file.read_text(encoding="utf-8"), "All checks passed!\n")
+
     def test_pydocfmt_output_file_redirects_check_errors_and_creates_parent(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
@@ -1322,7 +1355,30 @@ class TestCliShowFiles(unittest.TestCase):
             output = output_file.read_text(encoding="utf-8")
             self.assertIn(f"{target}:", output)
             self.assertIn("000* Needs formatting. Line 2", output)
-            self.assertIn("Found 1 rule check errors (1 fixable).", output)
+            self.assertIn("Found 1 rule check error (1 fixable).", output)
+
+    def test_pydocfmt_output_file_redirects_operational_errors(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            target = root / "missing.py"
+            output_file = root / "reports" / "errors.txt"
+            stdout = StringIO()
+            stderr = StringIO()
+            argv = ["pydocfmt", "check", str(target), "--output-file", str(output_file)]
+
+            with (
+                unittest.mock.patch("sys.argv", argv),
+                contextlib.redirect_stdout(stdout),
+                contextlib.redirect_stderr(stderr),
+            ):
+                exit_code = pydocfmt_main.main()
+
+            self.assertEqual(exit_code, 1)
+            self.assertEqual(stdout.getvalue(), "")
+            self.assertEqual(stderr.getvalue(), "")
+            output = output_file.read_text(encoding="utf-8")
+            self.assertIn(f"ERROR: Failed to read or write file {target}", output)
+            self.assertIn("Found 1 operational error.", output)
 
     def test_pydocfmt_output_file_redirects_clean_check_success_message(self) -> None:
         with tempfile.TemporaryDirectory() as td:

@@ -22,7 +22,7 @@ Settings outside this list are not part of the Ruff compatibility contract.
 - **D1: pydocformatter include default.**
   pydocformatter defaults to `["*.py", "*.pyi", "*.pyw"]`, because these are the file types it can process. This intentionally differs from Ruff's broader default include set.
 - **D2: gitignore scope.**
-  pydocformatter applies gitignore-style filtering through the existing git-based implementation. It does not add a separate Ruff-style `.ignore` file parser.
+  pydocformatter applies gitignore-style filtering through the existing git-based implementation. It does not add a separate Ruff-style `.ignore` file parser, and it aborts file selection if gitignore checks fail.
 
 ## Defaults
 
@@ -67,7 +67,7 @@ Given positional CLI paths, defaulting to `.` when no paths are specified:
 4. Prune excluded directories during discovery and record ignored decisions for them.
 5. For discovered files, require a match against `include` or `extend-include`.
 6. Reject files matching `exclude` or `extend-exclude`.
-7. If `respect-gitignore = true`, reject files matched by the gitignore filter.
+7. If `respect-gitignore = true`, reject files matched by the gitignore filter, or abort file selection if gitignore checks fail.
 8. Deduplicate accepted paths that resolve to the same physical file, recording later aliases as ignored duplicate decisions.
 9. Return accepted files and structured decisions for file-selection output.
 

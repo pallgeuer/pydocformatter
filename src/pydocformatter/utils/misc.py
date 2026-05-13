@@ -1,3 +1,13 @@
+import os
+
+import pydocformatter.config as config
+
+
+def auto_plural(count: int, word: str) -> str:
+    """Return a singular or plural word for a count."""
+    return word if count == 1 else f"{word}s"
+
+
 def format_line_ranges(line_numbers: list[int]) -> str:
     """Format sorted line numbers as compressed ranges.
 
@@ -44,3 +54,32 @@ def format_needs_formatting_message(
     label = "lines" if len(line_numbers) > 1 else "line"
     formatted_ranges = format_line_ranges(line_numbers)
     return f"{path}: Needs {subject} formatting on {label} {formatted_ranges}"
+
+
+def resolve_line_ending(source: str, *, line_ending: config.LineEnding) -> str:
+    """Return the concrete line ending to use for rewritten source."""
+    if line_ending == "lf":
+        return "\n"
+    if line_ending == "cr-lf":
+        return "\r\n"
+    if line_ending == "native":
+        return os.linesep
+    return detect_line_ending(source)
+
+
+def detect_line_ending(source: str) -> str:
+    """Return the first line ending in source, defaulting to LF when absent."""
+    for index, char in enumerate(source):
+        if char == "\n":
+            return "\n"
+        if char == "\r":
+            next_index = index + 1
+            if next_index < len(source) and source[next_index] == "\n":
+                return "\r\n"
+            return "\r"
+    return "\n"
+
+
+def normalize_line_endings(text: str, *, line_ending: str) -> str:
+    """Convert every line ending in text to line_ending."""
+    return text.replace("\r\n", "\n").replace("\r", "\n").replace("\n", line_ending)

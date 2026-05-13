@@ -115,9 +115,30 @@ class TestFormatterResults(unittest.TestCase):
                 "ERROR: Using standard input instead of input path: b.py",
                 "ERROR: Failed to read file a.py",
                 "",
-                "Found 0 rule check errors (0 fixable).",
+                "Found 2 operational errors.",
             ],
         )
+
+    def test_grouped_output_summary_counts_findings_and_operational_errors(self) -> None:
+        rule = Rule(
+            rule_code="PDF001",
+            rule_name="reflow-required",
+            message="Docstring chunk needs reflow",
+            fixable=True,
+        )
+        result = FormatterResult(
+            path="a.py",
+            source=None,
+            modified=False,
+            findings=(RuleFinding(rule=rule, line_numbers=(2,)),),
+            errors=("Failed to read file a.py",),
+        )
+
+        output = StringIO()
+        with contextlib.redirect_stdout(output):
+            check_command.print_results_grouped(["Using standard input instead of input path: b.py"], [result], output=None)
+
+        self.assertEqual(output.getvalue().splitlines()[-1], "Found 2 operational errors and 1 rule check error (1 fixable).")
 
     def test_output_stream_does_not_convert_body_os_errors(self) -> None:
         with tempfile.TemporaryDirectory() as td:

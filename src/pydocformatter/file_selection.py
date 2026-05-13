@@ -458,8 +458,7 @@ def _collect_gitignored_absolute_paths(
     for git_root, relative_paths in paths_by_git_root.items():
         ignored_relative_paths, error = _query_git_ignored_paths(git_root, relative_paths)
         if error is not None:
-            print(f"WARNING: {git_root}: Unable to apply gitignore filtering ({error}): Continuing without gitignore filtering for this repository root")
-            continue
+            raise FileSelectionError(f"{git_root}: Unable to apply gitignore filtering: {error}")
         gitignored_paths.update(os.path.abspath(os.path.join(git_root, path)) for path in ignored_relative_paths)
 
     return gitignored_paths

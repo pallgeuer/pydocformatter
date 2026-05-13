@@ -261,14 +261,13 @@ class TestFileSelection(unittest.TestCase):
         self.assertEqual(stdout.getvalue(), "")
         self.assertEqual(selection.accepted_paths, (str(root / "a.py"),))
 
-    def test_ruff_spec_warns_once_per_git_root_on_check_failure(self) -> None:
+    def test_ruff_spec_gitignore_check_failure_aborts_file_selection(self) -> None:
         settings = FormatterSettings(respect_gitignore=True)
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             self._write_git_marker(root)
             (root / "a.py").write_text("", encoding="utf-8")
             (root / "b.py").write_text("", encoding="utf-8")
-            stdout = StringIO()
 
             with (
                 unittest.mock.patch(
@@ -280,16 +279,9 @@ class TestFileSelection(unittest.TestCase):
                         stderr=b"fatal: no such command",
                     ),
                 ),
-                contextlib.redirect_stdout(stdout),
+                self.assertRaisesRegex(file_selection.FileSelectionError, rf"{root}: Unable to apply gitignore filtering: fatal: no such command"),
             ):
-                selection = file_selection.select_files([str(root)], settings)
-
-        warning = f"WARNING: {root}: Unable to apply gitignore filtering (fatal: no such command): Continuing without gitignore filtering for this repository root"
-        self.assertEqual(stdout.getvalue().splitlines(), [warning])
-        self.assertEqual(
-            selection.accepted_paths,
-            (str(root / "a.py"), str(root / "b.py")),
-        )
+                file_selection.select_files([str(root)], settings)
 
     def test_ruff_spec_slash_patterns_are_git_root_relative(self) -> None:
         settings = FormatterSettings(

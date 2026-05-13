@@ -13,7 +13,7 @@ import pydocformatter.config as config
 import pydocformatter.file_selection as file_selection
 import pydocformatter.formatter as formatter
 import pydocformatter.formatters.pydocfmt as pydocfmt
-import pydocformatter.utils.diagnostics as diagnostics
+import pydocformatter.utils.misc as misc
 from pydocformatter.formatter import FormatterResult, Rule, RuleFinding
 
 LEGACY_CHECK_RULE = Rule(rule_code="000", rule_name="legacy-formatting-needed", message="Needs formatting", fixable=True)
@@ -479,30 +479,35 @@ def print_results(errors: list[str], results: list[FormatterResult], *, settings
 
 def print_results_grouped(errors: list[str], results: list[FormatterResult], *, output: typing.TextIO | None) -> None:
     """Print remaining findings grouped by file."""
-    have_errors = False
+    num_operational_errors = 0
     for error in errors:
         print(f"ERROR: {error}", file=output)
-        have_errors = True
+        num_operational_errors += 1
     for result in results:
         for error in result.errors:
             print(f"ERROR: {error}", file=output)
-            have_errors = True
-    if have_errors:
+            num_operational_errors += 1
+    if num_operational_errors != 0:
         print(file=output)
 
-    have_findings = False
+    num_findings = 0
+    num_fixable_findings = 0
     for result in results:
         if result.findings:
             print(f"{result.path}:", file=output)
             for finding in _group_findings(result.findings):
                 print(f"  {_format_grouped_finding(finding)}", file=output)
             print(file=output)
-            have_findings = True
+            num_findings += len(result.findings)
+            num_fixable_findings += sum(1 for finding in result.findings if finding.fixable)
 
-    if have_errors or have_findings:
-        total_findings = sum(len(result.findings) for result in results)
-        fixable_findings = sum(1 for result in results for finding in result.findings if finding.fixable)
-        print(f"Found {total_findings} rule check errors ({fixable_findings} fixable).", file=output)
+    if num_operational_errors != 0 or num_findings != 0:
+        parts: list[str] = []
+        if num_operational_errors != 0:
+            parts.append(f"{num_operational_errors} operational {misc.auto_plural(num_operational_errors, 'error')}")
+        if num_findings != 0:
+            parts.append(f"{num_findings} rule check {misc.auto_plural(num_findings, 'error')} ({num_fixable_findings} fixable)")
+        print(f"Found {' and '.join(parts)}.", file=output)
     else:
         print("All checks passed!", file=output)
 
@@ -521,7 +526,7 @@ def _group_findings(findings: tuple[RuleFinding, ...]) -> tuple[RuleFinding, ...
 def _format_grouped_finding(finding: RuleFinding) -> str:
     """Format one grouped finding line."""
     label = "Lines" if len(finding.line_numbers) != 1 else "Line"
-    ranges = diagnostics.format_line_ranges(list(finding.line_numbers))
+    ranges = misc.format_line_ranges(list(finding.line_numbers))
     fixable = "*" if finding.fixable else ""
     message = finding.message
     message_end = "" if message.endswith((".", "!", "?")) else "."

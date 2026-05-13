@@ -57,7 +57,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 
 - **File discovery:**
   - `--show-files` now reports directories pruned by exclude patterns, such as `.venv`.
-  - `pydocfmt` now applies gitignore-based filtering when `respect-gitignore` is enabled, and emits one warning per git root if gitignore checks cannot be executed.
+  - `pydocfmt` now applies gitignore-based filtering when `respect-gitignore` is enabled, and aborts file selection if gitignore checks cannot be executed.
   - `force-exclude` now consistently applies `.gitignore` filtering to explicitly passed file paths.
   - File selection now deduplicates paths that resolve to the same physical file and prefers relative display paths when possible.
 
@@ -72,6 +72,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 
 - **Architecture:**
   - Utility helpers now live in explicit `pydocformatter.utils` submodules for diagnostics, glob matching, and line endings.
+  - Consolidated diagnostics, line-ending, and automatic pluralization helpers in `pydocformatter.utils.misc`.
   - Experimental formatter interfaces now live in `pydocformatter.formatter`.
   - Global CLI argument definitions now live in `pydocformatter.config` and are shared by the top-level and `check` parsers.
   - Moved enabled-state help text formatting into the configuration layer.
@@ -93,10 +94,10 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - `pydocfmt check --output-file` remains supported with the legacy formatter, while stdin input is limited to the experimental formatter path.
   - Operational errors no longer produce an `All checks passed!` success message.
   - Output-file setup errors are now reported without converting unrelated `OSError`s raised while producing diagnostics.
-  - `pydocfmt` now skips files that fail UTF-8 decoding, emits a warning to stdout, and continues processing remaining files instead of crashing.
+  - `pydocfmt` now skips files that fail UTF-8 decoding, emits an operational error in grouped output, and continues processing remaining files instead of crashing.
   - Invalid include glob patterns now report configuration or argument errors instead of crashing with a traceback.
   - `--help` now works even when the current `pyproject.toml` contains invalid pydocformatter configuration.
-  - Missing or unreadable files now emit a warning and processing continues instead of crashing.
+  - Missing or unreadable files now emit an operational error in grouped output and processing continues instead of crashing.
   - `--output-file` now creates only the direct parent directory instead of recursively creating nested output directories.
 
 - **File discovery:**
