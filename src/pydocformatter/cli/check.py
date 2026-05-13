@@ -289,17 +289,20 @@ def run(args: argparse.Namespace) -> int:
                 files = args.files
         else:
             files = ["."]
+        if use_stdin and args.files:
+            errors.extend(f"Using standard input instead of input path: {path}" for path in args.files if path != "-")
 
-        if use_stdin:
-            if args.files:
-                errors.extend(f"Using standard input instead of input path: {path}" for path in args.files if path != "-")
+        if use_stdin and args.stdin_filename is None:
             selection = file_selection.SelectionResult(
                 accepted_paths=tuple(files),
                 decisions=tuple(file_selection.FileDecision(path=file, accepted=True, reason=file_selection.DecisionReason.INCLUDED, explicit=True) for file in files),
             )
         else:
             try:
-                selection = file_selection.select_files(files, settings)
+                if use_stdin:
+                    selection = file_selection.select_virtual_file(args.stdin_filename, settings)
+                else:
+                    selection = file_selection.select_files(files, settings)
             except file_selection.FileSelectionError as error:
                 print(f"pydocfmt check: File selection error: {error}", file=sys.stderr)
                 return 2
@@ -310,8 +313,8 @@ def run(args: argparse.Namespace) -> int:
             return 0
 
         if settings.experimental:
-            if use_stdin and len(selection.accepted_paths) != 1:
-                raise AssertionError(f"Expect exactly one accepted path when using stdin: {selection.accepted_paths}")
+            if use_stdin and len(selection.accepted_paths) > 1:
+                raise AssertionError(f"Expect at most one accepted path when using stdin: {selection.accepted_paths}")
             results = [formatter.format_file_exp(path, file=sys.stdin if use_stdin else None, settings=settings, fix=args.fix) for path in selection.accepted_paths]
         else:
             if use_stdin:
@@ -319,9 +322,9 @@ def run(args: argparse.Namespace) -> int:
                 return 2
             results = format_files(selection.accepted_paths, settings=settings, fix=args.fix)
 
-        if use_stdin and args.fix:
+        if use_stdin and args.fix and results:
             if len(results) != 1:
-                raise AssertionError(f"Expect exactly one result when fixing stdin: Got {len(results)}")
+                raise AssertionError(f"Expect at most one result when fixing stdin: Got {len(results)}")
             if results[0].source is not None:
                 print(results[0].source, end="")
 

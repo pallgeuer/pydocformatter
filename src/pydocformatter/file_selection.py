@@ -130,6 +130,36 @@ def select_files(paths: list[str], settings: FormatterSettings) -> SelectionResu
         for collected in _collect_candidates(paths, exclude_matcher, root_cache)
     )
 
+    return _selection_result_with_gitignore(evaluated, settings, root_cache)
+
+
+def select_virtual_file(path: str, settings: FormatterSettings) -> SelectionResult:
+    """Select one explicit file path without checking whether it exists on disk."""
+    validate_include_patterns(settings.include_patterns)
+    validate_exclude_patterns(settings.exclude_patterns)
+    include_matcher = GlobPatternSet.compile(settings.include_patterns, match_parent_segments_for_bare=False)
+    exclude_matcher = GlobPatternSet.compile(settings.exclude_patterns, match_parent_segments_for_bare=True, match_descendants_for_slash=True)
+    root_cache: dict[str, str | None] = {}
+
+    evaluated = (
+        _evaluate_candidate(
+            _Candidate(path=path, explicit=True),
+            settings,
+            include_matcher,
+            exclude_matcher,
+            root_cache,
+        ),
+    )
+
+    return _selection_result_with_gitignore(evaluated, settings, root_cache)
+
+
+def _selection_result_with_gitignore(
+    evaluated: tuple[FileDecision, ...],
+    settings: FormatterSettings,
+    root_cache: dict[str, str | None],
+) -> SelectionResult:
+    """Build the final selection result, applying gitignore filtering when enabled."""
     if not settings.respect_gitignore:
         return _selection_result(evaluated)
 

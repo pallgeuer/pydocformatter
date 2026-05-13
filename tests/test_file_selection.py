@@ -77,6 +77,22 @@ class TestFileSelection(unittest.TestCase):
         self.assertEqual(selection.accepted_paths, ("a.py",))
         self.assertEqual(selection.decisions[0].path, "a.py")
 
+    def test_virtual_file_is_not_walked_when_path_exists_as_directory(self) -> None:
+        settings = FormatterSettings(respect_gitignore=False, force_exclude=True)
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "pkg.py").mkdir()
+            (root / "pkg.py" / "child.py").write_text("", encoding="utf-8")
+            previous_cwd = os.getcwd()
+            os.chdir(root)
+            try:
+                selection = file_selection.select_virtual_file("pkg.py", settings)
+            finally:
+                os.chdir(previous_cwd)
+
+        self.assertEqual(selection.accepted_paths, ("pkg.py",))
+        self.assertEqual([decision.path for decision in selection.decisions], ["pkg.py"])
+
     def test_selection_deduplicates_equivalent_paths(self) -> None:
         settings = FormatterSettings(respect_gitignore=False)
         with tempfile.TemporaryDirectory() as td:

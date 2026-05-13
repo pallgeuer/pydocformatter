@@ -88,6 +88,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 - **CLI:**
   - Legacy formatter findings now report the original changed source lines instead of a synthetic line number.
   - Formatter read, decode, and write errors now affect check exit status without being reported as rule findings.
+  - `--force-exclude` now applies to virtual paths supplied through `--stdin-filename`.
   - `pydocfmt check` now prints `All checks passed!` to the configured output when no diagnostics are found.
   - `pydocfmt check --output-file` remains supported with the legacy formatter, while stdin input is limited to the experimental formatter path.
   - Operational errors no longer produce an `All checks passed!` success message.

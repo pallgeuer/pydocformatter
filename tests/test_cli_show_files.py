@@ -1199,6 +1199,81 @@ class TestCliShowFiles(unittest.TestCase):
         self.assertNotIn("All checks passed!", stdout.getvalue())
         self.assertEqual(stderr.getvalue(), "")
 
+    def test_pydocfmt_stdin_filename_force_exclude_filters_by_exclude(self) -> None:
+        stdout = StringIO()
+        argv = [
+            "pydocfmt",
+            "check",
+            "--show-files",
+            "--stdin-filename",
+            "skip.py",
+            "--force-exclude",
+            "--exclude",
+            "skip.py",
+        ]
+
+        with (
+            unittest.mock.patch("sys.argv", argv),
+            contextlib.redirect_stdout(stdout),
+        ):
+            exit_code = pydocfmt_main.main()
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(stdout.getvalue().splitlines(), ["skip.py IGNORED: matches exclude patterns"])
+
+    def test_pydocfmt_stdin_filename_force_exclude_does_not_format_excluded_path(self) -> None:
+        source = "def foo():\n    pass\n"
+        stdout = StringIO()
+        stderr = StringIO()
+        format_file_exp = unittest.mock.Mock(return_value=FormatterResult(path="skip.py", source=source, modified=False, findings=(), errors=()))
+        argv = [
+            "pydocfmt",
+            "check",
+            "--stdin-filename",
+            "skip.py",
+            "--force-exclude",
+            "--exclude",
+            "skip.py",
+            "--experimental",
+        ]
+
+        with (
+            unittest.mock.patch("sys.argv", argv),
+            unittest.mock.patch("sys.stdin", StringIO(source)),
+            unittest.mock.patch("pydocformatter.formatter.format_file_exp", format_file_exp),
+            contextlib.redirect_stdout(stdout),
+            contextlib.redirect_stderr(stderr),
+        ):
+            exit_code = pydocfmt_main.main()
+
+        self.assertEqual(exit_code, 0)
+        format_file_exp.assert_not_called()
+        self.assertEqual(stdout.getvalue(), "All checks passed!\n")
+        self.assertEqual(stderr.getvalue(), "")
+
+    def test_pydocfmt_stdin_filename_force_exclude_filters_by_gitignore(self) -> None:
+        with self._make_git_tree() as td:
+            root = Path(td)
+            stdout = StringIO()
+            argv = ["pydocfmt", "check", "--show-files", "--stdin-filename", "skip.py", "--force-exclude"]
+            previous_cwd = os.getcwd()
+            os.chdir(root)
+            try:
+                with (
+                    unittest.mock.patch("sys.argv", argv),
+                    unittest.mock.patch(
+                        "pydocformatter.file_selection.subprocess.run",
+                        side_effect=self._fake_git_check_ignore_for_root(root, {"skip.py"}),
+                    ),
+                    contextlib.redirect_stdout(stdout),
+                ):
+                    exit_code = pydocfmt_main.main()
+            finally:
+                os.chdir(previous_cwd)
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(stdout.getvalue().splitlines(), ["skip.py IGNORED: matches .gitignore"])
+
     def test_pydocfmt_fix_stdin_writes_formatted_source_to_stdout(self) -> None:
         source = 'def foo():\n    """Does something.\n\nArgs:\n    x (int): some parameter.\n    """\n    pass\n'
         formatted_source = 'def foo():\n    """Does something.\n\n    Args:\n        x (int): some parameter.\n    """\n    pass\n'
