@@ -43,6 +43,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 
 - **CLI:**
   - Reorganized `pydocfmt check --help` into Ruff-inspired argument groups for options, rule selection, and file selection.
+  - Moved `--output-format` and `--experimental` to the Formatting help group, and moved `--output-file` to the end of the Options group.
   - Refactored parser setup to share global option definitions and isolate version/help subcommand construction.
   - Updated `pydocfmt check --help` argument ordering and metavars to keep help, settings output, and documentation consistent.
   - Rule and file-selection list options now use comma-separated CLI values, such as `--select PDF,PCF` and `--include "*.py,*.pyi"`.
@@ -55,6 +56,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Renamed the configuration table from `[tool.pydocformatter]` to `[tool.pydocfmt]`.
   - Settings now resolve from one `[tool.pydocfmt]` table, followed by command-line overrides.
   - Resolved settings output is now formatted by the configuration layer.
+  - Setting validation now uses shared generic validators for booleans, integers, string lists, and string enums.
   - File-selection settings now use Ruff-style glob lists (`include`, `extend-include`, `exclude`, `extend-exclude`) and `force-exclude`.
   - For each setting key, the highest-priority value wins (`dedicated CLI option > inline --config > explicit --config file > auto-discovered config > defaults`), including `extend-include` and `extend-exclude`.
 
@@ -69,17 +71,27 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Experimental formatter results now carry the formatted source alongside path, modification, finding, and error data.
   - `SourceFormatResult` now carries the original source alongside the possibly formatted source.
   - Formatter internals now require formatting controls such as line length, line endings, and indentation settings as explicit keyword-only arguments.
-  - Formatter functions now receive resolved `FormatterSettings` directly.
+  - Formatter functions now receive resolved `CheckSettings` directly.
   - Generated Google-style docstring section indentation is now configurable while preserving the existing base docstring indentation.
   - Check-mode output now includes docstring and comment line locations, emitted once per subject per file with compressed consecutive ranges.
 
 - **Architecture:**
+  - Setting metadata now derives default TOML keys from field names and default CLI flags from setting keys, with `SettingCliDefinition` renamed to `SettingCLIDefinition`.
   - Utility helpers now live in explicit `pydocformatter.utils` submodules for diagnostics, glob matching, and line endings.
   - Consolidated diagnostics, line-ending, and automatic pluralization helpers in `pydocformatter.utils.misc`.
   - Experimental formatter interfaces now live in `pydocformatter.formatter`.
-  - Global CLI argument definitions now live in `pydocformatter.config` and are shared by the top-level and `check` parsers.
+  - `pydocformatter.config` now provides generic schema-driven settings machinery for config loading, validation, settings output, argparse setup, and CLI override extraction.
+  - `pydocformatter.config` now provides generic multi-string map typing and validation, and raw CLI setting definitions now show default values unless explicitly disabled.
+  - Setting metadata now derives default validation, CLI behavior, and TOML rendering from each setting's declared type.
+  - Centralized check setting metadata in `pydocformatter.cli.settings_check` so config keys, validation, settings output, dedicated CLI options, and CLI override extraction share one ordered source of truth.
+  - Rule selector metadata is now inferred from setting group and CLI value shape instead of explicit setting definition tags.
+  - Moved global `--config` and `--isolated` parsing into reusable `GlobalArgs` helpers, shared by the top-level and `check` parsers.
+  - Renamed the CLI implementation module from `pydocformatter.cli.pydocfmt_main` to `pydocformatter.cli.main`.
   - Moved enabled-state help text formatting into the configuration layer.
   - Moved experimental file I/O diagnostics into the formatter layer.
+  - Moved generic settings loading, formatting, argparse setup, and CLI override extraction onto `SettingsSchema`.
+  - Settings schema metadata now defaults omitted CLI definitions to standard CLI-backed settings and omitted documentation to the setting help text.
+  - Settings schemas now record their override type and document the post-validation hook contract for implementers.
 
 - **Developer dependencies:**
   - Updated mypy from 1.20.2 to 2.1.0.

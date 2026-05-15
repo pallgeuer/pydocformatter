@@ -78,13 +78,13 @@ If no files or directories are specified, `pydocfmt check` checks the current di
 **Options:**
 - `--help`: Show help message and exit
 - `--fix`, `--no-fix`: Toggle applying fixes instead of only checking
-- `--output-format {grouped}`: Output format for rule findings (default: grouped)
-- `-o`, `--output-file FILE`: Write diagnostics and show output to a file instead of stdout
 - `--show-files`: Show file-selection decisions without formatting files
 - `--show-settings`: Show resolved settings without formatting files
-- `--experimental`, `--no-experimental`: Toggle the experimental rule-based formatter implementation (default: disabled)
+- `-o`, `--output-file FILE`: Write diagnostics and show output to a file instead of stdout
 
 **Formatting:**
+- `--output-format {grouped}`: Output format for rule findings (default: grouped)
+- `--experimental`, `--no-experimental`: Toggle the experimental rule-based formatter implementation (default: disabled)
 - `--line-length LENGTH`: Maximum line length for docstrings and comments (default: 88)
 - `--line-ending {auto,lf,cr-lf,native}`: Line ending to use when rewriting files (default: auto)
 - `--indent-style {space,tab}`: Indentation style for generated docstring sections (default: space)
@@ -94,8 +94,8 @@ If no files or directories are specified, `pydocfmt check` checks the current di
 - `--select RULE`: Comma-separated rule selector(s) to enable
 - `--ignore RULE`: Comma-separated rule selector(s) to ignore
 - `--extend-select RULE`: Comma-separated additional rule selector(s) to enable
-- `--per-file-ignores TOML`: TOML inline table mapping file patterns to ignored rule selectors
-- `--extend-per-file-ignores TOML`: TOML inline table mapping file patterns to additional ignored rule selectors
+- `--per-file-ignores RULE_TOML`: TOML inline table mapping file patterns to ignored rule selectors
+- `--extend-per-file-ignores RULE_TOML`: TOML inline table mapping file patterns to additional ignored rule selectors
 - `--fixable RULE`: Comma-separated rule selector(s) eligible for automatic fixes
 - `--unfixable RULE`: Comma-separated rule selector(s) ineligible for automatic fixes
 - `--extend-fixable RULE`: Comma-separated additional rule selector(s) eligible for automatic fixes
@@ -106,7 +106,7 @@ If no files or directories are specified, `pydocfmt check` checks the current di
 - `--exclude GLOB`: Comma-separated glob pattern(s) for files to exclude
 - `--extend-exclude GLOB`: Comma-separated additional glob pattern(s) for files to exclude
 - `--respect-gitignore`, `--no-respect-gitignore`: Toggle .gitignore-aware discovery (default: enabled)
-- `--force-exclude`, `--no-force-exclude`: Apply include/exclude rules even to explicitly listed files
+- `--force-exclude`, `--no-force-exclude`: Apply include/exclude/gitignore rules even to explicitly listed files
 
 **Miscellaneous:**
 - `--stdin-filename FILENAME`: File name to use when checking or fixing source from stdin

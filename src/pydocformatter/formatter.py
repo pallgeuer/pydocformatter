@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import dataclasses
+import os
 import typing
 
-from pydocformatter.config import FormatterSettings
+from pydocformatter.cli.settings_check import CheckSettings, LineEnding
 
 
 @dataclasses.dataclass(frozen=True)
@@ -59,7 +60,7 @@ class FormatterResult:
     errors: tuple[str, ...]
 
 
-def format_file_exp(path: str, *, file: typing.TextIO | None = None, settings: FormatterSettings, fix: bool) -> FormatterResult:
+def format_file_exp(path: str, *, file: typing.TextIO | None = None, settings: CheckSettings, fix: bool) -> FormatterResult:
     """Run the experimental formatter interface for one file."""
     try:
         if file is None:
@@ -86,10 +87,42 @@ def format_file_exp(path: str, *, file: typing.TextIO | None = None, settings: F
     return result
 
 
-def format_source_exp(source: str, path: str, *, settings: FormatterSettings, fix: bool) -> FormatterResult:
+def format_source_exp(source: str, path: str, *, settings: CheckSettings, fix: bool) -> FormatterResult:
     """Run the experimental formatter interface for source text."""
     del settings, fix
     # TODO: Temporary placeholder code that must produce a non-None new_source (can just be source if nothing was or
     #       should be fixed, otherwise it should represent the new formatted source)
     new_source = source
     return FormatterResult(path=path, source=new_source, modified=(new_source != source), findings=(), errors=())
+
+
+def resolve_line_ending(source: str, *, line_ending: LineEnding) -> str:
+    """Return the concrete line ending to use for rewritten source."""
+    if line_ending == LineEnding.AUTO:
+        return detect_line_ending(source)
+    elif line_ending == LineEnding.LF:
+        return "\n"
+    elif line_ending == LineEnding.CR_LF:
+        return "\r\n"
+    elif line_ending == LineEnding.NATIVE:
+        return os.linesep
+    else:
+        raise ValueError(f"Unexpected line ending specification: {line_ending}")
+
+
+def detect_line_ending(source: str) -> str:
+    """Return the first line ending in source, defaulting to LF when absent."""
+    for index, char in enumerate(source):
+        if char == "\n":
+            return "\n"
+        if char == "\r":
+            next_index = index + 1
+            if next_index < len(source) and source[next_index] == "\n":
+                return "\r\n"
+            return "\r"
+    return "\n"
+
+
+def normalize_line_endings(text: str, *, line_ending: str) -> str:
+    """Convert every line ending in text to line_ending."""
+    return text.replace("\r\n", "\n").replace("\r", "\n").replace("\n", line_ending)

@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Callable
 
 import pydocformatter.file_selection as file_selection
-from pydocformatter.config import FormatterSettings
+from pydocformatter.cli.settings_check import CheckSettings
 from pydocformatter.file_selection import DecisionReason
 
 
@@ -47,7 +47,7 @@ class TestFileSelection(unittest.TestCase):
         return fake_run
 
     def test_ruff_spec_deterministic_directory_order(self) -> None:
-        settings = FormatterSettings(respect_gitignore=False)
+        settings = CheckSettings(respect_gitignore=False)
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             (root / "z_dir").mkdir()
@@ -63,7 +63,7 @@ class TestFileSelection(unittest.TestCase):
         self.assertEqual(collected, ["a.py", "b.py", "a_dir/d.py", "z_dir/c.py"])
 
     def test_selection_preserves_relative_explicit_paths(self) -> None:
-        settings = FormatterSettings(respect_gitignore=False)
+        settings = CheckSettings(respect_gitignore=False)
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             (root / "a.py").write_text("", encoding="utf-8")
@@ -78,7 +78,7 @@ class TestFileSelection(unittest.TestCase):
         self.assertEqual(selection.decisions[0].path, "a.py")
 
     def test_virtual_file_is_not_walked_when_path_exists_as_directory(self) -> None:
-        settings = FormatterSettings(respect_gitignore=False, force_exclude=True)
+        settings = CheckSettings(respect_gitignore=False, force_exclude=True)
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             (root / "pkg.py").mkdir()
@@ -94,7 +94,7 @@ class TestFileSelection(unittest.TestCase):
         self.assertEqual([decision.path for decision in selection.decisions], ["pkg.py"])
 
     def test_selection_deduplicates_equivalent_paths(self) -> None:
-        settings = FormatterSettings(respect_gitignore=False)
+        settings = CheckSettings(respect_gitignore=False)
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             target = root / "a.py"
@@ -112,7 +112,7 @@ class TestFileSelection(unittest.TestCase):
         self.assertFalse(selection.decisions[1].accepted)
 
     def test_selection_canonicalizes_lexical_path_aliases(self) -> None:
-        settings = FormatterSettings(respect_gitignore=False)
+        settings = CheckSettings(respect_gitignore=False)
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             (root / "pkg").mkdir()
@@ -129,7 +129,7 @@ class TestFileSelection(unittest.TestCase):
         self.assertEqual(selection.decisions[1].reason, DecisionReason.DUPLICATE)
 
     def test_selection_converts_absolute_paths_inside_current_directory_to_relative_paths(self) -> None:
-        settings = FormatterSettings(respect_gitignore=False)
+        settings = CheckSettings(respect_gitignore=False)
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             target = root / "a.py"
@@ -145,7 +145,7 @@ class TestFileSelection(unittest.TestCase):
         self.assertEqual(selection.decisions[0].path, "a.py")
 
     def test_selection_preserves_absolute_paths_outside_current_directory(self) -> None:
-        settings = FormatterSettings(respect_gitignore=False)
+        settings = CheckSettings(respect_gitignore=False)
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             target = root / "a.py"
@@ -157,7 +157,7 @@ class TestFileSelection(unittest.TestCase):
         self.assertEqual(selection.decisions[0].path, str(target))
 
     def test_selection_deduplicates_symlink_aliases_by_physical_target(self) -> None:
-        settings = FormatterSettings(respect_gitignore=False)
+        settings = CheckSettings(respect_gitignore=False)
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             target = root / "a.py"
@@ -180,7 +180,7 @@ class TestFileSelection(unittest.TestCase):
     def test_ruff_spec_explicit_file_bypasses_filters_without_force(
         self,
     ) -> None:
-        settings = FormatterSettings(
+        settings = CheckSettings(
             respect_gitignore=True,
             force_exclude=False,
             include=("*.py",),
@@ -197,7 +197,7 @@ class TestFileSelection(unittest.TestCase):
         self.assertEqual(selection.decisions[0].reason, DecisionReason.EXPLICIT_INCLUDED)
 
     def test_ruff_spec_force_exclude_filters_explicit_file(self) -> None:
-        settings = FormatterSettings(
+        settings = CheckSettings(
             respect_gitignore=False,
             force_exclude=True,
             include=("*.py",),
@@ -214,7 +214,7 @@ class TestFileSelection(unittest.TestCase):
         self.assertEqual(selection.decisions[0].reason, DecisionReason.EXCLUDED)
 
     def test_ruff_spec_gitignore_can_be_disabled(self) -> None:
-        settings = FormatterSettings(respect_gitignore=False)
+        settings = CheckSettings(respect_gitignore=False)
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             self._write_git_marker(root)
@@ -227,7 +227,7 @@ class TestFileSelection(unittest.TestCase):
         self.assertEqual(selection.accepted_paths, (str(root / "a.py"),))
 
     def test_ruff_spec_gitignore_filters_discovered_files(self) -> None:
-        settings = FormatterSettings(respect_gitignore=True)
+        settings = CheckSettings(respect_gitignore=True)
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             self._write_git_marker(root)
@@ -245,7 +245,7 @@ class TestFileSelection(unittest.TestCase):
         self.assertEqual(decisions_by_name["skip.py"].reason, DecisionReason.GITIGNORED)
 
     def test_ruff_spec_non_git_directory_does_not_warn(self) -> None:
-        settings = FormatterSettings(respect_gitignore=True)
+        settings = CheckSettings(respect_gitignore=True)
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             (root / "a.py").write_text("", encoding="utf-8")
@@ -262,7 +262,7 @@ class TestFileSelection(unittest.TestCase):
         self.assertEqual(selection.accepted_paths, (str(root / "a.py"),))
 
     def test_ruff_spec_gitignore_check_failure_aborts_file_selection(self) -> None:
-        settings = FormatterSettings(respect_gitignore=True)
+        settings = CheckSettings(respect_gitignore=True)
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             self._write_git_marker(root)
@@ -284,7 +284,7 @@ class TestFileSelection(unittest.TestCase):
                 file_selection.select_files([str(root)], settings)
 
     def test_ruff_spec_slash_patterns_are_git_root_relative(self) -> None:
-        settings = FormatterSettings(
+        settings = CheckSettings(
             respect_gitignore=False,
             exclude=("src/pkg/*.py",),
         )
@@ -305,7 +305,7 @@ class TestFileSelection(unittest.TestCase):
         self.assertEqual(selection.decisions[0].reason, DecisionReason.EXCLUDED)
 
     def test_ruff_spec_direct_excluded_directory_is_skipped(self) -> None:
-        settings = FormatterSettings(
+        settings = CheckSettings(
             respect_gitignore=False,
             exclude=("src/generated",),
         )
@@ -322,7 +322,7 @@ class TestFileSelection(unittest.TestCase):
         self.assertEqual(selection.decisions[0].reason, DecisionReason.EXCLUDED)
 
     def test_pruned_excluded_directory_is_reported_as_decision(self) -> None:
-        settings = FormatterSettings(
+        settings = CheckSettings(
             respect_gitignore=False,
             exclude=("generated",),
         )
@@ -342,7 +342,7 @@ class TestFileSelection(unittest.TestCase):
     def test_ruff_spec_slash_directory_exclude_filters_descendant_file(
         self,
     ) -> None:
-        settings = FormatterSettings(
+        settings = CheckSettings(
             respect_gitignore=False,
             force_exclude=True,
             exclude=("src/generated",),
@@ -360,7 +360,7 @@ class TestFileSelection(unittest.TestCase):
         self.assertEqual(selection.decisions[0].reason, DecisionReason.EXCLUDED)
 
     def test_gitignore_query_encodes_surrogate_paths(self) -> None:
-        settings = FormatterSettings(respect_gitignore=True)
+        settings = CheckSettings(respect_gitignore=True)
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             self._write_git_marker(root)

@@ -4,7 +4,7 @@ import subprocess
 from collections import defaultdict
 from enum import Enum
 
-from pydocformatter.config import FormatterSettings
+from pydocformatter.cli.settings_check import CheckSettings
 from pydocformatter.utils.globs import GlobPatternSet
 
 
@@ -93,7 +93,7 @@ class _Candidate:
 _CollectedPath = _Candidate | FileDecision
 
 
-def select_files(paths: list[str], settings: FormatterSettings) -> SelectionResult:
+def select_files(paths: list[str], settings: CheckSettings) -> SelectionResult:
     """Select files from CLI paths using resolved formatter settings.
 
     Direct file paths are accepted without include, exclude, or gitignore filtering unless `settings.force_exclude` is
@@ -102,8 +102,8 @@ def select_files(paths: list[str], settings: FormatterSettings) -> SelectionResu
 
     Args:
         paths (list[str]): CLI path arguments naming files or directories to consider.
-        settings (FormatterSettings): Resolved formatter settings controlling include, exclude, force-exclude, and
-            gitignore behavior.
+        settings (CheckSettings): Resolved formatter settings controlling include, exclude, force-exclude, and gitignore
+            behavior.
 
     Returns:
         SelectionResult: Accepted paths plus file-selection decisions for accepted and rejected paths. Accepted paths
@@ -133,7 +133,7 @@ def select_files(paths: list[str], settings: FormatterSettings) -> SelectionResu
     return _selection_result_with_gitignore(evaluated, settings, root_cache)
 
 
-def select_virtual_file(path: str, settings: FormatterSettings) -> SelectionResult:
+def select_virtual_file(path: str, settings: CheckSettings) -> SelectionResult:
     """Select one explicit file path without checking whether it exists on disk."""
     validate_include_patterns(settings.include_patterns)
     validate_exclude_patterns(settings.exclude_patterns)
@@ -156,7 +156,7 @@ def select_virtual_file(path: str, settings: FormatterSettings) -> SelectionResu
 
 def _selection_result_with_gitignore(
     evaluated: tuple[FileDecision, ...],
-    settings: FormatterSettings,
+    settings: CheckSettings,
     root_cache: dict[str, str | None],
 ) -> SelectionResult:
     """Build the final selection result, applying gitignore filtering when enabled."""
@@ -229,7 +229,7 @@ def _excluded_directory_decision(path: str, explicit: bool) -> FileDecision:
 
 def _evaluate_candidate(
     candidate: _Candidate,
-    settings: FormatterSettings,
+    settings: CheckSettings,
     include_matcher: GlobPatternSet,
     exclude_matcher: GlobPatternSet,
     root_cache: dict[str, str | None],

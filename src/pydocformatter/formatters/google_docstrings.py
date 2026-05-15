@@ -1,8 +1,8 @@
 import re
 import textwrap
-from typing import Literal, Protocol
+from typing import Protocol
 
-IndentStyle = Literal["space", "tab"]
+from pydocformatter.cli.settings_check import IndentStyle
 
 
 class SectionFormatter(Protocol):
@@ -21,7 +21,7 @@ class SectionFormatter(Protocol):
 
 def _indent_unit(*, indent_style: IndentStyle, indent_width: int) -> str:
     """Return one generated indentation level."""
-    return "\t" if indent_style == "tab" else " " * indent_width
+    return "\t" if indent_style == IndentStyle.TAB else " " * indent_width
 
 
 def _visual_width(text: str, tab_width: int) -> int:

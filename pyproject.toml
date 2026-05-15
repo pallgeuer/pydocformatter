@@ -43,7 +43,7 @@ Changelog = "https://github.com/pallgeuer/pydocformatter/blob/main/CHANGELOG.md"
 Contributing = "https://github.com/pallgeuer/pydocformatter/blob/main/CONTRIBUTING.md"
 
 [project.scripts]
-pydocfmt = "pydocformatter.cli.pydocfmt_main:main"
+pydocfmt = "pydocformatter.cli.main:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

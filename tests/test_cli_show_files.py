@@ -8,13 +8,13 @@ from io import StringIO
 from pathlib import Path
 from typing import Callable, TextIO
 
-import pydocformatter.cli.pydocfmt_main as pydocfmt_main
+import pydocformatter.cli.main as pydocfmt_cli
 import pydocformatter.formatters.pydocfmt as pydocfmt
-from pydocformatter.config import FormatterSettings
+from pydocformatter.cli.settings_check import CheckSettings
 from pydocformatter.formatter import FormatterResult
 
 
-class TestCliShowFiles(unittest.TestCase):
+class TestCLIShowFiles(unittest.TestCase):
     @staticmethod
     def _make_sample_tree() -> tempfile.TemporaryDirectory[str]:
         temp_dir = tempfile.TemporaryDirectory()
@@ -61,7 +61,7 @@ class TestCliShowFiles(unittest.TestCase):
             stdout = StringIO()
             called_paths: list[str] = []
 
-            def fake_format(path: str, settings: FormatterSettings, fix: bool, **kwargs: object) -> bool:
+            def fake_format(path: str, settings: CheckSettings, fix: bool, **kwargs: object) -> bool:
                 called_paths.append(path)
                 return False
 
@@ -83,7 +83,7 @@ class TestCliShowFiles(unittest.TestCase):
                 ),
                 contextlib.redirect_stdout(stdout),
             ):
-                pydocfmt_main.main()
+                pydocfmt_cli.main()
 
             expected_lines = [
                 f"{root / 'a.py'} INCLUDED",
@@ -98,7 +98,7 @@ class TestCliShowFiles(unittest.TestCase):
             root = Path(td)
             called_paths: list[str] = []
 
-            def fake_format(path: str, settings: FormatterSettings, fix: bool) -> pydocfmt.SourceFormatResult:
+            def fake_format(path: str, settings: CheckSettings, fix: bool) -> pydocfmt.SourceFormatResult:
                 called_paths.append(os.path.abspath(path))
                 return pydocfmt.SourceFormatResult(source="x = 1\n", docstring_changed_lines=(), comment_changed_lines=())
 
@@ -113,7 +113,7 @@ class TestCliShowFiles(unittest.TestCase):
                         side_effect=fake_format,
                     ),
                 ):
-                    pydocfmt_main.main()
+                    pydocfmt_cli.main()
             finally:
                 os.chdir(previous_cwd)
 
@@ -131,7 +131,7 @@ class TestCliShowFiles(unittest.TestCase):
             stdout = StringIO()
             called_paths: list[str] = []
 
-            def fake_format(path: str, settings: FormatterSettings, fix: bool, **kwargs: object) -> bool:
+            def fake_format(path: str, settings: CheckSettings, fix: bool, **kwargs: object) -> bool:
                 called_paths.append(path)
                 return False
 
@@ -144,7 +144,7 @@ class TestCliShowFiles(unittest.TestCase):
                 ),
                 contextlib.redirect_stdout(stdout),
             ):
-                pydocfmt_main.main()
+                pydocfmt_cli.main()
 
             expected_lines = [
                 f"{root / '.venv'} IGNORED: matches exclude patterns",
@@ -159,7 +159,7 @@ class TestCliShowFiles(unittest.TestCase):
             stdout = StringIO()
             called_paths: list[str] = []
 
-            def fake_format(path: str, settings: FormatterSettings, fix: bool, **kwargs: object) -> bool:
+            def fake_format(path: str, settings: CheckSettings, fix: bool, **kwargs: object) -> bool:
                 called_paths.append(path)
                 return False
 
@@ -181,7 +181,7 @@ class TestCliShowFiles(unittest.TestCase):
                 ),
                 contextlib.redirect_stdout(stdout),
             ):
-                pydocfmt_main.main()
+                pydocfmt_cli.main()
 
             expected_lines = [
                 f"{root / 'a.py'} INCLUDED",
@@ -199,7 +199,7 @@ class TestCliShowFiles(unittest.TestCase):
             stdout = StringIO()
             called_paths: list[str] = []
 
-            def fake_format(path: str, settings: FormatterSettings, fix: bool, **kwargs: object) -> bool:
+            def fake_format(path: str, settings: CheckSettings, fix: bool, **kwargs: object) -> bool:
                 called_paths.append(path)
                 return False
 
@@ -222,7 +222,7 @@ class TestCliShowFiles(unittest.TestCase):
                 ),
                 contextlib.redirect_stdout(stdout),
             ):
-                pydocfmt_main.main()
+                pydocfmt_cli.main()
 
             expected_lines = [
                 f"{root / 'a.py'} INCLUDED",
@@ -238,7 +238,7 @@ class TestCliShowFiles(unittest.TestCase):
             stdout = StringIO()
             called_paths: list[str] = []
 
-            def fake_format(path: str, settings: FormatterSettings, fix: bool, **kwargs: object) -> bool:
+            def fake_format(path: str, settings: CheckSettings, fix: bool, **kwargs: object) -> bool:
                 called_paths.append(path)
                 return False
 
@@ -255,7 +255,7 @@ class TestCliShowFiles(unittest.TestCase):
                 ),
                 contextlib.redirect_stdout(stdout),
             ):
-                pydocfmt_main.main()
+                pydocfmt_cli.main()
 
             expected_lines = [
                 f"{root / 'a.py'} INCLUDED",
@@ -270,7 +270,7 @@ class TestCliShowFiles(unittest.TestCase):
             stdout = StringIO()
             called_paths: list[str] = []
 
-            def fake_format(path: str, settings: FormatterSettings, fix: bool, **kwargs: object) -> bool:
+            def fake_format(path: str, settings: CheckSettings, fix: bool, **kwargs: object) -> bool:
                 called_paths.append(path)
                 return False
 
@@ -284,7 +284,7 @@ class TestCliShowFiles(unittest.TestCase):
                 ),
                 contextlib.redirect_stdout(stdout),
             ):
-                pydocfmt_main.main()
+                pydocfmt_cli.main()
 
             self.assertFalse(run_mock.called)
             expected_lines = [
@@ -308,7 +308,7 @@ class TestCliShowFiles(unittest.TestCase):
                 ),
                 contextlib.redirect_stdout(stdout),
             ):
-                exit_code = pydocfmt_main.main()
+                exit_code = pydocfmt_cli.main()
 
             self.assertEqual(exit_code, 0)
             format_file.assert_not_called()
@@ -328,7 +328,7 @@ class TestCliShowFiles(unittest.TestCase):
                 ),
                 contextlib.redirect_stdout(stdout),
             ):
-                exit_code = pydocfmt_main.main()
+                exit_code = pydocfmt_cli.main()
 
             self.assertEqual(exit_code, 0)
             format_file_exp.assert_not_called()
@@ -351,7 +351,7 @@ class TestCliShowFiles(unittest.TestCase):
                     ),
                     contextlib.redirect_stdout(stdout),
                 ):
-                    exit_code = pydocfmt_main.main()
+                    exit_code = pydocfmt_cli.main()
             finally:
                 os.chdir(previous_cwd)
 
@@ -374,7 +374,7 @@ class TestCliShowFiles(unittest.TestCase):
             contextlib.redirect_stderr(stderr),
             self.assertRaises(SystemExit) as cm,
         ):
-            pydocfmt_main.main()
+            pydocfmt_cli.main()
 
         self.assertEqual(cm.exception.code, 2)
         self.assertIn(f"unrecognized arguments: {old_option}", stderr.getvalue())
@@ -391,12 +391,12 @@ class TestCliShowFiles(unittest.TestCase):
             legacy_called = False
             called_args: list[tuple[str, int, bool, bool, str]] = []
 
-            def fake_format(path: str, settings: FormatterSettings, fix: bool) -> pydocfmt.SourceFormatResult:
+            def fake_format(path: str, settings: CheckSettings, fix: bool) -> pydocfmt.SourceFormatResult:
                 nonlocal legacy_called
                 legacy_called = True
                 return pydocfmt.SourceFormatResult(source="x = 1\n", docstring_changed_lines=(), comment_changed_lines=())
 
-            def fake_exp_format(path: str, *, file: object = None, settings: FormatterSettings, fix: bool) -> FormatterResult:
+            def fake_exp_format(path: str, *, file: object = None, settings: CheckSettings, fix: bool) -> FormatterResult:
                 del file
                 called_args.append((path, settings.line_length, fix, settings.experimental, settings.output_format))
                 return FormatterResult(path=path, source="", modified=False, findings=(), errors=())
@@ -417,7 +417,7 @@ class TestCliShowFiles(unittest.TestCase):
                         side_effect=fake_exp_format,
                     ),
                 ):
-                    pydocfmt_main.main()
+                    pydocfmt_cli.main()
             finally:
                 os.chdir(previous_cwd)
 
@@ -431,7 +431,7 @@ class TestCliShowFiles(unittest.TestCase):
             (root / "a.py").write_text("x = 1\n", encoding="utf-8")
             called_settings: list[tuple[str, int]] = []
 
-            def fake_format(path: str, settings: FormatterSettings, fix: bool) -> pydocfmt.SourceFormatResult:
+            def fake_format(path: str, settings: CheckSettings, fix: bool) -> pydocfmt.SourceFormatResult:
                 called_settings.append((settings.indent_style, settings.indent_width))
                 return pydocfmt.SourceFormatResult(source="x = 1\n", docstring_changed_lines=(), comment_changed_lines=())
 
@@ -452,7 +452,7 @@ class TestCliShowFiles(unittest.TestCase):
                     side_effect=fake_format,
                 ),
             ):
-                pydocfmt_main.main()
+                pydocfmt_cli.main()
 
             self.assertEqual(
                 called_settings,
@@ -466,7 +466,7 @@ class TestCliShowFiles(unittest.TestCase):
             target.write_text("x = 1\n", encoding="utf-8")
             called_settings: list[str] = []
 
-            def fake_format(path: str, settings: FormatterSettings, fix: bool) -> pydocfmt.SourceFormatResult:
+            def fake_format(path: str, settings: CheckSettings, fix: bool) -> pydocfmt.SourceFormatResult:
                 called_settings.append(settings.line_ending)
                 return pydocfmt.SourceFormatResult(source="x = 1\n", docstring_changed_lines=(), comment_changed_lines=())
 
@@ -478,7 +478,7 @@ class TestCliShowFiles(unittest.TestCase):
                     side_effect=fake_format,
                 ),
             ):
-                pydocfmt_main.main()
+                pydocfmt_cli.main()
 
             self.assertEqual(called_settings, ["cr-lf"])
 
@@ -487,9 +487,9 @@ class TestCliShowFiles(unittest.TestCase):
             root = Path(td)
             target = root / "a.py"
             target.write_text("x = 1\n", encoding="utf-8")
-            called_settings: list[FormatterSettings] = []
+            called_settings: list[CheckSettings] = []
 
-            def fake_format(path: str, *, file: object = None, settings: FormatterSettings, fix: bool) -> FormatterResult:
+            def fake_format(path: str, *, file: object = None, settings: CheckSettings, fix: bool) -> FormatterResult:
                 del file, fix
                 called_settings.append(settings)
                 return FormatterResult(path=path, source="", modified=False, findings=(), errors=())
@@ -519,7 +519,7 @@ class TestCliShowFiles(unittest.TestCase):
                     side_effect=fake_format,
                 ),
             ):
-                exit_code = pydocfmt_main.main()
+                exit_code = pydocfmt_cli.main()
 
             self.assertEqual(exit_code, 0)
             self.assertEqual(called_settings[0].select, ("PCF", "PDF"))
@@ -541,7 +541,7 @@ class TestCliShowFiles(unittest.TestCase):
                 unittest.mock.patch("sys.argv", argv),
                 contextlib.redirect_stderr(stderr),
             ):
-                exit_code = pydocfmt_main.main()
+                exit_code = pydocfmt_cli.main()
 
         self.assertEqual(exit_code, 2)
         self.assertIn("unknown selector: BAD", stderr.getvalue())
@@ -555,7 +555,7 @@ class TestCliShowFiles(unittest.TestCase):
             stdout = StringIO()
             called_paths: list[str] = []
 
-            def fake_format(path: str, settings: FormatterSettings, fix: bool, **kwargs: object) -> bool:
+            def fake_format(path: str, settings: CheckSettings, fix: bool, **kwargs: object) -> bool:
                 called_paths.append(path)
                 return False
 
@@ -576,7 +576,7 @@ class TestCliShowFiles(unittest.TestCase):
                 ),
                 contextlib.redirect_stdout(stdout),
             ):
-                pydocfmt_main.main()
+                pydocfmt_cli.main()
 
             self.assertEqual(
                 stdout.getvalue().splitlines(),
@@ -591,7 +591,7 @@ class TestCliShowFiles(unittest.TestCase):
             stdout = StringIO()
             called_paths: list[str] = []
 
-            def fake_format(path: str, settings: FormatterSettings, fix: bool, **kwargs: object) -> bool:
+            def fake_format(path: str, settings: CheckSettings, fix: bool, **kwargs: object) -> bool:
                 called_paths.append(path)
                 return False
 
@@ -608,7 +608,7 @@ class TestCliShowFiles(unittest.TestCase):
                 ),
                 contextlib.redirect_stdout(stdout),
             ):
-                pydocfmt_main.main()
+                pydocfmt_cli.main()
 
             self.assertEqual(
                 stdout.getvalue().splitlines(),
@@ -627,7 +627,7 @@ class TestCliShowFiles(unittest.TestCase):
             )
             called_paths: list[str] = []
 
-            def fake_format(path: str, settings: FormatterSettings, fix: bool) -> pydocfmt.SourceFormatResult:
+            def fake_format(path: str, settings: CheckSettings, fix: bool) -> pydocfmt.SourceFormatResult:
                 called_paths.append(path)
                 return pydocfmt.SourceFormatResult(source="x = 1\n", docstring_changed_lines=(), comment_changed_lines=())
 
@@ -650,7 +650,7 @@ class TestCliShowFiles(unittest.TestCase):
                         side_effect=fake_format,
                     ),
                 ):
-                    pydocfmt_main.main()
+                    pydocfmt_cli.main()
             finally:
                 os.chdir(previous_cwd)
 
@@ -684,11 +684,11 @@ class TestCliShowFiles(unittest.TestCase):
                 os.chdir(previous_cwd)
 
         self.assertEqual(cm.exception.code, 0)
-        self.assertIn("usage:", stdout.getvalue())
+        self.assertIn("Usage:", stdout.getvalue())
         self.assertEqual(stderr.getvalue(), "")
 
     def test_pydocfmt_help_ignores_invalid_config(self) -> None:
-        self._assert_help_ignores_invalid_config(pydocfmt_main.main, "pydocfmt")
+        self._assert_help_ignores_invalid_config(pydocfmt_cli.main, "pydocfmt")
 
     def test_pydocfmt_check_help_ignores_invalid_config(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -709,16 +709,21 @@ class TestCliShowFiles(unittest.TestCase):
                     contextlib.redirect_stderr(stderr),
                     self.assertRaises(SystemExit) as cm,
                 ):
-                    pydocfmt_main.main()
+                    pydocfmt_cli.main()
             finally:
                 os.chdir(previous_cwd)
 
         self.assertEqual(cm.exception.code, 0)
         output = stdout.getvalue()
+        self.assertIn("Formatting:", output)
         self.assertIn("Rule selection:", output)
         self.assertIn("File selection:", output)
-        self.assertLess(output.index("--output-format"), output.index("--show-files"))
-        self.assertLess(output.index("--show-files"), output.index("--show-settings"))
+        options = output[output.index("Options:") : output.index("Formatting:")]
+        formatting = output[output.index("Formatting:") : output.index("Rule selection:")]
+        self.assertLess(options.index("--show-files"), options.index("--show-settings"))
+        self.assertLess(options.index("--show-settings"), options.index("--output-file"))
+        self.assertLess(formatting.index("--output-format"), formatting.index("--experimental"))
+        self.assertLess(formatting.index("--experimental"), formatting.index("--line-length"))
         self.assertLess(output.index("File selection:"), output.index("Miscellaneous:"))
         self.assertLess(output.index("Miscellaneous:"), output.index("Global options:"))
         self.assertIn("--output-file FILE", output)
@@ -726,7 +731,7 @@ class TestCliShowFiles(unittest.TestCase):
         self.assertIn("--config CONFIG", output)
         self.assertIn("--line-length LENGTH", output)
         self.assertIn("--indent-width WIDTH", output)
-        self.assertIn("--per-file-ignores TOML", output)
+        self.assertIn("--per-file-ignores RULE_TOML", output)
         self.assertEqual(stderr.getvalue(), "")
 
     def test_pydocfmt_help_check_prints_check_help(self) -> None:
@@ -736,10 +741,10 @@ class TestCliShowFiles(unittest.TestCase):
             unittest.mock.patch("sys.argv", argv),
             contextlib.redirect_stdout(stdout),
         ):
-            exit_code = pydocfmt_main.main()
+            exit_code = pydocfmt_cli.main()
 
         self.assertEqual(exit_code, 0)
-        self.assertIn("usage: pydocfmt check", stdout.getvalue())
+        self.assertIn("Usage: pydocfmt check", stdout.getvalue())
 
     def test_pydocfmt_version_flag_and_command_print_version(self) -> None:
         outputs = []
@@ -749,7 +754,7 @@ class TestCliShowFiles(unittest.TestCase):
                 unittest.mock.patch("sys.argv", argv),
                 contextlib.redirect_stdout(stdout),
             ):
-                exit_code = pydocfmt_main.main()
+                exit_code = pydocfmt_cli.main()
             self.assertEqual(exit_code, 0)
             outputs.append(stdout.getvalue())
 
@@ -763,10 +768,10 @@ class TestCliShowFiles(unittest.TestCase):
             unittest.mock.patch("sys.argv", argv),
             contextlib.redirect_stderr(stderr),
         ):
-            exit_code = pydocfmt_main.main()
+            exit_code = pydocfmt_cli.main()
 
         self.assertEqual(exit_code, 2)
-        self.assertIn("usage: pydocfmt", stderr.getvalue())
+        self.assertIn("Usage: pydocfmt", stderr.getvalue())
 
     def test_pydocfmt_legacy_top_level_check_flag_is_rejected(self) -> None:
         stderr = StringIO()
@@ -776,7 +781,7 @@ class TestCliShowFiles(unittest.TestCase):
             contextlib.redirect_stderr(stderr),
             self.assertRaises(SystemExit) as cm,
         ):
-            pydocfmt_main.main()
+            pydocfmt_cli.main()
 
         self.assertEqual(cm.exception.code, 2)
         self.assertIn("unrecognized arguments: --check", stderr.getvalue())
@@ -797,7 +802,7 @@ class TestCliShowFiles(unittest.TestCase):
                     unittest.mock.patch("sys.argv", argv),
                     contextlib.redirect_stdout(stdout),
                 ):
-                    exit_code = pydocfmt_main.main()
+                    exit_code = pydocfmt_cli.main()
             finally:
                 os.chdir(previous_cwd)
 
@@ -826,7 +831,7 @@ class TestCliShowFiles(unittest.TestCase):
                 unittest.mock.patch("sys.argv", argv),
                 contextlib.redirect_stdout(stdout),
             ):
-                exit_code = pydocfmt_main.main()
+                exit_code = pydocfmt_cli.main()
 
         self.assertEqual(exit_code, 0)
         output = stdout.getvalue()
@@ -850,7 +855,7 @@ class TestCliShowFiles(unittest.TestCase):
             unittest.mock.patch("sys.argv", argv),
             contextlib.redirect_stdout(stdout),
         ):
-            exit_code = pydocfmt_main.main()
+            exit_code = pydocfmt_cli.main()
 
         self.assertEqual(exit_code, 0)
         output = stdout.getvalue()
@@ -873,7 +878,7 @@ class TestCliShowFiles(unittest.TestCase):
                     unittest.mock.patch("sys.argv", argv),
                     contextlib.redirect_stdout(stdout),
                 ):
-                    exit_code = pydocfmt_main.main()
+                    exit_code = pydocfmt_cli.main()
             finally:
                 os.chdir(previous_cwd)
 
@@ -893,7 +898,7 @@ class TestCliShowFiles(unittest.TestCase):
                 unittest.mock.patch("sys.argv", argv),
                 contextlib.redirect_stderr(stderr),
             ):
-                exit_code = pydocfmt_main.main()
+                exit_code = pydocfmt_cli.main()
 
         self.assertEqual(exit_code, 2)
         self.assertIn("--config=PATH", stderr.getvalue())
@@ -906,7 +911,7 @@ class TestCliShowFiles(unittest.TestCase):
             unittest.mock.patch("sys.argv", argv),
             contextlib.redirect_stderr(stderr),
         ):
-            exit_code = pydocfmt_main.main()
+            exit_code = pydocfmt_cli.main()
 
         self.assertEqual(exit_code, 2)
         self.assertIn("Cannot use --show-files and --show-settings together", stderr.getvalue())
@@ -919,7 +924,7 @@ class TestCliShowFiles(unittest.TestCase):
             contextlib.redirect_stderr(stderr),
             self.assertRaises(SystemExit) as cm,
         ):
-            pydocfmt_main.main()
+            pydocfmt_cli.main()
 
         self.assertEqual(cm.exception.code, 2)
         self.assertIn("--exit-zero", stderr.getvalue())
@@ -965,7 +970,7 @@ class TestCliShowFiles(unittest.TestCase):
                     unittest.mock.patch("sys.argv", argv),
                     contextlib.redirect_stderr(stderr),
                 ):
-                    exit_code = pydocfmt_main.main()
+                    exit_code = pydocfmt_cli.main()
             finally:
                 os.chdir(previous_cwd)
 
@@ -977,7 +982,7 @@ class TestCliShowFiles(unittest.TestCase):
         self,
     ) -> None:
         self._assert_invalid_command_line_include_reports_argument_error(
-            pydocfmt_main.main,
+            pydocfmt_cli.main,
             "pydocfmt",
         )
 
@@ -1012,7 +1017,7 @@ class TestCliShowFiles(unittest.TestCase):
 
     def test_pydocfmt_invalid_config_include_reports_config_error(self) -> None:
         self._assert_invalid_config_include_reports_config_error(
-            pydocfmt_main.main,
+            pydocfmt_cli.main,
             "pydocfmt",
         )
 
@@ -1032,7 +1037,7 @@ class TestCliShowFiles(unittest.TestCase):
                     unittest.mock.patch("sys.argv", argv),
                     contextlib.redirect_stderr(stderr),
                 ):
-                    exit_code = pydocfmt_main.main()
+                    exit_code = pydocfmt_cli.main()
             finally:
                 os.chdir(previous_cwd)
 
@@ -1051,7 +1056,7 @@ class TestCliShowFiles(unittest.TestCase):
                 unittest.mock.patch("sys.argv", argv),
                 contextlib.redirect_stdout(stdout),
             ):
-                pydocfmt_main.main()
+                pydocfmt_cli.main()
 
         self.assertIn(f"ERROR: Failed to read or write file {target}", stdout.getvalue())
         self.assertNotIn("Traceback", stdout.getvalue())
@@ -1063,7 +1068,7 @@ class TestCliShowFiles(unittest.TestCase):
             stderr = StringIO()
             called_paths: list[str] = []
 
-            def fake_format(path: str, settings: FormatterSettings, fix: bool, **kwargs: object) -> bool:
+            def fake_format(path: str, settings: CheckSettings, fix: bool, **kwargs: object) -> bool:
                 called_paths.append(path)
                 return False
 
@@ -1081,7 +1086,7 @@ class TestCliShowFiles(unittest.TestCase):
                 contextlib.redirect_stdout(stdout),
                 contextlib.redirect_stderr(stderr),
             ):
-                exit_code = pydocfmt_main.main()
+                exit_code = pydocfmt_cli.main()
 
             self.assertEqual(exit_code, 2)
             self.assertEqual(stdout.getvalue(), "")
@@ -1105,7 +1110,7 @@ class TestCliShowFiles(unittest.TestCase):
                 unittest.mock.patch("sys.argv", argv),
                 contextlib.redirect_stdout(stdout),
             ):
-                pydocfmt_main.main()
+                pydocfmt_cli.main()
 
             output = stdout.getvalue()
             self.assertIn(f"ERROR: Failed to decode {root / 'bad.py'} as UTF-8", output)
@@ -1127,7 +1132,7 @@ class TestCliShowFiles(unittest.TestCase):
                 unittest.mock.patch("sys.argv", argv),
                 contextlib.redirect_stdout(stdout),
             ):
-                exit_code = pydocfmt_main.main()
+                exit_code = pydocfmt_cli.main()
 
             self.assertEqual(exit_code, 1)
             output = stdout.getvalue()
@@ -1147,7 +1152,7 @@ class TestCliShowFiles(unittest.TestCase):
             contextlib.redirect_stdout(stdout),
             contextlib.redirect_stderr(stderr),
         ):
-            exit_code = pydocfmt_main.main()
+            exit_code = pydocfmt_cli.main()
 
         self.assertEqual(exit_code, 2)
         self.assertEqual(stdout.getvalue(), "")
@@ -1165,7 +1170,7 @@ class TestCliShowFiles(unittest.TestCase):
                 unittest.mock.patch("sys.argv", argv),
                 contextlib.redirect_stdout(stdout),
             ):
-                exit_code = pydocfmt_main.main()
+                exit_code = pydocfmt_cli.main()
 
             self.assertEqual(exit_code, 0)
             self.assertEqual(stdout.getvalue(), "All checks passed!\n")
@@ -1176,7 +1181,7 @@ class TestCliShowFiles(unittest.TestCase):
         stderr = StringIO()
         called_paths: list[str] = []
 
-        def fake_format(path: str, *, file: TextIO | None = None, settings: FormatterSettings, fix: bool) -> FormatterResult:
+        def fake_format(path: str, *, file: TextIO | None = None, settings: CheckSettings, fix: bool) -> FormatterResult:
             del settings, fix
             called_paths.append(path)
             assert file is not None
@@ -1192,7 +1197,7 @@ class TestCliShowFiles(unittest.TestCase):
             contextlib.redirect_stdout(stdout),
             contextlib.redirect_stderr(stderr),
         ):
-            exit_code = pydocfmt_main.main()
+            exit_code = pydocfmt_cli.main()
 
         self.assertEqual(exit_code, 1)
         self.assertEqual(called_paths, ["virtual.py"])
@@ -1217,7 +1222,7 @@ class TestCliShowFiles(unittest.TestCase):
             unittest.mock.patch("sys.argv", argv),
             contextlib.redirect_stdout(stdout),
         ):
-            exit_code = pydocfmt_main.main()
+            exit_code = pydocfmt_cli.main()
 
         self.assertEqual(exit_code, 0)
         self.assertEqual(stdout.getvalue().splitlines(), ["skip.py IGNORED: matches exclude patterns"])
@@ -1245,7 +1250,7 @@ class TestCliShowFiles(unittest.TestCase):
             contextlib.redirect_stdout(stdout),
             contextlib.redirect_stderr(stderr),
         ):
-            exit_code = pydocfmt_main.main()
+            exit_code = pydocfmt_cli.main()
 
         self.assertEqual(exit_code, 0)
         format_file_exp.assert_not_called()
@@ -1268,7 +1273,7 @@ class TestCliShowFiles(unittest.TestCase):
                     ),
                     contextlib.redirect_stdout(stdout),
                 ):
-                    exit_code = pydocfmt_main.main()
+                    exit_code = pydocfmt_cli.main()
             finally:
                 os.chdir(previous_cwd)
 
@@ -1281,7 +1286,7 @@ class TestCliShowFiles(unittest.TestCase):
         stdout = StringIO()
         stderr = StringIO()
 
-        def fake_format(path: str, *, file: TextIO | None = None, settings: FormatterSettings, fix: bool) -> FormatterResult:
+        def fake_format(path: str, *, file: TextIO | None = None, settings: CheckSettings, fix: bool) -> FormatterResult:
             del path, settings
             assert fix
             assert file is not None
@@ -1297,7 +1302,7 @@ class TestCliShowFiles(unittest.TestCase):
             contextlib.redirect_stdout(stdout),
             contextlib.redirect_stderr(stderr),
         ):
-            exit_code = pydocfmt_main.main()
+            exit_code = pydocfmt_cli.main()
 
         self.assertEqual(exit_code, 0)
         self.assertEqual(stdout.getvalue(), formatted_source)
@@ -1312,7 +1317,7 @@ class TestCliShowFiles(unittest.TestCase):
             stdout = StringIO()
             stderr = StringIO()
 
-            def fake_format(path: str, *, file: TextIO | None = None, settings: FormatterSettings, fix: bool) -> FormatterResult:
+            def fake_format(path: str, *, file: TextIO | None = None, settings: CheckSettings, fix: bool) -> FormatterResult:
                 del path, settings
                 assert fix
                 assert file is not None
@@ -1328,7 +1333,7 @@ class TestCliShowFiles(unittest.TestCase):
                 contextlib.redirect_stdout(stdout),
                 contextlib.redirect_stderr(stderr),
             ):
-                exit_code = pydocfmt_main.main()
+                exit_code = pydocfmt_cli.main()
 
             self.assertEqual(exit_code, 0)
             self.assertEqual(stdout.getvalue(), formatted_source)
@@ -1348,7 +1353,7 @@ class TestCliShowFiles(unittest.TestCase):
                 unittest.mock.patch("sys.argv", argv),
                 contextlib.redirect_stdout(stdout),
             ):
-                exit_code = pydocfmt_main.main()
+                exit_code = pydocfmt_cli.main()
 
             self.assertEqual(exit_code, 1)
             self.assertEqual(stdout.getvalue(), "")
@@ -1371,7 +1376,7 @@ class TestCliShowFiles(unittest.TestCase):
                 contextlib.redirect_stdout(stdout),
                 contextlib.redirect_stderr(stderr),
             ):
-                exit_code = pydocfmt_main.main()
+                exit_code = pydocfmt_cli.main()
 
             self.assertEqual(exit_code, 1)
             self.assertEqual(stdout.getvalue(), "")
@@ -1393,7 +1398,7 @@ class TestCliShowFiles(unittest.TestCase):
                 unittest.mock.patch("sys.argv", argv),
                 contextlib.redirect_stdout(stdout),
             ):
-                exit_code = pydocfmt_main.main()
+                exit_code = pydocfmt_cli.main()
 
             self.assertEqual(exit_code, 0)
             self.assertEqual(stdout.getvalue(), "")
@@ -1412,7 +1417,7 @@ class TestCliShowFiles(unittest.TestCase):
                 unittest.mock.patch("sys.argv", argv),
                 contextlib.redirect_stderr(stderr),
             ):
-                exit_code = pydocfmt_main.main()
+                exit_code = pydocfmt_cli.main()
 
             self.assertEqual(exit_code, 2)
             self.assertFalse((root / "reports").exists())
@@ -1429,7 +1434,7 @@ class TestCliShowFiles(unittest.TestCase):
                 unittest.mock.patch("sys.argv", argv),
                 contextlib.redirect_stdout(stdout),
             ):
-                exit_code = pydocfmt_main.main()
+                exit_code = pydocfmt_cli.main()
 
             self.assertEqual(exit_code, 0)
             self.assertEqual(stdout.getvalue(), "")
@@ -1450,7 +1455,7 @@ class TestCliShowFiles(unittest.TestCase):
             unittest.mock.patch("sys.argv", argv),
             contextlib.redirect_stdout(stdout),
         ):
-            exit_code = pydocfmt_main.main()
+            exit_code = pydocfmt_cli.main()
 
         self.assertEqual(exit_code, 0)
         self.assertEqual(stdout.getvalue().splitlines(), ["virtual.py INCLUDED"])
@@ -1463,7 +1468,7 @@ class TestCliShowFiles(unittest.TestCase):
             unittest.mock.patch("sys.argv", argv),
             contextlib.redirect_stdout(stdout),
         ):
-            exit_code = pydocfmt_main.main()
+            exit_code = pydocfmt_cli.main()
 
         self.assertEqual(exit_code, 0)
         self.assertIn("[tool.pydocfmt]", stdout.getvalue())

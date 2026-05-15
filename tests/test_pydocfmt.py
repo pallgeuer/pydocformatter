@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pydocformatter.formatters.google_docstrings as google_docstrings
 import pydocformatter.formatters.pydocfmt as pydocfmt
-from pydocformatter.config import FormatterSettings
+from pydocformatter.cli.settings_check import CheckSettings, IndentStyle, LineEnding
 
 
 class TestPyDocFmt(unittest.TestCase):
@@ -17,7 +17,7 @@ class TestPyDocFmt(unittest.TestCase):
             source.strip(),
             indent,
             line_length=line_length,
-            indent_style="space",
+            indent_style=IndentStyle.SPACE,
             indent_width=4,
         )
 
@@ -131,7 +131,7 @@ Args:
             doc.strip(),
             "",
             line_length=78,
-            indent_style="space",
+            indent_style=IndentStyle.SPACE,
             indent_width=2,
         )
 
@@ -154,7 +154,7 @@ Args:
             doc.strip(),
             "",
             line_length=78,
-            indent_style="tab",
+            indent_style=IndentStyle.TAB,
             indent_width=4,
         )
 
@@ -177,7 +177,7 @@ Args:
             doc.strip(),
             "",
             line_length=24,
-            indent_style="tab",
+            indent_style=IndentStyle.TAB,
             indent_width=2,
         )
 
@@ -196,7 +196,7 @@ Args:
             doc.strip(),
             "    ",
             line_length=88,
-            indent_style="tab",
+            indent_style=IndentStyle.TAB,
             indent_width=4,
         )
 
@@ -211,7 +211,7 @@ This description should keep exactly one base indentation level after wrapping."
             doc.strip(),
             "    ",
             line_length=76,
-            indent_style="space",
+            indent_style=IndentStyle.SPACE,
             indent_width=4,
         )
 
@@ -379,7 +379,7 @@ Examples:
             tf.flush()
             path = tf.name
 
-        needs_fixing = pydocfmt.format_docstrings(path, FormatterSettings(line_length=72), check=True)
+        needs_fixing = pydocfmt.format_docstrings(path, CheckSettings(line_length=72), check=True)
         Path(path).unlink()
         self.assertTrue(needs_fixing, "The docstring should need formatting.")
 
@@ -389,7 +389,7 @@ Examples:
             tf.flush()
             path = tf.name
 
-        needs_fixing = pydocfmt.format_docstrings(path, FormatterSettings(line_length=72), check=True)
+        needs_fixing = pydocfmt.format_docstrings(path, CheckSettings(line_length=72), check=True)
         Path(path).unlink()
         self.assertFalse(needs_fixing, "The docstring should not need formatting.")
 
@@ -399,7 +399,7 @@ Examples:
             tf.flush()
             path = tf.name
 
-        modified = pydocfmt.format_docstrings(path, FormatterSettings(line_length=72), check=False)
+        modified = pydocfmt.format_docstrings(path, CheckSettings(line_length=72), check=False)
         Path(path).unlink()
         self.assertFalse(modified, "The file should not be modified if already formatted.")
 
@@ -409,7 +409,7 @@ Examples:
         source = b'def foo():\r\n    """Does something.\r\n\r\n    Args:\r\n        x (int): some parameter.\r\n    """\r\n    pass\r\n'
         Path(path).write_bytes(source)
 
-        modified = pydocfmt.format_docstrings(path, FormatterSettings(line_length=72, line_ending="lf"), check=False)
+        modified = pydocfmt.format_docstrings(path, CheckSettings(line_length=72, line_ending=LineEnding.LF), check=False)
         data = Path(path).read_bytes()
         Path(path).unlink()
 
@@ -424,7 +424,7 @@ Examples:
 
         output = StringIO()
         with contextlib.redirect_stdout(output):
-            modified = pydocfmt.format_docstrings(path, FormatterSettings(line_length=72, line_ending="lf"), check=True)
+            modified = pydocfmt.format_docstrings(path, CheckSettings(line_length=72, line_ending=LineEnding.LF), check=True)
         data = Path(path).read_bytes()
         Path(path).unlink()
 
@@ -437,7 +437,7 @@ Examples:
             path = tf.name
         Path(path).write_bytes(b'def foo():\r\n    """Does something.\r\n\r\nArgs:\r\n    x (int): some parameter.\r\n    """\r\n    pass\r\n')
 
-        modified = pydocfmt.format_docstrings(path, FormatterSettings(line_length=72), check=False)
+        modified = pydocfmt.format_docstrings(path, CheckSettings(line_length=72), check=False)
         data = Path(path).read_bytes()
         Path(path).unlink()
 
@@ -450,7 +450,7 @@ Examples:
             path = tf.name
         Path(path).write_bytes(b'def foo():\r\n    """Does something.\r\n\r\nArgs:\r\n    x (int): some parameter.\r\n    """\r\n    pass\r\n')
 
-        modified = pydocfmt.format_docstrings(path, FormatterSettings(line_length=72, line_ending="lf"), check=False)
+        modified = pydocfmt.format_docstrings(path, CheckSettings(line_length=72, line_ending=LineEnding.LF), check=False)
         data = Path(path).read_bytes()
         Path(path).unlink()
 
@@ -464,7 +464,7 @@ Examples:
         expected = b'header = 1\r\nother = 2\n\ndef foo():\r\n    """Does something.\r\n\r\n    Args:\r\n        x (int): some parameter.\r\n    """\r\n    pass\r\n'
         Path(path).write_bytes(source)
 
-        modified = pydocfmt.format_docstrings(path, FormatterSettings(line_length=72), check=False)
+        modified = pydocfmt.format_docstrings(path, CheckSettings(line_length=72), check=False)
         data = Path(path).read_bytes()
         Path(path).unlink()
 
@@ -479,7 +479,7 @@ Examples:
 
         output = StringIO()
         with contextlib.redirect_stdout(output):
-            needs_fixing = pydocfmt.format_docstrings(path, FormatterSettings(line_length=72), check=True)
+            needs_fixing = pydocfmt.format_docstrings(path, CheckSettings(line_length=72), check=True)
         Path(path).unlink()
 
         self.assertTrue(needs_fixing, "The docstring should need formatting.")
@@ -499,7 +499,7 @@ Examples:
 
         output = StringIO()
         with contextlib.redirect_stdout(output):
-            needs_fixing = pydocfmt.format_docstrings(path, FormatterSettings(line_length=72), check=True)
+            needs_fixing = pydocfmt.format_docstrings(path, CheckSettings(line_length=72), check=True)
         Path(path).unlink()
 
         self.assertTrue(needs_fixing, "Docstrings should need formatting.")
@@ -516,7 +516,7 @@ Examples:
 
         try:
             original_source = Path(path).read_text(encoding="utf-8")
-            result = pydocfmt.format_file_source(path, FormatterSettings(line_length=72), fix=True)
+            result = pydocfmt.format_file_source(path, CheckSettings(line_length=72), fix=True)
             written_source = Path(path).read_text(encoding="utf-8")
         finally:
             Path(path).unlink()

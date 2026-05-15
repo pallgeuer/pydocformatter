@@ -9,6 +9,9 @@ import typing
 from collections import defaultdict
 from collections.abc import Iterator
 
+import pydocformatter.cli.global_args as global_args
+import pydocformatter.cli.settings_check as settings_check
+import pydocformatter.cli.utils as cli_utils
 import pydocformatter.config as config
 import pydocformatter.file_selection as file_selection
 import pydocformatter.formatter as formatter
@@ -23,27 +26,22 @@ class OutputError(Exception):
     """Raised when an output stream cannot be opened or prepared."""
 
 
-def add_parser(
-    subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
-    settings: config.FormatterSettings,
-    formatter_class: type[argparse.HelpFormatter],
-) -> argparse.ArgumentParser:
+def add_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> argparse.ArgumentParser:
     """Add the check subcommand parser."""
-    parser = subparsers.add_parser(
-        "check",
+    parser = cli_utils.create_subparser(
+        subparsers,
+        name="check",
         description="Check and optionally fix Python docstrings and comments.",
         help="Check and optionally fix Python docstrings and comments",
-        formatter_class=formatter_class,
     )
-    add_arguments(parser, settings)
+    add_arguments(parser, settings_check.CheckSettings())
     parser.set_defaults(func=run)
     return parser
 
 
-def add_arguments(parser: argparse.ArgumentParser, settings: config.FormatterSettings) -> None:
+def add_arguments(parser: argparse.ArgumentParser, settings: settings_check.CheckSettings) -> None:
     """Add CLI arguments for the check subcommand."""
-    arguments = parser.add_argument_group("Arguments")
-    arguments.add_argument(
+    parser.add_argument(
         "files",
         nargs="*",
         default=None,
@@ -51,170 +49,31 @@ def add_arguments(parser: argparse.ArgumentParser, settings: config.FormatterSet
         help="Python files or directories to check, or '-' to read from stdin (default: current directory).",
     )
 
-    options = parser.add_argument_group("Options")
-    options.add_argument(
+    parser.add_argument(
         "--fix",
         action=argparse.BooleanOptionalAction,
         default=False,
         help="Apply fixes instead of only checking for needed changes.",
     )
-    options.add_argument(
-        "--output-format",
-        choices=("grouped",),
-        default=None,
-        help=f"Output format for experimental rule findings (default: {settings.output_format}).",
+    parser.add_argument(
+        "--show-files",
+        action="store_true",
+        help="Show file-selection decisions without checking or fixing files.",
     )
-    options.add_argument(
+    parser.add_argument(
+        "--show-settings",
+        action="store_true",
+        help="Show resolved settings without checking or fixing files.",
+    )
+    parser.add_argument(
         "-o",
         "--output-file",
         default=None,
         metavar="FILE",
         help="Specify file to write output to (default: stdout).",
     )
-    options.add_argument(
-        "--show-files",
-        action="store_true",
-        help="Show file-selection decisions without checking or fixing files.",
-    )
-    options.add_argument(
-        "--show-settings",
-        action="store_true",
-        help="Show resolved settings without checking or fixing files.",
-    )
-    options.add_argument(
-        "--experimental",
-        action=argparse.BooleanOptionalAction,
-        default=None,
-        help=f"Use the experimental rule-based formatter implementation (default: {config._enabled_label(settings.experimental)}).",
-    )
 
-    formatting = parser.add_argument_group("Formatting")
-    formatting.add_argument(
-        "--line-length",
-        type=int,
-        default=None,
-        metavar="LENGTH",
-        help=f"Maximum line length for docstrings and comments (default: {settings.line_length}).",
-    )
-    formatting.add_argument(
-        "--line-ending",
-        choices=("auto", "lf", "cr-lf", "native"),
-        default=None,
-        help=f"Line ending to use when rewriting files (default: {settings.line_ending}).",
-    )
-    formatting.add_argument(
-        "--indent-style",
-        choices=("space", "tab"),
-        default=None,
-        help=f"Indentation style for generated docstring sections (default: {settings.indent_style}).",
-    )
-    formatting.add_argument(
-        "--indent-width",
-        type=int,
-        default=None,
-        metavar="WIDTH",
-        help=f"Indentation width for generated docstring sections (default: {settings.indent_width}).",
-    )
-
-    rule_selection = parser.add_argument_group("Rule selection")
-    rule_selection.add_argument(
-        "--select",
-        action="append",
-        default=None,
-        metavar="RULE",
-        help="Comma-separated rule selector(s) to enable.",
-    )
-    rule_selection.add_argument(
-        "--ignore",
-        action="append",
-        default=None,
-        metavar="RULE",
-        help="Comma-separated rule selector(s) to ignore.",
-    )
-    rule_selection.add_argument(
-        "--extend-select",
-        action="append",
-        default=None,
-        metavar="RULE",
-        help="Comma-separated additional rule selector(s) to enable.",
-    )
-    rule_selection.add_argument(
-        "--per-file-ignores",
-        action="append",
-        default=None,
-        metavar="TOML",
-        help="TOML inline table mapping file patterns to ignored rule selectors.",
-    )
-    rule_selection.add_argument(
-        "--extend-per-file-ignores",
-        action="append",
-        default=None,
-        metavar="TOML",
-        help="TOML inline table mapping file patterns to additional ignored rule selectors.",
-    )
-    rule_selection.add_argument(
-        "--fixable",
-        action="append",
-        default=None,
-        metavar="RULE",
-        help="Comma-separated rule selector(s) eligible for automatic fixes.",
-    )
-    rule_selection.add_argument(
-        "--unfixable",
-        action="append",
-        default=None,
-        metavar="RULE",
-        help="Comma-separated rule selector(s) ineligible for automatic fixes.",
-    )
-    rule_selection.add_argument(
-        "--extend-fixable",
-        action="append",
-        default=None,
-        metavar="RULE",
-        help="Comma-separated additional rule selector(s) eligible for automatic fixes.",
-    )
-
-    file_selection_group = parser.add_argument_group("File selection")
-    file_selection_group.add_argument(
-        "--include",
-        action="append",
-        default=None,
-        metavar="GLOB",
-        help="Comma-separated glob pattern(s) for files to include.",
-    )
-    file_selection_group.add_argument(
-        "--extend-include",
-        action="append",
-        default=None,
-        metavar="GLOB",
-        help="Comma-separated additional glob pattern(s) for files to include.",
-    )
-    file_selection_group.add_argument(
-        "--exclude",
-        action="append",
-        default=None,
-        metavar="GLOB",
-        help="Comma-separated glob pattern(s) for files or directories to exclude.",
-    )
-    file_selection_group.add_argument(
-        "--extend-exclude",
-        action="append",
-        default=None,
-        metavar="GLOB",
-        help="Comma-separated additional glob pattern(s) for files or directories to exclude.",
-    )
-    file_selection_group.add_argument(
-        "--respect-gitignore",
-        action=argparse.BooleanOptionalAction,
-        default=None,
-        help=f"Respect .gitignore when discovering files (default: {config._enabled_label(settings.respect_gitignore)}).",
-    )
-    file_selection_group.add_argument(
-        "--force-exclude",
-        action=argparse.BooleanOptionalAction,
-        default=None,
-        help=f"Apply include/exclude/gitignore rules even to files passed explicitly (default: {config._enabled_label(settings.force_exclude)}).",
-    )
+    settings_check.SETTINGS_SCHEMA.add_arguments(parser, settings)
 
     miscellaneous = parser.add_argument_group("Miscellaneous")
     miscellaneous.add_argument(
@@ -236,28 +95,7 @@ def add_arguments(parser: argparse.ArgumentParser, settings: config.FormatterSet
         help="Exit with a non-zero status code if any files were modified via fix, even if no formatting violations remain.",
     )
 
-    config.add_global_arguments(parser, dest_prefix="command")
-
-
-@contextlib.contextmanager
-def output_stream(output_file: str | None) -> Iterator[typing.TextIO | None]:
-    """Yield the configured output stream."""
-    if output_file is None:
-        yield None
-        return
-
-    parent = os.path.dirname(output_file)
-    try:
-        if parent:
-            try:
-                os.mkdir(parent)
-            except FileExistsError:
-                pass
-        file = open(output_file, "w", encoding="utf-8", newline="")
-    except OSError as error:
-        raise OutputError(str(error)) from error
-    with file:
-        yield file
+    global_args.add_global_arguments(parser, dest_prefix="command")
 
 
 def run(args: argparse.Namespace) -> int:
@@ -348,7 +186,28 @@ def run(args: argparse.Namespace) -> int:
         return 0
 
 
-def format_files(paths: tuple[str, ...], *, settings: config.FormatterSettings, fix: bool) -> list[FormatterResult]:
+@contextlib.contextmanager
+def output_stream(output_file: str | None) -> Iterator[typing.TextIO | None]:
+    """Yield the configured output stream."""
+    if output_file is None:
+        yield None
+        return
+
+    parent = os.path.dirname(output_file)
+    try:
+        if parent:
+            try:
+                os.mkdir(parent)
+            except FileExistsError:
+                pass
+        file = open(output_file, "w", encoding="utf-8", newline="")
+    except OSError as error:
+        raise OutputError(str(error)) from error
+    with file:
+        yield file
+
+
+def format_files(paths: tuple[str, ...], *, settings: settings_check.CheckSettings, fix: bool) -> list[FormatterResult]:
     """Format files with the legacy formatter path."""
     results: list[FormatterResult] = []
     for path in paths:
@@ -373,11 +232,12 @@ def format_files(paths: tuple[str, ...], *, settings: config.FormatterSettings, 
     return results
 
 
-def load_settings(args: argparse.Namespace) -> config.FormatterSettings | None:
+def load_settings(args: argparse.Namespace) -> settings_check.CheckSettings | None:
     """Load settings with command-line overrides, returning None on failure."""
     try:
-        overrides = _settings_overrides_from_args(args)
-        return config.load_config(overrides, config_options=_config_options_from_args(args), isolated=_isolated_from_args(args))
+        global_values = global_args.global_args_from_namespace(args, dest_prefixes=("global", "command"))
+        overrides = settings_check.SETTINGS_SCHEMA.overrides_from_namespace(args)
+        return settings_check.SETTINGS_SCHEMA.load(overrides, global_args=global_values)
     except config.ConfigError as error:
         print(f"pydocfmt check: Configuration error: {error}", file=sys.stderr)
         return None
@@ -386,78 +246,9 @@ def load_settings(args: argparse.Namespace) -> config.FormatterSettings | None:
         return None
 
 
-def _settings_overrides_from_args(args: argparse.Namespace) -> config.SettingsOverrides:
-    """Build settings overrides from parsed command-line arguments."""
-    return config.SettingsOverrides(
-        output_format=args.output_format,
-        experimental=args.experimental,
-        line_length=args.line_length,
-        line_ending=args.line_ending,
-        indent_style=args.indent_style,
-        indent_width=args.indent_width,
-        select=_parse_comma_option_groups(args.select),
-        ignore=_parse_comma_option_groups(args.ignore),
-        extend_select=_parse_comma_option_groups(args.extend_select),
-        per_file_ignores=_parse_per_file_options(args.per_file_ignores),
-        extend_per_file_ignores=_parse_per_file_options(args.extend_per_file_ignores),
-        fixable=_parse_comma_option_groups(args.fixable),
-        unfixable=_parse_comma_option_groups(args.unfixable),
-        extend_fixable=_parse_comma_option_groups(args.extend_fixable),
-        include=_parse_comma_option_groups(args.include),
-        extend_include=_parse_comma_option_groups(args.extend_include),
-        exclude=_parse_comma_option_groups(args.exclude),
-        extend_exclude=_parse_comma_option_groups(args.extend_exclude),
-        respect_gitignore=args.respect_gitignore,
-        force_exclude=args.force_exclude,
-    )
-
-
-def _parse_comma_option_groups(groups: list[str] | None) -> tuple[str, ...] | None:
-    """Parse repeated comma-separated CLI option groups while preserving omitted options as None."""
-    if groups is None:
-        return None
-    return tuple(value.strip() for group in groups for value in group.split(","))
-
-
-def _parse_per_file_options(groups: list[str] | None) -> config.RuleSelectorMap | None:
-    """Parse repeated TOML inline per-file ignore maps from CLI options."""
-    if groups is None:
-        return None
-
-    merged: dict[str, tuple[str, ...]] = {}
-    for group in groups:
-        parsed = tomllib.loads(f"value = {group}")
-        value = parsed["value"]
-        if not isinstance(value, dict):
-            raise config.ConfigError("Per-file ignore CLI value must be a TOML table")
-        for pattern, selectors in value.items():
-            if not isinstance(pattern, str):
-                raise config.ConfigError("Per-file ignore CLI patterns must be strings")
-            if not isinstance(selectors, (list, tuple)) or not all(isinstance(selector, str) for selector in selectors):
-                raise config.ConfigError("Per-file ignore CLI selectors must be lists of strings")
-            merged[pattern] = tuple(selectors)
-    result: config.RuleSelectorMap = tuple((pattern, selectors) for pattern, selectors in merged.items())
-    return result
-
-
-def _config_options_from_args(args: argparse.Namespace) -> tuple[str, ...]:
-    """Return --config values from the top-level and subcommand parsers."""
-    options = []
-    for name in ("global_config", "command_config"):
-        value = getattr(args, name, None)
-        if value is not None:
-            options.extend(value)
-    return tuple(options)
-
-
-def _isolated_from_args(args: argparse.Namespace) -> bool:
-    """Return whether any parser position specified --isolated."""
-    return bool(getattr(args, "global_isolated", False) or getattr(args, "command_isolated", False))
-
-
-def print_settings(settings: config.FormatterSettings, *, output: typing.TextIO | None) -> None:
+def print_settings(settings: settings_check.CheckSettings, *, output: typing.TextIO | None) -> None:
     """Print resolved settings in a stable TOML-like form."""
-    print(config.format_settings(settings), end="", file=output)
+    print(settings_check.SETTINGS_SCHEMA.format(settings), end="", file=output)
 
 
 def print_file_selection_decisions(decisions: tuple[file_selection.FileDecision, ...], *, output: typing.TextIO | None) -> None:
@@ -469,9 +260,9 @@ def print_file_selection_decisions(decisions: tuple[file_selection.FileDecision,
             print(f"{decision.path} IGNORED: {decision.message}", file=output)
 
 
-def print_results(errors: list[str], results: list[FormatterResult], *, settings: config.FormatterSettings, output: typing.TextIO | None) -> None:
+def print_results(errors: list[str], results: list[FormatterResult], *, settings: settings_check.CheckSettings, output: typing.TextIO | None) -> None:
     """Print formatter results in the configured output format."""
-    if settings.output_format == "grouped":
+    if settings.output_format == settings_check.OutputFormat.GROUPED:
         print_results_grouped(errors, results, output=output)
     else:
         raise AssertionError(f"Unknown output format: {settings.output_format}")

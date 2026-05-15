@@ -6,9 +6,10 @@ import textwrap
 import tokenize
 import typing
 
+import pydocformatter.formatter as formatter
 import pydocformatter.formatters.google_docstrings as google_docstrings
 import pydocformatter.utils.misc as misc
-from pydocformatter.config import FormatterSettings, IndentStyle
+from pydocformatter.cli.settings_check import CheckSettings, IndentStyle
 
 
 @dataclasses.dataclass(frozen=True, init=False)
@@ -41,7 +42,7 @@ class SourceFormatResult:
 
 def _matches_ignoring_line_endings(left: str, right: str) -> bool:
     """Return whether two strings differ only by line-ending style."""
-    return misc.normalize_line_endings(left, line_ending="\n") == misc.normalize_line_endings(right, line_ending="\n")
+    return formatter.normalize_line_endings(left, line_ending="\n") == formatter.normalize_line_endings(right, line_ending="\n")
 
 
 def process_docstring_node(
@@ -100,7 +101,7 @@ def process_docstring_node(
         indent_style=indent_style,
         indent_width=indent_width,
     )
-    new_docstring = misc.normalize_line_endings("".join(new_lines), line_ending=line_ending)
+    new_docstring = formatter.normalize_line_endings("".join(new_lines), line_ending=line_ending)
 
     # Get original docstring
     original_docstring = "".join(output_lines[srow : erow + 1])
@@ -119,7 +120,7 @@ def process_docstring_node(
 
 def format_docstrings_in_source(
     source: str,
-    settings: FormatterSettings,
+    settings: CheckSettings,
     *,
     line_ending: str,
 ) -> tuple[str, tuple[int, ...]]:
@@ -151,7 +152,7 @@ def format_docstrings_in_source(
 
 def format_comments_in_source(
     source: str,
-    settings: FormatterSettings,
+    settings: CheckSettings,
     *,
     line_ending: str,
 ) -> tuple[str, tuple[int, ...]]:
@@ -264,7 +265,7 @@ def format_comments_in_source(
     return "".join(output_lines), tuple(sorted(changed_lines))
 
 
-def format_file(path: str, settings: FormatterSettings, fix: bool, *, output: typing.TextIO | None) -> bool:
+def format_file(path: str, settings: CheckSettings, fix: bool, *, output: typing.TextIO | None) -> bool:
     """Format docstrings and comments in a Python file.
 
     This function reads a Python file once, formats docstrings first, then formats comments. If `fix` is False, it only
@@ -272,7 +273,7 @@ def format_file(path: str, settings: FormatterSettings, fix: bool, *, output: ty
 
     Args:
         path (str): The path to the Python file.
-        settings (FormatterSettings): Resolved settings for formatting.
+        settings (CheckSettings): Resolved settings for formatting.
         fix (bool): If True, write formatting changes to the file.
         output (typing.TextIO | None): Stream for check-mode diagnostics, or stdout if None.
 
@@ -294,7 +295,7 @@ def format_file(path: str, settings: FormatterSettings, fix: bool, *, output: ty
 
 def format_file_source(
     path: str,
-    settings: FormatterSettings,
+    settings: CheckSettings,
     fix: bool,
 ) -> SourceFormatResult:
     """Format a Python file and return source-level formatting details."""
@@ -309,9 +310,9 @@ def format_file_source(
     return result
 
 
-def format_source(source: str, settings: FormatterSettings, fix: bool) -> SourceFormatResult:
+def format_source(source: str, settings: CheckSettings, fix: bool) -> SourceFormatResult:
     """Format Python source text and return changed line details."""
-    line_ending = misc.resolve_line_ending(source, line_ending=settings.line_ending)
+    line_ending = formatter.resolve_line_ending(source, line_ending=settings.line_ending)
     docstring_source, docstring_changed_lines = format_docstrings_in_source(source, settings, line_ending=line_ending)
 
     if not fix:
@@ -348,14 +349,14 @@ def source_diagnostic_messages(
 
 def format_docstrings(
     path: str,
-    settings: FormatterSettings,
+    settings: CheckSettings,
     check: bool,
 ) -> bool:
     """Format only docstrings in a Python file."""
     with open(path, encoding="utf-8", newline="") as file:
         source = file.read()
 
-    line_ending = misc.resolve_line_ending(source, line_ending=settings.line_ending)
+    line_ending = formatter.resolve_line_ending(source, line_ending=settings.line_ending)
     formatted_source, changed_lines = format_docstrings_in_source(source, settings, line_ending=line_ending)
 
     if check:
