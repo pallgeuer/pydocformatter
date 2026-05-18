@@ -1,5 +1,13 @@
 def auto_plural(count: int, word: str) -> str:
-    """Return a singular or plural word for a count."""
+    """Return a singular or plural word for a count.
+
+    Args:
+        count (int): Count that determines whether the singular form should be used.
+        word (str): Singular word to pluralize by appending `s`.
+
+    Returns:
+        str: `word` when count is one, otherwise `word` with a trailing `s`.
+    """
     return word if count == 1 else f"{word}s"
 
 

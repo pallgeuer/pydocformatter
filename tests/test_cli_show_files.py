@@ -20,6 +20,7 @@ from pydocformatter.formatter import FormatterResult, Rule, RuleFinding
 class TestCLIShowFiles(unittest.TestCase):
     @staticmethod
     def _make_sample_tree() -> tempfile.TemporaryDirectory[str]:
+        """Create a temporary tree with included, ignored, and non-Python files."""
         temp_dir = tempfile.TemporaryDirectory()
         root = Path(temp_dir.name)
         (root / "a.py").write_text("x = 1\n", encoding="utf-8")
@@ -29,6 +30,7 @@ class TestCLIShowFiles(unittest.TestCase):
 
     @staticmethod
     def _make_git_tree() -> tempfile.TemporaryDirectory[str]:
+        """Create a temporary tree with a minimal git marker."""
         temp_dir = tempfile.TemporaryDirectory()
         root = Path(temp_dir.name)
         (root / ".git").write_text("gitdir: .git-test\n", encoding="utf-8")
@@ -38,6 +40,8 @@ class TestCLIShowFiles(unittest.TestCase):
 
     @staticmethod
     def _fake_git_check_ignore_for_root(root: Path, ignored_paths: set[str]) -> Callable[..., subprocess.CompletedProcess[bytes]]:
+        """Return a fake git check-ignore runner for a temporary root."""
+
         def fake_run(*args: object, **kwargs: object) -> subprocess.CompletedProcess[bytes]:
             expected_command = [
                 "git",
@@ -672,6 +676,7 @@ class TestCLIShowFiles(unittest.TestCase):
         main: Callable[[], int],
         program: str,
     ) -> None:
+        """Assert that help output is available despite invalid local config."""
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             (root / "pyproject.toml").write_text(
@@ -1082,6 +1087,7 @@ class TestCLIShowFiles(unittest.TestCase):
         main: Callable[[], int],
         program: str,
     ) -> None:
+        """Assert that an empty include CLI value reports an argument error."""
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             (root / "a.py").write_text("x = 1\n", encoding="utf-8")
@@ -1138,6 +1144,7 @@ class TestCLIShowFiles(unittest.TestCase):
         main: Callable[[], int],
         program: str,
     ) -> None:
+        """Assert that an invalid include config value reports a config error."""
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             (root / "pyproject.toml").write_text(
@@ -1242,6 +1249,7 @@ class TestCLIShowFiles(unittest.TestCase):
 
     @staticmethod
     def _make_tree_with_invalid_utf8() -> tempfile.TemporaryDirectory[str]:
+        """Create a temporary tree containing one valid file and one invalid UTF-8 file."""
         temp_dir = tempfile.TemporaryDirectory()
         root = Path(temp_dir.name)
         (root / "good.py").write_text("x = 1\n", encoding="utf-8")

@@ -16,7 +16,20 @@ class SectionFormatter(Protocol):
         line_length: int,
         indent_style: IndentStyle,
         indent_width: int,
-    ) -> list[str]: ...
+    ) -> list[str]:
+        """Format one parsed Google-style docstring section.
+
+        Args:
+            buffer (list[str]): Raw section lines.
+            indent (str): Base indentation preserved from the docstring quote line.
+            line_length (int): Maximum line length used when wrapping text.
+            indent_style (IndentStyle): Indentation style for generated section levels.
+            indent_width (int): Width of one generated indentation level.
+
+        Returns:
+            list[str]: Formatted section lines, each ending with a newline.
+        """
+        ...
 
 
 def _indent_unit(*, indent_style: IndentStyle, indent_width: int) -> str:
@@ -105,6 +118,7 @@ def _format_param_section(
     desc_lines: list[str] = []
 
     def flush() -> None:
+        """Append the currently buffered parameter entry."""
         if current_arg is not None:
             name, type_ = current_arg
             desc = " ".join(desc_lines).strip()
@@ -286,6 +300,7 @@ def format_raises_section(
     desc_lines: list[str] = []
 
     def flush() -> None:
+        """Append the currently buffered exception entry."""
         if current_exc is not None:
             exc = current_exc
             desc = " ".join(desc_lines).strip()
@@ -376,6 +391,7 @@ def format_examples_section(
         return bool(lines) and lines[0].strip() == "```" and lines[-1].strip() == "```"
 
     def flush_block() -> None:
+        """Append the currently buffered example block."""
         if not block:
             return
 
@@ -493,6 +509,7 @@ def _extract_lists(paragraph: list[str]) -> list[list[str]]:
     current_group: list[str] = []
 
     def is_list_item(item_line: str) -> bool:
+        """Return whether a description line is a list item."""
         return item_line.strip().startswith("-")
 
     current_is_list = is_list_item(paragraph[0])
@@ -550,6 +567,7 @@ def reflow(
     )
 
     def add_section(name: str, section_lines: list[str]) -> None:
+        """Append a parsed section using the normalized plural section name."""
         # Normalize section names to plural forms to match SECTION_HANDLERS
         normalized_name = name.capitalize()
         if normalized_name in [

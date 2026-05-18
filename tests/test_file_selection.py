@@ -16,6 +16,7 @@ from pydocformatter.file_selection import DecisionReason
 class TestFileSelection(unittest.TestCase):
     @staticmethod
     def _write_git_marker(root: Path) -> None:
+        """Write a minimal git worktree marker in a temporary root."""
         (root / ".git").write_text("gitdir: .git-test\n", encoding="utf-8")
 
     @staticmethod
@@ -23,6 +24,8 @@ class TestFileSelection(unittest.TestCase):
         root: Path,
         ignored_paths: set[str],
     ) -> Callable[..., subprocess.CompletedProcess[bytes]]:
+        """Return a fake git check-ignore runner for a temporary root."""
+
         def fake_run(
             *args: object,
             **kwargs: object,

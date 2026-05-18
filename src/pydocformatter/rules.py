@@ -29,7 +29,14 @@ _SELECTOR_RE = re.compile(r"^([A-Z]+)([0-9]*)$")
 
 
 def selector_matches_known_rule(selector: str) -> bool:
-    """Return whether a selector matches a known rule."""
+    """Return whether a selector matches a known rule.
+
+    Args:
+        selector (str): Rule selector to validate, such as `ALL`, `PDF`, or `PDF001`.
+
+    Returns:
+        bool: True if the selector targets the full rule set, a known rule prefix, or at least one known concrete rule.
+    """
     if selector == ALL_RULE_CODE:
         return True
 

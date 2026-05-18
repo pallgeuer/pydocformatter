@@ -29,12 +29,18 @@ class SettingsError(ValueError):
     """Raised when configuration cannot be resolved or validated.
 
     This exception represents user-facing configuration failures, including malformed TOML, unsupported table shapes,
-    unknown setting keys, and invalid setting values.
+    unknown setting keys, and invalid setting values. Constructor arguments are forwarded to `ValueError`.
     """
 
 
 class SettingCLIValueKind(enum.StrEnum):
-    """CLI value parsing strategy for a setting."""
+    """CLI value parsing strategy for a setting.
+
+    Attributes:
+        RAW (SettingCLIValueKind): Use argparse's parsed value directly.
+        COMMA_LIST (SettingCLIValueKind): Split repeated CLI values on commas and return a tuple.
+        TOML_MAP (SettingCLIValueKind): Parse repeated CLI values as TOML inline tables and merge them.
+    """
 
     RAW = "raw"
     COMMA_LIST = "comma-list"
@@ -42,7 +48,17 @@ class SettingCLIValueKind(enum.StrEnum):
 
 
 class SettingCLIOptions(TypedDict, total=False):
-    """Unresolved argparse metadata for one setting."""
+    """Unresolved argparse metadata for one setting.
+
+    Attributes:
+        flags (tuple[str, ...]): CLI option flags to register.
+        action (SettingCLIAction | None): Argparse action to use.
+        choices (SettingCLIChoices | None): Allowed CLI choices.
+        type (SettingCLIType | None): Argparse value converter.
+        metavar (SettingCLIMetavar | None): Argparse metavar.
+        value_kind (SettingCLIValueKind): Post-parse conversion strategy.
+        show_default (bool): Whether help text should include the current default.
+    """
 
     flags: tuple[str, ...]
     action: SettingCLIAction | None
@@ -55,7 +71,17 @@ class SettingCLIOptions(TypedDict, total=False):
 
 @dataclasses.dataclass(frozen=True)
 class SettingCLIDefinition:
-    """Resolved argparse metadata for one setting."""
+    """Resolved argparse metadata for one setting.
+
+    Attributes:
+        flags (tuple[str, ...]): CLI option flags to register.
+        action (SettingCLIAction | None): Argparse action to use.
+        choices (SettingCLIChoices | None): Allowed CLI choices.
+        type (SettingCLIType | None): Argparse value converter.
+        metavar (SettingCLIMetavar | None): Argparse metavar.
+        value_kind (SettingCLIValueKind): Post-parse conversion strategy.
+        show_default (bool): Whether help text should include the current default.
+    """
 
     flags: tuple[str, ...] = ()
     action: SettingCLIAction | None = None
@@ -68,7 +94,21 @@ class SettingCLIDefinition:
 
 @dataclasses.dataclass(frozen=True, init=False)
 class SettingDefinition(Generic[SettingValueT]):
-    """Central metadata for one setting."""
+    """Central metadata for one setting.
+
+    Attributes:
+        field (str): Dataclass field name used for resolved settings.
+        value_type (type[SettingValueT] | GenericAlias): Declared validated setting type.
+        group (enum.StrEnum): Settings group used for CLI/help ordering.
+        help (str): Short help text for CLI output.
+        key (str): TOML key used for configuration.
+        available_in_cli (bool): Whether a dedicated CLI option should be registered.
+        available_in_toml (bool): Whether the setting can be loaded from TOML.
+        validator (SettingValidator[SettingValueT]): Validator that converts raw values to resolved values.
+        cli (SettingCLIDefinition | None): Resolved CLI metadata, or None when unavailable in CLI.
+        documentation (str): Longer user-facing configuration documentation.
+        example (str): Optional TOML example text.
+    """
 
     field: str
     value_type: type[SettingValueT] | GenericAlias
@@ -97,7 +137,25 @@ class SettingDefinition(Generic[SettingValueT]):
         documentation: str | None = None,
         example: str | None = None,
     ) -> None:
-        """Initialize setting metadata with derived defaults."""
+        """Initialize setting metadata with derived defaults.
+
+        Args:
+            field (str): Dataclass field name used for resolved settings.
+            value_type (type[SettingValueT] | GenericAlias): Declared validated setting type.
+            group (enum.StrEnum): Settings group used for CLI/help ordering.
+            help (str): Short help text for CLI output.
+            key (str): TOML key, defaulting to the field name with underscores replaced by dashes.
+            available_in_cli (bool): Whether a dedicated CLI option should be registered.
+            available_in_toml (bool): Whether the setting can be loaded from TOML.
+            validator (SettingValidator[SettingValueT] | None): Optional validator, defaulting from `value_type`.
+            cli (SettingCLIOptions | SettingCLIDefinition | dict[str, Any] | None): Optional unresolved or resolved CLI
+                metadata.
+            documentation (str | None): Optional longer configuration documentation, defaulting to `help`.
+            example (str | None): Optional TOML example text.
+
+        Raises:
+            `TypeError`: If no default validator exists for `value_type` and no validator is supplied.
+        """
         resolved_key = key or field.replace("_", "-")
         resolved_validator = cast(SettingValidator[SettingValueT], _default_validator_for_type(value_type)) if validator is None else validator
         resolved_documentation = documentation or help
@@ -191,7 +249,13 @@ class SettingsSchema(Generic[SettingsT]):
     post_validate: Callable[[dict[str, Any], str], None] | None = None
 
     def __post_init__(self) -> None:
-        """Validate schema group metadata."""
+        """Validate schema group metadata.
+
+        Raises:
+            `ValueError`: If the TOML table path is empty or contains empty segments.
+            `TypeError`: If a setting definition uses a group outside `group_type`.
+            `AssertionError`: If CLI availability and resolved CLI metadata disagree.
+        """
         if not self.table_path or any(not key for key in self.table_path):
             raise ValueError("Settings schema table_path must contain non-empty path segments")
         table_name = ".".join(self.table_path)
@@ -209,35 +273,76 @@ class SettingsSchema(Generic[SettingsT]):
             raise AssertionError(f"Inconsistent settings definitions found in terms of CLI availability: {invalid_fields}")
 
     def definitions_by_field(self) -> dict[str, SettingDefinition[Any]]:
-        """Return setting definitions keyed by dataclass field name."""
+        """Return setting definitions keyed by dataclass field name.
+
+        Returns:
+            dict[str, SettingDefinition[Any]]: Definitions keyed by resolved settings dataclass field.
+        """
         return {definition.field: definition for definition in self.definitions}
 
     def definitions_by_key(self) -> dict[str, SettingDefinition[Any]]:
-        """Return setting definitions keyed by TOML setting key."""
+        """Return setting definitions keyed by TOML setting key.
+
+        Returns:
+            dict[str, SettingDefinition[Any]]: Definitions keyed by TOML configuration key.
+        """
         return {definition.key: definition for definition in self.definitions}
 
     def toml_definitions(self) -> tuple[SettingDefinition[Any], ...]:
-        """Return setting definitions available in TOML configuration."""
+        """Return setting definitions available in TOML configuration.
+
+        Returns:
+            tuple[SettingDefinition[Any], ...]: Definitions accepted from TOML files or inline TOML.
+        """
         return tuple(definition for definition in self.definitions if definition.available_in_toml)
 
     def toml_keys(self) -> tuple[str, ...]:
-        """Return TOML keys accepted by this settings schema."""
+        """Return TOML keys accepted by this settings schema.
+
+        Returns:
+            tuple[str, ...]: TOML keys accepted by this schema.
+        """
         return tuple(definition.key for definition in self.definitions if definition.available_in_toml)
 
     def cli_definitions(self) -> tuple[SettingDefinition[Any], ...]:
-        """Return setting definitions available as dedicated CLI options."""
+        """Return setting definitions available as dedicated CLI options.
+
+        Returns:
+            tuple[SettingDefinition[Any], ...]: Definitions with dedicated CLI options.
+        """
         return tuple(definition for definition in self.definitions if definition.available_in_cli)
 
     def cli_keys(self) -> tuple[str, ...]:
-        """Return setting keys available as dedicated CLI options."""
+        """Return setting keys available as dedicated CLI options.
+
+        Returns:
+            tuple[str, ...]: TOML keys for settings that also have dedicated CLI options.
+        """
         return tuple(definition.key for definition in self.definitions if definition.available_in_cli)
 
     def cli_flags(self) -> tuple[str, ...]:
-        """Return CLI flags accepted by this settings schema."""
+        """Return CLI flags accepted by this settings schema.
+
+        Returns:
+            tuple[str, ...]: Registered CLI flags for all CLI-backed settings.
+        """
         return tuple(flag for definition in self.definitions if definition.cli is not None for flag in definition.cli.flags)
 
     def load(self, *, global_values: GlobalArgs | None = None, args: argparse.Namespace | None = None, field_overrides: Mapping[str, Any] | None = None) -> SettingsT:
-        """Resolve settings from defaults, config files, inline config, and optional CLI overrides."""
+        """Resolve settings from defaults, config files, inline config, and optional CLI overrides.
+
+        Args:
+            global_values (GlobalArgs | None): Global configuration options and isolated-mode flag.
+            args (argparse.Namespace | None): Parsed CLI namespace for dedicated option overrides.
+            field_overrides (Mapping[str, Any] | None): Final field-keyed raw overrides.
+
+        Returns:
+            SettingsT: Resolved settings dataclass instance.
+
+        Raises:
+            `SettingsError`: If any configuration source cannot be loaded or validated.
+            `tomllib.TOMLDecodeError`: If a TOML-map CLI value is malformed.
+        """
         if global_values is None:
             global_values = GlobalArgs()
 
@@ -277,7 +382,14 @@ class SettingsSchema(Generic[SettingsT]):
         return settings
 
     def format(self, settings: SettingsT) -> str:
-        """Return resolved settings in a stable TOML-like form."""
+        """Return resolved settings in a stable TOML-like form.
+
+        Args:
+            settings (SettingsT): Settings object to render.
+
+        Returns:
+            str: TOML-like settings text in schema definition order.
+        """
         lines = [f"[{self.table_name}]"] if self.table_name else []
         for definition in self.definitions:
             if not definition.available_in_toml:
@@ -289,7 +401,15 @@ class SettingsSchema(Generic[SettingsT]):
         return "\n".join(lines)
 
     def add_arguments(self, parser: argparse.ArgumentParser, settings: SettingsT) -> None:
-        """Add argparse arguments for every settings group in schema order."""
+        """Add argparse arguments for every settings group in schema order.
+
+        Args:
+            parser (argparse.ArgumentParser): Parser that should receive setting arguments.
+            settings (SettingsT): Settings object supplying current defaults for help text.
+
+        Raises:
+            `AssertionError`: If schema definitions cannot be mapped consistently to argparse groups.
+        """
         handled_definitions: list[SettingDefinition[Any]] = []
         for group in self.group_type:
             argument_group = parser.add_argument_group(group.value)
@@ -320,7 +440,19 @@ class SettingsSchema(Generic[SettingsT]):
             raise AssertionError(f"Not all settings definitions were added to argparse groups: {', '.join(missing_fields)}")
 
     def argument_overrides(self, args: argparse.Namespace) -> dict[str, Any]:
-        """Build settings overrides dict from parsed command-line arguments."""
+        """Build settings overrides dict from parsed command-line arguments.
+
+        Args:
+            args (argparse.Namespace): Parsed command-line namespace.
+
+        Returns:
+            dict[str, Any]: Field-keyed raw override values supplied through dedicated CLI options.
+
+        Raises:
+            `SettingsError`: If a TOML-map CLI value does not parse to a TOML table.
+            `tomllib.TOMLDecodeError`: If a TOML-map CLI value is malformed.
+            `AssertionError`: If a setting has an unknown CLI value kind.
+        """
         values: dict[str, Any] = {}
         for definition in self.definitions:
             if definition.available_in_cli:
@@ -366,7 +498,15 @@ def _format_string(value: Any) -> str:
 
 
 def format_value(value: Any, value_type: type[Any] | GenericAlias) -> str:
-    """Format a setting value as a TOML literal."""
+    """Format a setting value as a TOML literal.
+
+    Args:
+        value (Any): Resolved setting value.
+        value_type (type[Any] | GenericAlias): Declared setting value type.
+
+    Returns:
+        str: TOML-compatible literal representation.
+    """
     value_type_: object = value_type
     if value_type_ is bool:
         return str(value).lower()
@@ -398,16 +538,36 @@ def _format_multi_string_map(value: Any) -> str:
 
 
 def validate_bool(value: Any, context: str) -> bool:
-    """Validate and return a boolean setting value."""
+    """Validate and return a boolean setting value.
+
+    Args:
+        value (Any): Raw value to validate.
+        context (str): User-facing configuration location for error messages.
+
+    Returns:
+        bool: Validated boolean value.
+
+    Raises:
+        `SettingsError`: If the raw value is not a boolean.
+    """
     if not isinstance(value, bool):
         raise SettingsError(f"{context} must be a boolean")
     return value
 
 
 def validate_int(*, min_value: int | None = None, max_value: int | None = None) -> Callable[[Any, str], int]:
-    """Return a validator for integer settings with optional inclusive bounds."""
+    """Return a validator for integer settings with optional inclusive bounds.
+
+    Args:
+        min_value (int | None): Optional inclusive lower bound.
+        max_value (int | None): Optional inclusive upper bound.
+
+    Returns:
+        Callable[[Any, str], int]: Validator that converts raw values to bounded integers.
+    """
 
     def validate(value: Any, context: str) -> int:
+        """Validate one integer setting value."""
         if isinstance(value, bool) or not isinstance(value, int):
             raise SettingsError(f"{context} must be an integer")
         if min_value is not None and value < min_value:
@@ -420,9 +580,17 @@ def validate_int(*, min_value: int | None = None, max_value: int | None = None) 
 
 
 def validate_str_enum(enum_class: type[StrEnumT]) -> Callable[[Any, str], StrEnumT]:
-    """Return a validator that converts setting values to members of a string enum."""
+    """Return a validator that converts setting values to members of a string enum.
+
+    Args:
+        enum_class (type[StrEnumT]): String enum class to validate against.
+
+    Returns:
+        Callable[[Any, str], StrEnumT]: Validator that converts raw values to enum members.
+    """
 
     def validate(value: Any, context: str) -> StrEnumT:
+        """Validate one string enum setting value."""
         try:
             return enum_class(value)
         except ValueError as error:
@@ -433,7 +601,18 @@ def validate_str_enum(enum_class: type[StrEnumT]) -> Callable[[Any, str], StrEnu
 
 
 def validate_string_list(value: Any, context: str) -> StringList:
-    """Validate and return a tuple of string list values."""
+    """Validate and return a tuple of string list values.
+
+    Args:
+        value (Any): Raw value to validate.
+        context (str): User-facing configuration location for error messages.
+
+    Returns:
+        StringList: Validated string tuple.
+
+    Raises:
+        `SettingsError`: If the raw value is not a list or tuple of strings.
+    """
     if not isinstance(value, (list, tuple)):
         raise SettingsError(f"{context} must be a list of strings")
     if not all(isinstance(item, str) for item in value):
@@ -442,7 +621,18 @@ def validate_string_list(value: Any, context: str) -> StringList:
 
 
 def validate_non_empty_string_list(value: Any, context: str) -> StringList:
-    """Validate and return a tuple of non-empty string list values."""
+    """Validate and return a tuple of non-empty string list values.
+
+    Args:
+        value (Any): Raw value to validate.
+        context (str): User-facing configuration location for error messages.
+
+    Returns:
+        StringList: Validated string tuple.
+
+    Raises:
+        `SettingsError`: If any item is not a string or is empty.
+    """
     values = validate_string_list(value, context)
     if any(not value for value in values):
         raise SettingsError(f"{context} must not contain empty strings")
@@ -450,7 +640,18 @@ def validate_non_empty_string_list(value: Any, context: str) -> StringList:
 
 
 def validate_multi_string_map(value: Any, context: str) -> MultiStringMap:
-    """Validate and return a mapping of strings to non-empty string lists."""
+    """Validate and return a mapping of strings to non-empty string lists.
+
+    Args:
+        value (Any): Raw mapping or tuple of key/value pairs to validate.
+        context (str): User-facing configuration location for error messages.
+
+    Returns:
+        MultiStringMap: Validated tuple of string keys and non-empty string-list values.
+
+    Raises:
+        `SettingsError`: If the raw value is not a string-keyed mapping to non-empty string lists.
+    """
     if isinstance(value, tuple):
         items = value
     elif isinstance(value, dict):

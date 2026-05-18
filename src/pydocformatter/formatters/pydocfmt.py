@@ -14,7 +14,14 @@ from pydocformatter.cli.settings_check import CheckSettings, IndentStyle
 
 @dataclasses.dataclass(frozen=True, init=False)
 class SourceFormatResult:
-    """Formatting result for Python source text."""
+    """Formatting result for Python source text.
+
+    Attributes:
+        original_source (str): Source text before formatting.
+        source (str): Source text after formatting, or the original source in check mode.
+        docstring_changed_lines (tuple[int, ...]): One-based line numbers of docstrings that would change or changed.
+        comment_changed_lines (tuple[int, ...]): One-based line numbers of comments that would change or changed.
+    """
 
     original_source: str
     source: str
@@ -28,7 +35,15 @@ class SourceFormatResult:
         comment_changed_lines: tuple[int, ...],
         original_source: str | None = None,
     ) -> None:
-        """Initialize source formatting details."""
+        """Initialize source formatting details.
+
+        Args:
+            source (str): Source text after formatting, or original source in check mode.
+            docstring_changed_lines (tuple[int, ...]): One-based line numbers of docstrings that would change or
+                changed.
+            comment_changed_lines (tuple[int, ...]): One-based line numbers of comments that would change or changed.
+            original_source (str | None): Source text before formatting, defaulting to `source`.
+        """
         object.__setattr__(self, "original_source", source if original_source is None else original_source)
         object.__setattr__(self, "source", source)
         object.__setattr__(self, "docstring_changed_lines", docstring_changed_lines)
@@ -36,7 +51,11 @@ class SourceFormatResult:
 
     @property
     def modified(self) -> bool:
-        """Return whether formatting changed the source."""
+        """Return whether formatting changed the source.
+
+        Returns:
+            bool: True if any docstring or comment lines changed.
+        """
         return bool(self.docstring_changed_lines or self.comment_changed_lines)
 
 
@@ -124,7 +143,19 @@ def format_docstrings_in_source(
     *,
     line_ending: str,
 ) -> tuple[str, tuple[int, ...]]:
-    """Format docstrings in Python source and return changed line numbers."""
+    """Format docstrings in Python source and return changed line numbers.
+
+    Args:
+        source (str): Python source text to format.
+        settings (CheckSettings): Resolved formatter settings.
+        line_ending (str): Concrete line ending to use for generated docstring lines.
+
+    Returns:
+        tuple[str, tuple[int, ...]]: Formatted source and one-based changed line numbers.
+
+    Raises:
+        `SyntaxError`: If the source cannot be parsed as Python.
+    """
     source_lines = source.splitlines(keepends=True)
     tree = ast.parse(source)
     output_lines = list(source_lines)
@@ -156,7 +187,19 @@ def format_comments_in_source(
     *,
     line_ending: str,
 ) -> tuple[str, tuple[int, ...]]:
-    """Format comments in Python source and return changed line numbers."""
+    """Format comments in Python source and return changed line numbers.
+
+    Args:
+        source (str): Python source text to format.
+        settings (CheckSettings): Resolved formatter settings.
+        line_ending (str): Concrete line ending to use for generated comment lines.
+
+    Returns:
+        tuple[str, tuple[int, ...]]: Formatted source and one-based changed line numbers.
+
+    Raises:
+        `tokenize.TokenError`: If Python tokenization fails.
+    """
     tokens = list(tokenize.generate_tokens(io.StringIO(source).readline))
     lines = source.splitlines(keepends=True)
     output_lines = list(lines)
@@ -168,11 +211,11 @@ def format_comments_in_source(
     last_srow = -2
 
     def is_code_comment(text: str) -> bool:
-        """Check if the comment is a code-style comment."""
+        """Return whether the comment resembles disabled code."""
         return text.startswith("    ") or bool(re.match(r"\s*(if|for|while|def|class|try|except|print|return)\b", text))
 
     def flush_comment_block() -> None:
-        """Flush the current comment block to the output lines."""
+        """Flush the current standalone comment block to the output lines."""
         nonlocal comment_block
         if not comment_block:
             return
@@ -300,7 +343,23 @@ def format_file_source(
     fix: bool,
     write: bool = True,
 ) -> SourceFormatResult:
-    """Format a Python file and return source-level formatting details, optionally writing fixes."""
+    """Format a Python file and return source-level formatting details, optionally writing fixes.
+
+    Args:
+        path (str): Path to the Python source file.
+        settings (CheckSettings): Resolved formatter settings.
+        fix (bool): Whether formatting changes should be applied.
+        write (bool): Whether fixed source should be written back to disk.
+
+    Returns:
+        SourceFormatResult: Source-level formatting result.
+
+    Raises:
+        `OSError`: If the file cannot be read or written.
+        `SyntaxError`: If the file cannot be parsed as Python source.
+        `tokenize.TokenError`: If Python tokenization fails.
+        `UnicodeDecodeError`: If the file cannot be decoded as UTF-8.
+    """
     with open(path, encoding="utf-8", newline="") as file:
         source = file.read()
 
@@ -313,7 +372,20 @@ def format_file_source(
 
 
 def format_source(source: str, settings: CheckSettings, fix: bool) -> SourceFormatResult:
-    """Format Python source text and return changed line details."""
+    """Format Python source text and return changed line details.
+
+    Args:
+        source (str): Python source text to format.
+        settings (CheckSettings): Resolved formatter settings.
+        fix (bool): Whether formatting changes should be applied to returned source.
+
+    Returns:
+        SourceFormatResult: Source-level formatting result.
+
+    Raises:
+        `SyntaxError`: If the source cannot be parsed as Python.
+        `tokenize.TokenError`: If Python tokenization fails.
+    """
     line_ending = formatter.resolve_line_ending(source, line_ending=settings.line_ending)
     docstring_source, docstring_changed_lines = format_docstrings_in_source(source, settings, line_ending=line_ending)
 
@@ -331,7 +403,13 @@ def print_source_diagnostics(
     *,
     output: typing.TextIO | None,
 ) -> None:
-    """Print check-mode diagnostics for a source formatting result."""
+    """Print check-mode diagnostics for a source formatting result.
+
+    Args:
+        path (str): Display path for diagnostics.
+        result (SourceFormatResult): Source formatting result to report.
+        output (typing.TextIO | None): Output stream, or stdout when None.
+    """
     for message in source_diagnostic_messages(path, result):
         print(message, file=output)
 
@@ -360,7 +438,15 @@ def source_diagnostic_messages(
     path: str,
     result: SourceFormatResult,
 ) -> tuple[str, ...]:
-    """Return check-mode diagnostics for a source formatting result."""
+    """Return check-mode diagnostics for a source formatting result.
+
+    Args:
+        path (str): Display path for diagnostics.
+        result (SourceFormatResult): Source formatting result to report.
+
+    Returns:
+        tuple[str, ...]: Diagnostic messages for docstring and comment formatting needs.
+    """
     messages: list[str] = []
     if result.docstring_changed_lines:
         messages.append(format_needs_formatting_message(path, "docstring", list(result.docstring_changed_lines)))
@@ -374,7 +460,21 @@ def format_docstrings(
     settings: CheckSettings,
     check: bool,
 ) -> bool:
-    """Format only docstrings in a Python file."""
+    """Format only docstrings in a Python file.
+
+    Args:
+        path (str): Path to the Python source file.
+        settings (CheckSettings): Resolved formatter settings.
+        check (bool): Whether to only report needed formatting instead of writing fixes.
+
+    Returns:
+        bool: True if the file was modified or needs docstring formatting.
+
+    Raises:
+        `OSError`: If the file cannot be read or written.
+        `SyntaxError`: If the file cannot be parsed as Python source.
+        `UnicodeDecodeError`: If the file cannot be decoded as UTF-8.
+    """
     with open(path, encoding="utf-8", newline="") as file:
         source = file.read()
 

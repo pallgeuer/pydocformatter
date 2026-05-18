@@ -13,6 +13,7 @@ from pydocformatter.cli.settings_check import CheckSettings, IndentStyle, LineEn
 
 class TestPyDocFmt(unittest.TestCase):
     def _format_and_check(self, source: str, expected: str, *, line_length: int, indent: str = "") -> None:
+        """Reflow a docstring and assert that it matches the expected text."""
         formatted = google_docstrings.reflow(
             source.strip(),
             indent,

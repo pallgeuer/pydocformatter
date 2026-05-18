@@ -13,7 +13,11 @@ import pydocformatter.utils.argparser as argparser
 
 
 def main() -> int:
-    """Run the pydocfmt command-line entry point."""
+    """Run the pydocfmt command-line entry point.
+
+    Returns:
+        int: Process exit status code.
+    """
     parser = build_parser()
     args = parser.parse_args()
 
@@ -28,7 +32,11 @@ def main() -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    """Build the top-level pydocfmt argument parser."""
+    """Build the top-level pydocfmt argument parser.
+
+    Returns:
+        argparse.ArgumentParser: Configured parser for the `pydocfmt` command.
+    """
     parser = argparser.create_parser(prog="pydocfmt", description="Format Python docstrings and comments.")
     parser.add_argument("-V", "--version", action="store_true", help="Print version and exit.")
 
@@ -48,7 +56,14 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def add_version_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> argparse.ArgumentParser:
-    """Add the version subcommand parser."""
+    """Add the version subcommand parser.
+
+    Args:
+        subparsers (argparse._SubParsersAction[argparse.ArgumentParser]): Top-level subparser action.
+
+    Returns:
+        argparse.ArgumentParser: Configured `version` subcommand parser.
+    """
     version_parser = argparser.create_subparser(
         subparsers,
         name="version",
@@ -62,7 +77,16 @@ def add_version_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentP
 def add_parser_help(
     parser: argparse.ArgumentParser, subparsers: argparse._SubParsersAction[argparse.ArgumentParser], *, command_parsers: dict[str, argparse.ArgumentParser]
 ) -> argparse.ArgumentParser:
-    """Add the help subcommand parser."""
+    """Add the help subcommand parser.
+
+    Args:
+        parser (argparse.ArgumentParser): Top-level parser whose help should be shown without a topic.
+        subparsers (argparse._SubParsersAction[argparse.ArgumentParser]): Top-level subparser action.
+        command_parsers (dict[str, argparse.ArgumentParser]): Existing command parsers keyed by command name.
+
+    Returns:
+        argparse.ArgumentParser: Configured `help` subcommand parser.
+    """
     help_parser = argparser.create_subparser(
         subparsers,
         name="help",
@@ -82,14 +106,30 @@ def add_parser_help(
 
 
 def run_version(args: argparse.Namespace) -> int:
-    """Run the version subcommand."""
+    """Run the version subcommand.
+
+    Args:
+        args (argparse.Namespace): Parsed command arguments, currently unused.
+
+    Returns:
+        int: Process exit status code.
+    """
     del args
     print(f"pydocfmt {importlib.metadata.version('pydocformatter')}")
     return 0
 
 
 def run_help(args: argparse.Namespace, parser: argparse.ArgumentParser, *, command_parsers: dict[str, argparse.ArgumentParser]) -> int:
-    """Run the help subcommand."""
+    """Run the help subcommand.
+
+    Args:
+        args (argparse.Namespace): Parsed command arguments containing the optional help topic.
+        parser (argparse.ArgumentParser): Top-level parser used when no topic is supplied.
+        command_parsers (dict[str, argparse.ArgumentParser]): Command parsers keyed by command name.
+
+    Returns:
+        int: Process exit status code.
+    """
     if args.topic is None:
         parser.print_help()
     else:

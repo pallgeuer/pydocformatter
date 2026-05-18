@@ -11,6 +11,7 @@ from pydocformatter.cli.settings_check import CheckSettings, LineEnding
 class TestCommentFormatting(unittest.TestCase):
     @staticmethod
     def _write_and_readback(content: str, *, line_length: int, check: bool = False) -> tuple[bool, str, str]:
+        """Format temporary source and return the result, file content, and stdout."""
         with tempfile.NamedTemporaryFile(mode="w+", delete=False, suffix=".py", encoding="utf-8") as tf:
             tf.write(content)
             filename = tf.name

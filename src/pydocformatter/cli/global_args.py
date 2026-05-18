@@ -16,7 +16,12 @@ class GlobalArgs:
 
 
 def add_global_arguments(parser: argparse.ArgumentParser, *, dest_prefix: str) -> None:
-    """Add global configuration arguments to a parser."""
+    """Add global configuration arguments to a parser.
+
+    Args:
+        parser (argparse.ArgumentParser): Parser that should receive shared global options.
+        dest_prefix (str): Prefix used for argparse destination names so multiple parser levels can coexist.
+    """
     global_options = parser.add_argument_group("Global options")
     global_options.add_argument(
         "--config",
@@ -36,7 +41,15 @@ def add_global_arguments(parser: argparse.ArgumentParser, *, dest_prefix: str) -
 
 
 def global_values_from_arguments(args: argparse.Namespace, *, dest_prefixes: tuple[str, ...]) -> GlobalArgs:
-    """Resolve global arguments from all parser levels in precedence order."""
+    """Resolve global arguments from all parser levels in precedence order.
+
+    Args:
+        args (argparse.Namespace): Parsed command-line namespace.
+        dest_prefixes (tuple[str, ...]): Destination prefixes to inspect in increasing precedence order.
+
+    Returns:
+        GlobalArgs: Combined global argument values.
+    """
     config_options: list[str] = []
     isolated = False
     for dest_prefix in dest_prefixes:

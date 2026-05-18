@@ -14,7 +14,14 @@ from pydocformatter.settings import MultiStringMap, SettingDefinition, StringLis
 
 
 class ConfigOptionMetadata(TypedDict):
-    """JSON metadata for one configuration option."""
+    """JSON metadata for one configuration option.
+
+    Attributes:
+        doc (str): User-facing configuration documentation.
+        default (str): TOML-formatted default value.
+        value_type (str): User-facing value type description.
+        example (str): TOML usage example.
+    """
 
     doc: str
     default: str
@@ -23,7 +30,14 @@ class ConfigOptionMetadata(TypedDict):
 
 
 def add_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> argparse.ArgumentParser:
-    """Add the config subcommand parser."""
+    """Add the config subcommand parser.
+
+    Args:
+        subparsers (argparse._SubParsersAction[argparse.ArgumentParser]): Top-level subparser action.
+
+    Returns:
+        argparse.ArgumentParser: Configured `config` subcommand parser.
+    """
     parser = argparser.create_subparser(
         subparsers,
         name="config",
@@ -48,7 +62,14 @@ def add_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) 
 
 
 def run(args: argparse.Namespace) -> int:
-    """Run the config subcommand."""
+    """Run the config subcommand.
+
+    Args:
+        args (argparse.Namespace): Parsed command arguments.
+
+    Returns:
+        int: Process exit status code.
+    """
     definitions_by_key = {definition.key: definition for definition in settings_check.SETTINGS_SCHEMA.toml_definitions()}
     if args.option is not None and args.option not in definitions_by_key:
         print(f"pydocfmt config: Argument error: Invalid value {args.option!r} for 'OPTION'", file=sys.stderr)
@@ -73,7 +94,15 @@ def run(args: argparse.Namespace) -> int:
 
 
 def metadata_for_definition(definition: SettingDefinition[Any], settings: settings_check.CheckSettings) -> ConfigOptionMetadata:
-    """Return Ruff-style JSON metadata for one setting."""
+    """Return Ruff-style JSON metadata for one setting.
+
+    Args:
+        definition (SettingDefinition[Any]): Setting definition to describe.
+        settings (settings_check.CheckSettings): Settings object that provides the current default value.
+
+    Returns:
+        ConfigOptionMetadata: JSON-serializable metadata for the setting.
+    """
     default = settings_core.format_value(getattr(settings, definition.field), definition.value_type)
     metadata = ConfigOptionMetadata(
         doc=definition.documentation,
@@ -85,7 +114,15 @@ def metadata_for_definition(definition: SettingDefinition[Any], settings: settin
 
 
 def format_definition(definition: SettingDefinition[Any], settings: settings_check.CheckSettings) -> str:
-    """Return Ruff-style text metadata for one setting."""
+    """Return Ruff-style text metadata for one setting.
+
+    Args:
+        definition (SettingDefinition[Any]): Setting definition to describe.
+        settings (settings_check.CheckSettings): Settings object that provides the current default value.
+
+    Returns:
+        str: Text block describing the configuration option.
+    """
     metadata = metadata_for_definition(definition, settings)
     lines = [
         metadata["doc"].rstrip(),
@@ -102,7 +139,14 @@ def format_definition(definition: SettingDefinition[Any], settings: settings_che
 
 
 def value_type_name(value_type: object) -> str:
-    """Return a user-facing setting type name."""
+    """Return a user-facing setting type name.
+
+    Args:
+        value_type (object): Python type or generic alias stored in a setting definition.
+
+    Returns:
+        str: User-facing type name for help and JSON output.
+    """
     if value_type is bool:
         return "bool"
     elif value_type is int:

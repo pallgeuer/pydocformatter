@@ -35,14 +35,26 @@ DEFAULT_RULE_FIXABLE = (rules.ALL_RULE_CODE,)
 
 
 class IndentStyle(enum.StrEnum):
-    """Indentation styles for generated docstring sections."""
+    """Indentation styles for generated docstring sections.
+
+    Attributes:
+        SPACE (IndentStyle): Use spaces for generated section indentation.
+        TAB (IndentStyle): Use tabs for generated section indentation.
+    """
 
     SPACE = "space"
     TAB = "tab"
 
 
 class LineEnding(enum.StrEnum):
-    """Line ending modes for rewritten files."""
+    """Line ending modes for rewritten files.
+
+    Attributes:
+        AUTO (LineEnding): Preserve the first detected line ending in each file, defaulting to LF.
+        LF (LineEnding): Rewrite generated lines with LF endings.
+        CR_LF (LineEnding): Rewrite generated lines with CRLF endings.
+        NATIVE (LineEnding): Rewrite generated lines with the platform-native line ending.
+    """
 
     AUTO = "auto"
     LF = "lf"
@@ -51,7 +63,11 @@ class LineEnding(enum.StrEnum):
 
 
 class OutputFormat(enum.StrEnum):
-    """Output formats for rule findings."""
+    """Output formats for rule findings.
+
+    Attributes:
+        GROUPED (OutputFormat): Group diagnostics by file.
+    """
 
     GROUPED = "grouped"
 
@@ -106,17 +122,48 @@ class CheckSettings:
 
     @property
     def include_patterns(self) -> tuple[str, ...]:
-        """Return the final include patterns used by file selection."""
+        """Return the final include patterns used by file selection.
+
+        Returns:
+            tuple[str, ...]: Base include patterns followed by extension include patterns.
+        """
         return self.include + self.extend_include
 
     @property
     def exclude_patterns(self) -> tuple[str, ...]:
-        """Return the final exclude patterns used by file selection."""
+        """Return the final exclude patterns used by file selection.
+
+        Returns:
+            tuple[str, ...]: Base exclude patterns followed by extension exclude patterns.
+        """
         return self.exclude + self.extend_exclude
 
 
 class CheckSettingsOverrides(TypedDict, total=False):
-    """Formatter settings supplied by one precedence layer."""
+    """Formatter settings supplied by one precedence layer.
+
+    Attributes:
+        output_format (OutputFormat): Output format used for rule findings.
+        experimental (bool): Whether to use the experimental rule-based formatter implementation.
+        line_length (int): Maximum line length used when wrapping docstrings or comments.
+        line_ending (LineEnding): Line ending used when rewriting files.
+        indent_style (IndentStyle): Indentation style used for generated docstring section indentation.
+        indent_width (int): Number of spaces per generated docstring indentation level, or the visual width of a tab.
+        select (StringList): Base selected pydocformatter rule selectors.
+        ignore (StringList): Rule selectors to ignore.
+        extend_select (StringList): Additional selected rule selectors.
+        per_file_ignores (MultiStringMap): File-pattern-specific ignored selectors.
+        extend_per_file_ignores (MultiStringMap): Additional file-specific ignores.
+        fixable (StringList): Rule selectors eligible for automatic fixes.
+        unfixable (StringList): Rule selectors ineligible for automatic fixes.
+        extend_fixable (StringList): Additional fixable rule selectors.
+        include (StringList): Base glob patterns that identify format-eligible files.
+        extend_include (StringList): Additional include glob patterns appended to `include`.
+        exclude (StringList): Base glob patterns for files or directories to ignore.
+        extend_exclude (StringList): Additional exclude glob patterns appended to `exclude`.
+        respect_gitignore (bool): Whether discovered files are filtered through `.gitignore`.
+        force_exclude (bool): Whether include, exclude, and gitignore rules apply to explicitly passed paths.
+    """
 
     output_format: OutputFormat
     experimental: bool
@@ -141,7 +188,15 @@ class CheckSettingsOverrides(TypedDict, total=False):
 
 
 def validate_rule_selectors(values: dict[str, Any], context: str) -> None:
-    """Validate rule selectors against the known rule scope."""
+    """Validate rule selectors against the known rule scope.
+
+    Args:
+        values (dict[str, Any]): Field-keyed settings values from one precedence layer.
+        context (str): User-facing configuration location for error messages.
+
+    Raises:
+        `SettingsError`: If any selector is outside the known pydocformatter rule namespace.
+    """
     selector_values = [(definition, selector) for definition in RULE_SELECTOR_DEFINITIONS for selector in values.get(definition.field, ())]
     selector_values.extend((definition, selector) for definition in RULE_SELECTOR_MAP_DEFINITIONS for _, selectors in values.get(definition.field, ()) for selector in selectors)
     for definition, selector in selector_values:
@@ -150,12 +205,26 @@ def validate_rule_selectors(values: dict[str, Any], context: str) -> None:
 
 
 def post_validate(values: dict[str, Any], context: str) -> None:
-    """Validate check settings after field-level validation."""
+    """Validate check settings after field-level validation.
+
+    Args:
+        values (dict[str, Any]): Field-keyed settings values from one precedence layer.
+        context (str): User-facing configuration location for error messages.
+
+    Raises:
+        `SettingsError`: If any cross-field or domain validation fails.
+    """
     validate_rule_selectors(values, context)
 
 
 class SettingsGroup(enum.StrEnum):
-    """Check settings groups used for ordered CLI/help presentation."""
+    """Check settings groups used for ordered CLI/help presentation.
+
+    Attributes:
+        FORMATTING (SettingsGroup): Formatting behavior settings.
+        RULE_SELECTION (SettingsGroup): Rule selection settings.
+        FILE_SELECTION (SettingsGroup): File discovery and filtering settings.
+    """
 
     FORMATTING = "Formatting"
     RULE_SELECTION = "Rule selection"

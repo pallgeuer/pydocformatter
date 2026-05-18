@@ -29,7 +29,14 @@ class OutputError(Exception):
 
 
 def add_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> argparse.ArgumentParser:
-    """Add the check subcommand parser."""
+    """Add the check subcommand parser.
+
+    Args:
+        subparsers (argparse._SubParsersAction[argparse.ArgumentParser]): Top-level subparser action.
+
+    Returns:
+        argparse.ArgumentParser: Configured `check` subcommand parser.
+    """
     parser = argparser.create_subparser(
         subparsers,
         name="check",
@@ -42,7 +49,12 @@ def add_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) 
 
 
 def add_arguments(parser: argparse.ArgumentParser, settings: settings_check.CheckSettings) -> None:
-    """Add CLI arguments for the check subcommand."""
+    """Add CLI arguments for the check subcommand.
+
+    Args:
+        parser (argparse.ArgumentParser): Parser that should receive check-command arguments.
+        settings (settings_check.CheckSettings): Settings object supplying current defaults for help text.
+    """
     parser.add_argument(
         "files",
         nargs="*",
@@ -106,7 +118,14 @@ def add_arguments(parser: argparse.ArgumentParser, settings: settings_check.Chec
 
 
 def run(args: argparse.Namespace) -> int:
-    """Run the check subcommand."""
+    """Run the check subcommand.
+
+    Args:
+        args (argparse.Namespace): Parsed command arguments.
+
+    Returns:
+        int: Process exit status code.
+    """
     if args.show_files and args.show_settings:
         print("pydocfmt check: Argument error: Cannot use --show-files and --show-settings together", file=sys.stderr)
         return 2
@@ -201,7 +220,17 @@ def run(args: argparse.Namespace) -> int:
 
 @contextlib.contextmanager
 def output_stream(output_file: str | None) -> Iterator[typing.TextIO | None]:
-    """Yield the configured output stream."""
+    """Yield the configured output stream.
+
+    Args:
+        output_file (str | None): Optional file path to open for diagnostics.
+
+    Yields:
+        typing.TextIO | None: Open output stream, or None to let `print` use stdout.
+
+    Raises:
+        `OutputError`: If the output file or its direct parent cannot be created.
+    """
     if output_file is None:
         yield None
         return
@@ -221,7 +250,17 @@ def output_stream(output_file: str | None) -> Iterator[typing.TextIO | None]:
 
 
 def format_files(paths: tuple[str, ...], *, settings: settings_check.CheckSettings, fix: bool, write: bool) -> list[FormatterResult]:
-    """Format files with the legacy formatter path."""
+    """Format files with the legacy formatter path.
+
+    Args:
+        paths (tuple[str, ...]): File paths to format.
+        settings (settings_check.CheckSettings): Resolved formatter settings.
+        fix (bool): Whether formatting changes should be applied.
+        write (bool): Whether fixed source should be written back to disk.
+
+    Returns:
+        list[FormatterResult]: Formatter results in input path order.
+    """
     results: list[FormatterResult] = []
     for path in paths:
         try:
@@ -261,7 +300,14 @@ def format_files(paths: tuple[str, ...], *, settings: settings_check.CheckSettin
 
 
 def load_settings(args: argparse.Namespace) -> settings_check.CheckSettings | None:
-    """Load settings with command-line overrides, returning None on failure."""
+    """Load settings with command-line overrides, returning None on failure.
+
+    Args:
+        args (argparse.Namespace): Parsed command arguments.
+
+    Returns:
+        settings_check.CheckSettings | None: Resolved settings, or None after printing a configuration error.
+    """
     try:
         global_values = global_args.global_values_from_arguments(args, dest_prefixes=("global", "command"))
         return settings_check.SETTINGS_SCHEMA.load(global_values=global_values, args=args)
@@ -274,12 +320,22 @@ def load_settings(args: argparse.Namespace) -> settings_check.CheckSettings | No
 
 
 def print_settings(settings: settings_check.CheckSettings, *, output: typing.TextIO | None) -> None:
-    """Print resolved settings in a stable TOML-like form."""
+    """Print resolved settings in a stable TOML-like form.
+
+    Args:
+        settings (settings_check.CheckSettings): Resolved settings to print.
+        output (typing.TextIO | None): Output stream, or stdout when None.
+    """
     print(settings_check.SETTINGS_SCHEMA.format(settings), end="", file=output)
 
 
 def print_file_selection_decisions(decisions: tuple[file_selection.FileDecision, ...], *, output: typing.TextIO | None) -> None:
-    """Print file-selection decisions."""
+    """Print file-selection decisions.
+
+    Args:
+        decisions (tuple[file_selection.FileDecision, ...]): Ordered file-selection decisions to print.
+        output (typing.TextIO | None): Output stream, or stdout when None.
+    """
     for decision in decisions:
         if decision.accepted:
             print(f"{decision.path} INCLUDED", file=output)
@@ -288,7 +344,17 @@ def print_file_selection_decisions(decisions: tuple[file_selection.FileDecision,
 
 
 def print_results(errors: list[str], results: list[FormatterResult], *, output_format: settings_check.OutputFormat, output: typing.TextIO | None) -> None:
-    """Print formatter results in the configured output format."""
+    """Print formatter results in the configured output format.
+
+    Args:
+        errors (list[str]): Operational errors accumulated outside individual formatter results.
+        results (list[FormatterResult]): Formatter results to print.
+        output_format (settings_check.OutputFormat): Configured diagnostic output format.
+        output (typing.TextIO | None): Output stream, or stdout when None.
+
+    Raises:
+        `AssertionError`: If `output_format` is unknown.
+    """
     if output_format == settings_check.OutputFormat.GROUPED:
         print_results_grouped(errors, results, output=output)
     else:
@@ -296,7 +362,12 @@ def print_results(errors: list[str], results: list[FormatterResult], *, output_f
 
 
 def print_diff_results(results: list[FormatterResult], *, output: typing.TextIO | None) -> None:
-    """Print unified diffs for modified formatter results."""
+    """Print unified diffs for modified formatter results.
+
+    Args:
+        results (list[FormatterResult]): Formatter results to diff.
+        output (typing.TextIO | None): Output stream, or stdout when None.
+    """
     for result in results:
         if not result.modified or result.old_source is None or result.new_source is None:
             continue
@@ -312,7 +383,13 @@ def print_diff_results(results: list[FormatterResult], *, output: typing.TextIO 
 
 
 def print_diff_summary(errors: list[str], results: list[FormatterResult], *, output: typing.TextIO | None) -> None:
-    """Print Ruff-style diff summary and operational errors."""
+    """Print Ruff-style diff summary and operational errors.
+
+    Args:
+        errors (list[str]): Operational errors accumulated outside individual formatter results.
+        results (list[FormatterResult]): Formatter results to summarize.
+        output (typing.TextIO | None): Output stream, or stdout when None.
+    """
     num_operational_errors = 0
     for error in errors:
         print(f"ERROR: {error}", file=output)
@@ -332,7 +409,13 @@ def print_diff_summary(errors: list[str], results: list[FormatterResult], *, out
 
 
 def print_results_grouped(errors: list[str], results: list[FormatterResult], *, output: typing.TextIO | None) -> None:
-    """Print remaining findings grouped by file."""
+    """Print remaining findings grouped by file.
+
+    Args:
+        errors (list[str]): Operational errors accumulated outside individual formatter results.
+        results (list[FormatterResult]): Formatter results to print.
+        output (typing.TextIO | None): Output stream, or stdout when None.
+    """
     num_operational_errors = 0
     for error in errors:
         print(f"ERROR: {error}", file=output)

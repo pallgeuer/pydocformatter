@@ -134,7 +134,16 @@ def select_files(paths: list[str], settings: CheckSettings) -> SelectionResult:
 
 
 def select_virtual_file(path: str, settings: CheckSettings) -> SelectionResult:
-    """Select one explicit file path without checking whether it exists on disk."""
+    """Select one explicit file path without checking whether it exists on disk.
+
+    Args:
+        path (str): Virtual or display path to evaluate as an explicit input file.
+        settings (CheckSettings): Resolved formatter settings controlling include, exclude, force-exclude, and gitignore
+            behavior.
+
+    Returns:
+        SelectionResult: Selection result containing the accepted virtual path or the rejection decision.
+    """
     validate_include_patterns(settings.include_patterns)
     validate_exclude_patterns(settings.exclude_patterns)
     include_matcher = GlobPatternSet.compile(settings.include_patterns, match_parent_segments_for_bare=False)
@@ -200,7 +209,14 @@ def _collect_candidates(
 
 
 def validate_include_patterns(patterns: tuple[str, ...]) -> None:
-    """Validate glob patterns used for file inclusion."""
+    """Validate glob patterns used for file inclusion.
+
+    Args:
+        patterns (tuple[str, ...]): Include glob patterns to validate.
+
+    Raises:
+        `FileSelectionError`: If any include pattern is empty or cannot target files.
+    """
     for pattern in patterns:
         if not pattern:
             raise FileSelectionError("Include patterns must not be empty")
@@ -211,7 +227,14 @@ def validate_include_patterns(patterns: tuple[str, ...]) -> None:
 
 
 def validate_exclude_patterns(patterns: tuple[str, ...]) -> None:
-    """Validate glob patterns used for file exclusion."""
+    """Validate glob patterns used for file exclusion.
+
+    Args:
+        patterns (tuple[str, ...]): Exclude glob patterns to validate.
+
+    Raises:
+        `FileSelectionError`: If any exclude pattern is empty.
+    """
     for pattern in patterns:
         if not pattern:
             raise FileSelectionError("Exclude patterns must not be empty")
@@ -344,7 +367,14 @@ def _duplicate_decision(decision: FileDecision) -> FileDecision:
 
 
 def path_identity_key(path: str) -> str | None:
-    """Return a physical-path key for deduplicating existing files."""
+    """Return a physical-path key for deduplicating existing files.
+
+    Args:
+        path (str): File path to resolve.
+
+    Returns:
+        str | None: Normalized real path key, or None when the path does not exist.
+    """
     if not os.path.exists(path):
         return None
     return os.path.normcase(os.path.realpath(path))

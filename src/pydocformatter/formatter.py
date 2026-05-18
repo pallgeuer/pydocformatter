@@ -10,7 +10,14 @@ from pydocformatter.cli.settings_check import CheckSettings, LineEnding
 
 @dataclasses.dataclass(frozen=True)
 class Rule:
-    """Metadata for one pydocformatter rule."""
+    """Metadata for one pydocformatter rule.
+
+    Attributes:
+        rule_code (str): Stable rule code used in diagnostics.
+        rule_name (str): Stable human-readable rule name.
+        message (str): Default diagnostic message.
+        fixable (bool): Whether findings for this rule are fixable by default.
+    """
 
     rule_code: str
     rule_name: str
@@ -23,7 +30,14 @@ RuleFindingKey = tuple[Rule, str, bool]
 
 @dataclasses.dataclass(frozen=True)
 class RuleFinding:
-    """A remaining rule issue after formatting has run."""
+    """A remaining rule issue after formatting has run.
+
+    Attributes:
+        rule (Rule): Rule metadata for the finding.
+        line_numbers (tuple[int, ...]): One-based source line numbers associated with the finding.
+        instance_message (str | None): Optional message overriding the rule default for this instance.
+        instance_fixable (bool | None): Optional fixability overriding the rule default for this instance.
+    """
 
     rule: Rule
     line_numbers: tuple[int, ...]
@@ -32,21 +46,40 @@ class RuleFinding:
 
     @property
     def message(self) -> str:
-        """Return the message for this finding."""
+        """Return the message for this finding.
+
+        Returns:
+            str: Instance-specific message when present, otherwise the rule default message.
+        """
         return self.rule.message if self.instance_message is None else self.instance_message
 
     @property
     def fixable(self) -> bool:
-        """Return whether this specific finding can be automatically fixed."""
+        """Return whether this specific finding can be automatically fixed.
+
+        Returns:
+            bool: Instance-specific fixability when present, otherwise the rule default fixability.
+        """
         return self.rule.fixable if self.instance_fixable is None else self.instance_fixable
 
     @property
     def grouping_key(self) -> RuleFindingKey:
-        """Return the key used to merge findings that differ only by line numbers."""
+        """Return the key used to merge findings that differ only by line numbers.
+
+        Returns:
+            RuleFindingKey: Tuple of rule, resolved message, and resolved fixability.
+        """
         return self.rule, self.message, self.fixable
 
     def with_line_numbers(self, line_numbers: tuple[int, ...]) -> RuleFinding:
-        """Return this finding with updated line numbers."""
+        """Return this finding with updated line numbers.
+
+        Args:
+            line_numbers (tuple[int, ...]): Replacement one-based line numbers.
+
+        Returns:
+            RuleFinding: Copy of this finding with updated line numbers.
+        """
         return dataclasses.replace(self, line_numbers=line_numbers)
 
 
@@ -75,7 +108,18 @@ class FormatterResult:
 
 
 def format_file_exp(path: str, *, file: typing.TextIO | None = None, settings: CheckSettings, fix: bool, write: bool) -> FormatterResult:
-    """Run the experimental formatter interface for one file."""
+    """Run the experimental formatter interface for one file.
+
+    Args:
+        path (str): Display path and filesystem path for the source file.
+        file (typing.TextIO | None): Optional already-open text stream to read instead of opening `path`.
+        settings (CheckSettings): Resolved formatter settings.
+        fix (bool): Whether fixes should be applied to the returned source.
+        write (bool): Whether modified source should be written back to disk when reading from `path`.
+
+    Returns:
+        FormatterResult: Formatting result with source text, findings, and operational errors.
+    """
     try:
         if file is None:
             with open(path, encoding="utf-8", newline="") as path_file:
@@ -112,7 +156,17 @@ def format_file_exp(path: str, *, file: typing.TextIO | None = None, settings: C
 
 
 def format_source_exp(source: str, path: str, *, settings: CheckSettings, fix: bool) -> FormatterResult:
-    """Run the experimental formatter interface for source text."""
+    """Run the experimental formatter interface for source text.
+
+    Args:
+        source (str): Python source text to format.
+        path (str): Display path used for diagnostics.
+        settings (CheckSettings): Resolved formatter settings.
+        fix (bool): Whether fixes should be applied to the returned source.
+
+    Returns:
+        FormatterResult: Formatting result for the supplied source text.
+    """
     del settings, fix
     # TODO: Temporary placeholder code that must produce a non-None new_source (can just be source if nothing was or
     #       should be fixed, otherwise it should represent the new formatted source)
@@ -121,7 +175,18 @@ def format_source_exp(source: str, path: str, *, settings: CheckSettings, fix: b
 
 
 def resolve_line_ending(source: str, *, line_ending: LineEnding) -> str:
-    """Return the concrete line ending to use for rewritten source."""
+    """Return the concrete line ending to use for rewritten source.
+
+    Args:
+        source (str): Source text used when auto-detecting line endings.
+        line_ending (LineEnding): Configured line ending mode.
+
+    Returns:
+        str: Concrete line ending string.
+
+    Raises:
+        `ValueError`: If `line_ending` is not a known `LineEnding` member.
+    """
     if line_ending == LineEnding.AUTO:
         return detect_line_ending(source)
     elif line_ending == LineEnding.LF:
@@ -135,7 +200,14 @@ def resolve_line_ending(source: str, *, line_ending: LineEnding) -> str:
 
 
 def detect_line_ending(source: str) -> str:
-    """Return the first line ending in source, defaulting to LF when absent."""
+    """Return the first line ending in source, defaulting to LF when absent.
+
+    Args:
+        source (str): Source text to inspect.
+
+    Returns:
+        str: First detected line ending, or LF when the source contains no line endings.
+    """
     for index, char in enumerate(source):
         if char == "\n":
             return "\n"
@@ -148,5 +220,13 @@ def detect_line_ending(source: str) -> str:
 
 
 def normalize_line_endings(text: str, *, line_ending: str) -> str:
-    """Convert every line ending in text to line_ending."""
+    """Convert every line ending in text to line_ending.
+
+    Args:
+        text (str): Text whose line endings should be normalized.
+        line_ending (str): Replacement line ending.
+
+    Returns:
+        str: Text with all CRLF, CR, and LF endings converted to `line_ending`.
+    """
     return text.replace("\r\n", "\n").replace("\r", "\n").replace("\n", line_ending)
