@@ -6,16 +6,23 @@ import enum
 import json
 import os
 import tomllib
-from collections.abc import Callable, Mapping
-from typing import Any, Generic, TypeVar, cast
+from collections.abc import Callable, Iterable, Mapping
+from types import GenericAlias
+from typing import Any, Generic, TypeAlias, TypedDict, TypeVar, cast
 
 from pydocformatter.cli.global_args import GlobalArgs
 
 SettingsT = TypeVar("SettingsT")
 StrEnumT = TypeVar("StrEnumT", bound=enum.StrEnum)
-StringList = tuple[str, ...]
-MultiStringMap = tuple[tuple[str, StringList], ...]
-UNSET = object()
+SettingValueT = TypeVar("SettingValueT")
+StringList: TypeAlias = tuple[str, ...]
+MultiStringMap: TypeAlias = tuple[tuple[str, StringList], ...]
+SettingValidator: TypeAlias = Callable[[Any, str], SettingValueT]
+SettingCLIAction: TypeAlias = str | type[argparse.Action]
+SettingCLIChoices: TypeAlias = Iterable[Any]
+SettingCLIType: TypeAlias = Callable[[str], Any] | argparse.FileType | str
+SettingCLIMetavar: TypeAlias = str | tuple[str, ...]
+SettingsOverridesType: TypeAlias = type[Any] | GenericAlias
 
 
 class ConfigError(ValueError):
@@ -41,94 +48,122 @@ class SettingCLIValueKind(enum.StrEnum):
     TOML_MAP = "toml-map"
 
 
-@dataclasses.dataclass(frozen=True, init=False)
+class SettingCLIOptions(TypedDict, total=False):
+    """Unresolved argparse metadata for one setting."""
+
+    flags: tuple[str, ...]
+    action: SettingCLIAction | None
+    choices: SettingCLIChoices | None
+    type: SettingCLIType | None
+    metavar: SettingCLIMetavar | None
+    value_kind: SettingCLIValueKind
+    show_default: bool
+
+
+@dataclasses.dataclass(frozen=True)
 class SettingCLIDefinition:
-    """Argparse metadata for one setting."""
+    """Resolved argparse metadata for one setting."""
 
     flags: tuple[str, ...] = ()
-    action: Any | None = None
-    choices: tuple[str, ...] | None = None
-    type: Callable[[str], Any] | None = None
-    metavar: str | None = None
+    action: SettingCLIAction | None = None
+    choices: SettingCLIChoices | None = None
+    type: SettingCLIType | None = None
+    metavar: SettingCLIMetavar | None = None
     value_kind: SettingCLIValueKind = SettingCLIValueKind.RAW
-    show_default: bool = False
-    _value_kind_specified: bool = dataclasses.field(default=False, init=False, repr=False, compare=False)
-    _show_default_specified: bool = dataclasses.field(default=False, init=False, repr=False, compare=False)
-
-    def __init__(
-        self,
-        flags: tuple[str, ...] = (),
-        action: Any | None = None,
-        choices: tuple[str, ...] | None = None,
-        type: Callable[[str], Any] | None = None,
-        metavar: str | None = None,
-        value_kind: SettingCLIValueKind | object = UNSET,
-        show_default: bool | None = None,
-    ) -> None:
-        """Initialize argparse metadata with value-kind-aware default rendering."""
-        resolved_value_kind = SettingCLIValueKind.RAW if value_kind is UNSET else value_kind
-        object.__setattr__(self, "flags", flags)
-        object.__setattr__(self, "action", action)
-        object.__setattr__(self, "choices", choices)
-        object.__setattr__(self, "type", type)
-        object.__setattr__(self, "metavar", metavar)
-        object.__setattr__(self, "value_kind", resolved_value_kind)
-        object.__setattr__(self, "show_default", resolved_value_kind == SettingCLIValueKind.RAW if show_default is None else show_default)
-        object.__setattr__(self, "_value_kind_specified", value_kind is not UNSET)
-        object.__setattr__(self, "_show_default_specified", show_default is not None)
+    show_default: bool = True
 
 
 @dataclasses.dataclass(frozen=True, init=False)
-class SettingDefinition:
+class SettingDefinition(Generic[SettingValueT]):
     """Central metadata for one setting."""
 
     field: str
-    type: Any
+    value_type: type[SettingValueT] | GenericAlias
     group: enum.StrEnum
     help: str
-    cli: SettingCLIDefinition | None = None
     key: str = ""
-    validator: Callable[[Any, str], Any] | None = None
+    available_in_cli: bool = True
     available_in_toml: bool = True
+    validator: SettingValidator[SettingValueT] | None = None
+    cli: SettingCLIDefinition | None = None
     documentation: str = ""
 
     def __init__(
         self,
         *,
         field: str,
-        type: Any,
+        value_type: type[SettingValueT] | GenericAlias,
         group: enum.StrEnum,
         help: str,
-        cli: SettingCLIDefinition | None | object = UNSET,
         key: str = "",
-        validator: Callable[[Any, str], Any] | None = None,
+        available_in_cli: bool = True,
         available_in_toml: bool = True,
-        documentation: str | object = UNSET,
+        validator: SettingValidator[SettingValueT] | None = None,
+        cli: SettingCLIOptions | SettingCLIDefinition | dict[str, Any] | None = None,
+        documentation: str | None = None,
     ) -> None:
         """Initialize setting metadata with derived defaults."""
         resolved_key = key or field.replace("_", "-")
-        resolved_validator = _default_validator_for_type(type) if validator is None else validator
-        resolved_cli = SettingCLIDefinition() if cli is UNSET else cast(SettingCLIDefinition | None, cli)
-        if resolved_cli is not None:
-            cli = resolved_cli
-            if cli.flags == ():
-                cli = _replace_cli_definition(cli, flags=(f"--{resolved_key}",))
-            resolved_cli = _with_default_cli_metadata(cli, type)
+        resolved_validator = cast(SettingValidator[SettingValueT], _default_validator_for_type(value_type)) if validator is None else validator
+        resolved_documentation = documentation or help
+
+        resolved_cli: SettingCLIDefinition | None
+        if available_in_cli:
+            if cli is None:
+                cli_options: SettingCLIOptions = {}
+            elif isinstance(cli, SettingCLIDefinition):
+                cli_options = cast(SettingCLIOptions, {field.name: getattr(cli, field.name) for field in dataclasses.fields(cli)})
+            else:
+                cli_options = cast(SettingCLIOptions, dict(cli))
+
+            flags = cli_options.get("flags", ()) or (f"--{resolved_key}",)
+            action = cli_options.get("action")
+            choices = cli_options.get("choices")
+            cli_type = cli_options.get("type")
+            metavar = cli_options.get("metavar")
+            value_kind = cli_options.get("value_kind", SettingCLIValueKind.RAW)
+
+            if value_type is bool and action is None:
+                action = argparse.BooleanOptionalAction
+            if value_type is int and cli_type is None:
+                cli_type = int
+            if value_type == StringList:
+                if action is None:
+                    action = "append"
+                if "value_kind" not in cli_options:
+                    value_kind = SettingCLIValueKind.COMMA_LIST
+            if value_type == MultiStringMap:
+                if action is None:
+                    action = "append"
+                if "value_kind" not in cli_options:
+                    value_kind = SettingCLIValueKind.TOML_MAP
+            if _is_str_enum_type(value_type) and choices is None:
+                choices = tuple(member.value for member in cast(type[enum.StrEnum], value_type))
+
+            show_default = cli_options.get("show_default", value_kind == SettingCLIValueKind.RAW)
+
+            resolved_cli = SettingCLIDefinition(
+                flags=flags,
+                action=action,
+                choices=choices,
+                type=cli_type,
+                metavar=metavar,
+                value_kind=value_kind,
+                show_default=show_default,
+            )
+        else:
+            resolved_cli = None
 
         object.__setattr__(self, "field", field)
-        object.__setattr__(self, "type", type)
+        object.__setattr__(self, "value_type", value_type)
         object.__setattr__(self, "group", group)
         object.__setattr__(self, "help", help)
-        object.__setattr__(self, "cli", resolved_cli)
         object.__setattr__(self, "key", resolved_key)
-        object.__setattr__(self, "validator", resolved_validator)
+        object.__setattr__(self, "available_in_cli", available_in_cli)
         object.__setattr__(self, "available_in_toml", available_in_toml)
-        object.__setattr__(self, "documentation", help if documentation is UNSET else documentation)
-
-    @property
-    def available_in_argparse(self) -> bool:
-        """Return whether this setting has a dedicated argparse option."""
-        return self.cli is not None
+        object.__setattr__(self, "validator", resolved_validator)
+        object.__setattr__(self, "cli", resolved_cli)
+        object.__setattr__(self, "documentation", resolved_documentation)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -138,21 +173,23 @@ class SettingsSchema(Generic[SettingsT]):
     Attributes:
         settings_type: Resolved dataclass type constructed for defaults and returned by config loading.
         overrides_type: TypedDict-like class describing partial field overrides accepted from CLI/config layers.
+        group_type: Enum type that defines accepted settings groups and argparse group ordering.
         definitions: Ordered metadata mapping settings dataclass fields to TOML keys, CLI options, validation, and help
             text.
-        group_type: Enum type that defines accepted settings groups and argparse group ordering.
         table_path: TOML table path used for pyproject-style configuration. Empty schemas read top-level TOML tables
             only when explicitly supplied.
+        table_name: Dotted TOML table name derived from table_path.
         post_validate: Optional validation hook called after per-field validation with only the updates from the current
             layer, keyed by dataclass field name, and a user-facing context string. The hook should raise ConfigError
             for cross-field or domain validation failures and should not mutate values.
     """
 
     settings_type: type[SettingsT]
-    overrides_type: Any
-    definitions: tuple[SettingDefinition, ...]
+    overrides_type: SettingsOverridesType
     group_type: type[enum.StrEnum]
-    table_path: tuple[str, ...] = ()
+    definitions: tuple[SettingDefinition[Any], ...]
+    table_path: tuple[str, ...]
+    table_name: str = dataclasses.field(init=False)
     post_validate: Callable[[dict[str, Any], str], None] | None = None
 
     def __post_init__(self) -> None:
@@ -161,38 +198,41 @@ class SettingsSchema(Generic[SettingsT]):
         if invalid_definitions:
             invalid_fields = ", ".join(f"{definition.field}={definition.group!r}" for definition in invalid_definitions)
             raise TypeError(f"Settings definitions must belong to {self.group_type.__name__}: {invalid_fields}")
+        invalid_definitions = tuple(definition for definition in self.definitions if definition.available_in_cli != (definition.cli is not None))
+        if invalid_definitions:
+            invalid_fields = ", ".join(f"{definition.field}: {definition.available_in_cli}/{definition.cli is not None}" for definition in invalid_definitions)
+            raise AssertionError(f"Inconsistent settings definitions found in terms of CLI availability: {invalid_fields}")
+        object.__setattr__(self, "table_name", ".".join(self.table_path))
 
-    @property
-    def definitions_by_field(self) -> dict[str, SettingDefinition]:
+    def definitions_by_field(self) -> dict[str, SettingDefinition[Any]]:
         """Return setting definitions keyed by dataclass field name."""
         return {definition.field: definition for definition in self.definitions}
 
-    @property
-    def definitions_by_key(self) -> dict[str, SettingDefinition]:
+    def definitions_by_key(self) -> dict[str, SettingDefinition[Any]]:
         """Return setting definitions keyed by TOML setting key."""
         return {definition.key: definition for definition in self.definitions}
 
-    @property
-    def toml_definitions(self) -> tuple[SettingDefinition, ...]:
+    def toml_definitions(self) -> tuple[SettingDefinition[Any], ...]:
         """Return setting definitions available in TOML configuration."""
         return tuple(definition for definition in self.definitions if definition.available_in_toml)
 
-    @property
     def toml_keys(self) -> tuple[str, ...]:
         """Return TOML keys accepted by this settings schema."""
-        return tuple(definition.key for definition in self.toml_definitions)
+        return tuple(definition.key for definition in self.definitions if definition.available_in_toml)
 
-    @property
-    def table_name(self) -> str:
-        """Return the dotted TOML table name for this schema."""
-        return ".".join(self.table_path)
+    def cli_definitions(self) -> tuple[SettingDefinition[Any], ...]:
+        """Return setting definitions available as dedicated CLI options."""
+        return tuple(definition for definition in self.definitions if definition.available_in_cli)
 
-    def load(
-        self,
-        cli_overrides: Mapping[str, Any] | None = None,
-        *,
-        global_args: GlobalArgs = GlobalArgs(),
-    ) -> SettingsT:
+    def cli_keys(self) -> tuple[str, ...]:
+        """Return setting keys available as dedicated CLI options."""
+        return tuple(definition.key for definition in self.definitions if definition.available_in_cli)
+
+    def cli_flags(self) -> tuple[str, ...]:
+        """Return CLI flags accepted by this settings schema."""
+        return tuple(flag for definition in self.definitions if definition.cli is not None for flag in definition.cli.flags)
+
+    def load(self, cli_overrides: Mapping[str, Any] | None = None, *, global_args: GlobalArgs = GlobalArgs()) -> SettingsT:
         """Resolve settings from defaults, config files, inline config, and optional CLI overrides."""
         settings = self.settings_type()
 
@@ -221,15 +261,15 @@ class SettingsSchema(Generic[SettingsT]):
             if not definition.available_in_toml:
                 continue
             value = getattr(settings, definition.field)
-            if definition.type == MultiStringMap:
+            if definition.value_type == MultiStringMap:
                 rendered = _format_multi_string_map(value)
-            elif definition.type == StringList:
+            elif definition.value_type == StringList:
                 rendered = _format_string_list(value)
-            elif definition.type is str:
+            elif definition.value_type is str:
                 rendered = _format_string(value)
-            elif _is_str_enum_type(definition.type):
+            elif _is_str_enum_type(definition.value_type):
                 rendered = _format_string(value.value)
-            elif definition.type is bool:
+            elif definition.value_type is bool:
                 rendered = str(value).lower()
             else:
                 rendered = str(value)
@@ -237,21 +277,15 @@ class SettingsSchema(Generic[SettingsT]):
         lines.append("")
         return "\n".join(lines)
 
-    def add_arguments(
-        self,
-        parser: argparse.ArgumentParser,
-        settings: SettingsT,
-        *,
-        dest_prefix: str | None = None,
-    ) -> None:
+    def add_arguments(self, parser: argparse.ArgumentParser, settings: SettingsT, *, dest_prefix: str | None = None) -> None:
         """Add argparse arguments for every settings group in schema order."""
-        handled_definitions: list[SettingDefinition] = []
+        handled_definitions: list[SettingDefinition[Any]] = []
         for group in self.group_type:
             argument_group = parser.add_argument_group(group.value)
             for definition in self.definitions:
                 if definition.group == group:
                     handled_definitions.append(definition)
-                    if definition.cli is not None:
+                    if definition.available_in_cli:
                         _add_setting_argument(argument_group, definition, settings, dest_prefix=dest_prefix)
 
         if len(handled_definitions) != len(self.definitions):
@@ -263,12 +297,11 @@ class SettingsSchema(Generic[SettingsT]):
         """Build settings overrides from parsed command-line arguments."""
         values: dict[str, Any] = {}
         for definition in self.definitions:
-            if definition.cli is None:
-                continue
-            value = getattr(args, _dest_name(definition.field, dest_prefix), None)
-            parsed = _parse_cli_setting_value(definition, value)
-            if parsed is not None:
-                values[definition.field] = parsed
+            if definition.available_in_cli:
+                value = getattr(args, _dest_name(definition.field, dest_prefix), None)
+                parsed = _parse_cli_setting_value(definition, value)
+                if parsed is not None:
+                    values[definition.field] = parsed
         return values
 
 
@@ -343,72 +376,20 @@ def validate_str_enum(enum_class: type[StrEnumT]) -> Callable[[Any, str], StrEnu
     return validate
 
 
-def _default_validator_for_type(setting_type: Any) -> Callable[[Any, str], Any]:
+def _default_validator_for_type(setting_type: type[SettingValueT] | GenericAlias) -> Callable[[Any, str], Any]:
     """Return the default validator for a setting type."""
     if setting_type is bool:
         return validate_bool
-    if setting_type is int:
+    elif setting_type is int:
         return validate_int()
-    if setting_type == StringList:
+    elif setting_type == StringList:
         return validate_string_list
-    if setting_type == MultiStringMap:
+    elif setting_type == MultiStringMap:
         return validate_multi_string_map
-    if _is_str_enum_type(setting_type):
+    elif _is_str_enum_type(setting_type):
         return validate_str_enum(cast(type[enum.StrEnum], setting_type))
-    raise TypeError(f"No default validator for setting type: {setting_type!r}")
-
-
-def _with_default_cli_metadata(cli: SettingCLIDefinition, setting_type: Any) -> SettingCLIDefinition:
-    """Return CLI metadata with type-derived defaults filled in."""
-    action = cli.action
-    choices = cli.choices
-    cli_type = cli.type
-    value_kind = cli.value_kind
-
-    if setting_type is bool and action is None:
-        action = argparse.BooleanOptionalAction
-    if setting_type is int and cli_type is None:
-        cli_type = int
-    if setting_type == StringList:
-        if action is None:
-            action = "append"
-        if not cli._value_kind_specified:
-            value_kind = SettingCLIValueKind.COMMA_LIST
-    if setting_type == MultiStringMap:
-        if action is None:
-            action = "append"
-        if not cli._value_kind_specified:
-            value_kind = SettingCLIValueKind.TOML_MAP
-    if _is_str_enum_type(setting_type) and choices is None:
-        choices = tuple(member.value for member in setting_type)
-
-    return _replace_cli_definition(cli, action=action, choices=choices, type=cli_type, value_kind=value_kind)
-
-
-def _replace_cli_definition(
-    cli: SettingCLIDefinition,
-    *,
-    flags: tuple[str, ...] | object = UNSET,
-    action: Any | object = UNSET,
-    choices: tuple[str, ...] | None | object = UNSET,
-    type: Callable[[str], Any] | None | object = UNSET,
-    metavar: str | None | object = UNSET,
-    value_kind: SettingCLIValueKind | object = UNSET,
-) -> SettingCLIDefinition:
-    """Return CLI metadata with selected fields replaced."""
-    value_kind_argument = value_kind
-    if value_kind_argument is UNSET and cli._value_kind_specified:
-        value_kind_argument = cli.value_kind
-    show_default_argument = cli.show_default if cli._show_default_specified else None
-    return SettingCLIDefinition(
-        flags=cli.flags if flags is UNSET else cast(tuple[str, ...], flags),
-        action=cli.action if action is UNSET else action,
-        choices=cli.choices if choices is UNSET else cast(tuple[str, ...] | None, choices),
-        type=cli.type if type is UNSET else cast(Callable[[str], Any] | None, type),
-        metavar=cli.metavar if metavar is UNSET else cast(str | None, metavar),
-        value_kind=value_kind_argument,
-        show_default=show_default_argument,
-    )
+    else:
+        raise TypeError(f"No default validator for setting type: {setting_type!r}")
 
 
 def _is_str_enum_type(setting_type: Any) -> bool:
@@ -445,11 +426,6 @@ def parse_toml_map_option_groups(groups: list[str]) -> dict[str, Any]:
             raise ConfigError("TOML map CLI value must be a TOML table")
         merged.update(value)
     return merged
-
-
-def field_to_key(field: str) -> str:  # TODO: REMOVE
-    """Return the TOML setting key for a settings field name."""
-    return field.replace("_", "-")
 
 
 def _enabled_label(value: bool) -> str:
@@ -577,24 +553,15 @@ def _load_toml_file(path: str, *, required: bool) -> dict[str, Any]:
     return config
 
 
-def _apply_config_section(
-    schema: SettingsSchema[SettingsT],
-    settings: SettingsT,
-    section: dict[str, Any],
-    context: str,
-) -> SettingsT:
+def _apply_config_section(schema: SettingsSchema[SettingsT], settings: SettingsT, section: dict[str, Any], context: str) -> SettingsT:
     """Apply one TOML configuration section after validating allowed keys."""
-    _validate_config_section_keys(section, context, schema.toml_keys)
+    _validate_config_section_keys(section, context, schema.toml_keys())
 
-    values = {definition.field: section[definition.key] for definition in schema.toml_definitions if definition.key in section}
+    values = {definition.field: section[definition.key] for definition in schema.toml_definitions() if definition.key in section}
     return _apply_field_values(schema, settings, values, context)
 
 
-def _validate_config_section_keys(
-    section: dict[str, Any],
-    context: str,
-    allowed_keys: tuple[str, ...],
-) -> None:
+def _validate_config_section_keys(section: dict[str, Any], context: str, allowed_keys: tuple[str, ...]) -> None:
     """Reject unknown keys in one TOML configuration section."""
     unknown_keys = sorted(str(key) for key in section if key not in allowed_keys)
     if unknown_keys:
@@ -602,20 +569,16 @@ def _validate_config_section_keys(
         raise ConfigError(f"{context} contains unknown setting(s): {joined_keys}")
 
 
-def _apply_field_values(
-    schema: SettingsSchema[SettingsT],
-    settings: SettingsT,
-    values: dict[str, Any],
-    context: str,
-) -> SettingsT:
+def _apply_field_values(schema: SettingsSchema[SettingsT], settings: SettingsT, values: dict[str, Any], context: str) -> SettingsT:
     """Validate raw field values and return settings with those fields replaced."""
-    definitions_by_field = schema.definitions_by_field
+    definitions_by_field = schema.definitions_by_field()
     updates: dict[str, Any] = {}
     for field, value in values.items():
-        validator = definitions_by_field[field].validator
+        definition = definitions_by_field[field]
+        validator = definition.validator
         if validator is None:
             raise AssertionError(f"Setting definition for {field!r} has no validator")
-        updates[field] = validator(value, f"{context}.{field_to_key(field)}")  # TODO: field_to_key??
+        updates[field] = validator(value, f"{context}.{definition.key}")
     if schema.post_validate is not None:
         schema.post_validate(updates, context)
     return cast(SettingsT, dataclasses.replace(cast(Any, settings), **updates))
@@ -623,14 +586,16 @@ def _apply_field_values(
 
 def _add_setting_argument(
     argument_group: argparse._ActionsContainer,
-    definition: SettingDefinition,
+    definition: SettingDefinition[Any],
     settings: Any,
     *,
     dest_prefix: str | None,
 ) -> None:
     """Add one settings argument to an argparse argument group."""
-    if definition.cli is None:
+    if not definition.available_in_cli:
         return
+    if definition.cli is None:
+        raise AssertionError(f"Setting definition for {definition.field!r} has no CLI metadata")
 
     kwargs: dict[str, Any] = {
         "default": None,
@@ -648,7 +613,7 @@ def _add_setting_argument(
     argument_group.add_argument(*definition.cli.flags, **kwargs)
 
 
-def _format_cli_help(definition: SettingDefinition, settings: Any) -> str:
+def _format_cli_help(definition: SettingDefinition[Any], settings: Any) -> str:
     """Return argparse help text for one setting definition."""
     if definition.cli is None or not definition.cli.show_default:
         return definition.help
@@ -670,7 +635,7 @@ def _dest_name(field: str, dest_prefix: str | None) -> str:
     return f"{dest_prefix}_{field}"
 
 
-def _parse_cli_setting_value(definition: SettingDefinition, value: Any) -> Any:
+def _parse_cli_setting_value(definition: SettingDefinition[Any], value: Any) -> Any:
     """Parse one argparse namespace value into a settings override value."""
     if value is None:
         return None

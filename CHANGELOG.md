@@ -53,6 +53,15 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - `--include`, `--extend-include`, `--exclude`, and `--extend-exclude` now accept multiple glob values in one option usage (e.g. `--include *.py *.pyi`).
 
 - **Configuration:**
+  - Simplified resolved CLI setting metadata so `SettingCLIDefinition` uses a generated dataclass initializer.
+  - Split unresolved CLI setting metadata into `SettingCLIOptions` while keeping `SettingCLIDefinition` as the resolved argparse metadata shape.
+  - Added explicit `available_in_cli` setting metadata and treat empty documentation as omitted documentation.
+  - Renamed `SettingDefinition.type` to `value_type` to avoid ambiguity with argparse's `type` option.
+  - Made `SettingDefinition` generic over its validated setting value and reordered its optional metadata fields.
+  - Tightened `SettingsSchema.overrides_type` typing, reordered schema fields, and made `table_path` explicit.
+  - Converted settings schema definition/key helpers to methods and added CLI-specific key/flag helpers.
+  - Tightened `SettingCLIDefinition` type annotations to match the supported `argparse.add_argument` keyword shapes.
+  - Limited automatic underscore-to-dash setting key derivation to the `SettingDefinition` default key construction path.
   - Renamed the configuration table from `[tool.pydocformatter]` to `[tool.pydocfmt]`.
   - Settings now resolve from one `[tool.pydocfmt]` table, followed by command-line overrides.
   - Resolved settings output is now formatted by the configuration layer.

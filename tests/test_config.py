@@ -3,9 +3,9 @@ import dataclasses
 import enum
 import os
 import tempfile
+import typing
 import unittest
 from pathlib import Path
-from typing import get_type_hints
 
 import pydocformatter.cli.global_args as pydocformatter_global_args
 import pydocformatter.cli.settings_check as pydocformatter_settings
@@ -32,38 +32,64 @@ class TestConfig(unittest.TestCase):
         self.assertNotIn("render", tuple(field.name for field in dataclasses.fields(pydocformatter_config.SettingDefinition)))
         self.assertEqual(
             tuple(field.name for field in dataclasses.fields(pydocformatter_config.SettingDefinition)),
-            ("field", "type", "group", "help", "cli", "key", "validator", "available_in_toml", "documentation"),
+            ("field", "value_type", "group", "help", "key", "available_in_cli", "available_in_toml", "validator", "cli", "documentation"),
         )
         self.assertEqual(
             tuple(field.name for field in dataclasses.fields(pydocformatter_config.SettingsSchema)),
-            ("settings_type", "overrides_type", "definitions", "group_type", "table_path", "post_validate"),
+            ("settings_type", "overrides_type", "group_type", "definitions", "table_path", "table_name", "post_validate"),
         )
+        self.assertFalse(next(field for field in dataclasses.fields(pydocformatter_config.SettingsSchema) if field.name == "table_name").init)
+        self.assertEqual(pydocformatter_settings.SETTINGS_SCHEMA.table_name, "tool.pydocfmt")
         self.assertIs(pydocformatter_settings.SETTINGS_SCHEMA.group_type, SettingsGroup)
         self.assertIs(pydocformatter_config.ConfigError, ConfigError)
         self.assertTrue(hasattr(pydocformatter_config, "SettingCLIDefinition"))
+        self.assertTrue(hasattr(pydocformatter_config, "SettingCLIOptions"))
         self.assertFalse(hasattr(pydocformatter_config, "SettingCliDefinition"))
         self.assertTrue(hasattr(pydocformatter_config, "StringList"))
         self.assertTrue(hasattr(pydocformatter_config, "MultiStringMap"))
         self.assertFalse(hasattr(pydocformatter_settings, "RuleSelectorMap"))
 
-    def test_cli_definition_show_default_depends_on_value_kind(self) -> None:
+    def test_cli_options_and_resolved_definition_fields_match(self) -> None:
+        options_hints = typing.get_type_hints(pydocformatter_config.SettingCLIOptions)
+        definition_hints = typing.get_type_hints(pydocformatter_config.SettingCLIDefinition)
+
+        self.assertFalse(pydocformatter_config.SettingCLIOptions.__total__)
+        self.assertEqual(options_hints, definition_hints)
+        self.assertEqual(tuple(options_hints), tuple(field.name for field in dataclasses.fields(pydocformatter_config.SettingCLIDefinition)))
+
+    def test_cli_definition_stores_resolved_show_default(self) -> None:
         self.assertTrue(pydocformatter_config.SettingCLIDefinition().show_default)
-        self.assertFalse(pydocformatter_config.SettingCLIDefinition(value_kind=pydocformatter_config.SettingCLIValueKind.COMMA_LIST).show_default)
-        self.assertFalse(pydocformatter_config.SettingCLIDefinition(value_kind=pydocformatter_config.SettingCLIValueKind.TOML_MAP).show_default)
+        self.assertTrue(pydocformatter_config.SettingCLIDefinition(value_kind=pydocformatter_config.SettingCLIValueKind.COMMA_LIST).show_default)
         self.assertFalse(pydocformatter_config.SettingCLIDefinition(show_default=False).show_default)
         self.assertTrue(pydocformatter_config.SettingCLIDefinition(value_kind=pydocformatter_config.SettingCLIValueKind.COMMA_LIST, show_default=True).show_default)
 
     def test_setting_definition_resolves_default_key_and_cli_flags(self) -> None:
         definition = pydocformatter_config.SettingDefinition(
             field="line_length",
-            type=int,
+            value_type=int,
             group=SettingsGroup.FORMATTING,
             help="Maximum line length.",
             validator=pydocformatter_config.validate_int(),
         )
+        empty_documentation_definition = pydocformatter_config.SettingDefinition(
+            field="line_length",
+            value_type=int,
+            group=SettingsGroup.FORMATTING,
+            help="Maximum line length.",
+            documentation="",
+        )
+        none_documentation_definition = pydocformatter_config.SettingDefinition(
+            field="line_length",
+            value_type=int,
+            group=SettingsGroup.FORMATTING,
+            help="Maximum line length.",
+            documentation=None,
+        )
 
         self.assertEqual(definition.key, "line-length")
         self.assertEqual(definition.documentation, definition.help)
+        self.assertEqual(empty_documentation_definition.documentation, empty_documentation_definition.help)
+        self.assertEqual(none_documentation_definition.documentation, none_documentation_definition.help)
         self.assertIsNotNone(definition.cli)
         cli = definition.cli
         assert cli is not None
@@ -72,12 +98,12 @@ class TestConfig(unittest.TestCase):
     def test_setting_definition_respects_explicit_key_and_cli_flags(self) -> None:
         definition = pydocformatter_config.SettingDefinition(
             field="config_options",
-            type=pydocformatter_config.StringList,
+            value_type=pydocformatter_config.StringList,
             group=SettingsGroup.FORMATTING,
-            cli=pydocformatter_config.SettingCLIDefinition(flags=("-c", "--config")),
             help="Configuration options.",
-            validator=pydocformatter_config.validate_string_list,
             key="config",
+            validator=pydocformatter_config.validate_string_list,
+            cli={"flags": ("-c", "--config")},
         )
 
         self.assertEqual(definition.key, "config")
@@ -89,11 +115,11 @@ class TestConfig(unittest.TestCase):
     def test_setting_definition_uses_explicit_key_for_default_cli_flags(self) -> None:
         definition = pydocformatter_config.SettingDefinition(
             field="config_options",
-            type=pydocformatter_config.StringList,
+            value_type=pydocformatter_config.StringList,
             group=SettingsGroup.FORMATTING,
             help="Configuration options.",
-            validator=pydocformatter_config.validate_string_list,
             key="config",
+            validator=pydocformatter_config.validate_string_list,
         )
 
         self.assertEqual(definition.key, "config")
@@ -105,43 +131,43 @@ class TestConfig(unittest.TestCase):
     def test_setting_definition_respects_explicit_no_cli(self) -> None:
         definition = pydocformatter_config.SettingDefinition(
             field="experimental",
-            type=bool,
+            value_type=bool,
             group=SettingsGroup.FORMATTING,
-            cli=None,
             help="Experimental.",
+            available_in_cli=False,
         )
 
-        self.assertFalse(definition.available_in_argparse)
+        self.assertFalse(definition.available_in_cli)
         self.assertIsNone(definition.cli)
 
     def test_setting_definition_derives_defaults_from_type(self) -> None:
         enum_definition = pydocformatter_config.SettingDefinition(
             field="line_ending",
-            type=LineEnding,
+            value_type=LineEnding,
             group=SettingsGroup.FORMATTING,
             help="Line ending.",
         )
         bool_definition = pydocformatter_config.SettingDefinition(
             field="experimental",
-            type=bool,
+            value_type=bool,
             group=SettingsGroup.FORMATTING,
             help="Experimental.",
         )
         int_definition = pydocformatter_config.SettingDefinition(
             field="line_length",
-            type=int,
+            value_type=int,
             group=SettingsGroup.FORMATTING,
             help="Line length.",
         )
         string_list_definition = pydocformatter_config.SettingDefinition(
             field="include",
-            type=pydocformatter_config.StringList,
+            value_type=pydocformatter_config.StringList,
             group=SettingsGroup.FILE_SELECTION,
             help="Include.",
         )
         string_map_definition = pydocformatter_config.SettingDefinition(
             field="per_file_ignores",
-            type=pydocformatter_config.MultiStringMap,
+            value_type=pydocformatter_config.MultiStringMap,
             group=SettingsGroup.RULE_SELECTION,
             help="Per-file ignores.",
         )
@@ -156,8 +182,10 @@ class TestConfig(unittest.TestCase):
         self.assertIs(int_definition.cli.type, int)
         self.assertEqual(string_list_definition.cli.action, "append")
         self.assertEqual(string_list_definition.cli.value_kind, pydocformatter_config.SettingCLIValueKind.COMMA_LIST)
+        self.assertFalse(string_list_definition.cli.show_default)
         self.assertEqual(string_map_definition.cli.action, "append")
         self.assertEqual(string_map_definition.cli.value_kind, pydocformatter_config.SettingCLIValueKind.TOML_MAP)
+        self.assertFalse(string_map_definition.cli.show_default)
         enum_validator = enum_definition.validator
         bool_validator = bool_definition.validator
         int_validator = int_definition.validator
@@ -173,6 +201,38 @@ class TestConfig(unittest.TestCase):
         self.assertEqual(int_validator(1, "line-length"), 1)
         self.assertEqual(string_list_validator(["*.py"], "include"), ("*.py",))
         self.assertEqual(string_map_validator({"tests/*.py": ["PCF001"]}, "per-file-ignores"), (("tests/*.py", ("PCF001",)),))
+
+    def test_setting_definition_respects_explicit_cli_options_during_defaulting(self) -> None:
+        default_int_definition = pydocformatter_config.SettingDefinition(
+            field="line_length",
+            value_type=int,
+            group=SettingsGroup.FORMATTING,
+            help="Line length.",
+        )
+        raw_list_definition = pydocformatter_config.SettingDefinition(
+            field="include",
+            value_type=pydocformatter_config.StringList,
+            group=SettingsGroup.FILE_SELECTION,
+            help="Include.",
+            cli={"value_kind": pydocformatter_config.SettingCLIValueKind.RAW},
+        )
+        show_default_list_definition = pydocformatter_config.SettingDefinition(
+            field="include",
+            value_type=pydocformatter_config.StringList,
+            group=SettingsGroup.FILE_SELECTION,
+            help="Include.",
+            cli={"show_default": True},
+        )
+
+        assert default_int_definition.cli is not None
+        assert raw_list_definition.cli is not None
+        assert show_default_list_definition.cli is not None
+        self.assertEqual(default_int_definition.cli.value_kind, pydocformatter_config.SettingCLIValueKind.RAW)
+        self.assertTrue(default_int_definition.cli.show_default)
+        self.assertEqual(raw_list_definition.cli.value_kind, pydocformatter_config.SettingCLIValueKind.RAW)
+        self.assertTrue(raw_list_definition.cli.show_default)
+        self.assertEqual(show_default_list_definition.cli.value_kind, pydocformatter_config.SettingCLIValueKind.COMMA_LIST)
+        self.assertTrue(show_default_list_definition.cli.show_default)
 
     def test_global_args_defaults_without_parser_values(self) -> None:
         args = argparse.Namespace()
@@ -195,13 +255,12 @@ class TestConfig(unittest.TestCase):
 
     def test_setting_definitions_match_formatter_settings_fields(self) -> None:
         setting_fields = tuple(field.name for field in dataclasses.fields(CheckSettings))
-        setting_annotations = get_type_hints(CheckSettings)
-        override_annotations = get_type_hints(CheckSettingsOverrides)
+        setting_annotations = typing.get_type_hints(CheckSettings)
+        override_annotations = typing.get_type_hints(CheckSettingsOverrides)
         definition_fields = tuple(definition.field for definition in pydocformatter_settings.SETTINGS_SCHEMA.definitions)
 
         self.assertEqual(definition_fields, setting_fields)
-        self.assertEqual(tuple(definition.key for definition in pydocformatter_settings.SETTINGS_SCHEMA.definitions), tuple(field.replace("_", "-") for field in setting_fields))
-        self.assertEqual(tuple(definition.type for definition in pydocformatter_settings.SETTINGS_SCHEMA.definitions), tuple(setting_annotations[field] for field in setting_fields))
+        self.assertEqual(tuple(definition.value_type for definition in pydocformatter_settings.SETTINGS_SCHEMA.definitions), tuple(setting_annotations[field] for field in setting_fields))
         self.assertEqual(set(override_annotations), set(setting_fields))
         self.assertEqual(override_annotations, {field: setting_annotations[field] for field in setting_fields})
         self.assertEqual(
@@ -267,8 +326,18 @@ class TestConfig(unittest.TestCase):
         self.assertLess(group_titles.index(SettingsGroup.FORMATTING.value), group_titles.index(SettingsGroup.RULE_SELECTION.value))
         self.assertLess(group_titles.index(SettingsGroup.RULE_SELECTION.value), group_titles.index(SettingsGroup.FILE_SELECTION.value))
         option_strings = {option for action in parser._actions for option in action.option_strings}
-        expected_options = {flag for definition in pydocformatter_settings.SETTINGS_SCHEMA.definitions if definition.cli is not None for flag in definition.cli.flags}
-        self.assertLessEqual(expected_options, option_strings)
+        self.assertLessEqual(set(pydocformatter_settings.SETTINGS_SCHEMA.cli_flags()), option_strings)
+
+    def test_settings_schema_definition_methods_return_filtered_metadata(self) -> None:
+        schema = pydocformatter_settings.SETTINGS_SCHEMA
+
+        self.assertEqual(schema.definitions_by_field()["line_length"].key, "line-length")
+        self.assertEqual(schema.definitions_by_key()["line-length"].field, "line_length")
+        self.assertEqual(schema.toml_keys(), tuple(definition.key for definition in schema.toml_definitions()))
+        self.assertEqual(schema.cli_keys(), tuple(definition.key for definition in schema.cli_definitions()))
+        self.assertEqual(schema.cli_flags(), tuple(flag for definition in schema.cli_definitions() for flag in typing.cast(pydocformatter_config.SettingCLIDefinition, definition.cli).flags))
+        self.assertTrue(all(definition.available_in_toml for definition in schema.toml_definitions()))
+        self.assertTrue(all(definition.available_in_cli for definition in schema.cli_definitions()))
 
     def test_settings_schema_rejects_invalid_definition_group(self) -> None:
         class OtherGroup(enum.StrEnum):
@@ -278,16 +347,44 @@ class TestConfig(unittest.TestCase):
             pydocformatter_config.SettingsSchema(
                 settings_type=CheckSettings,
                 overrides_type=CheckSettingsOverrides,
+                group_type=SettingsGroup,
                 definitions=(
                     pydocformatter_config.SettingDefinition(
                         field="line_length",
-                        type=int,
+                        value_type=int,
                         group=OtherGroup.OTHER,
                         help="Maximum line length.",
                     ),
                 ),
-                group_type=SettingsGroup,
+                table_path=(),
             )
+
+    def test_validation_context_uses_explicit_key(self) -> None:
+        @dataclasses.dataclass(frozen=True)
+        class CustomSettings:
+            config_options: pydocformatter_config.StringList = ()
+
+        schema = pydocformatter_config.SettingsSchema(
+            settings_type=CustomSettings,
+            overrides_type=dict[str, object],
+            group_type=SettingsGroup,
+            definitions=(
+                pydocformatter_config.SettingDefinition(
+                    field="config_options",
+                    value_type=pydocformatter_config.StringList,
+                    group=SettingsGroup.FORMATTING,
+                    help="Configuration options.",
+                    key="config",
+                ),
+            ),
+            table_path=(),
+        )
+
+        with self.assertRaises(ConfigError) as context:
+            pydocformatter_config.settings_from_overrides(schema, {"config_options": "not-a-list"}, context="test")
+
+        self.assertIn("test.config", str(context.exception))
+        self.assertNotIn("config-options", str(context.exception))
 
     def test_settings_overrides_are_dict_like_and_omit_unspecified_values(self) -> None:
         overrides = CheckSettingsOverrides(line_length=103)
