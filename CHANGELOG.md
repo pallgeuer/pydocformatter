@@ -66,8 +66,11 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Settings now resolve from one `[tool.pydocfmt]` table, followed by command-line overrides.
   - Resolved settings output is now formatted by the configuration layer.
   - Setting validation now uses shared generic validators for booleans, integers, string lists, and string enums.
+  - Tightened `SettingDefinition.validator` typing after default validator resolution.
   - File-selection settings now use Ruff-style glob lists (`include`, `extend-include`, `exclude`, `extend-exclude`) and `force-exclude`.
   - For each setting key, the highest-priority value wins (`dedicated CLI option > inline --config > explicit --config file > auto-discovered config > defaults`), including `extend-include` and `extend-exclude`.
+  - Simplified `--config` option loading by separating explicit config-file paths from inline TOML options directly.
+  - Made settings loading accept keyword-only command-line overrides and nullable global arguments.
 
 - **File discovery:**
   - `--show-files` now reports directories pruned by exclude patterns, such as `.venv`.
@@ -99,6 +102,9 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Moved enabled-state help text formatting into the configuration layer.
   - Moved experimental file I/O diagnostics into the formatter layer.
   - Moved generic settings loading, formatting, argparse setup, and CLI override extraction onto `SettingsSchema`.
+  - Made `SettingsSchema.load` accept parsed argparse namespaces directly for command-line setting overrides.
+  - Simplified schema-driven settings argument extraction by removing unused destination-prefix plumbing and helper indirection.
+  - Limited pyproject-style explicit config parsing to files named `pyproject.toml`.
   - Settings schema metadata now defaults omitted CLI definitions to standard CLI-backed settings and omitted documentation to the setting help text.
   - Settings schemas now record their override type and document the post-validation hook contract for implementers.
 

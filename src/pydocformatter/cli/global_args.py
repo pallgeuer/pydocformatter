@@ -35,7 +35,7 @@ def add_global_arguments(parser: argparse.ArgumentParser, *, dest_prefix: str) -
     )
 
 
-def global_args_from_namespace(args: argparse.Namespace, *, dest_prefixes: tuple[str, ...]) -> GlobalArgs:
+def global_values_from_arguments(args: argparse.Namespace, *, dest_prefixes: tuple[str, ...]) -> GlobalArgs:
     """Resolve global arguments from all parser levels in precedence order."""
     config_options: list[str] = []
     isolated = False

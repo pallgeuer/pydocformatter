@@ -235,9 +235,8 @@ def format_files(paths: tuple[str, ...], *, settings: settings_check.CheckSettin
 def load_settings(args: argparse.Namespace) -> settings_check.CheckSettings | None:
     """Load settings with command-line overrides, returning None on failure."""
     try:
-        global_values = global_args.global_args_from_namespace(args, dest_prefixes=("global", "command"))
-        overrides = settings_check.SETTINGS_SCHEMA.overrides_from_namespace(args)
-        return settings_check.SETTINGS_SCHEMA.load(overrides, global_args=global_values)
+        global_values = global_args.global_values_from_arguments(args, dest_prefixes=("global", "command"))
+        return settings_check.SETTINGS_SCHEMA.load(global_values=global_values, args=args)
     except config.ConfigError as error:
         print(f"pydocfmt check: Configuration error: {error}", file=sys.stderr)
         return None

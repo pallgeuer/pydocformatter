@@ -952,7 +952,7 @@ class TestCLIShowFiles(unittest.TestCase):
                 os.chdir(previous_cwd)
 
         self.assertEqual(exit_code, 2)
-        self.assertIn("command line.include must not contain empty strings", stderr.getvalue())
+        self.assertIn("<argparse>.include must not contain empty strings", stderr.getvalue())
         self.assertNotIn("Traceback", stderr.getvalue())
 
     def test_pydocfmt_invalid_command_line_exclude_reports_argument_error(
@@ -975,7 +975,7 @@ class TestCLIShowFiles(unittest.TestCase):
                 os.chdir(previous_cwd)
 
         self.assertEqual(exit_code, 2)
-        self.assertIn("command line.exclude must not contain empty strings", stderr.getvalue())
+        self.assertIn("<argparse>.exclude must not contain empty strings", stderr.getvalue())
         self.assertNotIn("Traceback", stderr.getvalue())
 
     def test_pydocfmt_invalid_command_line_include_reports_argument_error(
