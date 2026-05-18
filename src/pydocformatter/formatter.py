@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import collections
 import dataclasses
 import os
 import typing
@@ -51,16 +52,29 @@ class RuleFinding:
 
 @dataclasses.dataclass(frozen=True)
 class FormatterResult:
-    """Formatter result, including the possibly now-formatted source, for one display path."""
+    """Formatter result for one display path.
+
+    Attributes:
+        path (str): Display path used for diagnostics and diff headers.
+        old_source (str | None): Source text before formatting, or None if source text could not be read or decoded.
+        new_source (str | None): Source text after formatting, or None if no valid source state is available.
+        modified (bool): Whether formatting changed the source and the result represents a successful source state.
+        fixed_findings (collections.Counter[str]): Counts of fixed findings keyed by rule code.
+        unfixed_findings (tuple[RuleFinding, ...]): Remaining rule findings after formatting, with line numbers aligned
+            to new_source.
+        errors (tuple[str, ...]): Operational errors that prevented normal formatting or writing.
+    """
 
     path: str
-    source: str | None
+    old_source: str | None
+    new_source: str | None
     modified: bool
-    findings: tuple[RuleFinding, ...]
+    fixed_findings: collections.Counter[str]
+    unfixed_findings: tuple[RuleFinding, ...]
     errors: tuple[str, ...]
 
 
-def format_file_exp(path: str, *, file: typing.TextIO | None = None, settings: CheckSettings, fix: bool) -> FormatterResult:
+def format_file_exp(path: str, *, file: typing.TextIO | None = None, settings: CheckSettings, fix: bool, write: bool) -> FormatterResult:
     """Run the experimental formatter interface for one file."""
     try:
         if file is None:
@@ -69,20 +83,30 @@ def format_file_exp(path: str, *, file: typing.TextIO | None = None, settings: C
         else:
             source = file.read()
     except UnicodeDecodeError as error:
-        return FormatterResult(path=path, source=None, modified=False, findings=(), errors=(f"Failed to decode {path} as UTF-8: {error}",))
+        return FormatterResult(
+            path=path, old_source=None, new_source=None, modified=False, fixed_findings=collections.Counter(), unfixed_findings=(), errors=(f"Failed to decode {path} as UTF-8: {error}",)
+        )
     except OSError as error:
-        return FormatterResult(path=path, source=None, modified=False, findings=(), errors=(f"Failed to read file {path}: {error}",))
+        return FormatterResult(path=path, old_source=None, new_source=None, modified=False, fixed_findings=collections.Counter(), unfixed_findings=(), errors=(f"Failed to read file {path}: {error}",))
 
     result = format_source_exp(source, path, settings=settings, fix=fix)
-    if result.source is None:
+    if result.old_source is None or result.new_source is None:
         raise AssertionError("format_source_exp() must return a valid source state")
 
-    if file is None and fix and result.modified:
+    if file is None and fix and write and result.modified:
         try:
             with open(path, "w", encoding="utf-8", newline="") as path_file:
-                path_file.write(result.source)
+                path_file.write(result.new_source)
         except OSError as error:
-            return FormatterResult(path=path, source=source, modified=False, findings=(), errors=(f"Failed to write file {path}: {error}",))
+            return FormatterResult(
+                path=path,
+                old_source=result.old_source,
+                new_source=result.old_source,
+                modified=False,
+                fixed_findings=collections.Counter(),
+                unfixed_findings=(),
+                errors=(f"Failed to write file {path}: {error}",),
+            )
 
     return result
 
@@ -93,7 +117,7 @@ def format_source_exp(source: str, path: str, *, settings: CheckSettings, fix: b
     # TODO: Temporary placeholder code that must produce a non-None new_source (can just be source if nothing was or
     #       should be fixed, otherwise it should represent the new formatted source)
     new_source = source
-    return FormatterResult(path=path, source=new_source, modified=(new_source != source), findings=(), errors=())
+    return FormatterResult(path=path, old_source=source, new_source=new_source, modified=(new_source != source), fixed_findings=collections.Counter(), unfixed_findings=(), errors=())
 
 
 def resolve_line_ending(source: str, *, line_ending: LineEnding) -> str:

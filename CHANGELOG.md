@@ -19,6 +19,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added `--show-files` to report all considered files during discovery, including included files and ignored files with include/exclude reasons, without formatting files.
   - Added Ruff-style stdin support via `pydocfmt check -` and `--stdin-filename`.
   - Added Ruff-style `-o` / `--output-file` for redirecting diagnostics and show output.
+  - Added Ruff-style `pydocfmt check --diff` for previewing fixes without writing files.
   - Added Ruff-style `-e` / `--exit-zero` and `--exit-non-zero-on-fix` status controls.
   - Added `--respect-gitignore` / `--no-respect-gitignore`, with enabled-by-default behavior and matching `pyproject.toml` configuration.
   - Added Ruff-style `--config` and `--isolated` global options for explicit config files, inline setting overrides, and config-free runs.

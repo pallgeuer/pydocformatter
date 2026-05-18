@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import argparse
+import collections
 import contextlib
+import difflib
 import os
 import sys
 import tomllib
@@ -19,7 +21,7 @@ import pydocformatter.settings as settings_core
 import pydocformatter.utils.misc as misc
 from pydocformatter.formatter import FormatterResult, Rule, RuleFinding
 
-LEGACY_CHECK_RULE = Rule(rule_code="000", rule_name="legacy-formatting-needed", message="Needs formatting", fixable=True)
+LEGACY_FORMAT_RULE = Rule(rule_code="000", rule_name="legacy-formatting-needed", message="Needs formatting", fixable=True)
 
 
 class OutputError(Exception):
@@ -54,6 +56,11 @@ def add_arguments(parser: argparse.ArgumentParser, settings: settings_check.Chec
         action=argparse.BooleanOptionalAction,
         default=False,
         help="Apply fixes instead of only checking for needed changes.",
+    )
+    parser.add_argument(
+        "--diff",
+        action="store_true",
+        help="Avoid writing any fixed files back; instead, output a diff for each changed file to stdout, and exit 0 if there are no diffs. Implies fix-only.",
     )
     parser.add_argument(
         "--show-files",
@@ -153,24 +160,28 @@ def run(args: argparse.Namespace) -> int:
         if settings.experimental:
             if use_stdin and len(selection.accepted_paths) > 1:
                 raise AssertionError(f"Expect at most one accepted path when using stdin: {selection.accepted_paths}")
-            results = [formatter.format_file_exp(path, file=sys.stdin if use_stdin else None, settings=settings, fix=args.fix) for path in selection.accepted_paths]
+            results = [formatter.format_file_exp(path, file=sys.stdin if use_stdin else None, settings=settings, fix=args.fix or args.diff, write=not args.diff) for path in selection.accepted_paths]
         else:
             if use_stdin:
                 print("pydocfmt check: Argument error: Cannot process input from stdin when using non-experimental mode", file=sys.stderr)
                 return 2
-            results = format_files(selection.accepted_paths, settings=settings, fix=args.fix)
+            results = format_files(selection.accepted_paths, settings=settings, fix=args.fix or args.diff, write=not args.diff)
 
-        if use_stdin and args.fix and results:
+        if use_stdin and args.fix and not args.diff and results:
             if len(results) != 1:
                 raise AssertionError(f"Expect at most one result when fixing stdin: Got {len(results)}")
-            if results[0].source is not None:
-                print(results[0].source, end="")
+            if results[0].new_source is not None:
+                print(results[0].new_source, end="")
 
-        if use_stdin and args.fix and args.output_file is None:
-            print_results(errors, results, settings=settings, output=sys.stderr)
+        if args.diff:
+            print_diff_results(results, output=None)
+            with output_stream(args.output_file) as output:
+                print_diff_summary(errors, results, output=output)
+        elif use_stdin and args.fix and args.output_file is None:
+            print_results(errors, results, output_format=settings.output_format, output=sys.stderr)
         else:
             with output_stream(args.output_file) as output:
-                print_results(errors, results, settings=settings, output=output)
+                print_results(errors, results, output_format=settings.output_format, output=output)
 
     except OutputError as error:
         print(f"pydocfmt check: Output error: {error}", file=sys.stderr)
@@ -178,7 +189,9 @@ def run(args: argparse.Namespace) -> int:
 
     if args.exit_zero:
         return 0
-    elif errors or any(result.errors or result.findings for result in results):
+    elif args.diff and any(result.modified for result in results):
+        return 1
+    elif errors or any(result.errors or result.unfixed_findings for result in results):
         return 1
     elif args.fix and args.exit_non_zero_on_fix and any(result.modified for result in results):
         return 1
@@ -207,27 +220,42 @@ def output_stream(output_file: str | None) -> Iterator[typing.TextIO | None]:
         yield file
 
 
-def format_files(paths: tuple[str, ...], *, settings: settings_check.CheckSettings, fix: bool) -> list[FormatterResult]:
+def format_files(paths: tuple[str, ...], *, settings: settings_check.CheckSettings, fix: bool, write: bool) -> list[FormatterResult]:
     """Format files with the legacy formatter path."""
     results: list[FormatterResult] = []
     for path in paths:
         try:
-            source_result = pydocfmt.format_file_source(path, settings, fix=fix)
+            source_result = pydocfmt.format_file_source(path, settings=settings, fix=fix, write=write)
         except UnicodeDecodeError as error:
-            result = FormatterResult(path=path, source=None, modified=False, findings=(), errors=(f"Failed to decode {path} as UTF-8: {error}",))
+            result = FormatterResult(
+                path=path, old_source=None, new_source=None, modified=False, fixed_findings=collections.Counter(), unfixed_findings=(), errors=(f"Failed to decode {path} as UTF-8: {error}",)
+            )
         except OSError as error:
-            result = FormatterResult(path=path, source=None, modified=False, findings=(), errors=(f"Failed to read or write file {path}: {error}",))
+            result = FormatterResult(
+                path=path, old_source=None, new_source=None, modified=False, fixed_findings=collections.Counter(), unfixed_findings=(), errors=(f"Failed to read or write file {path}: {error}",)
+            )
         else:
             if fix:
-                result = FormatterResult(path=path, source=source_result.source, modified=source_result.modified, findings=(), errors=())
+                fixed_findings = collections.Counter({LEGACY_FORMAT_RULE.rule_code: 1}) if source_result.modified else collections.Counter()
+                result = FormatterResult(
+                    path=path, old_source=source_result.original_source, new_source=source_result.source, modified=source_result.modified, fixed_findings=fixed_findings, unfixed_findings=(), errors=()
+                )
             else:
                 if source_result.modified:
                     line_numbers_set = set(source_result.docstring_changed_lines + source_result.comment_changed_lines)
                     line_numbers = tuple(sorted(line_numbers_set)) if line_numbers_set else (0,)
-                    findings: tuple[RuleFinding, ...] = (RuleFinding(rule=LEGACY_CHECK_RULE, line_numbers=line_numbers),)
+                    unfixed_findings: tuple[RuleFinding, ...] = (RuleFinding(rule=LEGACY_FORMAT_RULE, line_numbers=line_numbers),)
                 else:
-                    findings = ()
-                result = FormatterResult(path=path, source=source_result.original_source, modified=False, findings=findings, errors=())
+                    unfixed_findings = ()
+                result = FormatterResult(
+                    path=path,
+                    old_source=source_result.original_source,
+                    new_source=source_result.original_source,
+                    modified=False,
+                    fixed_findings=collections.Counter(),
+                    unfixed_findings=unfixed_findings,
+                    errors=(),
+                )
         results.append(result)
     return results
 
@@ -259,12 +287,48 @@ def print_file_selection_decisions(decisions: tuple[file_selection.FileDecision,
             print(f"{decision.path} IGNORED: {decision.message}", file=output)
 
 
-def print_results(errors: list[str], results: list[FormatterResult], *, settings: settings_check.CheckSettings, output: typing.TextIO | None) -> None:
+def print_results(errors: list[str], results: list[FormatterResult], *, output_format: settings_check.OutputFormat, output: typing.TextIO | None) -> None:
     """Print formatter results in the configured output format."""
-    if settings.output_format == settings_check.OutputFormat.GROUPED:
+    if output_format == settings_check.OutputFormat.GROUPED:
         print_results_grouped(errors, results, output=output)
     else:
-        raise AssertionError(f"Unknown output format: {settings.output_format}")
+        raise AssertionError(f"Unknown output format: {output_format}")
+
+
+def print_diff_results(results: list[FormatterResult], *, output: typing.TextIO | None) -> None:
+    """Print unified diffs for modified formatter results."""
+    for result in results:
+        if not result.modified or result.old_source is None or result.new_source is None:
+            continue
+        lines = difflib.unified_diff(
+            result.old_source.splitlines(keepends=True),
+            result.new_source.splitlines(keepends=True),
+            fromfile=result.path,
+            tofile=result.path,
+            lineterm="",
+        )
+        for line in lines:
+            print(line, end="" if line.endswith("\n") else "\n", file=output)
+
+
+def print_diff_summary(errors: list[str], results: list[FormatterResult], *, output: typing.TextIO | None) -> None:
+    """Print Ruff-style diff summary and operational errors."""
+    num_operational_errors = 0
+    for error in errors:
+        print(f"ERROR: {error}", file=output)
+        num_operational_errors += 1
+    for result in results:
+        for error in result.errors:
+            print(f"ERROR: {error}", file=output)
+            num_operational_errors += 1
+    if num_operational_errors != 0:
+        print(file=output)
+
+    if num_operational_errors != 0:
+        print(f"Found {num_operational_errors} operational {misc.auto_plural(num_operational_errors, 'error')}.", file=output)
+    num_fixes = sum(result.fixed_findings.total() for result in results)
+    if num_fixes != 0:
+        print(f"Would fix {num_fixes} rule check {misc.auto_plural(num_fixes, 'error')}.", file=output)
 
 
 def print_results_grouped(errors: list[str], results: list[FormatterResult], *, output: typing.TextIO | None) -> None:
@@ -283,13 +347,13 @@ def print_results_grouped(errors: list[str], results: list[FormatterResult], *, 
     num_findings = 0
     num_fixable_findings = 0
     for result in results:
-        if result.findings:
+        if result.unfixed_findings:
             print(f"{result.path}:", file=output)
-            for finding in _group_findings(result.findings):
+            for finding in _group_findings(result.unfixed_findings):
                 print(f"  {_format_grouped_finding(finding)}", file=output)
             print(file=output)
-            num_findings += len(result.findings)
-            num_fixable_findings += sum(1 for finding in result.findings if finding.fixable)
+            num_findings += len(result.unfixed_findings)
+            num_fixable_findings += sum(1 for finding in result.unfixed_findings if finding.fixable)
 
     if num_operational_errors != 0 or num_findings != 0:
         parts: list[str] = []

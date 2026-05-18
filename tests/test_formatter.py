@@ -1,4 +1,7 @@
+import collections
 import contextlib
+import dataclasses
+import inspect
 import os
 import tempfile
 import unittest
@@ -15,9 +18,21 @@ from pydocformatter.formatter import FormatterResult, Rule, RuleFinding
 
 
 class TestFormatterResults(unittest.TestCase):
+    def test_formatter_result_field_order_has_no_defaults(self) -> None:
+        fields = dataclasses.fields(FormatterResult)
+
+        self.assertEqual(tuple(field.name for field in fields), ("path", "old_source", "new_source", "modified", "fixed_findings", "unfixed_findings", "errors"))
+        self.assertTrue(all(field.default is dataclasses.MISSING for field in fields))
+        self.assertTrue(all(field.default_factory is dataclasses.MISSING for field in fields))
+
+    def test_experimental_file_formatter_write_has_no_default(self) -> None:
+        signature = inspect.signature(formatter.format_file_exp)
+
+        self.assertIs(signature.parameters["write"].default, inspect.Parameter.empty)
+
     def test_formatter_result_tracks_modified_and_findings_explicitly(self) -> None:
-        clean = FormatterResult(path="a.py", source="", modified=False, findings=(), errors=())
-        modified = FormatterResult(path="a.py", source="", modified=True, findings=(), errors=())
+        clean = FormatterResult(path="a.py", old_source="", new_source="", modified=False, fixed_findings=collections.Counter(), unfixed_findings=(), errors=())
+        modified = FormatterResult(path="a.py", old_source="", new_source="", modified=True, fixed_findings=collections.Counter({"PDF001": 1}), unfixed_findings=(), errors=())
         finding = RuleFinding(
             rule=Rule(
                 rule_code="PDF105",
@@ -27,12 +42,16 @@ class TestFormatterResults(unittest.TestCase):
             ),
             line_numbers=(3,),
         )
-        with_findings = FormatterResult(path="a.py", source="", modified=False, findings=(finding,), errors=())
+        with_findings = FormatterResult(path="a.py", old_source="", new_source="", modified=False, fixed_findings=collections.Counter(), unfixed_findings=(finding,), errors=())
 
         self.assertFalse(clean.modified)
-        self.assertEqual(clean.findings, ())
+        self.assertEqual(clean.unfixed_findings, ())
+        self.assertEqual(clean.old_source, "")
+        self.assertEqual(clean.new_source, "")
+        self.assertEqual(clean.fixed_findings, collections.Counter())
         self.assertTrue(modified.modified)
-        self.assertEqual(with_findings.findings, (finding,))
+        self.assertEqual(modified.fixed_findings, collections.Counter({"PDF001": 1}))
+        self.assertEqual(with_findings.unfixed_findings, (finding,))
 
     def test_rule_finding_uses_rule_defaults_with_per_finding_overrides(self) -> None:
         rule = Rule(
@@ -70,9 +89,11 @@ class TestFormatterResults(unittest.TestCase):
         )
         result = FormatterResult(
             path="a.py",
-            source="",
+            old_source="",
+            new_source="",
             modified=False,
-            findings=(
+            fixed_findings=collections.Counter(),
+            unfixed_findings=(
                 RuleFinding(rule=reflow_rule, line_numbers=(2, 2, 3)),
                 RuleFinding(rule=summary_rule, line_numbers=(5,)),
                 RuleFinding(rule=reflow_rule, line_numbers=(8,)),
@@ -98,12 +119,14 @@ class TestFormatterResults(unittest.TestCase):
     def test_grouped_output_prints_success_message_for_clean_results(self) -> None:
         output = StringIO()
         with contextlib.redirect_stdout(output):
-            check_command.print_results_grouped([], [FormatterResult(path="a.py", source="", modified=False, findings=(), errors=())], output=None)
+            check_command.print_results_grouped(
+                [], [FormatterResult(path="a.py", old_source="", new_source="", modified=False, fixed_findings=collections.Counter(), unfixed_findings=(), errors=())], output=None
+            )
 
         self.assertEqual(output.getvalue(), "All checks passed!\n")
 
     def test_grouped_output_prints_errors_without_success_message(self) -> None:
-        result = FormatterResult(path="a.py", source=None, modified=False, findings=(), errors=("Failed to read file a.py",))
+        result = FormatterResult(path="a.py", old_source=None, new_source=None, modified=False, fixed_findings=collections.Counter(), unfixed_findings=(), errors=("Failed to read file a.py",))
 
         output = StringIO()
         with contextlib.redirect_stdout(output):
@@ -128,9 +151,11 @@ class TestFormatterResults(unittest.TestCase):
         )
         result = FormatterResult(
             path="a.py",
-            source=None,
+            old_source=None,
+            new_source=None,
             modified=False,
-            findings=(RuleFinding(rule=rule, line_numbers=(2,)),),
+            fixed_findings=collections.Counter(),
+            unfixed_findings=(RuleFinding(rule=rule, line_numbers=(2,)),),
             errors=("Failed to read file a.py",),
         )
 
@@ -156,14 +181,15 @@ class TestFormatterResults(unittest.TestCase):
             previous_cwd = os.getcwd()
             os.chdir(root)
             try:
-                result = formatter.format_file_exp("a.py", settings=CheckSettings(experimental=True), fix=True)
+                result = formatter.format_file_exp("a.py", settings=CheckSettings(experimental=True), fix=True, write=True)
             finally:
                 os.chdir(previous_cwd)
 
             self.assertEqual(result.path, "a.py")
-            self.assertEqual(result.source, "x = 1\n")
+            self.assertEqual(result.old_source, "x = 1\n")
+            self.assertEqual(result.new_source, "x = 1\n")
             self.assertFalse(result.modified)
-            self.assertEqual(result.findings, ())
+            self.assertEqual(result.unfixed_findings, ())
             self.assertEqual(target.read_text(encoding="utf-8"), "x = 1\n")
 
     def test_experimental_file_formatter_delegates_to_source_formatter(self) -> None:
@@ -175,14 +201,14 @@ class TestFormatterResults(unittest.TestCase):
 
             def fake_format_source_exp(source: str, path: str, settings: CheckSettings, fix: bool) -> FormatterResult:
                 called_args.append((source, path, fix))
-                return FormatterResult(path=path, source=source, modified=False, findings=(), errors=())
+                return FormatterResult(path=path, old_source=source, new_source=source, modified=False, fixed_findings=collections.Counter(), unfixed_findings=(), errors=())
 
             with unittest.mock.patch("pydocformatter.formatter.format_source_exp", side_effect=fake_format_source_exp):
-                result = formatter.format_file_exp(str(target), settings=CheckSettings(experimental=True), fix=False)
+                result = formatter.format_file_exp(str(target), settings=CheckSettings(experimental=True), fix=False, write=True)
 
         self.assertEqual(called_args, [("x = 1\n", str(target), False)])
         self.assertEqual(result.path, str(target))
-        self.assertEqual(result.source, "x = 1\n")
+        self.assertEqual(result.new_source, "x = 1\n")
         self.assertFalse(result.modified)
 
     def test_experimental_file_formatter_writes_modified_fix_result(self) -> None:
@@ -193,23 +219,42 @@ class TestFormatterResults(unittest.TestCase):
 
             def fake_format_source_exp(source: str, path: str, settings: CheckSettings, fix: bool) -> FormatterResult:
                 del source
-                return FormatterResult(path=path, source="x = 2\n", modified=True, findings=(), errors=())
+                return FormatterResult(path=path, old_source="x = 1\n", new_source="x = 2\n", modified=True, fixed_findings=collections.Counter({"PDF001": 1}), unfixed_findings=(), errors=())
 
             with unittest.mock.patch("pydocformatter.formatter.format_source_exp", side_effect=fake_format_source_exp):
-                result = formatter.format_file_exp(str(target), settings=CheckSettings(experimental=True), fix=True)
+                result = formatter.format_file_exp(str(target), settings=CheckSettings(experimental=True), fix=True, write=True)
 
-            self.assertEqual(result.source, "x = 2\n")
+            self.assertEqual(result.new_source, "x = 2\n")
+            self.assertEqual(result.old_source, "x = 1\n")
             self.assertTrue(result.modified)
             self.assertEqual(target.read_text(encoding="utf-8"), "x = 2\n")
+
+    def test_experimental_file_formatter_can_skip_modified_fix_write(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            target = root / "a.py"
+            target.write_text("x = 1\n", encoding="utf-8")
+
+            def fake_format_source_exp(source: str, path: str, settings: CheckSettings, fix: bool) -> FormatterResult:
+                del source, settings, fix
+                return FormatterResult(path=path, old_source="x = 1\n", new_source="x = 2\n", modified=True, fixed_findings=collections.Counter({"PDF001": 1}), unfixed_findings=(), errors=())
+
+            with unittest.mock.patch("pydocformatter.formatter.format_source_exp", side_effect=fake_format_source_exp):
+                result = formatter.format_file_exp(str(target), settings=CheckSettings(experimental=True), fix=True, write=False)
+
+            self.assertEqual(result.new_source, "x = 2\n")
+            self.assertEqual(result.old_source, "x = 1\n")
+            self.assertTrue(result.modified)
+            self.assertEqual(target.read_text(encoding="utf-8"), "x = 1\n")
 
     def test_experimental_file_formatter_reports_file_io_errors(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             missing = str(Path(td) / "missing.py")
-            result = formatter.format_file_exp(missing, settings=CheckSettings(experimental=True), fix=False)
+            result = formatter.format_file_exp(missing, settings=CheckSettings(experimental=True), fix=False, write=True)
 
-        self.assertIsNone(result.source)
+        self.assertIsNone(result.new_source)
         self.assertFalse(result.modified)
-        self.assertEqual(result.findings, ())
+        self.assertEqual(result.unfixed_findings, ())
         self.assertEqual(len(result.errors), 1)
         self.assertIn(f"Failed to read file {missing}", result.errors[0])
 
@@ -223,13 +268,13 @@ class TestFormatterResults(unittest.TestCase):
             def fake_format_source_exp(source: str, path: str, settings: CheckSettings, fix: bool) -> FormatterResult:
                 del source, settings, fix
                 called_paths.append(path)
-                return FormatterResult(path=path, source="", modified=False, findings=(), errors=())
+                return FormatterResult(path=path, old_source="", new_source="", modified=False, fixed_findings=collections.Counter(), unfixed_findings=(), errors=())
 
             previous_cwd = os.getcwd()
             os.chdir(root)
             try:
                 with unittest.mock.patch("pydocformatter.formatter.format_source_exp", side_effect=fake_format_source_exp):
-                    results = [formatter.format_file_exp(path, settings=CheckSettings(experimental=True), fix=True) for path in ("a.py", str(target))]
+                    results = [formatter.format_file_exp(path, settings=CheckSettings(experimental=True), fix=True, write=True) for path in ("a.py", str(target))]
             finally:
                 os.chdir(previous_cwd)
 
@@ -242,9 +287,9 @@ class TestFormatterResults(unittest.TestCase):
             target = root / "a.py"
             target.write_text("x = 1\n", encoding="utf-8")
 
-            def fake_format_file_exp(path: str, *, file: object = None, settings: CheckSettings, fix: bool) -> FormatterResult:
-                del file, settings, fix
-                return FormatterResult(path=path, source="", modified=True, findings=(), errors=())
+            def fake_format_file_exp(path: str, *, file: object = None, settings: CheckSettings, fix: bool, write: bool) -> FormatterResult:
+                del file, settings, fix, write
+                return FormatterResult(path=path, old_source="", new_source="", modified=True, fixed_findings=collections.Counter({"PDF001": 1}), unfixed_findings=(), errors=())
 
             argv = ["pydocfmt", "check", "--experimental", str(target)]
             with (
@@ -262,9 +307,11 @@ class TestFormatterResults(unittest.TestCase):
             target.write_text("x = 1\n", encoding="utf-8")
             rule = Rule(rule_code="PDF105", rule_name="summary-too-long", message="Docstring summary does not fit on one line", fixable=False)
 
-            def fake_format_file_exp(path: str, *, file: object = None, settings: CheckSettings, fix: bool) -> FormatterResult:
-                del file, settings, fix
-                return FormatterResult(path=path, source="", modified=False, findings=(RuleFinding(rule=rule, line_numbers=(1,)),), errors=())
+            def fake_format_file_exp(path: str, *, file: object = None, settings: CheckSettings, fix: bool, write: bool) -> FormatterResult:
+                del file, settings, fix, write
+                return FormatterResult(
+                    path=path, old_source="", new_source="", modified=False, fixed_findings=collections.Counter(), unfixed_findings=(RuleFinding(rule=rule, line_numbers=(1,)),), errors=()
+                )
 
             argv = ["pydocfmt", "check", "--experimental", "--exit-zero", str(target)]
             stdout = StringIO()
@@ -283,9 +330,9 @@ class TestFormatterResults(unittest.TestCase):
             target = root / "a.py"
             target.write_text("x = 1\n", encoding="utf-8")
 
-            def fake_format_file_exp(path: str, *, file: object = None, settings: CheckSettings, fix: bool) -> FormatterResult:
-                del file, settings, fix
-                return FormatterResult(path=path, source=None, modified=False, findings=(), errors=("Failed to read file",))
+            def fake_format_file_exp(path: str, *, file: object = None, settings: CheckSettings, fix: bool, write: bool) -> FormatterResult:
+                del file, settings, fix, write
+                return FormatterResult(path=path, old_source=None, new_source=None, modified=False, fixed_findings=collections.Counter(), unfixed_findings=(), errors=("Failed to read file",))
 
             for extra_args, expected_exit_code in (([], 1), (["--exit-zero"], 0)):
                 argv = ["pydocfmt", "check", "--experimental", *extra_args, str(target)]
@@ -307,9 +354,11 @@ class TestFormatterResults(unittest.TestCase):
             target.write_text("x = 1\n", encoding="utf-8")
             rule = Rule(rule_code="PDF105", rule_name="summary-too-long", message="Docstring summary does not fit on one line", fixable=False)
 
-            def fake_format_file_exp(path: str, *, file: object = None, settings: CheckSettings, fix: bool) -> FormatterResult:
-                del file, settings, fix
-                return FormatterResult(path=path, source="", modified=False, findings=(RuleFinding(rule=rule, line_numbers=(1,)),), errors=())
+            def fake_format_file_exp(path: str, *, file: object = None, settings: CheckSettings, fix: bool, write: bool) -> FormatterResult:
+                del file, settings, fix, write
+                return FormatterResult(
+                    path=path, old_source="", new_source="", modified=False, fixed_findings=collections.Counter(), unfixed_findings=(RuleFinding(rule=rule, line_numbers=(1,)),), errors=()
+                )
 
             argv = ["pydocfmt", "check", "--experimental", "--fix", str(target)]
             stdout = StringIO()
@@ -328,9 +377,9 @@ class TestFormatterResults(unittest.TestCase):
             target = root / "a.py"
             target.write_text("x = 1\n", encoding="utf-8")
 
-            def fake_format_file_exp(path: str, *, file: object = None, settings: CheckSettings, fix: bool) -> FormatterResult:
-                del file, settings, fix
-                return FormatterResult(path=path, source="", modified=True, findings=(), errors=())
+            def fake_format_file_exp(path: str, *, file: object = None, settings: CheckSettings, fix: bool, write: bool) -> FormatterResult:
+                del file, settings, fix, write
+                return FormatterResult(path=path, old_source="", new_source="", modified=True, fixed_findings=collections.Counter({"PDF001": 1}), unfixed_findings=(), errors=())
 
             for extra_args, expected_exit_code in ((["--fix"], 0), (["--fix", "--exit-non-zero-on-fix"], 1)):
                 argv = ["pydocfmt", "check", "--experimental", *extra_args, str(target)]
@@ -347,13 +396,13 @@ class TestFormatterResults(unittest.TestCase):
 
             source_result = pydocfmt.SourceFormatResult(source="x = 1\n", docstring_changed_lines=(3, 1), comment_changed_lines=(5, 3))
             with unittest.mock.patch("pydocformatter.cli.check.pydocfmt.format_file_source", return_value=source_result):
-                results = check_command.format_files((str(target),), settings=CheckSettings(), fix=False)
+                results = check_command.format_files((str(target),), settings=CheckSettings(), fix=False, write=True)
 
         self.assertEqual(len(results), 1)
         self.assertFalse(results[0].modified)
-        self.assertEqual(len(results[0].findings), 1)
-        self.assertEqual(results[0].findings[0].rule.rule_code, "000")
-        self.assertEqual(results[0].findings[0].line_numbers, (1, 3, 5))
+        self.assertEqual(len(results[0].unfixed_findings), 1)
+        self.assertEqual(results[0].unfixed_findings[0].rule.rule_code, "000")
+        self.assertEqual(results[0].unfixed_findings[0].line_numbers, (1, 3, 5))
 
     def test_legacy_check_result_uses_zero_line_fallback_for_missing_changed_lines(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -364,11 +413,11 @@ class TestFormatterResults(unittest.TestCase):
             source_result = pydocfmt.SourceFormatResult(source="x = 1\n", docstring_changed_lines=(), comment_changed_lines=())
             with unittest.mock.patch.object(type(source_result), "modified", new_callable=unittest.mock.PropertyMock, return_value=True):
                 with unittest.mock.patch("pydocformatter.cli.check.pydocfmt.format_file_source", return_value=source_result):
-                    results = check_command.format_files((str(target),), settings=CheckSettings(), fix=False)
+                    results = check_command.format_files((str(target),), settings=CheckSettings(), fix=False, write=True)
 
         self.assertEqual(len(results), 1)
-        self.assertEqual(len(results[0].findings), 1)
-        self.assertEqual(results[0].findings[0].line_numbers, (0,))
+        self.assertEqual(len(results[0].unfixed_findings), 1)
+        self.assertEqual(results[0].unfixed_findings[0].line_numbers, (0,))
 
     def test_legacy_format_result_uses_modified_for_actual_writes(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -378,8 +427,9 @@ class TestFormatterResults(unittest.TestCase):
 
             source_result = pydocfmt.SourceFormatResult(source="x = 1\n", docstring_changed_lines=(1,), comment_changed_lines=())
             with unittest.mock.patch("pydocformatter.cli.check.pydocfmt.format_file_source", return_value=source_result):
-                results = check_command.format_files((str(target),), settings=CheckSettings(), fix=True)
+                results = check_command.format_files((str(target),), settings=CheckSettings(), fix=True, write=True)
 
         self.assertEqual(len(results), 1)
         self.assertTrue(results[0].modified)
-        self.assertEqual(results[0].findings, ())
+        self.assertEqual(results[0].fixed_findings, collections.Counter({"000": 1}))
+        self.assertEqual(results[0].unfixed_findings, ())

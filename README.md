@@ -78,6 +78,7 @@ If no files or directories are specified, `pydocfmt check` checks the current di
 **Options:**
 - `--help`: Show help message and exit
 - `--fix`, `--no-fix`: Toggle applying fixes instead of only checking
+- `--diff`: Print a unified diff for fixes without writing changed files
 - `--show-files`: Show file-selection decisions without formatting files
 - `--show-settings`: Show resolved settings without formatting files
 - `-o`, `--output-file FILE`: Write diagnostics and show output to a file instead of stdout

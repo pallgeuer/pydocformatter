@@ -516,13 +516,30 @@ Examples:
 
         try:
             original_source = Path(path).read_text(encoding="utf-8")
-            result = pydocfmt.format_file_source(path, CheckSettings(line_length=72), fix=True)
+            result = pydocfmt.format_file_source(path, settings=CheckSettings(line_length=72), fix=True)
             written_source = Path(path).read_text(encoding="utf-8")
         finally:
             Path(path).unlink()
 
         self.assertEqual(original_source, result.original_source)
         self.assertEqual(written_source, result.source)
+        self.assertNotEqual(result.original_source, result.source)
+
+    def test_format_file_source_can_skip_writing_formatted_source(self) -> None:
+        with tempfile.NamedTemporaryFile(mode="w+", suffix=".py", delete=False) as tf:
+            tf.write('def foo():\n    """Does something.\n\nArgs:\n    x (int): some parameter.\n    """\n    pass\n')
+            tf.flush()
+            path = tf.name
+
+        try:
+            original_source = Path(path).read_text(encoding="utf-8")
+            result = pydocfmt.format_file_source(path, settings=CheckSettings(line_length=72), fix=True, write=False)
+            written_source = Path(path).read_text(encoding="utf-8")
+        finally:
+            Path(path).unlink()
+
+        self.assertEqual(original_source, result.original_source)
+        self.assertEqual(original_source, written_source)
         self.assertNotEqual(result.original_source, result.source)
 
 

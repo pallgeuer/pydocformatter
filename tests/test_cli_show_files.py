@@ -1,3 +1,4 @@
+import collections
 import contextlib
 import json
 import os
@@ -13,7 +14,7 @@ import pydocformatter.cli.main as pydocfmt_cli
 import pydocformatter.cli.settings_check as settings_check
 import pydocformatter.formatters.pydocfmt as pydocfmt
 from pydocformatter.cli.settings_check import CheckSettings
-from pydocformatter.formatter import FormatterResult
+from pydocformatter.formatter import FormatterResult, Rule, RuleFinding
 
 
 class TestCLIShowFiles(unittest.TestCase):
@@ -100,7 +101,8 @@ class TestCLIShowFiles(unittest.TestCase):
             root = Path(td)
             called_paths: list[str] = []
 
-            def fake_format(path: str, settings: CheckSettings, fix: bool) -> pydocfmt.SourceFormatResult:
+            def fake_format(path: str, *, settings: CheckSettings, fix: bool, write: bool) -> pydocfmt.SourceFormatResult:
+                self.assertTrue(write)
                 called_paths.append(os.path.abspath(path))
                 return pydocfmt.SourceFormatResult(source="x = 1\n", docstring_changed_lines=(), comment_changed_lines=())
 
@@ -320,7 +322,9 @@ class TestCLIShowFiles(unittest.TestCase):
         with self._make_sample_tree() as td:
             root = Path(td)
             stdout = StringIO()
-            format_file_exp = unittest.mock.Mock(return_value=FormatterResult(path=str(root / "a.py"), source="", modified=False, findings=(), errors=()))
+            format_file_exp = unittest.mock.Mock(
+                return_value=FormatterResult(path=str(root / "a.py"), old_source="", new_source="", modified=False, fixed_findings=collections.Counter(), unfixed_findings=(), errors=())
+            )
             argv = ["pydocfmt", "check", "--show-files", "--experimental", str(root)]
             with (
                 unittest.mock.patch("sys.argv", argv),
@@ -393,15 +397,17 @@ class TestCLIShowFiles(unittest.TestCase):
             legacy_called = False
             called_args: list[tuple[str, int, bool, bool, str]] = []
 
-            def fake_format(path: str, settings: CheckSettings, fix: bool) -> pydocfmt.SourceFormatResult:
+            def fake_format(path: str, *, settings: CheckSettings, fix: bool, write: bool) -> pydocfmt.SourceFormatResult:
+                del write
                 nonlocal legacy_called
                 legacy_called = True
                 return pydocfmt.SourceFormatResult(source="x = 1\n", docstring_changed_lines=(), comment_changed_lines=())
 
-            def fake_exp_format(path: str, *, file: object = None, settings: CheckSettings, fix: bool) -> FormatterResult:
+            def fake_exp_format(path: str, *, file: object = None, settings: CheckSettings, fix: bool, write: bool) -> FormatterResult:
                 del file
                 called_args.append((path, settings.line_length, fix, settings.experimental, settings.output_format))
-                return FormatterResult(path=path, source="", modified=False, findings=(), errors=())
+                self.assertTrue(write)
+                return FormatterResult(path=path, old_source="", new_source="", modified=False, fixed_findings=collections.Counter(), unfixed_findings=(), errors=())
 
             argv = ["pydocfmt", "check", "--fix", str(root)]
             previous_cwd = os.getcwd()
@@ -433,7 +439,8 @@ class TestCLIShowFiles(unittest.TestCase):
             (root / "a.py").write_text("x = 1\n", encoding="utf-8")
             called_settings: list[tuple[str, int]] = []
 
-            def fake_format(path: str, settings: CheckSettings, fix: bool) -> pydocfmt.SourceFormatResult:
+            def fake_format(path: str, *, settings: CheckSettings, fix: bool, write: bool) -> pydocfmt.SourceFormatResult:
+                self.assertTrue(write)
                 called_settings.append((settings.indent_style, settings.indent_width))
                 return pydocfmt.SourceFormatResult(source="x = 1\n", docstring_changed_lines=(), comment_changed_lines=())
 
@@ -468,7 +475,8 @@ class TestCLIShowFiles(unittest.TestCase):
             target.write_text("x = 1\n", encoding="utf-8")
             called_settings: list[str] = []
 
-            def fake_format(path: str, settings: CheckSettings, fix: bool) -> pydocfmt.SourceFormatResult:
+            def fake_format(path: str, *, settings: CheckSettings, fix: bool, write: bool) -> pydocfmt.SourceFormatResult:
+                self.assertTrue(write)
                 called_settings.append(settings.line_ending)
                 return pydocfmt.SourceFormatResult(source="x = 1\n", docstring_changed_lines=(), comment_changed_lines=())
 
@@ -491,10 +499,10 @@ class TestCLIShowFiles(unittest.TestCase):
             target.write_text("x = 1\n", encoding="utf-8")
             called_settings: list[CheckSettings] = []
 
-            def fake_format(path: str, *, file: object = None, settings: CheckSettings, fix: bool) -> FormatterResult:
-                del file, fix
+            def fake_format(path: str, *, file: object = None, settings: CheckSettings, fix: bool, write: bool) -> FormatterResult:
+                del file, fix, write
                 called_settings.append(settings)
-                return FormatterResult(path=path, source="", modified=False, findings=(), errors=())
+                return FormatterResult(path=path, old_source="", new_source="", modified=False, fixed_findings=collections.Counter(), unfixed_findings=(), errors=())
 
             argv = [
                 "pydocfmt",
@@ -629,7 +637,8 @@ class TestCLIShowFiles(unittest.TestCase):
             )
             called_paths: list[str] = []
 
-            def fake_format(path: str, settings: CheckSettings, fix: bool) -> pydocfmt.SourceFormatResult:
+            def fake_format(path: str, *, settings: CheckSettings, fix: bool, write: bool) -> pydocfmt.SourceFormatResult:
+                self.assertTrue(write)
                 called_paths.append(path)
                 return pydocfmt.SourceFormatResult(source="x = 1\n", docstring_changed_lines=(), comment_changed_lines=())
 
@@ -722,6 +731,8 @@ class TestCLIShowFiles(unittest.TestCase):
         self.assertIn("File selection:", output)
         options = output[output.index("Options:") : output.index("Formatting:")]
         formatting = output[output.index("Formatting:") : output.index("Rule selection:")]
+        self.assertLess(options.index("--fix"), options.index("--diff"))
+        self.assertLess(options.index("--diff"), options.index("--show-files"))
         self.assertLess(options.index("--show-files"), options.index("--show-settings"))
         self.assertLess(options.index("--show-settings"), options.index("--output-file"))
         self.assertLess(formatting.index("--output-format"), formatting.index("--experimental"))
@@ -729,6 +740,7 @@ class TestCLIShowFiles(unittest.TestCase):
         self.assertLess(output.index("File selection:"), output.index("Miscellaneous:"))
         self.assertLess(output.index("Miscellaneous:"), output.index("Global options:"))
         self.assertIn("--output-file FILE", output)
+        self.assertIn("--diff", output)
         self.assertIn("--stdin-filename FILENAME", output)
         self.assertIn("--config CONFIG", output)
         self.assertIn("--line-length LENGTH", output)
@@ -1310,18 +1322,210 @@ class TestCLIShowFiles(unittest.TestCase):
             self.assertEqual(exit_code, 0)
             self.assertEqual(stdout.getvalue(), "All checks passed!\n")
 
+    def test_pydocfmt_diff_prints_legacy_unified_diff_without_writing_file(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            target = root / "a.py"
+            original_source = "x = 1\n"
+            formatted_source = "x = 2\n"
+            target.write_text(original_source, encoding="utf-8")
+            stdout = StringIO()
+            called_args: list[tuple[bool, bool]] = []
+
+            def fake_format(path: str, *, settings: CheckSettings, fix: bool, write: bool = True) -> pydocfmt.SourceFormatResult:
+                self.assertEqual(path, str(target))
+                del settings
+                called_args.append((fix, write))
+                return pydocfmt.SourceFormatResult(source=formatted_source, original_source=original_source, docstring_changed_lines=(1,), comment_changed_lines=())
+
+            argv = ["pydocfmt", "check", "--diff", str(target)]
+
+            with (
+                unittest.mock.patch("sys.argv", argv),
+                unittest.mock.patch("pydocformatter.cli.check.pydocfmt.format_file_source", side_effect=fake_format),
+                contextlib.redirect_stdout(stdout),
+            ):
+                exit_code = pydocfmt_cli.main()
+
+            self.assertEqual(exit_code, 1)
+            self.assertEqual(called_args, [(True, False)])
+            self.assertEqual(target.read_text(encoding="utf-8"), original_source)
+            output = stdout.getvalue()
+            self.assertIn(f"--- {target}", output)
+            self.assertIn(f"+++ {target}", output)
+            self.assertIn("-x = 1", output)
+            self.assertIn("+x = 2", output)
+            self.assertIn("Would fix 1 rule check error.", output)
+
+    def test_pydocfmt_diff_prints_unified_diff_without_writing_file(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            target = root / "a.py"
+            original_source = "x = 1\n"
+            formatted_source = "x = 2\n"
+            target.write_text(original_source, encoding="utf-8")
+            stdout = StringIO()
+            rule = Rule(rule_code="PDF105", rule_name="summary-too-long", message="Docstring summary does not fit on one line", fixable=False)
+            called_args: list[tuple[bool, bool]] = []
+
+            def fake_format(path: str, *, file: TextIO | None = None, settings: CheckSettings, fix: bool, write: bool) -> FormatterResult:
+                del path, file, settings
+                called_args.append((fix, write))
+                return FormatterResult(
+                    path=str(target),
+                    old_source=original_source,
+                    new_source=formatted_source,
+                    modified=True,
+                    fixed_findings=collections.Counter({"PDF001": 1}),
+                    unfixed_findings=(RuleFinding(rule=rule, line_numbers=(1,)),),
+                    errors=(),
+                )
+
+            argv = ["pydocfmt", "check", "--experimental", "--diff", str(target)]
+
+            with (
+                unittest.mock.patch("sys.argv", argv),
+                unittest.mock.patch("pydocformatter.formatter.format_file_exp", side_effect=fake_format),
+                contextlib.redirect_stdout(stdout),
+            ):
+                exit_code = pydocfmt_cli.main()
+
+            self.assertEqual(exit_code, 1)
+            self.assertEqual(called_args, [(True, False)])
+            self.assertEqual(target.read_text(encoding="utf-8"), original_source)
+            output = stdout.getvalue()
+            self.assertIn(f"--- {target}", output)
+            self.assertIn(f"+++ {target}", output)
+            self.assertIn("-x = 1", output)
+            self.assertIn("+x = 2", output)
+            self.assertIn("Would fix 1 rule check error.", output)
+            self.assertNotIn("PDF105", output)
+
+    def test_pydocfmt_diff_exit_zero_suppresses_diff_exit_status(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            target = root / "a.py"
+            target.write_text("x = 1\n", encoding="utf-8")
+            stdout = StringIO()
+
+            def fake_format(path: str, *, file: TextIO | None = None, settings: CheckSettings, fix: bool, write: bool) -> FormatterResult:
+                del file, settings, fix, write
+                return FormatterResult(path=path, old_source="x = 1\n", new_source="x = 2\n", modified=True, fixed_findings=collections.Counter({"PDF001": 1}), unfixed_findings=(), errors=())
+
+            argv = ["pydocfmt", "check", "--experimental", "--diff", "--exit-zero", str(target)]
+
+            with (
+                unittest.mock.patch("sys.argv", argv),
+                unittest.mock.patch("pydocformatter.formatter.format_file_exp", side_effect=fake_format),
+                contextlib.redirect_stdout(stdout),
+            ):
+                exit_code = pydocfmt_cli.main()
+
+            self.assertEqual(exit_code, 0)
+            self.assertIn("Would fix 1 rule check error.", stdout.getvalue())
+
+    def test_pydocfmt_clean_diff_prints_no_success_message(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            target = root / "a.py"
+            target.write_text("x = 1\n", encoding="utf-8")
+            stdout = StringIO()
+
+            argv = ["pydocfmt", "check", "--experimental", "--diff", str(target)]
+
+            with (
+                unittest.mock.patch("sys.argv", argv),
+                contextlib.redirect_stdout(stdout),
+            ):
+                exit_code = pydocfmt_cli.main()
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(stdout.getvalue(), "")
+
+    def test_pydocfmt_diff_output_file_writes_summary_without_diff(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            target = root / "a.py"
+            output_file = root / "reports" / "errors.txt"
+            target.write_text("x = 1\n", encoding="utf-8")
+            stdout = StringIO()
+
+            def fake_format(path: str, *, file: TextIO | None = None, settings: CheckSettings, fix: bool, write: bool) -> FormatterResult:
+                del file, settings, fix, write
+                return FormatterResult(
+                    path=path, old_source="x = 1\n", new_source="x = 2\n", modified=True, fixed_findings=collections.Counter({"PDF001": 1, "PCF001": 2}), unfixed_findings=(), errors=()
+                )
+
+            argv = ["pydocfmt", "check", "--experimental", "--diff", "--output-file", str(output_file), str(target)]
+
+            with (
+                unittest.mock.patch("sys.argv", argv),
+                unittest.mock.patch("pydocformatter.formatter.format_file_exp", side_effect=fake_format),
+                contextlib.redirect_stdout(stdout),
+            ):
+                exit_code = pydocfmt_cli.main()
+
+            self.assertEqual(exit_code, 1)
+            self.assertIn(f"--- {target}", stdout.getvalue())
+            self.assertNotIn("Would fix", stdout.getvalue())
+            self.assertEqual(output_file.read_text(encoding="utf-8"), "Would fix 3 rule check errors.\n")
+
+    def test_pydocfmt_clean_diff_output_file_is_empty(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            target = root / "a.py"
+            output_file = root / "reports" / "errors.txt"
+            target.write_text("x = 1\n", encoding="utf-8")
+            stdout = StringIO()
+
+            argv = ["pydocfmt", "check", "--experimental", "--diff", "--output-file", str(output_file), str(target)]
+
+            with (
+                unittest.mock.patch("sys.argv", argv),
+                contextlib.redirect_stdout(stdout),
+            ):
+                exit_code = pydocfmt_cli.main()
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(stdout.getvalue(), "")
+            self.assertEqual(output_file.read_text(encoding="utf-8"), "")
+
+    def test_pydocfmt_diff_stdin_uses_stdin_filename_in_diff_headers(self) -> None:
+        source = "x = 1\n"
+        stdout = StringIO()
+
+        def fake_format(path: str, *, file: TextIO | None = None, settings: CheckSettings, fix: bool, write: bool) -> FormatterResult:
+            del settings, fix, write
+            assert file is not None
+            assert file.read() == source
+            return FormatterResult(path=path, old_source=source, new_source="x = 2\n", modified=True, fixed_findings=collections.Counter({"PDF001": 1}), unfixed_findings=(), errors=())
+
+        argv = ["pydocfmt", "check", "--experimental", "--fix", "--diff", "--stdin-filename", "virtual.py"]
+
+        with (
+            unittest.mock.patch("sys.argv", argv),
+            unittest.mock.patch("sys.stdin", StringIO(source)),
+            unittest.mock.patch("pydocformatter.formatter.format_file_exp", side_effect=fake_format),
+            contextlib.redirect_stdout(stdout),
+        ):
+            exit_code = pydocfmt_cli.main()
+
+        self.assertEqual(exit_code, 1)
+        self.assertIn("--- virtual.py", stdout.getvalue())
+        self.assertIn("+++ virtual.py", stdout.getvalue())
+
     def test_pydocfmt_stdin_filename_sets_display_path_and_ignores_paths(self) -> None:
         source = 'def foo():\n    """This is a very long single-line docstring that should be reflowed by the formatter due to line length."""\n    pass\n'
         stdout = StringIO()
         stderr = StringIO()
         called_paths: list[str] = []
 
-        def fake_format(path: str, *, file: TextIO | None = None, settings: CheckSettings, fix: bool) -> FormatterResult:
-            del settings, fix
+        def fake_format(path: str, *, file: TextIO | None = None, settings: CheckSettings, fix: bool, write: bool) -> FormatterResult:
+            del settings, fix, write
             called_paths.append(path)
             assert file is not None
             assert file.read() == source
-            return FormatterResult(path=path, source=source, modified=False, findings=(), errors=())
+            return FormatterResult(path=path, old_source=source, new_source=source, modified=False, fixed_findings=collections.Counter(), unfixed_findings=(), errors=())
 
         argv = ["pydocfmt", "check", "ignored.py", "--stdin-filename", "virtual.py", "--line-length", "72", "--experimental"]
 
@@ -1366,7 +1570,9 @@ class TestCLIShowFiles(unittest.TestCase):
         source = "def foo():\n    pass\n"
         stdout = StringIO()
         stderr = StringIO()
-        format_file_exp = unittest.mock.Mock(return_value=FormatterResult(path="skip.py", source=source, modified=False, findings=(), errors=()))
+        format_file_exp = unittest.mock.Mock(
+            return_value=FormatterResult(path="skip.py", old_source=source, new_source=source, modified=False, fixed_findings=collections.Counter(), unfixed_findings=(), errors=())
+        )
         argv = [
             "pydocfmt",
             "check",
@@ -1421,12 +1627,13 @@ class TestCLIShowFiles(unittest.TestCase):
         stdout = StringIO()
         stderr = StringIO()
 
-        def fake_format(path: str, *, file: TextIO | None = None, settings: CheckSettings, fix: bool) -> FormatterResult:
+        def fake_format(path: str, *, file: TextIO | None = None, settings: CheckSettings, fix: bool, write: bool) -> FormatterResult:
             del path, settings
             assert fix
+            assert write
             assert file is not None
             assert file.read() == source
-            return FormatterResult(path="-", source=formatted_source, modified=True, findings=(), errors=())
+            return FormatterResult(path="-", old_source=source, new_source=formatted_source, modified=True, fixed_findings=collections.Counter({"PDF001": 1}), unfixed_findings=(), errors=())
 
         argv = ["pydocfmt", "check", "--fix", "-", "--line-length", "72", "--experimental"]
 
@@ -1452,12 +1659,13 @@ class TestCLIShowFiles(unittest.TestCase):
             stdout = StringIO()
             stderr = StringIO()
 
-            def fake_format(path: str, *, file: TextIO | None = None, settings: CheckSettings, fix: bool) -> FormatterResult:
+            def fake_format(path: str, *, file: TextIO | None = None, settings: CheckSettings, fix: bool, write: bool) -> FormatterResult:
                 del path, settings
                 assert fix
+                assert write
                 assert file is not None
                 assert file.read() == source
-                return FormatterResult(path="-", source=formatted_source, modified=True, findings=(), errors=())
+                return FormatterResult(path="-", old_source=source, new_source=formatted_source, modified=True, fixed_findings=collections.Counter({"PDF001": 1}), unfixed_findings=(), errors=())
 
             argv = ["pydocfmt", "check", "--fix", "-", "--line-length", "72", "--experimental", "--output-file", str(output_file)]
 

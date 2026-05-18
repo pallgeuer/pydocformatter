@@ -286,7 +286,7 @@ def format_file(path: str, settings: CheckSettings, fix: bool, *, output: typing
         `tokenize.TokenError`: If Python tokenization fails.
         `UnicodeDecodeError`: If the file cannot be decoded as UTF-8.
     """
-    result = format_file_source(path, settings, fix=fix)
+    result = format_file_source(path, settings=settings, fix=fix)
 
     if not fix:
         print_source_diagnostics(path, result, output=output)
@@ -295,16 +295,18 @@ def format_file(path: str, settings: CheckSettings, fix: bool, *, output: typing
 
 def format_file_source(
     path: str,
+    *,
     settings: CheckSettings,
     fix: bool,
+    write: bool = True,
 ) -> SourceFormatResult:
-    """Format a Python file and return source-level formatting details."""
+    """Format a Python file and return source-level formatting details, optionally writing fixes."""
     with open(path, encoding="utf-8", newline="") as file:
         source = file.read()
 
     result = format_source(source, settings, fix=fix)
 
-    if fix and result.modified:
+    if fix and write and result.modified:
         with open(path, "w", encoding="utf-8", newline="") as file:
             file.write(result.source)
     return result

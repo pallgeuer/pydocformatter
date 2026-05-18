@@ -2,7 +2,7 @@
 
 ## Code Style
 
-- Never manually wrap code/comments/docstrings during code writing and edits; allow the formatters to enforce line length.
+- NEVER manually wrap code/comments/docstrings during code writing and edits; allow the formatters to later enforce line length.
 - Avoid unqualified function imports like `from X.Y import func`; use `import X.Y` or `import X.Y as Y` and call via the module. Classes, exceptions, types, and constants may be imported directly.
 
 ## Commands
@@ -15,4 +15,5 @@
 ## Workflows
 
 - When changing function signatures or class attributes, update all affected docstrings in the same change.
+- If some tests fail only because the exact wording of a string has changed, then ask what to do instead of just blindly reverting the wording of the string.
 - Concisely document significant completed work in CHANGELOG.md; use Added/Changed/Fixed/Removed subheadings of the Unreleased section, and use nested bullets for clear organization under short and very general bolded categories.
