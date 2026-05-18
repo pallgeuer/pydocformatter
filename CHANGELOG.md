@@ -89,12 +89,13 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Check-mode output now includes docstring and comment line locations, emitted once per subject per file with compressed consecutive ranges.
 
 - **Architecture:**
+  - Renamed the generic settings module from `pydocformatter.config` to `pydocformatter.settings`, with `ConfigError` renamed to `SettingsError`.
   - Setting metadata now derives default TOML keys from field names and default CLI flags from setting keys, with `SettingCliDefinition` renamed to `SettingCLIDefinition`.
   - Utility helpers now live in explicit `pydocformatter.utils` submodules for diagnostics, glob matching, and line endings.
   - Consolidated diagnostics, line-ending, and automatic pluralization helpers in `pydocformatter.utils.misc`.
   - Experimental formatter interfaces now live in `pydocformatter.formatter`.
-  - `pydocformatter.config` now provides generic schema-driven settings machinery for config loading, validation, settings output, argparse setup, and CLI override extraction.
-  - `pydocformatter.config` now provides generic multi-string map typing and validation, and raw CLI setting definitions now show default values unless explicitly disabled.
+  - `pydocformatter.settings` now provides generic schema-driven settings machinery for config loading, validation, settings output, argparse setup, and CLI override extraction.
+  - `pydocformatter.settings` now provides generic multi-string map typing and validation, and raw CLI setting definitions now show default values unless explicitly disabled.
   - Setting metadata now derives default validation, CLI behavior, and TOML rendering from each setting's declared type.
   - Centralized check setting metadata in `pydocformatter.cli.settings_check` so config keys, validation, settings output, dedicated CLI options, and CLI override extraction share one ordered source of truth.
   - Rule selector metadata is now inferred from setting group and CLI value shape instead of explicit setting definition tags.

@@ -9,7 +9,8 @@ from typing import Any, TypedDict
 import pydocformatter.cli.global_args as global_args
 import pydocformatter.cli.settings_check as settings_check
 import pydocformatter.cli.utils as cli_utils
-import pydocformatter.config as config
+import pydocformatter.settings as settings_core
+from pydocformatter.settings import MultiStringMap, SettingDefinition, StringList
 
 
 class ConfigOptionMetadata(TypedDict):
@@ -71,9 +72,9 @@ def run(args: argparse.Namespace) -> int:
     return 0
 
 
-def metadata_for_definition(definition: config.SettingDefinition[Any], settings: settings_check.CheckSettings) -> ConfigOptionMetadata:
+def metadata_for_definition(definition: SettingDefinition[Any], settings: settings_check.CheckSettings) -> ConfigOptionMetadata:
     """Return Ruff-style JSON metadata for one setting."""
-    default = config.format_value(getattr(settings, definition.field), definition.value_type)
+    default = settings_core.format_value(getattr(settings, definition.field), definition.value_type)
     metadata = ConfigOptionMetadata(
         doc=definition.documentation,
         default=default,
@@ -83,7 +84,7 @@ def metadata_for_definition(definition: config.SettingDefinition[Any], settings:
     return metadata
 
 
-def format_definition(definition: config.SettingDefinition[Any], settings: settings_check.CheckSettings) -> str:
+def format_definition(definition: SettingDefinition[Any], settings: settings_check.CheckSettings) -> str:
     """Return Ruff-style text metadata for one setting."""
     metadata = metadata_for_definition(definition, settings)
     lines = [
@@ -108,9 +109,9 @@ def value_type_name(value_type: object) -> str:
         return "int"
     elif value_type is str:
         return "str"
-    elif value_type == config.StringList:
+    elif value_type == StringList:
         return "list[str]"
-    elif value_type == config.MultiStringMap:
+    elif value_type == MultiStringMap:
         return "dict[str, list[str]]"
     elif isinstance(value_type, type) and issubclass(value_type, enum.StrEnum):
         return " | ".join(json.dumps(member.value) for member in value_type)

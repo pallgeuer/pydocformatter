@@ -2,8 +2,9 @@ import dataclasses
 import enum
 from typing import Any, TypedDict
 
-import pydocformatter.config as config
 import pydocformatter.rules as rules
+import pydocformatter.settings as settings_core
+from pydocformatter.settings import MultiStringMap, SettingCLIValueKind, SettingDefinition, SettingsError, SettingsSchema, StringList
 
 DEFAULT_EXCLUDE = (
     ".bzr",
@@ -66,18 +67,18 @@ class CheckSettings:
         line_ending (LineEnding): Line ending used when rewriting files.
         indent_style (IndentStyle): Indentation style used for generated docstring section indentation.
         indent_width (int): Number of spaces per generated docstring indentation level, or the visual width of a tab.
-        select (config.StringList): Base selected pydocformatter rule selectors.
-        ignore (config.StringList): Rule selectors to ignore.
-        extend_select (config.StringList): Additional selected rule selectors.
-        per_file_ignores (config.MultiStringMap): File-pattern-specific ignored selectors.
-        extend_per_file_ignores (config.MultiStringMap): Additional file-specific ignores.
-        fixable (config.StringList): Rule selectors eligible for automatic fixes.
-        unfixable (config.StringList): Rule selectors ineligible for automatic fixes.
-        extend_fixable (config.StringList): Additional fixable rule selectors.
-        include (config.StringList): Base glob patterns that identify format-eligible files.
-        extend_include (config.StringList): Additional include glob patterns appended to `include`.
-        exclude (config.StringList): Base glob patterns for files or directories to ignore.
-        extend_exclude (config.StringList): Additional exclude glob patterns appended to `exclude`.
+        select (StringList): Base selected pydocformatter rule selectors.
+        ignore (StringList): Rule selectors to ignore.
+        extend_select (StringList): Additional selected rule selectors.
+        per_file_ignores (MultiStringMap): File-pattern-specific ignored selectors.
+        extend_per_file_ignores (MultiStringMap): Additional file-specific ignores.
+        fixable (StringList): Rule selectors eligible for automatic fixes.
+        unfixable (StringList): Rule selectors ineligible for automatic fixes.
+        extend_fixable (StringList): Additional fixable rule selectors.
+        include (StringList): Base glob patterns that identify format-eligible files.
+        extend_include (StringList): Additional include glob patterns appended to `include`.
+        exclude (StringList): Base glob patterns for files or directories to ignore.
+        extend_exclude (StringList): Additional exclude glob patterns appended to `exclude`.
         respect_gitignore (bool): Whether discovered files are filtered through `.gitignore`.
         force_exclude (bool): Whether include, exclude, and gitignore rules apply to explicitly passed paths.
     """
@@ -88,18 +89,18 @@ class CheckSettings:
     line_ending: LineEnding = LineEnding.AUTO
     indent_style: IndentStyle = IndentStyle.SPACE
     indent_width: int = 4
-    select: config.StringList = DEFAULT_RULE_SELECT
-    ignore: config.StringList = ()
-    extend_select: config.StringList = ()
-    per_file_ignores: config.MultiStringMap = ()
-    extend_per_file_ignores: config.MultiStringMap = ()
-    fixable: config.StringList = DEFAULT_RULE_FIXABLE
-    unfixable: config.StringList = ()
-    extend_fixable: config.StringList = ()
-    include: config.StringList = DEFAULT_INCLUDE
-    extend_include: config.StringList = ()
-    exclude: config.StringList = DEFAULT_EXCLUDE
-    extend_exclude: config.StringList = ()
+    select: StringList = DEFAULT_RULE_SELECT
+    ignore: StringList = ()
+    extend_select: StringList = ()
+    per_file_ignores: MultiStringMap = ()
+    extend_per_file_ignores: MultiStringMap = ()
+    fixable: StringList = DEFAULT_RULE_FIXABLE
+    unfixable: StringList = ()
+    extend_fixable: StringList = ()
+    include: StringList = DEFAULT_INCLUDE
+    extend_include: StringList = ()
+    exclude: StringList = DEFAULT_EXCLUDE
+    extend_exclude: StringList = ()
     respect_gitignore: bool = True
     force_exclude: bool = False
 
@@ -123,18 +124,18 @@ class CheckSettingsOverrides(TypedDict, total=False):
     line_ending: LineEnding
     indent_style: IndentStyle
     indent_width: int
-    select: config.StringList
-    ignore: config.StringList
-    extend_select: config.StringList
-    per_file_ignores: config.MultiStringMap
-    extend_per_file_ignores: config.MultiStringMap
-    fixable: config.StringList
-    unfixable: config.StringList
-    extend_fixable: config.StringList
-    include: config.StringList
-    extend_include: config.StringList
-    exclude: config.StringList
-    extend_exclude: config.StringList
+    select: StringList
+    ignore: StringList
+    extend_select: StringList
+    per_file_ignores: MultiStringMap
+    extend_per_file_ignores: MultiStringMap
+    fixable: StringList
+    unfixable: StringList
+    extend_fixable: StringList
+    include: StringList
+    extend_include: StringList
+    exclude: StringList
+    extend_exclude: StringList
     respect_gitignore: bool
     force_exclude: bool
 
@@ -145,7 +146,7 @@ def validate_rule_selectors(values: dict[str, Any], context: str) -> None:
     selector_values.extend((definition, selector) for definition in RULE_SELECTOR_MAP_DEFINITIONS for _, selectors in values.get(definition.field, ()) for selector in selectors)
     for definition, selector in selector_values:
         if not rules.selector_matches_known_rule(selector):
-            raise config.ConfigError(f"{context}.{definition.key} contains unknown selector: {selector}")
+            raise SettingsError(f"{context}.{definition.key} contains unknown selector: {selector}")
 
 
 def post_validate(values: dict[str, Any], context: str) -> None:
@@ -161,168 +162,168 @@ class SettingsGroup(enum.StrEnum):
     FILE_SELECTION = "File selection"
 
 
-SETTINGS_SCHEMA = config.SettingsSchema(
+SETTINGS_SCHEMA = SettingsSchema(
     settings_type=CheckSettings,
     overrides_type=CheckSettingsOverrides,
     group_type=SettingsGroup,
     definitions=(
-        config.SettingDefinition(
+        SettingDefinition(
             field="output_format",
             value_type=OutputFormat,
             group=SettingsGroup.FORMATTING,
             help="Output format for experimental rule findings.",
             documentation='Output format for rule findings; currently only "grouped" is supported.',
         ),
-        config.SettingDefinition(
+        SettingDefinition(
             field="experimental",
             value_type=bool,
             group=SettingsGroup.FORMATTING,
             help="Use the experimental rule-based formatter implementation.",
         ),
-        config.SettingDefinition(
+        SettingDefinition(
             field="line_length",
             value_type=int,
             group=SettingsGroup.FORMATTING,
             help="Maximum line length for docstrings and comments.",
-            validator=config.validate_int(min_value=1, max_value=320),
+            validator=settings_core.validate_int(min_value=1, max_value=320),
             cli={"metavar": "LENGTH"},
         ),
-        config.SettingDefinition(
+        SettingDefinition(
             field="line_ending",
             value_type=LineEnding,
             group=SettingsGroup.FORMATTING,
             help="Line ending to use when rewriting files.",
             documentation='Line ending to use when rewriting files; one of "auto", "lf", "cr-lf", or "native".',
         ),
-        config.SettingDefinition(
+        SettingDefinition(
             field="indent_style",
             value_type=IndentStyle,
             group=SettingsGroup.FORMATTING,
             help="Indentation style for generated docstring sections.",
             documentation='Generated docstring section indentation style; one of "space" or "tab".',
         ),
-        config.SettingDefinition(
+        SettingDefinition(
             field="indent_width",
             value_type=int,
             group=SettingsGroup.FORMATTING,
             help="Indentation width for generated docstring sections.",
-            validator=config.validate_int(min_value=1, max_value=255),
+            validator=settings_core.validate_int(min_value=1, max_value=255),
             cli={"metavar": "WIDTH"},
             documentation="Generated docstring section indentation width.",
         ),
-        config.SettingDefinition(
+        SettingDefinition(
             field="select",
-            value_type=config.StringList,
+            value_type=StringList,
             group=SettingsGroup.RULE_SELECTION,
             help="Comma-separated rule selector(s) to enable.",
-            validator=config.validate_non_empty_string_list,
+            validator=settings_core.validate_non_empty_string_list,
             cli={"metavar": "RULE"},
             documentation='Rule selectors to enable; defaults to ["ALL"].',
         ),
-        config.SettingDefinition(
+        SettingDefinition(
             field="ignore",
-            value_type=config.StringList,
+            value_type=StringList,
             group=SettingsGroup.RULE_SELECTION,
             help="Comma-separated rule selector(s) to ignore.",
-            validator=config.validate_non_empty_string_list,
+            validator=settings_core.validate_non_empty_string_list,
             cli={"metavar": "RULE"},
             documentation="Rule selectors to ignore.",
         ),
-        config.SettingDefinition(
+        SettingDefinition(
             field="extend_select",
-            value_type=config.StringList,
+            value_type=StringList,
             group=SettingsGroup.RULE_SELECTION,
             help="Comma-separated additional rule selector(s) to enable.",
-            validator=config.validate_non_empty_string_list,
+            validator=settings_core.validate_non_empty_string_list,
             cli={"metavar": "RULE"},
             documentation="Additional rule selectors to enable.",
         ),
-        config.SettingDefinition(
+        SettingDefinition(
             field="per_file_ignores",
-            value_type=config.MultiStringMap,
+            value_type=MultiStringMap,
             group=SettingsGroup.RULE_SELECTION,
             help="TOML inline table mapping file patterns to ignored rule selectors.",
             cli={"metavar": "RULE_TOML"},
             documentation="File-pattern-specific ignored rule selectors.",
         ),
-        config.SettingDefinition(
+        SettingDefinition(
             field="extend_per_file_ignores",
-            value_type=config.MultiStringMap,
+            value_type=MultiStringMap,
             group=SettingsGroup.RULE_SELECTION,
             help="TOML inline table mapping file patterns to additional ignored rule selectors.",
             cli={"metavar": "RULE_TOML"},
             documentation="Additional file-pattern-specific ignored rule selectors.",
         ),
-        config.SettingDefinition(
+        SettingDefinition(
             field="fixable",
-            value_type=config.StringList,
+            value_type=StringList,
             group=SettingsGroup.RULE_SELECTION,
             help="Comma-separated rule selector(s) eligible for automatic fixes.",
-            validator=config.validate_non_empty_string_list,
+            validator=settings_core.validate_non_empty_string_list,
             cli={"metavar": "RULE"},
             documentation='Rule selectors eligible for automatic fixes; defaults to ["ALL"].',
         ),
-        config.SettingDefinition(
+        SettingDefinition(
             field="unfixable",
-            value_type=config.StringList,
+            value_type=StringList,
             group=SettingsGroup.RULE_SELECTION,
             help="Comma-separated rule selector(s) ineligible for automatic fixes.",
-            validator=config.validate_non_empty_string_list,
+            validator=settings_core.validate_non_empty_string_list,
             cli={"metavar": "RULE"},
             documentation="Rule selectors ineligible for automatic fixes.",
         ),
-        config.SettingDefinition(
+        SettingDefinition(
             field="extend_fixable",
-            value_type=config.StringList,
+            value_type=StringList,
             group=SettingsGroup.RULE_SELECTION,
             help="Comma-separated additional rule selector(s) eligible for automatic fixes.",
-            validator=config.validate_non_empty_string_list,
+            validator=settings_core.validate_non_empty_string_list,
             cli={"metavar": "RULE"},
             documentation="Additional rule selectors eligible for automatic fixes.",
         ),
-        config.SettingDefinition(
+        SettingDefinition(
             field="include",
-            value_type=config.StringList,
+            value_type=StringList,
             group=SettingsGroup.FILE_SELECTION,
             help="Comma-separated glob pattern(s) for files to include.",
-            validator=config.validate_non_empty_string_list,
+            validator=settings_core.validate_non_empty_string_list,
             cli={"metavar": "GLOB"},
             documentation="Glob patterns for files to include.",
         ),
-        config.SettingDefinition(
+        SettingDefinition(
             field="extend_include",
-            value_type=config.StringList,
+            value_type=StringList,
             group=SettingsGroup.FILE_SELECTION,
             help="Comma-separated additional glob pattern(s) for files to include.",
-            validator=config.validate_non_empty_string_list,
+            validator=settings_core.validate_non_empty_string_list,
             cli={"metavar": "GLOB"},
             documentation="Additional include glob patterns.",
         ),
-        config.SettingDefinition(
+        SettingDefinition(
             field="exclude",
-            value_type=config.StringList,
+            value_type=StringList,
             group=SettingsGroup.FILE_SELECTION,
             help="Comma-separated glob pattern(s) for files or directories to exclude.",
-            validator=config.validate_non_empty_string_list,
+            validator=settings_core.validate_non_empty_string_list,
             cli={"metavar": "GLOB"},
             documentation="Glob patterns for files/directories to exclude.",
         ),
-        config.SettingDefinition(
+        SettingDefinition(
             field="extend_exclude",
-            value_type=config.StringList,
+            value_type=StringList,
             group=SettingsGroup.FILE_SELECTION,
             help="Comma-separated additional glob pattern(s) for files or directories to exclude.",
-            validator=config.validate_non_empty_string_list,
+            validator=settings_core.validate_non_empty_string_list,
             cli={"metavar": "GLOB"},
             documentation="Additional exclude glob patterns.",
         ),
-        config.SettingDefinition(
+        SettingDefinition(
             field="respect_gitignore",
             value_type=bool,
             group=SettingsGroup.FILE_SELECTION,
             help="Respect .gitignore when discovering files.",
         ),
-        config.SettingDefinition(
+        SettingDefinition(
             field="force_exclude",
             value_type=bool,
             group=SettingsGroup.FILE_SELECTION,
@@ -336,10 +337,10 @@ SETTINGS_SCHEMA = config.SettingsSchema(
 RULE_SELECTOR_DEFINITIONS = frozenset(
     definition
     for definition in SETTINGS_SCHEMA.definitions
-    if definition.group == SettingsGroup.RULE_SELECTION and definition.cli is not None and definition.cli.metavar == "RULE" and definition.cli.value_kind == config.SettingCLIValueKind.COMMA_LIST
+    if definition.group == SettingsGroup.RULE_SELECTION and definition.cli is not None and definition.cli.metavar == "RULE" and definition.cli.value_kind == SettingCLIValueKind.COMMA_LIST
 )
 RULE_SELECTOR_MAP_DEFINITIONS = frozenset(
     definition
     for definition in SETTINGS_SCHEMA.definitions
-    if definition.group == SettingsGroup.RULE_SELECTION and definition.cli is not None and definition.cli.metavar == "RULE_TOML" and definition.cli.value_kind == config.SettingCLIValueKind.TOML_MAP
+    if definition.group == SettingsGroup.RULE_SELECTION and definition.cli is not None and definition.cli.metavar == "RULE_TOML" and definition.cli.value_kind == SettingCLIValueKind.TOML_MAP
 )

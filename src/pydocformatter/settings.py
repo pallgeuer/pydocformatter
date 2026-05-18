@@ -25,7 +25,7 @@ SettingCLIMetavar: TypeAlias = str | tuple[str, ...]
 SettingsOverridesType: TypeAlias = type[Any] | GenericAlias
 
 
-class ConfigError(ValueError):
+class SettingsError(ValueError):
     """Raised when configuration cannot be resolved or validated.
 
     This exception represents user-facing configuration failures, including malformed TOML, unsupported table shapes,
@@ -178,7 +178,7 @@ class SettingsSchema(Generic[SettingsT]):
             other basename are treated as dedicated config files and read settings from the top-level table instead.
         table_name: Dotted TOML table name derived from table_path.
         post_validate: Optional validation hook called after per-field validation with only the updates from the current
-            layer, keyed by dataclass field name, and a user-facing path string. The hook should raise ConfigError for
+            layer, keyed by dataclass field name, and a user-facing path string. The hook should raise SettingsError for
             cross-field or domain validation failures and should not mutate values.
     """
 
@@ -253,7 +253,7 @@ class SettingsSchema(Generic[SettingsT]):
 
         if global_values.isolated:
             if path_options:
-                raise ConfigError("The argument --config=PATH cannot be used with --isolated")
+                raise SettingsError("The argument --config=PATH cannot be used with --isolated")
         else:
             settings = _apply_toml_file(self, settings, path="pyproject.toml", required=False)
             for option in path_options:
@@ -263,7 +263,7 @@ class SettingsSchema(Generic[SettingsT]):
             try:
                 section = tomllib.loads(option)
             except tomllib.TOMLDecodeError as error:
-                raise ConfigError(f"Failed to decode --config inline TOML: {error}") from error
+                raise SettingsError(f"Failed to decode --config inline TOML: {error}") from error
             settings = _apply_toml_section(self, settings, section=section, context="<--config>")
 
         if args is not None:
@@ -337,7 +337,7 @@ class SettingsSchema(Generic[SettingsT]):
                         parsed = tomllib.loads(f"value = {group}")
                         parsed_value = parsed["value"]
                         if not isinstance(parsed_value, dict):
-                            raise ConfigError("TOML map CLI value must be a TOML table")
+                            raise SettingsError("TOML map CLI value must be a TOML table")
                         merged.update(parsed_value)
                     values[definition.field] = merged
                 else:
@@ -400,7 +400,7 @@ def _format_multi_string_map(value: Any) -> str:
 def validate_bool(value: Any, context: str) -> bool:
     """Validate and return a boolean setting value."""
     if not isinstance(value, bool):
-        raise ConfigError(f"{context} must be a boolean")
+        raise SettingsError(f"{context} must be a boolean")
     return value
 
 
@@ -409,11 +409,11 @@ def validate_int(*, min_value: int | None = None, max_value: int | None = None) 
 
     def validate(value: Any, context: str) -> int:
         if isinstance(value, bool) or not isinstance(value, int):
-            raise ConfigError(f"{context} must be an integer")
+            raise SettingsError(f"{context} must be an integer")
         if min_value is not None and value < min_value:
-            raise ConfigError(f"{context} must be greater than or equal to {min_value}")
+            raise SettingsError(f"{context} must be greater than or equal to {min_value}")
         if max_value is not None and value > max_value:
-            raise ConfigError(f"{context} must be less than or equal to {max_value}")
+            raise SettingsError(f"{context} must be less than or equal to {max_value}")
         return value
 
     return validate
@@ -427,7 +427,7 @@ def validate_str_enum(enum_class: type[StrEnumT]) -> Callable[[Any, str], StrEnu
             return enum_class(value)
         except ValueError as error:
             options = "{" + ", ".join(f"'{member.value}'" for member in enum_class) + "}"
-            raise ConfigError(f"{context} must be one of {options}") from error
+            raise SettingsError(f"{context} must be one of {options}") from error
 
     return validate
 
@@ -435,9 +435,9 @@ def validate_str_enum(enum_class: type[StrEnumT]) -> Callable[[Any, str], StrEnu
 def validate_string_list(value: Any, context: str) -> StringList:
     """Validate and return a tuple of string list values."""
     if not isinstance(value, (list, tuple)):
-        raise ConfigError(f"{context} must be a list of strings")
+        raise SettingsError(f"{context} must be a list of strings")
     if not all(isinstance(item, str) for item in value):
-        raise ConfigError(f"{context} must be a list of strings")
+        raise SettingsError(f"{context} must be a list of strings")
     return tuple(value)
 
 
@@ -445,7 +445,7 @@ def validate_non_empty_string_list(value: Any, context: str) -> StringList:
     """Validate and return a tuple of non-empty string list values."""
     values = validate_string_list(value, context)
     if any(not value for value in values):
-        raise ConfigError(f"{context} must not contain empty strings")
+        raise SettingsError(f"{context} must not contain empty strings")
     return values
 
 
@@ -456,14 +456,14 @@ def validate_multi_string_map(value: Any, context: str) -> MultiStringMap:
     elif isinstance(value, dict):
         items = tuple(value.items())
     else:
-        raise ConfigError(f"{context} must be a table mapping strings to string lists")
+        raise SettingsError(f"{context} must be a table mapping strings to string lists")
 
     entries = []
     for key, values in items:
         if not isinstance(key, str):
-            raise ConfigError(f"{context} keys must be strings")
+            raise SettingsError(f"{context} keys must be strings")
         if not key:
-            raise ConfigError(f"{context} keys must not be empty")
+            raise SettingsError(f"{context} keys must not be empty")
         entries.append((key, validate_non_empty_string_list(values, f"{context}.{key}")))
     return tuple(entries)
 
@@ -495,19 +495,19 @@ def _load_toml_file(path: str, *, required: bool) -> dict[str, Any] | None:
         file = open(path, "rb")
     except FileNotFoundError as error:
         if required:
-            raise ConfigError(f"Configuration file not found: {path}") from error
+            raise SettingsError(f"Configuration file not found: {path}") from error
         return None
     except OSError as error:
-        raise ConfigError(f"Failed to read configuration file {path}: {error}") from error
+        raise SettingsError(f"Failed to read configuration file {path}: {error}") from error
 
     with file:
         try:
             config = tomllib.load(file)
         except tomllib.TOMLDecodeError as error:
-            raise ConfigError(f"Failed to decode {path}: {error}") from error
+            raise SettingsError(f"Failed to decode {path}: {error}") from error
 
     if not isinstance(config, dict):
-        raise ConfigError(f"{path}: Must contain a TOML table")
+        raise SettingsError(f"{path}: Must contain a TOML table")
     return config
 
 
@@ -519,15 +519,15 @@ def _toml_section_at_table_path(config: dict[str, Any], *, path: str, table_path
         traversed.append(key)
         if not isinstance(section, dict):
             table = ".".join(traversed[:-1])
-            raise ConfigError(f"{path}: The [{table}] section must be a table")
+            raise SettingsError(f"{path}: The [{table}] section must be a table")
         if key not in section:
             if required:
-                raise ConfigError(f"{path}: Must contain [{'.'.join(table_path)}]")
+                raise SettingsError(f"{path}: Must contain [{'.'.join(table_path)}]")
             return None
         section = section[key]
 
     if not isinstance(section, dict):
-        raise ConfigError(f"{path}: The [{'.'.join(table_path)}] section must be a table")
+        raise SettingsError(f"{path}: The [{'.'.join(table_path)}] section must be a table")
     return cast(dict[str, Any], section)
 
 
@@ -556,7 +556,7 @@ def _apply_toml_section(schema: SettingsSchema[SettingsT], settings: SettingsT, 
     if unknown_keys:
         unknown_keys.sort()
         joined_keys = ", ".join(unknown_keys)
-        raise ConfigError(f"{context} contains unknown setting(s): {joined_keys}")
+        raise SettingsError(f"{context} contains unknown setting(s): {joined_keys}")
 
     values = {definition.field: section[definition.key] for definition in schema.definitions if definition.available_in_toml and definition.key in section}
     return _apply_field_values(schema, settings, values=values, context=context, key_based=True)

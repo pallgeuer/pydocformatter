@@ -12,10 +12,10 @@ from collections.abc import Iterator
 import pydocformatter.cli.global_args as global_args
 import pydocformatter.cli.settings_check as settings_check
 import pydocformatter.cli.utils as cli_utils
-import pydocformatter.config as config
 import pydocformatter.file_selection as file_selection
 import pydocformatter.formatter as formatter
 import pydocformatter.formatters.pydocfmt as pydocfmt
+import pydocformatter.settings as settings_core
 import pydocformatter.utils.misc as misc
 from pydocformatter.formatter import FormatterResult, Rule, RuleFinding
 
@@ -237,7 +237,7 @@ def load_settings(args: argparse.Namespace) -> settings_check.CheckSettings | No
     try:
         global_values = global_args.global_values_from_arguments(args, dest_prefixes=("global", "command"))
         return settings_check.SETTINGS_SCHEMA.load(global_values=global_values, args=args)
-    except config.ConfigError as error:
+    except settings_core.SettingsError as error:
         print(f"pydocfmt check: Configuration error: {error}", file=sys.stderr)
         return None
     except tomllib.TOMLDecodeError as error:
