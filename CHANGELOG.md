@@ -22,6 +22,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added Ruff-style `-e` / `--exit-zero` and `--exit-non-zero-on-fix` status controls.
   - Added `--respect-gitignore` / `--no-respect-gitignore`, with enabled-by-default behavior and matching `pyproject.toml` configuration.
   - Added Ruff-style `--config` and `--isolated` global options for explicit config files, inline setting overrides, and config-free runs.
+  - Added `pydocfmt config` to list and describe supported configuration options in text or JSON format.
 
 - **Configuration:**
   - Added `output-format` for formatter configuration, currently supporting only `"grouped"`.
@@ -106,6 +107,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Simplified schema-driven settings argument extraction by removing unused destination-prefix plumbing and helper indirection.
   - Limited pyproject-style explicit config parsing to files named `pyproject.toml`.
   - Settings schema metadata now defaults omitted CLI definitions to standard CLI-backed settings and omitted documentation to the setting help text.
+  - Settings schema metadata now supports config-example text for CLI introspection.
   - Settings schemas now record their override type and document the post-validation hook contract for implementers.
 
 - **Developer dependencies:**

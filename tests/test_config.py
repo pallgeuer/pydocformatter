@@ -33,7 +33,7 @@ class TestConfig(unittest.TestCase):
         self.assertNotIn("render", tuple(field.name for field in dataclasses.fields(pydocformatter_config.SettingDefinition)))
         self.assertEqual(
             tuple(field.name for field in dataclasses.fields(pydocformatter_config.SettingDefinition)),
-            ("field", "value_type", "group", "help", "key", "available_in_cli", "available_in_toml", "validator", "cli", "documentation"),
+            ("field", "value_type", "group", "help", "key", "available_in_cli", "available_in_toml", "validator", "cli", "documentation", "example"),
         )
         self.assertEqual(
             tuple(field.name for field in dataclasses.fields(pydocformatter_config.SettingsSchema)),
@@ -86,11 +86,20 @@ class TestConfig(unittest.TestCase):
             help="Maximum line length.",
             documentation=None,
         )
+        example_definition = pydocformatter_config.SettingDefinition(
+            field="line_length",
+            value_type=int,
+            group=SettingsGroup.FORMATTING,
+            help="Maximum line length.",
+            example="line-length = 120",
+        )
 
         self.assertEqual(definition.key, "line-length")
         self.assertEqual(definition.documentation, definition.help)
+        self.assertEqual(definition.example, "")
         self.assertEqual(empty_documentation_definition.documentation, empty_documentation_definition.help)
         self.assertEqual(none_documentation_definition.documentation, none_documentation_definition.help)
+        self.assertEqual(example_definition.example, "line-length = 120")
         self.assertIsNotNone(definition.cli)
         cli = definition.cli
         assert cli is not None

@@ -80,6 +80,7 @@ class SettingDefinition(Generic[SettingValueT]):
     validator: SettingValidator[SettingValueT] = dataclasses.field(init=False)
     cli: SettingCLIDefinition | None = None
     documentation: str = ""
+    example: str = ""
 
     def __init__(
         self,
@@ -94,11 +95,13 @@ class SettingDefinition(Generic[SettingValueT]):
         validator: SettingValidator[SettingValueT] | None = None,
         cli: SettingCLIOptions | SettingCLIDefinition | dict[str, Any] | None = None,
         documentation: str | None = None,
+        example: str | None = None,
     ) -> None:
         """Initialize setting metadata with derived defaults."""
         resolved_key = key or field.replace("_", "-")
         resolved_validator = cast(SettingValidator[SettingValueT], _default_validator_for_type(value_type)) if validator is None else validator
         resolved_documentation = documentation or help
+        resolved_example = example or ""
 
         resolved_cli: SettingCLIDefinition | None
         if available_in_cli:
@@ -157,6 +160,7 @@ class SettingDefinition(Generic[SettingValueT]):
         object.__setattr__(self, "validator", resolved_validator)
         object.__setattr__(self, "cli", resolved_cli)
         object.__setattr__(self, "documentation", resolved_documentation)
+        object.__setattr__(self, "example", resolved_example)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -279,19 +283,7 @@ class SettingsSchema(Generic[SettingsT]):
             if not definition.available_in_toml:
                 continue
             value = getattr(settings, definition.field)
-            value_type: object = definition.value_type
-            if value_type is bool:
-                rendered = str(value).lower()
-            elif value_type is str:
-                rendered = _format_string(value)
-            elif _is_str_enum_type(value_type):
-                rendered = _format_string(value.value)
-            elif value_type == StringList:
-                rendered = _format_string_list(value)
-            elif value_type == MultiStringMap:
-                rendered = _format_multi_string_map(value)
-            else:
-                rendered = str(value)
+            rendered = format_value(value, definition.value_type)
             lines.append(f"{definition.key} = {rendered}")
         lines.append("")
         return "\n".join(lines)
@@ -371,6 +363,23 @@ def _format_cli_help(definition: SettingDefinition[Any], settings: Any) -> str:
 def _format_string(value: Any) -> str:
     """Format a string value for TOML output."""
     return json.dumps(value)
+
+
+def format_value(value: Any, value_type: type[Any] | GenericAlias) -> str:
+    """Format a setting value as a TOML literal."""
+    value_type_: object = value_type
+    if value_type_ is bool:
+        return str(value).lower()
+    elif value_type_ is str:
+        return _format_string(value)
+    elif _is_str_enum_type(value_type_):
+        return _format_string(value.value)
+    elif value_type_ == StringList:
+        return _format_string_list(value)
+    elif value_type_ == MultiStringMap:
+        return _format_multi_string_map(value)
+    else:
+        return str(value)
 
 
 def _format_string_list(values: tuple[Any, ...]) -> str:

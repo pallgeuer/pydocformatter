@@ -1,4 +1,5 @@
 import contextlib
+import json
 import os
 import subprocess
 import tempfile
@@ -9,6 +10,7 @@ from pathlib import Path
 from typing import Callable, TextIO
 
 import pydocformatter.cli.main as pydocfmt_cli
+import pydocformatter.cli.settings_check as settings_check
 import pydocformatter.formatters.pydocfmt as pydocfmt
 from pydocformatter.cli.settings_check import CheckSettings
 from pydocformatter.formatter import FormatterResult
@@ -745,6 +747,139 @@ class TestCLIShowFiles(unittest.TestCase):
 
         self.assertEqual(exit_code, 0)
         self.assertIn("Usage: pydocfmt check", stdout.getvalue())
+
+    def test_pydocfmt_config_lists_available_keys(self) -> None:
+        stdout = StringIO()
+        argv = ["pydocfmt", "config"]
+        with (
+            unittest.mock.patch("sys.argv", argv),
+            contextlib.redirect_stdout(stdout),
+        ):
+            exit_code = pydocfmt_cli.main()
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(stdout.getvalue().splitlines(), list(settings_check.SETTINGS_SCHEMA.toml_keys()))
+
+    def test_pydocfmt_config_prints_option_details(self) -> None:
+        stdout = StringIO()
+        argv = ["pydocfmt", "config", "line-length"]
+        with (
+            unittest.mock.patch("sys.argv", argv),
+            contextlib.redirect_stdout(stdout),
+        ):
+            exit_code = pydocfmt_cli.main()
+
+        self.assertEqual(exit_code, 0)
+        output = stdout.getvalue()
+        self.assertIn("Maximum line length for docstrings and comments.", output)
+        self.assertIn("Default value: 88", output)
+        self.assertIn("Type: int", output)
+        self.assertIn("Example usage:\n```toml\nline-length = 88\n```", output)
+
+    def test_pydocfmt_config_prints_option_json(self) -> None:
+        stdout = StringIO()
+        argv = ["pydocfmt", "config", "--output-format", "json", "line-ending"]
+        with (
+            unittest.mock.patch("sys.argv", argv),
+            contextlib.redirect_stdout(stdout),
+        ):
+            exit_code = pydocfmt_cli.main()
+
+        self.assertEqual(exit_code, 0)
+        output = json.loads(stdout.getvalue())
+        self.assertEqual(output["doc"], 'Line ending to use when rewriting files; one of "auto", "lf", "cr-lf", or "native".')
+        self.assertEqual(output["default"], '"auto"')
+        self.assertEqual(output["value_type"], '"auto" | "lf" | "cr-lf" | "native"')
+        self.assertEqual(output["example"], 'line-ending = "auto"')
+        self.assertNotIn("scope", output)
+        self.assertNotIn("deprecated", output)
+
+    def test_pydocfmt_config_prints_all_json(self) -> None:
+        stdout = StringIO()
+        argv = ["pydocfmt", "config", "--output-format", "json"]
+        with (
+            unittest.mock.patch("sys.argv", argv),
+            contextlib.redirect_stdout(stdout),
+        ):
+            exit_code = pydocfmt_cli.main()
+
+        self.assertEqual(exit_code, 0)
+        output = json.loads(stdout.getvalue())
+        self.assertEqual(tuple(output), settings_check.SETTINGS_SCHEMA.toml_keys())
+        self.assertEqual(output["line-length"]["default"], "88")
+        self.assertEqual(output["select"]["value_type"], "list[str]")
+        self.assertEqual(output["per-file-ignores"]["value_type"], "dict[str, list[str]]")
+
+    def test_pydocfmt_config_rejects_unknown_option(self) -> None:
+        stdout = StringIO()
+        stderr = StringIO()
+        argv = ["pydocfmt", "config", "unknown-key"]
+        with (
+            unittest.mock.patch("sys.argv", argv),
+            contextlib.redirect_stdout(stdout),
+            contextlib.redirect_stderr(stderr),
+        ):
+            exit_code = pydocfmt_cli.main()
+
+        self.assertEqual(exit_code, 2)
+        self.assertEqual(stdout.getvalue(), "")
+        self.assertIn("Invalid value 'unknown-key'", stderr.getvalue())
+
+    def test_pydocfmt_config_rejects_invalid_output_format(self) -> None:
+        stderr = StringIO()
+        argv = ["pydocfmt", "config", "--output-format", "yaml"]
+        with (
+            unittest.mock.patch("sys.argv", argv),
+            contextlib.redirect_stderr(stderr),
+            self.assertRaises(SystemExit) as cm,
+        ):
+            pydocfmt_cli.main()
+
+        self.assertEqual(cm.exception.code, 2)
+        self.assertIn("invalid choice: 'yaml'", stderr.getvalue())
+
+    def test_pydocfmt_config_help_and_help_config_print_config_help(self) -> None:
+        for argv in (["pydocfmt", "config", "--help"], ["pydocfmt", "help", "config"]):
+            stdout = StringIO()
+            with (
+                unittest.mock.patch("sys.argv", argv),
+                contextlib.redirect_stdout(stdout),
+            ):
+                if argv[-1] == "--help":
+                    with self.assertRaises(SystemExit) as cm:
+                        pydocfmt_cli.main()
+                    self.assertEqual(cm.exception.code, 0)
+                else:
+                    exit_code = pydocfmt_cli.main()
+                    self.assertEqual(exit_code, 0)
+            self.assertIn("Usage: pydocfmt config", stdout.getvalue())
+            self.assertIn("--output-format {text,json}", stdout.getvalue())
+
+    def test_pydocfmt_config_ignores_invalid_config_file(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "pyproject.toml").write_text(
+                '[tool.pydocfmt]\ninclude = ["src/"]\n',
+                encoding="utf-8",
+            )
+            stdout = StringIO()
+            stderr = StringIO()
+            argv = ["pydocfmt", "config", "line-length"]
+            previous_cwd = os.getcwd()
+            os.chdir(root)
+            try:
+                with (
+                    unittest.mock.patch("sys.argv", argv),
+                    contextlib.redirect_stdout(stdout),
+                    contextlib.redirect_stderr(stderr),
+                ):
+                    exit_code = pydocfmt_cli.main()
+            finally:
+                os.chdir(previous_cwd)
+
+        self.assertEqual(exit_code, 0)
+        self.assertIn("Default value: 88", stdout.getvalue())
+        self.assertEqual(stderr.getvalue(), "")
 
     def test_pydocfmt_version_flag_and_command_print_version(self) -> None:
         outputs = []
