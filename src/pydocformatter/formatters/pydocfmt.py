@@ -336,6 +336,26 @@ def print_source_diagnostics(
         print(message, file=output)
 
 
+def format_needs_formatting_message(
+    path: str,
+    subject: str,
+    line_numbers: list[int],
+) -> str:
+    """Build a compact per-file check message with line or line-range details.
+
+    Args:
+        path (str): File path to include in the diagnostic.
+        subject (str): Formatting subject, such as `docstring` or `comment`.
+        line_numbers (list[int]): Sorted 1-based line numbers that need formatting.
+
+    Returns:
+        str: Human-readable diagnostic message for check mode.
+    """
+    label = "lines" if len(line_numbers) > 1 else "line"
+    formatted_ranges = misc.format_line_ranges(line_numbers)
+    return f"{path}: Needs {subject} formatting on {label} {formatted_ranges}"
+
+
 def source_diagnostic_messages(
     path: str,
     result: SourceFormatResult,
@@ -343,9 +363,9 @@ def source_diagnostic_messages(
     """Return check-mode diagnostics for a source formatting result."""
     messages: list[str] = []
     if result.docstring_changed_lines:
-        messages.append(misc.format_needs_formatting_message(path, "docstring", list(result.docstring_changed_lines)))
+        messages.append(format_needs_formatting_message(path, "docstring", list(result.docstring_changed_lines)))
     if result.comment_changed_lines:
-        messages.append(misc.format_needs_formatting_message(path, "comment", list(result.comment_changed_lines)))
+        messages.append(format_needs_formatting_message(path, "comment", list(result.comment_changed_lines)))
     return tuple(messages)
 
 
@@ -363,7 +383,7 @@ def format_docstrings(
 
     if check:
         if changed_lines:
-            print(misc.format_needs_formatting_message(path, "docstring", list(changed_lines)))
+            print(format_needs_formatting_message(path, "docstring", list(changed_lines)))
         return bool(changed_lines)
 
     if source != formatted_source:

@@ -29,23 +29,3 @@ def format_line_ranges(line_numbers: list[int]) -> str:
 
     ranges.append(f"{start}-{end}" if start != end else str(start))
     return ", ".join(ranges)
-
-
-def format_needs_formatting_message(
-    path: str,
-    subject: str,
-    line_numbers: list[int],
-) -> str:
-    """Build a compact per-file check message with line or line-range details.
-
-    Args:
-        path (str): File path to include in the diagnostic.
-        subject (str): Formatting subject, such as `docstring` or `comment`.
-        line_numbers (list[int]): Sorted 1-based line numbers that need formatting.
-
-    Returns:
-        str: Human-readable diagnostic message for check mode.
-    """
-    label = "lines" if len(line_numbers) > 1 else "line"
-    formatted_ranges = format_line_ranges(line_numbers)
-    return f"{path}: Needs {subject} formatting on {label} {formatted_ranges}"

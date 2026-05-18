@@ -9,7 +9,7 @@ from collections.abc import Callable
 import pydocformatter.cli.check as check
 import pydocformatter.cli.config as config_command
 import pydocformatter.cli.global_args as global_args
-import pydocformatter.cli.utils as cli_utils
+import pydocformatter.utils.argparser as argparser
 
 
 def main() -> int:
@@ -29,7 +29,7 @@ def main() -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     """Build the top-level pydocfmt argument parser."""
-    parser = cli_utils.create_parser(prog="pydocfmt", description="Format Python docstrings and comments.")
+    parser = argparser.create_parser(prog="pydocfmt", description="Format Python docstrings and comments.")
     parser.add_argument("-V", "--version", action="store_true", help="Print version and exit.")
 
     SUBCOMMANDS = {
@@ -49,7 +49,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 def add_version_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> argparse.ArgumentParser:
     """Add the version subcommand parser."""
-    version_parser = cli_utils.create_subparser(
+    version_parser = argparser.create_subparser(
         subparsers,
         name="version",
         help="Print version and exit",
@@ -63,7 +63,7 @@ def add_parser_help(
     parser: argparse.ArgumentParser, subparsers: argparse._SubParsersAction[argparse.ArgumentParser], *, command_parsers: dict[str, argparse.ArgumentParser]
 ) -> argparse.ArgumentParser:
     """Add the help subcommand parser."""
-    help_parser = cli_utils.create_subparser(
+    help_parser = argparser.create_subparser(
         subparsers,
         name="help",
         help="Print this message or the help of the given subcommand",

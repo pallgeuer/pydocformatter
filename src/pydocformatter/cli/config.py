@@ -8,8 +8,8 @@ from typing import Any, TypedDict
 
 import pydocformatter.cli.global_args as global_args
 import pydocformatter.cli.settings_check as settings_check
-import pydocformatter.cli.utils as cli_utils
 import pydocformatter.settings as settings_core
+import pydocformatter.utils.argparser as argparser
 from pydocformatter.settings import MultiStringMap, SettingDefinition, StringList
 
 
@@ -24,7 +24,7 @@ class ConfigOptionMetadata(TypedDict):
 
 def add_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> argparse.ArgumentParser:
     """Add the config subcommand parser."""
-    parser = cli_utils.create_subparser(
+    parser = argparser.create_subparser(
         subparsers,
         name="config",
         description="List or describe the available configuration options.",

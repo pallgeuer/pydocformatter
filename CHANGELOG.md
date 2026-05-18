@@ -45,6 +45,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 
 - **CLI:**
   - Reorganized `pydocfmt check --help` into Ruff-inspired argument groups for options, rule selection, and file selection.
+  - Moved argparse helpers from `pydocformatter.cli.utils` to `pydocformatter.utils.argparser`.
   - Moved `--output-format` and `--experimental` to the Formatting help group, and moved `--output-file` to the end of the Options group.
   - Refactored parser setup to share global option definitions and isolate version/help subcommand construction.
   - Updated `pydocfmt check --help` argument ordering and metavars to keep help, settings output, and documentation consistent.

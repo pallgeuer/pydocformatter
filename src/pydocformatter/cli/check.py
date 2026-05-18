@@ -13,11 +13,11 @@ from collections.abc import Iterator
 
 import pydocformatter.cli.global_args as global_args
 import pydocformatter.cli.settings_check as settings_check
-import pydocformatter.cli.utils as cli_utils
 import pydocformatter.file_selection as file_selection
 import pydocformatter.formatter as formatter
 import pydocformatter.formatters.pydocfmt as pydocfmt
 import pydocformatter.settings as settings_core
+import pydocformatter.utils.argparser as argparser
 import pydocformatter.utils.misc as misc
 from pydocformatter.formatter import FormatterResult, Rule, RuleFinding
 
@@ -30,7 +30,7 @@ class OutputError(Exception):
 
 def add_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> argparse.ArgumentParser:
     """Add the check subcommand parser."""
-    parser = cli_utils.create_subparser(
+    parser = argparser.create_subparser(
         subparsers,
         name="check",
         description="Check and optionally fix Python docstrings and comments.",
