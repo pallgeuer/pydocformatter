@@ -5,7 +5,7 @@ import os
 
 import pydocformatter.rules.collection as rule_collection
 from pydocformatter.cli.settings_check import CheckSettings
-from pydocformatter.rules.base import ALL_RULE_SELECTOR_TAG, RuleBase, RuleCode, RuleMetadata, RuleSelector
+from pydocformatter.rules.base import ALL_RULE_SELECTOR_TAG, RuleCode, RuleMetadata, RuleSelector
 from pydocformatter.rules.collection import RuleCollection
 from pydocformatter.utils.globs import GlobPatternSet
 
@@ -16,6 +16,7 @@ class SelectedRule:
 
     rule: RuleMetadata
     fixable: bool
+    enabled_specificity: int
 
 
 @dataclasses.dataclass(frozen=True)
@@ -24,6 +25,7 @@ class PerFileRuleIgnore:
 
     pattern: str
     rule_codes: frozenset[RuleCode]
+    rule_specificities: tuple[tuple[RuleCode, int], ...]
 
     def matches(self, path: str) -> bool:
         """Return whether this per-file ignore entry matches a normalized path."""
@@ -43,13 +45,14 @@ class RuleSelection:
     def for_path(self, path: str) -> tuple[SelectedRule, ...]:
         """Return selected rules after applying per-file ignores to a path."""
         normalized_path = _normalize_path(path)
-        ignored_codes: set[RuleCode] = set()
+        ignored_specificities: dict[RuleCode, int] = {}
         for ignore in self.per_file_ignores:
             if ignore.matches(normalized_path):
-                ignored_codes.update(ignore.rule_codes)
-        if not ignored_codes:
+                for rule_code, specificity in ignore.rule_specificities:
+                    ignored_specificities[rule_code] = max(ignored_specificities.get(rule_code, -1), specificity)
+        if not ignored_specificities:
             return self.rules
-        return tuple(rule for rule in self.rules if rule.rule.code not in ignored_codes)
+        return tuple(rule for rule in self.rules if ignored_specificities.get(rule.rule.code, -1) < rule.enabled_specificity)
 
 
 def select_rules(settings: CheckSettings, *, collection: RuleCollection | None = None) -> RuleSelection:
@@ -58,29 +61,29 @@ def select_rules(settings: CheckSettings, *, collection: RuleCollection | None =
         collection = rule_collection.RULE_COLLECTION
 
     errors: list[str] = []
-    selected_codes = _resolve_rule_code_set(
+    selected_specificities = _resolve_rule_specificities(
         settings.select + settings.extend_select,
         collection=collection,
         context="rule selection",
         errors=errors,
     )
-    ignored_codes = _resolve_rule_code_set(settings.ignore, collection=collection, context="ignored rules", errors=errors)
-    enabled_codes = selected_codes - ignored_codes
+    ignored_specificities = _resolve_rule_specificities(settings.ignore, collection=collection, context="ignored rules", errors=errors)
+    enabled_specificities = _resolve_enabled_specificities(selected_specificities, ignored_specificities)
 
-    fixable_codes = _resolve_rule_code_set(
+    fixable_specificities = _resolve_rule_specificities(
         settings.fixable + settings.extend_fixable,
         collection=collection,
         context="fixable rules",
         errors=errors,
         require_inherently_fixable=True,
     )
-    unfixable_codes = _resolve_rule_code_set(settings.unfixable, collection=collection, context="unfixable rules", errors=errors)
-    effectively_fixable_codes = fixable_codes - unfixable_codes
+    unfixable_specificities = _resolve_rule_specificities(settings.unfixable, collection=collection, context="unfixable rules", errors=errors)
+    effectively_fixable_codes = _resolve_enabled_specificities(fixable_specificities, unfixable_specificities)
 
     selected_rules = tuple(
-        SelectedRule(rule=rule_class.meta, fixable=rule_class.meta.fixable and rule_class.meta.code in effectively_fixable_codes)
+        SelectedRule(rule=rule_class.meta, fixable=rule_class.meta.fixable and rule_class.meta.code in effectively_fixable_codes, enabled_specificity=enabled_specificities[rule_class.meta.code])
         for rule_class in collection.rules
-        if rule_class.meta.code in enabled_codes
+        if rule_class.meta.code in enabled_specificities
     )
     per_file_ignores = _resolve_per_file_ignores(settings, collection=collection, errors=errors)
     return RuleSelection(rules=selected_rules, per_file_ignores=per_file_ignores, errors=tuple(errors), collection=collection)
@@ -90,47 +93,63 @@ def _resolve_per_file_ignores(settings: CheckSettings, *, collection: RuleCollec
     """Resolve per-file rule ignore selectors."""
     ignores: list[PerFileRuleIgnore] = []
     for pattern, selectors in settings.per_file_ignores + settings.extend_per_file_ignores:
-        rule_codes = _resolve_rule_code_set(selectors, collection=collection, context=f"per-file ignores for {pattern!r}", errors=errors)
-        ignores.append(PerFileRuleIgnore(pattern=pattern, rule_codes=frozenset(rule_codes)))
+        rule_specificities = _resolve_rule_specificities(selectors, collection=collection, context=f"per-file ignores for {pattern!r}", errors=errors)
+        ignores.append(PerFileRuleIgnore(pattern=pattern, rule_codes=frozenset(rule_specificities), rule_specificities=tuple(sorted(rule_specificities.items()))))
     return tuple(ignores)
 
 
-def _resolve_rule_code_set(
+def _resolve_rule_specificities(
     selectors: tuple[str, ...],
     *,
     collection: RuleCollection,
     context: str,
     errors: list[str],
     require_inherently_fixable: bool = False,
-) -> set[RuleCode]:
-    """Resolve selectors to rule codes and append nonfatal errors for unusable selectors."""
-    rule_codes: set[RuleCode] = set()
-    for selector in selectors:
-        matching_rules = _matching_rules(selector, collection=collection, context=context, errors=errors)
+) -> dict[RuleCode, int]:
+    """Resolve selectors to rule-code specificities and append nonfatal errors for unusable selectors."""
+    rule_specificities: dict[RuleCode, int] = {}
+    for selector_tag in selectors:
+        selector = _parse_selector(selector_tag, context=context, errors=errors)
+        if selector is None:
+            continue
+
+        matching_rules = collection.matching_rules(selector)
         if not matching_rules:
+            if selector_tag != ALL_RULE_SELECTOR_TAG:
+                errors.append(f"{context} contains unknown selector: {selector_tag}")
             continue
 
         if require_inherently_fixable:
             fixable_rules = tuple(rule for rule in matching_rules if rule.meta.fixable)
-            if not fixable_rules and selector != ALL_RULE_SELECTOR_TAG:
-                errors.append(f"{context} selector {selector!r} only matches inherently unfixable rules")
+            if not fixable_rules and selector_tag != ALL_RULE_SELECTOR_TAG:
+                errors.append(f"{context} selector {selector_tag!r} only matches inherently unfixable rules")
             matching_rules = fixable_rules
 
-        rule_codes.update(rule.meta.code for rule in matching_rules)
-    return rule_codes
+        specificity = _selector_specificity(selector)
+        for rule in matching_rules:
+            rule_specificities[rule.meta.code] = max(rule_specificities.get(rule.meta.code, -1), specificity)
+    return rule_specificities
 
 
-def _matching_rules(selector: str, *, collection: RuleCollection, context: str, errors: list[str]) -> tuple[type[RuleBase], ...]:
-    """Resolve one selector against a collection."""
+def _resolve_enabled_specificities(enabled_specificities: dict[RuleCode, int], disabled_specificities: dict[RuleCode, int]) -> dict[RuleCode, int]:
+    """Return enabled rules where the enabling selector is more specific than the disabling selector."""
+    return {rule_code: enabled_specificity for rule_code, enabled_specificity in enabled_specificities.items() if enabled_specificity > disabled_specificities.get(rule_code, -1)}
+
+
+def _selector_specificity(selector: RuleSelector) -> int:
+    """Return the priority of a selector, where longer concrete selectors are more specific than shorter ones."""
+    if selector.tag == ALL_RULE_SELECTOR_TAG:
+        return 0
+    return len(selector.tag)
+
+
+def _parse_selector(selector: str, *, context: str, errors: list[str]) -> RuleSelector | None:
+    """Parse one selector and append a nonfatal error if it is invalid."""
     if not RuleSelector.is_valid_tag(selector):
         errors.append(f"{context} contains invalid selector: {selector}")
-        return ()
+        return None
 
-    rule_selector = RuleSelector(selector)
-    matching_rules = collection.matching_rules(rule_selector)
-    if not matching_rules and selector != ALL_RULE_SELECTOR_TAG:
-        errors.append(f"{context} contains unknown selector: {selector}")
-    return matching_rules
+    return RuleSelector(selector)
 
 
 def _normalize_path(path: str) -> str:

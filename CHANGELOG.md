@@ -138,6 +138,9 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 - **Documentation:**
   - Updated README, contributing, release, pull request, and file-selection docs for the single-command workflow and latest file-selection behavior.
 
+- **Rule selection:**
+  - Rule, per-file-ignore, and fixability selectors now resolve conflicts by selector specificity, with disabling selectors winning equal-specificity ties.
+
 - **CLI:**
   - Legacy formatter findings now report the original changed source lines instead of a synthetic line number.
   - Formatter read, decode, and write errors now affect check exit status without being reported as rule findings.

@@ -20,6 +20,14 @@ class PDF105SampleRule(RuleBase):
     meta = RuleMetadata(code=RuleCode("PDF105"), name="summary-too-long", message="Docstring summary does not fit on one line", fixable=False)
 
 
+class PDF142SampleRule(RuleBase):
+    meta = RuleMetadata(code=RuleCode("PDF142"), name="specific-rule", message="Specific rule", fixable=True)
+
+
+class PDF150SampleRule(RuleBase):
+    meta = RuleMetadata(code=RuleCode("PDF150"), name="sibling-rule", message="Sibling rule", fixable=True)
+
+
 class PCF001SampleRule(RuleBase):
     meta = RuleMetadata(code=RuleCode("PCF001"), name="comment-reflow-required", message="Comment chunk needs reflow", fixable=True)
 
@@ -27,6 +35,11 @@ class PCF001SampleRule(RuleBase):
 def sample_collection() -> rule_collection.RuleCollection:
     """Return a synthetic rule collection for selector tests."""
     return rule_collection.RuleCollection((PDF001SampleRule, PDF105SampleRule, PCF001SampleRule))
+
+
+def specificity_collection() -> rule_collection.RuleCollection:
+    """Return a synthetic rule collection for selector specificity tests."""
+    return rule_collection.RuleCollection((PDF142SampleRule, PDF150SampleRule))
 
 
 class TestRules(unittest.TestCase):
@@ -263,6 +276,64 @@ class TestRules(unittest.TestCase):
         self.assertEqual(selection.errors, ())
         self.assertEqual(tuple(rule.rule.code.tag for rule in selection.rules), ("PDF001",))
         self.assertEqual(tuple(rule.fixable for rule in selection.rules), (True,))
+
+    def test_select_rules_prefers_more_specific_select_over_broader_ignore(self) -> None:
+        selection = rules_selection.select_rules(
+            CheckSettings(select=("ALL",), extend_select=("PDF14",), ignore=("PDF1",)),
+            collection=specificity_collection(),
+        )
+
+        self.assertEqual(selection.errors, ())
+        self.assertEqual(tuple(rule.rule.code.tag for rule in selection.rules), ("PDF142",))
+
+    def test_select_rules_prefers_more_specific_ignore_over_broader_select(self) -> None:
+        selection = rules_selection.select_rules(
+            CheckSettings(select=("PDF1",), ignore=("PDF14",)),
+            collection=specificity_collection(),
+        )
+
+        self.assertEqual(selection.errors, ())
+        self.assertEqual(tuple(rule.rule.code.tag for rule in selection.rules), ("PDF150",))
+
+    def test_select_rules_ignore_wins_equal_specificity(self) -> None:
+        selection = rules_selection.select_rules(
+            CheckSettings(select=("PDF14",), ignore=("PDF14",)),
+            collection=specificity_collection(),
+        )
+
+        self.assertEqual(selection.errors, ())
+        self.assertEqual(selection.rules, ())
+
+    def test_select_rules_applies_per_file_ignore_specificity(self) -> None:
+        broader_ignore = rules_selection.select_rules(
+            CheckSettings(select=("PDF14",), per_file_ignores=(("tests/*.py", ("PDF1",)),)),
+            collection=specificity_collection(),
+        )
+        more_specific_ignore = rules_selection.select_rules(
+            CheckSettings(select=("PDF1",), per_file_ignores=(("tests/*.py", ("PDF14",)),)),
+            collection=specificity_collection(),
+        )
+
+        self.assertEqual(tuple(rule.rule.code.tag for rule in broader_ignore.for_path("tests/a.py")), ("PDF142",))
+        self.assertEqual(tuple(rule.rule.code.tag for rule in more_specific_ignore.for_path("tests/a.py")), ("PDF150",))
+
+    def test_select_rules_applies_fixability_specificity(self) -> None:
+        specific_fixable = rules_selection.select_rules(
+            CheckSettings(select=("PDF1",), fixable=("PDF14",), unfixable=("PDF1",)),
+            collection=specificity_collection(),
+        )
+        specific_unfixable = rules_selection.select_rules(
+            CheckSettings(select=("PDF1",), fixable=("PDF1",), unfixable=("PDF14",)),
+            collection=specificity_collection(),
+        )
+        equal_unfixable = rules_selection.select_rules(
+            CheckSettings(select=("PDF14",), fixable=("PDF14",), unfixable=("PDF14",)),
+            collection=specificity_collection(),
+        )
+
+        self.assertEqual(tuple((rule.rule.code.tag, rule.fixable) for rule in specific_fixable.rules), (("PDF142", True), ("PDF150", False)))
+        self.assertEqual(tuple((rule.rule.code.tag, rule.fixable) for rule in specific_unfixable.rules), (("PDF142", False), ("PDF150", True)))
+        self.assertEqual(tuple((rule.rule.code.tag, rule.fixable) for rule in equal_unfixable.rules), (("PDF142", False),))
 
     def test_select_rules_reports_selector_operational_errors(self) -> None:
         selection = rules_selection.select_rules(
