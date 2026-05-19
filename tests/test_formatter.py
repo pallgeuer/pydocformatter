@@ -14,7 +14,12 @@ import pydocformatter.cli.main as pydocfmt_cli
 import pydocformatter.formatter as formatter
 import pydocformatter.formatters.pydocfmt as pydocfmt
 from pydocformatter.cli.settings_check import CheckSettings
-from pydocformatter.formatter import FormatterResult, Rule, RuleFinding
+from pydocformatter.formatter import FormatterResult, RuleFinding
+from pydocformatter.rules.base import RuleMetadata
+
+PDF001_RULE = RuleMetadata(code="PDF001", name="reflow-required", message="Docstring chunk needs reflow", fixable=True)
+PDF105_RULE = RuleMetadata(code="PDF105", name="summary-too-long", message="Docstring summary does not fit on one line", fixable=False)
+PCF100_RULE = RuleMetadata(code="PCF100", name="comment-formatting-needed", message="Comment needs formatting", fixable=True)
 
 
 class TestFormatterResults(unittest.TestCase):
@@ -32,11 +37,11 @@ class TestFormatterResults(unittest.TestCase):
 
     def test_formatter_result_tracks_modified_and_findings_explicitly(self) -> None:
         clean = FormatterResult(path="a.py", old_source="", new_source="", modified=False, fixed_findings=collections.Counter(), unfixed_findings=(), errors=())
-        modified = FormatterResult(path="a.py", old_source="", new_source="", modified=True, fixed_findings=collections.Counter({"PDF001": 1}), unfixed_findings=(), errors=())
+        modified = FormatterResult(path="a.py", old_source="", new_source="", modified=True, fixed_findings=collections.Counter({PDF001_RULE: 1}), unfixed_findings=(), errors=())
         finding = RuleFinding(
-            rule=Rule(
-                rule_code="PDF105",
-                rule_name="summary-too-long",
+            rule=RuleMetadata(
+                code="PDF105",
+                name="summary-too-long",
                 message="Docstring summary does not fit on one line",
                 fixable=False,
             ),
@@ -50,13 +55,13 @@ class TestFormatterResults(unittest.TestCase):
         self.assertEqual(clean.new_source, "")
         self.assertEqual(clean.fixed_findings, collections.Counter())
         self.assertTrue(modified.modified)
-        self.assertEqual(modified.fixed_findings, collections.Counter({"PDF001": 1}))
+        self.assertEqual(modified.fixed_findings, collections.Counter({PDF001_RULE: 1}))
         self.assertEqual(with_findings.unfixed_findings, (finding,))
 
     def test_rule_finding_uses_rule_defaults_with_per_finding_overrides(self) -> None:
-        rule = Rule(
-            rule_code="PDF001",
-            rule_name="reflow-required",
+        rule = RuleMetadata(
+            code="PDF001",
+            name="reflow-required",
             message="Docstring chunk needs reflow",
             fixable=True,
         )
@@ -74,19 +79,17 @@ class TestFormatterResults(unittest.TestCase):
         self.assertEqual(overridden_finding.message, "Custom message")
         self.assertFalse(overridden_finding.fixable)
 
+    def test_rule_metadata_and_finding_keys_are_sortable(self) -> None:
+        later_rule = RuleMetadata(code="PDF999", name="later", message="Later", fixable=True)
+
+        self.assertEqual(sorted((later_rule, PDF001_RULE)), [PDF001_RULE, later_rule])
+        self.assertTrue(dataclasses.is_dataclass(RuleFinding.Key))
+        self.assertEqual(
+            sorted((RuleFinding.Key(rule=later_rule, message="Later", fixable=True), RuleFinding.Key(rule=PDF001_RULE, message="Docstring chunk needs reflow", fixable=True))),
+            [RuleFinding.Key(rule=PDF001_RULE, message="Docstring chunk needs reflow", fixable=True), RuleFinding.Key(rule=later_rule, message="Later", fixable=True)],
+        )
+
     def test_grouped_output_merges_matching_findings_and_prints_summary(self) -> None:
-        reflow_rule = Rule(
-            rule_code="PDF001",
-            rule_name="reflow-required",
-            message="Docstring chunk needs reflow",
-            fixable=True,
-        )
-        summary_rule = Rule(
-            rule_code="PDF105",
-            rule_name="summary-too-long",
-            message="Docstring summary does not fit on one line",
-            fixable=False,
-        )
         result = FormatterResult(
             path="a.py",
             old_source="",
@@ -94,9 +97,9 @@ class TestFormatterResults(unittest.TestCase):
             modified=False,
             fixed_findings=collections.Counter(),
             unfixed_findings=(
-                RuleFinding(rule=reflow_rule, line_numbers=(2, 2, 3)),
-                RuleFinding(rule=summary_rule, line_numbers=(5,)),
-                RuleFinding(rule=reflow_rule, line_numbers=(8,)),
+                RuleFinding(rule=PDF001_RULE, line_numbers=(2, 2, 3)),
+                RuleFinding(rule=PDF105_RULE, line_numbers=(5,)),
+                RuleFinding(rule=PDF001_RULE, line_numbers=(8,)),
             ),
             errors=(),
         )
@@ -113,6 +116,50 @@ class TestFormatterResults(unittest.TestCase):
                 "  PDF105 Docstring summary does not fit on one line. Line 5",
                 "",
                 "Found 3 rule check errors (2 fixable).",
+            ],
+        )
+
+    def test_grouped_output_prints_fixed_findings_before_unfixed_findings(self) -> None:
+        result = FormatterResult(
+            path="a.py",
+            old_source="",
+            new_source="",
+            modified=True,
+            fixed_findings=collections.Counter({PDF001_RULE: 50, PCF100_RULE: 1}),
+            unfixed_findings=(RuleFinding(rule=PDF105_RULE, line_numbers=(5,)),),
+            errors=(),
+        )
+
+        output = StringIO()
+        with contextlib.redirect_stdout(output):
+            check_command.print_results_grouped([], [result], output=None)
+
+        self.assertEqual(
+            output.getvalue().splitlines(),
+            [
+                "a.py:",
+                "  PCF100* Comment needs formatting. Fixed 1 time.",
+                "  PDF001* Docstring chunk needs reflow. Fixed 50 times.",
+                "  PDF105 Docstring summary does not fit on one line. Line 5",
+                "",
+                "Fixed 51 rule check errors and left 1 more unfixed (0 fixable).",
+            ],
+        )
+
+    def test_grouped_output_reports_fixed_findings_for_clean_results(self) -> None:
+        result = FormatterResult(path="a.py", old_source="", new_source="", modified=True, fixed_findings=collections.Counter({PDF001_RULE: 1}), unfixed_findings=(), errors=())
+
+        output = StringIO()
+        with contextlib.redirect_stdout(output):
+            check_command.print_results_grouped([], [result], output=None)
+
+        self.assertEqual(
+            output.getvalue().splitlines(),
+            [
+                "a.py:",
+                "  PDF001* Docstring chunk needs reflow. Fixed 1 time.",
+                "",
+                "Fixed 1 rule check error.",
             ],
         )
 
@@ -143,19 +190,13 @@ class TestFormatterResults(unittest.TestCase):
         )
 
     def test_grouped_output_summary_counts_findings_and_operational_errors(self) -> None:
-        rule = Rule(
-            rule_code="PDF001",
-            rule_name="reflow-required",
-            message="Docstring chunk needs reflow",
-            fixable=True,
-        )
         result = FormatterResult(
             path="a.py",
             old_source=None,
             new_source=None,
             modified=False,
             fixed_findings=collections.Counter(),
-            unfixed_findings=(RuleFinding(rule=rule, line_numbers=(2,)),),
+            unfixed_findings=(RuleFinding(rule=PDF001_RULE, line_numbers=(2,)),),
             errors=("Failed to read file a.py",),
         )
 
@@ -163,7 +204,58 @@ class TestFormatterResults(unittest.TestCase):
         with contextlib.redirect_stdout(output):
             check_command.print_results_grouped(["Using standard input instead of input path: b.py"], [result], output=None)
 
-        self.assertEqual(output.getvalue().splitlines()[-1], "Found 2 operational errors and 1 rule check error (1 fixable).")
+        self.assertEqual(output.getvalue().splitlines()[-3:], ["", "Found 2 operational errors.", "Found 1 rule check error (1 fixable)."])
+
+    def test_diff_summary_reports_fixed_and_remaining_findings(self) -> None:
+        result = FormatterResult(
+            path="a.py",
+            old_source="",
+            new_source="",
+            modified=True,
+            fixed_findings=collections.Counter({PDF001_RULE: 2}),
+            unfixed_findings=(RuleFinding(rule=PDF105_RULE, line_numbers=(1,)),),
+            errors=(),
+        )
+
+        output = StringIO()
+        with contextlib.redirect_stdout(output):
+            check_command.print_diff_summary([], [result], output=None)
+
+        self.assertEqual(output.getvalue(), "Would fix 2 rule check errors and leave 1 more unfixed (0 fixable).\n")
+
+    def test_diff_summary_reports_remaining_findings_without_fixes(self) -> None:
+        result = FormatterResult(
+            path="a.py",
+            old_source="",
+            new_source="",
+            modified=False,
+            fixed_findings=collections.Counter(),
+            unfixed_findings=(RuleFinding(rule=PDF001_RULE, line_numbers=(1,)), RuleFinding(rule=PDF105_RULE, line_numbers=(2,))),
+            errors=(),
+        )
+
+        output = StringIO()
+        with contextlib.redirect_stdout(output):
+            check_command.print_diff_summary([], [result], output=None)
+
+        self.assertEqual(output.getvalue(), "Would leave 2 rule check errors unfixed (1 fixable).\n")
+
+    def test_diff_summary_reports_operational_errors_separately(self) -> None:
+        result = FormatterResult(path="a.py", old_source=None, new_source=None, modified=False, fixed_findings=collections.Counter(), unfixed_findings=(), errors=("Failed to read file a.py",))
+
+        output = StringIO()
+        with contextlib.redirect_stdout(output):
+            check_command.print_diff_summary(["Using standard input instead of input path: b.py"], [result], output=None)
+
+        self.assertEqual(
+            output.getvalue().splitlines(),
+            [
+                "ERROR: Using standard input instead of input path: b.py",
+                "ERROR: Failed to read file a.py",
+                "",
+                "Found 2 operational errors.",
+            ],
+        )
 
     def test_output_stream_does_not_convert_body_os_errors(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -219,7 +311,7 @@ class TestFormatterResults(unittest.TestCase):
 
             def fake_format_source_exp(source: str, path: str, settings: CheckSettings, fix: bool) -> FormatterResult:
                 del source
-                return FormatterResult(path=path, old_source="x = 1\n", new_source="x = 2\n", modified=True, fixed_findings=collections.Counter({"PDF001": 1}), unfixed_findings=(), errors=())
+                return FormatterResult(path=path, old_source="x = 1\n", new_source="x = 2\n", modified=True, fixed_findings=collections.Counter({PDF001_RULE: 1}), unfixed_findings=(), errors=())
 
             with unittest.mock.patch("pydocformatter.formatter.format_source_exp", side_effect=fake_format_source_exp):
                 result = formatter.format_file_exp(str(target), settings=CheckSettings(experimental=True), fix=True, write=True)
@@ -237,7 +329,7 @@ class TestFormatterResults(unittest.TestCase):
 
             def fake_format_source_exp(source: str, path: str, settings: CheckSettings, fix: bool) -> FormatterResult:
                 del source, settings, fix
-                return FormatterResult(path=path, old_source="x = 1\n", new_source="x = 2\n", modified=True, fixed_findings=collections.Counter({"PDF001": 1}), unfixed_findings=(), errors=())
+                return FormatterResult(path=path, old_source="x = 1\n", new_source="x = 2\n", modified=True, fixed_findings=collections.Counter({PDF001_RULE: 1}), unfixed_findings=(), errors=())
 
             with unittest.mock.patch("pydocformatter.formatter.format_source_exp", side_effect=fake_format_source_exp):
                 result = formatter.format_file_exp(str(target), settings=CheckSettings(experimental=True), fix=True, write=False)
@@ -289,7 +381,7 @@ class TestFormatterResults(unittest.TestCase):
 
             def fake_format_file_exp(path: str, *, file: object = None, settings: CheckSettings, fix: bool, write: bool) -> FormatterResult:
                 del file, settings, fix, write
-                return FormatterResult(path=path, old_source="", new_source="", modified=True, fixed_findings=collections.Counter({"PDF001": 1}), unfixed_findings=(), errors=())
+                return FormatterResult(path=path, old_source="", new_source="", modified=True, fixed_findings=collections.Counter({PDF001_RULE: 1}), unfixed_findings=(), errors=())
 
             argv = ["pydocfmt", "check", "--experimental", str(target)]
             with (
@@ -305,7 +397,7 @@ class TestFormatterResults(unittest.TestCase):
             root = Path(td)
             target = root / "a.py"
             target.write_text("x = 1\n", encoding="utf-8")
-            rule = Rule(rule_code="PDF105", rule_name="summary-too-long", message="Docstring summary does not fit on one line", fixable=False)
+            rule = RuleMetadata(code="PDF105", name="summary-too-long", message="Docstring summary does not fit on one line", fixable=False)
 
             def fake_format_file_exp(path: str, *, file: object = None, settings: CheckSettings, fix: bool, write: bool) -> FormatterResult:
                 del file, settings, fix, write
@@ -352,7 +444,7 @@ class TestFormatterResults(unittest.TestCase):
             root = Path(td)
             target = root / "a.py"
             target.write_text("x = 1\n", encoding="utf-8")
-            rule = Rule(rule_code="PDF105", rule_name="summary-too-long", message="Docstring summary does not fit on one line", fixable=False)
+            rule = RuleMetadata(code="PDF105", name="summary-too-long", message="Docstring summary does not fit on one line", fixable=False)
 
             def fake_format_file_exp(path: str, *, file: object = None, settings: CheckSettings, fix: bool, write: bool) -> FormatterResult:
                 del file, settings, fix, write
@@ -379,7 +471,7 @@ class TestFormatterResults(unittest.TestCase):
 
             def fake_format_file_exp(path: str, *, file: object = None, settings: CheckSettings, fix: bool, write: bool) -> FormatterResult:
                 del file, settings, fix, write
-                return FormatterResult(path=path, old_source="", new_source="", modified=True, fixed_findings=collections.Counter({"PDF001": 1}), unfixed_findings=(), errors=())
+                return FormatterResult(path=path, old_source="", new_source="", modified=True, fixed_findings=collections.Counter({PDF001_RULE: 1}), unfixed_findings=(), errors=())
 
             for extra_args, expected_exit_code in ((["--fix"], 0), (["--fix", "--exit-non-zero-on-fix"], 1)):
                 argv = ["pydocfmt", "check", "--experimental", *extra_args, str(target)]
@@ -401,7 +493,7 @@ class TestFormatterResults(unittest.TestCase):
         self.assertEqual(len(results), 1)
         self.assertFalse(results[0].modified)
         self.assertEqual(len(results[0].unfixed_findings), 1)
-        self.assertEqual(results[0].unfixed_findings[0].rule.rule_code, "000")
+        self.assertEqual(results[0].unfixed_findings[0].rule.code, "PDF000")
         self.assertEqual(results[0].unfixed_findings[0].line_numbers, (1, 3, 5))
 
     def test_legacy_check_result_uses_zero_line_fallback_for_missing_changed_lines(self) -> None:
@@ -431,5 +523,5 @@ class TestFormatterResults(unittest.TestCase):
 
         self.assertEqual(len(results), 1)
         self.assertTrue(results[0].modified)
-        self.assertEqual(results[0].fixed_findings, collections.Counter({"000": 1}))
+        self.assertEqual(results[0].fixed_findings, collections.Counter({check_command.LEGACY_FORMAT_RULE_META: 1}))
         self.assertEqual(results[0].unfixed_findings, ())

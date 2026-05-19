@@ -7,6 +7,8 @@ from enum import Enum
 from pydocformatter.cli.settings_check import CheckSettings
 from pydocformatter.utils.globs import GlobPatternSet
 
+STDIN_VIRTUAL_FILE = "-"
+
 
 class FileSelectionError(ValueError):
     """Raised when file-selection settings cannot be applied."""
@@ -144,6 +146,19 @@ def select_virtual_file(path: str, settings: CheckSettings) -> SelectionResult:
     Returns:
         SelectionResult: Selection result containing the accepted virtual path or the rejection decision.
     """
+    if path == STDIN_VIRTUAL_FILE:
+        return SelectionResult(
+            accepted_paths=(STDIN_VIRTUAL_FILE,),
+            decisions=(
+                FileDecision(
+                    path=STDIN_VIRTUAL_FILE,
+                    accepted=True,
+                    reason=DecisionReason.INCLUDED,
+                    explicit=True,
+                ),
+            ),
+        )
+
     validate_include_patterns(settings.include_patterns)
     validate_exclude_patterns(settings.exclude_patterns)
     include_matcher = GlobPatternSet.compile(settings.include_patterns, match_parent_segments_for_bare=False)

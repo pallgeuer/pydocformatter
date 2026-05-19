@@ -6,26 +6,7 @@ import os
 import typing
 
 from pydocformatter.cli.settings_check import CheckSettings, LineEnding
-
-
-@dataclasses.dataclass(frozen=True)
-class Rule:
-    """Metadata for one pydocformatter rule.
-
-    Attributes:
-        rule_code (str): Stable rule code used in diagnostics.
-        rule_name (str): Stable human-readable rule name.
-        message (str): Default diagnostic message.
-        fixable (bool): Whether findings for this rule are fixable by default.
-    """
-
-    rule_code: str
-    rule_name: str
-    message: str
-    fixable: bool
-
-
-RuleFindingKey = tuple[Rule, str, bool]
+from pydocformatter.rules.base import RuleMetadata
 
 
 @dataclasses.dataclass(frozen=True)
@@ -33,13 +14,21 @@ class RuleFinding:
     """A remaining rule issue after formatting has run.
 
     Attributes:
-        rule (Rule): Rule metadata for the finding.
+        rule (RuleMetadata): Rule metadata for the finding.
         line_numbers (tuple[int, ...]): One-based source line numbers associated with the finding.
         instance_message (str | None): Optional message overriding the rule default for this instance.
         instance_fixable (bool | None): Optional fixability overriding the rule default for this instance.
     """
 
-    rule: Rule
+    @dataclasses.dataclass(frozen=True, order=True)
+    class Key:
+        """Key used to merge findings that differ only by line numbers."""
+
+        rule: RuleMetadata
+        message: str
+        fixable: bool
+
+    rule: RuleMetadata
     line_numbers: tuple[int, ...]
     instance_message: str | None = None
     instance_fixable: bool | None = None
@@ -63,13 +52,13 @@ class RuleFinding:
         return self.rule.fixable if self.instance_fixable is None else self.instance_fixable
 
     @property
-    def grouping_key(self) -> RuleFindingKey:
+    def grouping_key(self) -> RuleFinding.Key:
         """Return the key used to merge findings that differ only by line numbers.
 
         Returns:
-            RuleFindingKey: Tuple of rule, resolved message, and resolved fixability.
+            RuleFinding.Key: Tuple of rule, resolved message, and resolved fixability.
         """
-        return self.rule, self.message, self.fixable
+        return RuleFinding.Key(rule=self.rule, message=self.message, fixable=self.fixable)
 
     def with_line_numbers(self, line_numbers: tuple[int, ...]) -> RuleFinding:
         """Return this finding with updated line numbers.
@@ -92,7 +81,7 @@ class FormatterResult:
         old_source (str | None): Source text before formatting, or None if source text could not be read or decoded.
         new_source (str | None): Source text after formatting, or None if no valid source state is available.
         modified (bool): Whether formatting changed the source and the result represents a successful source state.
-        fixed_findings (collections.Counter[str]): Counts of fixed findings keyed by rule code.
+        fixed_findings (collections.Counter[RuleMetadata]): Counts of fixed findings keyed by rule metadata.
         unfixed_findings (tuple[RuleFinding, ...]): Remaining rule findings after formatting, with line numbers aligned
             to new_source.
         errors (tuple[str, ...]): Operational errors that prevented normal formatting or writing.
@@ -102,7 +91,7 @@ class FormatterResult:
     old_source: str | None
     new_source: str | None
     modified: bool
-    fixed_findings: collections.Counter[str]
+    fixed_findings: collections.Counter[RuleMetadata]
     unfixed_findings: tuple[RuleFinding, ...]
     errors: tuple[str, ...]
 

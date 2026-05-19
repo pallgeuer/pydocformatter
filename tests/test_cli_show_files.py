@@ -14,7 +14,11 @@ import pydocformatter.cli.main as pydocfmt_cli
 import pydocformatter.cli.settings_check as settings_check
 import pydocformatter.formatters.pydocfmt as pydocfmt
 from pydocformatter.cli.settings_check import CheckSettings
-from pydocformatter.formatter import FormatterResult, Rule, RuleFinding
+from pydocformatter.formatter import FormatterResult, RuleFinding
+from pydocformatter.rules.base import RuleMetadata
+
+PDF001_RULE = RuleMetadata(code="PDF001", name="reflow-required", message="Docstring chunk needs reflow", fixable=True)
+PCF001_RULE = RuleMetadata(code="PCF001", name="comment-formatting-needed", message="Comment needs formatting", fixable=True)
 
 
 class TestCLIShowFiles(unittest.TestCase):
@@ -528,6 +532,7 @@ class TestCLIShowFiles(unittest.TestCase):
             ]
             with (
                 unittest.mock.patch("sys.argv", argv),
+                unittest.mock.patch("pydocformatter.rules_selection.select_rules", return_value=unittest.mock.Mock(errors=())),
                 unittest.mock.patch(
                     "pydocformatter.formatter.format_file_exp",
                     side_effect=fake_format,
@@ -544,22 +549,22 @@ class TestCLIShowFiles(unittest.TestCase):
             self.assertTrue(called_settings[0].experimental)
             self.assertEqual(called_settings[0].output_format, "grouped")
 
-    def test_invalid_rule_cli_selector_reports_configuration_error(self) -> None:
+    def test_invalid_rule_cli_selector_reports_operational_error(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             target = root / "a.py"
             target.write_text("x = 1\n", encoding="utf-8")
-            stderr = StringIO()
+            stdout = StringIO()
             argv = ["pydocfmt", "check", str(target), "--select", "BAD"]
             with (
                 unittest.mock.patch("sys.argv", argv),
-                contextlib.redirect_stderr(stderr),
+                contextlib.redirect_stdout(stdout),
             ):
                 exit_code = pydocfmt_cli.main()
 
-        self.assertEqual(exit_code, 2)
-        self.assertIn("unknown selector: BAD", stderr.getvalue())
-        self.assertNotIn("Traceback", stderr.getvalue())
+        self.assertEqual(exit_code, 1)
+        self.assertIn("ERROR: rule selection contains unknown selector: BAD", stdout.getvalue())
+        self.assertNotIn("Traceback", stdout.getvalue())
 
     def test_force_exclude_filters_explicit_file_when_enabled(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -737,9 +742,10 @@ class TestCLIShowFiles(unittest.TestCase):
         options = output[output.index("Options:") : output.index("Formatting:")]
         formatting = output[output.index("Formatting:") : output.index("Rule selection:")]
         self.assertLess(options.index("--fix"), options.index("--diff"))
-        self.assertLess(options.index("--diff"), options.index("--show-files"))
-        self.assertLess(options.index("--show-files"), options.index("--show-settings"))
-        self.assertLess(options.index("--show-settings"), options.index("--output-file"))
+        self.assertLess(options.index("--diff"), options.index("--show-settings"))
+        self.assertLess(options.index("--show-settings"), options.index("--show-rules"))
+        self.assertLess(options.index("--show-rules"), options.index("--show-files"))
+        self.assertLess(options.index("--show-files"), options.index("--output-file"))
         self.assertLess(formatting.index("--output-format"), formatting.index("--experimental"))
         self.assertLess(formatting.index("--experimental"), formatting.index("--line-length"))
         self.assertLess(output.index("File selection:"), output.index("Miscellaneous:"))
@@ -775,7 +781,7 @@ class TestCLIShowFiles(unittest.TestCase):
             exit_code = pydocfmt_cli.main()
 
         self.assertEqual(exit_code, 0)
-        self.assertEqual(stdout.getvalue().splitlines(), list(settings_check.SETTINGS_SCHEMA.toml_keys()))
+        self.assertEqual(stdout.getvalue().splitlines(), [definition.key for definition in settings_check.SETTINGS_SCHEMA.definitions if definition.available_in_toml])
 
     def test_pydocfmt_config_prints_option_details(self) -> None:
         stdout = StringIO()
@@ -822,7 +828,7 @@ class TestCLIShowFiles(unittest.TestCase):
 
         self.assertEqual(exit_code, 0)
         output = json.loads(stdout.getvalue())
-        self.assertEqual(tuple(output), settings_check.SETTINGS_SCHEMA.toml_keys())
+        self.assertEqual(tuple(output), tuple(definition.key for definition in settings_check.SETTINGS_SCHEMA.definitions if definition.available_in_toml))
         self.assertEqual(output["line-length"]["default"], "88")
         self.assertEqual(output["select"]["value_type"], "list[str]")
         self.assertEqual(output["per-file-ignores"]["value_type"], "dict[str, list[str]]")
@@ -1066,7 +1072,7 @@ class TestCLIShowFiles(unittest.TestCase):
             exit_code = pydocfmt_cli.main()
 
         self.assertEqual(exit_code, 2)
-        self.assertIn("Cannot use --show-files and --show-settings together", stderr.getvalue())
+        self.assertIn("Cannot use more than one of {--show-settings, --show-rules, --show-files} together", stderr.getvalue())
 
     def test_pydocfmt_check_exit_flags_are_mutually_exclusive(self) -> None:
         stderr = StringIO()
@@ -1293,7 +1299,7 @@ class TestCLIShowFiles(unittest.TestCase):
             output = stdout.getvalue()
             self.assertIn(f"ERROR: Failed to decode {root / 'bad.py'} as UTF-8", output)
             self.assertIn(f"{root / 'needs_fix.py'}:", output)
-            self.assertIn("000* Needs formatting. Line 2", output)
+            self.assertIn("PDF000* Needs formatting. Line 2", output)
 
     def test_pydocfmt_check_rejects_stdin_without_experimental(self) -> None:
         source = 'def foo():\n    """This is a very long single-line docstring that should be reflowed by the formatter due to line length."""\n    pass\n'
@@ -1359,11 +1365,11 @@ class TestCLIShowFiles(unittest.TestCase):
             self.assertEqual(called_args, [(True, False)])
             self.assertEqual(target.read_text(encoding="utf-8"), original_source)
             output = stdout.getvalue()
-            self.assertIn(f"--- {target}", output)
+            self.assertTrue(output.startswith("Would fix 1 rule check error.\n\n"))
+            self.assertIn(f"\n--- {target}", output)
             self.assertIn(f"+++ {target}", output)
             self.assertIn("-x = 1", output)
             self.assertIn("+x = 2", output)
-            self.assertIn("Would fix 1 rule check error.", output)
 
     def test_pydocfmt_diff_prints_unified_diff_without_writing_file(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -1373,7 +1379,7 @@ class TestCLIShowFiles(unittest.TestCase):
             formatted_source = "x = 2\n"
             target.write_text(original_source, encoding="utf-8")
             stdout = StringIO()
-            rule = Rule(rule_code="PDF105", rule_name="summary-too-long", message="Docstring summary does not fit on one line", fixable=False)
+            rule = RuleMetadata(code="PDF105", name="summary-too-long", message="Docstring summary does not fit on one line", fixable=False)
             called_args: list[tuple[bool, bool]] = []
 
             def fake_format(path: str, *, file: TextIO | None = None, settings: CheckSettings, fix: bool, write: bool) -> FormatterResult:
@@ -1384,7 +1390,7 @@ class TestCLIShowFiles(unittest.TestCase):
                     old_source=original_source,
                     new_source=formatted_source,
                     modified=True,
-                    fixed_findings=collections.Counter({"PDF001": 1}),
+                    fixed_findings=collections.Counter({PDF001_RULE: 1}),
                     unfixed_findings=(RuleFinding(rule=rule, line_numbers=(1,)),),
                     errors=(),
                 )
@@ -1402,11 +1408,11 @@ class TestCLIShowFiles(unittest.TestCase):
             self.assertEqual(called_args, [(True, False)])
             self.assertEqual(target.read_text(encoding="utf-8"), original_source)
             output = stdout.getvalue()
-            self.assertIn(f"--- {target}", output)
+            self.assertTrue(output.startswith("Would fix 1 rule check error and leave 1 more unfixed (0 fixable).\n\n"))
+            self.assertIn(f"\n--- {target}", output)
             self.assertIn(f"+++ {target}", output)
             self.assertIn("-x = 1", output)
             self.assertIn("+x = 2", output)
-            self.assertIn("Would fix 1 rule check error.", output)
             self.assertNotIn("PDF105", output)
 
     def test_pydocfmt_diff_exit_zero_suppresses_diff_exit_status(self) -> None:
@@ -1418,7 +1424,7 @@ class TestCLIShowFiles(unittest.TestCase):
 
             def fake_format(path: str, *, file: TextIO | None = None, settings: CheckSettings, fix: bool, write: bool) -> FormatterResult:
                 del file, settings, fix, write
-                return FormatterResult(path=path, old_source="x = 1\n", new_source="x = 2\n", modified=True, fixed_findings=collections.Counter({"PDF001": 1}), unfixed_findings=(), errors=())
+                return FormatterResult(path=path, old_source="x = 1\n", new_source="x = 2\n", modified=True, fixed_findings=collections.Counter({PDF001_RULE: 1}), unfixed_findings=(), errors=())
 
             argv = ["pydocfmt", "check", "--experimental", "--diff", "--exit-zero", str(target)]
 
@@ -1430,9 +1436,9 @@ class TestCLIShowFiles(unittest.TestCase):
                 exit_code = pydocfmt_cli.main()
 
             self.assertEqual(exit_code, 0)
-            self.assertIn("Would fix 1 rule check error.", stdout.getvalue())
+            self.assertTrue(stdout.getvalue().startswith("Would fix 1 rule check error.\n\n"))
 
-    def test_pydocfmt_clean_diff_prints_no_success_message(self) -> None:
+    def test_pydocfmt_clean_diff_prints_success_message(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             target = root / "a.py"
@@ -1448,7 +1454,7 @@ class TestCLIShowFiles(unittest.TestCase):
                 exit_code = pydocfmt_cli.main()
 
             self.assertEqual(exit_code, 0)
-            self.assertEqual(stdout.getvalue(), "")
+            self.assertEqual(stdout.getvalue(), "All checks passed!\n")
 
     def test_pydocfmt_diff_output_file_writes_summary_without_diff(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -1461,7 +1467,7 @@ class TestCLIShowFiles(unittest.TestCase):
             def fake_format(path: str, *, file: TextIO | None = None, settings: CheckSettings, fix: bool, write: bool) -> FormatterResult:
                 del file, settings, fix, write
                 return FormatterResult(
-                    path=path, old_source="x = 1\n", new_source="x = 2\n", modified=True, fixed_findings=collections.Counter({"PDF001": 1, "PCF001": 2}), unfixed_findings=(), errors=()
+                    path=path, old_source="x = 1\n", new_source="x = 2\n", modified=True, fixed_findings=collections.Counter({PDF001_RULE: 1, PCF001_RULE: 2}), unfixed_findings=(), errors=()
                 )
 
             argv = ["pydocfmt", "check", "--experimental", "--diff", "--output-file", str(output_file), str(target)]
@@ -1474,11 +1480,11 @@ class TestCLIShowFiles(unittest.TestCase):
                 exit_code = pydocfmt_cli.main()
 
             self.assertEqual(exit_code, 1)
-            self.assertIn(f"--- {target}", stdout.getvalue())
+            self.assertTrue(stdout.getvalue().startswith(f"\n--- {target}"))
             self.assertNotIn("Would fix", stdout.getvalue())
             self.assertEqual(output_file.read_text(encoding="utf-8"), "Would fix 3 rule check errors.\n")
 
-    def test_pydocfmt_clean_diff_output_file_is_empty(self) -> None:
+    def test_pydocfmt_clean_diff_output_file_writes_success_message(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             target = root / "a.py"
@@ -1496,7 +1502,7 @@ class TestCLIShowFiles(unittest.TestCase):
 
             self.assertEqual(exit_code, 0)
             self.assertEqual(stdout.getvalue(), "")
-            self.assertEqual(output_file.read_text(encoding="utf-8"), "")
+            self.assertEqual(output_file.read_text(encoding="utf-8"), "All checks passed!\n")
 
     def test_pydocfmt_diff_stdin_uses_stdin_filename_in_diff_headers(self) -> None:
         source = "x = 1\n"
@@ -1506,7 +1512,7 @@ class TestCLIShowFiles(unittest.TestCase):
             del settings, fix, write
             assert file is not None
             assert file.read() == source
-            return FormatterResult(path=path, old_source=source, new_source="x = 2\n", modified=True, fixed_findings=collections.Counter({"PDF001": 1}), unfixed_findings=(), errors=())
+            return FormatterResult(path=path, old_source=source, new_source="x = 2\n", modified=True, fixed_findings=collections.Counter({PDF001_RULE: 1}), unfixed_findings=(), errors=())
 
         argv = ["pydocfmt", "check", "--experimental", "--fix", "--diff", "--stdin-filename", "virtual.py"]
 
@@ -1641,7 +1647,7 @@ class TestCLIShowFiles(unittest.TestCase):
             assert write
             assert file is not None
             assert file.read() == source
-            return FormatterResult(path="-", old_source=source, new_source=formatted_source, modified=True, fixed_findings=collections.Counter({"PDF001": 1}), unfixed_findings=(), errors=())
+            return FormatterResult(path="-", old_source=source, new_source=formatted_source, modified=True, fixed_findings=collections.Counter({PDF001_RULE: 1}), unfixed_findings=(), errors=())
 
         argv = ["pydocfmt", "check", "--fix", "-", "--line-length", "72", "--experimental"]
 
@@ -1656,7 +1662,7 @@ class TestCLIShowFiles(unittest.TestCase):
 
         self.assertEqual(exit_code, 0)
         self.assertEqual(stdout.getvalue(), formatted_source)
-        self.assertEqual(stderr.getvalue(), "All checks passed!\n")
+        self.assertEqual(stderr.getvalue(), "-:\n  PDF001* Docstring chunk needs reflow. Fixed 1 time.\n\nFixed 1 rule check error.\n")
 
     def test_pydocfmt_fix_stdin_with_output_file_writes_diagnostics_to_file(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -1673,7 +1679,7 @@ class TestCLIShowFiles(unittest.TestCase):
                 assert write
                 assert file is not None
                 assert file.read() == source
-                return FormatterResult(path="-", old_source=source, new_source=formatted_source, modified=True, fixed_findings=collections.Counter({"PDF001": 1}), unfixed_findings=(), errors=())
+                return FormatterResult(path="-", old_source=source, new_source=formatted_source, modified=True, fixed_findings=collections.Counter({PDF001_RULE: 1}), unfixed_findings=(), errors=())
 
             argv = ["pydocfmt", "check", "--fix", "-", "--line-length", "72", "--experimental", "--output-file", str(output_file)]
 
@@ -1689,7 +1695,7 @@ class TestCLIShowFiles(unittest.TestCase):
             self.assertEqual(exit_code, 0)
             self.assertEqual(stdout.getvalue(), formatted_source)
             self.assertEqual(stderr.getvalue(), "")
-            self.assertEqual(output_file.read_text(encoding="utf-8"), "All checks passed!\n")
+            self.assertEqual(output_file.read_text(encoding="utf-8"), "-:\n  PDF001* Docstring chunk needs reflow. Fixed 1 time.\n\nFixed 1 rule check error.\n")
 
     def test_pydocfmt_output_file_redirects_check_errors_and_creates_parent(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -1710,7 +1716,7 @@ class TestCLIShowFiles(unittest.TestCase):
             self.assertEqual(stdout.getvalue(), "")
             output = output_file.read_text(encoding="utf-8")
             self.assertIn(f"{target}:", output)
-            self.assertIn("000* Needs formatting. Line 2", output)
+            self.assertIn("PDF000* Needs formatting. Line 2", output)
             self.assertIn("Found 1 rule check error (1 fixable).", output)
 
     def test_pydocfmt_output_file_redirects_operational_errors(self) -> None:

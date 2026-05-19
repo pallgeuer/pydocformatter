@@ -1,10 +1,10 @@
 import dataclasses
 import enum
-from typing import Any, TypedDict
+from typing import TypedDict
 
 import pydocformatter.rules as rules
 import pydocformatter.settings as settings_core
-from pydocformatter.settings import MultiStringMap, SettingCLIValueKind, SettingDefinition, SettingsError, SettingsSchema, StringList
+from pydocformatter.settings import MultiStringMap, SettingDefinition, SettingsSchema, StringList
 
 DEFAULT_EXCLUDE = (
     ".bzr",
@@ -185,36 +185,6 @@ class CheckSettingsOverrides(TypedDict, total=False):
     extend_exclude: StringList
     respect_gitignore: bool
     force_exclude: bool
-
-
-def validate_rule_selectors(values: dict[str, Any], context: str) -> None:
-    """Validate rule selectors against the known rule scope.
-
-    Args:
-        values (dict[str, Any]): Field-keyed settings values from one precedence layer.
-        context (str): User-facing configuration location for error messages.
-
-    Raises:
-        `SettingsError`: If any selector is outside the known pydocformatter rule namespace.
-    """
-    selector_values = [(definition, selector) for definition in RULE_SELECTOR_DEFINITIONS for selector in values.get(definition.field, ())]
-    selector_values.extend((definition, selector) for definition in RULE_SELECTOR_MAP_DEFINITIONS for _, selectors in values.get(definition.field, ()) for selector in selectors)
-    for definition, selector in selector_values:
-        if not rules.selector_matches_known_rule(selector):
-            raise SettingsError(f"{context}.{definition.key} contains unknown selector: {selector}")
-
-
-def post_validate(values: dict[str, Any], context: str) -> None:
-    """Validate check settings after field-level validation.
-
-    Args:
-        values (dict[str, Any]): Field-keyed settings values from one precedence layer.
-        context (str): User-facing configuration location for error messages.
-
-    Raises:
-        `SettingsError`: If any cross-field or domain validation fails.
-    """
-    validate_rule_selectors(values, context)
 
 
 class SettingsGroup(enum.StrEnum):
@@ -400,16 +370,4 @@ SETTINGS_SCHEMA = SettingsSchema(
         ),
     ),
     table_path=("tool", "pydocfmt"),
-    post_validate=post_validate,
-)
-
-RULE_SELECTOR_DEFINITIONS = frozenset(
-    definition
-    for definition in SETTINGS_SCHEMA.definitions
-    if definition.group == SettingsGroup.RULE_SELECTION and definition.cli is not None and definition.cli.metavar == "RULE" and definition.cli.value_kind == SettingCLIValueKind.COMMA_LIST
-)
-RULE_SELECTOR_MAP_DEFINITIONS = frozenset(
-    definition
-    for definition in SETTINGS_SCHEMA.definitions
-    if definition.group == SettingsGroup.RULE_SELECTION and definition.cli is not None and definition.cli.metavar == "RULE_TOML" and definition.cli.value_kind == SettingCLIValueKind.TOML_MAP
 )

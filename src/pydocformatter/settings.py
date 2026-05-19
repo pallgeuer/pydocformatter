@@ -272,62 +272,6 @@ class SettingsSchema(Generic[SettingsT]):
             invalid_fields = ", ".join(f"{definition.field}: {definition.available_in_cli}/{definition.cli is not None}" for definition in invalid_definitions)
             raise AssertionError(f"Inconsistent settings definitions found in terms of CLI availability: {invalid_fields}")
 
-    def definitions_by_field(self) -> dict[str, SettingDefinition[Any]]:
-        """Return setting definitions keyed by dataclass field name.
-
-        Returns:
-            dict[str, SettingDefinition[Any]]: Definitions keyed by resolved settings dataclass field.
-        """
-        return {definition.field: definition for definition in self.definitions}
-
-    def definitions_by_key(self) -> dict[str, SettingDefinition[Any]]:
-        """Return setting definitions keyed by TOML setting key.
-
-        Returns:
-            dict[str, SettingDefinition[Any]]: Definitions keyed by TOML configuration key.
-        """
-        return {definition.key: definition for definition in self.definitions}
-
-    def toml_definitions(self) -> tuple[SettingDefinition[Any], ...]:
-        """Return setting definitions available in TOML configuration.
-
-        Returns:
-            tuple[SettingDefinition[Any], ...]: Definitions accepted from TOML files or inline TOML.
-        """
-        return tuple(definition for definition in self.definitions if definition.available_in_toml)
-
-    def toml_keys(self) -> tuple[str, ...]:
-        """Return TOML keys accepted by this settings schema.
-
-        Returns:
-            tuple[str, ...]: TOML keys accepted by this schema.
-        """
-        return tuple(definition.key for definition in self.definitions if definition.available_in_toml)
-
-    def cli_definitions(self) -> tuple[SettingDefinition[Any], ...]:
-        """Return setting definitions available as dedicated CLI options.
-
-        Returns:
-            tuple[SettingDefinition[Any], ...]: Definitions with dedicated CLI options.
-        """
-        return tuple(definition for definition in self.definitions if definition.available_in_cli)
-
-    def cli_keys(self) -> tuple[str, ...]:
-        """Return setting keys available as dedicated CLI options.
-
-        Returns:
-            tuple[str, ...]: TOML keys for settings that also have dedicated CLI options.
-        """
-        return tuple(definition.key for definition in self.definitions if definition.available_in_cli)
-
-    def cli_flags(self) -> tuple[str, ...]:
-        """Return CLI flags accepted by this settings schema.
-
-        Returns:
-            tuple[str, ...]: Registered CLI flags for all CLI-backed settings.
-        """
-        return tuple(flag for definition in self.definitions if definition.cli is not None for flag in definition.cli.flags)
-
     def load(self, *, global_values: GlobalArgs | None = None, args: argparse.Namespace | None = None, field_overrides: Mapping[str, Any] | None = None) -> SettingsT:
         """Resolve settings from defaults, config files, inline config, and optional CLI overrides.
 
@@ -765,7 +709,7 @@ def _apply_toml_section(schema: SettingsSchema[SettingsT], settings: SettingsT, 
 
 def _apply_field_values(schema: SettingsSchema[SettingsT], settings: SettingsT, *, values: Mapping[str, Any], context: str, key_based: bool) -> SettingsT:
     """Validate raw field values and return settings with those fields replaced."""
-    definitions_by_field = schema.definitions_by_field()
+    definitions_by_field = {definition.field: definition for definition in schema.definitions}
     updates: dict[str, Any] = {}
     for field, value in values.items():
         definition = definitions_by_field[field]

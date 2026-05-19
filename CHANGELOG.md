@@ -12,7 +12,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 
 - **CLI:**
   - Added Ruff-style subcommands with `pydocfmt check` for read-only checks and `pydocfmt check --fix` for formatting.
-  - Added `pydocfmt help [command]`, `pydocfmt version`, `pydocfmt --version`, and `pydocfmt check --show-settings`.
+  - Added `pydocfmt help [command]`, `pydocfmt version`, `pydocfmt --version`, `pydocfmt check --show-settings`, and `pydocfmt check --show-rules`.
   - Added `--line-ending` to control line endings used when rewriting files.
   - Added `--output-format grouped` for rule findings.
   - Added `--experimental` / `--no-experimental` for opting into the experimental formatter path.
@@ -24,6 +24,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added `--respect-gitignore` / `--no-respect-gitignore`, with enabled-by-default behavior and matching `pyproject.toml` configuration.
   - Added Ruff-style `--config` and `--isolated` global options for explicit config files, inline setting overrides, and config-free runs.
   - Added `pydocfmt config` to list and describe supported configuration options in text or JSON format.
+  - Added active-rule listing output for `pydocfmt check --show-rules`, including effective fixability markers.
 
 - **Configuration:**
   - Added `output-format` for formatter configuration, currently supporting only `"grouped"`.
@@ -36,6 +37,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 
 - **Documentation:**
   - Added a Ruff file-selection compatibility specification at `docs/file_selection_spec.md`, including exact defaults, precedence rules, force-exclude behavior, and explicit pydocformatter deviations.
+  - Added a rule-selection specification at `docs/rule_selection_spec.md`, covering rule collection, selectors, fixability, and future rule explanation output.
   - Added docstrings for public glob matching methods, the dependency-pin check tool, and important configuration, CLI, and file-selection helpers.
   - Completed Google-style docstrings for public source APIs and added concise docstrings for private helpers that previously lacked them.
 
@@ -55,6 +57,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - `pydocfmt` now exposes command-line overrides for Ruff-style rule settings.
   - `pydocfmt` now defaults to formatting the current directory when no files or directories are specified.
   - `--include`, `--extend-include`, `--exclude`, and `--extend-exclude` now accept multiple glob values in one option usage (e.g. `--include *.py *.pyi`).
+  - Check summaries now report fixed and remaining rule-check counts separately, including fixable remaining counts for diff output.
 
 - **Configuration:**
   - Simplified resolved CLI setting metadata so `SettingCLIDefinition` uses a generated dataclass initializer.
@@ -63,7 +66,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Renamed `SettingDefinition.type` to `value_type` to avoid ambiguity with argparse's `type` option.
   - Made `SettingDefinition` generic over its validated setting value and reordered its optional metadata fields.
   - Tightened `SettingsSchema.overrides_type` typing, reordered schema fields, and made `table_path` explicit.
-  - Converted settings schema definition/key helpers to methods and added CLI-specific key/flag helpers.
+  - Kept settings schema metadata lookups on the definitions tuple instead of separate convenience helpers.
   - Tightened `SettingCLIDefinition` type annotations to match the supported `argparse.add_argument` keyword shapes.
   - Limited automatic underscore-to-dash setting key derivation to the `SettingDefinition` default key construction path.
   - Renamed the configuration table from `[tool.pydocformatter]` to `[tool.pydocfmt]`.
@@ -92,6 +95,11 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Check-mode output now includes docstring and comment line locations, emitted once per subject per file with compressed consecutive ranges.
 
 - **Architecture:**
+  - Exposed rule metadata shortcuts such as `code`, `prefix`, and `fixable` as class-level properties on `RuleBase` subclasses.
+  - Changed rule metadata to expose ordered `code`, `prefix`, `number_str`, `number`, `name`, `message`, and `fixable` fields, with rule classes storing a single metadata object.
+  - Centralized rule code and selector parsing in `pydocformatter.rules.base`, including public regexes and selector matching helpers on `RuleMetadata`.
+  - Replaced the flat rule selector module with a modular `pydocformatter.rules` package, including `RuleBase`, `RuleMetadata`, decorator-based registration, and automatic collection from `rules/definitions/**`.
+  - Added `pydocformatter.rules_selection` to resolve rule selection and effective fixability after settings load, reporting selector issues as operational errors.
   - Renamed the generic settings module from `pydocformatter.config` to `pydocformatter.settings`, with `ConfigError` renamed to `SettingsError`.
   - Setting metadata now derives default TOML keys from field names and default CLI flags from setting keys, with `SettingCliDefinition` renamed to `SettingCLIDefinition`.
   - Utility helpers now live in explicit `pydocformatter.utils` submodules for diagnostics, glob matching, and line endings.
@@ -106,6 +114,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Renamed the CLI implementation module from `pydocformatter.cli.pydocfmt_main` to `pydocformatter.cli.main`.
   - Moved enabled-state help text formatting into the configuration layer.
   - Moved experimental file I/O diagnostics into the formatter layer.
+  - Simplified `RuleCollection` by removing convenience index properties and renaming selector existence checks to `selector_matches_some_rule`.
   - Moved generic settings loading, formatting, argparse setup, and CLI override extraction onto `SettingsSchema`.
   - Made `SettingsSchema.load` accept parsed argparse namespaces directly for command-line setting overrides.
   - Simplified schema-driven settings argument extraction by removing unused destination-prefix plumbing and helper indirection.
@@ -158,6 +167,8 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Removed the separate comment-formatting command and merged comment formatting into `pydocfmt`.
   - Removed tool-specific TOML configuration tables; nested formatter tables are now configuration errors.
   - Removed redundant shared CLI, formatter-type, and comment-command modules.
+  - Removed trivial `SettingsSchema` convenience helpers for field/key definition maps and CLI flag flattening.
+  - Removed unused rule-selector definition exports from check settings metadata.
 
 - **Developer dependencies:**
   - Removed the unused `build` and `twine` dev dependencies now that package build and publish workflows use uv directly.

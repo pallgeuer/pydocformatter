@@ -70,7 +70,8 @@ def run(args: argparse.Namespace) -> int:
     Returns:
         int: Process exit status code.
     """
-    definitions_by_key = {definition.key: definition for definition in settings_check.SETTINGS_SCHEMA.toml_definitions()}
+    toml_definitions = tuple(definition for definition in settings_check.SETTINGS_SCHEMA.definitions if definition.available_in_toml)
+    definitions_by_key = {definition.key: definition for definition in toml_definitions}
     if args.option is not None and args.option not in definitions_by_key:
         print(f"pydocfmt config: Argument error: Invalid value {args.option!r} for 'OPTION'", file=sys.stderr)
         return 2
@@ -79,13 +80,13 @@ def run(args: argparse.Namespace) -> int:
     if args.output_format == "json":
         output: ConfigOptionMetadata | dict[str, ConfigOptionMetadata]
         if args.option is None:
-            output = {definition.key: metadata_for_definition(definition, settings) for definition in settings_check.SETTINGS_SCHEMA.toml_definitions()}
+            output = {definition.key: metadata_for_definition(definition, settings) for definition in toml_definitions}
         else:
             output = metadata_for_definition(definitions_by_key[args.option], settings)
         print(json.dumps(output, indent=2))
     else:
         if args.option is None:
-            for definition in settings_check.SETTINGS_SCHEMA.toml_definitions():
+            for definition in toml_definitions:
                 print(definition.key)
         else:
             print(format_definition(definitions_by_key[args.option], settings), end="")

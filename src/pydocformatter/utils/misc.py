@@ -1,3 +1,52 @@
+from __future__ import annotations
+
+import functools
+from collections.abc import Callable
+from typing import Any, Generic, TypeVar, cast, overload
+
+_R_co = TypeVar("_R_co", covariant=True)
+
+
+class classproperty(Generic[_R_co]):
+    """A descriptor that computes a read-only value from the owning class.
+
+    Instance assignment/deletion is blocked. Class-level assignment/deletion can still replace/remove the descriptor
+    unless the metaclass prevents it.
+    """
+
+    fget: Callable[[type[Any]], _R_co]
+    __isabstractmethod__: bool
+
+    def __init__(self, fget: Callable[[type[Any]], _R_co]) -> None:
+        self.fget = fget
+        functools.update_wrapper(cast(Callable[..., Any], self), fget)
+        self.__isabstractmethod__ = getattr(fget, "__isabstractmethod__", False)
+
+    @overload
+    def __get__(self, obj: None, owner: type[Any]) -> _R_co: ...
+
+    @overload
+    def __get__(self, obj: object, owner: type[Any] | None = None) -> _R_co: ...
+
+    def __get__(self, obj: object | None, owner: type[Any] | None = None) -> _R_co:
+        if owner is None:
+            if obj is None:
+                raise TypeError("classproperty.__get__(None, None) is invalid")
+            owner = type(obj)
+        return self.fget(owner)
+
+    def __set__(self, obj: Any, value: Any) -> None:
+        name = getattr(self, "__name__", type(self).__name__)
+        raise AttributeError(f"Cannot set read-only classproperty {name!r}")
+
+    def __delete__(self, obj: Any) -> None:
+        name = getattr(self, "__name__", type(self).__name__)
+        raise AttributeError(f"Cannot delete read-only classproperty {name!r}")
+
+    def __repr__(self) -> str:
+        return f"<classproperty {self.fget!r}>"
+
+
 def auto_plural(count: int, word: str) -> str:
     """Return a singular or plural word for a count.
 

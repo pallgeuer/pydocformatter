@@ -317,14 +317,6 @@ class TestSettings(unittest.TestCase):
                 "force_exclude",
             ),
         )
-        self.assertEqual(
-            frozenset(definition.field for definition in pydocformatter_settings.RULE_SELECTOR_DEFINITIONS),
-            frozenset(("select", "ignore", "extend_select", "fixable", "unfixable", "extend_fixable")),
-        )
-        self.assertEqual(
-            frozenset(definition.field for definition in pydocformatter_settings.RULE_SELECTOR_MAP_DEFINITIONS),
-            frozenset(("per_file_ignores", "extend_per_file_ignores")),
-        )
 
     def test_settings_schema_add_arguments_adds_groups_in_order(self) -> None:
         parser = argparse.ArgumentParser()
@@ -335,18 +327,10 @@ class TestSettings(unittest.TestCase):
         self.assertLess(group_titles.index(SettingsGroup.FORMATTING.value), group_titles.index(SettingsGroup.RULE_SELECTION.value))
         self.assertLess(group_titles.index(SettingsGroup.RULE_SELECTION.value), group_titles.index(SettingsGroup.FILE_SELECTION.value))
         option_strings = {option for action in parser._actions for option in action.option_strings}
-        self.assertLessEqual(set(pydocformatter_settings.SETTINGS_SCHEMA.cli_flags()), option_strings)
-
-    def test_settings_schema_definition_methods_return_filtered_metadata(self) -> None:
-        schema = pydocformatter_settings.SETTINGS_SCHEMA
-
-        self.assertEqual(schema.definitions_by_field()["line_length"].key, "line-length")
-        self.assertEqual(schema.definitions_by_key()["line-length"].field, "line_length")
-        self.assertEqual(schema.toml_keys(), tuple(definition.key for definition in schema.toml_definitions()))
-        self.assertEqual(schema.cli_keys(), tuple(definition.key for definition in schema.cli_definitions()))
-        self.assertEqual(schema.cli_flags(), tuple(flag for definition in schema.cli_definitions() for flag in typing.cast(SettingCLIDefinition, definition.cli).flags))
-        self.assertTrue(all(definition.available_in_toml for definition in schema.toml_definitions()))
-        self.assertTrue(all(definition.available_in_cli for definition in schema.cli_definitions()))
+        schema_option_strings = {
+            flag for definition in pydocformatter_settings.SETTINGS_SCHEMA.definitions if definition.available_in_cli for flag in typing.cast(SettingCLIDefinition, definition.cli).flags
+        }
+        self.assertLessEqual(schema_option_strings, option_strings)
 
     def test_settings_schema_rejects_invalid_definition_group(self) -> None:
         class OtherGroup(enum.StrEnum):

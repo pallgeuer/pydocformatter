@@ -79,8 +79,9 @@ If no files or directories are specified, `pydocfmt check` checks the current di
 - `--help`: Show help message and exit
 - `--fix`, `--no-fix`: Toggle applying fixes instead of only checking
 - `--diff`: Print a unified diff for fixes without writing changed files
-- `--show-files`: Show file-selection decisions without formatting files
 - `--show-settings`: Show resolved settings without formatting files
+- `--show-rules`: Show active rules without formatting files
+- `--show-files`: Show file-selection decisions without formatting files
 - `-o`, `--output-file FILE`: Write diagnostics and show output to a file instead of stdout
 
 **Formatting:**
@@ -156,6 +157,9 @@ pydocfmt check --fix src/ --include "*.py,*.pyi"
 
 # Show resolved settings
 pydocfmt check --show-settings
+
+# Show active rules
+pydocfmt check --show-rules
 
 # Override one setting without editing pyproject.toml
 pydocfmt check --config "line-length = 100" src/
