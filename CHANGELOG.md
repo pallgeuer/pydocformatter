@@ -96,9 +96,11 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Check-mode output now includes docstring and comment line locations, emitted once per subject per file with compressed consecutive ranges.
 
 - **Architecture:**
+  - Added `RuleCode` and `RuleSelector` parsed value objects for rule metadata and selector handling.
+  - Simplified rule metadata parsing so split helpers return `(None, None)` for invalid codes/selectors, `ALL` is handled as a reserved selector in the base rule API, and collection relies on `RuleMetadata` post-init validation.
   - Exposed rule metadata shortcuts such as `code`, `prefix`, and `fixable` as class-level properties on `RuleBase` subclasses.
-  - Changed rule metadata to expose ordered `code`, `prefix`, `number_str`, `number`, `name`, `message`, and `fixable` fields, with rule classes storing a single metadata object.
-  - Centralized rule code and selector parsing in `pydocformatter.rules.base`, including public regexes and selector matching helpers on `RuleMetadata`.
+  - Changed rule metadata to expose ordered `code`, `name`, `message`, and `fixable` fields, with parsed code parts available on `RuleCode`.
+  - Centralized rule code and selector parsing in `pydocformatter.rules.base`, with selector matching handled by `RuleSelector.selects_code`.
   - Replaced the flat rule selector module with a modular `pydocformatter.rules` package, including `RuleBase`, `RuleMetadata`, decorator-based registration, and automatic collection from `rules/definitions/**`.
   - Added `pydocformatter.rules_selection` to resolve rule selection and effective fixability after settings load, reporting selector issues as operational errors.
   - Renamed the generic settings module from `pydocformatter.config` to `pydocformatter.settings`, with `ConfigError` renamed to `SettingsError`.
@@ -115,7 +117,11 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Renamed the CLI implementation module from `pydocformatter.cli.pydocfmt_main` to `pydocformatter.cli.main`.
   - Moved enabled-state help text formatting into the configuration layer.
   - Moved experimental file I/O diagnostics into the formatter layer.
-  - Simplified `RuleCollection` by removing convenience index properties and renaming selector existence checks to `selector_matches_some_rule`.
+  - Simplified `RuleCollection` by storing rule classes directly, exposing a rule-code-to-class index, and replacing string-based selector existence checks with `matching_rules_exist`.
+  - Rule registration now uses an explicit frozen `RuleRegistry`, allowing tests and custom collection paths to avoid stale global rule state.
+  - Rule collection now happens when `pydocformatter.rules.collection` is imported and is exposed as `RULE_COLLECTION`.
+  - Explicit rule package loading is now exposed as `import_package_rules`, with collections retrieved from the relevant `RuleRegistry`.
+  - `RuleBase` subclasses now fail at class definition time unless they define `meta` as a `RuleMetadata` instance.
   - Moved generic settings loading, formatting, argparse setup, and CLI override extraction onto `SettingsSchema`.
   - Made `SettingsSchema.load` accept parsed argparse namespaces directly for command-line setting overrides.
   - Simplified schema-driven settings argument extraction by removing unused destination-prefix plumbing and helper indirection.

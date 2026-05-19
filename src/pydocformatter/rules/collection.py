@@ -2,93 +2,87 @@ from __future__ import annotations
 
 import dataclasses
 import importlib
+import operator
 import pkgutil
 from types import ModuleType
+from typing import Callable, Iterable
 
-import pydocformatter.rules.base as rule_base
 import pydocformatter.rules.definitions as rule_definitions
-from pydocformatter.rules.base import RuleBase, RuleMetadata
+from pydocformatter.rules.base import RuleBase, RuleCode, RuleSelector
 
-ALL_RULE_CODE = "ALL"
-_REGISTERED_RULES: dict[str, type[RuleBase]] = {}
+
+@dataclasses.dataclass(frozen=True, init=False)
+class RuleCollection:
+    """Collected pydocformatter rule classes."""
+
+    rules: tuple[type[RuleBase], ...]
+    rule_class: dict[RuleCode, type[RuleBase]]
+
+    def __init__(self, rules: Iterable[type[RuleBase]]) -> None:
+        """Create a deterministically ordered rule collection from rule classes."""
+        rule_class_by_code: dict[RuleCode, type[RuleBase]] = {}
+        for rule in rules:
+            if not issubclass(rule, RuleBase):
+                raise TypeError(f"Collected rule must inherit RuleBase: {rule!r}")
+            existing = rule_class_by_code.get(rule.meta.code)
+            if existing is not None and existing is not rule:
+                raise ValueError(f"Duplicate rule code: {rule.meta.code}")
+            rule_class_by_code[rule.meta.code] = rule
+
+        sorted_rule_class = dict(sorted(rule_class_by_code.items(), key=operator.itemgetter(0)))
+        object.__setattr__(self, "rules", tuple(sorted_rule_class.values()))
+        object.__setattr__(self, "rule_class", sorted_rule_class)
+
+    def matching_rules_exist(self, selector: RuleSelector) -> bool:
+        """Return whether a selector matches at least one collected rule."""
+        return any(selector.selects_code(rule.meta.code) for rule in self.rules)
+
+    def matching_rules(self, selector: RuleSelector) -> tuple[type[RuleBase], ...]:
+        """Return collected rules matched by a selector."""
+        return tuple(rule for rule in self.rules if selector.selects_code(rule.meta.code))
 
 
 @dataclasses.dataclass(frozen=True)
-class RuleCollection:
-    """Collected pydocformatter rule metadata."""
+class RuleRegistry:
+    """Registry of rule implementation classes."""
 
-    rules: tuple[RuleMetadata, ...]
+    rule_classes: set[type[RuleBase]] = dataclasses.field(default_factory=set)
 
-    @classmethod
-    def from_metadata(cls, rules: tuple[RuleMetadata, ...]) -> RuleCollection:
-        """Return a deterministically ordered rule collection."""
-        metadata_by_rule_code: dict[str, RuleMetadata] = {}
-        for rule in rules:
-            _validate_rule_metadata(rule)
-            if rule.code in metadata_by_rule_code:
-                raise ValueError(f"Duplicate rule code: {rule.code}")
-            metadata_by_rule_code[rule.code] = rule
-        return cls(rules=tuple(sorted(metadata_by_rule_code.values(), key=lambda rule: rule.code)))
+    def register(self, rule_class: type[RuleBase]) -> type[RuleBase]:
+        """Register a rule implementation class for collection."""
+        if not issubclass(rule_class, RuleBase):
+            raise TypeError(f"Registered rule must inherit RuleBase: {rule_class!r}")
+        self.rule_classes.add(rule_class)
+        return rule_class
 
-    @classmethod
-    def from_rule_classes(cls, rule_classes: tuple[type[RuleBase], ...]) -> RuleCollection:
-        """Return a rule collection from registered rule classes."""
-        return cls.from_metadata(tuple(rule_class.meta for rule_class in rule_classes))
-
-    def selector_matches_some_rule(self, selector: str) -> bool:
-        """Return whether a selector matches at least one collected rule."""
-        if selector == ALL_RULE_CODE:
-            return bool(self.rules)
-
-        try:
-            prefix, number_str = rule_base.split_rule_selector(selector)
-        except ValueError:
-            return False
-        return any(rule.matches_selector_parts(prefix, number_str) for rule in self.rules)
-
-    def matching_rules(self, selector: str) -> tuple[RuleMetadata, ...]:
-        """Return collected rules matched by a selector."""
-        if selector == ALL_RULE_CODE:
-            return self.rules
-
-        try:
-            prefix, number_str = rule_base.split_rule_selector(selector)
-        except ValueError:
-            return ()
-        return tuple(rule for rule in self.rules if rule.matches_selector_parts(prefix, number_str))
+    def collection(self) -> RuleCollection:
+        """Return a deterministically ordered rule collection from registered rules."""
+        return RuleCollection(self.rule_classes)
 
 
 def register_rule(rule_class: type[RuleBase]) -> type[RuleBase]:
     """Register a rule implementation class for collection."""
-    if not issubclass(rule_class, RuleBase):
-        raise TypeError(f"Registered rule must inherit RuleBase: {rule_class!r}")
-
-    metadata = rule_class.meta
-    _validate_rule_metadata(metadata)
-    existing = _REGISTERED_RULES.get(metadata.code)
-    if existing is not None and existing is not rule_class:
-        raise ValueError(f"Duplicate rule code: {metadata.code}")
-    _REGISTERED_RULES[metadata.code] = rule_class
-    return rule_class
+    return DEFAULT_RULE_REGISTRY.register(rule_class)
 
 
-def collect_rules(*, definitions_package: ModuleType = rule_definitions) -> RuleCollection:
-    """Import rule definition modules and return the registered rule collection."""
-    if not hasattr(definitions_package, "__path__"):
-        raise TypeError(f"Rule definitions package has no __path__: {definitions_package.__name__}")
+def register_rule_to(registry: RuleRegistry) -> Callable[[type[RuleBase]], type[RuleBase]]:
+    """Return a rule decorator that registers rule classes to a specific registry."""
 
-    package_prefix = f"{definitions_package.__name__}."
-    for module in pkgutil.walk_packages(definitions_package.__path__, package_prefix):
+    def decorator(rule_class: type[RuleBase]) -> type[RuleBase]:
+        """Register a rule class to the bound registry."""
+        return registry.register(rule_class)
+
+    return decorator
+
+
+def import_package_rules(*, package: ModuleType) -> None:
+    """Import rule definition modules from a package."""
+    if not hasattr(package, "__path__"):
+        raise TypeError(f"Rule definitions package has no __path__: {package.__name__}")
+    for module in pkgutil.walk_packages(path=package.__path__, prefix=f"{package.__name__}."):
         importlib.import_module(module.name)
 
-    return RuleCollection.from_rule_classes(tuple(_REGISTERED_RULES[rule_code] for rule_code in sorted(_REGISTERED_RULES)))
 
-
-def _validate_rule_metadata(rule: RuleMetadata) -> None:
-    """Validate rule metadata supplied by rule definitions."""
-    if not rule_base.rule_code_is_valid(rule.code):
-        raise ValueError(f"{rule.code}: Rule code must match {rule_base.RULE_CODE_RE.pattern!r}")
-    if not rule.name:
-        raise ValueError(f"{rule.code}: Rule name must not be empty")
-    if not rule.message:
-        raise ValueError(f"{rule.code}: Rule message must not be empty")
+DEFAULT_RULE_REGISTRY = RuleRegistry()
+import_package_rules(package=rule_definitions)
+RULE_COLLECTION = DEFAULT_RULE_REGISTRY.collection()

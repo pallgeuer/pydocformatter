@@ -15,11 +15,11 @@ import pydocformatter.formatter as formatter
 import pydocformatter.formatters.pydocfmt as pydocfmt
 from pydocformatter.cli.settings_check import CheckSettings
 from pydocformatter.formatter import FormatterResult, RuleFinding
-from pydocformatter.rules.base import RuleMetadata
+from pydocformatter.rules.base import RuleCode, RuleMetadata
 
-PDF001_RULE = RuleMetadata(code="PDF001", name="reflow-required", message="Docstring chunk needs reflow", fixable=True)
-PDF105_RULE = RuleMetadata(code="PDF105", name="summary-too-long", message="Docstring summary does not fit on one line", fixable=False)
-PCF100_RULE = RuleMetadata(code="PCF100", name="comment-formatting-needed", message="Comment needs formatting", fixable=True)
+PDF001_RULE = RuleMetadata(code=RuleCode("PDF001"), name="reflow-required", message="Docstring chunk needs reflow", fixable=True)
+PDF105_RULE = RuleMetadata(code=RuleCode("PDF105"), name="summary-too-long", message="Docstring summary does not fit on one line", fixable=False)
+PCF100_RULE = RuleMetadata(code=RuleCode("PCF100"), name="comment-formatting-needed", message="Comment needs formatting", fixable=True)
 
 
 class TestFormatterResults(unittest.TestCase):
@@ -40,7 +40,7 @@ class TestFormatterResults(unittest.TestCase):
         modified = FormatterResult(path="a.py", old_source="", new_source="", modified=True, fixed_findings=collections.Counter({PDF001_RULE: 1}), unfixed_findings=(), errors=())
         finding = RuleFinding(
             rule=RuleMetadata(
-                code="PDF105",
+                code=RuleCode("PDF105"),
                 name="summary-too-long",
                 message="Docstring summary does not fit on one line",
                 fixable=False,
@@ -60,7 +60,7 @@ class TestFormatterResults(unittest.TestCase):
 
     def test_rule_finding_uses_rule_defaults_with_per_finding_overrides(self) -> None:
         rule = RuleMetadata(
-            code="PDF001",
+            code=RuleCode("PDF001"),
             name="reflow-required",
             message="Docstring chunk needs reflow",
             fixable=True,
@@ -80,7 +80,7 @@ class TestFormatterResults(unittest.TestCase):
         self.assertFalse(overridden_finding.fixable)
 
     def test_rule_metadata_and_finding_keys_are_sortable(self) -> None:
-        later_rule = RuleMetadata(code="PDF999", name="later", message="Later", fixable=True)
+        later_rule = RuleMetadata(code=RuleCode("PDF999"), name="later", message="Later", fixable=True)
 
         self.assertEqual(sorted((later_rule, PDF001_RULE)), [PDF001_RULE, later_rule])
         self.assertTrue(dataclasses.is_dataclass(RuleFinding.Key))
@@ -397,7 +397,7 @@ class TestFormatterResults(unittest.TestCase):
             root = Path(td)
             target = root / "a.py"
             target.write_text("x = 1\n", encoding="utf-8")
-            rule = RuleMetadata(code="PDF105", name="summary-too-long", message="Docstring summary does not fit on one line", fixable=False)
+            rule = RuleMetadata(code=RuleCode("PDF105"), name="summary-too-long", message="Docstring summary does not fit on one line", fixable=False)
 
             def fake_format_file_exp(path: str, *, file: object = None, settings: CheckSettings, fix: bool, write: bool) -> FormatterResult:
                 del file, settings, fix, write
@@ -444,7 +444,7 @@ class TestFormatterResults(unittest.TestCase):
             root = Path(td)
             target = root / "a.py"
             target.write_text("x = 1\n", encoding="utf-8")
-            rule = RuleMetadata(code="PDF105", name="summary-too-long", message="Docstring summary does not fit on one line", fixable=False)
+            rule = RuleMetadata(code=RuleCode("PDF105"), name="summary-too-long", message="Docstring summary does not fit on one line", fixable=False)
 
             def fake_format_file_exp(path: str, *, file: object = None, settings: CheckSettings, fix: bool, write: bool) -> FormatterResult:
                 del file, settings, fix, write
@@ -493,7 +493,7 @@ class TestFormatterResults(unittest.TestCase):
         self.assertEqual(len(results), 1)
         self.assertFalse(results[0].modified)
         self.assertEqual(len(results[0].unfixed_findings), 1)
-        self.assertEqual(results[0].unfixed_findings[0].rule.code, "PDF000")
+        self.assertEqual(results[0].unfixed_findings[0].rule.code.tag, "PDF000")
         self.assertEqual(results[0].unfixed_findings[0].line_numbers, (1, 3, 5))
 
     def test_legacy_check_result_uses_zero_line_fallback_for_missing_changed_lines(self) -> None:

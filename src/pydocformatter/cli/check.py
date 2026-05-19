@@ -23,10 +23,10 @@ import pydocformatter.utils.misc as misc
 from pydocformatter.cli.settings_check import SETTINGS_SCHEMA, CheckSettings, OutputFormat
 from pydocformatter.file_selection import STDIN_VIRTUAL_FILE, FileDecision, FileSelectionError, SelectionResult
 from pydocformatter.formatter import FormatterResult, RuleFinding
-from pydocformatter.rules.base import RuleMetadata
+from pydocformatter.rules.base import RuleCode, RuleMetadata
 from pydocformatter.rules_selection import RuleSelection
 
-LEGACY_FORMAT_RULE_META = RuleMetadata(code="PDF000", name="legacy-formatting-needed", message="Needs formatting", fixable=True)
+LEGACY_FORMAT_RULE_META = RuleMetadata(code=RuleCode("PDF000"), name="legacy-formatting-needed", message="Needs formatting", fixable=True)
 
 
 class OutputError(Exception):

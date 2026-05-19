@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import functools
+import operator
 import os
 from collections.abc import Callable
 from typing import Any, Generic, TypeVar, cast, overload
@@ -46,6 +47,11 @@ class classproperty(Generic[_R_co]):
 
     def __repr__(self) -> str:
         return f"<classproperty {self.fget!r}>"
+
+
+def alias_to_class_field(field_path: str) -> classproperty[Any]:
+    """Create a classproperty that delegates to a nested field path."""
+    return classproperty(operator.attrgetter(field_path))
 
 
 def auto_plural(count: int, word: str) -> str:

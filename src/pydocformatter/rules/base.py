@@ -1,79 +1,106 @@
 from __future__ import annotations
 
 import dataclasses
-import operator
 import re
-from typing import Any, ClassVar
+from typing import ClassVar
 
-from pydocformatter.utils.misc import classproperty
+import pydocformatter.utils.misc as misc
 
-RULE_CODE_RE = re.compile(r"^([A-Z]+)([0-9]+)$")
-RULE_SELECTOR_RE = re.compile(r"^([A-Z]+)([0-9]*)$")
-
-
-def rule_code_is_valid(code: str) -> bool:
-    """Return whether a string is a valid full rule code."""
-    return RULE_CODE_RE.fullmatch(code) is not None
+_RULE_CODE_RE = re.compile(r"^([A-Z]+)([0-9]+)$")
+_RULE_SELECTOR_RE = re.compile(r"^([A-Z]+)([0-9]*)$")
+ALL_RULE_SELECTOR_TAG = "ALL"
 
 
-def rule_selector_is_valid(selector: str) -> bool:
-    """Return whether a string is a valid rule selector."""
-    return RULE_SELECTOR_RE.fullmatch(selector) is not None
+@dataclasses.dataclass(frozen=True, order=True)
+class RuleCode:
+    """Parsed pydocformatter rule code."""
+
+    tag: str
+    prefix: str = dataclasses.field(init=False)
+    number_str: str = dataclasses.field(init=False)
+    number: int = dataclasses.field(init=False)
+
+    @staticmethod
+    def is_valid_tag(tag: str) -> bool:
+        """Return whether a string is a valid rule code tag."""
+        return _RULE_CODE_RE.fullmatch(tag) is not None and not tag.startswith(ALL_RULE_SELECTOR_TAG)
+
+    def __post_init__(self) -> None:
+        """Derive rule code parts from the full tag."""
+        match = _RULE_CODE_RE.fullmatch(self.tag)
+        if match is None or self.tag.startswith(ALL_RULE_SELECTOR_TAG):
+            raise ValueError(f"Invalid rule code: {self.tag}")
+        prefix, number_str = match.groups()
+        object.__setattr__(self, "prefix", prefix)
+        object.__setattr__(self, "number_str", number_str)
+        object.__setattr__(self, "number", int(number_str))
+
+    def __str__(self) -> str:
+        """Return the full rule code tag."""
+        return self.tag
+
+    def __format__(self, format_spec: str) -> str:
+        """Format the full rule code tag."""
+        return self.tag.__format__(format_spec)
 
 
-def split_rule_code(code: str) -> tuple[str, str]:
-    """Return the prefix and number string parts of a full rule code."""
-    match = RULE_CODE_RE.fullmatch(code)
-    if match is None:
-        raise ValueError(f"Invalid rule code: {code}")
-    prefix, number_str = match.groups()
-    return prefix, number_str
+@dataclasses.dataclass(frozen=True, order=True)
+class RuleSelector:
+    """Parsed pydocformatter rule selector."""
 
+    tag: str
+    prefix: str = dataclasses.field(init=False)
+    number_str: str = dataclasses.field(init=False)
 
-def split_rule_selector(selector: str) -> tuple[str, str]:
-    """Return the prefix and number string parts of a rule selector."""
-    match = RULE_SELECTOR_RE.fullmatch(selector)
-    if match is None:
-        raise ValueError(f"Invalid rule selector: {selector}")
-    prefix, number_str = match.groups()
-    return prefix, number_str
+    @staticmethod
+    def is_valid_tag(tag: str) -> bool:
+        """Return whether a string is a valid rule selector tag."""
+        return tag == ALL_RULE_SELECTOR_TAG or (_RULE_SELECTOR_RE.fullmatch(tag) is not None and not tag.startswith(ALL_RULE_SELECTOR_TAG))
+
+    def __post_init__(self) -> None:
+        """Derive selector parts from the full tag."""
+        if self.tag == ALL_RULE_SELECTOR_TAG:
+            prefix, number_str = ALL_RULE_SELECTOR_TAG, ""
+        else:
+            match = _RULE_SELECTOR_RE.fullmatch(self.tag)
+            if match is None or self.tag.startswith(ALL_RULE_SELECTOR_TAG):
+                raise ValueError(f"Invalid rule selector: {self.tag}")
+            prefix, number_str = match.groups()
+            if prefix is None or number_str is None:
+                raise ValueError(f"Invalid rule selector: {self.tag}")
+        object.__setattr__(self, "prefix", prefix)
+        object.__setattr__(self, "number_str", number_str)
+
+    def selects_code(self, code: RuleCode) -> bool:
+        """Return whether this selector selects a rule code."""
+        return self.prefix == ALL_RULE_SELECTOR_TAG or (self.prefix == code.prefix and (not self.number_str or code.number_str.startswith(self.number_str)))
+
+    def __str__(self) -> str:
+        """Return the full rule selector tag."""
+        return self.tag
+
+    def __format__(self, format_spec: str) -> str:
+        """Format the full rule selector tag."""
+        return self.tag.__format__(format_spec)
 
 
 @dataclasses.dataclass(frozen=True, order=True)
 class RuleMetadata:
     """Metadata for a pydocformatter rule."""
 
-    code: str
-    prefix: str = dataclasses.field(init=False)
-    number_str: str = dataclasses.field(init=False)
-    number: int = dataclasses.field(init=False)
+    code: RuleCode
     name: str
     message: str
     fixable: bool
 
     def __post_init__(self) -> None:
-        """Derive rule selector metadata from the full rule code."""
-        prefix, number_str = split_rule_code(self.code)
-        object.__setattr__(self, "prefix", prefix)
-        object.__setattr__(self, "number_str", number_str)
-        object.__setattr__(self, "number", int(number_str))
-
-    def matches_selector(self, selector: str) -> bool:
-        """Return whether this rule is matched by a rule selector."""
-        try:
-            prefix, number_str = split_rule_selector(selector)
-        except ValueError:
-            return False
-        return self.matches_selector_parts(prefix, number_str)
-
-    def matches_selector_parts(self, prefix: str, number_str: str) -> bool:
-        """Return whether this rule is matched by selector parts."""
-        return prefix == "ALL" or (prefix == self.prefix and (not number_str or self.number_str.startswith(number_str)))
-
-
-def _alias_meta_field(name: str) -> classproperty[Any]:
-    """Create a classproperty that delegates to meta.<name>."""
-    return classproperty(operator.attrgetter(f"meta.{name}"))
+        """Validate rule metadata fields."""
+        if not isinstance(self.code, RuleCode):
+            raise TypeError(f"Expected RuleCode, got {type(self.code).__name__}")
+        if not self.name:
+            raise ValueError(f"{self.code}: Rule name must not be empty")
+        if not self.message:
+            raise ValueError(f"{self.code}: Rule message must not be empty")
 
 
 class RuleBase:
@@ -81,10 +108,18 @@ class RuleBase:
 
     meta: ClassVar[RuleMetadata]
 
-    code = _alias_meta_field("code")
-    prefix = _alias_meta_field("prefix")
-    number_str = _alias_meta_field("number_str")
-    number = _alias_meta_field("number")
-    name = _alias_meta_field("name")
-    message = _alias_meta_field("message")
-    fixable = _alias_meta_field("fixable")
+    code = misc.alias_to_class_field("meta.code.tag")
+    prefix = misc.alias_to_class_field("meta.code.prefix")
+    number_str = misc.alias_to_class_field("meta.code.number_str")
+    number = misc.alias_to_class_field("meta.code.number")
+    name = misc.alias_to_class_field("meta.name")
+    message = misc.alias_to_class_field("meta.message")
+    fixable = misc.alias_to_class_field("meta.fixable")
+
+    def __init_subclass__(cls) -> None:
+        """Require implemented rule classes to define metadata."""
+        super().__init_subclass__()
+        if "meta" not in cls.__dict__:
+            raise TypeError(f"{cls.__name__} must define RuleMetadata as 'meta'")
+        if not isinstance(cls.meta, RuleMetadata):
+            raise TypeError(f"{cls.__name__}.meta must be a RuleMetadata instance")

@@ -15,10 +15,10 @@ import pydocformatter.cli.settings_check as settings_check
 import pydocformatter.formatters.pydocfmt as pydocfmt
 from pydocformatter.cli.settings_check import CheckSettings
 from pydocformatter.formatter import FormatterResult, RuleFinding
-from pydocformatter.rules.base import RuleMetadata
+from pydocformatter.rules.base import RuleCode, RuleMetadata
 
-PDF001_RULE = RuleMetadata(code="PDF001", name="reflow-required", message="Docstring chunk needs reflow", fixable=True)
-PCF001_RULE = RuleMetadata(code="PCF001", name="comment-formatting-needed", message="Comment needs formatting", fixable=True)
+PDF001_RULE = RuleMetadata(code=RuleCode("PDF001"), name="reflow-required", message="Docstring chunk needs reflow", fixable=True)
+PCF001_RULE = RuleMetadata(code=RuleCode("PCF001"), name="comment-formatting-needed", message="Comment needs formatting", fixable=True)
 
 
 class TestCLIShowFiles(unittest.TestCase):
@@ -1379,7 +1379,7 @@ class TestCLIShowFiles(unittest.TestCase):
             formatted_source = "x = 2\n"
             target.write_text(original_source, encoding="utf-8")
             stdout = StringIO()
-            rule = RuleMetadata(code="PDF105", name="summary-too-long", message="Docstring summary does not fit on one line", fixable=False)
+            rule = RuleMetadata(code=RuleCode("PDF105"), name="summary-too-long", message="Docstring summary does not fit on one line", fixable=False)
             called_args: list[tuple[bool, bool]] = []
 
             def fake_format(path: str, *, file: TextIO | None = None, settings: CheckSettings, fix: bool, write: bool) -> FormatterResult:

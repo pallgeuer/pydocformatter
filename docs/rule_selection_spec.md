@@ -14,9 +14,9 @@ src/pydocformatter/rules/definitions/PDF/PDF001_reflow_required.py
 
 The module registers exactly one `RuleBase` subclass with `@register_rule`. The class defines static metadata:
 
-- `code`: Full rule code, such as `"PDF001"`.
-- `prefix`: Alphabetic rule prefix derived from `code`, such as `"PDF"`.
-- `number`: Numeric rule suffix derived from `code`, such as `1`.
+- `code`: Parsed `RuleCode` metadata for the full rule code tag, such as `"PDF001"`.
+- `code.prefix`: Alphabetic rule prefix derived from `code`, such as `"PDF"`.
+- `code.number`: Numeric rule suffix derived from `code`, such as `1`.
 - `name`: Stable machine-readable rule name, such as `"reflow-required"`.
 - `message`: Default diagnostic message. It may include format fields such as `{section}` for per-finding message customization.
 - `fixable`: Whether the rule is inherently fixable in at least some situations.
@@ -25,7 +25,9 @@ No rule application or fix method interface is specified yet. That interface wil
 
 ## Collection
 
-`pydocformatter.rules.collection.collect_rules()` imports every module below `rules/definitions/**` and returns a `RuleCollection` built from decorated rule classes.
+Importing `pydocformatter.rules.collection` imports every module below `rules/definitions/**` and exposes the resulting class-based `RuleCollection` as `RULE_COLLECTION`. A collection stores rule classes in deterministic rule-code order in `rules`, and exposes the same order through the `rule_class` code-to-class mapping.
+
+Built-in rules use the default registry through `@register_rule`. `pydocformatter.rules.collection.import_package_rules(package=...)` remains available for explicit package imports, including custom definitions packages and tests. Test or custom rule modules can use `register_rule_to(registry)` when they need a decorator bound to a non-default registry, then call `registry.collection()` after importing the package to collect from that isolated registration state.
 
 The initial catalog intentionally contains no implemented rules. With the default settings, an empty catalog resolves to an empty active ruleset without errors.
 
