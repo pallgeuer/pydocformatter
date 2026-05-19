@@ -34,6 +34,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added Ruff-style rule settings under `[tool.pydocfmt]`: `select`, `ignore`, `extend-select`, `per-file-ignores`, `extend-per-file-ignores`, `fixable`, `unfixable`, and `extend-fixable`.
   - Added `respect-gitignore` for formatter configuration, defaulting to `true`.
   - Added explicit config-file support for `--config PATH`, including pyproject-style `[tool.pydocfmt]` files and dedicated top-level pydocfmt TOML files.
+  - Added auto-discovery for `[tool.pydocfmt]` in the nearest containing Git root `pyproject.toml`, with current directory `pyproject.toml` taking precedence.
 
 - **Documentation:**
   - Added a Ruff file-selection compatibility specification at `docs/file_selection_spec.md`, including exact defaults, precedence rules, force-exclude behavior, and explicit pydocformatter deviations.

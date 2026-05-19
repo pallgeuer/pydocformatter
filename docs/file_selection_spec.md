@@ -46,10 +46,11 @@ Configuration is read from `[tool.pydocfmt]`.
 Resolution order:
 
 1. Start with hard-coded defaults.
-2. Apply auto-discovered `[tool.pydocfmt]` from `pyproject.toml`, unless `--isolated` is set.
-3. Apply explicit `--config PATH` files.
-4. Apply inline `--config "<KEY> = <VALUE>"` settings.
-5. Apply dedicated command-line options.
+2. Apply auto-discovered `[tool.pydocfmt]` from the nearest containing Git root `pyproject.toml`, if a Git root exists, unless `--isolated` is set.
+3. Apply auto-discovered `[tool.pydocfmt]` from the current directory `pyproject.toml`, unless `--isolated` is set.
+4. Apply explicit `--config PATH` files.
+5. Apply inline `--config "<KEY> = <VALUE>"` settings.
+6. Apply dedicated command-line options.
 
 For every setting, including `extend-include` and `extend-exclude`, the highest-precedence specified value wins. Lists do not accumulate across configuration and command-line layers.
 

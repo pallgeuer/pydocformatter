@@ -34,6 +34,11 @@ from pydocformatter.settings import (
 
 
 class TestSettings(unittest.TestCase):
+    @staticmethod
+    def _write_git_marker(root: Path) -> None:
+        """Write a minimal git worktree marker in a temporary root."""
+        (root / ".git").write_text("gitdir: .git-test\n", encoding="utf-8")
+
     def test_check_settings_schema_uses_generic_settings_definitions(self) -> None:
         self.assertIs(pydocformatter_settings.SETTINGS_SCHEMA.settings_type, CheckSettings)
         self.assertIs(pydocformatter_settings.SETTINGS_SCHEMA.overrides_type, CheckSettingsOverrides)
@@ -444,6 +449,114 @@ class TestSettings(unittest.TestCase):
         self.assertEqual(config.unfixable, ())
         self.assertEqual(config.per_file_ignores, ())
         self.assertEqual(config.extend_per_file_ignores, ())
+
+    def test_git_root_pyproject_is_loaded_from_subdirectory(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            subdir = root / "src"
+            subdir.mkdir()
+            self._write_git_marker(root)
+            (root / "pyproject.toml").write_text(
+                "[tool.pydocfmt]\nline-length = 73\n",
+                encoding="utf-8",
+            )
+            previous_cwd = os.getcwd()
+            os.chdir(subdir)
+            try:
+                config = pydocformatter_settings.SETTINGS_SCHEMA.load()
+            finally:
+                os.chdir(previous_cwd)
+
+        self.assertEqual(config.line_length, 73)
+
+    def test_current_directory_pyproject_overrides_git_root_pyproject(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            subdir = root / "src"
+            subdir.mkdir()
+            self._write_git_marker(root)
+            (root / "pyproject.toml").write_text(
+                "[tool.pydocfmt]\nline-length = 73\nindent-width = 2\n",
+                encoding="utf-8",
+            )
+            (subdir / "pyproject.toml").write_text(
+                "[tool.pydocfmt]\nline-length = 74\n",
+                encoding="utf-8",
+            )
+            previous_cwd = os.getcwd()
+            os.chdir(subdir)
+            try:
+                config = pydocformatter_settings.SETTINGS_SCHEMA.load()
+            finally:
+                os.chdir(previous_cwd)
+
+        self.assertEqual(config.line_length, 74)
+        self.assertEqual(config.indent_width, 2)
+
+    def test_config_options_override_auto_discovered_git_root_and_current_pyprojects(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            subdir = root / "src"
+            subdir.mkdir()
+            self._write_git_marker(root)
+            (root / "pyproject.toml").write_text(
+                "[tool.pydocfmt]\nline-length = 73\nindent-width = 2\n",
+                encoding="utf-8",
+            )
+            (subdir / "pyproject.toml").write_text(
+                "[tool.pydocfmt]\nline-length = 74\n",
+                encoding="utf-8",
+            )
+            config_path = root / "pydocfmt.toml"
+            config_path.write_text(
+                "line-length = 75\nindent-width = 3\n",
+                encoding="utf-8",
+            )
+            previous_cwd = os.getcwd()
+            os.chdir(subdir)
+            try:
+                config = pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(config_options=(str(config_path), "line-length = 76")))
+            finally:
+                os.chdir(previous_cwd)
+
+        self.assertEqual(config.line_length, 76)
+        self.assertEqual(config.indent_width, 3)
+
+    def test_isolated_ignores_git_root_and_current_directory_pyprojects(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            subdir = root / "src"
+            subdir.mkdir()
+            self._write_git_marker(root)
+            (root / "pyproject.toml").write_text(
+                "[tool.pydocfmt]\nline-length = 73\n",
+                encoding="utf-8",
+            )
+            (subdir / "pyproject.toml").write_text(
+                "[tool.pydocfmt]\nline-length = 74\n",
+                encoding="utf-8",
+            )
+            previous_cwd = os.getcwd()
+            os.chdir(subdir)
+            try:
+                config = pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(isolated=True))
+            finally:
+                os.chdir(previous_cwd)
+
+        self.assertEqual(config.line_length, 88)
+
+    def test_auto_discovered_pyproject_paths_deduplicates_current_git_root(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            self._write_git_marker(root)
+            previous_cwd = os.getcwd()
+            os.chdir(root)
+            try:
+                paths = pydocformatter_settings_core._auto_discovered_pyproject_paths()
+            finally:
+                os.chdir(previous_cwd)
+
+        self.assertEqual(paths, ("pyproject.toml",))
 
     def test_rule_settings_accept_all_rule_prefixes(self) -> None:
         with tempfile.TemporaryDirectory() as td:

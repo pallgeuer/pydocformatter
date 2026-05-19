@@ -10,6 +10,7 @@ from collections.abc import Callable, Iterable, Mapping
 from types import GenericAlias
 from typing import Any, Generic, TypeAlias, TypedDict, TypeVar, cast
 
+import pydocformatter.utils.misc as misc
 from pydocformatter.cli.global_args import GlobalArgs
 
 SettingsT = TypeVar("SettingsT")
@@ -304,7 +305,8 @@ class SettingsSchema(Generic[SettingsT]):
             if path_options:
                 raise SettingsError("The argument --config=PATH cannot be used with --isolated")
         else:
-            settings = _apply_toml_file(self, settings, path="pyproject.toml", required=False)
+            for path in _auto_discovered_pyproject_paths():
+                settings = _apply_toml_file(self, settings, path=path, required=False)
             for option in path_options:
                 settings = _apply_toml_file(self, settings, path=option, required=True)
 
@@ -654,6 +656,20 @@ def _load_toml_file(path: str, *, required: bool) -> dict[str, Any] | None:
     if not isinstance(config, dict):
         raise SettingsError(f"{path}: Must contain a TOML table")
     return config
+
+
+def _auto_discovered_pyproject_paths() -> tuple[str, ...]:
+    """Return auto-discovered pyproject paths in increasing precedence order."""
+    current_pyproject_path = "pyproject.toml"
+    current_pyproject_absolute_path = os.path.abspath(current_pyproject_path)
+    git_root = misc.find_git_root_for_path(os.getcwd())
+    if git_root is None:
+        return (current_pyproject_path,)
+
+    git_root_pyproject_path = os.path.abspath(os.path.join(git_root, "pyproject.toml"))
+    if git_root_pyproject_path == current_pyproject_absolute_path:
+        return (current_pyproject_path,)
+    return git_root_pyproject_path, current_pyproject_path
 
 
 def _toml_section_at_table_path(config: dict[str, Any], *, path: str, table_path: tuple[str, ...], required: bool) -> dict[str, Any] | None:

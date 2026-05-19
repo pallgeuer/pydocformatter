@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import functools
+import os
 from collections.abc import Callable
 from typing import Any, Generic, TypeVar, cast, overload
 
@@ -58,6 +59,49 @@ def auto_plural(count: int, word: str) -> str:
         str: `word` when count is one, otherwise `word` with a trailing `s`.
     """
     return word if count == 1 else f"{word}s"
+
+
+def find_git_root_for_path(path: str, root_cache: dict[str, str | None] | None = None) -> str | None:
+    """Find and optionally cache the nearest containing Git root for a path."""
+    absolute_path = os.path.abspath(path)
+    start_dir = absolute_path if os.path.isdir(absolute_path) else os.path.dirname(absolute_path)
+    if root_cache is not None and start_dir in root_cache:
+        return root_cache[start_dir]
+
+    visited_dirs: list[str] = []
+    current_dir = os.path.abspath(start_dir)
+    while True:
+        if root_cache is not None and current_dir in root_cache:
+            git_root = root_cache[current_dir]
+            for visited_dir in visited_dirs:
+                root_cache[visited_dir] = git_root
+            return git_root
+
+        visited_dirs.append(current_dir)
+        git_marker = os.path.join(current_dir, ".git")
+        if _is_valid_git_marker(git_marker):
+            if root_cache is not None:
+                for visited_dir in visited_dirs:
+                    root_cache[visited_dir] = current_dir
+            return current_dir
+
+        parent_dir = os.path.dirname(current_dir)
+        if parent_dir == current_dir:
+            if root_cache is not None:
+                for visited_dir in visited_dirs:
+                    root_cache[visited_dir] = None
+            return None
+        current_dir = parent_dir
+
+
+def _is_valid_git_marker(path: str) -> bool:
+    """Return whether a .git path looks like a worktree marker."""
+    if os.path.isfile(path):
+        return True
+    elif not os.path.isdir(path):
+        return False
+    else:
+        return os.path.exists(os.path.join(path, "HEAD"))
 
 
 def format_line_ranges(line_numbers: list[int]) -> str:

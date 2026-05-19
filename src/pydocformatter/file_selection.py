@@ -4,6 +4,7 @@ import subprocess
 from collections import defaultdict
 from enum import Enum
 
+import pydocformatter.utils.misc as misc
 from pydocformatter.cli.settings_check import CheckSettings
 from pydocformatter.utils.globs import GlobPatternSet
 
@@ -204,14 +205,14 @@ def _collect_candidates(
     candidates: list[_CollectedPath] = []
     for path in paths:
         if os.path.isdir(path):
-            if exclude_matcher.matches(_normalized_posix_path(path, root_cache)):
+            if exclude_matcher.matches(_git_root_or_cwd_relative_posix_path(path, root_cache)):
                 candidates.append(_excluded_directory_decision(path, explicit=True))
                 continue
             for root, dirs, files in os.walk(path):
                 kept_dirs = []
                 for name in sorted(dirs):
                     directory = os.path.join(root, name)
-                    if exclude_matcher.matches(_normalized_posix_path(directory, root_cache)):
+                    if exclude_matcher.matches(_git_root_or_cwd_relative_posix_path(directory, root_cache)):
                         candidates.append(_excluded_directory_decision(directory, explicit=False))
                     else:
                         kept_dirs.append(name)
@@ -281,7 +282,7 @@ def _evaluate_candidate(
             explicit=True,
         )
 
-    normalized_path = _normalized_posix_path(candidate.path, root_cache)
+    normalized_path = _git_root_or_cwd_relative_posix_path(candidate.path, root_cache)
     if not include_matcher.matches(normalized_path):
         return FileDecision(
             path=candidate.path,
@@ -429,10 +430,10 @@ def _display_path_score(path: str) -> tuple[int, int, int, int, str]:
     )
 
 
-def _normalized_posix_path(path: str, root_cache: dict[str, str | None]) -> str:
+def _git_root_or_cwd_relative_posix_path(path: str, root_cache: dict[str, str | None]) -> str:
     """Return a git-root-relative or cwd-relative path using POSIX separators."""
     absolute_path = os.path.abspath(path)
-    git_root = _find_git_root_for_path(absolute_path, root_cache)
+    git_root = misc.find_git_root_for_path(absolute_path, root_cache)
     base_path = git_root if git_root is not None else os.getcwd()
     return os.path.relpath(absolute_path, base_path).replace(os.sep, "/")
 
@@ -452,7 +453,7 @@ def _accepted_paths_by_git_root(
             continue
 
         absolute_path = os.path.abspath(decision.path)
-        git_root = _find_git_root_for_path(absolute_path, root_cache)
+        git_root = misc.find_git_root_for_path(absolute_path, root_cache)
         if git_root is None:
             continue
 
@@ -460,38 +461,6 @@ def _accepted_paths_by_git_root(
         grouped_paths[git_root].append(relative_path)
 
     return dict(grouped_paths)
-
-
-def _find_git_root_for_path(
-    absolute_path: str,
-    root_cache: dict[str, str | None],
-) -> str | None:
-    """Find and cache the nearest containing git root for an absolute path."""
-    start_dir = absolute_path if os.path.isdir(absolute_path) else os.path.dirname(absolute_path)
-    if start_dir in root_cache:
-        return root_cache[start_dir]
-
-    current_dir = os.path.abspath(start_dir)
-    while True:
-        git_marker = os.path.join(current_dir, ".git")
-        if _is_valid_git_marker(git_marker):
-            root_cache[start_dir] = current_dir
-            return current_dir
-
-        parent_dir = os.path.dirname(current_dir)
-        if parent_dir == current_dir:
-            root_cache[start_dir] = None
-            return None
-        current_dir = parent_dir
-
-
-def _is_valid_git_marker(path: str) -> bool:
-    """Return whether a .git path looks like a worktree marker."""
-    if os.path.isfile(path):
-        return True
-    if not os.path.isdir(path):
-        return False
-    return os.path.exists(os.path.join(path, "HEAD"))
 
 
 def _collect_gitignored_absolute_paths(
