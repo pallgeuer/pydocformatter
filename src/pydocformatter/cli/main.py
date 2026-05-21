@@ -9,6 +9,7 @@ from collections.abc import Callable
 import pydocformatter.cli.check as check
 import pydocformatter.cli.config as config_command
 import pydocformatter.cli.global_args as global_args
+import pydocformatter.cli.rule as rule_command
 import pydocformatter.utils.argparser as argparser
 
 
@@ -43,6 +44,7 @@ def build_parser() -> argparse.ArgumentParser:
     SUBCOMMANDS = {
         "check": check.add_parser,
         "config": config_command.add_parser,
+        "rule": rule_command.add_parser,
         "version": add_version_parser,
     }
 

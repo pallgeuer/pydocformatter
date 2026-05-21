@@ -1,0 +1,31 @@
+# multiline-opening-quotes-same-line (PDF101)
+
+Fix is always available.
+
+## What it does
+Checks for multi-line docstrings whose opening triple quotes should share a line with the first content line.
+
+## Why is this useful?
+Projects that prefer compact docstrings can keep the opening delimiter and summary together while still allowing multi-line bodies.
+
+## Ruff compatibility
+This rule is intended to replace Ruff's `D212` or `D213` when the configured pydocformatter style keeps opening quotes on the summary line. It conflicts with `PDF102`.
+
+## Example
+```python
+def area(radius: float) -> float:
+    """
+    Return the area.
+
+    The radius must be non-negative.
+    """
+```
+
+Use instead:
+```python
+def area(radius: float) -> float:
+    """Return the area.
+
+    The radius must be non-negative.
+    """
+```

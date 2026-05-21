@@ -14,6 +14,7 @@
 
 ## Workflows
 
+- Rule documentation Markdown files follow the template at `src/pydocformatter/rules/rule_template.md`.
 - When changing function signatures or class attributes, update all affected docstrings in the same change.
 - If some tests fail only because the exact wording of a string has changed, then ask what to do instead of just blindly reverting the wording of the string.
 - Concisely document significant completed work in CHANGELOG.md; use Added/Changed/Fixed/Removed subheadings of the Unreleased section, and use nested bullets for clear organization under short and very general bolded categories.

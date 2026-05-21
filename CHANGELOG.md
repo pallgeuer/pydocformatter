@@ -25,6 +25,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added Ruff-style `--config` and `--isolated` global options for explicit config files, inline setting overrides, and config-free runs.
   - Added `pydocfmt config` to list and describe supported configuration options in text or JSON format.
   - Added active-rule listing output for `pydocfmt check --show-rules`, including effective fixability markers.
+  - Added `pydocfmt rule` to explain individual rules or all rules in Ruff-style text or JSON output.
 
 - **Configuration:**
   - Added `output-format` for formatter configuration, currently supporting only `"grouped"`.
@@ -38,7 +39,10 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 
 - **Documentation:**
   - Added a Ruff file-selection compatibility specification at `docs/file_selection_spec.md`, including exact defaults, precedence rules, force-exclude behavior, and explicit pydocformatter deviations.
-  - Added a rule-selection specification at `docs/rule_selection_spec.md`, covering rule collection, selectors, fixability, and future rule explanation output.
+  - Added an empirical Ruff file-selection behavior specification at `docs/ruff_file_selection_spec.md`, covering config-relative glob bases, cwd-relative CLI overrides, gitignore behavior, explicit-file behavior, and per-file ignores.
+  - Added a rule-selection specification at `docs/rule_selection_spec.md`, covering rule collection, selectors, fixability, and rule explanation output.
+  - Added adjacent Markdown documentation for all built-in pydocformatter rules, including Ruff compatibility notes where relevant.
+  - Added a reusable rule documentation Markdown template at `src/pydocformatter/rules/rule_template.md`.
   - Added docstrings for public glob matching methods, the dependency-pin check tool, and important configuration, CLI, and file-selection helpers.
   - Completed Google-style docstrings for public source APIs and added concise docstrings for private helpers that previously lacked them.
 
@@ -122,6 +126,8 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Rule collection now happens when `pydocformatter.rules.collection` is imported and is exposed as `RULE_COLLECTION`.
   - Explicit rule package loading is now exposed as `import_package_rules`, with collections retrieved from the relevant `RuleRegistry`.
   - `RuleBase` subclasses now fail at class definition time unless they define `meta` as a `RuleMetadata` instance.
+  - Registered the built-in PDF and PCF rule metadata modules so rule selection, active-rule listing, and rule explanation output share one catalog.
+  - Rule metadata now requires an explicit stable version for every rule.
   - Moved generic settings loading, formatting, argparse setup, and CLI override extraction onto `SettingsSchema`.
   - Made `SettingsSchema.load` accept parsed argparse namespaces directly for command-line setting overrides.
   - Simplified schema-driven settings argument extraction by removing unused destination-prefix plumbing and helper indirection.

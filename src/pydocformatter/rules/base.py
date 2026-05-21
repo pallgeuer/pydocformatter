@@ -86,12 +86,21 @@ class RuleSelector:
 
 @dataclasses.dataclass(frozen=True, order=True)
 class RuleMetadata:
-    """Metadata for a pydocformatter rule."""
+    """Metadata for a pydocformatter rule.
+
+    Attributes:
+        code (RuleCode): Rule code.
+        name (str): Rule name.
+        message (str): Default diagnostic message.
+        fixable (bool): Whether the rule is inherently fixable.
+        stable_since (str): pydocformatter version in which the rule became stable.
+    """
 
     code: RuleCode
     name: str
     message: str
     fixable: bool
+    stable_since: str
 
     def __post_init__(self) -> None:
         """Validate rule metadata fields."""
@@ -101,6 +110,8 @@ class RuleMetadata:
             raise ValueError(f"{self.code}: Rule name must not be empty")
         if not self.message:
             raise ValueError(f"{self.code}: Rule message must not be empty")
+        if not self.stable_since:
+            raise ValueError(f"{self.code}: Stable version must not be empty")
 
 
 class RuleBase:
@@ -115,6 +126,7 @@ class RuleBase:
     name = misc.alias_to_class_field("meta.name")
     message = misc.alias_to_class_field("meta.message")
     fixable = misc.alias_to_class_field("meta.fixable")
+    stable_since = misc.alias_to_class_field("meta.stable_since")
 
     def __init_subclass__(cls) -> None:
         """Require implemented rule classes to define metadata."""

@@ -26,7 +26,7 @@ from pydocformatter.formatter import FormatterResult, RuleFinding
 from pydocformatter.rules.base import RuleCode, RuleMetadata
 from pydocformatter.rules_selection import RuleSelection
 
-LEGACY_FORMAT_RULE_META = RuleMetadata(code=RuleCode("PDF000"), name="legacy-formatting-needed", message="Needs formatting", fixable=True)
+LEGACY_FORMAT_RULE_META = RuleMetadata(code=RuleCode("PDF000"), name="legacy-formatting-needed", message="Needs formatting", fixable=True, stable_since="0.3.0")
 
 
 class OutputError(Exception):

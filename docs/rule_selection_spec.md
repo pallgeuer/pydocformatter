@@ -225,4 +225,11 @@ Only global rule selection is displayed. Per-file ignores are intentionally not 
 
 ## CLI Rule Explanations
 
-A future Ruff-style command may expose rule explanations, similar to `ruff rule`. The intended source is the collected rule metadata plus rule class documentation, with text and JSON output formats. This command is not part of the current implementation.
+`pydocfmt rule [RULE|--all]` exposes Ruff-style rule explanations.
+
+- `RULE` must be an exact uppercase rule code, such as `PDF001`; rule names and lowercase codes are invalid.
+- `--all` prints all collected rules in rule-code order and cannot be combined with `RULE`.
+- `--output-format text` prints the adjacent Markdown rule document directly.
+- `--output-format json` prints Ruff-style metadata for one rule, or a list of metadata objects with `--all`; its `explanation` field omits the Markdown title and fixability paragraph.
+
+Rule documents live next to their rule definition modules with the same basename and a `.md` extension. For example, `src/pydocformatter/rules/definitions/PDF/PDF001_reflow_required.py` is documented by `src/pydocformatter/rules/definitions/PDF/PDF001_reflow_required.md`. New rule docs should follow `src/pydocformatter/rules/rule_template.md`.
