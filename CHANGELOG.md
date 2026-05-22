@@ -66,6 +66,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Check summaries now report fixed and remaining rule-check counts separately, including fixable remaining counts for diff output.
 
 - **Configuration:**
+  - Changed rule metadata fixability from a boolean to `FixAvailability` with `Always`, `Sometimes`, and `Never` values while keeping individual rule findings boolean-fixable.
   - Simplified resolved CLI setting metadata so `SettingCLIDefinition` uses a generated dataclass initializer.
   - Split unresolved CLI setting metadata into `SettingCLIOptions` while keeping `SettingCLIDefinition` as the resolved argparse metadata shape.
   - Added explicit `available_in_cli` setting metadata and treat empty documentation as omitted documentation.

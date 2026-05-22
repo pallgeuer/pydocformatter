@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
+import enum
 import re
 from typing import ClassVar
 
@@ -9,6 +10,14 @@ import pydocformatter.utils.misc as misc
 _RULE_CODE_RE = re.compile(r"^([A-Z]+)([0-9]+)$")
 _RULE_SELECTOR_RE = re.compile(r"^([A-Z]+)([0-9]*)$")
 ALL_RULE_SELECTOR_TAG = "ALL"
+
+
+class FixAvailability(enum.StrEnum):
+    """Rule-level automatic fix availability."""
+
+    ALWAYS = "Always"
+    SOMETIMES = "Sometimes"
+    NEVER = "Never"
 
 
 @dataclasses.dataclass(frozen=True, order=True)
@@ -92,26 +101,40 @@ class RuleMetadata:
         code (RuleCode): Rule code.
         name (str): Rule name.
         message (str): Default diagnostic message.
-        fixable (bool): Whether the rule is inherently fixable.
+        fix_availability (FixAvailability): Rule-level automatic fix availability.
         stable_since (str): pydocformatter version in which the rule became stable.
     """
 
     code: RuleCode
     name: str
     message: str
-    fixable: bool
+    fix_availability: FixAvailability
     stable_since: str
 
     def __post_init__(self) -> None:
         """Validate rule metadata fields."""
         if not isinstance(self.code, RuleCode):
             raise TypeError(f"Expected RuleCode, got {type(self.code).__name__}")
+        if not isinstance(self.fix_availability, FixAvailability):
+            raise TypeError(f"Expected FixAvailability, got {type(self.fix_availability).__name__}")
         if not self.name:
             raise ValueError(f"{self.code}: Rule name must not be empty")
         if not self.message:
             raise ValueError(f"{self.code}: Rule message must not be empty")
         if not self.stable_since:
             raise ValueError(f"{self.code}: Stable version must not be empty")
+
+
+def rule_fix_text(rule: RuleMetadata) -> str:
+    """Return user-facing fix availability text for one rule."""
+    if rule.fix_availability == FixAvailability.ALWAYS:
+        return "Fix is always available."
+    elif rule.fix_availability == FixAvailability.SOMETIMES:
+        return "Fix is sometimes available."
+    elif rule.fix_availability == FixAvailability.NEVER:
+        return "Fix is not available."
+    else:
+        raise AssertionError(f"Unexpected fix availability: {rule.fix_availability}")
 
 
 class RuleBase:
@@ -125,7 +148,7 @@ class RuleBase:
     number = misc.alias_to_class_field("meta.code.number")
     name = misc.alias_to_class_field("meta.name")
     message = misc.alias_to_class_field("meta.message")
-    fixable = misc.alias_to_class_field("meta.fixable")
+    fix_availability = misc.alias_to_class_field("meta.fix_availability")
     stable_since = misc.alias_to_class_field("meta.stable_since")
 
     def __init_subclass__(cls) -> None:

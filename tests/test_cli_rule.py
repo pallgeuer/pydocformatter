@@ -38,7 +38,7 @@ class TestCLIRule(unittest.TestCase):
         self.assertEqual(output["code"], "PDF105")
         self.assertEqual(output["linter"], "pydocformatter")
         self.assertEqual(output["fix"], "Fix is not available.")
-        self.assertEqual(output["fix_availability"], "None")
+        self.assertEqual(output["fix_availability"], "Never")
         self.assertEqual(output["status"], {"Stable": {"since": "v0.3.0"}})
         self.assertTrue(output["explanation"].startswith("## What it does\n"))
         self.assertNotIn("# summary-too-long (PDF105)", output["explanation"])

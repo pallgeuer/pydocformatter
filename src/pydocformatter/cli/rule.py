@@ -3,15 +3,14 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from typing import Literal, TypedDict
+from typing import TypedDict
 
 import pydocformatter.cli.global_args as global_args
+import pydocformatter.rules.base as rule_base
 import pydocformatter.rules.collection as rule_collection
 import pydocformatter.rules.documentation as rule_documentation
 import pydocformatter.utils.argparser as argparser
-from pydocformatter.rules.base import RuleBase, RuleCode, RuleMetadata
-
-FixAvailability = Literal["Always", "None"]
+from pydocformatter.rules.base import FixAvailability, RuleBase, RuleCode
 
 
 class RuleSourceLocationMetadata(TypedDict):
@@ -127,8 +126,8 @@ def rule_json(rule_class: type[RuleBase]) -> RuleMetadataOutput:
         linter="pydocformatter",
         summary=rule.message,
         message_formats=[rule.message],
-        fix=rule_fix_text(rule),
-        fix_availability=rule_fix_availability(rule),
+        fix=rule_base.rule_fix_text(rule),
+        fix_availability=rule.fix_availability,
         explanation=rule_documentation.rule_explanation_body(rule_class),
         preview=False,
         status={"Stable": {"since": f"v{rule.stable_since}"}},
@@ -139,19 +138,3 @@ def rule_json(rule_class: type[RuleBase]) -> RuleMetadataOutput:
 def format_rule_text(rule_class: type[RuleBase]) -> str:
     """Return Ruff-style Markdown text for one rule."""
     return f"{rule_documentation.load_rule_explanation(rule_class).rstrip()}\n"
-
-
-def rule_fix_text(rule: RuleMetadata) -> str:
-    """Return user-facing fix availability text for one rule."""
-    if rule.fixable:
-        return "Fix is always available."
-    else:
-        return "Fix is not available."
-
-
-def rule_fix_availability(rule: RuleMetadata) -> FixAvailability:
-    """Return Ruff-style fix availability metadata for one rule."""
-    if rule.fixable:
-        return "Always"
-    else:
-        return "None"

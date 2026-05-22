@@ -7,7 +7,7 @@ from collections.abc import Mapping
 import pydocformatter.rules.collection as rule_collection
 import pydocformatter.settings as settings_core
 from pydocformatter.cli.settings_check import CheckSettings
-from pydocformatter.rules.base import ALL_RULE_SELECTOR_TAG, RuleCode, RuleMetadata, RuleSelector
+from pydocformatter.rules.base import ALL_RULE_SELECTOR_TAG, FixAvailability, RuleCode, RuleMetadata, RuleSelector
 from pydocformatter.rules.collection import RuleCollection
 from pydocformatter.utils.globs import GlobPatternSet
 
@@ -86,13 +86,17 @@ def select_rules(
         collection=collection,
         context="fixable rules",
         errors=errors,
-        require_inherently_fixable=True,
+        require_available_fix=True,
     )
     unfixable_specificities = _resolve_rule_specificities(settings.unfixable, collection=collection, context="unfixable rules", errors=errors)
     effectively_fixable_codes = _resolve_enabled_specificities(fixable_specificities, unfixable_specificities)
 
     selected_rules = tuple(
-        SelectedRule(rule=rule_class.meta, fixable=rule_class.meta.fixable and rule_class.meta.code in effectively_fixable_codes, enabled_specificity=enabled_specificities[rule_class.meta.code])
+        SelectedRule(
+            rule=rule_class.meta,
+            fixable=rule_class.meta.fix_availability != FixAvailability.NEVER and rule_class.meta.code in effectively_fixable_codes,
+            enabled_specificity=enabled_specificities[rule_class.meta.code],
+        )
         for rule_class in collection.rules
         if rule_class.meta.code in enabled_specificities
     )
@@ -111,7 +115,7 @@ def _resolve_per_file_ignores(settings: CheckSettings, *, collection: RuleCollec
     return tuple(ignores)
 
 
-def _resolve_rule_specificities(selectors: tuple[str, ...], *, collection: RuleCollection, context: str, errors: list[str], require_inherently_fixable: bool = False) -> dict[RuleCode, int]:
+def _resolve_rule_specificities(selectors: tuple[str, ...], *, collection: RuleCollection, context: str, errors: list[str], require_available_fix: bool = False) -> dict[RuleCode, int]:
     """Resolve selectors to rule-code specificities and append nonfatal errors for unusable selectors."""
     rule_specificities: dict[RuleCode, int] = {}
     for selector_tag in selectors:
@@ -125,10 +129,10 @@ def _resolve_rule_specificities(selectors: tuple[str, ...], *, collection: RuleC
                 errors.append(f"{context} contains unknown selector: {selector_tag}")
             continue
 
-        if require_inherently_fixable:
-            fixable_rules = tuple(rule for rule in matching_rules if rule.meta.fixable)
+        if require_available_fix:
+            fixable_rules = tuple(rule for rule in matching_rules if rule.meta.fix_availability != FixAvailability.NEVER)
             if not fixable_rules and selector_tag != ALL_RULE_SELECTOR_TAG:
-                errors.append(f"{context} selector {selector_tag!r} only matches inherently unfixable rules")
+                errors.append(f"{context} selector {selector_tag!r} only matches rules with no available fixes")
             matching_rules = fixable_rules
 
         specificity = _selector_specificity(selector)

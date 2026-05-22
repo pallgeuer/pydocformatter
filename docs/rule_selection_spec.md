@@ -17,9 +17,9 @@ Rule classes register with `@register_rule` and define a `meta` class attribute 
 - `code`: A `RuleCode`, such as `PDF001`.
 - `name`: A stable machine-readable name, such as `reflow-required`.
 - `message`: The default diagnostic message. It may include format fields for per-finding customization.
-- `fixable`: Whether the rule is inherently fixable in at least some situations.
+- `fix_availability`: A `FixAvailability` value describing whether automatic fixes are `Always`, `Sometimes`, or `Never` available at the rule level.
 
-`RuleBase` rejects subclasses without `meta`, or with non-`RuleMetadata` metadata, at class definition time. `RuleMetadata` rejects non-`RuleCode` codes and empty names or messages.
+`RuleBase` rejects subclasses without `meta`, or with non-`RuleMetadata` metadata, at class definition time. `RuleMetadata` rejects non-`RuleCode` codes, non-`FixAvailability` fix availability values, and empty names, messages, or stable versions.
 
 No rule application or fix method interface is specified yet. That interface will be added when rule execution is implemented.
 
@@ -155,11 +155,13 @@ Effective fixability uses the same specificity model as rule selection:
 - For each rule, track the strongest matching fixable selector specificity.
 - For each rule, track the strongest matching unfixable selector specificity.
 - Treat the rule as configured-fixable only when the fixable specificity is greater than the unfixable specificity.
-- Intersect configured fixability with the rule's inherent `RuleMetadata.fixable`.
+- Intersect configured fixability with the rule's `RuleMetadata.fix_availability`.
 
-Settings cannot make an inherently unfixable rule fixable.
+Settings cannot make a rule with `fix_availability = FixAvailability.NEVER` fixable. Rules with `FixAvailability.ALWAYS` and `FixAvailability.SOMETIMES` both have available fixes for selector purposes.
 
-A selector in `fixable` or `extend-fixable` that matches only inherently unfixable rules is an operational error unless the selector is `ALL`. This means the default `fixable = ["ALL"]` does not warn merely because some collected rules are inherently unfixable.
+A selector in `fixable` or `extend-fixable` that matches only rules with no available fixes is an operational error unless the selector is `ALL`. This means the default `fixable = ["ALL"]` does not warn merely because some collected rules have `FixAvailability.NEVER`.
+
+Rule findings still expose boolean fixability because each finding is either fixable or not. Findings for `FixAvailability.SOMETIMES` rules must provide per-instance fixability.
 
 Examples:
 
@@ -175,7 +177,7 @@ Current error wording:
 
 - Invalid selector: `"{context} contains invalid selector: {selector}"`
 - Unknown selector: `"{context} contains unknown selector: {selector}"`
-- Fixability selector that only matches inherently unfixable rules: `"{context} selector {selector!r} only matches inherently unfixable rules"`
+- Fixability selector that only matches rules with no available fixes: `"{context} selector {selector!r} only matches rules with no available fixes"`
 
 Contexts include:
 

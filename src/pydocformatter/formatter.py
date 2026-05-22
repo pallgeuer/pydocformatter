@@ -6,7 +6,7 @@ import os
 import typing
 
 from pydocformatter.cli.settings_check import CheckSettings, LineEnding
-from pydocformatter.rules.base import RuleMetadata
+from pydocformatter.rules.base import FixAvailability, RuleMetadata
 
 
 @dataclasses.dataclass(frozen=True)
@@ -48,8 +48,20 @@ class RuleFinding:
 
         Returns:
             bool: Instance-specific fixability when present, otherwise the rule default fixability.
+
+        Raises:
+            `ValueError`: If the rule is sometimes fixable and no instance-specific fixability is available.
         """
-        return self.rule.fixable if self.instance_fixable is None else self.instance_fixable
+        if self.instance_fixable is not None:
+            return self.instance_fixable
+        if self.rule.fix_availability == FixAvailability.ALWAYS:
+            return True
+        elif self.rule.fix_availability == FixAvailability.NEVER:
+            return False
+        elif self.rule.fix_availability == FixAvailability.SOMETIMES:
+            raise ValueError(f"{self.rule.code}: Findings for sometimes-fixable rules must specify instance_fixable")
+        else:
+            raise AssertionError(f"Unexpected fix availability: {self.rule.fix_availability}")
 
     @property
     def grouping_key(self) -> RuleFinding.Key:

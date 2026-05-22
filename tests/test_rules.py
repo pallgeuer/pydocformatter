@@ -11,7 +11,6 @@ from io import StringIO
 from pathlib import Path
 
 import pydocformatter.cli.check as check
-import pydocformatter.cli.rule as rule_command
 import pydocformatter.file_selection as file_selection
 import pydocformatter.rules.base as rule_base
 import pydocformatter.rules.collection as rule_collection
@@ -20,27 +19,31 @@ import pydocformatter.rules.documentation as rule_documentation
 import pydocformatter.rules_selection as rules_selection
 from pydocformatter.cli.global_args import GlobalArgs
 from pydocformatter.cli.settings_check import SETTINGS_SCHEMA, CheckSettings
-from pydocformatter.rules.base import RuleBase, RuleCode, RuleMetadata, RuleSelector
+from pydocformatter.rules.base import FixAvailability, RuleBase, RuleCode, RuleMetadata, RuleSelector
 
 
 class PDF001SampleRule(RuleBase):
-    meta = RuleMetadata(code=RuleCode("PDF001"), name="reflow-required", message="Docstring chunk needs reflow", fixable=True, stable_since="0.3.0")
+    meta = RuleMetadata(code=RuleCode("PDF001"), name="reflow-required", message="Docstring chunk needs reflow", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0")
 
 
 class PDF105SampleRule(RuleBase):
-    meta = RuleMetadata(code=RuleCode("PDF105"), name="summary-too-long", message="Docstring summary does not fit on one line", fixable=False, stable_since="0.3.0")
+    meta = RuleMetadata(code=RuleCode("PDF105"), name="summary-too-long", message="Docstring summary does not fit on one line", fix_availability=FixAvailability.NEVER, stable_since="0.3.0")
 
 
 class PDF142SampleRule(RuleBase):
-    meta = RuleMetadata(code=RuleCode("PDF142"), name="specific-rule", message="Specific rule", fixable=True, stable_since="0.3.0")
+    meta = RuleMetadata(code=RuleCode("PDF142"), name="specific-rule", message="Specific rule", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0")
 
 
 class PDF150SampleRule(RuleBase):
-    meta = RuleMetadata(code=RuleCode("PDF150"), name="sibling-rule", message="Sibling rule", fixable=True, stable_since="0.3.0")
+    meta = RuleMetadata(code=RuleCode("PDF150"), name="sibling-rule", message="Sibling rule", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0")
+
+
+class PDF160SometimesFixableSampleRule(RuleBase):
+    meta = RuleMetadata(code=RuleCode("PDF160"), name="sometimes-fixable-rule", message="Sometimes fixable rule", fix_availability=FixAvailability.SOMETIMES, stable_since="0.3.0")
 
 
 class PCF001SampleRule(RuleBase):
-    meta = RuleMetadata(code=RuleCode("PCF001"), name="comment-reflow-required", message="Comment chunk needs reflow", fixable=True, stable_since="0.3.0")
+    meta = RuleMetadata(code=RuleCode("PCF001"), name="comment-reflow-required", message="Comment chunk needs reflow", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0")
 
 
 def sample_collection() -> rule_collection.RuleCollection:
@@ -51,6 +54,11 @@ def sample_collection() -> rule_collection.RuleCollection:
 def specificity_collection() -> rule_collection.RuleCollection:
     """Return a synthetic rule collection for selector specificity tests."""
     return rule_collection.RuleCollection((PDF142SampleRule, PDF150SampleRule))
+
+
+def fix_availability_collection() -> rule_collection.RuleCollection:
+    """Return a synthetic rule collection for rule-level fix availability tests."""
+    return rule_collection.RuleCollection((PDF105SampleRule, PDF160SometimesFixableSampleRule))
 
 
 class TestRules(unittest.TestCase):
@@ -86,13 +94,13 @@ class TestRules(unittest.TestCase):
         for rule_class in collection.rules:
             explanation = rule_documentation.load_rule_explanation(rule_class)
             self.assertTrue(explanation.startswith(f"# {rule_class.meta.name} ({rule_class.meta.code})\n\n"))
-            self.assertIn(f"\n\n{rule_command.rule_fix_text(rule_class.meta)}\n\n", explanation)
+            self.assertIn(f"\n\n{rule_base.rule_fix_text(rule_class.meta)}\n\n", explanation)
 
     def test_rule_registry_collects_rule_metadata(self) -> None:
         registry = rule_collection.RuleRegistry()
 
         class PDF999TestRule(RuleBase):
-            meta = RuleMetadata(code=RuleCode("PDF999"), name="test-rule", message="Test rule", fixable=True, stable_since="0.3.0")
+            meta = RuleMetadata(code=RuleCode("PDF999"), name="test-rule", message="Test rule", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0")
 
         registry.register(PDF999TestRule)
 
@@ -107,7 +115,7 @@ class TestRules(unittest.TestCase):
 
             @rule_collection.register_rule
             class PDF999TestRule(RuleBase):
-                meta = RuleMetadata(code=RuleCode("PDF999"), name="test-rule", message="Test rule", fixable=True, stable_since="0.3.0")
+                meta = RuleMetadata(code=RuleCode("PDF999"), name="test-rule", message="Test rule", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0")
 
             collection = rule_collection.DEFAULT_RULE_REGISTRY.collection()
         finally:
@@ -123,7 +131,7 @@ class TestRules(unittest.TestCase):
 
         @rule_collection.register_rule_to(registry)
         class PDF999TestRule(RuleBase):
-            meta = RuleMetadata(code=RuleCode("PDF999"), name="test-rule", message="Test rule", fixable=True, stable_since="0.3.0")
+            meta = RuleMetadata(code=RuleCode("PDF999"), name="test-rule", message="Test rule", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0")
 
         self.assertEqual(registry.collection().rules, (PDF999TestRule,))
 
@@ -131,10 +139,10 @@ class TestRules(unittest.TestCase):
         registry = rule_collection.RuleRegistry()
 
         class PDF999FirstRule(RuleBase):
-            meta = RuleMetadata(code=RuleCode("PDF999"), name="first-rule", message="First rule", fixable=True, stable_since="0.3.0")
+            meta = RuleMetadata(code=RuleCode("PDF999"), name="first-rule", message="First rule", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0")
 
         class PDF999SecondRule(RuleBase):
-            meta = RuleMetadata(code=RuleCode("PDF999"), name="second-rule", message="Second rule", fixable=True, stable_since="0.3.0")
+            meta = RuleMetadata(code=RuleCode("PDF999"), name="second-rule", message="Second rule", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0")
 
         registry.register(PDF999FirstRule)
         registry.register(PDF999SecondRule)
@@ -146,7 +154,7 @@ class TestRules(unittest.TestCase):
         registry = rule_collection.RuleRegistry()
 
         class PDF999TestRule(RuleBase):
-            meta = RuleMetadata(code=RuleCode("PDF999"), name="test-rule", message="Test rule", fixable=True, stable_since="0.3.0")
+            meta = RuleMetadata(code=RuleCode("PDF999"), name="test-rule", message="Test rule", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0")
 
         registry.register(PDF999TestRule)
         registry.register(PDF999TestRule)
@@ -155,7 +163,7 @@ class TestRules(unittest.TestCase):
 
     def test_rule_collection_allows_the_same_rule_class_twice(self) -> None:
         class PDF999TestRule(RuleBase):
-            meta = RuleMetadata(code=RuleCode("PDF999"), name="test-rule", message="Test rule", fixable=True, stable_since="0.3.0")
+            meta = RuleMetadata(code=RuleCode("PDF999"), name="test-rule", message="Test rule", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0")
 
         collection = rule_collection.RuleCollection((PDF999TestRule, PDF999TestRule))
 
@@ -171,7 +179,7 @@ class TestRules(unittest.TestCase):
         registry = rule_collection.RuleRegistry()
 
         class PDF999TestRule(RuleBase):
-            meta = RuleMetadata(code=RuleCode("PDF999"), name="test-rule", message="Test rule", fixable=True, stable_since="0.3.0")
+            meta = RuleMetadata(code=RuleCode("PDF999"), name="test-rule", message="Test rule", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0")
 
         registry.register(PDF999TestRule)
 
@@ -185,17 +193,17 @@ class TestRules(unittest.TestCase):
 
         @rule_collection.register_rule_to(default_registry)
         class PDF999DefaultRule(RuleBase):
-            meta = RuleMetadata(code=RuleCode("PDF999"), name="default-rule", message="Default rule", fixable=True, stable_since="0.3.0")
+            meta = RuleMetadata(code=RuleCode("PDF999"), name="default-rule", message="Default rule", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0")
 
         @rule_collection.register_rule_to(isolated_registry)
         class PDF998IsolatedRule(RuleBase):
-            meta = RuleMetadata(code=RuleCode("PDF998"), name="isolated-rule", message="Isolated rule", fixable=True, stable_since="0.3.0")
+            meta = RuleMetadata(code=RuleCode("PDF998"), name="isolated-rule", message="Isolated rule", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0")
 
         self.assertEqual(default_registry.collection().rules, (PDF999DefaultRule,))
         self.assertEqual(isolated_registry.collection().rules, (PDF998IsolatedRule,))
 
     def test_rule_metadata_derives_prefix_and_number_from_code(self) -> None:
-        rule = RuleMetadata(code=RuleCode("PDF001"), name="reflow-required", message="Docstring chunk needs reflow", fixable=True, stable_since="0.3.0")
+        rule = RuleMetadata(code=RuleCode("PDF001"), name="reflow-required", message="Docstring chunk needs reflow", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0")
 
         self.assertEqual(tuple(field.name for field in dataclasses.fields(RuleCode)), ("tag", "prefix", "number_str", "number"))
         self.assertEqual(str(rule.code), "PDF001")
@@ -209,8 +217,14 @@ class TestRules(unittest.TestCase):
         self.assertFalse(hasattr(rule_base, "valid_rule_code_tag"))
         self.assertFalse(hasattr(rule_base, "split_rule_code"))
         self.assertEqual(rule.stable_since, "0.3.0")
-        self.assertEqual(tuple(field.name for field in dataclasses.fields(RuleMetadata)), ("code", "name", "message", "fixable", "stable_since"))
+        self.assertEqual(tuple(field.name for field in dataclasses.fields(RuleMetadata)), ("code", "name", "message", "fix_availability", "stable_since"))
         self.assertTrue(all(field.default is dataclasses.MISSING for field in dataclasses.fields(RuleMetadata)))
+        self.assertEqual(rule_base.rule_fix_text(rule), "Fix is always available.")
+        self.assertEqual(
+            rule_base.rule_fix_text(RuleMetadata(code=RuleCode("PDF999"), name="sometimes-rule", message="Sometimes rule", fix_availability=FixAvailability.SOMETIMES, stable_since="0.3.0")),
+            "Fix is sometimes available.",
+        )
+        self.assertEqual(str(FixAvailability.SOMETIMES), "Sometimes")
         self.assertFalse(hasattr(rule, "matches_selector"))
         self.assertFalse(hasattr(rule, "matches_selector_parts"))
 
@@ -243,11 +257,13 @@ class TestRules(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Invalid rule code: ALL001"):
             RuleCode("ALL001")
         with self.assertRaisesRegex(TypeError, "Expected RuleCode, got str"):
-            RuleMetadata(code=typing.cast(typing.Any, "bad"), name="bad-rule", message="Bad rule", fixable=True, stable_since="0.3.0")
+            RuleMetadata(code=typing.cast(typing.Any, "bad"), name="bad-rule", message="Bad rule", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0")
+        with self.assertRaisesRegex(TypeError, "Expected FixAvailability, got str"):
+            RuleMetadata(code=RuleCode("PDF001"), name="bad-rule", message="Bad rule", fix_availability=typing.cast(typing.Any, "Always"), stable_since="0.3.0")
         with self.assertRaisesRegex(TypeError, "missing 1 required positional argument: 'stable_since'"):
-            RuleMetadata(code=RuleCode("PDF001"), name="bad-rule", message="Bad rule", fixable=True)  # type: ignore[call-arg]
+            RuleMetadata(code=RuleCode("PDF001"), name="bad-rule", message="Bad rule", fix_availability=FixAvailability.ALWAYS)  # type: ignore[call-arg]
         with self.assertRaisesRegex(ValueError, "PDF001: Stable version must not be empty"):
-            RuleMetadata(code=RuleCode("PDF001"), name="bad-rule", message="Bad rule", fixable=True, stable_since="")
+            RuleMetadata(code=RuleCode("PDF001"), name="bad-rule", message="Bad rule", fix_availability=FixAvailability.ALWAYS, stable_since="")
 
     def test_rule_selector_validates_tag(self) -> None:
         with self.assertRaisesRegex(ValueError, "Invalid rule selector: bad"):
@@ -269,17 +285,18 @@ class TestRules(unittest.TestCase):
 
     def test_rule_base_class_properties_redirect_to_metadata(self) -> None:
         class PDF999TestRule(RuleBase):
-            meta = RuleMetadata(code=RuleCode("PDF999"), name="test-rule", message="Test rule", fixable=True, stable_since="0.3.0")
+            meta = RuleMetadata(code=RuleCode("PDF999"), name="test-rule", message="Test rule", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0")
 
         rule = PDF999TestRule()
 
         self.assertEqual(
-            (PDF999TestRule.code, PDF999TestRule.prefix, PDF999TestRule.number_str, PDF999TestRule.number, PDF999TestRule.name, PDF999TestRule.message, PDF999TestRule.fixable),
-            ("PDF999", "PDF", "999", 999, "test-rule", "Test rule", True),
+            (PDF999TestRule.code, PDF999TestRule.prefix, PDF999TestRule.number_str, PDF999TestRule.number, PDF999TestRule.name, PDF999TestRule.message, PDF999TestRule.fix_availability),
+            ("PDF999", "PDF", "999", 999, "test-rule", "Test rule", FixAvailability.ALWAYS),
         )
         self.assertEqual(PDF999TestRule.stable_since, "0.3.0")
         self.assertEqual(
-            (rule.code, rule.prefix, rule.number_str, rule.number, rule.name, rule.message, rule.fixable, rule.stable_since), ("PDF999", "PDF", "999", 999, "test-rule", "Test rule", True, "0.3.0")
+            (rule.code, rule.prefix, rule.number_str, rule.number, rule.name, rule.message, rule.fix_availability, rule.stable_since),
+            ("PDF999", "PDF", "999", 999, "test-rule", "Test rule", FixAvailability.ALWAYS, "0.3.0"),
         )
 
     def test_selectors_must_use_complete_rule_prefixes(self) -> None:
@@ -384,6 +401,15 @@ class TestRules(unittest.TestCase):
         self.assertEqual(tuple((rule.rule.code.tag, rule.fixable) for rule in specific_unfixable.rules), (("PDF142", False), ("PDF150", True)))
         self.assertEqual(tuple((rule.rule.code.tag, rule.fixable) for rule in equal_unfixable.rules), (("PDF142", False),))
 
+    def test_select_rules_treats_sometimes_fixable_rules_as_having_available_fixes(self) -> None:
+        selection = rules_selection.select_rules(
+            CheckSettings(select=("PDF160",), fixable=("PDF160",)),
+            collection=fix_availability_collection(),
+        )
+
+        self.assertEqual(selection.errors, ())
+        self.assertEqual(tuple((rule.rule.code.tag, rule.fixable) for rule in selection.rules), (("PDF160", True),))
+
     def test_select_rules_reports_selector_operational_errors(self) -> None:
         selection = rules_selection.select_rules(
             CheckSettings(select=("BAD", "bad"), fixable=("PDF105",)),
@@ -392,7 +418,7 @@ class TestRules(unittest.TestCase):
 
         self.assertIn("rule selection contains unknown selector: BAD", selection.errors)
         self.assertIn("rule selection contains invalid selector: bad", selection.errors)
-        self.assertIn("fixable rules selector 'PDF105' only matches inherently unfixable rules", selection.errors)
+        self.assertIn("fixable rules selector 'PDF105' only matches rules with no available fixes", selection.errors)
 
     def test_select_rules_applies_per_file_ignores(self) -> None:
         selection = rules_selection.select_rules(
@@ -534,7 +560,7 @@ class TestRules(unittest.TestCase):
 
         self.assertEqual(
             output.getvalue(),
-            "ERROR: rule selection contains unknown selector: BAD\n" "ERROR: fixable rules selector 'PDF105' only matches inherently unfixable rules\n" "\n" "No active rules.\n",
+            "ERROR: rule selection contains unknown selector: BAD\n" "ERROR: fixable rules selector 'PDF105' only matches rules with no available fixes\n" "\n" "No active rules.\n",
         )
 
     def test_print_rules_prints_empty_message_without_active_rules(self) -> None:

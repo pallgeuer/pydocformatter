@@ -15,11 +15,11 @@ import pydocformatter.formatter as formatter
 import pydocformatter.formatters.pydocfmt as pydocfmt
 from pydocformatter.cli.settings_check import CheckSettings
 from pydocformatter.formatter import FormatterResult, RuleFinding
-from pydocformatter.rules.base import RuleCode, RuleMetadata
+from pydocformatter.rules.base import FixAvailability, RuleCode, RuleMetadata
 
-PDF001_RULE = RuleMetadata(code=RuleCode("PDF001"), name="reflow-required", message="Docstring chunk needs reflow", fixable=True, stable_since="0.3.0")
-PDF105_RULE = RuleMetadata(code=RuleCode("PDF105"), name="summary-too-long", message="Docstring summary does not fit on one line", fixable=False, stable_since="0.3.0")
-PCF100_RULE = RuleMetadata(code=RuleCode("PCF100"), name="comment-formatting-needed", message="Comment needs formatting", fixable=True, stable_since="0.3.0")
+PDF001_RULE = RuleMetadata(code=RuleCode("PDF001"), name="reflow-required", message="Docstring chunk needs reflow", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0")
+PDF105_RULE = RuleMetadata(code=RuleCode("PDF105"), name="summary-too-long", message="Docstring summary does not fit on one line", fix_availability=FixAvailability.NEVER, stable_since="0.3.0")
+PCF100_RULE = RuleMetadata(code=RuleCode("PCF100"), name="comment-formatting-needed", message="Comment needs formatting", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0")
 
 
 class TestFormatterResults(unittest.TestCase):
@@ -43,7 +43,7 @@ class TestFormatterResults(unittest.TestCase):
                 code=RuleCode("PDF105"),
                 name="summary-too-long",
                 message="Docstring summary does not fit on one line",
-                fixable=False,
+                fix_availability=FixAvailability.NEVER,
                 stable_since="0.3.0",
             ),
             line_numbers=(3,),
@@ -64,7 +64,7 @@ class TestFormatterResults(unittest.TestCase):
             code=RuleCode("PDF001"),
             name="reflow-required",
             message="Docstring chunk needs reflow",
-            fixable=True,
+            fix_availability=FixAvailability.ALWAYS,
             stable_since="0.3.0",
         )
 
@@ -82,7 +82,7 @@ class TestFormatterResults(unittest.TestCase):
         self.assertFalse(overridden_finding.fixable)
 
     def test_rule_metadata_and_finding_keys_are_sortable(self) -> None:
-        later_rule = RuleMetadata(code=RuleCode("PDF999"), name="later", message="Later", fixable=True, stable_since="0.3.0")
+        later_rule = RuleMetadata(code=RuleCode("PDF999"), name="later", message="Later", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0")
 
         self.assertEqual(sorted((later_rule, PDF001_RULE)), [PDF001_RULE, later_rule])
         self.assertTrue(dataclasses.is_dataclass(RuleFinding.Key))
@@ -90,6 +90,14 @@ class TestFormatterResults(unittest.TestCase):
             sorted((RuleFinding.Key(rule=later_rule, message="Later", fixable=True), RuleFinding.Key(rule=PDF001_RULE, message="Docstring chunk needs reflow", fixable=True))),
             [RuleFinding.Key(rule=PDF001_RULE, message="Docstring chunk needs reflow", fixable=True), RuleFinding.Key(rule=later_rule, message="Later", fixable=True)],
         )
+
+    def test_rule_finding_requires_instance_fixability_for_sometimes_fixable_rules(self) -> None:
+        rule = RuleMetadata(code=RuleCode("PDF999"), name="sometimes-rule", message="Sometimes rule", fix_availability=FixAvailability.SOMETIMES, stable_since="0.3.0")
+
+        self.assertTrue(RuleFinding(rule=rule, line_numbers=(2,), instance_fixable=True).fixable)
+        self.assertFalse(RuleFinding(rule=rule, line_numbers=(3,), instance_fixable=False).fixable)
+        with self.assertRaisesRegex(ValueError, "Findings for sometimes-fixable rules must specify instance_fixable"):
+            _ = RuleFinding(rule=rule, line_numbers=(4,)).fixable
 
     def test_grouped_output_merges_matching_findings_and_prints_summary(self) -> None:
         result = FormatterResult(
@@ -399,7 +407,7 @@ class TestFormatterResults(unittest.TestCase):
             root = Path(td)
             target = root / "a.py"
             target.write_text("x = 1\n", encoding="utf-8")
-            rule = RuleMetadata(code=RuleCode("PDF105"), name="summary-too-long", message="Docstring summary does not fit on one line", fixable=False, stable_since="0.3.0")
+            rule = RuleMetadata(code=RuleCode("PDF105"), name="summary-too-long", message="Docstring summary does not fit on one line", fix_availability=FixAvailability.NEVER, stable_since="0.3.0")
 
             def fake_format_file_exp(path: str, *, file: object = None, settings: CheckSettings, fix: bool, write: bool) -> FormatterResult:
                 del file, settings, fix, write
@@ -446,7 +454,7 @@ class TestFormatterResults(unittest.TestCase):
             root = Path(td)
             target = root / "a.py"
             target.write_text("x = 1\n", encoding="utf-8")
-            rule = RuleMetadata(code=RuleCode("PDF105"), name="summary-too-long", message="Docstring summary does not fit on one line", fixable=False, stable_since="0.3.0")
+            rule = RuleMetadata(code=RuleCode("PDF105"), name="summary-too-long", message="Docstring summary does not fit on one line", fix_availability=FixAvailability.NEVER, stable_since="0.3.0")
 
             def fake_format_file_exp(path: str, *, file: object = None, settings: CheckSettings, fix: bool, write: bool) -> FormatterResult:
                 del file, settings, fix, write

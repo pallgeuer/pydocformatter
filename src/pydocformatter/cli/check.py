@@ -24,10 +24,10 @@ import pydocformatter.utils.misc as misc
 from pydocformatter.cli.settings_check import SETTINGS_SCHEMA, CheckSettings, OutputFormat
 from pydocformatter.file_selection import STDIN_VIRTUAL_FILE, FileDecision, FileSelectionError, SelectionResult
 from pydocformatter.formatter import FormatterResult, RuleFinding
-from pydocformatter.rules.base import RuleCode, RuleMetadata
+from pydocformatter.rules.base import FixAvailability, RuleCode, RuleMetadata
 from pydocformatter.rules_selection import RuleSelection
 
-LEGACY_FORMAT_RULE_META = RuleMetadata(code=RuleCode("PDF000"), name="legacy-formatting-needed", message="Needs formatting", fixable=True, stable_since="0.3.0")
+LEGACY_FORMAT_RULE_META = RuleMetadata(code=RuleCode("PDF000"), name="legacy-formatting-needed", message="Needs formatting", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0")
 
 
 @dataclasses.dataclass(frozen=True)
@@ -605,7 +605,7 @@ def _group_unfixed_findings(findings: tuple[RuleFinding, ...]) -> tuple[RuleFind
 
 def _format_fixed_finding(rule: RuleMetadata, count: int) -> str:
     """Format one fixed finding line."""
-    fixable = "*" if rule.fixable else ""
+    fixable = "" if rule.fix_availability == FixAvailability.NEVER else "*"
     message = rule.message
     message_end = "" if message.endswith((".", "!", "?")) else "."
     return f"{rule.code}{fixable} {message}{message_end} Fixed {count} {misc.auto_plural(count, 'time')}."

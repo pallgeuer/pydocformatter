@@ -73,6 +73,15 @@ FROM: ([A-Z]+[0-9]{3})\t([a-z-]+)\t([^\n]+)\t(\nRule has been stable since v?([0
 
 ## pydocformatter Rules
 
+[//]: # (TODO: Worry about always vs sometimes fixable rules in the table)
+
+### pydocformatter comments (PCF)
+
+|  Code  | Name                        | Message                             | Fixable | Stable Since | Comment                                                                                                |
+|:------:|:----------------------------|:------------------------------------|:-------:|:------------:|:-------------------------------------------------------------------------------------------------------|
+| PCF001 | standalone-comment-too-long | Standalone comment needs formatting |  Auto   |    0.3.0     | Formats standalone comment blocks that need wrapping or spacing normalization                          |
+| PCF002 | trailing-comment-too-long   | Trailing comment needs formatting   |  Auto   |    0.3.0     | Formats trailing comments that need spacing normalization or extraction into standalone comment blocks |
+
 ### pydocformatter docstrings (PDF)
 
 |  Code  | Name                               | Message                                                                   | Fixable | Stable Since | Ruff Rules         | Rules                 | Comment                                                                                                                                                     |
@@ -90,13 +99,6 @@ FROM: ([A-Z]+[0-9]{3})\t([a-z-]+)\t([^\n]+)\t(\nRule has been stable since v?([0
 | PDF104 | multiline-closing-quotes-sep-line  | Multi-line docstring closing quotes should be on a separate line          |  Auto   |    0.3.0     | Disable D209       | Conflicts with PDF103 | For multi-content-line docstrings, ensures the closing quotes are on their own separate line                                                                |
 | PDF105 | summary-too-long                   | Docstring summary does not fit on one line                                |         |    0.3.0     | Disable D205       |                       | Warns if the docstring summary spans multiple lines                                                                                                         |
 | PDF106 | docstring-should-be-one-line       | Docstring with one content line should be one line                        |  Auto   |    0.3.0     | Disable D200       |                       | Avoids having starting/ending triple quotes on their own line when the entire docstring is a summary that fits (including both triple quotes) onto one line |
-
-### pydocformatter comments (PCF)
-
-|  Code  | Name                        | Message                             | Fixable | Stable Since | Comment                                                                                                |
-|:------:|:----------------------------|:------------------------------------|:-------:|:------------:|:-------------------------------------------------------------------------------------------------------|
-| PCF001 | standalone-comment-too-long | Standalone comment needs formatting |  Auto   |    0.3.0     | Formats standalone comment blocks that need wrapping or spacing normalization                          |
-| PCF002 | trailing-comment-too-long   | Trailing comment needs formatting   |  Auto   |    0.3.0     | Formats trailing comments that need spacing normalization or extraction into standalone comment blocks |
 
 [//]: # (TODO: Complete the tables)
 

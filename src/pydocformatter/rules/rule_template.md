@@ -1,6 +1,6 @@
 # rule-name (CODE)
 
-Fix is always available.
+Fix is always available. (Use `Fix is sometimes available.` or `Fix is not available.` when that matches the rule metadata.)
 
 ## What it does
 Describe the rule's check in one or two short paragraphs.
