@@ -8,6 +8,7 @@ from typing import ClassVar
 import pydocformatter.utils.misc as misc
 
 _RULE_CODE_RE = re.compile(r"^([A-Z]+)([0-9]+)$")
+_RULE_PREFIX_RE = re.compile(r"^[A-Z]+$")
 _RULE_SELECTOR_RE = re.compile(r"^([A-Z]+)([0-9]*)$")
 ALL_RULE_SELECTOR_TAG = "ALL"
 
@@ -123,6 +124,28 @@ class RuleMetadata:
             raise ValueError(f"{self.code}: Rule message must not be empty")
         if not self.stable_since:
             raise ValueError(f"{self.code}: Stable version must not be empty")
+
+
+@dataclasses.dataclass(frozen=True, order=True)
+class RuleLinterMetadata:
+    """Metadata for one pydocformatter rule-prefix linter.
+
+    Attributes:
+        prefix (str): Rule-code prefix for the linter.
+        name (str): User-facing linter name.
+        url (str | None): Optional project or documentation URL for the linter.
+    """
+
+    prefix: str
+    name: str
+    url: str | None = None
+
+    def __post_init__(self) -> None:
+        """Validate linter metadata fields."""
+        if _RULE_PREFIX_RE.fullmatch(self.prefix) is None or self.prefix.startswith(ALL_RULE_SELECTOR_TAG):
+            raise ValueError(f"Invalid linter prefix: {self.prefix}")
+        if self.name == "":
+            raise ValueError(f"{self.prefix}: Linter name must not be empty")
 
 
 def rule_fix_text(rule: RuleMetadata) -> str:

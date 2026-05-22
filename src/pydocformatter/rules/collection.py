@@ -8,7 +8,7 @@ from types import ModuleType
 from typing import Callable, Iterable
 
 import pydocformatter.rules.definitions as rule_definitions
-from pydocformatter.rules.base import RuleBase, RuleCode, RuleSelector
+from pydocformatter.rules.base import RuleBase, RuleCode, RuleLinterMetadata, RuleSelector
 
 
 @dataclasses.dataclass(frozen=True, init=False)
@@ -17,6 +17,7 @@ class RuleCollection:
 
     rules: tuple[type[RuleBase], ...]
     rule_class: dict[RuleCode, type[RuleBase]]
+    linters: tuple[RuleLinterMetadata, ...]
 
     def __init__(self, rules: Iterable[type[RuleBase]]) -> None:
         """Create a deterministically ordered rule collection from rule classes."""
@@ -32,6 +33,7 @@ class RuleCollection:
         sorted_rule_class = dict(sorted(rule_class_by_code.items(), key=operator.itemgetter(0)))
         object.__setattr__(self, "rules", tuple(sorted_rule_class.values()))
         object.__setattr__(self, "rule_class", sorted_rule_class)
+        object.__setattr__(self, "linters", _collect_linters(sorted_rule_class.values()))
 
     def matching_rules_exist(self, selector: RuleSelector) -> bool:
         """Return whether a selector matches at least one collected rule."""
@@ -81,6 +83,37 @@ def import_package_rules(*, package: ModuleType) -> None:
         raise TypeError(f"Rule definitions package has no __path__: {package.__name__}")
     for module in pkgutil.walk_packages(path=package.__path__, prefix=f"{package.__name__}."):
         importlib.import_module(module.name)
+
+
+def _collect_linters(rules: Iterable[type[RuleBase]]) -> tuple[RuleLinterMetadata, ...]:
+    """Return linter metadata for unique rule prefixes in rule order."""
+    linters: list[RuleLinterMetadata] = []
+    seen_prefixes: set[str] = set()
+    for rule in rules:
+        prefix = rule.meta.code.prefix
+        if prefix not in seen_prefixes:
+            seen_prefixes.add(prefix)
+            linters.append(_linter_metadata_for_prefix(prefix))
+    return tuple(linters)
+
+
+def _linter_metadata_for_prefix(prefix: str) -> RuleLinterMetadata:
+    """Return package-provided linter metadata for a rule prefix."""
+    try:
+        package = importlib.import_module(f"{rule_definitions.__name__}.{prefix}")
+    except ModuleNotFoundError as exc:
+        if exc.name == f"{rule_definitions.__name__}.{prefix}":
+            return RuleLinterMetadata(prefix=prefix, name=prefix)
+        raise
+
+    metadata = getattr(package, "LINTER", None)
+    if metadata is None:
+        return RuleLinterMetadata(prefix=prefix, name=prefix)
+    if not isinstance(metadata, RuleLinterMetadata):
+        raise TypeError(f"{package.__name__}.LINTER must be a RuleLinterMetadata instance")
+    if metadata.prefix != prefix:
+        raise ValueError(f"{package.__name__}.LINTER prefix {metadata.prefix!r} does not match collected prefix {prefix!r}")
+    return metadata
 
 
 DEFAULT_RULE_REGISTRY = RuleRegistry()

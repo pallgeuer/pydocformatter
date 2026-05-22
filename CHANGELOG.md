@@ -26,6 +26,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added `pydocfmt config` to list and describe supported configuration options in text or JSON format.
   - Added active-rule listing output for `pydocfmt check --show-rules`, including effective fixability markers.
   - Added `pydocfmt rule` to explain individual rules or all rules in Ruff-style text or JSON output.
+  - Added `pydocfmt linter` to list rule-prefix linters in Ruff-style text or JSON output.
 
 - **Configuration:**
   - Added `output-format` for formatter configuration, currently supporting only `"grouped"`.
@@ -135,6 +136,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Explicit rule package loading is now exposed as `import_package_rules`, with collections retrieved from the relevant `RuleRegistry`.
   - `RuleBase` subclasses now fail at class definition time unless they define `meta` as a `RuleMetadata` instance.
   - Registered the built-in PDF and PCF rule metadata modules so rule selection, active-rule listing, and rule explanation output share one catalog.
+  - Rule collections now expose pre-collected rule-prefix linter metadata.
   - Rule metadata now requires an explicit stable version for every rule.
   - Moved generic settings loading, formatting, argparse setup, and CLI override extraction onto `SettingsSchema`.
   - Made `SettingsSchema.load` accept parsed argparse namespaces directly for command-line setting overrides.

@@ -20,7 +20,7 @@ import pydocformatter.rules_selection as rules_selection
 import pydocformatter.settings as settings_core
 from pydocformatter.cli.global_args import GlobalArgs
 from pydocformatter.cli.settings_check import SETTINGS_SCHEMA, CheckSettings
-from pydocformatter.rules.base import FixAvailability, RuleBase, RuleCode, RuleMetadata, RuleSelector
+from pydocformatter.rules.base import FixAvailability, RuleBase, RuleCode, RuleLinterMetadata, RuleMetadata, RuleSelector
 
 
 class PDF001SampleRule(RuleBase):
@@ -90,6 +90,13 @@ class TestRules(unittest.TestCase):
 
         self.assertEqual(modules_without_rules, [])
         self.assertEqual(collection.rules, rule_collection.RuleCollection(discovered_rule_classes).rules)
+        self.assertEqual(
+            collection.linters,
+            (
+                RuleLinterMetadata(prefix="PCF", name="pydocformatter comment formatting", url="https://github.com/pallgeuer/pydocformatter"),
+                RuleLinterMetadata(prefix="PDF", name="pydocformatter docstring formatting", url="https://github.com/pallgeuer/pydocformatter"),
+            ),
+        )
         self.assertEqual(rule_documentation.undocumented_rules(collection), ())
         self.assertTrue(rule_documentation.TEMPLATE_PATH.is_file())
         for rule_class in collection.rules:
@@ -108,6 +115,7 @@ class TestRules(unittest.TestCase):
         self.assertEqual(registry.rule_classes, {PDF999TestRule})
         self.assertEqual(registry.collection().rules, (PDF999TestRule,))
         self.assertEqual(registry.collection().rule_class, {RuleCode("PDF999"): PDF999TestRule})
+        self.assertEqual(registry.collection().linters, (RuleLinterMetadata(prefix="PDF", name="pydocformatter docstring formatting", url="https://github.com/pallgeuer/pydocformatter"),))
 
     def test_register_rule_decorator_collects_rule_metadata_in_default_registry(self) -> None:
         previous_registry = rule_collection.DEFAULT_RULE_REGISTRY
@@ -317,6 +325,13 @@ class TestRules(unittest.TestCase):
 
         self.assertEqual(collection.rules, (PCF001SampleRule, PDF001SampleRule, PDF105SampleRule))
         self.assertEqual(tuple(collection.rule_class.values()), collection.rules)
+        self.assertEqual(
+            collection.linters,
+            (
+                RuleLinterMetadata(prefix="PCF", name="pydocformatter comment formatting", url="https://github.com/pallgeuer/pydocformatter"),
+                RuleLinterMetadata(prefix="PDF", name="pydocformatter docstring formatting", url="https://github.com/pallgeuer/pydocformatter"),
+            ),
+        )
 
     def test_rule_collection_matching_rules_returns_rule_classes(self) -> None:
         collection = sample_collection()

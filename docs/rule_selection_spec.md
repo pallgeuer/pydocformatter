@@ -54,17 +54,18 @@ Examples:
 
 ## Collection
 
-`RuleCollection` stores rule classes in deterministic rule-code order in `rules`, and exposes the same order through the `rule_class` code-to-class mapping.
+`RuleCollection` stores rule classes in deterministic rule-code order in `rules`, exposes the same order through the `rule_class` code-to-class mapping, and pre-collects unique rule-prefix linter metadata in `linters`.
 
 Collection behavior:
 
 - Every collected object must inherit from `RuleBase`.
 - Duplicate rule codes are rejected unless they refer to the same rule class.
 - Re-registering the same rule class is allowed and deduplicated by code.
+- `linters` contains one entry per collected rule prefix in first-seen rule order after rule-code sorting.
 - `matching_rules(selector)` returns matching rule classes in collection order.
 - `matching_rules_exist(selector)` returns whether any collected rule matches the selector.
 
-Built-in rules use the default registry through `@register_rule`. Tests and custom rule packages can use an isolated `RuleRegistry` with `register_rule_to(registry)`, import the package, then call `registry.collection()`.
+Built-in rules use the default registry through `@register_rule`. Rule-prefix linter names are declared by prefix packages, such as `pydocformatter.rules.definitions.PCF.LINTER`. Tests and custom rule packages can use an isolated `RuleRegistry` with `register_rule_to(registry)`, import the package, then call `registry.collection()`.
 
 With default settings, a custom empty catalog resolves to an empty active ruleset without errors.
 
@@ -296,3 +297,11 @@ Only global rule selection is displayed. Per-file ignores are intentionally not 
 - `--output-format json` prints Ruff-style metadata for one rule, or a list of metadata objects with `--all`; its `explanation` field omits the Markdown title and fixability paragraph.
 
 Rule documents live next to their rule definition modules with the same basename and a `.md` extension. For example, `src/pydocformatter/rules/definitions/PDF/PDF001_reflow_required.py` is documented by `src/pydocformatter/rules/definitions/PDF/PDF001_reflow_required.md`. New rule docs should follow `src/pydocformatter/rules/rule_template.md`.
+
+## CLI Linter Listing
+
+`pydocfmt linter` exposes Ruff-style linter metadata for collected rule prefixes.
+
+- Text output prints a right-aligned prefix/name table.
+- JSON output prints a list of objects with `prefix`, `name`, and `url` when a URL is configured.
+- The command reports `RuleCollection.linters` directly and does not resolve project configuration.
