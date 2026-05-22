@@ -35,10 +35,10 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added Ruff-style rule settings under `[tool.pydocfmt]`: `select`, `ignore`, `extend-select`, `per-file-ignores`, `extend-per-file-ignores`, `fixable`, `unfixable`, and `extend-fixable`.
   - Added `respect-gitignore` for formatter configuration, defaulting to `true`.
   - Added explicit config-file support for `--config PATH`, including pyproject-style `[tool.pydocfmt]` files and dedicated top-level pydocfmt TOML files.
-  - Added auto-discovery for `[tool.pydocfmt]` in the nearest containing Git root `pyproject.toml`, with current directory `pyproject.toml` taking precedence.
+  - Added Ruff-style path-aware auto-discovery for the closest containing `[tool.pydocfmt]` `pyproject.toml`.
 
 - **Documentation:**
-  - Added a Ruff file-selection compatibility specification at `docs/file_selection_spec.md`, including exact defaults, precedence rules, force-exclude behavior, and explicit pydocformatter deviations.
+  - Added a Ruff file-selection compatibility specification at `docs/file_selection_spec.md`, including exact defaults, precedence rules, force-exclude behavior, config-relative glob bases, and explicit pydocformatter deviations.
   - Added an empirical Ruff file-selection behavior specification at `docs/ruff_file_selection_spec.md`, covering config-relative glob bases, cwd-relative CLI overrides, gitignore behavior, explicit-file behavior, and per-file ignores.
   - Added a rule-selection specification at `docs/rule_selection_spec.md`, covering rule collection, selectors, fixability, and rule explanation output.
   - Added adjacent Markdown documentation for all built-in pydocformatter rules, including Ruff compatibility notes where relevant.
@@ -48,6 +48,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 
 - **Developer workflow:**
   - Added a pytest pre-commit hook that runs the test suite before commits.
+  - Added regression coverage for Ruff-compatible file-selection and per-file-ignore pattern-base behavior.
 
 ### Changed
 
@@ -83,12 +84,18 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - For each setting key, the highest-priority value wins (`dedicated CLI option > inline --config > explicit --config file > auto-discovered config > defaults`), including `extend-include` and `extend-exclude`.
   - Simplified `--config` option loading by separating explicit config-file paths from inline TOML options directly.
   - Made settings loading accept keyword-only command-line overrides and nullable global arguments.
+  - Consolidated settings file, TOML section, and raw field-value application around the profile-aware configuration path.
 
 - **File discovery:**
   - `--show-files` now reports directories pruned by exclude patterns, such as `.venv`.
+  - File-selection helpers now require a path-aware settings resolver instead of accepting raw `CheckSettings`.
   - `pydocfmt` now applies gitignore-based filtering when `respect-gitignore` is enabled, and aborts file selection if gitignore checks cannot be executed.
-  - `force-exclude` now consistently applies `.gitignore` filtering to explicitly passed file paths.
-  - File selection now deduplicates paths that resolve to the same physical file and prefers relative display paths when possible.
+  - `force-exclude` now follows Ruff-style explicit-file behavior by applying exclude patterns while still bypassing include and gitignore filtering.
+  - File selection now resolves include, exclude, and per-file-ignore patterns relative to their setting source, including closest auto config directories and cwd-relative CLI overrides.
+  - Explicit `--config PATH` files now disable auto-discovered configuration and only one explicit config file is accepted, while inline `--config` overrides still layer over auto-discovered configuration.
+  - Gitignore filtering now follows the `respect-gitignore` setting resolved for the current working directory.
+  - Gitignore filtering now handles symlinked directory traversal by querying git with real paths while preserving symlinked display paths.
+  - File selection now deduplicates paths that resolve to the same physical file and displays real filesystem paths as absolute normalized paths.
 
 - **Formatting:**
   - Added experimental `Rule`, `RuleFinding`, and `FormatterResult` data structures for reporting remaining rule issues after fixes.
@@ -150,16 +157,18 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 - **CLI:**
   - Legacy formatter findings now report the original changed source lines instead of a synthetic line number.
   - Formatter read, decode, and write errors now affect check exit status without being reported as rule findings.
+  - `pydocfmt check` now reports invalid nested path-specific configuration without producing a traceback.
   - `--force-exclude` now applies to virtual paths supplied through `--stdin-filename`.
   - `pydocfmt check` now prints `All checks passed!` to the configured output when no diagnostics are found.
   - `pydocfmt check --output-file` remains supported with the legacy formatter, while stdin input is limited to the experimental formatter path.
   - Operational errors no longer produce an `All checks passed!` success message.
   - Output-file setup errors are now reported without converting unrelated `OSError`s raised while producing diagnostics.
   - `pydocfmt` now skips files that fail UTF-8 decoding, emits an operational error in grouped output, and continues processing remaining files instead of crashing.
-  - Invalid include glob patterns now report configuration or argument errors instead of crashing with a traceback.
+  - Empty include glob patterns now report configuration or argument errors instead of crashing with a traceback.
   - `--help` now works even when the current `pyproject.toml` contains invalid pydocformatter configuration.
   - Missing or unreadable files now emit an operational error in grouped output and processing continues instead of crashing.
   - `--output-file` now creates only the direct parent directory instead of recursively creating nested output directories.
+  - Path-aware rule-selection operational errors are now reported once for equivalent resolved profiles instead of once per selected directory.
 
 - **File discovery:**
   - Empty exclude glob patterns are now rejected as invalid configuration or arguments.

@@ -491,7 +491,7 @@ class TestSettings(unittest.TestCase):
                 os.chdir(previous_cwd)
 
         self.assertEqual(config.line_length, 74)
-        self.assertEqual(config.indent_width, 2)
+        self.assertEqual(config.indent_width, 4)
 
     def test_config_options_override_auto_discovered_git_root_and_current_pyprojects(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -522,6 +522,28 @@ class TestSettings(unittest.TestCase):
         self.assertEqual(config.line_length, 76)
         self.assertEqual(config.indent_width, 3)
 
+    def test_explicit_config_file_ignores_auto_discovered_pyproject(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            config_path = root / "pydocfmt.toml"
+            (root / "pyproject.toml").write_text(
+                "[tool.pydocfmt]\nindent-width = 2\n",
+                encoding="utf-8",
+            )
+            config_path.write_text(
+                "line-length = 75\n",
+                encoding="utf-8",
+            )
+            previous_cwd = os.getcwd()
+            os.chdir(root)
+            try:
+                config = pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(config_options=(str(config_path),)))
+            finally:
+                os.chdir(previous_cwd)
+
+        self.assertEqual(config.line_length, 75)
+        self.assertEqual(config.indent_width, 4)
+
     def test_isolated_ignores_git_root_and_current_directory_pyprojects(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
@@ -545,18 +567,18 @@ class TestSettings(unittest.TestCase):
 
         self.assertEqual(config.line_length, 88)
 
-    def test_auto_discovered_pyproject_paths_deduplicates_current_git_root(self) -> None:
+    def test_auto_discovered_pyproject_path_requires_pydocfmt_table(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             self._write_git_marker(root)
             previous_cwd = os.getcwd()
             os.chdir(root)
             try:
-                paths = pydocformatter_settings_core._auto_discovered_pyproject_paths()
+                path = pydocformatter_settings_core._auto_discovered_pyproject_path_for_path(None, table_path=("tool", "pydocfmt"))
             finally:
                 os.chdir(previous_cwd)
 
-        self.assertEqual(paths, ("pyproject.toml",))
+        self.assertIsNone(path)
 
     def test_rule_settings_accept_all_rule_prefixes(self) -> None:
         with tempfile.TemporaryDirectory() as td:

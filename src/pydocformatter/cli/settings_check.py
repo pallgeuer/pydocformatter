@@ -96,7 +96,7 @@ class CheckSettings:
         exclude (StringList): Base glob patterns for files or directories to ignore.
         extend_exclude (StringList): Additional exclude glob patterns appended to `exclude`.
         respect_gitignore (bool): Whether discovered files are filtered through `.gitignore`.
-        force_exclude (bool): Whether include, exclude, and gitignore rules apply to explicitly passed paths.
+        force_exclude (bool): Whether exclude rules apply to explicitly passed paths.
     """
 
     output_format: OutputFormat = OutputFormat.GROUPED
@@ -162,7 +162,7 @@ class CheckSettingsOverrides(TypedDict, total=False):
         exclude (StringList): Base glob patterns for files or directories to ignore.
         extend_exclude (StringList): Additional exclude glob patterns appended to `exclude`.
         respect_gitignore (bool): Whether discovered files are filtered through `.gitignore`.
-        force_exclude (bool): Whether include, exclude, and gitignore rules apply to explicitly passed paths.
+        force_exclude (bool): Whether exclude rules apply to explicitly passed paths.
     """
 
     output_format: OutputFormat
@@ -366,7 +366,7 @@ SETTINGS_SCHEMA = SettingsSchema(
             field="force_exclude",
             value_type=bool,
             group=SettingsGroup.FILE_SELECTION,
-            help="Apply include/exclude/gitignore rules even to files passed explicitly.",
+            help="Apply exclude rules even to files passed explicitly.",
         ),
     ),
     table_path=("tool", "pydocfmt"),

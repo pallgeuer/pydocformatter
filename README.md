@@ -108,7 +108,7 @@ If no files or directories are specified, `pydocfmt check` checks the current di
 - `--exclude GLOB`: Comma-separated glob pattern(s) for files to exclude
 - `--extend-exclude GLOB`: Comma-separated additional glob pattern(s) for files to exclude
 - `--respect-gitignore`, `--no-respect-gitignore`: Toggle .gitignore-aware discovery (default: enabled)
-- `--force-exclude`, `--no-force-exclude`: Apply include/exclude/gitignore rules even to explicitly listed files
+- `--force-exclude`, `--no-force-exclude`: Apply exclude rules even to explicitly listed files
 
 **Miscellaneous:**
 - `--stdin-filename FILENAME`: File name to use when checking or fixing source from stdin
@@ -173,7 +173,7 @@ pydocfmt check --isolated --config "line-length = 100" src/
 # Show included and ignored files
 pydocfmt check --show-files src/
 
-# Apply include, exclude, and gitignore rules to explicit files too
+# Apply exclude rules to explicit files too
 pydocfmt check --fix --force-exclude generated.py src/
 ```
 
@@ -227,11 +227,11 @@ force-exclude = false
 - `exclude`: Glob patterns for files/directories to exclude
 - `extend-exclude`: Additional exclude glob patterns
 - `respect-gitignore`: Respect `.gitignore` during file discovery (default: `true`)
-- `force-exclude`: Apply include/exclude/gitignore rules to explicitly listed files (default: `false`)
+- `force-exclude`: Apply exclude rules to explicitly listed files (default: `false`)
 
 When `respect-gitignore` is enabled, pydocfmt aborts if gitignore filtering cannot be checked, because continuing without that filter could format files that should stay ignored.
 
-Settings are resolved as defaults, then auto-discovered `[tool.pydocfmt]` from the nearest containing Git root `pyproject.toml` and then the current directory `pyproject.toml`, then explicit `--config` files, then inline `--config` setting overrides, then dedicated command-line options. The highest-precedence specified value wins for each key, including `extend-include` and `extend-exclude`.
+Settings are resolved per path as defaults, then the closest containing `pyproject.toml` with `[tool.pydocfmt]`, then explicit `--config` files, then inline `--config` setting overrides, then dedicated command-line options. Parent config files are not merged into child config files. The highest-precedence specified value wins for each key, including `extend-include` and `extend-exclude`.
 
 `--config PATH` accepts either a pyproject-style file containing `[tool.pydocfmt]` or a dedicated config file with pydocfmt settings at top level. `--isolated` ignores auto-discovered configuration files; it can be combined with inline `--config` setting overrides but not with `--config PATH`.
 

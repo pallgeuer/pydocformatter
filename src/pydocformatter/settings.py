@@ -10,7 +10,6 @@ from collections.abc import Callable, Iterable, Mapping
 from types import GenericAlias
 from typing import Any, Generic, TypeAlias, TypedDict, TypeVar, cast
 
-import pydocformatter.utils.misc as misc
 from pydocformatter.cli.global_args import GlobalArgs
 
 SettingsT = TypeVar("SettingsT")
@@ -32,6 +31,39 @@ class SettingsError(ValueError):
     This exception represents user-facing configuration failures, including malformed TOML, unsupported table shapes,
     unknown setting keys, and invalid setting values. Constructor arguments are forwarded to `ValueError`.
     """
+
+
+@dataclasses.dataclass(frozen=True)
+class SettingsProfile(Generic[SettingsT]):
+    """Resolved settings plus source-base metadata for path-like settings."""
+
+    settings: SettingsT
+    field_bases: Mapping[str, str]
+
+    def base_for_field(self, field: str) -> str:
+        """Return the absolute base directory associated with a resolved field."""
+        return self.field_bases.get(field, os.getcwd())
+
+
+@dataclasses.dataclass(frozen=True)
+class SettingsResolver(Generic[SettingsT]):
+    """Resolve settings for paths using Ruff-style closest-config semantics."""
+
+    schema: SettingsSchema[SettingsT]
+    global_values: GlobalArgs
+    args: argparse.Namespace | None = None
+    field_overrides: Mapping[str, Any] | None = None
+    _profiles_by_start_dir: dict[str, SettingsProfile[SettingsT]] = dataclasses.field(default_factory=dict)
+
+    def profile_for_path(self, path: str | None = None) -> SettingsProfile[SettingsT]:
+        """Return settings for a path, caching by the path's containing directory."""
+        start_dir = _settings_start_dir(path)
+        cached_profile = self._profiles_by_start_dir.get(start_dir)
+        if cached_profile is not None:
+            return cached_profile
+        profile = self.schema.load_profile(global_values=self.global_values, args=self.args, field_overrides=self.field_overrides, path=start_dir)
+        self._profiles_by_start_dir[start_dir] = profile
+        return profile
 
 
 class SettingCLIValueKind(enum.StrEnum):
@@ -288,6 +320,35 @@ class SettingsSchema(Generic[SettingsT]):
             `SettingsError`: If any configuration source cannot be loaded or validated.
             `tomllib.TOMLDecodeError`: If a TOML-map CLI value is malformed.
         """
+        return self.load_profile(global_values=global_values, args=args, field_overrides=field_overrides).settings
+
+    def resolver(self, *, global_values: GlobalArgs | None = None, args: argparse.Namespace | None = None, field_overrides: Mapping[str, Any] | None = None) -> SettingsResolver[SettingsT]:
+        """Return a path-aware settings resolver for repeated per-path lookups."""
+        return SettingsResolver(
+            schema=self,
+            global_values=GlobalArgs() if global_values is None else global_values,
+            args=args,
+            field_overrides=field_overrides,
+        )
+
+    def load_profile(
+        self, *, global_values: GlobalArgs | None = None, args: argparse.Namespace | None = None, field_overrides: Mapping[str, Any] | None = None, path: str | None = None
+    ) -> SettingsProfile[SettingsT]:
+        """Resolve settings and source-base metadata for one path.
+
+        Args:
+            global_values (GlobalArgs | None): Global configuration options and isolated-mode flag.
+            args (argparse.Namespace | None): Parsed CLI namespace for dedicated option overrides.
+            field_overrides (Mapping[str, Any] | None): Final field-keyed raw overrides.
+            path (str | None): Path whose closest auto-discovered configuration should be used, defaulting to cwd.
+
+        Returns:
+            SettingsProfile[SettingsT]: Resolved settings plus field source bases.
+
+        Raises:
+            `SettingsError`: If any configuration source cannot be loaded or validated.
+            `tomllib.TOMLDecodeError`: If a TOML-map CLI value is malformed.
+        """
         if global_values is None:
             global_values = GlobalArgs()
 
@@ -298,34 +359,42 @@ class SettingsSchema(Generic[SettingsT]):
                 inline_options.append(option)
             else:
                 path_options.append(option)
+        if len(path_options) > 1:
+            raise SettingsError("Only one --config=PATH configuration file can be supplied")
 
-        settings = self.settings_type()
+        cwd_base = os.getcwd()
+        profile = SettingsProfile(
+            settings=self.settings_type(),
+            field_bases={definition.field: cwd_base for definition in self.definitions},
+        )
 
         if global_values.isolated:
             if path_options:
                 raise SettingsError("The argument --config=PATH cannot be used with --isolated")
         else:
-            for path in _auto_discovered_pyproject_paths():
-                settings = _apply_toml_file(self, settings, path=path, required=False)
+            if not path_options:
+                auto_path = _auto_discovered_pyproject_path_for_path(path, table_path=self.table_path)
+                if auto_path is not None:
+                    profile = _apply_toml_file_profile(self, profile, path=auto_path, required=False, source_base=os.path.dirname(os.path.abspath(auto_path)))
             for option in path_options:
-                settings = _apply_toml_file(self, settings, path=option, required=True)
+                profile = _apply_toml_file_profile(self, profile, path=option, required=True, source_base=cwd_base)
 
         for option in inline_options:
             try:
                 section = tomllib.loads(option)
             except tomllib.TOMLDecodeError as error:
                 raise SettingsError(f"Failed to decode --config inline TOML: {error}") from error
-            settings = _apply_toml_section(self, settings, section=section, context="<--config>")
+            profile = _apply_toml_section_profile(self, profile, section=section, context="<--config>", source_base=cwd_base)
 
         if args is not None:
             argument_overrides = self.argument_overrides(args)
             if argument_overrides:
-                settings = _apply_field_values(self, settings, values=argument_overrides, context="<argparse>", key_based=False)
+                profile = _apply_field_values_profile(self, profile, values=argument_overrides, context="<argparse>", key_based=False, source_base=cwd_base)
 
         if field_overrides:
-            settings = _apply_field_values(self, settings, values=field_overrides, context="<overrides>", key_based=False)
+            profile = _apply_field_values_profile(self, profile, values=field_overrides, context="<overrides>", key_based=False, source_base=cwd_base)
 
-        return settings
+        return profile
 
     def format(self, settings: SettingsT) -> str:
         """Return resolved settings in a stable TOML-like form.
@@ -658,18 +727,30 @@ def _load_toml_file(path: str, *, required: bool) -> dict[str, Any] | None:
     return config
 
 
-def _auto_discovered_pyproject_paths() -> tuple[str, ...]:
-    """Return auto-discovered pyproject paths in increasing precedence order."""
-    current_pyproject_path = "pyproject.toml"
-    current_pyproject_absolute_path = os.path.abspath(current_pyproject_path)
-    git_root = misc.find_git_root_for_path(os.getcwd())
-    if git_root is None:
-        return (current_pyproject_path,)
+def _settings_start_dir(path: str | None) -> str:
+    """Return the directory used to resolve path-specific configuration."""
+    if path is None:
+        return os.getcwd()
+    absolute_path = os.path.abspath(path)
+    if os.path.isdir(absolute_path):
+        return absolute_path
+    return os.path.dirname(absolute_path)
 
-    git_root_pyproject_path = os.path.abspath(os.path.join(git_root, "pyproject.toml"))
-    if git_root_pyproject_path == current_pyproject_absolute_path:
-        return (current_pyproject_path,)
-    return git_root_pyproject_path, current_pyproject_path
+
+def _auto_discovered_pyproject_path_for_path(path: str | None, *, table_path: tuple[str, ...]) -> str | None:
+    """Return the closest containing pyproject with the configured table."""
+    current_dir = _settings_start_dir(path)
+    while True:
+        candidate = os.path.join(current_dir, "pyproject.toml")
+        if os.path.exists(candidate):
+            config = _load_toml_file(candidate, required=True)
+            if config is not None and _toml_section_at_table_path(config, path=candidate, table_path=table_path, required=False) is not None:
+                return candidate
+
+        parent_dir = os.path.dirname(current_dir)
+        if parent_dir == current_dir:
+            return None
+        current_dir = parent_dir
 
 
 def _toml_section_at_table_path(config: dict[str, Any], *, path: str, table_path: tuple[str, ...], required: bool) -> dict[str, Any] | None:
@@ -692,26 +773,26 @@ def _toml_section_at_table_path(config: dict[str, Any], *, path: str, table_path
     return cast(dict[str, Any], section)
 
 
-def _apply_toml_file(schema: SettingsSchema[SettingsT], settings: SettingsT, *, path: str, required: bool) -> SettingsT:
-    """Apply one config file to the passed settings."""
+def _apply_toml_file_profile(schema: SettingsSchema[SettingsT], profile: SettingsProfile[SettingsT], *, path: str, required: bool, source_base: str) -> SettingsProfile[SettingsT]:
+    """Apply one config file to the passed settings profile."""
     section = _load_toml_file(path, required=required)  # Only returns None if the file is both absent and not required
     if section is None:
-        return settings
+        return profile
 
     if os.path.basename(path) == "pyproject.toml":
         # Only returns None if the section is both absent and not required
         section = _toml_section_at_table_path(section, path=path, table_path=schema.table_path, required=required)
         if section is None:
-            return settings
+            return profile
         context = f"<{path}>.{schema.table_name}"
     else:
         context = f"<{path}>"
 
-    return _apply_toml_section(schema, settings, section=section, context=context)
+    return _apply_toml_section_profile(schema, profile, section=section, context=context, source_base=source_base)
 
 
-def _apply_toml_section(schema: SettingsSchema[SettingsT], settings: SettingsT, *, section: dict[str, Any], context: str) -> SettingsT:
-    """Apply one TOML configuration section after validating allowed keys."""
+def _apply_toml_section_profile(schema: SettingsSchema[SettingsT], profile: SettingsProfile[SettingsT], *, section: dict[str, Any], context: str, source_base: str) -> SettingsProfile[SettingsT]:
+    """Apply one TOML configuration section to a settings profile."""
     schema_toml_keys = set(definition.key for definition in schema.definitions if definition.available_in_toml)
     unknown_keys = [key for key in section if key not in schema_toml_keys]
     if unknown_keys:
@@ -720,11 +801,11 @@ def _apply_toml_section(schema: SettingsSchema[SettingsT], settings: SettingsT, 
         raise SettingsError(f"{context} contains unknown setting(s): {joined_keys}")
 
     values = {definition.field: section[definition.key] for definition in schema.definitions if definition.available_in_toml and definition.key in section}
-    return _apply_field_values(schema, settings, values=values, context=context, key_based=True)
+    return _apply_field_values_profile(schema, profile, values=values, context=context, key_based=True, source_base=source_base)
 
 
-def _apply_field_values(schema: SettingsSchema[SettingsT], settings: SettingsT, *, values: Mapping[str, Any], context: str, key_based: bool) -> SettingsT:
-    """Validate raw field values and return settings with those fields replaced."""
+def _validated_field_updates(schema: SettingsSchema[SettingsT], *, values: Mapping[str, Any], context: str, key_based: bool) -> dict[str, Any]:
+    """Validate raw field values and return resolved field updates."""
     definitions_by_field = {definition.field: definition for definition in schema.definitions}
     updates: dict[str, Any] = {}
     for field, value in values.items():
@@ -732,4 +813,17 @@ def _apply_field_values(schema: SettingsSchema[SettingsT], settings: SettingsT, 
         updates[field] = definition.validator(value, f"{context}.{definition.key if key_based else field}")
     if schema.post_validate is not None:
         schema.post_validate(updates, context)
-    return cast(SettingsT, dataclasses.replace(cast(Any, settings), **updates))
+    return updates
+
+
+def _apply_field_values_profile(
+    schema: SettingsSchema[SettingsT], profile: SettingsProfile[SettingsT], *, values: Mapping[str, Any], context: str, key_based: bool, source_base: str
+) -> SettingsProfile[SettingsT]:
+    """Validate raw field values and return an updated settings profile."""
+    updates = _validated_field_updates(schema, values=values, context=context, key_based=key_based)
+    settings = cast(SettingsT, dataclasses.replace(cast(Any, profile.settings), **updates))
+    field_bases = dict(profile.field_bases)
+    absolute_source_base = os.path.abspath(source_base)
+    for field in updates:
+        field_bases[field] = absolute_source_base
+    return SettingsProfile(settings=settings, field_bases=field_bases)

@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import collections
 import contextlib
+import dataclasses
 import difflib
 import itertools
 import os
@@ -27,6 +28,19 @@ from pydocformatter.rules.base import RuleCode, RuleMetadata
 from pydocformatter.rules_selection import RuleSelection
 
 LEGACY_FORMAT_RULE_META = RuleMetadata(code=RuleCode("PDF000"), name="legacy-formatting-needed", message="Needs formatting", fixable=True, stable_since="0.3.0")
+
+
+@dataclasses.dataclass(frozen=True)
+class CheckRunContext:
+    """Path-aware settings context for one check invocation."""
+
+    resolver: settings_core.SettingsResolver[CheckSettings]
+    cwd_profile: settings_core.SettingsProfile[CheckSettings]
+
+    @property
+    def cwd_settings(self) -> CheckSettings:
+        """Return settings resolved for the current working directory."""
+        return self.cwd_profile.settings
 
 
 class OutputError(Exception):
@@ -140,9 +154,10 @@ def run(args: argparse.Namespace) -> int:
         print("pydocfmt check: Argument error: Cannot use more than one of {--show-settings, --show-rules, --show-files} together", file=sys.stderr)
         return 2
 
-    settings = load_settings(args)
-    if settings is None:
+    settings_context = load_settings(args)
+    if settings_context is None:
         return 2
+    settings = settings_context.cwd_settings
 
     try:
         if args.show_settings:
@@ -151,36 +166,40 @@ def run(args: argparse.Namespace) -> int:
             return 0
 
         elif args.show_rules:
-            selected_rules = rules_selection.select_rules(settings)
+            selected_rules = rules_selection.select_rules(settings, profile=settings_context.cwd_profile)
             with output_stream(args.output_file) as output:
                 print_rules(selected_rules, output=output)
             return 1 if selected_rules.errors else 0
 
         elif args.show_files:
             try:
-                files, errors, use_stdin = select_files(paths=args.files, stdin_filename=args.stdin_filename, settings=settings)
+                files, errors, use_stdin = select_files(paths=args.files, stdin_filename=args.stdin_filename, resolver=settings_context.resolver)
             except FileSelectionError as error:
                 print(f"pydocfmt check: File selection error: {error}", file=sys.stderr)
+                return 2
+            except settings_core.SettingsError as error:
+                print(f"pydocfmt check: Configuration error: {error}", file=sys.stderr)
                 return 2
             with output_stream(args.output_file) as output:
                 print_file_selection_decisions(errors, files.decisions, output=output)
             return 1 if errors else 0
 
         else:
-            return check_files(args=args, settings=settings)
+            return check_files(args=args, settings_context=settings_context)
 
     except OutputError as error:
         print(f"pydocfmt check: Output error: {error}", file=sys.stderr)
         return 2
 
 
-def select_files(*, paths: list[str] | None, stdin_filename: str | None, settings: CheckSettings) -> tuple[SelectionResult, list[str], bool]:
+def select_files(*, paths: list[str] | None, stdin_filename: str | None, resolver: settings_core.SettingsResolver[CheckSettings]) -> tuple[SelectionResult, list[str], bool]:
     """Select input files and resolve stdin-related path handling.
 
     Args:
         paths (list[str] | None): CLI path arguments, or None when no path arguments were provided.
         stdin_filename (str | None): Optional display path to use for source read from stdin.
-        settings (CheckSettings): Resolved formatter settings controlling file selection.
+        resolver (settings_core.SettingsResolver[CheckSettings]): Path-aware settings resolver controlling file
+            selection.
 
     Returns:
         tuple[SelectionResult, list[str], bool]: The selected files, operational warnings, and whether stdin should be
@@ -205,45 +224,54 @@ def select_files(*, paths: list[str] | None, stdin_filename: str | None, setting
         errors.extend(f"Using standard input instead of input path: {path}" for path in paths if path != STDIN_VIRTUAL_FILE)
 
     if use_stdin:
-        files = file_selection.select_virtual_file(file_paths[0], settings)
+        files = file_selection.select_virtual_file(file_paths[0], resolver)
     else:
-        files = file_selection.select_files(file_paths, settings)
+        files = file_selection.select_files(file_paths, resolver)
 
     return files, errors, use_stdin
 
 
-def check_files(*, args: argparse.Namespace, settings: CheckSettings) -> int:
+def check_files(*, args: argparse.Namespace, settings_context: CheckRunContext) -> int:
     """Check or fix selected input files and print diagnostics.
 
     Args:
         args (argparse.Namespace): Parsed check-command arguments controlling file selection, formatting mode, output
             routing, and exit-code behavior.
-        settings (CheckSettings): Resolved formatter settings.
+        settings_context (CheckRunContext): Path-aware settings context.
 
     Returns:
         int: Process exit status code.
     """
     errors: list[str] = []
 
-    selected_rules = rules_selection.select_rules(settings)
-    errors.extend(selected_rules.errors)
-
     try:
-        files, files_errors, use_stdin = select_files(paths=args.files, stdin_filename=args.stdin_filename, settings=settings)
+        files, files_errors, use_stdin = select_files(paths=args.files, stdin_filename=args.stdin_filename, resolver=settings_context.resolver)
         errors.extend(files_errors)
     except FileSelectionError as error:
         print(f"pydocfmt check: File selection error: {error}", file=sys.stderr)
         return 2
+    except settings_core.SettingsError as error:
+        print(f"pydocfmt check: Configuration error: {error}", file=sys.stderr)
+        return 2
 
-    if settings.experimental:
-        if use_stdin and len(files.accepted_paths) > 1:
+    rule_profiles = files.selected_files or (file_selection.SelectedFile(path="", profile=settings_context.cwd_profile),)
+    seen_rule_profiles: set[tuple[CheckSettings, tuple[tuple[str, str], ...]]] = set()
+    for selected_file in rule_profiles:
+        profile_key = _rule_profile_key(selected_file.profile)
+        if profile_key in seen_rule_profiles:
+            continue
+        seen_rule_profiles.add(profile_key)
+        selected_rules = rules_selection.select_rules(selected_file.settings, profile=selected_file.profile)
+        errors.extend(selected_rules.errors)
+
+    if use_stdin:
+        if len(files.accepted_paths) > 1:
             raise AssertionError(f"Expect at most one accepted path when using stdin: {files.accepted_paths}")
-        results = [formatter.format_file_exp(path, file=sys.stdin if use_stdin else None, settings=settings, fix=args.fix or args.diff, write=not args.diff) for path in files.accepted_paths]
-    else:
-        if use_stdin:
+        if files.selected_files and not files.selected_files[0].settings.experimental:
             print("pydocfmt check: Argument error: Cannot process input from stdin when using non-experimental mode", file=sys.stderr)
             return 2
-        results = format_files(files.accepted_paths, settings=settings, fix=args.fix or args.diff, write=not args.diff)
+
+    results = format_selected_files(files.selected_files, use_stdin=use_stdin, fix=args.fix or args.diff, write=not args.diff)
 
     if use_stdin and args.fix and not args.diff and results:
         if len(results) != 1:
@@ -256,10 +284,10 @@ def check_files(*, args: argparse.Namespace, settings: CheckSettings) -> int:
             print_diff_summary(errors, results, output=output)
         print_diff_results(results, output=None)
     elif use_stdin and args.fix and args.output_file is None:
-        print_results(errors, results, output_format=settings.output_format, output=sys.stderr)
+        print_results(errors, results, output_format=settings_context.cwd_settings.output_format, output=sys.stderr)
     else:
         with output_stream(args.output_file) as output:
-            print_results(errors, results, output_format=settings.output_format, output=output)
+            print_results(errors, results, output_format=settings_context.cwd_settings.output_format, output=output)
 
     if args.exit_zero:
         return 0
@@ -271,6 +299,11 @@ def check_files(*, args: argparse.Namespace, settings: CheckSettings) -> int:
         return 1
     else:
         return 0
+
+
+def _rule_profile_key(profile: settings_core.SettingsProfile[CheckSettings]) -> tuple[CheckSettings, tuple[tuple[str, str], ...]]:
+    """Return the identity used to deduplicate equivalent rule-selection profiles."""
+    return profile.settings, tuple(sorted(profile.field_bases.items()))
 
 
 @contextlib.contextmanager
@@ -354,18 +387,39 @@ def format_files(paths: tuple[str, ...], *, settings: CheckSettings, fix: bool, 
     return results
 
 
-def load_settings(args: argparse.Namespace) -> CheckSettings | None:
-    """Load settings with command-line overrides, returning None on failure.
+def format_selected_files(selected_files: tuple[file_selection.SelectedFile, ...], *, use_stdin: bool, fix: bool, write: bool) -> list[FormatterResult]:
+    """Format selected files with each file's resolved settings profile."""
+    results: list[FormatterResult] = []
+    for index, selected_file in enumerate(selected_files):
+        settings = selected_file.settings
+        if settings.experimental:
+            results.append(
+                formatter.format_file_exp(
+                    selected_file.path,
+                    file=sys.stdin if use_stdin and index == 0 else None,
+                    settings=settings,
+                    fix=fix,
+                    write=write,
+                )
+            )
+        else:
+            results.extend(format_files((selected_file.path,), settings=settings, fix=fix, write=write))
+    return results
+
+
+def load_settings(args: argparse.Namespace) -> CheckRunContext | None:
+    """Load path-aware settings with command-line overrides, returning None on failure.
 
     Args:
         args (argparse.Namespace): Parsed command arguments.
 
     Returns:
-        CheckSettings | None: Resolved settings, or None after printing a configuration error.
+        CheckRunContext | None: Resolved settings context, or None after printing a configuration error.
     """
     try:
         global_values = global_args.global_values_from_arguments(args, dest_prefixes=("global", "command"))
-        return SETTINGS_SCHEMA.load(global_values=global_values, args=args)
+        resolver = SETTINGS_SCHEMA.resolver(global_values=global_values, args=args)
+        return CheckRunContext(resolver=resolver, cwd_profile=resolver.profile_for_path(os.getcwd()))
     except settings_core.SettingsError as error:
         print(f"pydocfmt check: Configuration error: {error}", file=sys.stderr)
         return None

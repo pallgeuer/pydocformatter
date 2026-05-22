@@ -1,9 +1,13 @@
+from __future__ import annotations
+
 import dataclasses
 import os
 import subprocess
 from collections import defaultdict
+from collections.abc import Mapping
 from enum import Enum
 
+import pydocformatter.settings as settings_core
 import pydocformatter.utils.misc as misc
 from pydocformatter.cli.settings_check import CheckSettings
 from pydocformatter.utils.globs import GlobPatternSet
@@ -20,7 +24,7 @@ class DecisionReason(str, Enum):
 
     Attributes:
         INCLUDED (DecisionReason): The path matched include rules and did not match exclude rules.
-        EXPLICIT_INCLUDED (DecisionReason): The path was passed explicitly while `force_exclude` was disabled.
+        EXPLICIT_INCLUDED (DecisionReason): The path was passed explicitly and accepted.
         NOT_INCLUDED (DecisionReason): The path did not match configured include patterns.
         EXCLUDED (DecisionReason): The path matched configured exclude patterns.
         GITIGNORED (DecisionReason): The path was rejected because git reported it as ignored.
@@ -37,7 +41,7 @@ class DecisionReason(str, Enum):
 
 _REASON_MESSAGES = {
     DecisionReason.INCLUDED: "included",
-    DecisionReason.EXPLICIT_INCLUDED: "included explicitly (force-exclude disabled)",
+    DecisionReason.EXPLICIT_INCLUDED: "included explicitly",
     DecisionReason.NOT_INCLUDED: "does not match include patterns",
     DecisionReason.EXCLUDED: "matches exclude patterns",
     DecisionReason.GITIGNORED: "matches .gitignore",
@@ -46,20 +50,36 @@ _REASON_MESSAGES = {
 
 
 @dataclasses.dataclass(frozen=True)
+class SelectedFile:
+    """An accepted path with the settings profile that applies to it."""
+
+    path: str
+    profile: settings_core.SettingsProfile[CheckSettings]
+
+    @property
+    def settings(self) -> CheckSettings:
+        """Return the resolved settings for this selected file."""
+        return self.profile.settings
+
+
+@dataclasses.dataclass(frozen=True)
 class FileDecision:
     """Result of evaluating whether one path should be formatted.
 
     Attributes:
-        path (str): Original path that was evaluated.
+        path (str): Display path that was evaluated.
         accepted (bool): Whether the path should be formatted.
         reason (DecisionReason): Stable machine-readable decision reason.
         explicit (bool): Whether the path came directly from a CLI argument rather than directory traversal.
+        profile (settings_core.SettingsProfile[CheckSettings] | None): Settings profile used to make the decision.
     """
 
     path: str
     accepted: bool
     reason: DecisionReason
     explicit: bool
+    profile: settings_core.SettingsProfile[CheckSettings] | None = dataclasses.field(default=None, compare=False, repr=False)
+    respect_gitignore: bool = dataclasses.field(default=True, compare=False, repr=False)
 
     @property
     def message(self) -> str:
@@ -76,13 +96,21 @@ class SelectionResult:
     """Accepted files and all file-selection decisions.
 
     Attributes:
-        accepted_paths (tuple[str, ...]): Ordered, deduplicated paths that should be formatted. Paths are normalized for
-            display while staying relative when possible.
+        accepted_paths (tuple[str, ...]): Ordered, deduplicated display paths that should be formatted.
         decisions (tuple[FileDecision, ...]): Ordered decisions for every considered path or pruned directory.
+        selected_files (tuple[SelectedFile, ...]): Accepted paths paired with their resolved settings profiles.
     """
 
     accepted_paths: tuple[str, ...]
     decisions: tuple[FileDecision, ...]
+    selected_files: tuple[SelectedFile, ...] = ()
+
+    def profile_for_path(self, path: str) -> settings_core.SettingsProfile[CheckSettings]:
+        """Return the selected settings profile for an accepted display path."""
+        for selected_file in self.selected_files:
+            if selected_file.path == path:
+                return selected_file.profile
+        raise KeyError(path)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -91,136 +119,222 @@ class _Candidate:
 
     path: str
     explicit: bool
+    profile: settings_core.SettingsProfile[CheckSettings]
+    respect_gitignore: bool
+
+
+@dataclasses.dataclass(frozen=True)
+class _PatternGroup:
+    """Compiled patterns that share one base directory."""
+
+    base_path: str
+    matcher: GlobPatternSet
+
+    def matches(self, path: str) -> bool:
+        """Return whether this group matches a filesystem path."""
+        return self.matcher.matches(_base_relative_posix_path(path, self.base_path))
+
+
+@dataclasses.dataclass(frozen=True)
+class _PatternMatcher:
+    """A matcher made from one or more source-base-specific pattern groups."""
+
+    groups: tuple[_PatternGroup, ...]
+
+    @classmethod
+    def compile(
+        cls,
+        profile: settings_core.SettingsProfile[CheckSettings],
+        fields: tuple[str, ...],
+        *,
+        match_parent_segments_for_bare: bool,
+        match_descendants_for_slash: bool = False,
+    ) -> "_PatternMatcher":
+        """Compile path-pattern fields from a settings profile."""
+        groups: list[_PatternGroup] = []
+        for field in fields:
+            patterns = getattr(profile.settings, field)
+            if not patterns:
+                continue
+            groups.append(
+                _PatternGroup(
+                    base_path=profile.base_for_field(field),
+                    matcher=GlobPatternSet.compile(
+                        patterns,
+                        match_parent_segments_for_bare=match_parent_segments_for_bare,
+                        match_descendants_for_slash=match_descendants_for_slash,
+                    ),
+                )
+            )
+        return cls(tuple(groups))
+
+    def matches(self, path: str) -> bool:
+        """Return whether any source-base-specific group matches the path."""
+        return any(group.matches(path) for group in self.groups)
+
+
+@dataclasses.dataclass
+class _SelectionContext:
+    """Shared state for one file-selection run."""
+
+    resolver: settings_core.SettingsResolver[CheckSettings]
+    respect_gitignore: bool
+    matcher_cache: dict[int, tuple[_PatternMatcher, _PatternMatcher]] = dataclasses.field(default_factory=dict)
+
+    def profile_for_path(self, path: str | None = None) -> settings_core.SettingsProfile[CheckSettings]:
+        """Return the settings profile for a path."""
+        return self.resolver.profile_for_path(path)
+
+    def matchers_for_profile(self, profile: settings_core.SettingsProfile[CheckSettings]) -> tuple[_PatternMatcher, _PatternMatcher]:
+        """Return include and exclude matchers for a settings profile."""
+        profile_id = id(profile)
+        cached_matchers = self.matcher_cache.get(profile_id)
+        if cached_matchers is not None:
+            return cached_matchers
+
+        validate_include_patterns(profile.settings.include_patterns)
+        validate_exclude_patterns(profile.settings.exclude_patterns)
+        matchers = (
+            _PatternMatcher.compile(
+                profile,
+                ("include", "extend_include"),
+                match_parent_segments_for_bare=False,
+            ),
+            _PatternMatcher.compile(
+                profile,
+                ("exclude", "extend_exclude"),
+                match_parent_segments_for_bare=True,
+                match_descendants_for_slash=True,
+            ),
+        )
+        self.matcher_cache[profile_id] = matchers
+        return matchers
 
 
 _CollectedPath = _Candidate | FileDecision
 
 
-def select_files(paths: list[str], settings: CheckSettings) -> SelectionResult:
+def select_files(paths: list[str], resolver: settings_core.SettingsResolver[CheckSettings]) -> SelectionResult:
     """Select files from CLI paths using resolved formatter settings.
 
-    Direct file paths are accepted without include, exclude, or gitignore filtering unless `settings.force_exclude` is
-    enabled. Directory paths are walked recursively with excluded directories pruned before file candidates are
-    evaluated.
+    Direct file paths are accepted without include or gitignore filtering. When `force_exclude` is enabled, direct file
+    paths are rejected by matching exclude patterns. Directory paths are walked recursively with excluded directories
+    pruned before file candidates are evaluated.
 
     Args:
         paths (list[str]): CLI path arguments naming files or directories to consider.
-        settings (CheckSettings): Resolved formatter settings controlling include, exclude, force-exclude, and gitignore
-            behavior.
+        resolver (settings_core.SettingsResolver[CheckSettings]): Path-aware settings resolver controlling include,
+            exclude, force-exclude, and gitignore behavior.
 
     Returns:
-        SelectionResult: Accepted paths plus file-selection decisions for accepted and rejected paths. Accepted paths
-            are deduplicated by physical file identity.
+        SelectionResult: Accepted paths plus file-selection decisions for accepted and rejected paths.
     """
-    validate_include_patterns(settings.include_patterns)
-    validate_exclude_patterns(settings.exclude_patterns)
-    include_matcher = GlobPatternSet.compile(settings.include_patterns, match_parent_segments_for_bare=False)
-    exclude_matcher = GlobPatternSet.compile(settings.exclude_patterns, match_parent_segments_for_bare=True, match_descendants_for_slash=True)
-    root_cache: dict[str, str | None] = {}
-
+    context = _selection_context(resolver)
     evaluated = tuple(
         (
             collected
             if isinstance(collected, FileDecision)
             else _evaluate_candidate(
                 collected,
-                settings,
-                include_matcher,
-                exclude_matcher,
-                root_cache,
+                context,
             )
         )
-        for collected in _collect_candidates(paths, exclude_matcher, root_cache)
+        for collected in _collect_candidates(paths, context)
     )
 
-    return _selection_result_with_gitignore(evaluated, settings, root_cache)
+    return _selection_result_with_gitignore(evaluated)
 
 
-def select_virtual_file(path: str, settings: CheckSettings) -> SelectionResult:
+def select_virtual_file(path: str, resolver: settings_core.SettingsResolver[CheckSettings]) -> SelectionResult:
     """Select one explicit file path without checking whether it exists on disk.
 
     Args:
         path (str): Virtual or display path to evaluate as an explicit input file.
-        settings (CheckSettings): Resolved formatter settings controlling include, exclude, force-exclude, and gitignore
-            behavior.
+        resolver (settings_core.SettingsResolver[CheckSettings]): Path-aware settings resolver controlling include,
+            exclude, force-exclude, and gitignore behavior.
 
     Returns:
         SelectionResult: Selection result containing the accepted virtual path or the rejection decision.
     """
+    context = _selection_context(resolver)
+    profile = context.profile_for_path(None if path == STDIN_VIRTUAL_FILE else path)
     if path == STDIN_VIRTUAL_FILE:
-        return SelectionResult(
-            accepted_paths=(STDIN_VIRTUAL_FILE,),
-            decisions=(
+        return _selection_result(
+            (
                 FileDecision(
                     path=STDIN_VIRTUAL_FILE,
                     accepted=True,
                     reason=DecisionReason.INCLUDED,
                     explicit=True,
+                    profile=profile,
+                    respect_gitignore=False,
                 ),
-            ),
+            )
         )
-
-    validate_include_patterns(settings.include_patterns)
-    validate_exclude_patterns(settings.exclude_patterns)
-    include_matcher = GlobPatternSet.compile(settings.include_patterns, match_parent_segments_for_bare=False)
-    exclude_matcher = GlobPatternSet.compile(settings.exclude_patterns, match_parent_segments_for_bare=True, match_descendants_for_slash=True)
-    root_cache: dict[str, str | None] = {}
 
     evaluated = (
         _evaluate_candidate(
-            _Candidate(path=path, explicit=True),
-            settings,
-            include_matcher,
-            exclude_matcher,
-            root_cache,
+            _Candidate(path=path, explicit=True, profile=profile, respect_gitignore=False),
+            context,
         ),
     )
 
-    return _selection_result_with_gitignore(evaluated, settings, root_cache)
+    return _selection_result_with_gitignore(evaluated)
 
 
-def _selection_result_with_gitignore(
-    evaluated: tuple[FileDecision, ...],
-    settings: CheckSettings,
-    root_cache: dict[str, str | None],
-) -> SelectionResult:
+def _selection_context(resolver: settings_core.SettingsResolver[CheckSettings]) -> _SelectionContext:
+    """Return a selection context from a path-aware settings resolver."""
+    return _SelectionContext(resolver, respect_gitignore=resolver.profile_for_path(os.getcwd()).settings.respect_gitignore)
+
+
+def _selection_result_with_gitignore(evaluated: tuple[FileDecision, ...]) -> SelectionResult:
     """Build the final selection result, applying gitignore filtering when enabled."""
-    if not settings.respect_gitignore:
-        return _selection_result(evaluated)
-
-    gitignored_paths = _collect_gitignored_absolute_paths(_accepted_paths_by_git_root(evaluated, settings.force_exclude, root_cache))
+    gitignored_paths = _collect_gitignored_absolute_paths(_accepted_paths_by_git_root(evaluated))
     if not gitignored_paths:
         return _selection_result(evaluated)
 
-    decisions = tuple(_apply_gitignore_decision(decision, settings.force_exclude, gitignored_paths) for decision in evaluated)
+    decisions = tuple(_apply_gitignore_decision(decision, gitignored_paths) for decision in evaluated)
     return _selection_result(decisions)
 
 
-def _collect_candidates(
-    paths: list[str],
-    exclude_matcher: GlobPatternSet,
-    root_cache: dict[str, str | None],
-) -> tuple[_CollectedPath, ...]:
+def _collect_candidates(paths: list[str], context: _SelectionContext) -> tuple[_CollectedPath, ...]:
     """Collect explicit files and recursively discovered files, pruning excluded directories."""
     candidates: list[_CollectedPath] = []
     for path in paths:
         if os.path.isdir(path):
-            if exclude_matcher.matches(_git_root_or_cwd_relative_posix_path(path, root_cache)):
-                candidates.append(_excluded_directory_decision(path, explicit=True))
+            profile = context.profile_for_path(path)
+            _, exclude_matcher = context.matchers_for_profile(profile)
+            if exclude_matcher.matches(path) or _force_excluded_explicit_directory(path, profile):
+                candidates.append(_excluded_directory_decision(path, explicit=True, profile=profile))
                 continue
-            for root, dirs, files in os.walk(path):
-                kept_dirs = []
-                for name in sorted(dirs):
-                    directory = os.path.join(root, name)
-                    if exclude_matcher.matches(_git_root_or_cwd_relative_posix_path(directory, root_cache)):
-                        candidates.append(_excluded_directory_decision(directory, explicit=False))
-                    else:
-                        kept_dirs.append(name)
-                dirs[:] = kept_dirs
-                files.sort()
-                candidates.extend(_Candidate(path=os.path.join(root, name), explicit=False) for name in files if name != ".git")
+            candidates.extend(_walk_directory(path, context, respect_gitignore=context.respect_gitignore))
         else:
-            candidates.append(_Candidate(path=path, explicit=True))
+            candidates.append(_Candidate(path=path, explicit=True, profile=context.profile_for_path(path), respect_gitignore=False))
+    return tuple(candidates)
+
+
+def _walk_directory(path: str, context: _SelectionContext, *, respect_gitignore: bool) -> tuple[_CollectedPath, ...]:
+    """Recursively collect candidates below one accepted directory."""
+    candidates: list[_CollectedPath] = []
+    for root, dirs, files in os.walk(path):
+        profile = context.profile_for_path(root)
+        _, exclude_matcher = context.matchers_for_profile(profile)
+
+        kept_dirs = []
+        for name in sorted(dirs):
+            directory = os.path.join(root, name)
+            if exclude_matcher.matches(directory):
+                candidates.append(_excluded_directory_decision(directory, explicit=False, profile=profile))
+            else:
+                kept_dirs.append(name)
+        dirs[:] = kept_dirs
+
+        files.sort()
+        for name in files:
+            if name == ".git":
+                continue
+            file_path = os.path.join(root, name)
+            candidates.append(_Candidate(path=file_path, explicit=False, profile=context.profile_for_path(file_path), respect_gitignore=respect_gitignore))
     return tuple(candidates)
 
 
@@ -231,15 +345,11 @@ def validate_include_patterns(patterns: tuple[str, ...]) -> None:
         patterns (tuple[str, ...]): Include glob patterns to validate.
 
     Raises:
-        `FileSelectionError`: If any include pattern is empty or cannot target files.
+        `FileSelectionError`: If any include pattern is empty.
     """
     for pattern in patterns:
         if not pattern:
             raise FileSelectionError("Include patterns must not be empty")
-        if pattern.endswith("/"):
-            raise FileSelectionError(f"Include pattern must target files: {pattern}")
-        if pattern.rstrip("/") in {"**", "**/*"}:
-            raise FileSelectionError(f"Include pattern must target files: {pattern}")
 
 
 def validate_exclude_patterns(patterns: tuple[str, ...]) -> None:
@@ -256,81 +366,106 @@ def validate_exclude_patterns(patterns: tuple[str, ...]) -> None:
             raise FileSelectionError("Exclude patterns must not be empty")
 
 
-def _excluded_directory_decision(path: str, explicit: bool) -> FileDecision:
+def _force_excluded_explicit_directory(path: str, profile: settings_core.SettingsProfile[CheckSettings]) -> bool:
+    """Return whether force-exclude rejects an explicit directory path."""
+    if not profile.settings.force_exclude:
+        return False
+    matcher = GlobPatternSet.compile(
+        profile.settings.exclude_patterns,
+        match_parent_segments_for_bare=True,
+        match_descendants_for_slash=True,
+    )
+    return matcher.matches(_base_relative_posix_path(path, os.getcwd()))
+
+
+def _excluded_directory_decision(path: str, *, explicit: bool, profile: settings_core.SettingsProfile[CheckSettings]) -> FileDecision:
     """Return a rejection decision for an excluded directory path."""
     return FileDecision(
         path=path,
         accepted=False,
         reason=DecisionReason.EXCLUDED,
         explicit=explicit,
+        profile=profile,
     )
 
 
-def _evaluate_candidate(
-    candidate: _Candidate,
-    settings: CheckSettings,
-    include_matcher: GlobPatternSet,
-    exclude_matcher: GlobPatternSet,
-    root_cache: dict[str, str | None],
-) -> FileDecision:
+def _evaluate_candidate(candidate: _Candidate, context: _SelectionContext) -> FileDecision:
     """Evaluate one candidate path against explicit-path, include, and exclude rules."""
-    if candidate.explicit and not settings.force_exclude:
+    include_matcher, exclude_matcher = context.matchers_for_profile(candidate.profile)
+
+    if candidate.explicit:
+        if candidate.profile.settings.force_exclude and exclude_matcher.matches(candidate.path):
+            return FileDecision(
+                path=candidate.path,
+                accepted=False,
+                reason=DecisionReason.EXCLUDED,
+                explicit=True,
+                profile=candidate.profile,
+                respect_gitignore=candidate.respect_gitignore,
+            )
         return FileDecision(
             path=candidate.path,
             accepted=True,
             reason=DecisionReason.EXPLICIT_INCLUDED,
             explicit=True,
+            profile=candidate.profile,
+            respect_gitignore=candidate.respect_gitignore,
         )
 
-    normalized_path = _git_root_or_cwd_relative_posix_path(candidate.path, root_cache)
-    if not include_matcher.matches(normalized_path):
+    if not include_matcher.matches(candidate.path):
         return FileDecision(
             path=candidate.path,
             accepted=False,
             reason=DecisionReason.NOT_INCLUDED,
-            explicit=candidate.explicit,
+            explicit=False,
+            profile=candidate.profile,
+            respect_gitignore=candidate.respect_gitignore,
         )
-    if exclude_matcher.matches(normalized_path):
+    if exclude_matcher.matches(candidate.path):
         return FileDecision(
             path=candidate.path,
             accepted=False,
             reason=DecisionReason.EXCLUDED,
-            explicit=candidate.explicit,
+            explicit=False,
+            profile=candidate.profile,
+            respect_gitignore=candidate.respect_gitignore,
         )
     return FileDecision(
         path=candidate.path,
         accepted=True,
         reason=DecisionReason.INCLUDED,
-        explicit=candidate.explicit,
+        explicit=False,
+        profile=candidate.profile,
+        respect_gitignore=candidate.respect_gitignore,
     )
 
 
-def _apply_gitignore_decision(
-    decision: FileDecision,
-    force_exclude: bool,
-    gitignored_paths: set[str],
-) -> FileDecision:
-    """Reject accepted paths that git reported as ignored, honoring explicit path rules."""
+def _apply_gitignore_decision(decision: FileDecision, gitignored_paths: set[str]) -> FileDecision:
+    """Reject accepted discovered paths that git reported as ignored."""
     if not decision.accepted:
         return decision
-    if decision.explicit and not force_exclude:
+    if decision.explicit:
         return decision
-    if os.path.abspath(decision.path) not in gitignored_paths:
+    if os.path.realpath(decision.path) not in gitignored_paths:
         return decision
     return FileDecision(
         path=decision.path,
         accepted=False,
         reason=DecisionReason.GITIGNORED,
         explicit=decision.explicit,
+        profile=decision.profile,
+        respect_gitignore=decision.respect_gitignore,
     )
 
 
 def _selection_result(decisions: tuple[FileDecision, ...]) -> SelectionResult:
     """Build a selection result from the ordered file-decision stream."""
     decisions = _deduplicated_decisions(decisions)
+    selected_files = tuple(SelectedFile(path=decision.path, profile=decision.profile) for decision in decisions if decision.accepted and decision.profile is not None)
     return SelectionResult(
-        accepted_paths=tuple(decision.path for decision in decisions if decision.accepted),
+        accepted_paths=tuple(selected_file.path for selected_file in selected_files),
         decisions=decisions,
+        selected_files=selected_files,
     )
 
 
@@ -379,6 +514,8 @@ def _duplicate_decision(decision: FileDecision) -> FileDecision:
         accepted=False,
         reason=DecisionReason.DUPLICATE,
         explicit=decision.explicit,
+        profile=decision.profile,
+        respect_gitignore=decision.respect_gitignore,
     )
 
 
@@ -398,31 +535,20 @@ def path_identity_key(path: str) -> str | None:
 
 def _display_path(path: str) -> str:
     """Return the preferred path spelling for user-facing output."""
-    normalized_path = os.path.normpath(path)
-    if not os.path.isabs(normalized_path):
-        return normalized_path
+    if path == STDIN_VIRTUAL_FILE:
+        return path
 
-    absolute_path = os.path.abspath(normalized_path)
-    current_directory = os.getcwd()
-    if _is_relative_to(absolute_path, current_directory):
-        return os.path.relpath(absolute_path, current_directory)
+    normalized_path = os.path.normpath(path)
+    if os.path.exists(normalized_path):
+        return os.path.abspath(normalized_path)
     return normalized_path
 
 
-def _is_relative_to(path: str, base_path: str) -> bool:
-    """Return whether a path is inside a base path."""
-    try:
-        return os.path.commonpath((path, base_path)) == base_path
-    except ValueError:
-        return False
-
-
-def _display_path_score(path: str) -> tuple[int, int, int, int, str]:
+def _display_path_score(path: str) -> tuple[int, int, int, str]:
     """Return a sortable score where lower means a clearer display path."""
     normalized_path = os.path.normpath(path)
     segments = tuple(segment for segment in normalized_path.split(os.sep) if segment)
     return (
-        int(os.path.isabs(normalized_path)),
         segments.count(".."),
         len(segments),
         len(normalized_path),
@@ -430,29 +556,25 @@ def _display_path_score(path: str) -> tuple[int, int, int, int, str]:
     )
 
 
-def _git_root_or_cwd_relative_posix_path(path: str, root_cache: dict[str, str | None]) -> str:
-    """Return a git-root-relative or cwd-relative path using POSIX separators."""
-    absolute_path = os.path.abspath(path)
-    git_root = misc.find_git_root_for_path(absolute_path, root_cache)
-    base_path = git_root if git_root is not None else os.getcwd()
-    return os.path.relpath(absolute_path, base_path).replace(os.sep, "/")
+def _base_relative_posix_path(path: str, base_path: str) -> str:
+    """Return a base-relative path using POSIX separators."""
+    return os.path.relpath(os.path.abspath(path), os.path.abspath(base_path)).replace(os.sep, "/")
 
 
-def _accepted_paths_by_git_root(
-    decisions: tuple[FileDecision, ...],
-    force_exclude: bool,
-    root_cache: dict[str, str | None],
-) -> dict[str, list[str]]:
+def _accepted_paths_by_git_root(decisions: tuple[FileDecision, ...]) -> dict[str, list[str]]:
     """Group accepted, gitignore-checkable paths by containing git root."""
     grouped_paths: dict[str, list[str]] = defaultdict(list)
+    root_cache: dict[str, str | None] = {}
 
     for decision in decisions:
         if not decision.accepted:
             continue
-        if decision.explicit and not force_exclude:
+        if decision.explicit:
+            continue
+        if not decision.respect_gitignore:
             continue
 
-        absolute_path = os.path.abspath(decision.path)
+        absolute_path = os.path.realpath(decision.path)
         git_root = misc.find_git_root_for_path(absolute_path, root_cache)
         if git_root is None:
             continue
@@ -463,9 +585,7 @@ def _accepted_paths_by_git_root(
     return dict(grouped_paths)
 
 
-def _collect_gitignored_absolute_paths(
-    paths_by_git_root: dict[str, list[str]],
-) -> set[str]:
+def _collect_gitignored_absolute_paths(paths_by_git_root: Mapping[str, list[str]]) -> set[str]:
     """Return absolute paths reported as ignored by git for each repository root."""
     gitignored_paths: set[str] = set()
 
@@ -473,15 +593,12 @@ def _collect_gitignored_absolute_paths(
         ignored_relative_paths, error = _query_git_ignored_paths(git_root, relative_paths)
         if error is not None:
             raise FileSelectionError(f"{git_root}: Unable to apply gitignore filtering: {error}")
-        gitignored_paths.update(os.path.abspath(os.path.join(git_root, path)) for path in ignored_relative_paths)
+        gitignored_paths.update(os.path.realpath(os.path.join(git_root, path)) for path in ignored_relative_paths)
 
     return gitignored_paths
 
 
-def _query_git_ignored_paths(
-    git_root: str,
-    relative_paths: list[str],
-) -> tuple[set[str], str | None]:
+def _query_git_ignored_paths(git_root: str, relative_paths: list[str]) -> tuple[set[str], str | None]:
     """Ask git which repository-relative paths are ignored."""
     unique_relative_paths = list(dict.fromkeys(relative_paths))
     if not unique_relative_paths:

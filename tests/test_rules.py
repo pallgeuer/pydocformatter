@@ -1,19 +1,25 @@
+import argparse
 import dataclasses
 import importlib
 import inspect
+import os
 import pkgutil
+import tempfile
 import typing
 import unittest
 from io import StringIO
+from pathlib import Path
 
 import pydocformatter.cli.check as check
 import pydocformatter.cli.rule as rule_command
+import pydocformatter.file_selection as file_selection
 import pydocformatter.rules.base as rule_base
 import pydocformatter.rules.collection as rule_collection
 import pydocformatter.rules.definitions as rule_definitions
 import pydocformatter.rules.documentation as rule_documentation
 import pydocformatter.rules_selection as rules_selection
-from pydocformatter.cli.settings_check import CheckSettings
+from pydocformatter.cli.global_args import GlobalArgs
+from pydocformatter.cli.settings_check import SETTINGS_SCHEMA, CheckSettings
 from pydocformatter.rules.base import RuleBase, RuleCode, RuleMetadata, RuleSelector
 
 
@@ -48,6 +54,18 @@ def specificity_collection() -> rule_collection.RuleCollection:
 
 
 class TestRules(unittest.TestCase):
+    @staticmethod
+    def _write(path: Path, text: str = "x = 1\n") -> None:
+        """Write a UTF-8 test fixture file, creating parents as needed."""
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
+
+    @staticmethod
+    def _active_rule_tags_for_path(profile: typing.Any, path: Path) -> tuple[str, ...]:
+        """Return active sample rule tags for a path after per-file ignores."""
+        selection = rules_selection.select_rules(profile.settings, collection=sample_collection(), profile=profile)
+        return tuple(rule.rule.code.tag for rule in selection.for_path(str(path)))
+
     def test_default_rule_collection_is_collected_on_import(self) -> None:
         collection = rule_collection.RULE_COLLECTION
         rule_module_names = tuple(module.name for module in pkgutil.walk_packages(path=rule_definitions.__path__, prefix=f"{rule_definitions.__name__}.") if not module.ispkg)
@@ -384,6 +402,110 @@ class TestRules(unittest.TestCase):
 
         self.assertEqual(tuple(rule.rule.code.tag for rule in selection.for_path("src/a.py")), ("PCF001", "PDF001", "PDF105"))
         self.assertEqual(tuple(rule.rule.code.tag for rule in selection.for_path("tests/a.py")), ("PCF001", "PDF105"))
+
+    def test_ruff_spec_per_file_ignores_are_auto_config_directory_relative(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            target = root / "src" / "pkg" / "a.py"
+            self._write(target)
+            previous_cwd = os.getcwd()
+            os.chdir(root / "src")
+            try:
+                self._write(root / "pyproject.toml", '[tool.pydocfmt]\nselect = ["PDF001"]\nper-file-ignores = {"src/pkg/*.py" = ["PDF001"]}\n')
+                matching_profile = SETTINGS_SCHEMA.load_profile(path=str(target))
+                self._write(root / "pyproject.toml", '[tool.pydocfmt]\nselect = ["PDF001"]\nper-file-ignores = {"pkg/*.py" = ["PDF001"]}\n')
+                non_matching_profile = SETTINGS_SCHEMA.load_profile(path=str(target))
+                self._write(root / "pyproject.toml", '[tool.pydocfmt]\nselect = ["PDF001"]\nper-file-ignores = {"*.py" = ["PDF001"]}\n')
+                bare_star_profile = SETTINGS_SCHEMA.load_profile(path=str(target))
+                self._write(root / "pyproject.toml", '[tool.pydocfmt]\nselect = ["PDF001"]\nper-file-ignores = {"a.py" = ["PDF001"]}\n')
+                bare_literal_profile = SETTINGS_SCHEMA.load_profile(path=str(target))
+            finally:
+                os.chdir(previous_cwd)
+
+        self.assertEqual(self._active_rule_tags_for_path(matching_profile, target), ())
+        self.assertEqual(self._active_rule_tags_for_path(non_matching_profile, target), ("PDF001",))
+        self.assertEqual(self._active_rule_tags_for_path(bare_star_profile, target), ())
+        self.assertEqual(self._active_rule_tags_for_path(bare_literal_profile, target), ())
+
+    def test_ruff_spec_per_file_ignores_do_not_use_git_root_as_base(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / ".git").mkdir()
+            target = root / "src" / "pkg" / "a.py"
+            self._write(target)
+            previous_cwd = os.getcwd()
+            os.chdir(root / "src" / "pkg")
+            try:
+                self._write(root / "src" / "pyproject.toml", '[tool.pydocfmt]\nselect = ["PDF001"]\nper-file-ignores = {"pkg/*.py" = ["PDF001"]}\n')
+                matching_profile = SETTINGS_SCHEMA.load_profile(path=str(target))
+                self._write(root / "src" / "pyproject.toml", '[tool.pydocfmt]\nselect = ["PDF001"]\nper-file-ignores = {"src/pkg/*.py" = ["PDF001"]}\n')
+                non_matching_profile = SETTINGS_SCHEMA.load_profile(path=str(target))
+            finally:
+                os.chdir(previous_cwd)
+
+        self.assertEqual(self._active_rule_tags_for_path(matching_profile, target), ())
+        self.assertEqual(self._active_rule_tags_for_path(non_matching_profile, target), ("PDF001",))
+
+    def test_ruff_spec_explicit_config_per_file_ignores_are_current_directory_relative(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            repo = root / "repo"
+            config = root / "config" / "pydocfmt.toml"
+            target = repo / "src" / "pkg" / "a.py"
+            self._write(target)
+            self._write(config, 'select = ["PDF001"]\nper-file-ignores = {"src/pkg/*.py" = ["PDF001"]}\n')
+
+            previous_cwd = os.getcwd()
+            os.chdir(repo)
+            try:
+                matching_profile = SETTINGS_SCHEMA.load_profile(global_values=GlobalArgs(config_options=(str(config),)), path=str(target))
+            finally:
+                os.chdir(previous_cwd)
+
+            os.chdir(repo / "src")
+            try:
+                non_matching_profile = SETTINGS_SCHEMA.load_profile(global_values=GlobalArgs(config_options=(str(config),)), path=str(target))
+                self._write(config, 'select = ["PDF001"]\nper-file-ignores = {"pkg/*.py" = ["PDF001"]}\n')
+                changed_pattern_profile = SETTINGS_SCHEMA.load_profile(global_values=GlobalArgs(config_options=(str(config),)), path=str(target))
+            finally:
+                os.chdir(previous_cwd)
+
+        self.assertEqual(self._active_rule_tags_for_path(matching_profile, target), ())
+        self.assertEqual(self._active_rule_tags_for_path(non_matching_profile, target), ("PDF001",))
+        self.assertEqual(self._active_rule_tags_for_path(changed_pattern_profile, target), ())
+
+    def test_ruff_spec_cli_per_file_ignores_are_current_directory_relative(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            target = root / "src" / "pkg" / "a.py"
+            self._write(target)
+            self._write(root / "pyproject.toml", '[tool.pydocfmt]\nselect = ["PDF001"]\n')
+            previous_cwd = os.getcwd()
+            os.chdir(root / "src")
+            try:
+                matching_profile = SETTINGS_SCHEMA.load_profile(args=argparse.Namespace(per_file_ignores=['{"pkg/*.py" = ["PDF001"]}']), path=str(target))
+                non_matching_profile = SETTINGS_SCHEMA.load_profile(args=argparse.Namespace(per_file_ignores=['{"src/pkg/*.py" = ["PDF001"]}']), path=str(target))
+            finally:
+                os.chdir(previous_cwd)
+
+        self.assertEqual(self._active_rule_tags_for_path(matching_profile, target), ())
+        self.assertEqual(self._active_rule_tags_for_path(non_matching_profile, target), ("PDF001",))
+
+    def test_ruff_spec_per_file_ignores_apply_to_explicit_files(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            target = root / "src" / "pkg" / "a.py"
+            self._write(target)
+            self._write(root / "pyproject.toml", '[tool.pydocfmt]\nselect = ["PDF001"]\nper-file-ignores = {"src/pkg/*.py" = ["PDF001"]}\n')
+            previous_cwd = os.getcwd()
+            os.chdir(root / "src")
+            try:
+                selection = file_selection.select_files(["pkg/a.py"], SETTINGS_SCHEMA.resolver())
+            finally:
+                os.chdir(previous_cwd)
+
+        self.assertEqual(selection.accepted_paths, (str(target),))
+        self.assertEqual(self._active_rule_tags_for_path(selection.profile_for_path(str(target)), target), ())
 
     def test_print_rules_prints_active_rules_with_effective_fixability(self) -> None:
         selection = rules_selection.select_rules(

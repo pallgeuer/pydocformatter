@@ -62,15 +62,16 @@ class TestGlobMatcher(unittest.TestCase):
         self.assertTrue(matcher.matches("src/pkg/test_a.py"))
         self.assertFalse(matcher.matches("pkg/test_a.py"))
 
-    def test_invalid_include_patterns_are_rejected(self) -> None:
+    def test_empty_include_patterns_are_rejected(self) -> None:
         with self.assertRaises(FileSelectionError):
             file_selection.validate_include_patterns(
                 ("",),
             )
-        with self.assertRaises(FileSelectionError):
-            file_selection.validate_include_patterns(
-                ("src/",),
-            )
+
+    def test_directory_shaped_include_patterns_are_allowed(self) -> None:
+        file_selection.validate_include_patterns(
+            ("src/", "src/**", "**"),
+        )
 
     def test_invalid_exclude_patterns_are_rejected(self) -> None:
         with self.assertRaises(FileSelectionError):

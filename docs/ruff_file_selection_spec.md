@@ -2,7 +2,7 @@
 
 This document summarizes Ruff file selection as observed in Ruff `0.15.14` via `uvx ruff` on 2026-05-21. Examples were run in temporary directories; paths shown as `$T/...` stand in for those real temporary roots.
 
-The point of this document is not to restate every Ruff setting. It focuses on the path-resolution and pattern-matching behavior that matters when comparing Ruff to `pydocformatter.file_selection`.
+The point of this document is not to restate every Ruff setting. It focuses on Ruff's path-resolution, file-discovery, filtering, and per-file-ignore pattern behavior as observed from concrete command-line examples.
 
 ## Compact Summary
 
@@ -14,6 +14,8 @@ Ruff resolves path patterns relative to a project root chosen from configuration
 - For an explicit `--config PATH` config file, the base is the current working directory.
 - For individual command-line settings such as `--exclude`, `--extend-exclude`, `--per-file-ignores`, `--extend-per-file-ignores`, and inline `--config "key = value"` overrides, the base is the current working directory.
 - With no discovered config, the base is the current working directory.
+
+Supplying an explicit `--config PATH` config file disables auto-discovered config files for that invocation, and Ruff rejects invocations with more than one explicit config file. Inline `--config "key = value"` overrides do not disable auto-discovery; they layer over the discovered config.
 
 Ruff uses hierarchical config discovery. The closest config file applies to each file, and parent config files are not merged into child config files. Directory excludes in a parent config can still prune traversal before Ruff enters a child directory. File-specific parent excludes do not exclude a file that is governed by a closer child config.
 
@@ -27,19 +29,9 @@ Bare exclude patterns such as `pkg` or `generated` match file or directory names
 
 Explicit files bypass discovery and are analyzed regardless of include patterns. With `force-exclude`, Ruff applies configured exclude patterns to explicit files. In Ruff `0.15.14`, explicit files still bypass include patterns and gitignore filtering even when `force-exclude` is enabled.
 
-`respect-gitignore = true` affects discovered files from directory traversal. It does not change the base used for `include`, `exclude`, or per-file-ignore patterns.
+`respect-gitignore = true` affects discovered files from directory traversal. In observed traversal cases, Ruff uses the setting resolved for the current working directory; closer child configs and configs inside explicit directory arguments can change include and exclude behavior but do not enable or disable gitignore filtering for the run. The setting does not change the base used for `include`, `exclude`, or per-file-ignore patterns.
 
 Per-file ignores are not file selection. They apply after a file is selected and suppress selected rules for matching files. Their pattern base follows the same config context rules: closest auto-discovered config directory, cwd for explicit `--config PATH`, and cwd for CLI per-file-ignore options.
-
-## Comparison To Current pydocformatter
-
-Current `pydocformatter.file_selection` normalizes candidate paths relative to the nearest containing Git root when one exists, otherwise relative to cwd. Ruff does not do that. Ruff uses the closest config directory, explicit-config cwd, or command cwd as described above.
-
-Current `pydocformatter.file_selection` has one resolved config for a run. Ruff applies the closest config per file and does not merge parent configs into child configs.
-
-Current `pydocformatter.file_selection` applies include, exclude, and gitignore checks to explicit files when `force_exclude=True`. Ruff applies exclude checks to explicit files when `force-exclude=True`, but explicit files still bypass include and gitignore checks in the tested Ruff version.
-
-Current `pydocformatter.file_selection` defaults to `*.py`, `*.pyi`, and `*.pyw`. Ruff defaults to `*.py`, `*.pyi`, `*.ipynb`, and `pyproject.toml`, with `*.pyw` added only in preview mode.
 
 ## Tested Examples
 
@@ -695,6 +687,86 @@ Output:
 ```text
 All checks passed!
 ```
+
+### E19: Explicit `--config PATH` Disables Auto-Discovered Config
+
+Setup:
+
+```text
+$T/repo/pyproject.toml
+$T/repo/auto_skip.py
+$T/repo/keep.py
+$T/config/ruff.toml
+```
+
+Auto config in `$T/repo/pyproject.toml`:
+
+```toml
+[tool.ruff]
+include = ["*.py"]
+exclude = ["auto_skip.py"]
+```
+
+Explicit config in `$T/config/ruff.toml`:
+
+```toml
+include = ["*.py"]
+```
+
+Command from `$T/repo`:
+
+```bash
+uvx ruff check --show-files --no-cache --config "$T/config/ruff.toml" .
+```
+
+Selected:
+
+```text
+$T/repo/auto_skip.py
+$T/repo/keep.py
+```
+
+The auto-discovered `exclude = ["auto_skip.py"]` did not apply. By contrast, an inline-only override such as `--config 'include = ["*.py"]'` still layered over the auto-discovered config and kept excluding `auto_skip.py`.
+
+Supplying two explicit config files, such as `--config "$T/config/one.toml" --config "$T/config/two.toml"`, failed with a configuration-file multiplicity error.
+
+### E20: `respect-gitignore` Is Taken From The Current Working Directory
+
+Setup:
+
+```text
+$T/repo/.git/
+$T/repo/.gitignore
+$T/repo/pyproject.toml
+$T/repo/src/pkg/pyproject.toml
+$T/repo/src/pkg/ignored.py
+$T/repo/src/pkg/keep.py
+```
+
+`.gitignore`:
+
+```text
+src/pkg/ignored.py
+```
+
+With a cwd config omitting `respect-gitignore` and a child config setting `respect-gitignore = false`, command `uvx ruff check --show-files --no-cache .` from `$T/repo` selected:
+
+```text
+$T/repo/src/pkg/keep.py
+```
+
+The child config did not disable gitignore filtering for the run.
+
+With parent `respect-gitignore = false` and child `respect-gitignore = true`, the same command selected:
+
+```text
+$T/repo/src/pkg/ignored.py
+$T/repo/src/pkg/keep.py
+```
+
+The child config did not re-enable gitignore filtering for that run.
+
+Likewise, when running from `$T/repo` with no cwd config, passing two explicit directory arguments `left` and `right` used the default `respect-gitignore = true` for both directory traversals even if `$T/repo/right/pyproject.toml` set `respect-gitignore = false`.
 
 ## References
 

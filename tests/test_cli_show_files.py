@@ -374,8 +374,8 @@ class TestCLIShowFiles(unittest.TestCase):
             self.assertEqual(
                 stdout.getvalue().splitlines(),
                 [
-                    "a.py INCLUDED",
-                    "a.py IGNORED: duplicate path to already selected file",
+                    f"{root / 'a.py'} INCLUDED",
+                    f"{root / 'a.py'} IGNORED: duplicate path to already selected file",
                 ],
             )
 
@@ -439,7 +439,7 @@ class TestCLIShowFiles(unittest.TestCase):
 
             self.assertFalse(run_mock.called)
             self.assertFalse(legacy_called)
-            self.assertEqual(called_args, [("a.py", 72, True, True, "grouped")])
+            self.assertEqual(called_args, [(str(root / "a.py"), 72, True, True, settings_check.OutputFormat.GROUPED)])
 
     def test_pydocfmt_indent_cli_settings_are_applied(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -566,6 +566,26 @@ class TestCLIShowFiles(unittest.TestCase):
         self.assertIn("ERROR: rule selection contains unknown selector: BAD", stdout.getvalue())
         self.assertNotIn("Traceback", stdout.getvalue())
 
+    def test_invalid_rule_config_selector_reports_operational_error_once_for_equivalent_profiles(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "pyproject.toml").write_text('[tool.pydocfmt]\nselect = ["BAD999"]\n', encoding="utf-8")
+            (root / "a").mkdir()
+            (root / "b").mkdir()
+            (root / "a" / "one.py").write_text("x = 1\n", encoding="utf-8")
+            (root / "b" / "two.py").write_text("x = 2\n", encoding="utf-8")
+            stdout = StringIO()
+            argv = ["pydocfmt", "check", str(root / "a"), str(root / "b"), "--no-respect-gitignore"]
+            with (
+                unittest.mock.patch("sys.argv", argv),
+                contextlib.redirect_stdout(stdout),
+            ):
+                exit_code = pydocfmt_cli.main()
+
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(stdout.getvalue().count("ERROR: rule selection contains unknown selector: BAD999"), 1)
+        self.assertNotIn("Traceback", stdout.getvalue())
+
     def test_force_exclude_filters_explicit_file_when_enabled(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
@@ -603,7 +623,7 @@ class TestCLIShowFiles(unittest.TestCase):
             )
             self.assertEqual(called_paths, [])
 
-    def test_force_exclude_filters_explicit_file_by_gitignore(self) -> None:
+    def test_force_exclude_does_not_filter_explicit_file_by_gitignore(self) -> None:
         with self._make_git_tree() as td:
             root = Path(td)
             target = root / "skip.py"
@@ -620,7 +640,7 @@ class TestCLIShowFiles(unittest.TestCase):
                 unittest.mock.patch(
                     "pydocformatter.file_selection.subprocess.run",
                     side_effect=self._fake_git_check_ignore_for_root(root, {"skip.py"}),
-                ),
+                ) as run_mock,
                 unittest.mock.patch(
                     "pydocformatter.cli.check.pydocfmt.format_file",
                     side_effect=fake_format,
@@ -631,9 +651,10 @@ class TestCLIShowFiles(unittest.TestCase):
 
             self.assertEqual(
                 stdout.getvalue().splitlines(),
-                [f"{target} IGNORED: matches .gitignore"],
+                [f"{target} INCLUDED"],
             )
             self.assertEqual(called_paths, [])
+            run_mock.assert_not_called()
 
     def test_command_line_extend_exclude_overrides_config_extend_exclude(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -674,7 +695,7 @@ class TestCLIShowFiles(unittest.TestCase):
             finally:
                 os.chdir(previous_cwd)
 
-            self.assertEqual(called_paths, ["skip.py"])
+            self.assertEqual(called_paths, [str(target)])
 
     def _assert_help_ignores_invalid_config(
         self,
@@ -1145,12 +1166,12 @@ class TestCLIShowFiles(unittest.TestCase):
             "pydocfmt",
         )
 
-    def _assert_invalid_config_include_reports_config_error(
+    def _assert_directory_config_include_is_allowed(
         self,
         main: Callable[[], int],
         program: str,
     ) -> None:
-        """Assert that an invalid include config value reports a config error."""
+        """Assert that a Ruff-style directory include config value is accepted."""
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             (root / "pyproject.toml").write_text(
@@ -1158,25 +1179,27 @@ class TestCLIShowFiles(unittest.TestCase):
                 encoding="utf-8",
             )
             stderr = StringIO()
+            stdout = StringIO()
             argv = [program, "check", str(root)]
             previous_cwd = os.getcwd()
             os.chdir(root)
             try:
                 with (
                     unittest.mock.patch("sys.argv", argv),
+                    contextlib.redirect_stdout(stdout),
                     contextlib.redirect_stderr(stderr),
                 ):
                     exit_code = main()
             finally:
                 os.chdir(previous_cwd)
 
-        self.assertEqual(exit_code, 2)
-        self.assertIn(f"{program} check: File selection error", stderr.getvalue())
-        self.assertIn("Include pattern must target files", stderr.getvalue())
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(stdout.getvalue(), "All checks passed!\n")
+        self.assertEqual(stderr.getvalue(), "")
         self.assertNotIn("Traceback", stderr.getvalue())
 
-    def test_pydocfmt_invalid_config_include_reports_config_error(self) -> None:
-        self._assert_invalid_config_include_reports_config_error(
+    def test_pydocfmt_directory_config_include_is_allowed(self) -> None:
+        self._assert_directory_config_include_is_allowed(
             pydocfmt_cli.main,
             "pydocfmt",
         )
@@ -1203,7 +1226,72 @@ class TestCLIShowFiles(unittest.TestCase):
 
         self.assertEqual(exit_code, 2)
         self.assertIn("pydocfmt check: Configuration error", stderr.getvalue())
-        self.assertIn("Failed to decode pyproject.toml", stderr.getvalue())
+        self.assertIn("Failed to decode", stderr.getvalue())
+        self.assertIn("pyproject.toml", stderr.getvalue())
+        self.assertNotIn("Traceback", stderr.getvalue())
+
+    def test_pydocfmt_invalid_nested_config_reports_config_error(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            package = root / "package"
+            package.mkdir()
+            (package / "module.py").write_text("x = 1\n", encoding="utf-8")
+            (package / "pyproject.toml").write_text(
+                "[tool.pydocfmt]\nline-length = 0\n",
+                encoding="utf-8",
+            )
+            stderr = StringIO()
+            stdout = StringIO()
+            argv = ["pydocfmt", "check", str(root)]
+            previous_cwd = os.getcwd()
+            os.chdir(root)
+            try:
+                with (
+                    unittest.mock.patch("sys.argv", argv),
+                    contextlib.redirect_stdout(stdout),
+                    contextlib.redirect_stderr(stderr),
+                ):
+                    exit_code = pydocfmt_cli.main()
+            finally:
+                os.chdir(previous_cwd)
+
+        self.assertEqual(exit_code, 2)
+        self.assertEqual(stdout.getvalue(), "")
+        self.assertIn("pydocfmt check: Configuration error", stderr.getvalue())
+        self.assertIn("line-length", stderr.getvalue())
+        self.assertIn("greater than or equal to 1", stderr.getvalue())
+        self.assertNotIn("Traceback", stderr.getvalue())
+
+    def test_pydocfmt_show_files_invalid_nested_config_reports_config_error(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            package = root / "package"
+            package.mkdir()
+            (package / "module.py").write_text("x = 1\n", encoding="utf-8")
+            (package / "pyproject.toml").write_text(
+                "[tool.pydocfmt]\nline-length = 0\n",
+                encoding="utf-8",
+            )
+            stderr = StringIO()
+            stdout = StringIO()
+            argv = ["pydocfmt", "check", "--show-files", str(root)]
+            previous_cwd = os.getcwd()
+            os.chdir(root)
+            try:
+                with (
+                    unittest.mock.patch("sys.argv", argv),
+                    contextlib.redirect_stdout(stdout),
+                    contextlib.redirect_stderr(stderr),
+                ):
+                    exit_code = pydocfmt_cli.main()
+            finally:
+                os.chdir(previous_cwd)
+
+        self.assertEqual(exit_code, 2)
+        self.assertEqual(stdout.getvalue(), "")
+        self.assertIn("pydocfmt check: Configuration error", stderr.getvalue())
+        self.assertIn("line-length", stderr.getvalue())
+        self.assertIn("greater than or equal to 1", stderr.getvalue())
         self.assertNotIn("Traceback", stderr.getvalue())
 
     def test_pydocfmt_missing_explicit_file_reports_operational_error(self) -> None:
@@ -1633,7 +1721,7 @@ class TestCLIShowFiles(unittest.TestCase):
                 os.chdir(previous_cwd)
 
         self.assertEqual(exit_code, 0)
-        self.assertEqual(stdout.getvalue().splitlines(), ["skip.py IGNORED: matches .gitignore"])
+        self.assertEqual(stdout.getvalue().splitlines(), [f"{root / 'skip.py'} INCLUDED"])
 
     def test_pydocfmt_fix_stdin_writes_formatted_source_to_stdout(self) -> None:
         source = 'def foo():\n    """Does something.\n\nArgs:\n    x (int): some parameter.\n    """\n    pass\n'

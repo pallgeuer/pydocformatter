@@ -120,16 +120,17 @@ Per-file ignores are resolved from `per-file-ignores` followed by `extend-per-fi
 Each per-file ignore entry stores:
 
 - `pattern`: The file pattern exactly as configured.
+- `base_path`: The setting source base used for matching the pattern.
 - `rule_codes`: The set of rule codes matched by the entry's selectors.
 - `rule_specificities`: The strongest selector specificity for each matched rule code.
 
 `RuleSelection.for_path(path)`:
 
-- Normalizes `path` with `os.path.normpath`.
-- Converts absolute paths to paths relative to the current working directory when possible.
-- Converts path separators to `/`.
+- Converts `path` to a POSIX-style relative path from the per-file-ignore entry's `base_path`.
 - Matches per-file ignore patterns with `GlobPatternSet.compile((pattern,), match_parent_segments_for_bare=False)`.
 - Removes a globally selected rule only when the matching per-file ignore specificity is greater than or equal to the global selector specificity that enabled the rule.
+
+Per-file-ignore bases follow file-selection glob bases: auto-discovered config patterns are relative to their config directory, and explicit config, inline config, and CLI patterns are relative to the current working directory.
 
 Examples:
 

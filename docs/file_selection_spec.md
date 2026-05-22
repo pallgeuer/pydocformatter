@@ -2,7 +2,7 @@
 
 This document specifies how `pydocfmt` selects files for processing.
 
-The compatibility surface is intentionally limited to:
+The Ruff compatibility surface relating to file selection is intentionally limited to:
 
 - `line-length`
 - `line-ending`
@@ -15,14 +15,20 @@ The compatibility surface is intentionally limited to:
 - `respect-gitignore`
 - `force-exclude`
 
-Settings outside this list are not part of the Ruff compatibility contract.
+Settings outside this list are not part of the Ruff compatibility contract. Per-file-ignore pattern bases follow the same source-base rules as file-selection patterns, but per-file ignores are specified in `docs/rule_selection_spec.md` because they affect rule selection after a file has already been selected.
 
 ## Compatibility Deltas
 
 - **D1: pydocformatter include default.**
   pydocformatter defaults to `["*.py", "*.pyi", "*.pyw"]`, because these are the file types it can process. This intentionally differs from Ruff's broader default include set.
 - **D2: gitignore scope.**
-  pydocformatter applies gitignore-style filtering through the existing git-based implementation. It does not add a separate Ruff-style `.ignore` file parser, and it aborts file selection if gitignore checks fail.
+  pydocformatter applies gitignore-style filtering through a git-based implementation. It does not add a separate Ruff-style `.ignore` file parser, only filters files below detected Git roots, and aborts file selection if gitignore checks fail.
+- **D3: show-files detail.**
+  `pydocfmt check --show-files` keeps pydocformatter's richer decision output: included files, ignored files, pruned directories, and reasons. Ruff's `--show-files` only prints selected files.
+- **D4: command-line `extend-include`.**
+  pydocformatter exposes `--extend-include` as a dedicated CLI option. Ruff supports `extend-include` in configuration but does not expose a `ruff check --extend-include` option.
+- **D5: list layering.**
+  pydocformatter uses the same highest-precedence-wins rule for all list settings. In particular, CLI `--extend-exclude` replaces configured `extend-exclude` instead of accumulating with it. This intentionally differs from Ruff's CLI `--extend-exclude` behavior.
 
 ## Defaults
 
@@ -41,20 +47,25 @@ The `exclude` default is kept aligned with Ruff's current documented top-level d
 
 ## Configuration Layout
 
-Configuration is read from `[tool.pydocfmt]`.
+Auto-discovered configuration is read from `[tool.pydocfmt]` in `pyproject.toml`. Explicit `--config PATH` can also load a pyproject-style file named `pyproject.toml` with `[tool.pydocfmt]`, or a dedicated TOML config file with pydocfmt settings at top level.
 
 Resolution order:
 
+For each path being checked, settings resolution order is:
+
 1. Start with hard-coded defaults.
-2. Apply auto-discovered `[tool.pydocfmt]` from the nearest containing Git root `pyproject.toml`, if a Git root exists, unless `--isolated` is set.
-3. Apply auto-discovered `[tool.pydocfmt]` from the current directory `pyproject.toml`, unless `--isolated` is set.
-4. Apply explicit `--config PATH` files.
-5. Apply inline `--config "<KEY> = <VALUE>"` settings.
-6. Apply dedicated command-line options.
+2. Apply the explicit `--config PATH` file, when present.
+3. Otherwise, apply the single closest containing `pyproject.toml` with `[tool.pydocfmt]`, unless `--isolated` is set.
+4. Apply inline `--config "<KEY> = <VALUE>"` settings.
+5. Apply dedicated command-line options.
 
-For every setting, including `extend-include` and `extend-exclude`, the highest-precedence specified value wins. Lists do not accumulate across configuration and command-line layers.
+For every setting, including `extend-include` and `extend-exclude`, the highest-precedence specified value wins. The same list setting does not accumulate across configuration and command-line layers. After resolution, `extend-include` is appended to `include`, and `extend-exclude` is appended to `exclude`.
 
-`--config PATH` accepts either a pyproject-style file containing `[tool.pydocfmt]` or a dedicated config file with pydocfmt settings at top level. `--isolated` ignores auto-discovered configuration files. Inline `--config` settings can still be used with `--isolated`, but explicit config file paths cannot.
+`--config PATH` accepts either a pyproject-style file named `pyproject.toml` containing `[tool.pydocfmt]` or a dedicated config file with pydocfmt settings at top level. Supplying an explicit `--config PATH` file disables auto-discovered configuration for that settings resolution, and at most one explicit config file can be supplied. Inline `--config "<KEY> = <VALUE>"` overrides still layer over explicit config files or auto-discovered config. `--isolated` ignores auto-discovered configuration files. Inline `--config` settings can still be used with `--isolated`, but explicit config file paths cannot.
+
+Auto-discovered configuration is hierarchical and Ruff-style: the single closest config file applies to the file or directory being evaluated, and parent config files are not merged into child config files. During traversal, a parent directory exclude can still prune a child directory before that child directory's config is entered.
+
+`--show-settings` displays settings resolved for the current working directory. The `respect-gitignore` value used during a file-selection run is also resolved from the current working directory, not separately from each traversed path.
 
 `line-ending` follows Ruff's formatter values: `"auto"`, `"lf"`, `"cr-lf"`, and `"native"`. `"auto"` uses the first line ending detected in the source file, defaulting to LF when the file has no line endings. The setting controls rewritten files; files that do not require formatting are not rewritten solely to normalize line endings.
 
@@ -62,32 +73,52 @@ For every setting, including `extend-include` and `extend-exclude`, the highest-
 
 Given positional CLI paths, defaulting to `.` when no paths are specified:
 
-1. Treat direct file arguments as explicit file inputs.
-2. Recursively discover files under directory arguments.
+1. Treat non-directory path arguments as explicit file inputs, regardless of whether the file exists.
+2. Treat directory arguments as traversal roots. A directory argument can itself be rejected by exclude rules before traversal starts; otherwise, recursively discover files under it.
 3. Keep deterministic traversal order by sorting directory and file names.
-4. Prune excluded directories during discovery and record ignored decisions for them.
-5. For discovered files, require a match against `include` or `extend-include`.
-6. Reject files matching `exclude` or `extend-exclude`.
-7. If `respect-gitignore = true`, reject files matched by the gitignore filter, or abort file selection if gitignore checks fail.
-8. Deduplicate accepted paths that resolve to the same physical file, recording later aliases as ignored duplicate decisions.
-9. Return accepted files and structured decisions for file-selection output.
+4. Resolve settings for each traversed directory or file with closest-config semantics.
+5. Prune excluded directories during discovery and record ignored decisions for them.
+6. For discovered files, require a match against `include` or `extend-include`.
+7. Reject files matching `exclude` or `extend-exclude`.
+8. If `respect-gitignore = true` in the settings resolved for the current working directory, reject discovered files matched by the gitignore filter, or abort file selection if gitignore checks fail.
+9. Deduplicate accepted paths that resolve to the same physical file, recording later aliases as ignored duplicate decisions.
+10. Return accepted files and structured decisions for file-selection output.
 
-Include and exclude patterns are glob patterns, not regexes. Matching uses normalized POSIX-style paths. Bare exclude patterns can match file basenames or parent directory segments. Slash-containing patterns are matched relative to the repository root when a git repository is found, otherwise relative to the current working directory.
-Slash-containing exclude patterns that match a directory path also exclude descendant files.
-Glob lists cannot contain empty strings. Include patterns must target files, so directory-only patterns such as `src/` are rejected for `include` and `extend-include`.
-Absolute accepted paths inside the current working directory are displayed as relative paths.
+Include and exclude patterns are glob patterns, not regexes. Matching uses normalized POSIX-style paths. Pattern bases follow the source of each setting:
+
+- Defaults are current-working-directory relative.
+- Auto-discovered config-file patterns are relative to the directory containing that config file.
+- Explicit `--config PATH`, inline `--config`, and dedicated CLI option patterns are current-working-directory relative.
+
+Bare include patterns such as `*.py` match basenames at any depth. Slash-containing include patterns are anchored to their setting base. Include patterns select files, not directory subtrees: `src` and `src/` do not include files below `src`, while `src/**` does.
+
+Bare exclude patterns can match file basenames or parent directory segments. Slash-containing exclude patterns are anchored to their setting base. Slash-containing exclude patterns that match a directory path also exclude descendant files.
+
+Explicit files bypass include matching and gitignore filtering. With `force-exclude = true`, explicit files are rejected only when the applicable exclude matcher matches them.
+
+Directory arguments are not explicit files. A directory argument is skipped when the directory path matches the applicable source-base-aware exclude matcher. When `force-exclude = true`, a directory argument is also skipped when the final exclude pattern list matches the CLI path relative to the current working directory. If a directory argument is not skipped, files discovered below it are normal discovered files.
+
+`respect-gitignore` is evaluated once from the settings resolved for the current working directory. A closer child config can change include, exclude, and per-file-ignore behavior for files below it, but it does not enable or disable gitignore filtering for that run.
+
+When gitignore filtering is enabled, only accepted discovered files are queried. Explicit files bypass gitignore filtering, including when `force-exclude = true`. Paths are grouped by the nearest detected Git root of their real filesystem path; symlinked traversal paths keep their symlinked display path, but gitignore matching is queried against the real path. Files outside a Git root are not gitignore-filtered. If `git check-ignore` exits with a status other than `0` or `1`, file selection aborts.
+
+Glob lists cannot contain empty strings. Include patterns follow Ruff's permissive shape rules, so patterns such as `src/`, `src/**`, and `**` are accepted.
+
+Existing filesystem paths are displayed as absolute normalized paths. Non-existing explicit paths are displayed as normalized lexical paths, and stdin uses `-`.
+
+Accepted existing paths are deduplicated by normalized real path after gitignore filtering. The retained spelling is chosen by a stable display-path score; duplicate aliases are recorded as ignored duplicate decisions. Non-existing explicit paths are not deduplicated.
 
 ## Decision Table
 
-`Filter result` means the combined include, exclude, and gitignore checks.
+`Filter result` means the combined include, exclude, and gitignore checks for files.
 
 | Input kind      | `force-exclude` | Filter result             | Outcome   |
 |-----------------|-----------------|---------------------------|-----------|
 | Explicit file   | `false`         | Any result                | Accepted  |
-| Explicit file   | `true`          | Included and not excluded | Accepted  |
-| Explicit file   | `true`          | Not included              | Rejected  |
+| Explicit file   | `true`          | Not excluded by glob      | Accepted  |
+| Explicit file   | `true`          | Not included              | Accepted  |
 | Explicit file   | `true`          | Excluded by glob          | Rejected  |
-| Explicit file   | `true`          | Excluded by gitignore     | Rejected  |
+| Explicit file   | `true`          | Excluded by gitignore     | Accepted  |
 | Discovered file | `false`         | Included and not excluded | Accepted  |
 | Discovered file | `false`         | Not included              | Rejected  |
 | Discovered file | `false`         | Excluded by glob          | Rejected  |
@@ -97,6 +128,8 @@ Absolute accepted paths inside the current working directory are displayed as re
 | Discovered file | `true`          | Excluded by glob          | Rejected  |
 | Discovered file | `true`          | Excluded by gitignore     | Rejected  |
 
+Directory arguments are evaluated before this table applies to files below them. A directory argument that is excluded is rejected as an ignored directory decision. A directory argument that is not excluded is walked, and files found below it are evaluated as discovered files.
+
 ## CLI List Options
 
 The CLI accepts comma-separated glob values per option occurrence:
@@ -105,11 +138,13 @@ The CLI accepts comma-separated glob values per option occurrence:
 pydocfmt check --fix src/ --include "*.py,*.pyi" --exclude "generated,skip.py"
 ```
 
-Repeated option occurrences append values:
+Repeated option occurrences append values within the command-line layer:
 
 ```bash
 pydocfmt check --fix --include "*.py" --include "*.pyi" src/
 ```
+
+The resulting command-line list still replaces lower-precedence values for the same setting. For example, `--extend-exclude cli.py` replaces a configured `extend-exclude = ["config.py"]`, although the resolved final exclude list is still `exclude + extend-exclude`.
 
 ## Validation Guidance
 
