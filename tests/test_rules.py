@@ -17,6 +17,7 @@ import pydocformatter.rules.collection as rule_collection
 import pydocformatter.rules.definitions as rule_definitions
 import pydocformatter.rules.documentation as rule_documentation
 import pydocformatter.rules_selection as rules_selection
+import pydocformatter.settings as settings_core
 from pydocformatter.cli.global_args import GlobalArgs
 from pydocformatter.cli.settings_check import SETTINGS_SCHEMA, CheckSettings
 from pydocformatter.rules.base import FixAvailability, RuleBase, RuleCode, RuleMetadata, RuleSelector
@@ -370,7 +371,67 @@ class TestRules(unittest.TestCase):
         self.assertEqual(selection.errors, ())
         self.assertEqual(selection.rules, ())
 
-    def test_select_rules_applies_per_file_ignore_specificity(self) -> None:
+    def test_select_rules_all_is_less_specific_than_exact_extensions(self) -> None:
+        selected_rule = rules_selection.select_rules(
+            CheckSettings(select=("ALL",), extend_select=("PDF142",), ignore=("ALL",)),
+            collection=specificity_collection(),
+        )
+        selected_fix = rules_selection.select_rules(
+            CheckSettings(select=("PDF1",), fixable=("ALL",), extend_fixable=("PDF142",), unfixable=("ALL",)),
+            collection=specificity_collection(),
+        )
+
+        self.assertEqual(tuple(rule.rule.code.tag for rule in selected_rule.rules), ("PDF142",))
+        self.assertEqual(tuple((rule.rule.code.tag, rule.fixable) for rule in selected_fix.rules), (("PDF142", True), ("PDF150", False)))
+
+    def test_select_rules_uses_source_priority_before_specificity(self) -> None:
+        lower_priority_ignore = rules_selection.select_rules(
+            CheckSettings(select=("PDF1",), ignore=("PDF142",)),
+            collection=specificity_collection(),
+            field_priorities={"select": settings_core.ARGUMENT_SOURCE_PRIORITY, "ignore": settings_core.CONFIG_FILE_SOURCE_PRIORITY},
+        )
+        higher_priority_ignore = rules_selection.select_rules(
+            CheckSettings(select=("PDF142",), ignore=("PDF1",)),
+            collection=specificity_collection(),
+            field_priorities={"select": settings_core.CONFIG_FILE_SOURCE_PRIORITY, "ignore": settings_core.ARGUMENT_SOURCE_PRIORITY},
+        )
+        higher_priority_extend_select = rules_selection.select_rules(
+            CheckSettings(select=("PDF1",), extend_select=("PDF14",), ignore=("PDF142",)),
+            collection=specificity_collection(),
+            field_priorities={"select": settings_core.CONFIG_FILE_SOURCE_PRIORITY, "extend_select": settings_core.ARGUMENT_SOURCE_PRIORITY, "ignore": settings_core.CONFIG_FILE_SOURCE_PRIORITY},
+        )
+        lower_priority_extend_select = rules_selection.select_rules(
+            CheckSettings(select=("PDF142",), extend_select=("PDF150",)),
+            collection=specificity_collection(),
+            field_priorities={"select": settings_core.ARGUMENT_SOURCE_PRIORITY, "extend_select": settings_core.CONFIG_FILE_SOURCE_PRIORITY},
+        )
+
+        self.assertEqual(tuple(rule.rule.code.tag for rule in lower_priority_ignore.rules), ("PDF142", "PDF150"))
+        self.assertEqual(higher_priority_ignore.rules, ())
+        self.assertEqual(tuple(rule.rule.code.tag for rule in higher_priority_extend_select.rules), ("PDF142", "PDF150"))
+        self.assertEqual(tuple(rule.rule.code.tag for rule in lower_priority_extend_select.rules), ("PDF142",))
+
+    def test_select_rules_reports_errors_from_lower_priority_skipped_selectors(self) -> None:
+        selection = rules_selection.select_rules(
+            CheckSettings(select=("PDF142",), extend_select=("PDF999",), ignore=("bad",), fixable=("PDF142",), extend_fixable=("PDF999",), unfixable=("bad",)),
+            collection=specificity_collection(),
+            field_priorities={
+                "select": settings_core.ARGUMENT_SOURCE_PRIORITY,
+                "extend_select": settings_core.CONFIG_FILE_SOURCE_PRIORITY,
+                "ignore": settings_core.CONFIG_FILE_SOURCE_PRIORITY,
+                "fixable": settings_core.ARGUMENT_SOURCE_PRIORITY,
+                "extend_fixable": settings_core.CONFIG_FILE_SOURCE_PRIORITY,
+                "unfixable": settings_core.CONFIG_FILE_SOURCE_PRIORITY,
+            },
+        )
+
+        self.assertEqual(tuple(rule.rule.code.tag for rule in selection.rules), ("PDF142",))
+        self.assertIn("rule selection contains unknown selector: PDF999", selection.errors)
+        self.assertIn("ignored rules contains invalid selector: bad", selection.errors)
+        self.assertIn("fixable rules contains unknown selector: PDF999", selection.errors)
+        self.assertIn("unfixable rules contains invalid selector: bad", selection.errors)
+
+    def test_select_rules_applies_per_file_ignores_without_enabled_selector_specificity(self) -> None:
         broader_ignore = rules_selection.select_rules(
             CheckSettings(select=("PDF14",), per_file_ignores=(("tests/*.py", ("PDF1",)),)),
             collection=specificity_collection(),
@@ -380,8 +441,35 @@ class TestRules(unittest.TestCase):
             collection=specificity_collection(),
         )
 
-        self.assertEqual(tuple(rule.rule.code.tag for rule in broader_ignore.for_path("tests/a.py")), ("PDF142",))
+        self.assertEqual(tuple(rule.rule.code.tag for rule in broader_ignore.for_path("tests/a.py")), ())
         self.assertEqual(tuple(rule.rule.code.tag for rule in more_specific_ignore.for_path("tests/a.py")), ("PDF150",))
+
+    def test_ruff_spec_repeated_cli_per_file_ignore_patterns_append_selectors(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            target = root / "a.py"
+            self._write(target)
+            previous_cwd = os.getcwd()
+            os.chdir(root)
+            try:
+                profile = SETTINGS_SCHEMA.load_profile(
+                    args=argparse.Namespace(
+                        select=["PDF100,PDF105"],
+                        per_file_ignores=[
+                            '{"a.py" = ["PDF100"]}',
+                            '{"a.py" = ["PDF105"]}',
+                        ],
+                    ),
+                    path=str(target),
+                )
+            finally:
+                os.chdir(previous_cwd)
+
+        selection = rules_selection.select_rules(profile.settings, profile=profile)
+
+        self.assertEqual(profile.settings.per_file_ignores, (("a.py", ("PDF100", "PDF105")),))
+        self.assertEqual(tuple(rule.rule.code.tag for rule in selection.rules), ("PDF100", "PDF105"))
+        self.assertEqual(tuple(rule.rule.code.tag for rule in selection.for_path(str(target))), ())
 
     def test_select_rules_applies_fixability_specificity(self) -> None:
         specific_fixable = rules_selection.select_rules(
@@ -400,6 +488,27 @@ class TestRules(unittest.TestCase):
         self.assertEqual(tuple((rule.rule.code.tag, rule.fixable) for rule in specific_fixable.rules), (("PDF142", True), ("PDF150", False)))
         self.assertEqual(tuple((rule.rule.code.tag, rule.fixable) for rule in specific_unfixable.rules), (("PDF142", False), ("PDF150", True)))
         self.assertEqual(tuple((rule.rule.code.tag, rule.fixable) for rule in equal_unfixable.rules), (("PDF142", False),))
+
+    def test_select_rules_uses_source_priority_for_fixability(self) -> None:
+        lower_priority_unfixable = rules_selection.select_rules(
+            CheckSettings(select=("PDF1",), fixable=("PDF1",), unfixable=("PDF142",)),
+            collection=specificity_collection(),
+            field_priorities={"fixable": settings_core.ARGUMENT_SOURCE_PRIORITY, "unfixable": settings_core.CONFIG_FILE_SOURCE_PRIORITY},
+        )
+        higher_priority_unfixable = rules_selection.select_rules(
+            CheckSettings(select=("PDF1",), fixable=("PDF1",), unfixable=("PDF142",)),
+            collection=specificity_collection(),
+            field_priorities={"fixable": settings_core.CONFIG_FILE_SOURCE_PRIORITY, "unfixable": settings_core.ARGUMENT_SOURCE_PRIORITY},
+        )
+        lower_priority_extend_fixable = rules_selection.select_rules(
+            CheckSettings(select=("PDF1",), fixable=("PDF142",), extend_fixable=("PDF150",)),
+            collection=specificity_collection(),
+            field_priorities={"fixable": settings_core.ARGUMENT_SOURCE_PRIORITY, "extend_fixable": settings_core.CONFIG_FILE_SOURCE_PRIORITY},
+        )
+
+        self.assertEqual(tuple((rule.rule.code.tag, rule.fixable) for rule in lower_priority_unfixable.rules), (("PDF142", True), ("PDF150", True)))
+        self.assertEqual(tuple((rule.rule.code.tag, rule.fixable) for rule in higher_priority_unfixable.rules), (("PDF142", False), ("PDF150", True)))
+        self.assertEqual(tuple((rule.rule.code.tag, rule.fixable) for rule in lower_priority_extend_fixable.rules), (("PDF142", True), ("PDF150", False)))
 
     def test_select_rules_treats_sometimes_fixable_rules_as_having_available_fixes(self) -> None:
         selection = rules_selection.select_rules(
@@ -428,6 +537,16 @@ class TestRules(unittest.TestCase):
 
         self.assertEqual(tuple(rule.rule.code.tag for rule in selection.for_path("src/a.py")), ("PCF001", "PDF001", "PDF105"))
         self.assertEqual(tuple(rule.rule.code.tag for rule in selection.for_path("tests/a.py")), ("PCF001", "PDF105"))
+
+    def test_ruff_spec_negated_per_file_ignore_patterns_ignore_everywhere_else(self) -> None:
+        selection = rules_selection.select_rules(
+            CheckSettings(select=("PDF",), per_file_ignores=(("!src/*.py", ("PDF001",)), ("!tests/*.py", ("PDF105",)))),
+            collection=sample_collection(),
+        )
+
+        self.assertEqual(tuple(rule.rule.code.tag for rule in selection.for_path("src/a.py")), ("PDF001",))
+        self.assertEqual(tuple(rule.rule.code.tag for rule in selection.for_path("tests/a.py")), ("PDF105",))
+        self.assertEqual(tuple(rule.rule.code.tag for rule in selection.for_path("a.py")), ())
 
     def test_ruff_spec_per_file_ignores_are_auto_config_directory_relative(self) -> None:
         with tempfile.TemporaryDirectory() as td:

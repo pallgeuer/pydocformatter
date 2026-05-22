@@ -15,6 +15,7 @@ from pydocformatter.cli.global_args import GlobalArgs
 SettingsT = TypeVar("SettingsT")
 StrEnumT = TypeVar("StrEnumT", bound=enum.StrEnum)
 SettingValueT = TypeVar("SettingValueT")
+
 StringList: TypeAlias = tuple[str, ...]
 MultiStringMap: TypeAlias = tuple[tuple[str, StringList], ...]
 SettingValidator: TypeAlias = Callable[[Any, str], SettingValueT]
@@ -23,6 +24,12 @@ SettingCLIChoices: TypeAlias = Iterable[Any]
 SettingCLIType: TypeAlias = Callable[[str], Any] | argparse.FileType | str
 SettingCLIMetavar: TypeAlias = str | tuple[str, ...]
 SettingsOverridesType: TypeAlias = type[Any] | GenericAlias
+
+DEFAULT_SOURCE_PRIORITY = 0
+CONFIG_FILE_SOURCE_PRIORITY = 1
+INLINE_CONFIG_SOURCE_PRIORITY = 2
+ARGUMENT_SOURCE_PRIORITY = 3
+FIELD_OVERRIDE_SOURCE_PRIORITY = 4
 
 
 class SettingsError(ValueError):
@@ -35,14 +42,19 @@ class SettingsError(ValueError):
 
 @dataclasses.dataclass(frozen=True)
 class SettingsProfile(Generic[SettingsT]):
-    """Resolved settings plus source-base metadata for path-like settings."""
+    """Resolved settings plus source-base and source-priority metadata."""
 
     settings: SettingsT
     field_bases: Mapping[str, str]
+    field_priorities: Mapping[str, int]
 
     def base_for_field(self, field: str) -> str:
         """Return the absolute base directory associated with a resolved field."""
         return self.field_bases.get(field, os.getcwd())
+
+    def priority_for_field(self, field: str) -> int:
+        """Return the configuration-source priority associated with a resolved field."""
+        return self.field_priorities.get(field, DEFAULT_SOURCE_PRIORITY)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -334,7 +346,7 @@ class SettingsSchema(Generic[SettingsT]):
     def load_profile(
         self, *, global_values: GlobalArgs | None = None, args: argparse.Namespace | None = None, field_overrides: Mapping[str, Any] | None = None, path: str | None = None
     ) -> SettingsProfile[SettingsT]:
-        """Resolve settings and source-base metadata for one path.
+        """Resolve settings and source metadata for one path.
 
         Args:
             global_values (GlobalArgs | None): Global configuration options and isolated-mode flag.
@@ -343,7 +355,7 @@ class SettingsSchema(Generic[SettingsT]):
             path (str | None): Path whose closest auto-discovered configuration should be used, defaulting to cwd.
 
         Returns:
-            SettingsProfile[SettingsT]: Resolved settings plus field source bases.
+            SettingsProfile[SettingsT]: Resolved settings plus field source bases and source priorities.
 
         Raises:
             `SettingsError`: If any configuration source cannot be loaded or validated.
@@ -366,6 +378,7 @@ class SettingsSchema(Generic[SettingsT]):
         profile = SettingsProfile(
             settings=self.settings_type(),
             field_bases={definition.field: cwd_base for definition in self.definitions},
+            field_priorities={definition.field: DEFAULT_SOURCE_PRIORITY for definition in self.definitions},
         )
 
         if global_values.isolated:
@@ -375,24 +388,31 @@ class SettingsSchema(Generic[SettingsT]):
             if not path_options:
                 auto_path = _auto_discovered_pyproject_path_for_path(path, table_path=self.table_path)
                 if auto_path is not None:
-                    profile = _apply_toml_file_profile(self, profile, path=auto_path, required=False, source_base=os.path.dirname(os.path.abspath(auto_path)))
+                    profile = _apply_toml_file_profile(
+                        self,
+                        profile,
+                        path=auto_path,
+                        required=False,
+                        source_base=os.path.dirname(os.path.abspath(auto_path)),
+                        source_priority=CONFIG_FILE_SOURCE_PRIORITY,
+                    )
             for option in path_options:
-                profile = _apply_toml_file_profile(self, profile, path=option, required=True, source_base=cwd_base)
+                profile = _apply_toml_file_profile(self, profile, path=option, required=True, source_base=cwd_base, source_priority=CONFIG_FILE_SOURCE_PRIORITY)
 
         for option in inline_options:
             try:
                 section = tomllib.loads(option)
             except tomllib.TOMLDecodeError as error:
                 raise SettingsError(f"Failed to decode --config inline TOML: {error}") from error
-            profile = _apply_toml_section_profile(self, profile, section=section, context="<--config>", source_base=cwd_base)
+            profile = _apply_toml_section_profile(self, profile, section=section, context="<--config>", source_base=cwd_base, source_priority=INLINE_CONFIG_SOURCE_PRIORITY)
 
         if args is not None:
             argument_overrides = self.argument_overrides(args)
             if argument_overrides:
-                profile = _apply_field_values_profile(self, profile, values=argument_overrides, context="<argparse>", key_based=False, source_base=cwd_base)
+                profile = _apply_field_values_profile(self, profile, values=argument_overrides, context="<argparse>", key_based=False, source_base=cwd_base, source_priority=ARGUMENT_SOURCE_PRIORITY)
 
         if field_overrides:
-            profile = _apply_field_values_profile(self, profile, values=field_overrides, context="<overrides>", key_based=False, source_base=cwd_base)
+            profile = _apply_field_values_profile(self, profile, values=field_overrides, context="<overrides>", key_based=False, source_base=cwd_base, source_priority=FIELD_OVERRIDE_SOURCE_PRIORITY)
 
         return profile
 
@@ -485,7 +505,11 @@ class SettingsSchema(Generic[SettingsT]):
                         parsed_value = parsed["value"]
                         if not isinstance(parsed_value, dict):
                             raise SettingsError("TOML map CLI value must be a TOML table")
-                        merged.update(parsed_value)
+                        for pattern, selectors in parsed_value.items():
+                            if pattern in merged and isinstance(merged[pattern], list) and isinstance(selectors, list):
+                                merged[pattern].extend(selectors)
+                            else:
+                                merged[pattern] = selectors
                     values[definition.field] = merged
                 else:
                     raise AssertionError(f"Unknown CLI value kind: {definition.cli.value_kind}")
@@ -773,7 +797,9 @@ def _toml_section_at_table_path(config: dict[str, Any], *, path: str, table_path
     return cast(dict[str, Any], section)
 
 
-def _apply_toml_file_profile(schema: SettingsSchema[SettingsT], profile: SettingsProfile[SettingsT], *, path: str, required: bool, source_base: str) -> SettingsProfile[SettingsT]:
+def _apply_toml_file_profile(
+    schema: SettingsSchema[SettingsT], profile: SettingsProfile[SettingsT], *, path: str, required: bool, source_base: str, source_priority: int
+) -> SettingsProfile[SettingsT]:
     """Apply one config file to the passed settings profile."""
     section = _load_toml_file(path, required=required)  # Only returns None if the file is both absent and not required
     if section is None:
@@ -788,10 +814,12 @@ def _apply_toml_file_profile(schema: SettingsSchema[SettingsT], profile: Setting
     else:
         context = f"<{path}>"
 
-    return _apply_toml_section_profile(schema, profile, section=section, context=context, source_base=source_base)
+    return _apply_toml_section_profile(schema, profile, section=section, context=context, source_base=source_base, source_priority=source_priority)
 
 
-def _apply_toml_section_profile(schema: SettingsSchema[SettingsT], profile: SettingsProfile[SettingsT], *, section: dict[str, Any], context: str, source_base: str) -> SettingsProfile[SettingsT]:
+def _apply_toml_section_profile(
+    schema: SettingsSchema[SettingsT], profile: SettingsProfile[SettingsT], *, section: dict[str, Any], context: str, source_base: str, source_priority: int
+) -> SettingsProfile[SettingsT]:
     """Apply one TOML configuration section to a settings profile."""
     schema_toml_keys = set(definition.key for definition in schema.definitions if definition.available_in_toml)
     unknown_keys = [key for key in section if key not in schema_toml_keys]
@@ -801,7 +829,7 @@ def _apply_toml_section_profile(schema: SettingsSchema[SettingsT], profile: Sett
         raise SettingsError(f"{context} contains unknown setting(s): {joined_keys}")
 
     values = {definition.field: section[definition.key] for definition in schema.definitions if definition.available_in_toml and definition.key in section}
-    return _apply_field_values_profile(schema, profile, values=values, context=context, key_based=True, source_base=source_base)
+    return _apply_field_values_profile(schema, profile, values=values, context=context, key_based=True, source_base=source_base, source_priority=source_priority)
 
 
 def _validated_field_updates(schema: SettingsSchema[SettingsT], *, values: Mapping[str, Any], context: str, key_based: bool) -> dict[str, Any]:
@@ -817,13 +845,15 @@ def _validated_field_updates(schema: SettingsSchema[SettingsT], *, values: Mappi
 
 
 def _apply_field_values_profile(
-    schema: SettingsSchema[SettingsT], profile: SettingsProfile[SettingsT], *, values: Mapping[str, Any], context: str, key_based: bool, source_base: str
+    schema: SettingsSchema[SettingsT], profile: SettingsProfile[SettingsT], *, values: Mapping[str, Any], context: str, key_based: bool, source_base: str, source_priority: int
 ) -> SettingsProfile[SettingsT]:
     """Validate raw field values and return an updated settings profile."""
     updates = _validated_field_updates(schema, values=values, context=context, key_based=key_based)
     settings = cast(SettingsT, dataclasses.replace(cast(Any, profile.settings), **updates))
     field_bases = dict(profile.field_bases)
+    field_priorities = dict(profile.field_priorities)
     absolute_source_base = os.path.abspath(source_base)
     for field in updates:
         field_bases[field] = absolute_source_base
-    return SettingsProfile(settings=settings, field_bases=field_bases)
+        field_priorities[field] = source_priority
+    return SettingsProfile(settings=settings, field_bases=field_bases, field_priorities=field_priorities)

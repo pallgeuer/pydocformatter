@@ -255,7 +255,7 @@ def check_files(*, args: argparse.Namespace, settings_context: CheckRunContext) 
         return 2
 
     rule_profiles = files.selected_files or (file_selection.SelectedFile(path="", profile=settings_context.cwd_profile),)
-    seen_rule_profiles: set[tuple[CheckSettings, tuple[tuple[str, str], ...]]] = set()
+    seen_rule_profiles: set[tuple[CheckSettings, tuple[tuple[str, str], ...], tuple[tuple[str, int], ...]]] = set()
     for selected_file in rule_profiles:
         profile_key = _rule_profile_key(selected_file.profile)
         if profile_key in seen_rule_profiles:
@@ -301,9 +301,9 @@ def check_files(*, args: argparse.Namespace, settings_context: CheckRunContext) 
         return 0
 
 
-def _rule_profile_key(profile: settings_core.SettingsProfile[CheckSettings]) -> tuple[CheckSettings, tuple[tuple[str, str], ...]]:
+def _rule_profile_key(profile: settings_core.SettingsProfile[CheckSettings]) -> tuple[CheckSettings, tuple[tuple[str, str], ...], tuple[tuple[str, int], ...]]:
     """Return the identity used to deduplicate equivalent rule-selection profiles."""
-    return profile.settings, tuple(sorted(profile.field_bases.items()))
+    return profile.settings, tuple(sorted(profile.field_bases.items())), tuple(sorted(profile.field_priorities.items()))
 
 
 @contextlib.contextmanager

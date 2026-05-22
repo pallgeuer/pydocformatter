@@ -153,7 +153,10 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Updated README, contributing, release, pull request, and file-selection docs for the single-command workflow and latest file-selection behavior.
 
 - **Rule selection:**
-  - Rule, per-file-ignore, and fixability selectors now resolve conflicts by selector specificity, with disabling selectors winning equal-specificity ties.
+  - Rule and fixability selectors now resolve conflicts by Ruff-style source priority before selector specificity, with disabling selectors winning equal-priority and equal-specificity ties.
+  - Per-file ignores now suppress every selected matching rule for matching files, without comparing the ignore selector specificity against the selector that enabled the rule.
+  - Per-file ignore patterns now support Ruff-style leading `!` negation.
+  - Repeated `--per-file-ignores` and `--extend-per-file-ignores` entries for the same pattern now append selector lists within the command-line layer.
 
 - **CLI:**
   - Legacy formatter findings now report the original changed source lines instead of a synthetic line number.

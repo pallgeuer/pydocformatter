@@ -2,6 +2,19 @@
 
 This document specifies how `pydocfmt` discovers rule definitions and resolves rule-selection, per-file-ignore, and fixability settings.
 
+## Ruff Compatibility Deltas
+
+- **D1: Rule catalog and selector prefixes.**
+  pydocformatter has its own rule catalog and requires selectors to use complete pydocformatter rule prefixes such as `PDF` or `PCF`. The selector `P` does not match `PDF` or `PCF` rules.
+- **D2: Supported settings.**
+  pydocformatter implements `select`, `ignore`, `extend-select`, `per-file-ignores`, `extend-per-file-ignores`, `fixable`, `unfixable`, and `extend-fixable`. Ruff settings that have no pydocformatter equivalent, such as deprecated `extend-ignore`, preview-rule settings, fix-safety settings, and `external`, are outside this compatibility surface.
+- **D3: Selector errors.**
+  pydocformatter records selector validation problems as operational errors so one run can report all rule-selection issues together. Ruff may fail earlier while parsing or resolving its own configuration.
+- **D4: Fixability selector validation.**
+  pydocformatter reports an operational error when a `fixable` or `extend-fixable` selector matches only rules whose `FixAvailability` is `Never`. Ruff accepts such selectors and simply has no fix to apply for those rules.
+- **D5: Command-line comma-list whitespace.**
+  pydocformatter strips whitespace around entries in dedicated command-line comma-list options, so `--select "PDF100, PDF105"` is accepted as `PDF100` and `PDF105`. Ruff rejects whitespace-containing selector entries such as ` F841`.
+
 ## Rule Definitions
 
 Rules live under `pydocformatter.rules.definitions`. Importing `pydocformatter.rules.collection` imports every module below that package and builds the default `RULE_COLLECTION`.
@@ -53,7 +66,7 @@ Collection behavior:
 
 Built-in rules use the default registry through `@register_rule`. Tests and custom rule packages can use an isolated `RuleRegistry` with `register_rule_to(registry)`, import the package, then call `registry.collection()`.
 
-The current built-in catalog intentionally contains no implemented rules. With default settings, an empty catalog resolves to an empty active ruleset without errors.
+With default settings, a custom empty catalog resolves to an empty active ruleset without errors.
 
 ## Selector Grammar
 
@@ -68,9 +81,17 @@ Selectors are case-sensitive and must use complete rule prefixes. For example, `
 
 Selectors outside the grammar are operational errors. Selectors that match no collected rule are operational errors, except `ALL`, which may match an empty collection without error. Invalid or unknown selectors resolve to no rules and resolution continues.
 
-## Specificity
+## Source Priority And Specificity
 
-Selection conflicts are resolved by selector specificity, not by selector order or configuration source.
+Selection conflicts are resolved first by configuration source priority, then by selector specificity. Selector order inside one setting is not significant.
+
+Source priority values:
+
+- Defaults have priority `0`.
+- Auto-discovered or explicit config-file settings have priority `1`.
+- Inline `--config "<KEY> = <VALUE>"` settings have priority `2`.
+- Dedicated command-line options have priority `3`.
+- In-process field overrides used by tests and callers have priority `4`.
 
 Specificity values:
 
@@ -79,9 +100,11 @@ Specificity values:
 
 Resolution rule:
 
-- The most specific matching enabling selector is compared with the most specific matching disabling selector.
-- The enabling side wins only if it is more specific.
-- The disabling side wins equal-specificity ties.
+- The strongest matching enabling selector is compared with the strongest matching disabling selector.
+- A selector with a higher source priority beats a selector with a lower source priority, even if the lower-priority selector is more specific.
+- When both sides have the same source priority, the more specific selector wins.
+- The disabling side wins equal-priority, equal-specificity ties.
+- Lower-priority adjustment settings that do not participate in the final decision are still validated and can still produce operational errors.
 
 Examples:
 
@@ -89,6 +112,8 @@ Examples:
 - `select = ["PDF1"]` and `ignore = ["PDF14"]` disables `PDF142` but can still enable `PDF150`.
 - `select = ["PDF14"]` and `ignore = ["PDF14"]` disables `PDF142`.
 - With default `select = ["ALL"]`, `extend-select = ["PDF14"]` and `ignore = ["PDF1"]` enables `PDF142` but disables `PDF150`.
+- A command-line `--select PDF1` enables `PDF142` even when a lower-priority config file has `ignore = ["PDF142"]`.
+- A command-line `--ignore PDF1` disables `PDF142` even when a lower-priority config file has `select = ["PDF142"]`.
 
 ## Global Rule Selection
 
@@ -100,11 +125,12 @@ Defaults:
 
 Global enabled rules are resolved per rule:
 
-- Combine `select` and `extend-select` into one enabling selector set.
-- Resolve `ignore` as the disabling selector set.
-- For each rule, track the strongest matching enabling selector specificity.
-- For each rule, track the strongest matching disabling selector specificity.
-- Select the rule only when the enabling specificity is greater than the disabling specificity.
+- Use the resolved `select` value as the active rule-selection basis. The source priority of this `select` value is the active select priority.
+- Keep `extend-select` only when its source priority is greater than or equal to the active select priority. Lower-priority `extend-select` settings are ignored.
+- Keep `ignore` only when its source priority is greater than or equal to the active select priority. Lower-priority `ignore` settings are ignored.
+- For each rule, track the strongest matching enabling selector by source priority and specificity.
+- For each rule, track the strongest matching disabling selector by source priority and specificity.
+- Select the rule only when the enabling selector strength is greater than the disabling selector strength.
 
 The output `rules` tuple preserves deterministic rule-code order after filtering.
 
@@ -117,6 +143,8 @@ Defaults:
 
 Per-file ignores are resolved from `per-file-ignores` followed by `extend-per-file-ignores`. Both settings are TOML-style mappings from file patterns to lists of rule selectors.
 
+Each field uses the resolved highest-priority value for that field. For example, a command-line `--per-file-ignores` value replaces configured `per-file-ignores`, while a command-line `--extend-per-file-ignores` value contributes through the separate extension field and does not replace configured `per-file-ignores`.
+
 Each per-file ignore entry stores:
 
 - `pattern`: The file pattern exactly as configured.
@@ -128,17 +156,45 @@ Each per-file ignore entry stores:
 
 - Converts `path` to a POSIX-style relative path from the per-file-ignore entry's `base_path`.
 - Matches per-file ignore patterns with `GlobPatternSet.compile((pattern,), match_parent_segments_for_bare=False)`.
-- Removes a globally selected rule only when the matching per-file ignore specificity is greater than or equal to the global selector specificity that enabled the rule.
+- Treats a leading `!` in the pattern as negation: the entry applies to files that do not match the pattern after `!` is removed.
+- Removes any globally selected rule whose code is matched by a matching per-file-ignore entry.
+- Does not compare per-file-ignore selector specificity against the selector that enabled the rule.
 
 Per-file-ignore bases follow file-selection glob bases: auto-discovered config patterns are relative to their config directory, and explicit config, inline config, and CLI patterns are relative to the current working directory.
 
 Examples:
 
-- `select = ["PDF14"]` with `per-file-ignores = {"tests/*.py" = ["PDF1"]}` keeps `PDF142` for matching files.
+- `select = ["PDF14"]` with `per-file-ignores = {"tests/*.py" = ["PDF1"]}` removes `PDF142` for matching files.
 - `select = ["PDF1"]` with `per-file-ignores = {"tests/*.py" = ["PDF14"]}` removes `PDF142` for matching files and keeps `PDF150`.
 - `select = ["PDF14"]` with `per-file-ignores = {"tests/*.py" = ["PDF14"]}` removes `PDF142` for matching files.
+- `select = ["PDF"]` with `per-file-ignores = {"!src/*.py" = ["PDF001"]}` removes `PDF001` everywhere except files matching `src/*.py`.
+- A lower-priority config-file `per-file-ignores` entry still suppresses a rule selected by a higher-priority command-line `--select`; per-file ignores apply after global rule selection.
 
 `pydocfmt check --show-rules` prints the global active rules and does not apply per-file ignores.
+
+## CLI List Options
+
+Rule-selection CLI list options accept comma-separated selector values per option occurrence:
+
+```bash
+pydocfmt check --select PDF100,PDF105 --ignore PDF106
+```
+
+Whitespace around command-line comma-list entries is stripped before validation. This is a pydocformatter CLI parsing delta from Ruff, which treats the whitespace as part of the selector.
+
+Repeated list option occurrences append values within the command-line layer:
+
+```bash
+pydocfmt check --select PDF100 --select PDF105
+```
+
+Repeated TOML-map option occurrences merge entries within the command-line layer. If the same pattern appears more than once in repeated `--per-file-ignores` or `--extend-per-file-ignores` values, the selector lists are appended:
+
+```bash
+pydocfmt check --per-file-ignores '{"tests/*.py" = ["PDF100"]}' --per-file-ignores '{"tests/*.py" = ["PDF105"]}'
+```
+
+As with other settings, the resolved command-line value for a field replaces lower-priority values for the same field.
 
 ## Fixability
 
@@ -148,13 +204,14 @@ Defaults:
 - `unfixable = []`
 - `extend-fixable = []`
 
-Effective fixability uses the same specificity model as rule selection:
+Effective fixability uses the same source-priority and specificity model as rule selection:
 
-- Combine `fixable` and `extend-fixable` into one enabling selector set.
-- Resolve `unfixable` as the disabling selector set.
-- For each rule, track the strongest matching fixable selector specificity.
-- For each rule, track the strongest matching unfixable selector specificity.
-- Treat the rule as configured-fixable only when the fixable specificity is greater than the unfixable specificity.
+- Use the resolved `fixable` value as the active fixability basis. The source priority of this `fixable` value is the active fixable priority.
+- Keep `extend-fixable` only when its source priority is greater than or equal to the active fixable priority. Lower-priority `extend-fixable` settings are ignored.
+- Keep `unfixable` only when its source priority is greater than or equal to the active fixable priority. Lower-priority `unfixable` settings are ignored.
+- For each rule, track the strongest matching fixable selector by source priority and specificity.
+- For each rule, track the strongest matching unfixable selector by source priority and specificity.
+- Treat the rule as configured-fixable only when the fixable selector strength is greater than the unfixable selector strength.
 - Intersect configured fixability with the rule's `RuleMetadata.fix_availability`.
 
 Settings cannot make a rule with `fix_availability = FixAvailability.NEVER` fixable. Rules with `FixAvailability.ALWAYS` and `FixAvailability.SOMETIMES` both have available fixes for selector purposes.
@@ -168,6 +225,8 @@ Examples:
 - `fixable = ["PDF14"]` and `unfixable = ["PDF1"]` makes `PDF142` configured-fixable.
 - `fixable = ["PDF1"]` and `unfixable = ["PDF14"]` makes `PDF142` configured-unfixable but can leave `PDF150` configured-fixable.
 - `fixable = ["PDF14"]` and `unfixable = ["PDF14"]` makes `PDF142` configured-unfixable.
+- A command-line `--fixable PDF1` makes `PDF142` configured-fixable even when a lower-priority config file has `unfixable = ["PDF142"]`.
+- A command-line `--unfixable PDF1` makes `PDF142` configured-unfixable even when a lower-priority config file has `fixable = ["PDF142"]`.
 
 ## Operational Errors
 
@@ -191,7 +250,7 @@ When `pydocfmt check --show-rules` sees rule-selection errors, it prints them be
 
 ## Resolved Selection API
 
-`select_rules(settings, collection=None)` resolves a `CheckSettings` object against a `RuleCollection`. If no collection is passed, it uses `pydocformatter.rules.collection.RULE_COLLECTION`.
+`select_rules(settings, collection=None)` resolves a `CheckSettings` object against a `RuleCollection`. If no collection is passed, it uses `pydocformatter.rules.collection.RULE_COLLECTION`. Callers can pass a `SettingsProfile` to preserve source bases and source priorities from configuration loading; when no profile or explicit field priorities are provided, all selectors are treated as coming from the same source priority.
 
 It returns `RuleSelection`:
 
@@ -204,6 +263,7 @@ It returns `RuleSelection`:
 
 - `rule`: The rule's `RuleMetadata`.
 - `fixable`: The effective fixability after configured and inherent fixability are combined.
+- `enabled_priority`: The source priority of the selector that enabled the rule.
 - `enabled_specificity`: The global selector specificity that enabled the rule.
 
 `PerFileRuleIgnore` contains:
