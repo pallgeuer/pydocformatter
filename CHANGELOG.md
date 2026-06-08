@@ -54,6 +54,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 
 - **Formatting:**
   - Added the LibCST-based experimental rule execution framework with ordered category preprocessing, repeated automatic-fix passes, final read-only checks, and non-convergence diagnostics.
+  - Added typed PCF comment and PDF docstring category data, together with a shared validated source-edit helper, as the foundation for individual rule implementations.
 
 ### Changed
 
@@ -62,6 +63,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 
 - **Rule framework:**
   - Split rule models, authoring contracts, execution, and line-ending utilities into focused modules while keeping formatter file and source orchestration separate.
+  - Changed internal PDF and PCF classification types from string-compatible enums to ordinary enums.
 
 - **CLI:**
   - Reorganized `pydocfmt check --help` into Ruff-inspired argument groups for options, rule selection, and file selection.
