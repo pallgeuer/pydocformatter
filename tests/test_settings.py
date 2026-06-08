@@ -474,6 +474,15 @@ class TestSettings(unittest.TestCase):
         self.assertEqual(profile.priority_for_field("fixable"), pydocformatter_settings_core.FIELD_OVERRIDE_SOURCE_PRIORITY)
         self.assertEqual(profile.priority_for_field("unfixable"), pydocformatter_settings_core.DEFAULT_SOURCE_PRIORITY)
 
+    def test_settings_profile_key_is_hashable_and_mapping_order_independent(self) -> None:
+        settings = CheckSettings()
+        first = pydocformatter_settings_core.SettingsProfile(settings=settings, field_bases={"select": "/a", "ignore": "/b"}, field_priorities={"select": 1, "ignore": 2})
+        second = pydocformatter_settings_core.SettingsProfile(settings=settings, field_bases={"ignore": "/b", "select": "/a"}, field_priorities={"ignore": 2, "select": 1})
+
+        self.assertIsInstance(first.key(), pydocformatter_settings_core.SettingsProfile.Key)
+        self.assertEqual(first.key(), second.key())
+        self.assertEqual({first.key(): "value"}[second.key()], "value")
+
     def test_git_root_pyproject_is_loaded_from_subdirectory(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)

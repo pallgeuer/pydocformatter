@@ -2,7 +2,7 @@ import dataclasses
 import enum
 from typing import TypedDict
 
-import pydocformatter.rules.base as rule_base
+import pydocformatter.rules.models as rule_models
 import pydocformatter.settings as settings_core
 from pydocformatter.settings import MultiStringMap, SettingDefinition, SettingsSchema, StringList
 
@@ -30,8 +30,8 @@ DEFAULT_EXCLUDE = (
 )
 
 DEFAULT_INCLUDE = ("*.py", "*.pyi", "*.pyw")
-DEFAULT_RULE_SELECT = (rule_base.ALL_RULE_SELECTOR_TAG,)
-DEFAULT_RULE_FIXABLE = (rule_base.ALL_RULE_SELECTOR_TAG,)
+DEFAULT_RULE_SELECT = (rule_models.ALL_RULE_SELECTOR_TAG,)
+DEFAULT_RULE_FIXABLE = (rule_models.ALL_RULE_SELECTOR_TAG,)
 
 
 class IndentStyle(enum.StrEnum):

@@ -13,6 +13,7 @@ from typing import Any, Generic, TypeAlias, TypedDict, TypeVar, cast
 from pydocformatter.cli.global_args import GlobalArgs
 
 SettingsT = TypeVar("SettingsT")
+SettingsKeyT = TypeVar("SettingsKeyT")
 StrEnumT = TypeVar("StrEnumT", bound=enum.StrEnum)
 SettingValueT = TypeVar("SettingValueT")
 
@@ -44,9 +45,21 @@ class SettingsError(ValueError):
 class SettingsProfile(Generic[SettingsT]):
     """Resolved settings plus source-base and source-priority metadata."""
 
+    @dataclasses.dataclass(frozen=True)
+    class Key(Generic[SettingsKeyT]):
+        """Hashable identity for equivalent resolved settings profiles."""
+
+        settings: SettingsKeyT
+        field_bases: tuple[tuple[str, str], ...]
+        field_priorities: tuple[tuple[str, int], ...]
+
     settings: SettingsT
     field_bases: Mapping[str, str]
     field_priorities: Mapping[str, int]
+
+    def key(self) -> SettingsProfile.Key[SettingsT]:
+        """Return a stable hashable identity for this resolved settings profile."""
+        return SettingsProfile.Key(settings=self.settings, field_bases=tuple(sorted(self.field_bases.items())), field_priorities=tuple(sorted(self.field_priorities.items())))
 
     def base_for_field(self, field: str) -> str:
         """Return the absolute base directory associated with a resolved field."""

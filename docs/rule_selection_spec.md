@@ -306,7 +306,7 @@ Only global rule selection is displayed. Per-file ignores are intentionally not 
 - `--output-format text` prints the adjacent Markdown rule document directly.
 - `--output-format json` prints Ruff-style metadata for one rule, or a list of metadata objects with `--all`; its `explanation` field omits the Markdown title and fixability paragraph.
 
-Rule documents live next to their rule definition modules with the same basename and a `.md` extension. For example, `src/pydocformatter/rules/definitions/PDF/PDF001_reflow_required.py` is documented by `src/pydocformatter/rules/definitions/PDF/PDF001_reflow_required.md`. New rule docs should follow `src/pydocformatter/rules/rule_template.md`.
+Rule documents live next to their rule definition modules with the same basename and a `.md` extension. For example, `src/pydocformatter/rules/definitions/PDF/PDF001_reflow_required.py` is documented by `src/pydocformatter/rules/definitions/PDF/PDF001_reflow_required.md`. New rule docs should follow `src/pydocformatter/rules/templates/rule_template.md`.
 
 ## CLI Linter Listing
 

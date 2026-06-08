@@ -9,7 +9,8 @@ from types import ModuleType
 from typing import Callable, Iterable, TypeVar
 
 import pydocformatter.rules.definitions as rule_definitions
-from pydocformatter.rules.base import RuleBase, RuleCategoryBase, RuleCode, RuleSelector
+from pydocformatter.rules.definition import RuleBase, RuleCategoryBase
+from pydocformatter.rules.models import RuleCode, RuleSelector
 
 _BaseT = TypeVar("_BaseT")
 

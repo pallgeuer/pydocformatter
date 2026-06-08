@@ -3,9 +3,6 @@ from __future__ import annotations
 import dataclasses
 import enum
 import re
-from typing import ClassVar
-
-import pydocformatter.utils.misc as misc
 
 _RULE_CODE_RE = re.compile(r"^([A-Z]+)([0-9]+)$")
 _RULE_PREFIX_RE = re.compile(r"^[A-Z]+$")
@@ -148,66 +145,54 @@ class RuleCategoryMetadata:
             raise ValueError(f"{self.prefix}: Rule category name must not be empty")
 
 
-def rule_fix_text(rule: RuleMetadata) -> str:
-    """Return user-facing fix availability text for one rule."""
-    if rule.fix_availability == FixAvailability.ALWAYS:
-        return "Fix is always available."
-    elif rule.fix_availability == FixAvailability.SOMETIMES:
-        return "Fix is sometimes available."
-    elif rule.fix_availability == FixAvailability.NEVER:
-        return "Fix is not available."
-    else:
-        raise AssertionError(f"Unexpected fix availability: {rule.fix_availability}")
+@dataclasses.dataclass(frozen=True)
+class RuleFinding:
+    """A remaining or fixed instance of a rule issue.
 
+    Attributes:
+        rule (RuleMetadata): Rule metadata for the finding.
+        line_numbers (tuple[int, ...]): One-based source line numbers associated with the finding.
+        instance_message (str | None): Optional message overriding the rule default for this instance.
+        instance_fixable (bool | None): Optional fixability overriding the rule default for this instance.
+    """
 
-class RuleBase:
-    """Base class for implemented pydocformatter rules."""
+    @dataclasses.dataclass(frozen=True, order=True)
+    class Key:
+        """Key used to merge findings that differ only by line numbers."""
 
-    meta: ClassVar[RuleMetadata]
+        rule: RuleMetadata
+        message: str
+        fixable: bool
 
-    code = misc.alias_to_class_field("meta.code.tag")
-    prefix = misc.alias_to_class_field("meta.code.prefix")
-    number_str = misc.alias_to_class_field("meta.code.number_str")
-    number = misc.alias_to_class_field("meta.code.number")
-    name = misc.alias_to_class_field("meta.name")
-    message = misc.alias_to_class_field("meta.message")
-    fix_availability = misc.alias_to_class_field("meta.fix_availability")
-    stable_since = misc.alias_to_class_field("meta.stable_since")
+    rule: RuleMetadata
+    line_numbers: tuple[int, ...]
+    instance_message: str | None = None
+    instance_fixable: bool | None = None
 
-    def __init_subclass__(cls) -> None:
-        """Require implemented rule classes to define metadata."""
-        super().__init_subclass__()
-        if "meta" not in cls.__dict__:
-            raise TypeError(f"{cls.__name__} must define RuleMetadata as 'meta'")
-        if not isinstance(cls.meta, RuleMetadata):
-            raise TypeError(f"{cls.__name__}.meta must be a RuleMetadata instance")
+    @property
+    def message(self) -> str:
+        """Return the instance-specific or default rule message."""
+        return self.rule.message if self.instance_message is None else self.instance_message
 
+    @property
+    def fixable(self) -> bool:
+        """Return whether this specific finding can be automatically fixed."""
+        if self.instance_fixable is not None:
+            return self.instance_fixable
+        if self.rule.fix_availability == FixAvailability.ALWAYS:
+            return True
+        elif self.rule.fix_availability == FixAvailability.NEVER:
+            return False
+        elif self.rule.fix_availability == FixAvailability.SOMETIMES:
+            raise ValueError(f"{self.rule.code}: Findings for sometimes-fixable rules must specify instance_fixable")
+        else:
+            raise AssertionError(f"Unexpected fix availability: {self.rule.fix_availability}")
 
-class RuleCategoryBase:
-    """Base class for pydocformatter rule categories."""
+    @property
+    def grouping_key(self) -> RuleFinding.Key:
+        """Return the key used to merge findings that differ only by line numbers."""
+        return RuleFinding.Key(rule=self.rule, message=self.message, fixable=self.fixable)
 
-    meta: ClassVar[RuleCategoryMetadata]
-    code_class_map: ClassVar[dict[RuleCode, type[RuleBase]]]
-
-    prefix = misc.alias_to_class_field("meta.prefix")
-    name = misc.alias_to_class_field("meta.name")
-    url = misc.alias_to_class_field("meta.url")
-
-    def __init_subclass__(cls) -> None:
-        """Require category metadata and create isolated rule registration state."""
-        super().__init_subclass__()
-        if "meta" not in cls.__dict__:
-            raise TypeError(f"{cls.__name__} must define RuleCategoryMetadata as 'meta'")
-        if not isinstance(cls.meta, RuleCategoryMetadata):
-            raise TypeError(f"{cls.__name__}.meta must be a RuleCategoryMetadata instance")
-        cls.code_class_map = {}
-
-    @classmethod
-    def ordered_rules(cls) -> tuple[type[RuleBase], ...]:
-        """Return registered rules in deterministic rule-code order."""
-        return tuple(rule_class for _, rule_class in sorted(cls.code_class_map.items()))
-
-    @classmethod
-    def ordered_code_class_map(cls) -> dict[RuleCode, type[RuleBase]]:
-        """Return registered rules indexed in deterministic rule-code order."""
-        return dict(sorted(cls.code_class_map.items()))
+    def with_line_numbers(self, line_numbers: tuple[int, ...]) -> RuleFinding:
+        """Return this finding with updated line numbers."""
+        return dataclasses.replace(self, line_numbers=line_numbers)

@@ -22,16 +22,11 @@ repos:
         entry: uv run pydocfmt check --fix
         language: system
         types: [python]
-
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v2.1.0
-    hooks:
       - id: mypy
         name: mypy (type checker)
+        entry: uv run mypy
+        language: system
         pass_filenames: false
-
-  - repo: local
-    hooks:
       - id: pytest
         name: pytest (test suite)
         entry: uv run pytest

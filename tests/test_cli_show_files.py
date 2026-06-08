@@ -14,8 +14,9 @@ import pydocformatter.cli.main as pydocfmt_cli
 import pydocformatter.cli.settings_check as settings_check
 import pydocformatter.formatters.pydocfmt as pydocfmt
 from pydocformatter.cli.settings_check import CheckSettings
-from pydocformatter.formatter import FormatterResult, RuleFinding
-from pydocformatter.rules.base import FixAvailability, RuleCode, RuleMetadata
+from pydocformatter.formatter import FormatterResult
+from pydocformatter.rules.models import FixAvailability, RuleCode, RuleFinding, RuleMetadata
+from pydocformatter.rules_selection import RuleSelection
 
 PDF001_RULE = RuleMetadata(code=RuleCode("PDF001"), name="reflow-required", message="Docstring chunk needs reflow", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0")
 PCF001_RULE = RuleMetadata(code=RuleCode("PCF001"), name="comment-formatting-needed", message="Comment needs formatting", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0")
@@ -411,8 +412,8 @@ class TestCLIShowFiles(unittest.TestCase):
                 legacy_called = True
                 return pydocfmt.SourceFormatResult(source="x = 1\n", docstring_changed_lines=(), comment_changed_lines=())
 
-            def fake_exp_format(path: str, *, file: object = None, settings: CheckSettings, fix: bool, write: bool) -> FormatterResult:
-                del file
+            def fake_exp_format(path: str, *, file: object = None, settings: CheckSettings, rule_selection: RuleSelection, fix: bool, write: bool) -> FormatterResult:
+                del file, rule_selection
                 called_args.append((path, settings.line_length, fix, settings.experimental, settings.output_format))
                 self.assertTrue(write)
                 return FormatterResult(path=path, old_source="", new_source="", modified=False, fixed_findings=collections.Counter(), unfixed_findings=(), errors=())
@@ -507,8 +508,8 @@ class TestCLIShowFiles(unittest.TestCase):
             target.write_text("x = 1\n", encoding="utf-8")
             called_settings: list[CheckSettings] = []
 
-            def fake_format(path: str, *, file: object = None, settings: CheckSettings, fix: bool, write: bool) -> FormatterResult:
-                del file, fix, write
+            def fake_format(path: str, *, file: object = None, settings: CheckSettings, rule_selection: RuleSelection, fix: bool, write: bool) -> FormatterResult:
+                del file, rule_selection, fix, write
                 called_settings.append(settings)
                 return FormatterResult(path=path, old_source="", new_source="", modified=False, fixed_findings=collections.Counter(), unfixed_findings=(), errors=())
 
@@ -1470,8 +1471,8 @@ class TestCLIShowFiles(unittest.TestCase):
             rule = RuleMetadata(code=RuleCode("PDF105"), name="summary-too-long", message="Docstring summary does not fit on one line", fix_availability=FixAvailability.NEVER, stable_since="0.3.0")
             called_args: list[tuple[bool, bool]] = []
 
-            def fake_format(path: str, *, file: TextIO | None = None, settings: CheckSettings, fix: bool, write: bool) -> FormatterResult:
-                del path, file, settings
+            def fake_format(path: str, *, file: TextIO | None = None, settings: CheckSettings, rule_selection: RuleSelection, fix: bool, write: bool) -> FormatterResult:
+                del path, file, settings, rule_selection
                 called_args.append((fix, write))
                 return FormatterResult(
                     path=str(target),
@@ -1510,8 +1511,8 @@ class TestCLIShowFiles(unittest.TestCase):
             target.write_text("x = 1\n", encoding="utf-8")
             stdout = StringIO()
 
-            def fake_format(path: str, *, file: TextIO | None = None, settings: CheckSettings, fix: bool, write: bool) -> FormatterResult:
-                del file, settings, fix, write
+            def fake_format(path: str, *, file: TextIO | None = None, settings: CheckSettings, rule_selection: RuleSelection, fix: bool, write: bool) -> FormatterResult:
+                del file, settings, rule_selection, fix, write
                 return FormatterResult(path=path, old_source="x = 1\n", new_source="x = 2\n", modified=True, fixed_findings=collections.Counter({PDF001_RULE: 1}), unfixed_findings=(), errors=())
 
             argv = ["pydocfmt", "check", "--experimental", "--diff", "--exit-zero", str(target)]
@@ -1552,8 +1553,8 @@ class TestCLIShowFiles(unittest.TestCase):
             target.write_text("x = 1\n", encoding="utf-8")
             stdout = StringIO()
 
-            def fake_format(path: str, *, file: TextIO | None = None, settings: CheckSettings, fix: bool, write: bool) -> FormatterResult:
-                del file, settings, fix, write
+            def fake_format(path: str, *, file: TextIO | None = None, settings: CheckSettings, rule_selection: RuleSelection, fix: bool, write: bool) -> FormatterResult:
+                del file, settings, rule_selection, fix, write
                 return FormatterResult(
                     path=path, old_source="x = 1\n", new_source="x = 2\n", modified=True, fixed_findings=collections.Counter({PDF001_RULE: 1, PCF001_RULE: 2}), unfixed_findings=(), errors=()
                 )
@@ -1596,8 +1597,8 @@ class TestCLIShowFiles(unittest.TestCase):
         source = "x = 1\n"
         stdout = StringIO()
 
-        def fake_format(path: str, *, file: TextIO | None = None, settings: CheckSettings, fix: bool, write: bool) -> FormatterResult:
-            del settings, fix, write
+        def fake_format(path: str, *, file: TextIO | None = None, settings: CheckSettings, rule_selection: RuleSelection, fix: bool, write: bool) -> FormatterResult:
+            del settings, rule_selection, fix, write
             assert file is not None
             assert file.read() == source
             return FormatterResult(path=path, old_source=source, new_source="x = 2\n", modified=True, fixed_findings=collections.Counter({PDF001_RULE: 1}), unfixed_findings=(), errors=())
@@ -1622,8 +1623,8 @@ class TestCLIShowFiles(unittest.TestCase):
         stderr = StringIO()
         called_paths: list[str] = []
 
-        def fake_format(path: str, *, file: TextIO | None = None, settings: CheckSettings, fix: bool, write: bool) -> FormatterResult:
-            del settings, fix, write
+        def fake_format(path: str, *, file: TextIO | None = None, settings: CheckSettings, rule_selection: RuleSelection, fix: bool, write: bool) -> FormatterResult:
+            del settings, rule_selection, fix, write
             called_paths.append(path)
             assert file is not None
             assert file.read() == source
@@ -1729,8 +1730,8 @@ class TestCLIShowFiles(unittest.TestCase):
         stdout = StringIO()
         stderr = StringIO()
 
-        def fake_format(path: str, *, file: TextIO | None = None, settings: CheckSettings, fix: bool, write: bool) -> FormatterResult:
-            del path, settings
+        def fake_format(path: str, *, file: TextIO | None = None, settings: CheckSettings, rule_selection: RuleSelection, fix: bool, write: bool) -> FormatterResult:
+            del path, settings, rule_selection
             assert fix
             assert write
             assert file is not None
@@ -1761,8 +1762,8 @@ class TestCLIShowFiles(unittest.TestCase):
             stdout = StringIO()
             stderr = StringIO()
 
-            def fake_format(path: str, *, file: TextIO | None = None, settings: CheckSettings, fix: bool, write: bool) -> FormatterResult:
-                del path, settings
+            def fake_format(path: str, *, file: TextIO | None = None, settings: CheckSettings, rule_selection: RuleSelection, fix: bool, write: bool) -> FormatterResult:
+                del path, settings, rule_selection
                 assert fix
                 assert write
                 assert file is not None

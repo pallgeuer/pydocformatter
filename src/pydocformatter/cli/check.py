@@ -23,8 +23,8 @@ import pydocformatter.utils.argparser as argparser
 import pydocformatter.utils.misc as misc
 from pydocformatter.cli.settings_check import SETTINGS_SCHEMA, CheckSettings, OutputFormat
 from pydocformatter.file_selection import STDIN_VIRTUAL_FILE, FileDecision, FileSelectionError, SelectionResult
-from pydocformatter.formatter import FormatterResult, RuleFinding
-from pydocformatter.rules.base import FixAvailability, RuleCode, RuleMetadata
+from pydocformatter.formatter import FormatterResult
+from pydocformatter.rules.models import FixAvailability, RuleCode, RuleFinding, RuleMetadata
 from pydocformatter.rules_selection import RuleSelection
 
 LEGACY_FORMAT_RULE_META = RuleMetadata(code=RuleCode("PDF000"), name="legacy-formatting-needed", message="Needs formatting", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0")
@@ -255,13 +255,15 @@ def check_files(*, args: argparse.Namespace, settings_context: CheckRunContext) 
         return 2
 
     rule_profiles = files.selected_files or (file_selection.SelectedFile(path="", profile=settings_context.cwd_profile),)
-    seen_rule_profiles: set[tuple[CheckSettings, tuple[tuple[str, str], ...], tuple[tuple[str, int], ...]]] = set()
+    seen_rule_profiles: set[settings_core.SettingsProfile.Key[CheckSettings]] = set()
+    rule_selections: dict[settings_core.SettingsProfile.Key[CheckSettings], RuleSelection] = {}
     for selected_file in rule_profiles:
-        profile_key = _rule_profile_key(selected_file.profile)
+        profile_key = selected_file.profile.key()
         if profile_key in seen_rule_profiles:
             continue
         seen_rule_profiles.add(profile_key)
         selected_rules = rules_selection.select_rules(selected_file.settings, profile=selected_file.profile)
+        rule_selections[profile_key] = selected_rules
         errors.extend(selected_rules.errors)
 
     if use_stdin:
@@ -271,7 +273,7 @@ def check_files(*, args: argparse.Namespace, settings_context: CheckRunContext) 
             print("pydocfmt check: Argument error: Cannot process input from stdin when using non-experimental mode", file=sys.stderr)
             return 2
 
-    results = format_selected_files(files.selected_files, use_stdin=use_stdin, fix=args.fix or args.diff, write=not args.diff)
+    results = format_selected_files(files.selected_files, rule_selections=rule_selections, use_stdin=use_stdin, fix=args.fix or args.diff, write=not args.diff)
 
     if use_stdin and args.fix and not args.diff and results:
         if len(results) != 1:
@@ -299,11 +301,6 @@ def check_files(*, args: argparse.Namespace, settings_context: CheckRunContext) 
         return 1
     else:
         return 0
-
-
-def _rule_profile_key(profile: settings_core.SettingsProfile[CheckSettings]) -> tuple[CheckSettings, tuple[tuple[str, str], ...], tuple[tuple[str, int], ...]]:
-    """Return the identity used to deduplicate equivalent rule-selection profiles."""
-    return profile.settings, tuple(sorted(profile.field_bases.items())), tuple(sorted(profile.field_priorities.items()))
 
 
 @contextlib.contextmanager
@@ -387,17 +384,26 @@ def format_files(paths: tuple[str, ...], *, settings: CheckSettings, fix: bool, 
     return results
 
 
-def format_selected_files(selected_files: tuple[file_selection.SelectedFile, ...], *, use_stdin: bool, fix: bool, write: bool) -> list[FormatterResult]:
+def format_selected_files(
+    selected_files: tuple[file_selection.SelectedFile, ...],
+    *,
+    rule_selections: dict[settings_core.SettingsProfile.Key[CheckSettings], RuleSelection],
+    use_stdin: bool,
+    fix: bool,
+    write: bool,
+) -> list[FormatterResult]:
     """Format selected files with each file's resolved settings profile."""
     results: list[FormatterResult] = []
     for index, selected_file in enumerate(selected_files):
         settings = selected_file.settings
         if settings.experimental:
+            rule_selection = rule_selections[selected_file.profile.key()]
             results.append(
                 formatter.format_file_exp(
                     selected_file.path,
                     file=sys.stdin if use_stdin and index == 0 else None,
                     settings=settings,
+                    rule_selection=rule_selection,
                     fix=fix,
                     write=write,
                 )

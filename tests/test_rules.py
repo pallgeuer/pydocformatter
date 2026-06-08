@@ -13,15 +13,16 @@ from pathlib import Path
 
 import pydocformatter.cli.check as check
 import pydocformatter.file_selection as file_selection
-import pydocformatter.rules.base as rule_base
 import pydocformatter.rules.collection as rule_collection
 import pydocformatter.rules.definitions as rule_definitions
 import pydocformatter.rules.documentation as rule_documentation
+import pydocformatter.rules.models as rule_models
 import pydocformatter.rules_selection as rules_selection
 import pydocformatter.settings as settings_core
 from pydocformatter.cli.global_args import GlobalArgs
 from pydocformatter.cli.settings_check import SETTINGS_SCHEMA, CheckSettings
-from pydocformatter.rules.base import FixAvailability, RuleBase, RuleCategoryBase, RuleCategoryMetadata, RuleCode, RuleMetadata, RuleSelector
+from pydocformatter.rules.definition import RuleBase, RuleCategoryBase
+from pydocformatter.rules.models import FixAvailability, RuleCategoryMetadata, RuleCode, RuleMetadata, RuleSelector
 
 
 class PDFSampleCategory(RuleCategoryBase):
@@ -109,7 +110,8 @@ class TestRules(unittest.TestCase):
             "PDF/__init__.py": "",
             "PDF/PDF.py": (
                 "import pydocformatter.rules.collection as rule_collection\n"
-                "from pydocformatter.rules.base import RuleCategoryBase, RuleCategoryMetadata\n\n"
+                "from pydocformatter.rules.definition import RuleCategoryBase\n"
+                "from pydocformatter.rules.models import RuleCategoryMetadata\n\n"
                 "@rule_collection.register_rule_category\n"
                 "class PDF(RuleCategoryBase):\n"
                 "    meta = RuleCategoryMetadata(prefix='PDF', name='test PDF')\n"
@@ -117,7 +119,8 @@ class TestRules(unittest.TestCase):
             "PDF/PDF.md": "# test PDF (PDF)\n",
             "PDF/PDF001_test.py": (
                 "import pydocformatter.rules.collection as rule_collection\n"
-                "from pydocformatter.rules.base import FixAvailability, RuleBase, RuleCode, RuleMetadata\n"
+                "from pydocformatter.rules.definition import RuleBase\n"
+                "from pydocformatter.rules.models import FixAvailability, RuleCode, RuleMetadata\n"
                 f"from {package_name}.PDF.PDF import PDF\n\n"
                 "@rule_collection.register_rule_to(PDF)\n"
                 "class PDF001Test(RuleBase):\n"
@@ -180,7 +183,7 @@ class TestRules(unittest.TestCase):
         for rule_class in collection.rules:
             explanation = rule_documentation.load_rule_explanation(rule_class)
             self.assertTrue(explanation.startswith(f"# {rule_class.meta.name} ({rule_class.meta.code})\n\n"))
-            self.assertIn(f"\n\n{rule_base.rule_fix_text(rule_class.meta)}\n\n", explanation)
+            self.assertIn(f"\n\n{rule_documentation.rule_fix_text(rule_class.meta)}\n\n", explanation)
 
     def test_rule_registry_collects_categories_and_rules(self) -> None:
         registry = rule_collection.RuleRegistry()
@@ -312,7 +315,8 @@ class TestRules(unittest.TestCase):
         package_name = "synthetic_rule_definitions"
         files = self._valid_rule_package_files(package_name)
         files["../synthetic_rule_support.py"] = (
-            "from pydocformatter.rules.base import FixAvailability, RuleBase, RuleCode, RuleMetadata\n\n"
+            "from pydocformatter.rules.definition import RuleBase\n"
+            "from pydocformatter.rules.models import FixAvailability, RuleCode, RuleMetadata\n\n"
             "class PDF002External(RuleBase):\n"
             "    meta = RuleMetadata(code=RuleCode('PDF002'), name='external', message='External', fix_availability=FixAvailability.ALWAYS, stable_since='0.3.0')\n"
         )
@@ -325,7 +329,8 @@ class TestRules(unittest.TestCase):
         package_name = "synthetic_rule_definitions"
         files = self._valid_rule_package_files(package_name)
         files["PDF/__init__.py"] = (
-            "from pydocformatter.rules.base import FixAvailability, RuleBase, RuleCode, RuleMetadata\n\n"
+            "from pydocformatter.rules.definition import RuleBase\n"
+            "from pydocformatter.rules.models import FixAvailability, RuleCode, RuleMetadata\n\n"
             "class PDF002PackageRule(RuleBase):\n"
             "    meta = RuleMetadata(code=RuleCode('PDF002'), name='package-rule', message='Package rule', fix_availability=FixAvailability.ALWAYS, stable_since='0.3.0')\n"
         )
@@ -424,14 +429,14 @@ class TestRules(unittest.TestCase):
         self.assertTrue(RuleCode.is_valid_tag("PDF001"))
         self.assertFalse(RuleCode.is_valid_tag("001"))
         self.assertFalse(RuleCode.is_valid_tag("ALL001"))
-        self.assertFalse(hasattr(rule_base, "valid_rule_code_tag"))
-        self.assertFalse(hasattr(rule_base, "split_rule_code"))
+        self.assertFalse(hasattr(rule_models, "valid_rule_code_tag"))
+        self.assertFalse(hasattr(rule_models, "split_rule_code"))
         self.assertEqual(rule.stable_since, "0.3.0")
         self.assertEqual(tuple(field.name for field in dataclasses.fields(RuleMetadata)), ("code", "name", "message", "fix_availability", "stable_since"))
         self.assertTrue(all(field.default is dataclasses.MISSING for field in dataclasses.fields(RuleMetadata)))
-        self.assertEqual(rule_base.rule_fix_text(rule), "Fix is always available.")
+        self.assertEqual(rule_documentation.rule_fix_text(rule), "Fix is always available.")
         self.assertEqual(
-            rule_base.rule_fix_text(RuleMetadata(code=RuleCode("PDF999"), name="sometimes-rule", message="Sometimes rule", fix_availability=FixAvailability.SOMETIMES, stable_since="0.3.0")),
+            rule_documentation.rule_fix_text(RuleMetadata(code=RuleCode("PDF999"), name="sometimes-rule", message="Sometimes rule", fix_availability=FixAvailability.SOMETIMES, stable_since="0.3.0")),
             "Fix is sometimes available.",
         )
         self.assertEqual(str(FixAvailability.SOMETIMES), "Sometimes")
@@ -452,8 +457,8 @@ class TestRules(unittest.TestCase):
         self.assertTrue(RuleSelector.is_valid_tag("PDF10"))
         self.assertFalse(RuleSelector.is_valid_tag("bad"))
         self.assertFalse(RuleSelector.is_valid_tag("ALL1"))
-        self.assertFalse(hasattr(rule_base, "rule_selector_is_valid"))
-        self.assertFalse(hasattr(rule_base, "split_rule_selector"))
+        self.assertFalse(hasattr(rule_models, "rule_selector_is_valid"))
+        self.assertFalse(hasattr(rule_models, "split_rule_selector"))
         self.assertTrue(RuleSelector("ALL").selects_code(code))
         self.assertTrue(RuleSelector("PDF").selects_code(code))
         self.assertTrue(RuleSelector("PDF1").selects_code(code))

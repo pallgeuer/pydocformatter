@@ -6,8 +6,8 @@ import textwrap
 import tokenize
 import typing
 
-import pydocformatter.formatter as formatter
 import pydocformatter.formatters.google_docstrings as google_docstrings
+import pydocformatter.rules.line_endings as line_endings
 import pydocformatter.utils.misc as misc
 from pydocformatter.cli.settings_check import CheckSettings, IndentStyle
 
@@ -61,7 +61,7 @@ class SourceFormatResult:
 
 def _matches_ignoring_line_endings(left: str, right: str) -> bool:
     """Return whether two strings differ only by line-ending style."""
-    return formatter.normalize_line_endings(left, line_ending="\n") == formatter.normalize_line_endings(right, line_ending="\n")
+    return line_endings.normalize_line_endings(left, line_ending="\n") == line_endings.normalize_line_endings(right, line_ending="\n")
 
 
 def process_docstring_node(
@@ -120,7 +120,7 @@ def process_docstring_node(
         indent_style=indent_style,
         indent_width=indent_width,
     )
-    new_docstring = formatter.normalize_line_endings("".join(new_lines), line_ending=line_ending)
+    new_docstring = line_endings.normalize_line_endings("".join(new_lines), line_ending=line_ending)
 
     # Get original docstring
     original_docstring = "".join(output_lines[srow : erow + 1])
@@ -386,7 +386,7 @@ def format_source(source: str, settings: CheckSettings, fix: bool) -> SourceForm
         `SyntaxError`: If the source cannot be parsed as Python.
         `tokenize.TokenError`: If Python tokenization fails.
     """
-    line_ending = formatter.resolve_line_ending(source, line_ending=settings.line_ending)
+    line_ending = line_endings.resolve_line_ending(source, line_ending=settings.line_ending)
     docstring_source, docstring_changed_lines = format_docstrings_in_source(source, settings, line_ending=line_ending)
 
     if not fix:
@@ -478,7 +478,7 @@ def format_docstrings(
     with open(path, encoding="utf-8", newline="") as file:
         source = file.read()
 
-    line_ending = formatter.resolve_line_ending(source, line_ending=settings.line_ending)
+    line_ending = line_endings.resolve_line_ending(source, line_ending=settings.line_ending)
     formatted_source, changed_lines = format_docstrings_in_source(source, settings, line_ending=line_ending)
 
     if check:

@@ -43,7 +43,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added an empirical Ruff file-selection behavior specification at `docs/ruff_file_selection_spec.md`, covering config-relative glob bases, cwd-relative CLI overrides, gitignore behavior, explicit-file behavior, and per-file ignores.
   - Added a rule-selection specification at `docs/rule_selection_spec.md`, covering rule collection, selectors, fixability, and rule explanation output.
   - Added adjacent Markdown documentation for all built-in pydocformatter rules, including Ruff compatibility notes where relevant.
-  - Added a reusable rule documentation Markdown template at `src/pydocformatter/rules/rule_template.md`.
+  - Added a reusable rule documentation Markdown template at `src/pydocformatter/rules/templates/rule_template.md`.
   - Added adjacent documentation for each rule category and a reusable rule category documentation template.
   - Added docstrings for public glob matching methods, the dependency-pin check tool, and important configuration, CLI, and file-selection helpers.
   - Completed Google-style docstrings for public source APIs and added concise docstrings for private helpers that previously lacked them.
@@ -52,7 +52,16 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added a pytest pre-commit hook that runs the test suite before commits.
   - Added regression coverage for Ruff-compatible file-selection and per-file-ignore pattern-base behavior.
 
+- **Formatting:**
+  - Added the LibCST-based experimental rule execution framework with ordered category preprocessing, repeated automatic-fix passes, final read-only checks, and non-convergence diagnostics.
+
 ### Changed
+
+- **Developer workflow:**
+  - Changed the mypy pre-commit hook to use the locked project environment through `uv run mypy`.
+
+- **Rule framework:**
+  - Split rule models, authoring contracts, execution, and line-ending utilities into focused modules while keeping formatter file and source orchestration separate.
 
 - **CLI:**
   - Reorganized `pydocfmt check --help` into Ruff-inspired argument groups for options, rule selection, and file selection.
@@ -110,6 +119,8 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Check-mode output now includes docstring and comment line locations, emitted once per subject per file with compressed consecutive ranges.
 
 - **Architecture:**
+  - Added hashable `SettingsProfile.Key` identities and moved rule templates and line-ending helpers under the rules package.
+  - Added modular no-op rule check/fix hooks and category preprocessing contexts so rule implementations can share per-pass analysis without coupling rules to each other.
   - Replaced inferred rule-prefix linter metadata with first-class `RuleCategoryBase` classes that own rule registration, validation, ordering, and metadata.
   - Changed rule registries and collections to accept categories only, while exposing deterministic category and flattened rule iteration.
   - Updated rule definition loading to import explicit prefix-named category modules before rule modules without relying on package `__init__.py` exports.
@@ -157,6 +168,10 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Updated mypy from 1.20.2 to 2.1.0.
 
 ### Fixed
+
+- **Rule framework:**
+  - Category preprocessing data is now refreshed after an earlier rule changes the module while remaining shared by later rules processing the same module version.
+  - UTF-8 byte order marks are now preserved when automatic fixes rewrite source, and fixes that converge on the final permitted iteration no longer report a non-convergence error.
 
 - **Documentation:**
   - Updated README, contributing, release, pull request, and file-selection docs for the single-command workflow and latest file-selection behavior.

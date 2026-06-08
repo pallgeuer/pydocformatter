@@ -5,11 +5,23 @@ import importlib.resources
 import inspect
 import pathlib
 
-from pydocformatter.rules.base import RuleCategoryMetadata, RuleMetadata
 from pydocformatter.rules.collection import RuleCollection
+from pydocformatter.rules.models import FixAvailability, RuleCategoryMetadata, RuleMetadata
 
-TEMPLATE_PATH = pathlib.Path(__file__).with_name("rule_template.md")
-CATEGORY_TEMPLATE_PATH = pathlib.Path(__file__).with_name("rule_category_template.md")
+TEMPLATE_PATH = pathlib.Path(__file__).with_name("templates") / "rule_template.md"
+CATEGORY_TEMPLATE_PATH = pathlib.Path(__file__).with_name("templates") / "rule_category_template.md"
+
+
+def rule_fix_text(rule: RuleMetadata) -> str:
+    """Return user-facing fix availability text for one rule."""
+    if rule.fix_availability == FixAvailability.ALWAYS:
+        return "Fix is always available."
+    elif rule.fix_availability == FixAvailability.SOMETIMES:
+        return "Fix is sometimes available."
+    elif rule.fix_availability == FixAvailability.NEVER:
+        return "Fix is not available."
+    else:
+        raise AssertionError(f"Unexpected fix availability: {rule.fix_availability}")
 
 
 @dataclasses.dataclass(frozen=True)

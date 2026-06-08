@@ -12,11 +12,10 @@ PYPROJECT_PATH = ROOT / "pyproject.toml"
 PRECOMMIT_PATH = ROOT / ".pre-commit-config.yaml"
 
 GROUPS_TO_CHECK = ("test", "dev")
-TOOL_PACKAGES = ("black", "isort", "mypy")
+TOOL_PACKAGES = ("black", "isort")
 REPO_TO_PACKAGE = {
     "https://github.com/psf/black": "black",
     "https://github.com/PyCQA/isort": "isort",
-    "https://github.com/pre-commit/mirrors-mypy": "mypy",
 }
 
 NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*(?:\[[A-Za-z0-9_,.-]+\])?$")

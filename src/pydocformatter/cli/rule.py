@@ -6,11 +6,11 @@ import sys
 from typing import TypedDict
 
 import pydocformatter.cli.global_args as global_args
-import pydocformatter.rules.base as rule_base
 import pydocformatter.rules.collection as rule_collection
 import pydocformatter.rules.documentation as rule_documentation
 import pydocformatter.utils.argparser as argparser
-from pydocformatter.rules.base import FixAvailability, RuleBase, RuleCode
+from pydocformatter.rules.definition import RuleBase
+from pydocformatter.rules.models import FixAvailability, RuleCode
 
 
 class RuleSourceLocationMetadata(TypedDict):
@@ -126,7 +126,7 @@ def rule_json(rule_class: type[RuleBase]) -> RuleMetadataOutput:
         linter="pydocformatter",
         summary=rule.message,
         message_formats=[rule.message],
-        fix=rule_base.rule_fix_text(rule),
+        fix=rule_documentation.rule_fix_text(rule),
         fix_availability=rule.fix_availability,
         explanation=rule_documentation.rule_explanation_body(rule_class),
         preview=False,

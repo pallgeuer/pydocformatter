@@ -7,8 +7,8 @@ from collections.abc import Mapping
 import pydocformatter.rules.collection as rule_collection
 import pydocformatter.settings as settings_core
 from pydocformatter.cli.settings_check import CheckSettings
-from pydocformatter.rules.base import ALL_RULE_SELECTOR_TAG, FixAvailability, RuleCode, RuleMetadata, RuleSelector
 from pydocformatter.rules.collection import RuleCollection
+from pydocformatter.rules.models import ALL_RULE_SELECTOR_TAG, FixAvailability, RuleCode, RuleMetadata, RuleSelector
 from pydocformatter.utils.globs import GlobPatternSet
 
 

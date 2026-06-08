@@ -9,17 +9,38 @@ import unittest.mock
 from io import StringIO
 from pathlib import Path
 
+import libcst as cst
+
 import pydocformatter.cli.check as check_command
 import pydocformatter.cli.main as pydocfmt_cli
 import pydocformatter.formatter as formatter
 import pydocformatter.formatters.pydocfmt as pydocfmt
-from pydocformatter.cli.settings_check import CheckSettings
-from pydocformatter.formatter import FormatterResult, RuleFinding
-from pydocformatter.rules.base import FixAvailability, RuleCode, RuleMetadata
+import pydocformatter.rules.collection as rule_collection
+import pydocformatter.rules.definition as rule_base
+import pydocformatter.rules.models as rule_models
+import pydocformatter.rules.runner as rule_runner
+import pydocformatter.rules_selection as rules_selection
+from pydocformatter.cli.settings_check import CheckSettings, LineEnding
+from pydocformatter.formatter import FormatterResult
+from pydocformatter.rules.models import FixAvailability, RuleCode, RuleFinding, RuleMetadata
 
 PDF001_RULE = RuleMetadata(code=RuleCode("PDF001"), name="reflow-required", message="Docstring chunk needs reflow", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0")
 PDF105_RULE = RuleMetadata(code=RuleCode("PDF105"), name="summary-too-long", message="Docstring summary does not fit on one line", fix_availability=FixAvailability.NEVER, stable_since="0.3.0")
 PCF100_RULE = RuleMetadata(code=RuleCode("PCF100"), name="comment-formatting-needed", message="Comment needs formatting", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0")
+
+
+def default_rule_selection() -> rules_selection.RuleSelection:
+    return rules_selection.select_rules(CheckSettings(experimental=True))
+
+
+def isolated_rule_selection(*categories: type[rule_base.RuleCategoryBase], fixable: bool = True) -> rules_selection.RuleSelection:
+    collection = rule_collection.RuleCollection(categories)
+    return rules_selection.RuleSelection(
+        rules=tuple(rules_selection.SelectedRule(rule=rule_class.meta, fixable=fixable, enabled_priority=0, enabled_specificity=0) for rule_class in collection.rules),
+        per_file_ignores=(),
+        errors=(),
+        collection=collection,
+    )
 
 
 class TestFormatterResults(unittest.TestCase):
@@ -34,6 +55,14 @@ class TestFormatterResults(unittest.TestCase):
         signature = inspect.signature(formatter.format_file_exp)
 
         self.assertIs(signature.parameters["write"].default, inspect.Parameter.empty)
+
+    def test_experimental_source_formatter_requires_precomputed_rule_selection(self) -> None:
+        signature = inspect.signature(formatter.format_source_exp)
+
+        self.assertIs(signature.parameters["rule_selection"].default, inspect.Parameter.empty)
+
+    def test_max_fix_iterations_is_one_hundred(self) -> None:
+        self.assertEqual(rule_runner.MAX_FIX_ITERATIONS, 100)
 
     def test_formatter_result_tracks_modified_and_findings_explicitly(self) -> None:
         clean = FormatterResult(path="a.py", old_source="", new_source="", modified=False, fixed_findings=collections.Counter(), unfixed_findings=(), errors=())
@@ -283,7 +312,7 @@ class TestFormatterResults(unittest.TestCase):
             previous_cwd = os.getcwd()
             os.chdir(root)
             try:
-                result = formatter.format_file_exp("a.py", settings=CheckSettings(experimental=True), fix=True, write=True)
+                result = formatter.format_file_exp("a.py", settings=CheckSettings(experimental=True), rule_selection=default_rule_selection(), fix=True, write=True)
             finally:
                 os.chdir(previous_cwd)
 
@@ -294,6 +323,289 @@ class TestFormatterResults(unittest.TestCase):
             self.assertEqual(result.unfixed_findings, ())
             self.assertEqual(target.read_text(encoding="utf-8"), "x = 1\n")
 
+    def test_experimental_source_formatter_runs_fixes_to_convergence_and_checks_latest_positions(self) -> None:
+        prepare_sources: list[str] = []
+
+        class TST(rule_base.RuleCategoryBase):
+            meta = rule_models.RuleCategoryMetadata(prefix="TST", name="test")
+
+            @classmethod
+            def prepare(cls, context: rule_base.RuleCategoryContext) -> object:
+                del cls
+                prepare_sources.append(context.module.code)
+                return context.module.code
+
+        @rule_collection.register_rule_to(TST)
+        class TST001InsertLeadingLine(rule_base.RuleBase):
+            meta = rule_models.RuleMetadata(
+                code=rule_models.RuleCode("TST001"), name="insert-leading-line", message="Insert leading line", fix_availability=rule_models.FixAvailability.ALWAYS, stable_since="0.3.0"
+            )
+
+            @classmethod
+            def fix(cls, context: rule_base.RuleContext) -> rule_base.RuleFixResult:
+                if context.module.header:
+                    return rule_base.RuleFixResult(module=context.module)
+                return rule_base.RuleFixResult(module=context.module.with_changes(header=(cst.EmptyLine(),)), fixed_findings=(rule_models.RuleFinding(rule=cls.meta, line_numbers=(1,)),))
+
+        @rule_collection.register_rule_to(TST)
+        class TST002FindName(rule_base.RuleBase):
+            meta = rule_models.RuleMetadata(code=rule_models.RuleCode("TST002"), name="find-name", message="Found name", fix_availability=rule_models.FixAvailability.NEVER, stable_since="0.3.0")
+
+            @classmethod
+            def check(cls, context: rule_base.RuleContext) -> tuple[rule_models.RuleFinding, ...]:
+                collector = _NameCollector("x")
+                context.module.visit(collector)
+                line_numbers = tuple(context.positions[node].start.line for node in collector.nodes)
+                return (rule_models.RuleFinding(rule=cls.meta, line_numbers=line_numbers),)
+
+        class _NameCollector(cst.CSTVisitor):
+            def __init__(self, name: str) -> None:
+                self.name = name
+                self.nodes: list[cst.Name] = []
+
+            def visit_Name(self, node: cst.Name) -> None:
+                if node.value == self.name:
+                    self.nodes.append(node)
+
+        settings = CheckSettings(experimental=True)
+        result = formatter.format_source_exp("x = 1\n", "a.py", settings=settings, rule_selection=isolated_rule_selection(TST), fix=True)
+
+        self.assertEqual(result.new_source, "\nx = 1\n")
+        self.assertEqual(result.fixed_findings, collections.Counter({TST001InsertLeadingLine.meta: 1}))
+        self.assertEqual(result.unfixed_findings, (RuleFinding(rule=TST002FindName.meta, line_numbers=(2,)),))
+        self.assertEqual(prepare_sources, ["x = 1\n", "\nx = 1\n", "\nx = 1\n", "\nx = 1\n"])
+        self.assertEqual(result.errors, ())
+
+    def test_experimental_source_formatter_refreshes_and_reuses_category_data_after_a_fix(self) -> None:
+        prepared_data: list[object] = []
+        observed_data: list[object | None] = []
+
+        class TST(rule_base.RuleCategoryBase):
+            meta = rule_models.RuleCategoryMetadata(prefix="TST", name="test")
+
+            @classmethod
+            def prepare(cls, context: rule_base.RuleCategoryContext) -> object:
+                del cls
+                collector = _NameCollector("x")
+                context.module.visit(collector)
+                data = (context.module.code, tuple(context.positions[node].start.line for node in collector.nodes))
+                prepared_data.append(data)
+                return data
+
+        @rule_collection.register_rule_to(TST)
+        class TST001InsertLeadingLine(rule_base.RuleBase):
+            meta = rule_models.RuleMetadata(
+                code=rule_models.RuleCode("TST001"), name="insert-leading-line", message="Insert leading line", fix_availability=rule_models.FixAvailability.ALWAYS, stable_since="0.3.0"
+            )
+
+            @classmethod
+            def fix(cls, context: rule_base.RuleContext) -> rule_base.RuleFixResult:
+                if context.module.header:
+                    return rule_base.RuleFixResult(module=context.module)
+                return rule_base.RuleFixResult(module=context.module.with_changes(header=(cst.EmptyLine(),)), fixed_findings=(rule_models.RuleFinding(rule=cls.meta, line_numbers=(1,)),))
+
+        @rule_collection.register_rule_to(TST)
+        class TST002ObserveCategoryData(rule_base.RuleBase):
+            meta = rule_models.RuleMetadata(
+                code=rule_models.RuleCode("TST002"), name="observe-category-data", message="Observe category data", fix_availability=rule_models.FixAvailability.ALWAYS, stable_since="0.3.0"
+            )
+
+            @classmethod
+            def fix(cls, context: rule_base.RuleContext) -> rule_base.RuleFixResult:
+                del cls
+                observed_data.append(context.category_data)
+                return rule_base.RuleFixResult(module=context.module)
+
+        @rule_collection.register_rule_to(TST)
+        class TST003ObserveCategoryDataAgain(rule_base.RuleBase):
+            meta = rule_models.RuleMetadata(
+                code=rule_models.RuleCode("TST003"),
+                name="observe-category-data-again",
+                message="Observe category data again",
+                fix_availability=rule_models.FixAvailability.ALWAYS,
+                stable_since="0.3.0",
+            )
+
+            @classmethod
+            def fix(cls, context: rule_base.RuleContext) -> rule_base.RuleFixResult:
+                del cls
+                observed_data.append(context.category_data)
+                return rule_base.RuleFixResult(module=context.module)
+
+        class _NameCollector(cst.CSTVisitor):
+            def __init__(self, name: str) -> None:
+                self.name = name
+                self.nodes: list[cst.Name] = []
+
+            def visit_Name(self, node: cst.Name) -> None:
+                if node.value == self.name:
+                    self.nodes.append(node)
+
+        settings = CheckSettings(experimental=True)
+        result = formatter.format_source_exp("x = 1\n", "a.py", settings=settings, rule_selection=isolated_rule_selection(TST), fix=True)
+
+        self.assertEqual(result.new_source, "\nx = 1\n")
+        self.assertEqual(result.fixed_findings, collections.Counter({TST001InsertLeadingLine.meta: 1}))
+        self.assertEqual(observed_data, [("\nx = 1\n", (2,))] * 4)
+        self.assertIs(observed_data[0], observed_data[1])
+        self.assertIs(observed_data[2], observed_data[3])
+        self.assertIsNot(observed_data[0], observed_data[2])
+        self.assertEqual(prepared_data, [("x = 1\n", (1,)), ("\nx = 1\n", (2,)), ("\nx = 1\n", (2,)), ("\nx = 1\n", (2,))])
+        self.assertEqual(result.errors, ())
+
+    def test_experimental_source_formatter_does_not_normalize_line_endings_without_a_fix(self) -> None:
+        settings = CheckSettings(experimental=True, line_ending=LineEnding.CR_LF)
+        source = "x = 1\ny = 2\n"
+
+        result = formatter.format_source_exp(source, "a.py", settings=settings, rule_selection=isolated_rule_selection(), fix=True)
+
+        self.assertEqual(result.new_source, source)
+        self.assertFalse(result.modified)
+
+    def test_experimental_source_formatter_normalizes_configured_line_endings_after_a_fix(self) -> None:
+        class TST(rule_base.RuleCategoryBase):
+            meta = rule_models.RuleCategoryMetadata(prefix="TST", name="test")
+
+        @rule_collection.register_rule_to(TST)
+        class TST001InsertLeadingLine(rule_base.RuleBase):
+            meta = rule_models.RuleMetadata(
+                code=rule_models.RuleCode("TST001"), name="insert-leading-line", message="Insert leading line", fix_availability=rule_models.FixAvailability.ALWAYS, stable_since="0.3.0"
+            )
+
+            @classmethod
+            def fix(cls, context: rule_base.RuleContext) -> rule_base.RuleFixResult:
+                if context.module.header:
+                    return rule_base.RuleFixResult(module=context.module)
+                return rule_base.RuleFixResult(module=context.module.with_changes(header=(cst.EmptyLine(),)), fixed_findings=(rule_models.RuleFinding(rule=cls.meta, line_numbers=(1,)),))
+
+        settings = CheckSettings(experimental=True, line_ending=LineEnding.CR_LF)
+        result = formatter.format_source_exp("x = 1\ny = 2\n", "a.py", settings=settings, rule_selection=isolated_rule_selection(TST), fix=True)
+
+        self.assertEqual(result.new_source, "\r\nx = 1\r\ny = 2\r\n")
+
+    def test_experimental_source_formatter_preserves_utf8_bom_after_a_fix(self) -> None:
+        class TST(rule_base.RuleCategoryBase):
+            meta = rule_models.RuleCategoryMetadata(prefix="TST", name="test")
+
+        @rule_collection.register_rule_to(TST)
+        class TST001InsertLeadingLine(rule_base.RuleBase):
+            meta = rule_models.RuleMetadata(
+                code=rule_models.RuleCode("TST001"), name="insert-leading-line", message="Insert leading line", fix_availability=rule_models.FixAvailability.ALWAYS, stable_since="0.3.0"
+            )
+
+            @classmethod
+            def fix(cls, context: rule_base.RuleContext) -> rule_base.RuleFixResult:
+                if context.module.header:
+                    return rule_base.RuleFixResult(module=context.module)
+                return rule_base.RuleFixResult(module=context.module.with_changes(header=(cst.EmptyLine(),)), fixed_findings=(rule_models.RuleFinding(rule=cls.meta, line_numbers=(1,)),))
+
+        settings = CheckSettings(experimental=True)
+        result = formatter.format_source_exp("\ufeffx = 1\n", "a.py", settings=settings, rule_selection=isolated_rule_selection(TST), fix=True)
+
+        self.assertEqual(result.new_source, "\ufeff\nx = 1\n")
+
+    def test_experimental_source_formatter_applies_per_file_ignores(self) -> None:
+        checks: list[str] = []
+
+        class TST(rule_base.RuleCategoryBase):
+            meta = rule_models.RuleCategoryMetadata(prefix="TST", name="test")
+
+        @rule_collection.register_rule_to(TST)
+        class TST001Check(rule_base.RuleBase):
+            meta = rule_models.RuleMetadata(code=rule_models.RuleCode("TST001"), name="check", message="Check", fix_availability=rule_models.FixAvailability.NEVER, stable_since="0.3.0")
+
+            @classmethod
+            def check(cls, context: rule_base.RuleContext) -> tuple[rule_models.RuleFinding, ...]:
+                checks.append(context.path)
+                return (rule_models.RuleFinding(rule=cls.meta, line_numbers=(1,)),)
+
+        settings = CheckSettings(experimental=True, select=("TST",), per_file_ignores=(("skip.py", ("TST",)),))
+        selection = rules_selection.select_rules(settings, collection=rule_collection.RuleCollection((TST,)))
+        result = formatter.format_source_exp("x = 1\n", "skip.py", settings=settings, rule_selection=selection, fix=False)
+
+        self.assertEqual(checks, [])
+        self.assertEqual(result.unfixed_findings, ())
+
+    def test_experimental_source_formatter_reports_non_converging_fixes_and_keeps_latest_source(self) -> None:
+        class TST(rule_base.RuleCategoryBase):
+            meta = rule_models.RuleCategoryMetadata(prefix="TST", name="test")
+
+        class ToggleInteger(cst.CSTTransformer):
+            def leave_Integer(self, original_node: cst.Integer, updated_node: cst.Integer) -> cst.Integer:
+                del original_node
+                return updated_node.with_changes(value="2" if updated_node.value == "1" else "1")
+
+        @rule_collection.register_rule_to(TST)
+        class TST001Toggle(rule_base.RuleBase):
+            meta = rule_models.RuleMetadata(code=rule_models.RuleCode("TST001"), name="toggle", message="Toggle", fix_availability=rule_models.FixAvailability.ALWAYS, stable_since="0.3.0")
+
+            @classmethod
+            def fix(cls, context: rule_base.RuleContext) -> rule_base.RuleFixResult:
+                return rule_base.RuleFixResult(module=context.module.visit(ToggleInteger()), fixed_findings=(rule_models.RuleFinding(rule=cls.meta, line_numbers=(1,)),))
+
+            @classmethod
+            def check(cls, context: rule_base.RuleContext) -> tuple[rule_models.RuleFinding, ...]:
+                del context
+                return (rule_models.RuleFinding(rule=cls.meta, line_numbers=(1,)),)
+
+        settings = CheckSettings(experimental=True)
+        with unittest.mock.patch.object(rule_runner, "MAX_FIX_ITERATIONS", 3):
+            result = formatter.format_source_exp("x = 1\n", "a.py", settings=settings, rule_selection=isolated_rule_selection(TST), fix=True)
+
+        self.assertEqual(result.new_source, "x = 2\n")
+        self.assertEqual(result.fixed_findings, collections.Counter({TST001Toggle.meta: 3}))
+        self.assertEqual(result.unfixed_findings, (RuleFinding(rule=TST001Toggle.meta, line_numbers=(1,)),))
+        self.assertEqual(len(result.errors), 1)
+        self.assertIn("did not converge after 3 iterations", result.errors[0])
+        self.assertIn("TST001 lines 1", result.errors[0])
+
+    def test_experimental_source_formatter_accepts_convergence_on_final_fix_iteration(self) -> None:
+        class TST(rule_base.RuleCategoryBase):
+            meta = rule_models.RuleCategoryMetadata(prefix="TST", name="test")
+
+        class IncrementInteger(cst.CSTTransformer):
+            def leave_Integer(self, original_node: cst.Integer, updated_node: cst.Integer) -> cst.Integer:
+                del original_node
+                return updated_node.with_changes(value=str(int(updated_node.value) + 1))
+
+        @rule_collection.register_rule_to(TST)
+        class TST001IncrementToFour(rule_base.RuleBase):
+            meta = rule_models.RuleMetadata(
+                code=rule_models.RuleCode("TST001"), name="increment-to-four", message="Increment to four", fix_availability=rule_models.FixAvailability.ALWAYS, stable_since="0.3.0"
+            )
+
+            @classmethod
+            def fix(cls, context: rule_base.RuleContext) -> rule_base.RuleFixResult:
+                if context.module.code == "x = 4\n":
+                    return rule_base.RuleFixResult(module=context.module)
+                return rule_base.RuleFixResult(module=context.module.visit(IncrementInteger()), fixed_findings=(rule_models.RuleFinding(rule=cls.meta, line_numbers=(1,)),))
+
+            @classmethod
+            def check(cls, context: rule_base.RuleContext) -> tuple[rule_models.RuleFinding, ...]:
+                if context.module.code == "x = 4\n":
+                    return ()
+                return (rule_models.RuleFinding(rule=cls.meta, line_numbers=(1,)),)
+
+        settings = CheckSettings(experimental=True)
+        with unittest.mock.patch.object(rule_runner, "MAX_FIX_ITERATIONS", 3):
+            result = formatter.format_source_exp("x = 1\n", "a.py", settings=settings, rule_selection=isolated_rule_selection(TST), fix=True)
+
+        self.assertEqual(result.new_source, "x = 4\n")
+        self.assertEqual(result.fixed_findings, collections.Counter({TST001IncrementToFour.meta: 3}))
+        self.assertEqual(result.unfixed_findings, ())
+        self.assertEqual(result.errors, ())
+
+    def test_experimental_source_formatter_reports_libcst_parse_errors(self) -> None:
+        settings = CheckSettings(experimental=True)
+
+        result = formatter.format_source_exp("def broken(:\n", "broken.py", settings=settings, rule_selection=isolated_rule_selection(), fix=True)
+
+        self.assertEqual(result.old_source, "def broken(:\n")
+        self.assertEqual(result.new_source, "def broken(:\n")
+        self.assertFalse(result.modified)
+        self.assertEqual(len(result.errors), 1)
+        self.assertIn("Failed to parse broken.py with LibCST", result.errors[0])
+
     def test_experimental_file_formatter_delegates_to_source_formatter(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
@@ -301,12 +613,13 @@ class TestFormatterResults(unittest.TestCase):
             target.write_text("x = 1\n", encoding="utf-8")
             called_args: list[tuple[str, str, bool]] = []
 
-            def fake_format_source_exp(source: str, path: str, settings: CheckSettings, fix: bool) -> FormatterResult:
+            def fake_format_source_exp(source: str, path: str, settings: CheckSettings, rule_selection: rules_selection.RuleSelection, fix: bool) -> FormatterResult:
+                del settings, rule_selection
                 called_args.append((source, path, fix))
                 return FormatterResult(path=path, old_source=source, new_source=source, modified=False, fixed_findings=collections.Counter(), unfixed_findings=(), errors=())
 
             with unittest.mock.patch("pydocformatter.formatter.format_source_exp", side_effect=fake_format_source_exp):
-                result = formatter.format_file_exp(str(target), settings=CheckSettings(experimental=True), fix=False, write=True)
+                result = formatter.format_file_exp(str(target), settings=CheckSettings(experimental=True), rule_selection=default_rule_selection(), fix=False, write=True)
 
         self.assertEqual(called_args, [("x = 1\n", str(target), False)])
         self.assertEqual(result.path, str(target))
@@ -319,12 +632,12 @@ class TestFormatterResults(unittest.TestCase):
             target = root / "a.py"
             target.write_text("x = 1\n", encoding="utf-8")
 
-            def fake_format_source_exp(source: str, path: str, settings: CheckSettings, fix: bool) -> FormatterResult:
-                del source
+            def fake_format_source_exp(source: str, path: str, settings: CheckSettings, rule_selection: rules_selection.RuleSelection, fix: bool) -> FormatterResult:
+                del source, settings, rule_selection, fix
                 return FormatterResult(path=path, old_source="x = 1\n", new_source="x = 2\n", modified=True, fixed_findings=collections.Counter({PDF001_RULE: 1}), unfixed_findings=(), errors=())
 
             with unittest.mock.patch("pydocformatter.formatter.format_source_exp", side_effect=fake_format_source_exp):
-                result = formatter.format_file_exp(str(target), settings=CheckSettings(experimental=True), fix=True, write=True)
+                result = formatter.format_file_exp(str(target), settings=CheckSettings(experimental=True), rule_selection=default_rule_selection(), fix=True, write=True)
 
             self.assertEqual(result.new_source, "x = 2\n")
             self.assertEqual(result.old_source, "x = 1\n")
@@ -337,12 +650,12 @@ class TestFormatterResults(unittest.TestCase):
             target = root / "a.py"
             target.write_text("x = 1\n", encoding="utf-8")
 
-            def fake_format_source_exp(source: str, path: str, settings: CheckSettings, fix: bool) -> FormatterResult:
-                del source, settings, fix
+            def fake_format_source_exp(source: str, path: str, settings: CheckSettings, rule_selection: rules_selection.RuleSelection, fix: bool) -> FormatterResult:
+                del source, settings, rule_selection, fix
                 return FormatterResult(path=path, old_source="x = 1\n", new_source="x = 2\n", modified=True, fixed_findings=collections.Counter({PDF001_RULE: 1}), unfixed_findings=(), errors=())
 
             with unittest.mock.patch("pydocformatter.formatter.format_source_exp", side_effect=fake_format_source_exp):
-                result = formatter.format_file_exp(str(target), settings=CheckSettings(experimental=True), fix=True, write=False)
+                result = formatter.format_file_exp(str(target), settings=CheckSettings(experimental=True), rule_selection=default_rule_selection(), fix=True, write=False)
 
             self.assertEqual(result.new_source, "x = 2\n")
             self.assertEqual(result.old_source, "x = 1\n")
@@ -352,7 +665,7 @@ class TestFormatterResults(unittest.TestCase):
     def test_experimental_file_formatter_reports_file_io_errors(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             missing = str(Path(td) / "missing.py")
-            result = formatter.format_file_exp(missing, settings=CheckSettings(experimental=True), fix=False, write=True)
+            result = formatter.format_file_exp(missing, settings=CheckSettings(experimental=True), rule_selection=default_rule_selection(), fix=False, write=True)
 
         self.assertIsNone(result.new_source)
         self.assertFalse(result.modified)
@@ -367,8 +680,8 @@ class TestFormatterResults(unittest.TestCase):
             target.write_text("x = 1\n", encoding="utf-8")
             called_paths: list[str] = []
 
-            def fake_format_source_exp(source: str, path: str, settings: CheckSettings, fix: bool) -> FormatterResult:
-                del source, settings, fix
+            def fake_format_source_exp(source: str, path: str, settings: CheckSettings, rule_selection: rules_selection.RuleSelection, fix: bool) -> FormatterResult:
+                del source, settings, rule_selection, fix
                 called_paths.append(path)
                 return FormatterResult(path=path, old_source="", new_source="", modified=False, fixed_findings=collections.Counter(), unfixed_findings=(), errors=())
 
@@ -376,7 +689,9 @@ class TestFormatterResults(unittest.TestCase):
             os.chdir(root)
             try:
                 with unittest.mock.patch("pydocformatter.formatter.format_source_exp", side_effect=fake_format_source_exp):
-                    results = [formatter.format_file_exp(path, settings=CheckSettings(experimental=True), fix=True, write=True) for path in ("a.py", str(target))]
+                    results = [
+                        formatter.format_file_exp(path, settings=CheckSettings(experimental=True), rule_selection=default_rule_selection(), fix=True, write=True) for path in ("a.py", str(target))
+                    ]
             finally:
                 os.chdir(previous_cwd)
 
@@ -389,8 +704,8 @@ class TestFormatterResults(unittest.TestCase):
             target = root / "a.py"
             target.write_text("x = 1\n", encoding="utf-8")
 
-            def fake_format_file_exp(path: str, *, file: object = None, settings: CheckSettings, fix: bool, write: bool) -> FormatterResult:
-                del file, settings, fix, write
+            def fake_format_file_exp(path: str, *, file: object = None, settings: CheckSettings, rule_selection: rules_selection.RuleSelection, fix: bool, write: bool) -> FormatterResult:
+                del file, settings, rule_selection, fix, write
                 return FormatterResult(path=path, old_source="", new_source="", modified=True, fixed_findings=collections.Counter({PDF001_RULE: 1}), unfixed_findings=(), errors=())
 
             argv = ["pydocfmt", "check", "--experimental", str(target)]
@@ -409,8 +724,8 @@ class TestFormatterResults(unittest.TestCase):
             target.write_text("x = 1\n", encoding="utf-8")
             rule = RuleMetadata(code=RuleCode("PDF105"), name="summary-too-long", message="Docstring summary does not fit on one line", fix_availability=FixAvailability.NEVER, stable_since="0.3.0")
 
-            def fake_format_file_exp(path: str, *, file: object = None, settings: CheckSettings, fix: bool, write: bool) -> FormatterResult:
-                del file, settings, fix, write
+            def fake_format_file_exp(path: str, *, file: object = None, settings: CheckSettings, rule_selection: rules_selection.RuleSelection, fix: bool, write: bool) -> FormatterResult:
+                del file, settings, rule_selection, fix, write
                 return FormatterResult(
                     path=path, old_source="", new_source="", modified=False, fixed_findings=collections.Counter(), unfixed_findings=(RuleFinding(rule=rule, line_numbers=(1,)),), errors=()
                 )
@@ -432,8 +747,8 @@ class TestFormatterResults(unittest.TestCase):
             target = root / "a.py"
             target.write_text("x = 1\n", encoding="utf-8")
 
-            def fake_format_file_exp(path: str, *, file: object = None, settings: CheckSettings, fix: bool, write: bool) -> FormatterResult:
-                del file, settings, fix, write
+            def fake_format_file_exp(path: str, *, file: object = None, settings: CheckSettings, rule_selection: rules_selection.RuleSelection, fix: bool, write: bool) -> FormatterResult:
+                del file, settings, rule_selection, fix, write
                 return FormatterResult(path=path, old_source=None, new_source=None, modified=False, fixed_findings=collections.Counter(), unfixed_findings=(), errors=("Failed to read file",))
 
             for extra_args, expected_exit_code in (([], 1), (["--exit-zero"], 0)):
@@ -456,8 +771,8 @@ class TestFormatterResults(unittest.TestCase):
             target.write_text("x = 1\n", encoding="utf-8")
             rule = RuleMetadata(code=RuleCode("PDF105"), name="summary-too-long", message="Docstring summary does not fit on one line", fix_availability=FixAvailability.NEVER, stable_since="0.3.0")
 
-            def fake_format_file_exp(path: str, *, file: object = None, settings: CheckSettings, fix: bool, write: bool) -> FormatterResult:
-                del file, settings, fix, write
+            def fake_format_file_exp(path: str, *, file: object = None, settings: CheckSettings, rule_selection: rules_selection.RuleSelection, fix: bool, write: bool) -> FormatterResult:
+                del file, settings, rule_selection, fix, write
                 return FormatterResult(
                     path=path, old_source="", new_source="", modified=False, fixed_findings=collections.Counter(), unfixed_findings=(RuleFinding(rule=rule, line_numbers=(1,)),), errors=()
                 )
@@ -479,8 +794,8 @@ class TestFormatterResults(unittest.TestCase):
             target = root / "a.py"
             target.write_text("x = 1\n", encoding="utf-8")
 
-            def fake_format_file_exp(path: str, *, file: object = None, settings: CheckSettings, fix: bool, write: bool) -> FormatterResult:
-                del file, settings, fix, write
+            def fake_format_file_exp(path: str, *, file: object = None, settings: CheckSettings, rule_selection: rules_selection.RuleSelection, fix: bool, write: bool) -> FormatterResult:
+                del file, settings, rule_selection, fix, write
                 return FormatterResult(path=path, old_source="", new_source="", modified=True, fixed_findings=collections.Counter({PDF001_RULE: 1}), unfixed_findings=(), errors=())
 
             for extra_args, expected_exit_code in ((["--fix"], 0), (["--fix", "--exit-non-zero-on-fix"], 1)):
