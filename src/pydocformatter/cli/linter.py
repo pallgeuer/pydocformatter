@@ -10,8 +10,8 @@ import pydocformatter.rules.collection as rule_collection
 import pydocformatter.utils.argparser as argparser
 
 
-class LinterMetadataOutput(TypedDict, total=False):
-    """JSON metadata for one rule-prefix linter."""
+class CategoryMetadataOutput(TypedDict, total=False):
+    """JSON metadata for one rule category in Ruff linter format."""
 
     prefix: str
     name: str
@@ -23,8 +23,8 @@ def add_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) 
     parser = argparser.create_subparser(
         subparsers,
         name="linter",
-        description="List all supported rule-prefix linters.",
-        help="List all supported rule-prefix linters",
+        description="List all supported rule-prefix linters (rule categories).",
+        help="List all supported rule-prefix linters (rule categories)",
     )
     parser.add_argument(
         "--output-format",
@@ -39,25 +39,25 @@ def add_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) 
 
 def run(args: argparse.Namespace) -> int:
     """Run the linter subcommand."""
-    linters = rule_collection.RULE_COLLECTION.linters
+    categories = rule_collection.RULE_COLLECTION.categories
     if args.output_format == "json":
-        print(json.dumps([linter_json(linter) for linter in linters], indent=2))
+        print(json.dumps([category_json(category) for category in categories], indent=2))
     else:
-        print(format_linters_text(linters), end="")
+        print(format_categories_text(categories), end="")
     return 0
 
 
-def linter_json(linter: rule_base.RuleLinterMetadata) -> LinterMetadataOutput:
-    """Return Ruff-style JSON metadata for one linter."""
-    output = LinterMetadataOutput(prefix=linter.prefix, name=linter.name)
-    if linter.url is not None:
-        output["url"] = linter.url
+def category_json(category: type[rule_base.RuleCategoryBase]) -> CategoryMetadataOutput:
+    """Return Ruff-style linter JSON metadata for one rule category."""
+    output = CategoryMetadataOutput(prefix=category.meta.prefix, name=category.meta.name)
+    if category.meta.url is not None:
+        output["url"] = category.meta.url
     return output
 
 
-def format_linters_text(linters: tuple[rule_base.RuleLinterMetadata, ...]) -> str:
-    """Return Ruff-style text metadata for linters."""
-    if not linters:
+def format_categories_text(categories: tuple[type[rule_base.RuleCategoryBase], ...]) -> str:
+    """Return Ruff-style linter text metadata for rule categories."""
+    if not categories:
         return ""
-    prefix_width = max(len(linter.prefix) for linter in linters)
-    return "".join(f"{linter.prefix:>{prefix_width}} {linter.name}\n" for linter in linters)
+    prefix_width = max(len(category.meta.prefix) for category in categories)
+    return "".join(f"{category.meta.prefix:>{prefix_width}} {category.meta.name}\n" for category in categories)

@@ -17,7 +17,16 @@ This document specifies how `pydocfmt` discovers rule definitions and resolves r
 
 ## Rule Definitions
 
-Rules live under `pydocformatter.rules.definitions`. Importing `pydocformatter.rules.collection` imports every module below that package and builds the default `RULE_COLLECTION`.
+Rules and rule categories live under `pydocformatter.rules.definitions`. Importing `pydocformatter.rules.collection` imports each category module before its rule modules and builds the default `RULE_COLLECTION`.
+
+Each rule category is a `RuleCategoryBase` subclass in a module named after its rule-code prefix, with adjacent category documentation:
+
+```text
+src/pydocformatter/rules/definitions/PDF/PDF.py
+src/pydocformatter/rules/definitions/PDF/PDF.md
+```
+
+The class is also named after the prefix and defines `RuleCategoryMetadata` containing its `prefix`, user-facing `name`, and optional `url`. `RuleCategoryBase` rejects missing or invalid metadata at class definition time and provides `ordered_rules()` and `ordered_code_class_map()` views.
 
 Each implemented rule should be defined as one `RuleBase` subclass, normally in a module grouped by prefix:
 
@@ -25,14 +34,14 @@ Each implemented rule should be defined as one `RuleBase` subclass, normally in 
 src/pydocformatter/rules/definitions/PDF/PDF001_reflow_required.py
 ```
 
-Rule classes register with `@register_rule` and define a `meta` class attribute containing `RuleMetadata`:
+Rule classes register with their category through `@register_rule_to(PDF)` and define a `meta` class attribute containing `RuleMetadata`:
 
 - `code`: A `RuleCode`, such as `PDF001`.
 - `name`: A stable machine-readable name, such as `reflow-required`.
 - `message`: The default diagnostic message. It may include format fields for per-finding customization.
 - `fix_availability`: A `FixAvailability` value describing whether automatic fixes are `Always`, `Sometimes`, or `Never` available at the rule level.
 
-`RuleBase` rejects subclasses without `meta`, or with non-`RuleMetadata` metadata, at class definition time. `RuleMetadata` rejects non-`RuleCode` codes, non-`FixAvailability` fix availability values, and empty names, messages, or stable versions.
+`RuleBase` rejects subclasses without `meta`, or with non-`RuleMetadata` metadata, at class definition time. `RuleMetadata` rejects non-`RuleCode` codes, non-`FixAvailability` fix availability values, and empty names, messages, or stable versions. Category registration rejects rules whose code prefix differs from the category prefix and rejects duplicate rule codes from different classes.
 
 No rule application or fix method interface is specified yet. That interface will be added when rule execution is implemented.
 
@@ -54,18 +63,19 @@ Examples:
 
 ## Collection
 
-`RuleCollection` stores rule classes in deterministic rule-code order in `rules`, exposes the same order through the `rule_class` code-to-class mapping, and pre-collects unique rule-prefix linter metadata in `linters`.
+`RuleCollection` stores category classes in deterministic prefix order in `categories`, exposes the same order through `category_class`, and flattens their rules into deterministic rule-code order in `rules` and `rule_class`.
 
 Collection behavior:
 
-- Every collected object must inherit from `RuleBase`.
-- Duplicate rule codes are rejected unless they refer to the same rule class.
-- Re-registering the same rule class is allowed and deduplicated by code.
-- `linters` contains one entry per collected rule prefix in first-seen rule order after rule-code sorting.
+- Every collected object must inherit from `RuleCategoryBase`; rules cannot be registered directly with a registry or collection.
+- Duplicate category prefixes are rejected unless they refer to the same category class.
+- Categories expose their rules in rule-code order and allow idempotent re-registration of the same rule class.
 - `matching_rules(selector)` returns matching rule classes in collection order.
 - `matching_rules_exist(selector)` returns whether any collected rule matches the selector.
 
-Built-in rules use the default registry through `@register_rule`. Rule-prefix linter names are declared by prefix packages, such as `pydocformatter.rules.definitions.PCF.LINTER`. Tests and custom rule packages can use an isolated `RuleRegistry` with `register_rule_to(registry)`, import the package, then call `registry.collection()`.
+Built-in categories use the default registry through `@register_rule_category`, and their rules use `@register_rule_to(category)`. Tests and custom rule packages can use an isolated `RuleRegistry` with `register_rule_category_to(registry)`, pass that registry to `import_package_rule_categories`, then call `registry.collection()`.
+
+Definition package loading validates the complete built-in layout: the definitions package contains only category packages; each category package is flat and contains a matching prefix-named category module and class; each rule module contains exactly one registered local rule whose code matches its filename and category; registered rules originate from and have modules in their category package; and every category and rule has adjacent Markdown documentation with no orphan Markdown files.
 
 With default settings, a custom empty catalog resolves to an empty active ruleset without errors.
 
@@ -300,8 +310,8 @@ Rule documents live next to their rule definition modules with the same basename
 
 ## CLI Linter Listing
 
-`pydocfmt linter` exposes Ruff-style linter metadata for collected rule prefixes.
+`pydocfmt linter` exposes Ruff-style linter metadata translated from collected rule categories. The public command retains Ruff's terminology even though the internal model uses categories.
 
 - Text output prints a right-aligned prefix/name table.
 - JSON output prints a list of objects with `prefix`, `name`, and `url` when a URL is configured.
-- The command reports `RuleCollection.linters` directly and does not resolve project configuration.
+- The command reports metadata from `RuleCollection.categories` and does not resolve project configuration.

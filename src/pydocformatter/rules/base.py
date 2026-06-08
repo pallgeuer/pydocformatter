@@ -127,13 +127,13 @@ class RuleMetadata:
 
 
 @dataclasses.dataclass(frozen=True, order=True)
-class RuleLinterMetadata:
-    """Metadata for one pydocformatter rule-prefix linter.
+class RuleCategoryMetadata:
+    """Metadata for one pydocformatter rule category.
 
     Attributes:
-        prefix (str): Rule-code prefix for the linter.
-        name (str): User-facing linter name.
-        url (str | None): Optional project or documentation URL for the linter.
+        prefix (str): Rule-code prefix for the category.
+        name (str): User-facing category name.
+        url (str | None): Optional project or documentation URL for the category.
     """
 
     prefix: str
@@ -141,11 +141,11 @@ class RuleLinterMetadata:
     url: str | None = None
 
     def __post_init__(self) -> None:
-        """Validate linter metadata fields."""
+        """Validate category metadata fields."""
         if _RULE_PREFIX_RE.fullmatch(self.prefix) is None or self.prefix.startswith(ALL_RULE_SELECTOR_TAG):
-            raise ValueError(f"Invalid linter prefix: {self.prefix}")
+            raise ValueError(f"Invalid rule category prefix: {self.prefix}")
         if self.name == "":
-            raise ValueError(f"{self.prefix}: Linter name must not be empty")
+            raise ValueError(f"{self.prefix}: Rule category name must not be empty")
 
 
 def rule_fix_text(rule: RuleMetadata) -> str:
@@ -181,3 +181,33 @@ class RuleBase:
             raise TypeError(f"{cls.__name__} must define RuleMetadata as 'meta'")
         if not isinstance(cls.meta, RuleMetadata):
             raise TypeError(f"{cls.__name__}.meta must be a RuleMetadata instance")
+
+
+class RuleCategoryBase:
+    """Base class for pydocformatter rule categories."""
+
+    meta: ClassVar[RuleCategoryMetadata]
+    code_class_map: ClassVar[dict[RuleCode, type[RuleBase]]]
+
+    prefix = misc.alias_to_class_field("meta.prefix")
+    name = misc.alias_to_class_field("meta.name")
+    url = misc.alias_to_class_field("meta.url")
+
+    def __init_subclass__(cls) -> None:
+        """Require category metadata and create isolated rule registration state."""
+        super().__init_subclass__()
+        if "meta" not in cls.__dict__:
+            raise TypeError(f"{cls.__name__} must define RuleCategoryMetadata as 'meta'")
+        if not isinstance(cls.meta, RuleCategoryMetadata):
+            raise TypeError(f"{cls.__name__}.meta must be a RuleCategoryMetadata instance")
+        cls.code_class_map = {}
+
+    @classmethod
+    def ordered_rules(cls) -> tuple[type[RuleBase], ...]:
+        """Return registered rules in deterministic rule-code order."""
+        return tuple(rule_class for _, rule_class in sorted(cls.code_class_map.items()))
+
+    @classmethod
+    def ordered_code_class_map(cls) -> dict[RuleCode, type[RuleBase]]:
+        """Return registered rules indexed in deterministic rule-code order."""
+        return dict(sorted(cls.code_class_map.items()))

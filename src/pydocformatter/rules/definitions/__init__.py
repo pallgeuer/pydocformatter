@@ -1,1 +1,0 @@
-"""Implemented pydocformatter rule definitions."""

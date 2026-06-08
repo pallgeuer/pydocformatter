@@ -44,6 +44,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added a rule-selection specification at `docs/rule_selection_spec.md`, covering rule collection, selectors, fixability, and rule explanation output.
   - Added adjacent Markdown documentation for all built-in pydocformatter rules, including Ruff compatibility notes where relevant.
   - Added a reusable rule documentation Markdown template at `src/pydocformatter/rules/rule_template.md`.
+  - Added adjacent documentation for each rule category and a reusable rule category documentation template.
   - Added docstrings for public glob matching methods, the dependency-pin check tool, and important configuration, CLI, and file-selection helpers.
   - Completed Google-style docstrings for public source APIs and added concise docstrings for private helpers that previously lacked them.
 
@@ -109,6 +110,12 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Check-mode output now includes docstring and comment line locations, emitted once per subject per file with compressed consecutive ranges.
 
 - **Architecture:**
+  - Replaced inferred rule-prefix linter metadata with first-class `RuleCategoryBase` classes that own rule registration, validation, ordering, and metadata.
+  - Changed rule registries and collections to accept categories only, while exposing deterministic category and flattened rule iteration.
+  - Updated rule definition loading to import explicit prefix-named category modules before rule modules without relying on package `__init__.py` exports.
+  - Made rule definition loading reject inconsistent category layouts, registrations, module names, rule codes, and adjacent documentation.
+  - Added `RuleCollectionError` for rule category registration, collection, and definition import failures.
+  - Moved rule-to-category registration from `RuleCategoryBase` to the collection-level `register_rule_to(category)` decorator.
   - Added `RuleCode` and `RuleSelector` parsed value objects for rule metadata and selector handling.
   - Simplified rule metadata parsing so split helpers return `(None, None)` for invalid codes/selectors, `ALL` is handled as a reserved selector in the base rule API, and collection relies on `RuleMetadata` post-init validation.
   - Exposed rule metadata shortcuts such as `code`, `prefix`, and `fixable` as class-level properties on `RuleBase` subclasses.

@@ -5,10 +5,11 @@ import importlib.resources
 import inspect
 import pathlib
 
-from pydocformatter.rules.base import RuleMetadata
+from pydocformatter.rules.base import RuleCategoryMetadata, RuleMetadata
 from pydocformatter.rules.collection import RuleCollection
 
 TEMPLATE_PATH = pathlib.Path(__file__).with_name("rule_template.md")
+CATEGORY_TEMPLATE_PATH = pathlib.Path(__file__).with_name("rule_category_template.md")
 
 
 @dataclasses.dataclass(frozen=True)
@@ -26,6 +27,11 @@ def load_rule_explanation(rule_class: type[object]) -> str:
     if not package_name or not module_basename:
         raise FileNotFoundError(f"Rule class module does not have an adjacent package resource path: {module_name}")
     return importlib.resources.files(package_name).joinpath(f"{module_basename}.md").read_text(encoding="utf-8")
+
+
+def load_rule_category_explanation(category_class: type[object]) -> str:
+    """Load Markdown documentation adjacent to a rule category module."""
+    return load_rule_explanation(category_class)
 
 
 def rule_explanation_body(rule_class: type[object]) -> str:
@@ -63,4 +69,15 @@ def undocumented_rules(collection: RuleCollection) -> tuple[RuleMetadata, ...]:
             load_rule_explanation(rule_class)
         except FileNotFoundError:
             missing.append(rule_class.meta)
+    return tuple(missing)
+
+
+def undocumented_rule_categories(collection: RuleCollection) -> tuple[RuleCategoryMetadata, ...]:
+    """Return built-in rule categories whose adjacent Markdown cannot be loaded."""
+    missing: list[RuleCategoryMetadata] = []
+    for category_class in collection.categories:
+        try:
+            load_rule_category_explanation(category_class)
+        except FileNotFoundError:
+            missing.append(category_class.meta)
     return tuple(missing)
