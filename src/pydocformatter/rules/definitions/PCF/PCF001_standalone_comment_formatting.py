@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import ast
-import dataclasses
 import re
 import textwrap
 
@@ -26,14 +25,6 @@ _REST_GRID_BORDER_RE = re.compile(r"^[ \t]*\+(?:[-=]+\+)+[ \t]*$")
 _REST_SIMPLE_BORDER_RE = re.compile(r"^[ \t]*(?:={3,}|-{3,})(?:[ \t]+(?:={3,}|-{3,}))*[ \t]*$")
 
 
-@dataclasses.dataclass(frozen=True)
-class _PlannedChange:
-    """One standalone comment replacement and its original source lines."""
-
-    edit: rule_edits.SourceEdit
-    line_numbers: tuple[int, ...]
-
-
 @rule_collection.register_rule_to(PCF_definition.PCF)
 class PCF001StandaloneCommentFormatting(RuleBase):
     meta = RuleMetadata(
@@ -47,7 +38,7 @@ class PCF001StandaloneCommentFormatting(RuleBase):
     @classmethod
     def check(cls, context: RuleContext) -> tuple[RuleFinding, ...]:
         """Return standalone comment formatting findings."""
-        return tuple(RuleFinding(rule=cls.meta, line_numbers=change.line_numbers) for change in _planned_changes(context))
+        return rule_edits.findings_for_planned_source_changes(cls.meta, _planned_changes(context))
 
     @classmethod
     def fix(cls, context: RuleContext) -> RuleFixResult:
@@ -55,15 +46,15 @@ class PCF001StandaloneCommentFormatting(RuleBase):
         changes = _planned_changes(context)
         if not changes:
             return RuleFixResult(module=context.module)
-        module = rule_edits.apply_source_edits(context.module, tuple(change.edit for change in changes))
-        findings = tuple(RuleFinding(rule=cls.meta, line_numbers=change.line_numbers) for change in changes)
+        module = rule_edits.apply_planned_source_changes(context.module, changes)
+        findings = rule_edits.findings_for_planned_source_changes(cls.meta, changes)
         return RuleFixResult(module=module, fixed_findings=findings)
 
 
-def _planned_changes(context: RuleContext) -> tuple[_PlannedChange, ...]:
+def _planned_changes(context: RuleContext) -> tuple[rule_edits.PlannedSourceChange, ...]:
     """Return all standalone comment changes for the current source."""
     data = PCF_definition.PCF.require_data(context)
-    changes: list[_PlannedChange] = []
+    changes: list[rule_edits.PlannedSourceChange] = []
     for run in data.standalone_runs:
         preserved = _preserved_indices(run, settings=context.settings)
         if _run_contains_code(run, preserved=preserved, settings=context.settings):
@@ -100,7 +91,7 @@ def _change_for_unit(
     output_lines: tuple[str, ...],
     indent: str,
     line_ending: str,
-) -> _PlannedChange | None:
+) -> rule_edits.PlannedSourceChange | None:
     """Build a planned replacement when generated unit source differs."""
     code_range = cst_metadata.CodeRange(start=comments[0].range.start, end=comments[-1].range.end)
     rendered = [PCF_definition.render_comment(output_lines[0], include_indent=False)]
@@ -108,7 +99,7 @@ def _change_for_unit(
     replacement = line_ending.join(rendered)
     if data.source_for(code_range) == replacement:
         return None
-    return _PlannedChange(
+    return rule_edits.PlannedSourceChange(
         edit=rule_edits.SourceEdit(range=code_range, replacement=replacement),
         line_numbers=tuple(comment.range.start.line for comment in comments),
     )

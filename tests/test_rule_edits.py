@@ -4,9 +4,26 @@ import libcst as cst
 import libcst.metadata as cst_metadata
 
 import pydocformatter.rules.edits as rule_edits
+from pydocformatter.rules.models import FixAvailability, RuleCode, RuleFinding, RuleMetadata
 
 
 class TestSourceEdits(unittest.TestCase):
+    def test_planned_source_changes_apply_edits_and_create_findings(self) -> None:
+        module = cst.parse_module("value = 1\n")
+        rule = RuleMetadata(code=RuleCode("PDF999"), name="test-rule", message="Test message", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0")
+        changes = (
+            rule_edits.PlannedSourceChange(
+                edit=rule_edits.SourceEdit(cst_metadata.CodeRange(start=cst_metadata.CodePosition(1, 8), end=cst_metadata.CodePosition(1, 9)), "2"),
+                line_numbers=(1,),
+            ),
+        )
+
+        result = rule_edits.apply_planned_source_changes(module, changes)
+        findings = rule_edits.findings_for_planned_source_changes(rule, changes)
+
+        self.assertEqual(result.code, "value = 2\n")
+        self.assertEqual(findings, (RuleFinding(rule=rule, line_numbers=(1,)),))
+
     def test_empty_edits_return_original_module(self) -> None:
         module = cst.parse_module("x = 1\n")
 

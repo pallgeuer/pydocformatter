@@ -10,6 +10,11 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 
 ### Added
 
+- **Docstring formatting:**
+  - Added convention-aware semantic docstring preparation with explicit reflow regions and configurable recognition of lists, headings, doctests, code fences, block quotes, tables, directives, literal blocks, and Sphinx fields.
+  - Added `PDF000` to rewrite implicitly concatenated docstrings as equivalent simple triple-double-quoted literals.
+  - Added the `docstring-convention` setting with `none`, `google`, `numpy`, and `pep257` modes.
+
 - **CLI:**
   - Added Ruff-style subcommands with `pydocfmt check` for read-only checks and `pydocfmt check --fix` for formatting.
   - Added `pydocfmt help [command]`, `pydocfmt version`, `pydocfmt --version`, `pydocfmt check --show-settings`, and `pydocfmt check --show-rules`.
@@ -54,6 +59,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added a pytest pre-commit hook that runs the test suite before commits.
   - Added regression coverage for Ruff-compatible file-selection and per-file-ignore pattern-base behavior.
   - Vastly expanded PCF rule tests across comment classification, run boundaries, structure preservation, code detection, width handling, line endings, mixed formatting, syntax-position safety, convergence, idempotence, and rule independence.
+  - Vastly expanded PDF category preparation tests across docstring collection, source metadata, semantic sections and entries, protected structures, reflow regions, malformed inputs, and mixed edge cases.
 
 - **Formatting:**
   - Added the LibCST-based rule execution framework with ordered category preprocessing, repeated automatic-fix passes, final read-only checks, and non-convergence diagnostics.
@@ -191,6 +197,8 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 
 - **Formatting:**
   - Kept extracted trailing comments separate from preceding standalone comments, required fenced-region closers to contain no trailing text, and normalized tab-equivalent block-quote prefixes in one formatting pass.
+  - Preserved CRLF line endings when `PDF000` rewrites concatenated docstrings whose evaluated values contain newlines.
+  - Kept protected docstring structures opaque to convention section and entry parsing, preserved semantic entries and reflow regions in source order, used visual indentation for literal blocks, and avoided ambiguous evaluated-to-source line mappings.
 
 - **Rule framework:**
   - Category preprocessing data is now refreshed after an earlier rule changes the module while remaining shared by later rules processing the same module version.

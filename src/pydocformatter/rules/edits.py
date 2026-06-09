@@ -5,6 +5,8 @@ import dataclasses
 import libcst as cst
 import libcst.metadata as cst_metadata
 
+from pydocformatter.rules.models import RuleFinding, RuleMetadata
+
 
 @dataclasses.dataclass(frozen=True)
 class SourceEdit:
@@ -12,6 +14,24 @@ class SourceEdit:
 
     range: cst_metadata.CodeRange
     replacement: str
+
+
+@dataclasses.dataclass(frozen=True)
+class PlannedSourceChange:
+    """One source edit and the lines reported for it."""
+
+    edit: SourceEdit
+    line_numbers: tuple[int, ...]
+
+
+def apply_planned_source_changes(module: cst.Module, changes: tuple[PlannedSourceChange, ...]) -> cst.Module:
+    """Apply the source edits from planned changes to a module."""
+    return apply_source_edits(module, tuple(change.edit for change in changes))
+
+
+def findings_for_planned_source_changes(rule: RuleMetadata, changes: tuple[PlannedSourceChange, ...]) -> tuple[RuleFinding, ...]:
+    """Return rule findings for planned source changes."""
+    return tuple(RuleFinding(rule=rule, line_numbers=change.line_numbers) for change in changes)
 
 
 def apply_source_edits(module: cst.Module, edits: tuple[SourceEdit, ...]) -> cst.Module:

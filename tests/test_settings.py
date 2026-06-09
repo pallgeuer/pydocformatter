@@ -781,6 +781,49 @@ class TestSettings(unittest.TestCase):
         self.assertTrue(overridden.comment_preserve_tables)
         self.assertFalse(overridden.comment_detect_code)
 
+    def test_docstring_parsing_settings_are_loaded_and_validated(self) -> None:
+        for convention in pydocformatter_settings.DocstringConvention:
+            config = pydocformatter_settings.SETTINGS_SCHEMA.load(field_overrides={"docstring_convention": convention.value})
+            self.assertEqual(config.docstring_convention, convention)
+
+        configured = pydocformatter_settings.SETTINGS_SCHEMA.load(
+            global_values=pydocformatter_global_args.GlobalArgs(isolated=True, config_options=('docstring-convention = "google"\ndocstring-parse-tables = false',))
+        )
+        overridden = pydocformatter_settings.SETTINGS_SCHEMA.load(
+            global_values=pydocformatter_global_args.GlobalArgs(isolated=True),
+            args=argparse.Namespace(docstring_convention="numpy", docstring_parse_tables=False),
+        )
+        self.assertEqual(configured.docstring_convention, pydocformatter_settings.DocstringConvention.GOOGLE)
+        self.assertFalse(configured.docstring_parse_tables)
+        self.assertEqual(overridden.docstring_convention, pydocformatter_settings.DocstringConvention.NUMPY)
+        self.assertFalse(overridden.docstring_parse_tables)
+
+        config = pydocformatter_settings.SETTINGS_SCHEMA.load(
+            field_overrides={
+                "docstring_parse_list_items": False,
+                "docstring_parse_headings": False,
+                "docstring_parse_doctests": False,
+                "docstring_parse_code_fences": False,
+                "docstring_parse_block_quotes": False,
+                "docstring_parse_tables": False,
+                "docstring_parse_directives": False,
+                "docstring_parse_literal_blocks": False,
+                "docstring_parse_sphinx_fields": False,
+            }
+        )
+        self.assertFalse(config.docstring_parse_list_items)
+        self.assertFalse(config.docstring_parse_headings)
+        self.assertFalse(config.docstring_parse_doctests)
+        self.assertFalse(config.docstring_parse_code_fences)
+        self.assertFalse(config.docstring_parse_block_quotes)
+        self.assertFalse(config.docstring_parse_tables)
+        self.assertFalse(config.docstring_parse_directives)
+        self.assertFalse(config.docstring_parse_literal_blocks)
+        self.assertFalse(config.docstring_parse_sphinx_fields)
+
+        with self.assertRaisesRegex(SettingsError, "docstring_convention must be one of"):
+            pydocformatter_settings.SETTINGS_SCHEMA.load(field_overrides={"docstring_convention": "automatic"})
+
     def test_output_format_setting_is_applied(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)

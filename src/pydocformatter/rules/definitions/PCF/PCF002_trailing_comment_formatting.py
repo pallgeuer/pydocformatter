@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import dataclasses
-
 import libcst.metadata as cst_metadata
 
 import pydocformatter.rules.collection as rule_collection
@@ -9,14 +7,6 @@ import pydocformatter.rules.definitions.PCF.PCF as PCF_definition
 import pydocformatter.rules.edits as rule_edits
 from pydocformatter.rules.definition import RuleBase, RuleContext, RuleFixResult
 from pydocformatter.rules.models import FixAvailability, RuleCode, RuleFinding, RuleMetadata
-
-
-@dataclasses.dataclass(frozen=True)
-class _PlannedChange:
-    """One trailing comment replacement."""
-
-    edit: rule_edits.SourceEdit
-    line_number: int
 
 
 @rule_collection.register_rule_to(PCF_definition.PCF)
@@ -32,7 +22,7 @@ class PCF002TrailingCommentFormatting(RuleBase):
     @classmethod
     def check(cls, context: RuleContext) -> tuple[RuleFinding, ...]:
         """Return trailing comment formatting findings."""
-        return tuple(RuleFinding(rule=cls.meta, line_numbers=(change.line_number,)) for change in _planned_changes(context))
+        return rule_edits.findings_for_planned_source_changes(cls.meta, _planned_changes(context))
 
     @classmethod
     def fix(cls, context: RuleContext) -> RuleFixResult:
@@ -40,15 +30,15 @@ class PCF002TrailingCommentFormatting(RuleBase):
         changes = _planned_changes(context)
         if not changes:
             return RuleFixResult(module=context.module)
-        module = rule_edits.apply_source_edits(context.module, tuple(change.edit for change in changes))
-        findings = tuple(RuleFinding(rule=cls.meta, line_numbers=(change.line_number,)) for change in changes)
+        module = rule_edits.apply_planned_source_changes(context.module, changes)
+        findings = rule_edits.findings_for_planned_source_changes(cls.meta, changes)
         return RuleFixResult(module=module, fixed_findings=findings)
 
 
-def _planned_changes(context: RuleContext) -> tuple[_PlannedChange, ...]:
+def _planned_changes(context: RuleContext) -> tuple[rule_edits.PlannedSourceChange, ...]:
     """Return all trailing comment changes for the current source."""
     data = PCF_definition.PCF.require_data(context)
-    changes: list[_PlannedChange] = []
+    changes: list[rule_edits.PlannedSourceChange] = []
     for comment in data.trailing_comments:
         if comment.kind != PCF_definition.CommentKind.REGULAR:
             continue
@@ -75,9 +65,9 @@ def _planned_changes(context: RuleContext) -> tuple[_PlannedChange, ...]:
         if data.source_for(code_range) == replacement:
             continue
         changes.append(
-            _PlannedChange(
+            rule_edits.PlannedSourceChange(
                 edit=rule_edits.SourceEdit(range=code_range, replacement=replacement),
-                line_number=comment.range.start.line,
+                line_numbers=(comment.range.start.line,),
             )
         )
     return tuple(changes)

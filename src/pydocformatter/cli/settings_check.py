@@ -62,6 +62,15 @@ class LineEnding(enum.StrEnum):
     NATIVE = "native"
 
 
+class DocstringConvention(enum.StrEnum):
+    """Conventions used to parse semantic docstring sections."""
+
+    NONE = "none"
+    GOOGLE = "google"
+    NUMPY = "numpy"
+    PEP257 = "pep257"
+
+
 class OutputFormat(enum.StrEnum):
     """Output formats for rule findings.
 
@@ -83,6 +92,16 @@ class CheckSettings:
         line_ending (LineEnding): Line ending used when rewriting files.
         indent_style (IndentStyle): Indentation style used for generated docstring section indentation.
         indent_width (int): Number of spaces per generated docstring indentation level, or the visual width of a tab.
+        docstring_convention (DocstringConvention): Convention used to parse semantic docstring sections.
+        docstring_parse_list_items (bool): Whether list items are parsed as distinct docstring structures.
+        docstring_parse_headings (bool): Whether Markdown and reStructuredText headings are parsed.
+        docstring_parse_doctests (bool): Whether doctest regions are parsed and protected.
+        docstring_parse_code_fences (bool): Whether Markdown fenced code blocks are parsed and protected.
+        docstring_parse_block_quotes (bool): Whether Markdown block quotes are parsed as distinct structures.
+        docstring_parse_tables (bool): Whether Markdown and reStructuredText tables are parsed and protected.
+        docstring_parse_directives (bool): Whether reStructuredText directives and their bodies are parsed.
+        docstring_parse_literal_blocks (bool): Whether reStructuredText literal blocks are parsed and protected.
+        docstring_parse_sphinx_fields (bool): Whether Sphinx fields are parsed into semantic entries.
         comment_join_standalone_lines (bool): Whether consecutive standalone prose comment lines are joined before
             wrapping.
         comment_format_list_items (bool): Whether standalone comment list items are detected and reflowed.
@@ -119,6 +138,16 @@ class CheckSettings:
     line_ending: LineEnding = LineEnding.AUTO
     indent_style: IndentStyle = IndentStyle.SPACE
     indent_width: int = 4
+    docstring_convention: DocstringConvention = DocstringConvention.NONE
+    docstring_parse_list_items: bool = True
+    docstring_parse_headings: bool = True
+    docstring_parse_doctests: bool = True
+    docstring_parse_code_fences: bool = True
+    docstring_parse_block_quotes: bool = True
+    docstring_parse_tables: bool = True
+    docstring_parse_directives: bool = True
+    docstring_parse_literal_blocks: bool = True
+    docstring_parse_sphinx_fields: bool = True
     comment_join_standalone_lines: bool = False
     comment_format_list_items: bool = True
     comment_preserve_headings: bool = True
@@ -174,6 +203,16 @@ class CheckSettingsOverrides(TypedDict, total=False):
         line_ending (LineEnding): Line ending used when rewriting files.
         indent_style (IndentStyle): Indentation style used for generated docstring section indentation.
         indent_width (int): Number of spaces per generated docstring indentation level, or the visual width of a tab.
+        docstring_convention (DocstringConvention): Convention used to parse semantic docstring sections.
+        docstring_parse_list_items (bool): Whether list items are parsed as distinct docstring structures.
+        docstring_parse_headings (bool): Whether Markdown and reStructuredText headings are parsed.
+        docstring_parse_doctests (bool): Whether doctest regions are parsed and protected.
+        docstring_parse_code_fences (bool): Whether Markdown fenced code blocks are parsed and protected.
+        docstring_parse_block_quotes (bool): Whether Markdown block quotes are parsed as distinct structures.
+        docstring_parse_tables (bool): Whether Markdown and reStructuredText tables are parsed and protected.
+        docstring_parse_directives (bool): Whether reStructuredText directives and their bodies are parsed.
+        docstring_parse_literal_blocks (bool): Whether reStructuredText literal blocks are parsed and protected.
+        docstring_parse_sphinx_fields (bool): Whether Sphinx fields are parsed into semantic entries.
         comment_join_standalone_lines (bool): Whether consecutive standalone prose comment lines are joined before
             wrapping.
         comment_format_list_items (bool): Whether standalone comment list items are detected and reflowed.
@@ -210,6 +249,16 @@ class CheckSettingsOverrides(TypedDict, total=False):
     line_ending: LineEnding
     indent_style: IndentStyle
     indent_width: int
+    docstring_convention: DocstringConvention
+    docstring_parse_list_items: bool
+    docstring_parse_headings: bool
+    docstring_parse_doctests: bool
+    docstring_parse_code_fences: bool
+    docstring_parse_block_quotes: bool
+    docstring_parse_tables: bool
+    docstring_parse_directives: bool
+    docstring_parse_literal_blocks: bool
+    docstring_parse_sphinx_fields: bool
     comment_join_standalone_lines: bool
     comment_format_list_items: bool
     comment_preserve_headings: bool
@@ -242,11 +291,14 @@ class SettingsGroup(enum.StrEnum):
 
     Attributes:
         FORMATTING (SettingsGroup): Formatting behavior settings.
+        DOCSTRING_FORMATTING (SettingsGroup): Docstring semantic parsing settings.
+        COMMENT_FORMATTING (SettingsGroup): Comment formatting settings.
         RULE_SELECTION (SettingsGroup): Rule selection settings.
         FILE_SELECTION (SettingsGroup): File discovery and filtering settings.
     """
 
     FORMATTING = "Formatting"
+    DOCSTRING_FORMATTING = "Docstring formatting"
     COMMENT_FORMATTING = "Comment formatting"
     RULE_SELECTION = "Rule selection"
     FILE_SELECTION = "File selection"
@@ -300,6 +352,67 @@ SETTINGS_SCHEMA = SettingsSchema(
             validator=settings_core.validate_int(min_value=1, max_value=255),
             cli={"metavar": "WIDTH"},
             documentation="Generated docstring section indentation width and tab expansion width used when measuring comments.",
+        ),
+        SettingDefinition(
+            field="docstring_convention",
+            value_type=DocstringConvention,
+            group=SettingsGroup.DOCSTRING_FORMATTING,
+            help="Convention used to parse semantic docstring sections.",
+            documentation='Docstring convention; one of "none", "google", "numpy", or "pep257".',
+        ),
+        SettingDefinition(
+            field="docstring_parse_list_items",
+            value_type=bool,
+            group=SettingsGroup.DOCSTRING_FORMATTING,
+            help="Parse docstring list items as distinct structures.",
+        ),
+        SettingDefinition(
+            field="docstring_parse_headings",
+            value_type=bool,
+            group=SettingsGroup.DOCSTRING_FORMATTING,
+            help="Parse Markdown and reStructuredText docstring headings.",
+        ),
+        SettingDefinition(
+            field="docstring_parse_doctests",
+            value_type=bool,
+            group=SettingsGroup.DOCSTRING_FORMATTING,
+            help="Parse and protect doctest regions in docstrings.",
+        ),
+        SettingDefinition(
+            field="docstring_parse_code_fences",
+            value_type=bool,
+            group=SettingsGroup.DOCSTRING_FORMATTING,
+            help="Parse and protect fenced code blocks in docstrings.",
+        ),
+        SettingDefinition(
+            field="docstring_parse_block_quotes",
+            value_type=bool,
+            group=SettingsGroup.DOCSTRING_FORMATTING,
+            help="Parse Markdown block quotes in docstrings.",
+        ),
+        SettingDefinition(
+            field="docstring_parse_tables",
+            value_type=bool,
+            group=SettingsGroup.DOCSTRING_FORMATTING,
+            help="Parse and protect Markdown and reStructuredText tables in docstrings.",
+        ),
+        SettingDefinition(
+            field="docstring_parse_directives",
+            value_type=bool,
+            group=SettingsGroup.DOCSTRING_FORMATTING,
+            help="Parse reStructuredText directives and their bodies in docstrings.",
+        ),
+        SettingDefinition(
+            field="docstring_parse_literal_blocks",
+            value_type=bool,
+            group=SettingsGroup.DOCSTRING_FORMATTING,
+            help="Parse and protect reStructuredText literal blocks in docstrings.",
+        ),
+        SettingDefinition(
+            field="docstring_parse_sphinx_fields",
+            value_type=bool,
+            group=SettingsGroup.DOCSTRING_FORMATTING,
+            help="Parse Sphinx docstring fields into semantic entries.",
         ),
         SettingDefinition(
             field="comment_join_standalone_lines",
