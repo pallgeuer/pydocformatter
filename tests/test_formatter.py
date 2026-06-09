@@ -462,7 +462,7 @@ class TestFormatterResults(unittest.TestCase):
         self.assertEqual(result.new_source, source)
         self.assertFalse(result.modified)
 
-    def test_experimental_source_formatter_normalizes_configured_line_endings_after_a_fix(self) -> None:
+    def test_experimental_source_formatter_preserves_untouched_line_endings_after_a_fix(self) -> None:
         class TST(rule_base.RuleCategoryBase):
             meta = rule_models.RuleCategoryMetadata(prefix="TST", name="test")
 
@@ -481,7 +481,7 @@ class TestFormatterResults(unittest.TestCase):
         settings = CheckSettings(experimental=True, line_ending=LineEnding.CR_LF)
         result = formatter.format_source_exp("x = 1\ny = 2\n", "a.py", settings=settings, rule_selection=isolated_rule_selection(TST), fix=True)
 
-        self.assertEqual(result.new_source, "\r\nx = 1\r\ny = 2\r\n")
+        self.assertEqual(result.new_source, "\nx = 1\ny = 2\n")
 
     def test_experimental_source_formatter_preserves_utf8_bom_after_a_fix(self) -> None:
         class TST(rule_base.RuleCategoryBase):

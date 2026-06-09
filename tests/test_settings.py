@@ -284,6 +284,7 @@ class TestSettings(unittest.TestCase):
 
     def test_setting_definitions_are_iterable_by_group(self) -> None:
         formatting_fields = tuple(definition.field for definition in pydocformatter_settings.SETTINGS_SCHEMA.definitions if definition.group == SettingsGroup.FORMATTING)
+        comment_formatting_fields = tuple(definition.field for definition in pydocformatter_settings.SETTINGS_SCHEMA.definitions if definition.group == SettingsGroup.COMMENT_FORMATTING)
         rule_selection_fields = tuple(definition.field for definition in pydocformatter_settings.SETTINGS_SCHEMA.definitions if definition.group == SettingsGroup.RULE_SELECTION)
         file_selection_fields = tuple(definition.field for definition in pydocformatter_settings.SETTINGS_SCHEMA.definitions if definition.group == SettingsGroup.FILE_SELECTION)
 
@@ -296,6 +297,22 @@ class TestSettings(unittest.TestCase):
                 "line_ending",
                 "indent_style",
                 "indent_width",
+            ),
+        )
+        self.assertEqual(
+            comment_formatting_fields,
+            (
+                "comment_join_standalone_lines",
+                "comment_format_list_items",
+                "comment_preserve_headings",
+                "comment_preserve_doctests",
+                "comment_preserve_code_fences",
+                "comment_format_block_quotes",
+                "comment_preserve_tables",
+                "comment_preserve_directives",
+                "comment_detect_code",
+                "comment_detect_statements",
+                "comment_detect_expressions",
             ),
         )
         self.assertEqual(
@@ -329,7 +346,8 @@ class TestSettings(unittest.TestCase):
         pydocformatter_settings.SETTINGS_SCHEMA.add_arguments(parser, CheckSettings())
 
         group_titles = tuple(group.title for group in parser._action_groups)
-        self.assertLess(group_titles.index(SettingsGroup.FORMATTING.value), group_titles.index(SettingsGroup.RULE_SELECTION.value))
+        self.assertLess(group_titles.index(SettingsGroup.FORMATTING.value), group_titles.index(SettingsGroup.COMMENT_FORMATTING.value))
+        self.assertLess(group_titles.index(SettingsGroup.COMMENT_FORMATTING.value), group_titles.index(SettingsGroup.RULE_SELECTION.value))
         self.assertLess(group_titles.index(SettingsGroup.RULE_SELECTION.value), group_titles.index(SettingsGroup.FILE_SELECTION.value))
         option_strings = {option for action in parser._actions for option in action.option_strings}
         schema_option_strings = {
@@ -433,6 +451,17 @@ class TestSettings(unittest.TestCase):
         self.assertIs(config.line_ending, LineEnding.AUTO)
         self.assertIs(config.indent_style, IndentStyle.SPACE)
         self.assertEqual(config.indent_width, 4)
+        self.assertFalse(config.comment_join_standalone_lines)
+        self.assertTrue(config.comment_format_list_items)
+        self.assertTrue(config.comment_preserve_headings)
+        self.assertTrue(config.comment_preserve_doctests)
+        self.assertTrue(config.comment_preserve_code_fences)
+        self.assertTrue(config.comment_format_block_quotes)
+        self.assertTrue(config.comment_preserve_tables)
+        self.assertTrue(config.comment_preserve_directives)
+        self.assertFalse(config.comment_detect_code)
+        self.assertTrue(config.comment_detect_statements)
+        self.assertFalse(config.comment_detect_expressions)
         self.assertEqual(config.include, DEFAULT_INCLUDE)
         self.assertEqual(config.extend_include, ())
         self.assertEqual(config.exclude, DEFAULT_EXCLUDE)
@@ -715,6 +744,24 @@ class TestSettings(unittest.TestCase):
                     pydocformatter_settings.SETTINGS_SCHEMA.load()
             finally:
                 os.chdir(previous_cwd)
+
+    def test_comment_formatting_boolean_settings_are_loaded_from_toml_and_cli(self) -> None:
+        configured = pydocformatter_settings.SETTINGS_SCHEMA.load(
+            global_values=pydocformatter_global_args.GlobalArgs(
+                isolated=True,
+                config_options=("comment-join-standalone-lines = true\ncomment-format-list-items = true\ncomment-detect-code = false",),
+            )
+        )
+        overridden = pydocformatter_settings.SETTINGS_SCHEMA.load(
+            global_values=pydocformatter_global_args.GlobalArgs(isolated=True),
+            args=argparse.Namespace(comment_preserve_tables=True, comment_detect_code=False),
+        )
+
+        self.assertTrue(configured.comment_join_standalone_lines)
+        self.assertTrue(configured.comment_format_list_items)
+        self.assertFalse(configured.comment_detect_code)
+        self.assertTrue(overridden.comment_preserve_tables)
+        self.assertFalse(overridden.comment_detect_code)
 
     def test_output_format_setting_is_applied(self) -> None:
         with tempfile.TemporaryDirectory() as td:

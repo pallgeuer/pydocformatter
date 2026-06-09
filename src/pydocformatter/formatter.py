@@ -121,7 +121,7 @@ def format_source_exp(source: str, path: str, *, settings: CheckSettings, rule_s
 
     if run_result.source_changed:
         try:
-            new_source = line_endings.normalize_line_endings(run_result.module.code, line_ending=line_ending)
+            new_source = run_result.module.code
             if source.startswith(UTF8_BOM) and not new_source.startswith(UTF8_BOM):
                 new_source = UTF8_BOM + new_source
         except Exception as error:

@@ -19,7 +19,7 @@ def area(radius: float) -> float:
     """
 ```
 
-Use instead:
+Applying this rule produces:
 ```python
 def area(radius: float) -> float:
     """Return the area for a circle after validating the radius."""

@@ -16,7 +16,7 @@ Describe how this rule complements, replaces, or differs from relevant Ruff rule
 # Example that triggers the rule.
 ```
 
-Use instead:
+Applying this rule produces:
 ```python
 # Preferred formatting.
 ```

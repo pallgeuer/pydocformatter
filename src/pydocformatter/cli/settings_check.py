@@ -83,6 +83,20 @@ class CheckSettings:
         line_ending (LineEnding): Line ending used when rewriting files.
         indent_style (IndentStyle): Indentation style used for generated docstring section indentation.
         indent_width (int): Number of spaces per generated docstring indentation level, or the visual width of a tab.
+        comment_join_standalone_lines (bool): Whether consecutive standalone prose comment lines are joined before
+            wrapping.
+        comment_format_list_items (bool): Whether standalone comment list items are detected and reflowed.
+        comment_preserve_headings (bool): Whether detected Markdown and reStructuredText comment headings are preserved.
+        comment_preserve_doctests (bool): Whether standalone doctest comment regions are preserved.
+        comment_preserve_code_fences (bool): Whether fenced code regions in standalone comments are preserved.
+        comment_format_block_quotes (bool): Whether Markdown block quotes in standalone comments are detected and
+            reflowed.
+        comment_preserve_tables (bool): Whether detected Markdown and reStructuredText comment tables are preserved.
+        comment_preserve_directives (bool): Whether reStructuredText directives and their indented bodies are preserved.
+        comment_detect_code (bool): Whether the indentation and leading-keyword heuristic protects standalone comment
+            runs.
+        comment_detect_statements (bool): Whether parseable Python statements protect standalone comment runs.
+        comment_detect_expressions (bool): Whether nontrivial Python expressions protect standalone comment runs.
         select (StringList): Base selected pydocformatter rule selectors.
         ignore (StringList): Rule selectors to ignore.
         extend_select (StringList): Additional selected rule selectors.
@@ -105,6 +119,17 @@ class CheckSettings:
     line_ending: LineEnding = LineEnding.AUTO
     indent_style: IndentStyle = IndentStyle.SPACE
     indent_width: int = 4
+    comment_join_standalone_lines: bool = False
+    comment_format_list_items: bool = True
+    comment_preserve_headings: bool = True
+    comment_preserve_doctests: bool = True
+    comment_preserve_code_fences: bool = True
+    comment_format_block_quotes: bool = True
+    comment_preserve_tables: bool = True
+    comment_preserve_directives: bool = True
+    comment_detect_code: bool = False
+    comment_detect_statements: bool = True
+    comment_detect_expressions: bool = False
     select: StringList = DEFAULT_RULE_SELECT
     ignore: StringList = ()
     extend_select: StringList = ()
@@ -149,6 +174,20 @@ class CheckSettingsOverrides(TypedDict, total=False):
         line_ending (LineEnding): Line ending used when rewriting files.
         indent_style (IndentStyle): Indentation style used for generated docstring section indentation.
         indent_width (int): Number of spaces per generated docstring indentation level, or the visual width of a tab.
+        comment_join_standalone_lines (bool): Whether consecutive standalone prose comment lines are joined before
+            wrapping.
+        comment_format_list_items (bool): Whether standalone comment list items are detected and reflowed.
+        comment_preserve_headings (bool): Whether detected Markdown and reStructuredText comment headings are preserved.
+        comment_preserve_doctests (bool): Whether standalone doctest comment regions are preserved.
+        comment_preserve_code_fences (bool): Whether fenced code regions in standalone comments are preserved.
+        comment_format_block_quotes (bool): Whether Markdown block quotes in standalone comments are detected and
+            reflowed.
+        comment_preserve_tables (bool): Whether detected Markdown and reStructuredText comment tables are preserved.
+        comment_preserve_directives (bool): Whether reStructuredText directives and their indented bodies are preserved.
+        comment_detect_code (bool): Whether the indentation and leading-keyword heuristic protects standalone comment
+            runs.
+        comment_detect_statements (bool): Whether parseable Python statements protect standalone comment runs.
+        comment_detect_expressions (bool): Whether nontrivial Python expressions protect standalone comment runs.
         select (StringList): Base selected pydocformatter rule selectors.
         ignore (StringList): Rule selectors to ignore.
         extend_select (StringList): Additional selected rule selectors.
@@ -171,6 +210,17 @@ class CheckSettingsOverrides(TypedDict, total=False):
     line_ending: LineEnding
     indent_style: IndentStyle
     indent_width: int
+    comment_join_standalone_lines: bool
+    comment_format_list_items: bool
+    comment_preserve_headings: bool
+    comment_preserve_doctests: bool
+    comment_preserve_code_fences: bool
+    comment_format_block_quotes: bool
+    comment_preserve_tables: bool
+    comment_preserve_directives: bool
+    comment_detect_code: bool
+    comment_detect_statements: bool
+    comment_detect_expressions: bool
     select: StringList
     ignore: StringList
     extend_select: StringList
@@ -197,6 +247,7 @@ class SettingsGroup(enum.StrEnum):
     """
 
     FORMATTING = "Formatting"
+    COMMENT_FORMATTING = "Comment formatting"
     RULE_SELECTION = "Rule selection"
     FILE_SELECTION = "File selection"
 
@@ -248,7 +299,73 @@ SETTINGS_SCHEMA = SettingsSchema(
             help="Indentation width for generated docstring sections.",
             validator=settings_core.validate_int(min_value=1, max_value=255),
             cli={"metavar": "WIDTH"},
-            documentation="Generated docstring section indentation width.",
+            documentation="Generated docstring section indentation width and tab expansion width used when measuring comments.",
+        ),
+        SettingDefinition(
+            field="comment_join_standalone_lines",
+            value_type=bool,
+            group=SettingsGroup.COMMENT_FORMATTING,
+            help="Join consecutive standalone prose comment lines before wrapping.",
+        ),
+        SettingDefinition(
+            field="comment_format_list_items",
+            value_type=bool,
+            group=SettingsGroup.COMMENT_FORMATTING,
+            help="Detect and reflow standalone comment list items with hanging indentation.",
+        ),
+        SettingDefinition(
+            field="comment_preserve_headings",
+            value_type=bool,
+            group=SettingsGroup.COMMENT_FORMATTING,
+            help="Preserve detected Markdown and reStructuredText comment headings.",
+        ),
+        SettingDefinition(
+            field="comment_preserve_doctests",
+            value_type=bool,
+            group=SettingsGroup.COMMENT_FORMATTING,
+            help="Preserve standalone doctest comment regions.",
+        ),
+        SettingDefinition(
+            field="comment_preserve_code_fences",
+            value_type=bool,
+            group=SettingsGroup.COMMENT_FORMATTING,
+            help="Preserve fenced code regions in standalone comments.",
+        ),
+        SettingDefinition(
+            field="comment_format_block_quotes",
+            value_type=bool,
+            group=SettingsGroup.COMMENT_FORMATTING,
+            help="Detect and reflow Markdown block quotes in standalone comments.",
+        ),
+        SettingDefinition(
+            field="comment_preserve_tables",
+            value_type=bool,
+            group=SettingsGroup.COMMENT_FORMATTING,
+            help="Preserve detected Markdown and reStructuredText comment tables.",
+        ),
+        SettingDefinition(
+            field="comment_preserve_directives",
+            value_type=bool,
+            group=SettingsGroup.COMMENT_FORMATTING,
+            help="Preserve reStructuredText directives and their indented bodies.",
+        ),
+        SettingDefinition(
+            field="comment_detect_code",
+            value_type=bool,
+            group=SettingsGroup.COMMENT_FORMATTING,
+            help="Protect standalone runs matching the indentation and leading-keyword heuristic.",
+        ),
+        SettingDefinition(
+            field="comment_detect_statements",
+            value_type=bool,
+            group=SettingsGroup.COMMENT_FORMATTING,
+            help="Protect standalone runs containing parseable Python statements.",
+        ),
+        SettingDefinition(
+            field="comment_detect_expressions",
+            value_type=bool,
+            group=SettingsGroup.COMMENT_FORMATTING,
+            help="Protect standalone runs containing nontrivial Python expressions.",
         ),
         SettingDefinition(
             field="select",

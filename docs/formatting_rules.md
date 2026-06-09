@@ -77,10 +77,10 @@ FROM: ([A-Z]+[0-9]{3})\t([a-z-]+)\t([^\n]+)\t(\nRule has been stable since v?([0
 
 ### pydocformatter comments (PCF)
 
-|  Code  | Name                        | Message                             | Fixable | Stable Since | Comment                                                                                                |
-|:------:|:----------------------------|:------------------------------------|:-------:|:------------:|:-------------------------------------------------------------------------------------------------------|
-| PCF001 | standalone-comment-too-long | Standalone comment needs formatting |  Auto   |    0.3.0     | Formats standalone comment blocks that need wrapping or spacing normalization                          |
-| PCF002 | trailing-comment-too-long   | Trailing comment needs formatting   |  Auto   |    0.3.0     | Formats trailing comments that need spacing normalization or extraction into standalone comment blocks |
+|  Code  | Name                          | Message                             | Fixable | Stable Since | Comment                                                                                                    |
+|:------:|:------------------------------|:------------------------------------|:-------:|:------------:|:-----------------------------------------------------------------------------------------------------------|
+| PCF001 | standalone-comment-formatting | Standalone comment needs formatting |  Auto   |    0.3.0     | Formats standalone comments with conservative physical-line defaults and optional structure/code detection |
+| PCF002 | trailing-comment-formatting   | Trailing comment needs formatting   |  Auto   |    0.3.0     | Normalizes trailing comments or extracts overlong comments into independently formatted standalone blocks  |
 
 ### pydocformatter docstrings (PDF)
 

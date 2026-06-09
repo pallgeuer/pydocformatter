@@ -3,6 +3,7 @@ from __future__ import annotations
 import dataclasses
 import enum
 import re
+import textwrap
 from collections.abc import Mapping
 
 import libcst as cst
@@ -14,7 +15,10 @@ from pydocformatter.rules.models import RuleCategoryMetadata
 
 _ENCODING_COOKIE_RE = re.compile(r"^#.*?coding[:=][ \t]*[-_.a-zA-Z0-9]+")
 _TYPE_DIRECTIVE_RE = re.compile(r"^#\s*type\s*:", re.IGNORECASE)
-_TOOL_DIRECTIVE_RE = re.compile(r"^#\s*(?:noqa\b|pylint\b|pyright\b|mypy\b|ruff\b|flake8\b|fmt\s*:|isort\s*:|pragma\b)", re.IGNORECASE)
+_TOOL_DIRECTIVE_RE = re.compile(
+    r"^#\s*(?:noqa\b|nosec\b|nosemgrep\b|pylint\b|pyright\b|mypy\b|ruff\b|flake8\b|fmt\s*:|isort\s*:|pragma\b)",
+    re.IGNORECASE,
+)
 
 
 class CommentPlacement(enum.Enum):
@@ -43,22 +47,39 @@ class CommentInfo:
     placement: CommentPlacement
     kind: CommentKind
     indent: str
+    line_prefix: str
     text: str
 
     @property
+    def raw_content(self) -> str:
+        """Return comment text after exactly one leading hash."""
+        return self.text.removeprefix("#")
+
+    @property
+    def body(self) -> str:
+        """Return comment text after one optional conventional marker space."""
+        content = self.raw_content
+        return content[1:] if content.startswith(" ") else content
+
+    @property
     def content(self) -> str:
-        """Return comment text without its leading hash or surrounding whitespace."""
-        return self.text.removeprefix("#").strip()
+        """Return normalized comment content without surrounding whitespace."""
+        return self.raw_content.strip()
 
     @property
     def is_empty(self) -> bool:
         """Return whether the comment has no non-whitespace content."""
         return not self.content
 
+    @property
+    def is_hash_only(self) -> bool:
+        """Return whether the comment consists only of hashes and whitespace."""
+        return not self.text.strip("# \t\f")
+
 
 @dataclasses.dataclass(frozen=True)
-class CommentBlock:
-    """Consecutive regular standalone comments with one indentation level."""
+class StandaloneCommentRun:
+    """Consecutive regular non-empty standalone comments at one indentation."""
 
     comments: tuple[CommentInfo, ...]
     range: cst_metadata.CodeRange
@@ -67,10 +88,23 @@ class CommentBlock:
 
 @dataclasses.dataclass(frozen=True)
 class PCFCategoryData:
-    """Prepared comment information shared by PCF rules."""
+    """Prepared source and comment information shared by PCF rules."""
 
+    source_lines: tuple[str, ...]
     comments: tuple[CommentInfo, ...]
-    standalone_blocks: tuple[CommentBlock, ...]
+    standalone_runs: tuple[StandaloneCommentRun, ...]
+    trailing_comments: tuple[CommentInfo, ...]
+
+    def source_for(self, code_range: cst_metadata.CodeRange) -> str:
+        """Return exact source text for a half-open LibCST code range."""
+        start_line = code_range.start.line - 1
+        end_line = code_range.end.line - 1
+        if start_line == end_line:
+            return self.source_lines[start_line][code_range.start.column : code_range.end.column]
+        parts = [self.source_lines[start_line][code_range.start.column :]]
+        parts.extend(self.source_lines[start_line + 1 : end_line])
+        parts.append(self.source_lines[end_line][: code_range.end.column])
+        return "".join(parts)
 
 
 class _CommentCollector(cst.CSTVisitor):
@@ -102,14 +136,20 @@ class PCF(RuleCategoryBase):
         collector = _CommentCollector()
         context.module.visit(collector)
         parents = context.metadata_wrapper.resolve(cst_metadata.ParentNodeProvider)
-        source_lines = _source_lines(context.module.code)
+        source_lines_with_endings = tuple(_source_lines_with_endings(context.module.code))
+        source_lines = [line.rstrip("\r\n") for line in source_lines_with_endings]
         comments = tuple(
             sorted(
                 (_comment_info(node, positions=context.positions, parents=parents, source_lines=source_lines) for node in collector.comments),
                 key=lambda comment: (comment.range.start.line, comment.range.start.column),
             )
         )
-        return PCFCategoryData(comments=comments, standalone_blocks=_standalone_blocks(comments))
+        return PCFCategoryData(
+            source_lines=source_lines_with_endings,
+            comments=comments,
+            standalone_runs=_standalone_runs(comments),
+            trailing_comments=tuple(comment for comment in comments if comment.placement == CommentPlacement.TRAILING),
+        )
 
     @classmethod
     def require_data(cls, context: RuleContext) -> PCFCategoryData:
@@ -117,6 +157,37 @@ class PCF(RuleCategoryBase):
         if not isinstance(context.category_data, PCFCategoryData):
             raise TypeError(f"{cls.meta.prefix} rules require PCFCategoryData")
         return context.category_data
+
+
+def display_width(text: str, *, tab_width: int) -> int:
+    """Return the display width after expanding tabs to configured stops."""
+    return len(text.expandtabs(tab_width))
+
+
+def available_comment_width(indent: str, *, line_length: int, tab_width: int, prefix: str = "") -> int:
+    """Return available content width after indentation and comment prefixes."""
+    return line_length - display_width(f"{indent}# {prefix}", tab_width=tab_width)
+
+
+def wrap_comment_text(text: str, *, width: int, initial_indent: str = "", subsequent_indent: str = "") -> tuple[str, ...]:
+    """Wrap normalized comment text, retaining it unwrapped for impossible widths."""
+    if width <= 0:
+        return (f"{initial_indent}{text}",)
+    wrapped = textwrap.wrap(
+        text,
+        width=width,
+        initial_indent=initial_indent,
+        subsequent_indent=subsequent_indent,
+        break_long_words=False,
+        break_on_hyphens=False,
+    )
+    return tuple(wrapped) or (initial_indent.rstrip(),)
+
+
+def render_comment(content: str, *, indent: str = "", include_indent: bool = True) -> str:
+    """Render one canonical comment line."""
+    prefix = indent if include_indent else ""
+    return f"{prefix}# {content}" if content else f"{prefix}#"
 
 
 def _comment_info(node: cst.Comment, *, positions: Mapping[cst.CSTNode, cst_metadata.CodeRange], parents: Mapping[cst.CSTNode, cst.CSTNode], source_lines: list[str]) -> CommentInfo:
@@ -133,6 +204,7 @@ def _comment_info(node: cst.Comment, *, positions: Mapping[cst.CSTNode, cst_meta
         placement=placement,
         kind=_comment_kind(node.value, line=code_range.start.line, source_lines=source_lines),
         indent=indent,
+        line_prefix=line_prefix,
         text=node.value,
     )
 
@@ -151,16 +223,16 @@ def _comment_kind(text: str, *, line: int, source_lines: list[str]) -> CommentKi
     return CommentKind.REGULAR
 
 
-def _standalone_blocks(comments: tuple[CommentInfo, ...]) -> tuple[CommentBlock, ...]:
-    """Group eligible standalone comments into formatting blocks."""
-    blocks: list[CommentBlock] = []
+def _standalone_runs(comments: tuple[CommentInfo, ...]) -> tuple[StandaloneCommentRun, ...]:
+    """Group physical standalone comments without applying formatting policy."""
+    runs: list[StandaloneCommentRun] = []
     current: list[CommentInfo] = []
 
     def flush() -> None:
         if not current:
             return
-        blocks.append(
-            CommentBlock(
+        runs.append(
+            StandaloneCommentRun(
                 comments=tuple(current),
                 range=cst_metadata.CodeRange(start=current[0].range.start, end=current[-1].range.end),
                 indent=current[0].indent,
@@ -169,7 +241,7 @@ def _standalone_blocks(comments: tuple[CommentInfo, ...]) -> tuple[CommentBlock,
         current.clear()
 
     for comment in comments:
-        eligible = comment.placement == CommentPlacement.STANDALONE and comment.kind == CommentKind.REGULAR and not comment.is_empty
+        eligible = comment.placement == CommentPlacement.STANDALONE and comment.kind == CommentKind.REGULAR and not comment.is_empty and not comment.is_hash_only
         consecutive = not current or comment.range.start.line == current[-1].range.end.line + 1
         same_indent = not current or comment.indent == current[-1].indent
         if not eligible:
@@ -180,22 +252,22 @@ def _standalone_blocks(comments: tuple[CommentInfo, ...]) -> tuple[CommentBlock,
             flush()
             current.append(comment)
     flush()
-    return tuple(blocks)
+    return tuple(runs)
 
 
-def _source_lines(source: str) -> list[str]:
-    """Split source at Python physical line endings without Unicode separators."""
+def _source_lines_with_endings(source: str) -> list[str]:
+    """Split source while preserving Python physical line endings."""
     lines: list[str] = []
     line_start = 0
     index = 0
     while index < len(source):
         if source[index] == "\r":
-            lines.append(source[line_start:index])
             index += 2 if index + 1 < len(source) and source[index + 1] == "\n" else 1
+            lines.append(source[line_start:index])
             line_start = index
         elif source[index] == "\n":
-            lines.append(source[line_start:index])
             index += 1
+            lines.append(source[line_start:index])
             line_start = index
         else:
             index += 1

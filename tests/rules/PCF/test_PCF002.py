@@ -1,0 +1,224 @@
+import conftest
+import pytest
+
+import pydocformatter.formatter as formatter
+import pydocformatter.rules_selection as rules_selection
+from pydocformatter.cli.settings_check import CheckSettings, LineEnding
+
+
+def test_trailing_comment_spacing_and_empty_comment_are_canonicalized() -> None:
+    source = "first = 1 #bad spacing\nsecond = 2 #   \n"
+    result = conftest.format_pcf(source)
+    assert result.new_source == "first = 1  # bad spacing\nsecond = 2  #\n"
+
+
+def test_long_trailing_comment_moves_above_code_and_is_independent_of_pcf001() -> None:
+    source = "value = compute()  # This trailing comment has enough words that it must move above the code line.\n"
+    settings = CheckSettings(experimental=True, select=("PCF002",), line_length=42)
+    result = formatter.format_source_exp(source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
+    assert result.new_source == "# This trailing comment has enough words\n# that it must move above the code line.\nvalue = compute()\n"
+    assert not result.unfixed_findings
+
+
+def test_protected_trailing_comments_are_not_modified() -> None:
+    source = "value = compute() # type: ignore\nother = compute() # nosec\n"
+    result = conftest.format_pcf(source, line_length=20)
+    assert result.new_source == source
+
+
+def test_tiny_available_width_is_stable_and_does_not_crash() -> None:
+    source = "if enabled:\n        # comment text\n        value = 1  # trailing comment text\n"
+    result = conftest.format_pcf(source, line_length=8)
+    assert result.new_source == "if enabled:\n        # comment text\n\n        # trailing comment text\n        value = 1\n"
+    assert not result.errors
+
+
+def test_tabs_are_measured_at_indent_width_columns() -> None:
+    source = "value\t= 1  # text\n"
+    result = conftest.format_pcf(source, line_length=17, indent_width=4)
+    assert result.new_source == "# text\nvalue\t= 1\n"
+
+
+def test_check_and_fix_report_the_same_original_lines() -> None:
+    source = "#bad spacing\nvalue = 1 #bad trailing spacing\n"
+    checked = conftest.format_pcf(source, fix=False)
+    fixed = conftest.format_pcf(source)
+    assert tuple(finding.line_numbers for finding in checked.unfixed_findings) == ((1,), (2,))
+    assert sum(fixed.fixed_findings.values()) == 2
+    assert not fixed.unfixed_findings
+
+
+def test_canonical_trailing_comment_at_exact_line_length_remains_inline() -> None:
+    source = "value = 1  # exact\n"
+    result = conftest.format_pcf(source, line_length=len(source.rstrip("\n")))
+    assert result.new_source == source
+    assert not result.fixed_findings
+
+
+def test_trailing_comment_one_column_over_limit_moves_above_code() -> None:
+    source = "value = 1  # exact\n"
+    result = conftest.format_pcf(source, line_length=len(source.rstrip("\n")) - 1)
+    assert result.new_source == "# exact\nvalue = 1\n"
+
+
+@pytest.mark.parametrize(
+    ("source", "expected"),
+    (
+        ("if enabled:\n    value = compute()#comment\n", "if enabled:\n    value = compute()  # comment\n"),
+        ("if enabled:\n    value = compute() \t\f #  comment   \n", "if enabled:\n    value = compute()  # comment\n"),
+        ("value = compute()  ### heading-like content\n", "value = compute()  # ## heading-like content\n"),
+        ("value = compute()#", "value = compute()  #"),
+    ),
+)
+def test_trailing_comment_normalization_covers_missing_spacing_whitespace_and_additional_hashes(source: str, expected: str) -> None:
+    assert conftest.format_pcf(source).new_source == expected
+
+
+def test_indented_overlong_trailing_comment_moves_to_code_indentation_and_wraps() -> None:
+    source = "if enabled:\n    value = compute()  # This explanation has enough words to move and wrap.\n"
+    result = conftest.format_pcf(source, line_length=32)
+    assert result.new_source == "if enabled:\n    # This explanation has\n    # enough words to move and\n    # wrap.\n    value = compute()\n"
+
+
+def test_multiple_trailing_comment_edits_are_applied_in_source_order() -> None:
+    source = "first = compute() # first explanation needs wrapping\nsecond = compute()#second explanation needs wrapping\nthird = 3 # short\n"
+    result = conftest.format_pcf(source, line_length=30)
+    assert result.new_source == "# first explanation needs\n# wrapping\nfirst = compute()\n# second explanation needs\n# wrapping\nsecond = compute()\nthird = 3  # short\n"
+    assert sum(result.fixed_findings.values()) == 3
+
+
+def test_moved_trailing_comment_preserves_eof_without_final_newline() -> None:
+    source = "value = compute()  # explanation that is too long"
+    result = conftest.format_pcf(source, line_length=24)
+    assert result.new_source == "# explanation that is\n# too long\nvalue = compute()"
+
+
+def test_moved_trailing_comment_uses_configured_line_endings_inside_replacement_only() -> None:
+    source = "first = 1\nvalue = compute()  # explanation with enough words to move\r\nlast = 3\n"
+    result = conftest.format_pcf(source, line_length=30, line_ending=LineEnding.CR_LF)
+    assert result.new_source == "first = 1\n# explanation with enough\r\n# words to move\r\nvalue = compute()\r\nlast = 3\n"
+
+
+def test_overlong_unsplittable_trailing_word_moves_without_splitting() -> None:
+    source = "value = 1  # supercalifragilisticexpialidocious\n"
+    result = conftest.format_pcf(source, line_length=16)
+    assert result.new_source == "# supercalifragilisticexpialidocious\nvalue = 1\n"
+
+
+@pytest.mark.parametrize(
+    "directive",
+    (
+        "# type: ignore",
+        "# TYPE : ignore",
+        "# noqa",
+        "# nosec",
+        "# nosemgrep",
+        "# pylint: disable=x",
+        "# pyright: ignore",
+        "# mypy: ignore-errors",
+        "# ruff: noqa",
+        "# flake8: noqa",
+        "# fmt: off",
+        "# isort: skip",
+        "# pragma: no cover",
+    ),
+)
+def test_all_protected_trailing_directive_families_remain_byte_exact(directive: str) -> None:
+    source = f"value = compute() {directive}\n"
+    assert conftest.format_pcf(source, line_length=10).new_source == source
+
+
+def test_trailing_rule_does_not_modify_standalone_comments_when_selected_alone() -> None:
+    source = "#bad standalone spacing\nvalue = 1 #bad trailing spacing\n"
+    settings = CheckSettings(experimental=True, select=("PCF002",))
+    result = formatter.format_source_exp(source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
+    assert result.new_source == "#bad standalone spacing\nvalue = 1  # bad trailing spacing\n"
+
+
+def test_trailing_formatting_ignores_all_standalone_structure_settings() -> None:
+    source = "value = compute()  # >>> This trailing doctest-like comment is too long.\n"
+    result = conftest.format_pcf(
+        source,
+        line_length=32,
+        comment_preserve_doctests=True,
+        comment_preserve_code_fences=True,
+        comment_preserve_tables=True,
+        comment_preserve_directives=True,
+        comment_detect_code=True,
+        comment_detect_statements=True,
+        comment_detect_expressions=True,
+    )
+    assert result.new_source == "# >>> This trailing doctest-like\n# comment is too long.\nvalue = compute()\n"
+
+
+def test_short_comment_moves_when_code_alone_makes_the_combined_line_too_long() -> None:
+    source = "very_long_variable_name = compute_expensive_value()  # why\n"
+    result = conftest.format_pcf(source, line_length=40)
+    assert result.new_source == "# why\nvery_long_variable_name = compute_expensive_value()\n"
+
+
+def test_empty_trailing_comment_remains_inline_even_when_code_is_overlong() -> None:
+    source = "very_long_variable_name = compute_expensive_value() #   \n"
+    result = conftest.format_pcf(source, line_length=20)
+    assert result.new_source == "very_long_variable_name = compute_expensive_value()  #\n"
+
+
+@pytest.mark.parametrize(
+    ("source", "expected"),
+    (
+        (
+            "values = [\n    item,  # explanation long enough to move above this item\n]\n",
+            "values = [\n    # explanation long enough to\n    # move above this item\n    item,\n]\n",
+        ),
+        (
+            "if enabled:  # explanation long enough to move above the header\n    pass\n",
+            "# explanation long enough to\n# move above the header\nif enabled:\n    pass\n",
+        ),
+        (
+            "@decorator  # explanation long enough to move above the decorator\ndef function():\n    pass\n",
+            "# explanation long enough to\n# move above the decorator\n@decorator\ndef function():\n    pass\n",
+        ),
+    ),
+)
+def test_overlong_trailing_comments_move_safely_in_unusual_syntax_positions(source: str, expected: str) -> None:
+    assert conftest.format_pcf(source, line_length=32).new_source == expected
+
+
+def test_moved_structure_like_comment_is_plain_wrapped_and_does_not_gain_standalone_semantics() -> None:
+    source = "value = compute()  # - alpha beta gamma delta epsilon\nother = compute()  # > alpha beta gamma delta epsilon\n"
+    result = conftest.format_pcf(source, line_length=24)
+    assert result.new_source == "# - alpha beta gamma\n# delta epsilon\nvalue = compute()\n# > alpha beta gamma\n# delta epsilon\nother = compute()\n"
+
+
+def test_standalone_and_trailing_edits_on_adjacent_lines_converge_without_overlap() -> None:
+    source = "#standalone explanation with enough words to wrap\nvalue = compute()#trailing explanation with enough words to move\n"
+    result = conftest.format_pcf(source, line_length=28)
+    assert result.new_source == "# standalone explanation\n# with enough words to wrap\n\n# trailing explanation with\n# enough words to move\nvalue = compute()\n"
+    assert not result.errors
+
+
+def test_extracted_trailing_comment_stays_separate_from_joined_standalone_paragraph() -> None:
+    source = "# Existing note.\nvalue = compute()  # Extracted explanation has enough words to require moving above code.\n"
+    first = conftest.format_pcf(source, line_length=34, comment_join_standalone_lines=True)
+    assert first.new_source == "# Existing note.\n\n# Extracted explanation has enough\n# words to require moving above\n# code.\nvalue = compute()\n"
+    assert {rule.code.tag: count for rule, count in first.fixed_findings.items()} == {"PCF002": 1}
+    second = conftest.format_pcf(first.new_source, line_length=34, comment_join_standalone_lines=True)
+    assert second.new_source == first.new_source
+    assert not second.fixed_findings
+    assert not second.errors
+
+
+def test_cr_only_source_uses_detected_line_endings_for_all_generated_lines() -> None:
+    source = "# alpha beta gamma delta\rvalue = 1 # comment\r"
+    result = conftest.format_pcf(source, line_length=16, line_ending=LineEnding.AUTO)
+    assert result.new_source == "# alpha beta\r# gamma delta\r\r# comment\rvalue = 1"
+
+
+def test_complex_trailing_formatting_is_idempotent() -> None:
+    source = "values = [\n    first,  # first explanation is long enough to move\n    second, # short\n]\n"
+    first = conftest.format_pcf(source, line_length=32)
+    assert first.new_source is not None
+    second = conftest.format_pcf(first.new_source, line_length=32)
+    assert second.new_source == first.new_source
+    assert not second.fixed_findings
+    assert not second.errors

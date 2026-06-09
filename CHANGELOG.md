@@ -29,6 +29,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added `pydocfmt linter` to list rule-prefix linters in Ruff-style text or JSON output.
 
 - **Configuration:**
+  - Enabled comment list-item and block-quote formatting, structural preservation, and Python statement detection by default, while leaving heuristic disabled-code and expression detection disabled.
   - Added `output-format` for formatter configuration, currently supporting only `"grouped"`.
   - Added `experimental` for formatter configuration, defaulting to `false`.
   - Added Ruff-style `line-ending` configuration with `"auto"`, `"lf"`, `"cr-lf"`, and `"native"` values.
@@ -37,6 +38,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added `respect-gitignore` for formatter configuration, defaulting to `true`.
   - Added explicit config-file support for `--config PATH`, including pyproject-style `[tool.pydocfmt]` files and dedicated top-level pydocfmt TOML files.
   - Added Ruff-style path-aware auto-discovery for the closest containing `[tool.pydocfmt]` `pyproject.toml`.
+  - Added independent experimental comment-formatting settings for standalone paragraph joining, list items, headings, doctests, code fences, block quotes, tables, reStructuredText directives, and disabled-code detection.
 
 - **Documentation:**
   - Added a Ruff file-selection compatibility specification at `docs/file_selection_spec.md`, including exact defaults, precedence rules, force-exclude behavior, config-relative glob bases, and explicit pydocformatter deviations.
@@ -51,19 +53,27 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 - **Developer workflow:**
   - Added a pytest pre-commit hook that runs the test suite before commits.
   - Added regression coverage for Ruff-compatible file-selection and per-file-ignore pattern-base behavior.
+  - Vastly expanded PCF rule tests across comment classification, run boundaries, structure preservation, code detection, width handling, line endings, mixed formatting, syntax-position safety, convergence, idempotence, and rule independence.
 
 - **Formatting:**
   - Added the LibCST-based experimental rule execution framework with ordered category preprocessing, repeated automatic-fix passes, final read-only checks, and non-convergence diagnostics.
   - Added typed PCF comment and PDF docstring category data, together with a shared validated source-edit helper, as the foundation for individual rule implementations.
+  - Implemented PCF001 standalone-comment formatting and PCF002 trailing-comment formatting with independent fixes, protected directive handling, tab-expanded widths, stable impossible-width behavior, and exact EOF preservation.
 
 ### Changed
 
+- **Rule documentation:**
+  - Expanded the PCF001 and PCF002 rule examples to demonstrate common spacing, wrapping, structure, protection, boundary, and extraction behavior.
+  - Rephrased rule example results to describe the effect of applying each rule.
+
 - **Developer workflow:**
   - Changed the mypy pre-commit hook to use the locked project environment through `uv run mypy`.
+  - Organized rule tests by category and rule code under `tests/rules/`.
 
 - **Rule framework:**
   - Split rule models, authoring contracts, execution, and line-ending utilities into focused modules while keeping formatter file and source orchestration separate.
   - Changed internal PDF and PCF classification types from string-compatible enums to ordinary enums.
+  - Renamed PCF001 to `standalone-comment-formatting` and PCF002 to `trailing-comment-formatting` to reflect their spacing and wrapping behavior.
 
 - **CLI:**
   - Reorganized `pydocfmt check --help` into Ruff-inspired argument groups for options, rule selection, and file selection.
@@ -113,6 +123,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 
 - **Formatting:**
   - Added experimental `Rule`, `RuleFinding`, and `FormatterResult` data structures for reporting remaining rule issues after fixes.
+  - Changed experimental fixes to preserve untouched mixed line endings instead of normalizing the complete file after any source change.
   - Experimental formatter results now carry the formatted source alongside path, modification, finding, and error data.
   - `SourceFormatResult` now carries the original source alongside the possibly formatted source.
   - Formatter internals now require formatting controls such as line length, line endings, and indentation settings as explicit keyword-only arguments.
@@ -170,6 +181,9 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Updated mypy from 1.20.2 to 2.1.0.
 
 ### Fixed
+
+- **Formatting:**
+  - Kept extracted trailing comments separate from preceding standalone comments, required fenced-region closers to contain no trailing text, and normalized tab-equivalent block-quote prefixes in one formatting pass.
 
 - **Rule framework:**
   - Category preprocessing data is now refreshed after an earlier rule changes the module while remaining shared by later rules processing the same module version.

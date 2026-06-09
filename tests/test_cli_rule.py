@@ -57,9 +57,9 @@ class TestCLIRule(unittest.TestCase):
 
         output = stdout.getvalue()
         self.assertEqual(exit_code, 0)
-        self.assertIn("# standalone-comment-too-long (PCF001)\n", output)
+        self.assertIn("# standalone-comment-formatting (PCF001)\n", output)
         self.assertIn("# docstring-should-be-one-line (PDF106)\n", output)
-        self.assertLess(output.index("# standalone-comment-too-long (PCF001)"), output.index("# reflow-required (PDF001)"))
+        self.assertLess(output.index("# standalone-comment-formatting (PCF001)"), output.index("# reflow-required (PDF001)"))
 
     def test_pydocfmt_rule_prints_all_rules_json(self) -> None:
         stdout = StringIO()

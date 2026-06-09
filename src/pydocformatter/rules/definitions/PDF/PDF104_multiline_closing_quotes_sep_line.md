@@ -19,7 +19,7 @@ def area(radius: float) -> float:
     The radius must be non-negative."""
 ```
 
-Use instead:
+Applying this rule produces:
 ```python
 def area(radius: float) -> float:
     """Return the area.

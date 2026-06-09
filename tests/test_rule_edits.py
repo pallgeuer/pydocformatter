@@ -13,17 +13,17 @@ class TestSourceEdits(unittest.TestCase):
         self.assertIs(rule_edits.apply_source_edits(module, ()), module)
 
     def test_multiple_unsorted_edits_support_unicode_and_adjacent_ranges(self) -> None:
-        module = cst.parse_module("alpha = 'α'\nbeta = 2\n")
+        module = cst.parse_module("alpha = '\u03b1'\nbeta = 2\n")
         edits = (
             rule_edits.SourceEdit(cst_metadata.CodeRange(start=cst_metadata.CodePosition(2, 0), end=cst_metadata.CodePosition(2, 4)), "gamma"),
-            rule_edits.SourceEdit(cst_metadata.CodeRange(start=cst_metadata.CodePosition(1, 9), end=cst_metadata.CodePosition(1, 10)), "ω"),
+            rule_edits.SourceEdit(cst_metadata.CodeRange(start=cst_metadata.CodePosition(1, 9), end=cst_metadata.CodePosition(1, 10)), "\u03c9"),
             rule_edits.SourceEdit(cst_metadata.CodeRange(start=cst_metadata.CodePosition(1, 0), end=cst_metadata.CodePosition(1, 5)), "name"),
             rule_edits.SourceEdit(cst_metadata.CodeRange(start=cst_metadata.CodePosition(2, 4), end=cst_metadata.CodePosition(2, 5)), ""),
         )
 
         result = rule_edits.apply_source_edits(module, edits)
 
-        self.assertEqual(result.code, "name = 'ω'\ngamma= 2\n")
+        self.assertEqual(result.code, "name = '\u03c9'\ngamma= 2\n")
 
     def test_overlapping_edits_are_rejected(self) -> None:
         module = cst.parse_module("value = 1\n")

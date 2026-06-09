@@ -17,7 +17,7 @@ def area(radius: float) -> float:
     """Return the area for a circle with the supplied radius after validating that the radius is finite and non-negative."""
 ```
 
-Use instead:
+Applying this rule produces:
 ```python
 def area(radius: float) -> float:
     """Return the area for a circle with the supplied radius after validating

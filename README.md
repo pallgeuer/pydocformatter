@@ -90,7 +90,20 @@ If no files or directories are specified, `pydocfmt check` checks the current di
 - `--line-length LENGTH`: Maximum line length for docstrings and comments (default: 88)
 - `--line-ending {auto,lf,cr-lf,native}`: Line ending to use when rewriting files (default: auto)
 - `--indent-style {space,tab}`: Indentation style for generated docstring sections (default: space)
-- `--indent-width WIDTH`: Indentation width for generated docstring sections (default: 4)
+- `--indent-width WIDTH`: Generated docstring indentation width and comment tab width (default: 4)
+
+**Comment formatting:**
+- `--comment-join-standalone-lines`, `--no-comment-join-standalone-lines`: Toggle joining standalone prose lines before wrapping (default: disabled)
+- `--comment-format-list-items`, `--no-comment-format-list-items`: Toggle list-item detection and hanging-indented reflow (default: enabled)
+- `--comment-preserve-headings`, `--no-comment-preserve-headings`: Toggle preserving Markdown and reStructuredText headings (default: enabled)
+- `--comment-preserve-doctests`, `--no-comment-preserve-doctests`: Toggle preserving standalone doctest regions (default: enabled)
+- `--comment-preserve-code-fences`, `--no-comment-preserve-code-fences`: Toggle preserving fenced code regions (default: enabled)
+- `--comment-format-block-quotes`, `--no-comment-format-block-quotes`: Toggle prefix-preserving block-quote reflow (default: enabled)
+- `--comment-preserve-tables`, `--no-comment-preserve-tables`: Toggle preserving detected Markdown and reStructuredText tables (default: enabled)
+- `--comment-preserve-directives`, `--no-comment-preserve-directives`: Toggle preserving reStructuredText directives and their indented bodies (default: enabled)
+- `--comment-detect-code`, `--no-comment-detect-code`: Toggle the disabled-code indentation and leading-keyword heuristic (default: disabled)
+- `--comment-detect-statements`, `--no-comment-detect-statements`: Toggle parseable Python statement detection (default: enabled)
+- `--comment-detect-expressions`, `--no-comment-detect-expressions`: Toggle nontrivial Python expression detection (default: disabled)
 
 **Rule Selection:**
 - `--select RULE`: Comma-separated rule selector(s) to enable
@@ -191,6 +204,17 @@ line-length = 88
 line-ending = "auto"
 indent-style = "space"
 indent-width = 4
+comment-join-standalone-lines = false
+comment-format-list-items = true
+comment-preserve-headings = true
+comment-preserve-doctests = true
+comment-preserve-code-fences = true
+comment-format-block-quotes = true
+comment-preserve-tables = true
+comment-preserve-directives = true
+comment-detect-code = false
+comment-detect-statements = true
+comment-detect-expressions = false
 select = ["ALL"]
 ignore = []
 extend-select = []
@@ -213,7 +237,18 @@ force-exclude = false
 - `line-length`: Maximum line length for docstrings and comments (default: 88)
 - `line-ending`: Line ending to use when rewriting files; one of `"auto"`, `"lf"`, `"cr-lf"`, or `"native"` (default: `"auto"`)
 - `indent-style`: Generated docstring section indentation style; one of `"space"` or `"tab"` (default: `"space"`)
-- `indent-width`: Generated docstring section indentation width (default: 4)
+- `indent-width`: Generated docstring section indentation width and tab expansion width used when measuring comments (default: 4)
+- `comment-join-standalone-lines`: Join consecutive standalone prose comment lines before wrapping (default: `false`)
+- `comment-format-list-items`: Detect ordered and unordered standalone comment list items and reflow them with hanging indentation (default: `true`)
+- `comment-preserve-headings`: Preserve detected Markdown and reStructuredText comment headings unchanged (default: `true`)
+- `comment-preserve-doctests`: Preserve standalone doctest comment regions from the first `>>>` prompt to the physical-run boundary (default: `true`)
+- `comment-preserve-code-fences`: Preserve backtick- and tilde-fenced standalone comment regions (default: `true`)
+- `comment-format-block-quotes`: Detect and reflow Markdown block quotes while retaining quote prefixes (default: `true`)
+- `comment-preserve-tables`: Preserve structurally detected Markdown pipe tables and reStructuredText grid/simple tables (default: `true`)
+- `comment-preserve-directives`: Preserve reStructuredText directives and their more-indented option/content lines (default: `true`)
+- `comment-detect-code`: Protect whole standalone runs matching the disabled-code indentation or leading-keyword heuristic (default: `false`)
+- `comment-detect-statements`: Protect whole standalone runs containing parseable Python non-expression statements (default: `true`)
+- `comment-detect-expressions`: Protect whole standalone runs containing parseable nontrivial Python expressions (default: `false`)
 - `select`: Rule selectors to enable (default: `["ALL"]`)
 - `ignore`: Rule selectors to ignore
 - `extend-select`: Additional rule selectors to enable
@@ -230,6 +265,8 @@ force-exclude = false
 - `force-exclude`: Apply exclude rules to explicitly listed files (default: `false`)
 
 When `respect-gitignore` is enabled, pydocfmt aborts if gitignore filtering cannot be checked, because continuing without that filter could format files that should stay ignored.
+
+The `comment-*` settings currently affect only the experimental rule-based formatter selected with `experimental = true`. PCF001 defaults to formatting each standalone physical line independently; joining and structured-markup interpretation are opt-in. See `pydocfmt rule PCF001` and `pydocfmt rule PCF002` for exact detector precedence and protected-comment behavior.
 
 Settings are resolved per path as defaults, then the closest containing `pyproject.toml` with `[tool.pydocfmt]`, then explicit `--config` files, then inline `--config` setting overrides, then dedicated command-line options. Parent config files are not merged into child config files. The highest-precedence specified value wins for each key, including `extend-include` and `extend-exclude`.
 
