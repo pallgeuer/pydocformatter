@@ -84,6 +84,7 @@ known_first_party = ["pydocformatter"]
 skip = [".github", ".eggs", ".git", ".hg", ".mypy_cache", ".tox", ".venv", "htmlcov", "__pycache__", "_build", "buck-out", "build", "dist", "tests/data"]
 
 [tool.pydocfmt]
+legacy = true
 line-length = 120
 
 [tool.mypy]

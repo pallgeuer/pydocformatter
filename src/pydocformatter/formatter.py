@@ -39,8 +39,8 @@ class FormatterResult:
     errors: tuple[str, ...]
 
 
-def format_file_exp(path: str, *, file: typing.TextIO | None = None, settings: CheckSettings, rule_selection: RuleSelection, fix: bool, write: bool) -> FormatterResult:
-    """Run the experimental formatter interface for one file.
+def format_file(path: str, *, file: typing.TextIO | None = None, settings: CheckSettings, rule_selection: RuleSelection, fix: bool, write: bool) -> FormatterResult:
+    """Run the rule-based formatter for one file.
 
     Args:
         path (str): Display path and filesystem path for the source file.
@@ -66,9 +66,9 @@ def format_file_exp(path: str, *, file: typing.TextIO | None = None, settings: C
     except OSError as error:
         return FormatterResult(path=path, old_source=None, new_source=None, modified=False, fixed_findings=collections.Counter(), unfixed_findings=(), errors=(f"Failed to read file {path}: {error}",))
 
-    result = format_source_exp(source, path, settings=settings, rule_selection=rule_selection, fix=fix)
+    result = format_source(source, path, settings=settings, rule_selection=rule_selection, fix=fix)
     if result.old_source is None or result.new_source is None:
-        raise AssertionError("format_source_exp() must return a valid source state")
+        raise AssertionError("format_source() must return a valid source state")
 
     if file is None and fix and write and result.modified:
         try:
@@ -88,8 +88,8 @@ def format_file_exp(path: str, *, file: typing.TextIO | None = None, settings: C
     return result
 
 
-def format_source_exp(source: str, path: str, *, settings: CheckSettings, rule_selection: RuleSelection, fix: bool) -> FormatterResult:
-    """Run the experimental formatter interface for source text.
+def format_source(source: str, path: str, *, settings: CheckSettings, rule_selection: RuleSelection, fix: bool) -> FormatterResult:
+    """Run the rule-based formatter for source text.
 
     Args:
         source (str): Python source text to format.

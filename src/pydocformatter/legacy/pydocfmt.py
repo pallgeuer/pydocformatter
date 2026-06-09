@@ -6,7 +6,7 @@ import textwrap
 import tokenize
 import typing
 
-import pydocformatter.formatters.google_docstrings as google_docstrings
+import pydocformatter.legacy.google_docstrings as google_docstrings
 import pydocformatter.rules.line_endings as line_endings
 import pydocformatter.utils.misc as misc
 from pydocformatter.cli.settings_check import CheckSettings, IndentStyle

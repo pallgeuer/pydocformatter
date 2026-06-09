@@ -12,7 +12,7 @@ def category_context(source: str) -> RuleCategoryContext:
     metadata_wrapper = cst_metadata.MetadataWrapper(module, unsafe_skip_copy=True)
     return RuleCategoryContext(
         path="example.py",
-        settings=CheckSettings(experimental=True),
+        settings=CheckSettings(),
         module=module,
         metadata_wrapper=metadata_wrapper,
         positions=metadata_wrapper.resolve(cst_metadata.PositionProvider),

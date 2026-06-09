@@ -6,8 +6,8 @@ import unittest
 from io import StringIO
 from pathlib import Path
 
-import pydocformatter.formatters.google_docstrings as google_docstrings
-import pydocformatter.formatters.pydocfmt as pydocfmt
+import pydocformatter.legacy.google_docstrings as google_docstrings
+import pydocformatter.legacy.pydocfmt as pydocfmt
 from pydocformatter.cli.settings_check import CheckSettings, IndentStyle, LineEnding
 
 

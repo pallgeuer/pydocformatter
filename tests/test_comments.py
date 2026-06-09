@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from io import StringIO
 
-import pydocformatter.formatters.pydocfmt as pydocfmt
+import pydocformatter.legacy.pydocfmt as pydocfmt
 from pydocformatter.cli.settings_check import CheckSettings, LineEnding
 
 

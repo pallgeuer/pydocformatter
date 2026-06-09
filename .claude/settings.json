@@ -1,0 +1,24 @@
+{
+  "model": "opus",
+  "effortLevel": "high",
+  "permissions": {
+    "defaultMode": "default",
+    "allow": ["WebSearch"]
+  },
+  "sandbox": {
+    "enabled": true,
+    "autoAllowBashIfSandboxed": true,
+    "network": {
+      "allowedDomains": [
+        "pypi.org",
+        "files.pythonhosted.org",
+        "github.com",
+        "codeload.github.com",
+        "objects.githubusercontent.com",
+        "raw.githubusercontent.com",
+        "astral.sh"
+      ],
+      "allowLocalBinding": true
+    }
+  }
+}

@@ -16,7 +16,7 @@ from typing import TextIO
 import pydocformatter.cli.global_args as global_args
 import pydocformatter.file_selection as file_selection
 import pydocformatter.formatter as formatter
-import pydocformatter.formatters.pydocfmt as pydocfmt
+import pydocformatter.legacy.pydocfmt as legacy_formatter
 import pydocformatter.rules_selection as rules_selection
 import pydocformatter.settings as settings_core
 import pydocformatter.utils.argparser as argparser
@@ -269,8 +269,8 @@ def check_files(*, args: argparse.Namespace, settings_context: CheckRunContext) 
     if use_stdin:
         if len(files.accepted_paths) > 1:
             raise AssertionError(f"Expect at most one accepted path when using stdin: {files.accepted_paths}")
-        if files.selected_files and not files.selected_files[0].settings.experimental:
-            print("pydocfmt check: Argument error: Cannot process input from stdin when using non-experimental mode", file=sys.stderr)
+        if files.selected_files and files.selected_files[0].settings.legacy:
+            print("pydocfmt check: Argument error: Cannot process input from stdin when using legacy mode", file=sys.stderr)
             return 2
 
     results = format_selected_files(files.selected_files, rule_selections=rule_selections, use_stdin=use_stdin, fix=args.fix or args.diff, write=not args.diff)
@@ -334,7 +334,7 @@ def output_stream(output_file: str | None) -> Iterator[TextIO | None]:
         yield file
 
 
-def format_files(paths: tuple[str, ...], *, settings: CheckSettings, fix: bool, write: bool) -> list[FormatterResult]:
+def format_legacy_files(paths: tuple[str, ...], *, settings: CheckSettings, fix: bool, write: bool) -> list[FormatterResult]:
     """Format files with the legacy formatter path.
 
     Args:
@@ -349,7 +349,7 @@ def format_files(paths: tuple[str, ...], *, settings: CheckSettings, fix: bool, 
     results: list[FormatterResult] = []
     for path in paths:
         try:
-            source_result = pydocfmt.format_file_source(path, settings=settings, fix=fix, write=write)
+            source_result = legacy_formatter.format_file_source(path, settings=settings, fix=fix, write=write)
         except UnicodeDecodeError as error:
             result = FormatterResult(
                 path=path, old_source=None, new_source=None, modified=False, fixed_findings=collections.Counter(), unfixed_findings=(), errors=(f"Failed to decode {path} as UTF-8: {error}",)
@@ -396,10 +396,12 @@ def format_selected_files(
     results: list[FormatterResult] = []
     for index, selected_file in enumerate(selected_files):
         settings = selected_file.settings
-        if settings.experimental:
+        if settings.legacy:
+            results.extend(format_legacy_files((selected_file.path,), settings=settings, fix=fix, write=write))
+        else:
             rule_selection = rule_selections[selected_file.profile.key()]
             results.append(
-                formatter.format_file_exp(
+                formatter.format_file(
                     selected_file.path,
                     file=sys.stdin if use_stdin and index == 0 else None,
                     settings=settings,
@@ -408,8 +410,6 @@ def format_selected_files(
                     write=write,
                 )
             )
-        else:
-            results.extend(format_files((selected_file.path,), settings=settings, fix=fix, write=write))
     return results
 
 

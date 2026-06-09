@@ -78,7 +78,7 @@ class CheckSettings:
 
     Attributes:
         output_format (OutputFormat): Output format used for rule findings.
-        experimental (bool): Whether to use the experimental rule-based formatter implementation.
+        legacy (bool): Whether to use the legacy formatter implementation.
         line_length (int): Maximum line length used when wrapping docstrings or comments.
         line_ending (LineEnding): Line ending used when rewriting files.
         indent_style (IndentStyle): Indentation style used for generated docstring section indentation.
@@ -114,7 +114,7 @@ class CheckSettings:
     """
 
     output_format: OutputFormat = OutputFormat.GROUPED
-    experimental: bool = False
+    legacy: bool = False
     line_length: int = 88
     line_ending: LineEnding = LineEnding.AUTO
     indent_style: IndentStyle = IndentStyle.SPACE
@@ -169,7 +169,7 @@ class CheckSettingsOverrides(TypedDict, total=False):
 
     Attributes:
         output_format (OutputFormat): Output format used for rule findings.
-        experimental (bool): Whether to use the experimental rule-based formatter implementation.
+        legacy (bool): Whether to use the legacy formatter implementation.
         line_length (int): Maximum line length used when wrapping docstrings or comments.
         line_ending (LineEnding): Line ending used when rewriting files.
         indent_style (IndentStyle): Indentation style used for generated docstring section indentation.
@@ -205,7 +205,7 @@ class CheckSettingsOverrides(TypedDict, total=False):
     """
 
     output_format: OutputFormat
-    experimental: bool
+    legacy: bool
     line_length: int
     line_ending: LineEnding
     indent_style: IndentStyle
@@ -261,14 +261,14 @@ SETTINGS_SCHEMA = SettingsSchema(
             field="output_format",
             value_type=OutputFormat,
             group=SettingsGroup.FORMATTING,
-            help="Output format for experimental rule findings.",
+            help="Output format for rule findings.",
             documentation='Output format for rule findings; currently only "grouped" is supported.',
         ),
         SettingDefinition(
-            field="experimental",
+            field="legacy",
             value_type=bool,
             group=SettingsGroup.FORMATTING,
-            help="Use the experimental rule-based formatter implementation.",
+            help="Use the legacy formatter implementation.",
         ),
         SettingDefinition(
             field="line_length",

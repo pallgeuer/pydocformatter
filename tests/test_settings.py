@@ -154,10 +154,10 @@ class TestSettings(unittest.TestCase):
 
     def test_setting_definition_respects_explicit_no_cli(self) -> None:
         definition = SettingDefinition(
-            field="experimental",
+            field="legacy",
             value_type=bool,
             group=SettingsGroup.FORMATTING,
-            help="Experimental.",
+            help="Legacy.",
             available_in_cli=False,
         )
 
@@ -172,10 +172,10 @@ class TestSettings(unittest.TestCase):
             help="Line ending.",
         )
         bool_definition = SettingDefinition(
-            field="experimental",
+            field="legacy",
             value_type=bool,
             group=SettingsGroup.FORMATTING,
-            help="Experimental.",
+            help="Legacy.",
         )
         int_definition = SettingDefinition(
             field="line_length",
@@ -211,7 +211,7 @@ class TestSettings(unittest.TestCase):
         self.assertEqual(string_map_definition.cli.value_kind, SettingCLIValueKind.TOML_MAP)
         self.assertFalse(string_map_definition.cli.show_default)
         self.assertEqual(enum_definition.validator("lf", "line-ending"), LineEnding.LF)
-        self.assertTrue(bool_definition.validator(True, "experimental"))
+        self.assertTrue(bool_definition.validator(True, "legacy"))
         self.assertEqual(int_definition.validator(1, "line-length"), 1)
         self.assertEqual(string_list_definition.validator(["*.py"], "include"), ("*.py",))
         self.assertEqual(string_map_definition.validator({"tests/*.py": ["PCF001"]}, "per-file-ignores"), (("tests/*.py", ("PCF001",)),))
@@ -292,7 +292,7 @@ class TestSettings(unittest.TestCase):
             formatting_fields,
             (
                 "output_format",
-                "experimental",
+                "legacy",
                 "line_length",
                 "line_ending",
                 "indent_style",
@@ -433,17 +433,17 @@ class TestSettings(unittest.TestCase):
         self.assertNotIn("line_ending", overrides)
 
     def test_readme_configuration_options_document_all_settings(self) -> None:
-        readme = Path("README.md").read_text(encoding="utf-8")
+        readme = (Path(__file__).resolve().parent.parent / "README.md").read_text(encoding="utf-8")
 
         for definition in pydocformatter_settings.SETTINGS_SCHEMA.definitions:
             self.assertIn(f"- `{definition.key}`:", readme)
 
-    def test_load_settings_defaults_without_pyproject(self) -> None:
+    def test_load_settings_defaults_in_isolated_mode(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             previous_cwd = os.getcwd()
             os.chdir(td)
             try:
-                config = pydocformatter_settings.SETTINGS_SCHEMA.load()
+                config = pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(isolated=True))
             finally:
                 os.chdir(previous_cwd)
 
@@ -468,7 +468,7 @@ class TestSettings(unittest.TestCase):
         self.assertEqual(config.extend_exclude, ())
         self.assertTrue(config.respect_gitignore)
         self.assertFalse(config.force_exclude)
-        self.assertFalse(config.experimental)
+        self.assertFalse(config.legacy)
         self.assertIs(config.output_format, OutputFormat.GROUPED)
         self.assertEqual(config.select, ("ALL",))
         self.assertEqual(config.extend_select, ())
@@ -629,10 +629,12 @@ class TestSettings(unittest.TestCase):
 
         self.assertEqual(config.line_length, 88)
 
-    def test_auto_discovered_pyproject_path_requires_pydocfmt_table(self) -> None:
+    def test_auto_discovered_pyproject_path_skips_files_without_pydocfmt_table(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             self._write_git_marker(root)
+            candidate = root / "pyproject.toml"
+            candidate.write_text("[tool.other]\nvalue = true\n", encoding="utf-8")
             previous_cwd = os.getcwd()
             os.chdir(root)
             try:
@@ -640,7 +642,23 @@ class TestSettings(unittest.TestCase):
             finally:
                 os.chdir(previous_cwd)
 
-        self.assertIsNone(path)
+        self.assertIsNotNone(path)
+        self.assertNotEqual(path, str(candidate))
+
+    def test_suite_temporary_directories_stay_below_configuration_boundary(self) -> None:
+        boundary = Path(tempfile.gettempdir())
+        boundary_config = boundary / "pyproject.toml"
+
+        self.assertEqual(boundary_config.read_text(encoding="utf-8"), "[tool.pydocfmt]\n")
+        with tempfile.TemporaryDirectory() as td:
+            nested = Path(td) / "nested"
+            nested.mkdir()
+            discovered = pydocformatter_settings_core._auto_discovered_pyproject_path_for_path(str(nested), table_path=("tool", "pydocfmt"))
+            settings = pydocformatter_settings.SETTINGS_SCHEMA.load_profile(path=str(nested)).settings
+
+        self.assertTrue(nested.is_relative_to(boundary))
+        self.assertEqual(discovered, str(boundary_config))
+        self.assertEqual(settings, CheckSettings())
 
     def test_rule_settings_accept_all_rule_prefixes(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -701,17 +719,17 @@ class TestSettings(unittest.TestCase):
         output = pydocformatter_settings.SETTINGS_SCHEMA.format(settings)
 
         self.assertIn("[tool.pydocfmt]\n", output)
-        self.assertLess(output.index("output-format"), output.index("experimental"))
-        self.assertLess(output.index("experimental"), output.index("line-length"))
+        self.assertLess(output.index("output-format"), output.index("legacy"))
+        self.assertLess(output.index("legacy"), output.index("line-length"))
         self.assertIn('line-ending = "lf"\n', output)
         self.assertIn('select = ["PDF", "PCF"]\n', output)
         self.assertIn('per-file-ignores = {"tests/\\"quoted\\"/*.py" = ["PCF001"]}\n', output)
 
-    def test_experimental_setting_is_applied(self) -> None:
+    def test_legacy_setting_is_applied(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             (root / "pyproject.toml").write_text(
-                "[tool.pydocfmt]\nexperimental = true\n",
+                "[tool.pydocfmt]\nlegacy = true\n",
                 encoding="utf-8",
             )
             previous_cwd = os.getcwd()
@@ -721,26 +739,26 @@ class TestSettings(unittest.TestCase):
             finally:
                 os.chdir(previous_cwd)
 
-        self.assertTrue(config.experimental)
+        self.assertTrue(config.legacy)
 
-    def test_experimental_cli_override_is_applied(self) -> None:
+    def test_legacy_cli_override_is_applied(self) -> None:
         config = pydocformatter_settings.SETTINGS_SCHEMA.load(
-            field_overrides=CheckSettingsOverrides(experimental=True),
+            field_overrides=CheckSettingsOverrides(legacy=True),
         )
 
-        self.assertTrue(config.experimental)
+        self.assertTrue(config.legacy)
 
-    def test_experimental_setting_must_be_boolean(self) -> None:
+    def test_legacy_setting_must_be_boolean(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             (root / "pyproject.toml").write_text(
-                '[tool.pydocfmt]\nexperimental = "yes"\n',
+                '[tool.pydocfmt]\nlegacy = "yes"\n',
                 encoding="utf-8",
             )
             previous_cwd = os.getcwd()
             os.chdir(root)
             try:
-                with self.assertRaisesRegex(SettingsError, "experimental"):
+                with self.assertRaisesRegex(SettingsError, "legacy"):
                     pydocformatter_settings.SETTINGS_SCHEMA.load()
             finally:
                 os.chdir(previous_cwd)

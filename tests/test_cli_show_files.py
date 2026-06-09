@@ -12,7 +12,7 @@ from typing import Callable, TextIO
 
 import pydocformatter.cli.main as pydocfmt_cli
 import pydocformatter.cli.settings_check as settings_check
-import pydocformatter.formatters.pydocfmt as pydocfmt
+import pydocformatter.legacy.pydocfmt as pydocfmt
 from pydocformatter.cli.settings_check import CheckSettings
 from pydocformatter.formatter import FormatterResult
 from pydocformatter.rules.models import FixAvailability, RuleCode, RuleFinding, RuleMetadata
@@ -90,7 +90,7 @@ class TestCLIShowFiles(unittest.TestCase):
             with (
                 unittest.mock.patch("sys.argv", argv),
                 unittest.mock.patch(
-                    "pydocformatter.cli.check.pydocfmt.format_file",
+                    "pydocformatter.cli.check.legacy_formatter.format_file",
                     side_effect=fake_format,
                 ),
                 contextlib.redirect_stdout(stdout),
@@ -118,11 +118,11 @@ class TestCLIShowFiles(unittest.TestCase):
             previous_cwd = os.getcwd()
             os.chdir(root)
             try:
-                argv = ["pydocfmt", "check", "--fix", "--no-respect-gitignore"]
+                argv = ["pydocfmt", "check", "--legacy", "--fix", "--no-respect-gitignore"]
                 with (
                     unittest.mock.patch("sys.argv", argv),
                     unittest.mock.patch(
-                        "pydocformatter.cli.check.pydocfmt.format_file_source",
+                        "pydocformatter.cli.check.legacy_formatter.format_file_source",
                         side_effect=fake_format,
                     ),
                 ):
@@ -152,7 +152,7 @@ class TestCLIShowFiles(unittest.TestCase):
             with (
                 unittest.mock.patch("sys.argv", argv),
                 unittest.mock.patch(
-                    "pydocformatter.cli.check.pydocfmt.format_file",
+                    "pydocformatter.cli.check.legacy_formatter.format_file",
                     side_effect=fake_format,
                 ),
                 contextlib.redirect_stdout(stdout),
@@ -189,7 +189,7 @@ class TestCLIShowFiles(unittest.TestCase):
             with (
                 unittest.mock.patch("sys.argv", argv),
                 unittest.mock.patch(
-                    "pydocformatter.cli.check.pydocfmt.format_file",
+                    "pydocformatter.cli.check.legacy_formatter.format_file",
                     side_effect=fake_format,
                 ),
                 contextlib.redirect_stdout(stdout),
@@ -230,7 +230,7 @@ class TestCLIShowFiles(unittest.TestCase):
             with (
                 unittest.mock.patch("sys.argv", argv),
                 unittest.mock.patch(
-                    "pydocformatter.cli.check.pydocfmt.format_file",
+                    "pydocformatter.cli.check.legacy_formatter.format_file",
                     side_effect=fake_format,
                 ),
                 contextlib.redirect_stdout(stdout),
@@ -263,7 +263,7 @@ class TestCLIShowFiles(unittest.TestCase):
                     side_effect=self._fake_git_check_ignore_for_root(root, {"skip.py"}),
                 ),
                 unittest.mock.patch(
-                    "pydocformatter.cli.check.pydocfmt.format_file",
+                    "pydocformatter.cli.check.legacy_formatter.format_file",
                     side_effect=fake_format,
                 ),
                 contextlib.redirect_stdout(stdout),
@@ -292,7 +292,7 @@ class TestCLIShowFiles(unittest.TestCase):
                 unittest.mock.patch("sys.argv", argv),
                 unittest.mock.patch("pydocformatter.file_selection.subprocess.run") as run_mock,
                 unittest.mock.patch(
-                    "pydocformatter.cli.check.pydocfmt.format_file",
+                    "pydocformatter.cli.check.legacy_formatter.format_file",
                     side_effect=fake_format,
                 ),
                 contextlib.redirect_stdout(stdout),
@@ -307,16 +307,16 @@ class TestCLIShowFiles(unittest.TestCase):
             self.assertEqual(stdout.getvalue().splitlines(), expected_lines)
             self.assertEqual(called_paths, [])
 
-    def test_pydocfmt_show_files_with_check_does_not_format(self) -> None:
+    def test_pydocfmt_show_files_with_legacy_does_not_format(self) -> None:
         with self._make_sample_tree() as td:
             root = Path(td)
             stdout = StringIO()
             format_file = unittest.mock.Mock(return_value=True)
-            argv = ["pydocfmt", "check", "--show-files", str(root)]
+            argv = ["pydocfmt", "check", "--show-files", "--legacy", str(root)]
             with (
                 unittest.mock.patch("sys.argv", argv),
                 unittest.mock.patch(
-                    "pydocformatter.cli.check.pydocfmt.format_file",
+                    "pydocformatter.cli.check.legacy_formatter.format_file",
                     format_file,
                 ),
                 contextlib.redirect_stdout(stdout),
@@ -327,26 +327,26 @@ class TestCLIShowFiles(unittest.TestCase):
             format_file.assert_not_called()
             self.assertIn(f"{root / 'a.py'} INCLUDED", stdout.getvalue().splitlines())
 
-    def test_pydocfmt_show_files_with_experimental_does_not_format(self) -> None:
+    def test_pydocfmt_show_files_with_rule_formatter_does_not_format(self) -> None:
         with self._make_sample_tree() as td:
             root = Path(td)
             stdout = StringIO()
-            format_file_exp = unittest.mock.Mock(
+            format_file = unittest.mock.Mock(
                 return_value=FormatterResult(path=str(root / "a.py"), old_source="", new_source="", modified=False, fixed_findings=collections.Counter(), unfixed_findings=(), errors=())
             )
-            argv = ["pydocfmt", "check", "--show-files", "--experimental", str(root)]
+            argv = ["pydocfmt", "check", "--show-files", str(root)]
             with (
                 unittest.mock.patch("sys.argv", argv),
                 unittest.mock.patch(
-                    "pydocformatter.formatter.format_file_exp",
-                    format_file_exp,
+                    "pydocformatter.formatter.format_file",
+                    format_file,
                 ),
                 contextlib.redirect_stdout(stdout),
             ):
                 exit_code = pydocfmt_cli.main()
 
             self.assertEqual(exit_code, 0)
-            format_file_exp.assert_not_called()
+            format_file.assert_not_called()
             self.assertIn(f"{root / 'a.py'} INCLUDED", stdout.getvalue().splitlines())
 
     def test_pydocfmt_show_files_reports_duplicate_paths_without_formatting(self) -> None:
@@ -361,7 +361,7 @@ class TestCLIShowFiles(unittest.TestCase):
                 with (
                     unittest.mock.patch("sys.argv", argv),
                     unittest.mock.patch(
-                        "pydocformatter.cli.check.pydocfmt.format_file",
+                        "pydocformatter.cli.check.legacy_formatter.format_file",
                         format_file,
                     ),
                     contextlib.redirect_stdout(stdout),
@@ -400,7 +400,7 @@ class TestCLIShowFiles(unittest.TestCase):
             (root / ".git").mkdir()
             (root / "a.py").write_text("x = 1\n", encoding="utf-8")
             (root / "pyproject.toml").write_text(
-                "[tool.pydocfmt]\nline-length = 72\nrespect-gitignore = false\nexperimental = true\n",
+                "[tool.pydocfmt]\nline-length = 72\nrespect-gitignore = false\nlegacy = true\n",
                 encoding="utf-8",
             )
             legacy_called = False
@@ -412,9 +412,9 @@ class TestCLIShowFiles(unittest.TestCase):
                 legacy_called = True
                 return pydocfmt.SourceFormatResult(source="x = 1\n", docstring_changed_lines=(), comment_changed_lines=())
 
-            def fake_exp_format(path: str, *, file: object = None, settings: CheckSettings, rule_selection: RuleSelection, fix: bool, write: bool) -> FormatterResult:
+            def fake_rule_format(path: str, *, file: object = None, settings: CheckSettings, rule_selection: RuleSelection, fix: bool, write: bool) -> FormatterResult:
                 del file, rule_selection
-                called_args.append((path, settings.line_length, fix, settings.experimental, settings.output_format))
+                called_args.append((path, settings.line_length, fix, settings.legacy, settings.output_format))
                 self.assertTrue(write)
                 return FormatterResult(path=path, old_source="", new_source="", modified=False, fixed_findings=collections.Counter(), unfixed_findings=(), errors=())
 
@@ -426,12 +426,12 @@ class TestCLIShowFiles(unittest.TestCase):
                     unittest.mock.patch("sys.argv", argv),
                     unittest.mock.patch("pydocformatter.file_selection.subprocess.run") as run_mock,
                     unittest.mock.patch(
-                        "pydocformatter.cli.check.pydocfmt.format_file_source",
+                        "pydocformatter.cli.check.legacy_formatter.format_file_source",
                         side_effect=fake_format,
                     ),
                     unittest.mock.patch(
-                        "pydocformatter.formatter.format_file_exp",
-                        side_effect=fake_exp_format,
+                        "pydocformatter.formatter.format_file",
+                        side_effect=fake_rule_format,
                     ),
                 ):
                     pydocfmt_cli.main()
@@ -439,8 +439,8 @@ class TestCLIShowFiles(unittest.TestCase):
                 os.chdir(previous_cwd)
 
             self.assertFalse(run_mock.called)
-            self.assertFalse(legacy_called)
-            self.assertEqual(called_args, [(str(root / "a.py"), 72, True, True, settings_check.OutputFormat.GROUPED)])
+            self.assertTrue(legacy_called)
+            self.assertEqual(called_args, [])
 
     def test_pydocfmt_indent_cli_settings_are_applied(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -456,6 +456,7 @@ class TestCLIShowFiles(unittest.TestCase):
             argv = [
                 "pydocfmt",
                 "check",
+                "--legacy",
                 "--fix",
                 "--indent-style",
                 "tab",
@@ -466,7 +467,7 @@ class TestCLIShowFiles(unittest.TestCase):
             with (
                 unittest.mock.patch("sys.argv", argv),
                 unittest.mock.patch(
-                    "pydocformatter.cli.check.pydocfmt.format_file_source",
+                    "pydocformatter.cli.check.legacy_formatter.format_file_source",
                     side_effect=fake_format,
                 ),
             ):
@@ -489,11 +490,11 @@ class TestCLIShowFiles(unittest.TestCase):
                 called_settings.append(settings.line_ending)
                 return pydocfmt.SourceFormatResult(source="x = 1\n", docstring_changed_lines=(), comment_changed_lines=())
 
-            argv = ["pydocfmt", "check", "--fix", "--line-ending", "cr-lf", str(target)]
+            argv = ["pydocfmt", "check", "--legacy", "--fix", "--line-ending", "cr-lf", str(target)]
             with (
                 unittest.mock.patch("sys.argv", argv),
                 unittest.mock.patch(
-                    "pydocformatter.cli.check.pydocfmt.format_file_source",
+                    "pydocformatter.cli.check.legacy_formatter.format_file_source",
                     side_effect=fake_format,
                 ),
             ):
@@ -517,7 +518,6 @@ class TestCLIShowFiles(unittest.TestCase):
                 "pydocfmt",
                 "check",
                 str(target),
-                "--experimental",
                 "--output-format",
                 "grouped",
                 "--select",
@@ -535,7 +535,7 @@ class TestCLIShowFiles(unittest.TestCase):
                 unittest.mock.patch("sys.argv", argv),
                 unittest.mock.patch("pydocformatter.rules_selection.select_rules", return_value=unittest.mock.Mock(errors=())),
                 unittest.mock.patch(
-                    "pydocformatter.formatter.format_file_exp",
+                    "pydocformatter.formatter.format_file",
                     side_effect=fake_format,
                 ),
             ):
@@ -547,7 +547,7 @@ class TestCLIShowFiles(unittest.TestCase):
             self.assertEqual(called_settings[0].fixable, ("ALL",))
             self.assertEqual(called_settings[0].unfixable, ("PCF001",))
             self.assertEqual(called_settings[0].per_file_ignores, (("tests/*.py", ("PCF001",)),))
-            self.assertTrue(called_settings[0].experimental)
+            self.assertFalse(called_settings[0].legacy)
             self.assertEqual(called_settings[0].output_format, "grouped")
 
     def test_invalid_rule_cli_selector_reports_operational_error(self) -> None:
@@ -611,7 +611,7 @@ class TestCLIShowFiles(unittest.TestCase):
             with (
                 unittest.mock.patch("sys.argv", argv),
                 unittest.mock.patch(
-                    "pydocformatter.cli.check.pydocfmt.format_file",
+                    "pydocformatter.cli.check.legacy_formatter.format_file",
                     side_effect=fake_format,
                 ),
                 contextlib.redirect_stdout(stdout),
@@ -643,7 +643,7 @@ class TestCLIShowFiles(unittest.TestCase):
                     side_effect=self._fake_git_check_ignore_for_root(root, {"skip.py"}),
                 ) as run_mock,
                 unittest.mock.patch(
-                    "pydocformatter.cli.check.pydocfmt.format_file",
+                    "pydocformatter.cli.check.legacy_formatter.format_file",
                     side_effect=fake_format,
                 ),
                 contextlib.redirect_stdout(stdout),
@@ -676,6 +676,7 @@ class TestCLIShowFiles(unittest.TestCase):
             argv = [
                 "pydocfmt",
                 "check",
+                "--legacy",
                 "--fix",
                 str(target),
                 "--force-exclude",
@@ -688,7 +689,7 @@ class TestCLIShowFiles(unittest.TestCase):
                 with (
                     unittest.mock.patch("sys.argv", argv),
                     unittest.mock.patch(
-                        "pydocformatter.cli.check.pydocfmt.format_file_source",
+                        "pydocformatter.cli.check.legacy_formatter.format_file_source",
                         side_effect=fake_format,
                     ),
                 ):
@@ -768,8 +769,8 @@ class TestCLIShowFiles(unittest.TestCase):
         self.assertLess(options.index("--show-settings"), options.index("--show-rules"))
         self.assertLess(options.index("--show-rules"), options.index("--show-files"))
         self.assertLess(options.index("--show-files"), options.index("--output-file"))
-        self.assertLess(formatting.index("--output-format"), formatting.index("--experimental"))
-        self.assertLess(formatting.index("--experimental"), formatting.index("--line-length"))
+        self.assertLess(formatting.index("--output-format"), formatting.index("--legacy"))
+        self.assertLess(formatting.index("--legacy"), formatting.index("--line-length"))
         self.assertLess(output.index("File selection:"), output.index("Miscellaneous:"))
         self.assertLess(output.index("Miscellaneous:"), output.index("Global options:"))
         self.assertIn("--output-file FILE", output)
@@ -989,8 +990,8 @@ class TestCLIShowFiles(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         output = stdout.getvalue()
         self.assertIn("[tool.pydocfmt]", output)
-        self.assertLess(output.index("output-format"), output.index("experimental"))
-        self.assertLess(output.index("experimental"), output.index("line-length"))
+        self.assertLess(output.index("output-format"), output.index("legacy"))
+        self.assertLess(output.index("legacy"), output.index("line-length"))
         self.assertLess(output.index("line-length"), output.index("select"))
         self.assertLess(output.index("extend-fixable"), output.index("include"))
         self.assertIn("line-length = 72", output)
@@ -1300,7 +1301,7 @@ class TestCLIShowFiles(unittest.TestCase):
             root = Path(td)
             target = root / "missing.py"
             stdout = StringIO()
-            argv = ["pydocfmt", "check", str(target)]
+            argv = ["pydocfmt", "check", "--legacy", str(target)]
             with (
                 unittest.mock.patch("sys.argv", argv),
                 contextlib.redirect_stdout(stdout),
@@ -1329,7 +1330,7 @@ class TestCLIShowFiles(unittest.TestCase):
                     return_value=subprocess.CompletedProcess(["git"], 128, stdout=b"", stderr=b"fatal: broken git"),
                 ),
                 unittest.mock.patch(
-                    "pydocformatter.cli.check.pydocfmt.format_file",
+                    "pydocformatter.cli.check.legacy_formatter.format_file",
                     side_effect=fake_format,
                 ),
                 contextlib.redirect_stdout(stdout),
@@ -1377,7 +1378,7 @@ class TestCLIShowFiles(unittest.TestCase):
             (root / "bad.py").write_bytes(b"\xff")
 
             stdout = StringIO()
-            argv = ["pydocfmt", "check", "--line-length", "72", str(root)]
+            argv = ["pydocfmt", "check", "--legacy", "--line-length", "72", str(root)]
             with (
                 unittest.mock.patch("sys.argv", argv),
                 contextlib.redirect_stdout(stdout),
@@ -1390,11 +1391,11 @@ class TestCLIShowFiles(unittest.TestCase):
             self.assertIn(f"{root / 'needs_fix.py'}:", output)
             self.assertIn("PDF000* Needs formatting. Line 2", output)
 
-    def test_pydocfmt_check_rejects_stdin_without_experimental(self) -> None:
+    def test_pydocfmt_check_rejects_stdin_with_legacy(self) -> None:
         source = 'def foo():\n    """This is a very long single-line docstring that should be reflowed by the formatter due to line length."""\n    pass\n'
         stdout = StringIO()
         stderr = StringIO()
-        argv = ["pydocfmt", "check", "-", "--line-length", "72"]
+        argv = ["pydocfmt", "check", "--legacy", "-", "--line-length", "72"]
 
         with (
             unittest.mock.patch("sys.argv", argv),
@@ -1406,7 +1407,7 @@ class TestCLIShowFiles(unittest.TestCase):
 
         self.assertEqual(exit_code, 2)
         self.assertEqual(stdout.getvalue(), "")
-        self.assertIn("Cannot process input from stdin when using non-experimental mode", stderr.getvalue())
+        self.assertIn("Cannot process input from stdin when using legacy mode", stderr.getvalue())
 
     def test_pydocfmt_check_prints_success_message_for_clean_file(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -1441,11 +1442,11 @@ class TestCLIShowFiles(unittest.TestCase):
                 called_args.append((fix, write))
                 return pydocfmt.SourceFormatResult(source=formatted_source, original_source=original_source, docstring_changed_lines=(1,), comment_changed_lines=())
 
-            argv = ["pydocfmt", "check", "--diff", str(target)]
+            argv = ["pydocfmt", "check", "--legacy", "--diff", str(target)]
 
             with (
                 unittest.mock.patch("sys.argv", argv),
-                unittest.mock.patch("pydocformatter.cli.check.pydocfmt.format_file_source", side_effect=fake_format),
+                unittest.mock.patch("pydocformatter.cli.check.legacy_formatter.format_file_source", side_effect=fake_format),
                 contextlib.redirect_stdout(stdout),
             ):
                 exit_code = pydocfmt_cli.main()
@@ -1484,11 +1485,11 @@ class TestCLIShowFiles(unittest.TestCase):
                     errors=(),
                 )
 
-            argv = ["pydocfmt", "check", "--experimental", "--diff", str(target)]
+            argv = ["pydocfmt", "check", "--diff", str(target)]
 
             with (
                 unittest.mock.patch("sys.argv", argv),
-                unittest.mock.patch("pydocformatter.formatter.format_file_exp", side_effect=fake_format),
+                unittest.mock.patch("pydocformatter.formatter.format_file", side_effect=fake_format),
                 contextlib.redirect_stdout(stdout),
             ):
                 exit_code = pydocfmt_cli.main()
@@ -1515,11 +1516,11 @@ class TestCLIShowFiles(unittest.TestCase):
                 del file, settings, rule_selection, fix, write
                 return FormatterResult(path=path, old_source="x = 1\n", new_source="x = 2\n", modified=True, fixed_findings=collections.Counter({PDF001_RULE: 1}), unfixed_findings=(), errors=())
 
-            argv = ["pydocfmt", "check", "--experimental", "--diff", "--exit-zero", str(target)]
+            argv = ["pydocfmt", "check", "--diff", "--exit-zero", str(target)]
 
             with (
                 unittest.mock.patch("sys.argv", argv),
-                unittest.mock.patch("pydocformatter.formatter.format_file_exp", side_effect=fake_format),
+                unittest.mock.patch("pydocformatter.formatter.format_file", side_effect=fake_format),
                 contextlib.redirect_stdout(stdout),
             ):
                 exit_code = pydocfmt_cli.main()
@@ -1534,7 +1535,7 @@ class TestCLIShowFiles(unittest.TestCase):
             target.write_text("x = 1\n", encoding="utf-8")
             stdout = StringIO()
 
-            argv = ["pydocfmt", "check", "--experimental", "--diff", str(target)]
+            argv = ["pydocfmt", "check", "--diff", str(target)]
 
             with (
                 unittest.mock.patch("sys.argv", argv),
@@ -1559,11 +1560,11 @@ class TestCLIShowFiles(unittest.TestCase):
                     path=path, old_source="x = 1\n", new_source="x = 2\n", modified=True, fixed_findings=collections.Counter({PDF001_RULE: 1, PCF001_RULE: 2}), unfixed_findings=(), errors=()
                 )
 
-            argv = ["pydocfmt", "check", "--experimental", "--diff", "--output-file", str(output_file), str(target)]
+            argv = ["pydocfmt", "check", "--diff", "--output-file", str(output_file), str(target)]
 
             with (
                 unittest.mock.patch("sys.argv", argv),
-                unittest.mock.patch("pydocformatter.formatter.format_file_exp", side_effect=fake_format),
+                unittest.mock.patch("pydocformatter.formatter.format_file", side_effect=fake_format),
                 contextlib.redirect_stdout(stdout),
             ):
                 exit_code = pydocfmt_cli.main()
@@ -1581,7 +1582,7 @@ class TestCLIShowFiles(unittest.TestCase):
             target.write_text("x = 1\n", encoding="utf-8")
             stdout = StringIO()
 
-            argv = ["pydocfmt", "check", "--experimental", "--diff", "--output-file", str(output_file), str(target)]
+            argv = ["pydocfmt", "check", "--diff", "--output-file", str(output_file), str(target)]
 
             with (
                 unittest.mock.patch("sys.argv", argv),
@@ -1603,12 +1604,12 @@ class TestCLIShowFiles(unittest.TestCase):
             assert file.read() == source
             return FormatterResult(path=path, old_source=source, new_source="x = 2\n", modified=True, fixed_findings=collections.Counter({PDF001_RULE: 1}), unfixed_findings=(), errors=())
 
-        argv = ["pydocfmt", "check", "--experimental", "--fix", "--diff", "--stdin-filename", "virtual.py"]
+        argv = ["pydocfmt", "check", "--fix", "--diff", "--stdin-filename", "virtual.py"]
 
         with (
             unittest.mock.patch("sys.argv", argv),
             unittest.mock.patch("sys.stdin", StringIO(source)),
-            unittest.mock.patch("pydocformatter.formatter.format_file_exp", side_effect=fake_format),
+            unittest.mock.patch("pydocformatter.formatter.format_file", side_effect=fake_format),
             contextlib.redirect_stdout(stdout),
         ):
             exit_code = pydocfmt_cli.main()
@@ -1630,12 +1631,12 @@ class TestCLIShowFiles(unittest.TestCase):
             assert file.read() == source
             return FormatterResult(path=path, old_source=source, new_source=source, modified=False, fixed_findings=collections.Counter(), unfixed_findings=(), errors=())
 
-        argv = ["pydocfmt", "check", "ignored.py", "--stdin-filename", "virtual.py", "--line-length", "72", "--experimental"]
+        argv = ["pydocfmt", "check", "ignored.py", "--stdin-filename", "virtual.py", "--line-length", "72"]
 
         with (
             unittest.mock.patch("sys.argv", argv),
             unittest.mock.patch("sys.stdin", StringIO(source)),
-            unittest.mock.patch("pydocformatter.formatter.format_file_exp", side_effect=fake_format),
+            unittest.mock.patch("pydocformatter.formatter.format_file", side_effect=fake_format),
             contextlib.redirect_stdout(stdout),
             contextlib.redirect_stderr(stderr),
         ):
@@ -1673,7 +1674,7 @@ class TestCLIShowFiles(unittest.TestCase):
         source = "def foo():\n    pass\n"
         stdout = StringIO()
         stderr = StringIO()
-        format_file_exp = unittest.mock.Mock(
+        format_file = unittest.mock.Mock(
             return_value=FormatterResult(path="skip.py", old_source=source, new_source=source, modified=False, fixed_findings=collections.Counter(), unfixed_findings=(), errors=())
         )
         argv = [
@@ -1684,20 +1685,19 @@ class TestCLIShowFiles(unittest.TestCase):
             "--force-exclude",
             "--exclude",
             "skip.py",
-            "--experimental",
         ]
 
         with (
             unittest.mock.patch("sys.argv", argv),
             unittest.mock.patch("sys.stdin", StringIO(source)),
-            unittest.mock.patch("pydocformatter.formatter.format_file_exp", format_file_exp),
+            unittest.mock.patch("pydocformatter.formatter.format_file", format_file),
             contextlib.redirect_stdout(stdout),
             contextlib.redirect_stderr(stderr),
         ):
             exit_code = pydocfmt_cli.main()
 
         self.assertEqual(exit_code, 0)
-        format_file_exp.assert_not_called()
+        format_file.assert_not_called()
         self.assertEqual(stdout.getvalue(), "All checks passed!\n")
         self.assertEqual(stderr.getvalue(), "")
 
@@ -1738,12 +1738,12 @@ class TestCLIShowFiles(unittest.TestCase):
             assert file.read() == source
             return FormatterResult(path="-", old_source=source, new_source=formatted_source, modified=True, fixed_findings=collections.Counter({PDF001_RULE: 1}), unfixed_findings=(), errors=())
 
-        argv = ["pydocfmt", "check", "--fix", "-", "--line-length", "72", "--experimental"]
+        argv = ["pydocfmt", "check", "--fix", "-", "--line-length", "72"]
 
         with (
             unittest.mock.patch("sys.argv", argv),
             unittest.mock.patch("sys.stdin", StringIO(source)),
-            unittest.mock.patch("pydocformatter.formatter.format_file_exp", side_effect=fake_format),
+            unittest.mock.patch("pydocformatter.formatter.format_file", side_effect=fake_format),
             contextlib.redirect_stdout(stdout),
             contextlib.redirect_stderr(stderr),
         ):
@@ -1770,12 +1770,12 @@ class TestCLIShowFiles(unittest.TestCase):
                 assert file.read() == source
                 return FormatterResult(path="-", old_source=source, new_source=formatted_source, modified=True, fixed_findings=collections.Counter({PDF001_RULE: 1}), unfixed_findings=(), errors=())
 
-            argv = ["pydocfmt", "check", "--fix", "-", "--line-length", "72", "--experimental", "--output-file", str(output_file)]
+            argv = ["pydocfmt", "check", "--fix", "-", "--line-length", "72", "--output-file", str(output_file)]
 
             with (
                 unittest.mock.patch("sys.argv", argv),
                 unittest.mock.patch("sys.stdin", StringIO(source)),
-                unittest.mock.patch("pydocformatter.formatter.format_file_exp", side_effect=fake_format),
+                unittest.mock.patch("pydocformatter.formatter.format_file", side_effect=fake_format),
                 contextlib.redirect_stdout(stdout),
                 contextlib.redirect_stderr(stderr),
             ):
@@ -1793,7 +1793,7 @@ class TestCLIShowFiles(unittest.TestCase):
             target.write_text('def foo():\n    """This is a very long single-line docstring that should be reflowed by the formatter due to line length."""\n    pass\n', encoding="utf-8")
             output_file = root / "reports" / "errors.txt"
             stdout = StringIO()
-            argv = ["pydocfmt", "check", str(target), "--line-length", "72", "--output-file", str(output_file)]
+            argv = ["pydocfmt", "check", "--legacy", str(target), "--line-length", "72", "--output-file", str(output_file)]
 
             with (
                 unittest.mock.patch("sys.argv", argv),
@@ -1815,7 +1815,7 @@ class TestCLIShowFiles(unittest.TestCase):
             output_file = root / "reports" / "errors.txt"
             stdout = StringIO()
             stderr = StringIO()
-            argv = ["pydocfmt", "check", str(target), "--output-file", str(output_file)]
+            argv = ["pydocfmt", "check", "--legacy", str(target), "--output-file", str(output_file)]
 
             with (
                 unittest.mock.patch("sys.argv", argv),

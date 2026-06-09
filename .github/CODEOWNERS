@@ -4,7 +4,7 @@
 * @pallgeuer
 
 # Core formatter modules require extra review
-/src/pydocformatter/formatters/ @pallgeuer
+/src/pydocformatter/legacy/ @pallgeuer
 
 # Configuration and build files
 /pyproject.toml @pallgeuer

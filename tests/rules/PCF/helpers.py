@@ -23,7 +23,6 @@ def format_pcf(
     comment_detect_expressions: bool = False,
 ) -> formatter.FormatterResult:
     settings = CheckSettings(
-        experimental=True,
         select=("PCF",),
         line_length=line_length,
         line_ending=line_ending,
@@ -44,4 +43,4 @@ def format_pcf(
 
 
 def format_pcf_settings(source: str, *, settings: CheckSettings, fix: bool = True) -> formatter.FormatterResult:
-    return formatter.format_source_exp(source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=fix)
+    return formatter.format_source(source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=fix)

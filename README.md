@@ -86,7 +86,7 @@ If no files or directories are specified, `pydocfmt check` checks the current di
 
 **Formatting:**
 - `--output-format {grouped}`: Output format for rule findings (default: grouped)
-- `--experimental`, `--no-experimental`: Toggle the experimental rule-based formatter implementation (default: disabled)
+- `--legacy`, `--no-legacy`: Toggle the legacy formatter implementation (default: disabled)
 - `--line-length LENGTH`: Maximum line length for docstrings and comments (default: 88)
 - `--line-ending {auto,lf,cr-lf,native}`: Line ending to use when rewriting files (default: auto)
 - `--indent-style {space,tab}`: Indentation style for generated docstring sections (default: space)
@@ -199,7 +199,7 @@ pydocformatter can be configured via `pyproject.toml` (example):
 ```toml
 [tool.pydocfmt]
 output-format = "grouped"
-experimental = false
+legacy = false
 line-length = 88
 line-ending = "auto"
 indent-style = "space"
@@ -233,7 +233,7 @@ force-exclude = false
 
 **Configuration Options:**
 - `output-format`: Output format for rule findings; currently only `"grouped"` is supported (default: `"grouped"`)
-- `experimental`: Use the experimental rule-based formatter implementation (default: `false`)
+- `legacy`: Use the legacy formatter implementation (default: `false`)
 - `line-length`: Maximum line length for docstrings and comments (default: 88)
 - `line-ending`: Line ending to use when rewriting files; one of `"auto"`, `"lf"`, `"cr-lf"`, or `"native"` (default: `"auto"`)
 - `indent-style`: Generated docstring section indentation style; one of `"space"` or `"tab"` (default: `"space"`)
@@ -266,7 +266,7 @@ force-exclude = false
 
 When `respect-gitignore` is enabled, pydocfmt aborts if gitignore filtering cannot be checked, because continuing without that filter could format files that should stay ignored.
 
-The `comment-*` settings currently affect only the experimental rule-based formatter selected with `experimental = true`. PCF001 defaults to formatting each standalone physical line independently; joining and structured-markup interpretation are opt-in. See `pydocfmt rule PCF001` and `pydocfmt rule PCF002` for exact detector precedence and protected-comment behavior.
+The `comment-*` settings affect the rule-based formatter. PCF001 defaults to formatting each standalone physical line independently; joining and structured-markup interpretation are opt-in. See `pydocfmt rule PCF001` and `pydocfmt rule PCF002` for exact detector precedence and protected-comment behavior.
 
 Settings are resolved per path as defaults, then the closest containing `pyproject.toml` with `[tool.pydocfmt]`, then explicit `--config` files, then inline `--config` setting overrides, then dedicated command-line options. Parent config files are not merged into child config files. The highest-precedence specified value wins for each key, including `extend-include` and `extend-exclude`.
 

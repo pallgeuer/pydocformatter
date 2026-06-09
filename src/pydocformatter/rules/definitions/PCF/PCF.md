@@ -17,7 +17,7 @@ Comments remain readable and consistently spaced without rewriting directives or
 Physical standalone runs contain consecutive, same-indent, regular, non-empty comments. Empty comments, hash-only separators, protected comments, indentation changes, and nonconsecutive source lines end a run. PCF001 may subdivide a run further according to its enabled structure settings.
 
 ## Related tooling
-Ruff can report comment line-length and whitespace issues, but does not provide equivalent configurable comment reflow and trailing-comment extraction. The advanced settings below currently affect only the experimental rule-based formatter selected with `experimental = true`.
+Ruff can report comment line-length and whitespace issues, but does not provide equivalent configurable comment reflow and trailing-comment extraction.
 
 ## Settings
 Standalone paragraph joining remains disabled by default, so ordinary prose comments are formatted one physical line at a time. List items and block quotes are formatted by default, fenced code is preserved, and Python statements are protected from prose formatting.

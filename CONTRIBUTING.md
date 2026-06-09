@@ -152,7 +152,7 @@ uv run pytest -q tests/test_pydocfmt.py
 
 #### Test File Structure
 ```python
-from pydocformatter.formatters.your_module import your_function  # noqa
+from pydocformatter.your_module import your_function  # noqa
 
 def test_normal_case() -> None:
     """Test the normal expected behavior."""

@@ -15,7 +15,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added `pydocfmt help [command]`, `pydocfmt version`, `pydocfmt --version`, `pydocfmt check --show-settings`, and `pydocfmt check --show-rules`.
   - Added `--line-ending` to control line endings used when rewriting files.
   - Added `--output-format grouped` for rule findings.
-  - Added `--experimental` / `--no-experimental` for opting into the experimental formatter path.
+  - Added `--legacy` / `--no-legacy` for opting into the legacy formatter path.
   - Added `--show-files` to report all considered files during discovery, including included files and ignored files with include/exclude reasons, without formatting files.
   - Added Ruff-style stdin support via `pydocfmt check -` and `--stdin-filename`.
   - Added Ruff-style `-o` / `--output-file` for redirecting diagnostics and show output.
@@ -31,14 +31,14 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 - **Configuration:**
   - Enabled comment list-item and block-quote formatting, structural preservation, and Python statement detection by default, while leaving heuristic disabled-code and expression detection disabled.
   - Added `output-format` for formatter configuration, currently supporting only `"grouped"`.
-  - Added `experimental` for formatter configuration, defaulting to `false`.
+  - Added `legacy` for formatter configuration, defaulting to `false`.
   - Added Ruff-style `line-ending` configuration with `"auto"`, `"lf"`, `"cr-lf"`, and `"native"` values.
   - Added `indent-style` and `indent-width` for generated docstring section indentation, with Ruff-style defaults of `"space"` and `4`.
   - Added Ruff-style rule settings under `[tool.pydocfmt]`: `select`, `ignore`, `extend-select`, `per-file-ignores`, `extend-per-file-ignores`, `fixable`, `unfixable`, and `extend-fixable`.
   - Added `respect-gitignore` for formatter configuration, defaulting to `true`.
   - Added explicit config-file support for `--config PATH`, including pyproject-style `[tool.pydocfmt]` files and dedicated top-level pydocfmt TOML files.
   - Added Ruff-style path-aware auto-discovery for the closest containing `[tool.pydocfmt]` `pyproject.toml`.
-  - Added independent experimental comment-formatting settings for standalone paragraph joining, list items, headings, doctests, code fences, block quotes, tables, reStructuredText directives, and disabled-code detection.
+  - Added independent comment-formatting settings for standalone paragraph joining, list items, headings, doctests, code fences, block quotes, tables, reStructuredText directives, and disabled-code detection.
 
 - **Documentation:**
   - Added a Ruff file-selection compatibility specification at `docs/file_selection_spec.md`, including exact defaults, precedence rules, force-exclude behavior, config-relative glob bases, and explicit pydocformatter deviations.
@@ -56,7 +56,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Vastly expanded PCF rule tests across comment classification, run boundaries, structure preservation, code detection, width handling, line endings, mixed formatting, syntax-position safety, convergence, idempotence, and rule independence.
 
 - **Formatting:**
-  - Added the LibCST-based experimental rule execution framework with ordered category preprocessing, repeated automatic-fix passes, final read-only checks, and non-convergence diagnostics.
+  - Added the LibCST-based rule execution framework with ordered category preprocessing, repeated automatic-fix passes, final read-only checks, and non-convergence diagnostics.
   - Added typed PCF comment and PDF docstring category data, together with a shared validated source-edit helper, as the foundation for individual rule implementations.
   - Implemented PCF001 standalone-comment formatting and PCF002 trailing-comment formatting with independent fixes, protected directive handling, tab-expanded widths, stable impossible-width behavior, and exact EOF preservation.
 
@@ -68,6 +68,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 
 - **Developer workflow:**
   - Changed the mypy pre-commit hook to use the locked project environment through `uv run mypy`.
+  - Added an explicit test package boundary and moved reusable PCF test helpers out of `conftest.py`, allowing mypy to check multiple directory-scoped pytest configurations without exclusions.
   - Organized rule tests by category and rule code under `tests/rules/`.
 
 - **Rule framework:**
@@ -76,9 +77,10 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Renamed PCF001 to `standalone-comment-formatting` and PCF002 to `trailing-comment-formatting` to reflect their spacing and wrapping behavior.
 
 - **CLI:**
+  - Made rule-based formatting the default and added `--legacy` for temporarily selecting the previous formatter implementation.
   - Reorganized `pydocfmt check --help` into Ruff-inspired argument groups for options, rule selection, and file selection.
   - Moved argparse helpers from `pydocformatter.cli.utils` to `pydocformatter.utils.argparser`.
-  - Moved `--output-format` and `--experimental` to the Formatting help group, and moved `--output-file` to the end of the Options group.
+  - Moved `--output-format` and `--legacy` to the Formatting help group, and moved `--output-file` to the end of the Options group.
   - Refactored parser setup to share global option definitions and isolate version/help subcommand construction.
   - Updated `pydocfmt check --help` argument ordering and metavars to keep help, settings output, and documentation consistent.
   - Rule and file-selection list options now use comma-separated CLI values, such as `--select PDF,PCF` and `--include "*.py,*.pyi"`.
@@ -122,9 +124,10 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - File selection now deduplicates paths that resolve to the same physical file and displays real filesystem paths as absolute normalized paths.
 
 - **Formatting:**
-  - Added experimental `Rule`, `RuleFinding`, and `FormatterResult` data structures for reporting remaining rule issues after fixes.
-  - Changed experimental fixes to preserve untouched mixed line endings instead of normalizing the complete file after any source change.
-  - Experimental formatter results now carry the formatted source alongside path, modification, finding, and error data.
+  - Moved the previous formatter implementation into `pydocformatter.legacy` and gave the rule-based formatter APIs their permanent unsuffixed names.
+  - Added `Rule`, `RuleFinding`, and `FormatterResult` data structures for reporting remaining rule issues after fixes.
+  - Changed rule fixes to preserve untouched mixed line endings instead of normalizing the complete file after any source change.
+  - Formatter results now carry the formatted source alongside path, modification, finding, and error data.
   - `SourceFormatResult` now carries the original source alongside the possibly formatted source.
   - Formatter internals now require formatting controls such as line length, line endings, and indentation settings as explicit keyword-only arguments.
   - Formatter functions now receive resolved `CheckSettings` directly.
@@ -151,7 +154,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Setting metadata now derives default TOML keys from field names and default CLI flags from setting keys, with `SettingCliDefinition` renamed to `SettingCLIDefinition`.
   - Utility helpers now live in explicit `pydocformatter.utils` submodules for diagnostics, glob matching, and line endings.
   - Consolidated diagnostics, line-ending, and automatic pluralization helpers in `pydocformatter.utils.misc`.
-  - Experimental formatter interfaces now live in `pydocformatter.formatter`.
+  - Rule-based formatter interfaces now live in `pydocformatter.formatter`.
   - `pydocformatter.settings` now provides generic schema-driven settings machinery for config loading, validation, settings output, argparse setup, and CLI override extraction.
   - `pydocformatter.settings` now provides generic multi-string map typing and validation, and raw CLI setting definitions now show default values unless explicitly disabled.
   - Setting metadata now derives default validation, CLI behavior, and TOML rendering from each setting's declared type.
@@ -160,7 +163,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Moved global `--config` and `--isolated` parsing into reusable `GlobalArgs` helpers, shared by the top-level and `check` parsers.
   - Renamed the CLI implementation module from `pydocformatter.cli.pydocfmt_main` to `pydocformatter.cli.main`.
   - Moved enabled-state help text formatting into the configuration layer.
-  - Moved experimental file I/O diagnostics into the formatter layer.
+  - Moved rule-based file I/O diagnostics into the formatter layer.
   - Simplified `RuleCollection` by storing rule classes directly, exposing a rule-code-to-class index, and replacing string-based selector existence checks with `matching_rules_exist`.
   - Rule registration now uses an explicit frozen `RuleRegistry`, allowing tests and custom collection paths to avoid stale global rule state.
   - Rule collection now happens when `pydocformatter.rules.collection` is imported and is exposed as `RULE_COLLECTION`.
@@ -181,6 +184,10 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Updated mypy from 1.20.2 to 2.1.0.
 
 ### Fixed
+
+- **Tests:**
+  - Added a session-wide temporary configuration boundary and per-test working directories so tests no longer inherit ancestor `[tool.pydocfmt]` configuration, fixing stdin checks that failed under the repository's `legacy = true` self-configuration and removing latent coupling for CLI and file-selection tests.
+  - Made the README settings-documentation test locate `README.md` relative to the test file instead of the current working directory.
 
 - **Formatting:**
   - Kept extracted trailing comments separate from preceding standalone comments, required fenced-region closers to contain no trailing text, and normalized tab-equivalent block-quote prefixes in one formatting pass.
@@ -204,7 +211,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - `pydocfmt check` now reports invalid nested path-specific configuration without producing a traceback.
   - `--force-exclude` now applies to virtual paths supplied through `--stdin-filename`.
   - `pydocfmt check` now prints `All checks passed!` to the configured output when no diagnostics are found.
-  - `pydocfmt check --output-file` remains supported with the legacy formatter, while stdin input is limited to the experimental formatter path.
+  - `pydocfmt check --output-file` remains supported with the legacy formatter, while stdin input is limited to the rule-based formatter path.
   - Operational errors no longer produce an `All checks passed!` success message.
   - Output-file setup errors are now reported without converting unrelated `OSError`s raised while producing diagnostics.
   - `pydocfmt` now skips files that fail UTF-8 decoding, emits an operational error in grouped output, and continues processing remaining files instead of crashing.
