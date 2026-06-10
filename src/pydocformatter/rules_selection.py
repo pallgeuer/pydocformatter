@@ -6,6 +6,7 @@ from collections.abc import Mapping
 
 import pydocformatter.rules.collection as rule_collection
 import pydocformatter.settings as settings_core
+import pydocformatter.utils.misc as misc
 from pydocformatter.cli.settings_check import CheckSettings
 from pydocformatter.rules.codes import ALL_RULE_SELECTOR_TAG, RuleCode, RuleSelector
 from pydocformatter.rules.collection import RuleCollection
@@ -246,8 +247,7 @@ def _resolve_rule_incompatibilities(enabled_strengths: dict[RuleCode, _SelectorS
         earlier_conflicts = tuple(code for code in effective_strengths if code in incompatible_codes)
         if earlier_conflicts:
             conflicts = ", ".join(map(str, earlier_conflicts))
-            rule_noun = "rule" if len(earlier_conflicts) == 1 else "rules"
-            errors.append(f"Selected rule {rule.code} is incompatible with earlier selected {rule_noun} {conflicts}; {rule.code} has been disabled")
+            errors.append(f"Selected rule {rule.code} is incompatible with earlier selected {misc.auto_plural(len(earlier_conflicts), 'rule')} {conflicts}; {rule.code} has been disabled")
         else:
             effective_strengths[rule.code] = enabled_strengths[rule.code]
     return effective_strengths
