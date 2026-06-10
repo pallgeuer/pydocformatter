@@ -11,7 +11,7 @@ from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetada
 class TestSourceEdits(unittest.TestCase):
     def test_planned_source_changes_apply_edits_and_create_findings(self) -> None:
         module = cst.parse_module("value = 1\n")
-        rule = RuleMetadata(code=RuleCode("PDF999"), name="test-rule", message="Test message", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0", setting_effects=())
+        rule = RuleMetadata(code=RuleCode("PDF999"), name="test-rule", message="Test message", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0", setting_effects=(), incompatible_with=())
         changes = (
             rule_edits.PlannedSourceChange(
                 edit=rule_edits.SourceEdit(cst_metadata.CodeRange(start=cst_metadata.CodePosition(1, 8), end=cst_metadata.CodePosition(1, 9)), "2"),

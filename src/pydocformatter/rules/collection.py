@@ -52,6 +52,21 @@ class RuleCollection:
         object.__setattr__(self, "rules", tuple(rule_class_by_code.values()))
         object.__setattr__(self, "rule_class", rule_class_by_code)
 
+        self._validate_rule_incompatibilities()
+
+    def _validate_rule_incompatibilities(self) -> None:
+        """Validate incompatibility metadata against the complete rule collection."""
+        for rule in self.rules:
+            code = rule.meta.code
+            if code in rule.meta.incompatible_with:
+                raise RuleCollectionError(f"Rule {code} cannot be incompatible with itself")
+            for incompatible_code in rule.meta.incompatible_with:
+                incompatible_rule = self.rule_class.get(incompatible_code)
+                if incompatible_rule is None:
+                    raise RuleCollectionError(f"Rule {code} is incompatible with unknown rule code {incompatible_code}")
+                if code not in incompatible_rule.meta.incompatible_with:
+                    raise RuleCollectionError(f"Rule incompatibility between {code} and {incompatible_code} must be declared by both rules")
+
     def matching_rules_exist(self, selector: RuleSelector) -> bool:
         """Return whether a selector matches at least one collected rule."""
         return any(selector.selects_code(rule.meta.code) for rule in self.rules)

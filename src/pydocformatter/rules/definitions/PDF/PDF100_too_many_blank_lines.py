@@ -16,4 +16,5 @@ class PDF100TooManyBlankLines(RuleBase):
         fix_availability=FixAvailability.ALWAYS,
         stable_since="0.3.0",
         setting_effects=(),
+        incompatible_with=(),
     )

@@ -148,6 +148,7 @@ def select_rules(
     )
     enabled_strengths = _resolve_enabled_strengths(selected_strengths, ignored_strengths)
     enabled_strengths = _apply_setting_effects(settings, enabled_strengths=enabled_strengths, collection=collection)
+    enabled_strengths = _resolve_rule_incompatibilities(enabled_strengths, collection=collection, errors=errors)
 
     fixable_strengths = _resolve_rule_strengths(
         _selector_groups(
@@ -231,6 +232,24 @@ def _apply_setting_effects(settings: CheckSettings, *, enabled_strengths: dict[R
         enabled_strength = effective_strengths[rule.code]
         if RuleSettingEffect.DISABLED in triggered_effects or (RuleSettingEffect.IGNORED in triggered_effects and not enabled_strength.exact_match):
             del effective_strengths[rule.code]
+    return effective_strengths
+
+
+def _resolve_rule_incompatibilities(enabled_strengths: dict[RuleCode, _SelectorStrength], *, collection: RuleCollection, errors: list[str]) -> dict[RuleCode, _SelectorStrength]:
+    """Keep the first selected rule from each incompatible set and report discarded rules."""
+    effective_strengths: dict[RuleCode, _SelectorStrength] = {}
+    for rule_class in collection.rules:
+        rule = rule_class.meta
+        if rule.code not in enabled_strengths:
+            continue
+        incompatible_codes = set(rule.incompatible_with)
+        earlier_conflicts = tuple(code for code in effective_strengths if code in incompatible_codes)
+        if earlier_conflicts:
+            conflicts = ", ".join(map(str, earlier_conflicts))
+            rule_noun = "rule" if len(earlier_conflicts) == 1 else "rules"
+            errors.append(f"Selected rule {rule.code} is incompatible with earlier selected {rule_noun} {conflicts}; {rule.code} has been disabled")
+        else:
+            effective_strengths[rule.code] = enabled_strengths[rule.code]
     return effective_strengths
 
 

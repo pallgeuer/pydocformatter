@@ -4,6 +4,8 @@ Fix is always available.
 
 Rule is ignored if `docstring-convention` is `numpy` or `pep257`.
 
+Rule is incompatible with `PDF102`.
+
 ## What it does
 Checks for multi-line docstrings whose opening triple quotes should share a line with the first content line.
 
@@ -11,7 +13,7 @@ Checks for multi-line docstrings whose opening triple quotes should share a line
 Projects that prefer compact docstrings can keep the opening delimiter and summary together while still allowing multi-line bodies.
 
 ## Ruff compatibility
-This rule is intended to replace Ruff's `D212` or `D213` when the configured pydocformatter style keeps opening quotes on the summary line. It conflicts with `PDF102`.
+This rule is intended to replace Ruff's `D212` or `D213` when the configured pydocformatter style keeps opening quotes on the summary line.
 
 ## Example
 ```python

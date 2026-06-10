@@ -19,9 +19,17 @@ from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetadata
 from pydocformatter.rules_selection import RuleSelection
 
-PDF001_RULE = RuleMetadata(code=RuleCode("PDF001"), name="reflow-required", message="Docstring chunk needs reflow", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0", setting_effects=())
+PDF001_RULE = RuleMetadata(
+    code=RuleCode("PDF001"), name="reflow-required", message="Docstring chunk needs reflow", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0", setting_effects=(), incompatible_with=()
+)
 PCF001_RULE = RuleMetadata(
-    code=RuleCode("PCF001"), name="comment-formatting-needed", message="Comment needs formatting", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0", setting_effects=()
+    code=RuleCode("PCF001"),
+    name="comment-formatting-needed",
+    message="Comment needs formatting",
+    fix_availability=FixAvailability.ALWAYS,
+    stable_since="0.3.0",
+    setting_effects=(),
+    incompatible_with=(),
 )
 
 
@@ -1002,7 +1010,7 @@ class TestCLIShowFiles(unittest.TestCase):
         self.assertIn("respect-gitignore = false", output)
 
     def test_pydocfmt_check_show_rules_applies_conventions_and_manual_reenablements(self) -> None:
-        def shown_convention_rules(*args: str) -> tuple[str, ...]:
+        def show_convention_rules(*args: str) -> tuple[int, tuple[str, ...], str]:
             stdout = StringIO()
             argv = ["pydocfmt", "--isolated", "check", "--show-rules", *args]
             with (
@@ -1010,33 +1018,32 @@ class TestCLIShowFiles(unittest.TestCase):
                 contextlib.redirect_stdout(stdout),
             ):
                 exit_code = pydocfmt_cli.main()
-            self.assertEqual(exit_code, 0)
-            return tuple(line.split(maxsplit=1)[0].removesuffix("*") for line in stdout.getvalue().splitlines() if line.startswith(("PDF101", "PDF102", "PDF103")))
+            output = stdout.getvalue()
+            rules = tuple(line.split(maxsplit=1)[0].removesuffix("*") for line in output.splitlines() if line.startswith(("PDF101", "PDF102", "PDF103", "PDF104")))
+            return exit_code, rules, output
 
         broad_expectations = {
-            "none": ("PDF101", "PDF102", "PDF103"),
-            "google": ("PDF101",),
-            "numpy": (),
-            "pep257": (),
+            "none": (0, ("PDF101", "PDF104")),
+            "google": (0, ("PDF101", "PDF104")),
+            "numpy": (0, ("PDF104",)),
+            "pep257": (0, ("PDF104",)),
         }
-        for convention, expected in broad_expectations.items():
+        for convention, (expected_exit_code, expected_rules) in broad_expectations.items():
             with self.subTest(variation="broad", convention=convention):
-                self.assertEqual(shown_convention_rules("--docstring-convention", convention), expected)
+                exit_code, rules, output = show_convention_rules("--docstring-convention", convention)
+                self.assertEqual((exit_code, rules), (expected_exit_code, expected_rules))
+                self.assertNotIn("has been disabled", output)
 
         for convention in broad_expectations:
             with self.subTest(variation="exact-extend-select", convention=convention):
-                self.assertEqual(
-                    shown_convention_rules("--docstring-convention", convention, "--extend-select", "PDF101,PDF102,PDF103"),
-                    ("PDF101", "PDF102", "PDF103"),
-                )
+                exit_code, rules, output = show_convention_rules("--docstring-convention", convention, "--extend-select", "PDF101,PDF102,PDF103,PDF104")
+                self.assertEqual((exit_code, rules, output.count("has been disabled")), (1, ("PDF101", "PDF103"), 2))
 
-        self.assertEqual(shown_convention_rules("--docstring-convention", "google", "--extend-select", "PDF10"), ("PDF101",))
-        self.assertEqual(shown_convention_rules("--docstring-convention", "numpy", "--extend-select", "PDF10"), ())
-        self.assertEqual(shown_convention_rules("--docstring-convention", "google", "--select", "PDF102"), ("PDF102",))
-        self.assertEqual(
-            shown_convention_rules("--docstring-convention", "google", "--extend-select", "PDF102,PDF103", "--ignore", "PDF102"),
-            ("PDF101", "PDF103"),
-        )
+        self.assertEqual(show_convention_rules("--docstring-convention", "google", "--extend-select", "PDF10")[:2], (0, ("PDF101", "PDF104")))
+        self.assertEqual(show_convention_rules("--docstring-convention", "numpy", "--extend-select", "PDF10")[:2], (0, ("PDF104",)))
+        self.assertEqual(show_convention_rules("--docstring-convention", "google", "--select", "PDF102")[:2], (0, ("PDF102",)))
+        exit_code, rules, output = show_convention_rules("--docstring-convention", "google", "--extend-select", "PDF102,PDF103", "--ignore", "PDF102")
+        self.assertEqual((exit_code, rules, output.count("has been disabled")), (1, ("PDF101", "PDF103"), 1))
 
     def test_pydocfmt_check_config_file_prints_resolved_settings(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -1510,7 +1517,13 @@ class TestCLIShowFiles(unittest.TestCase):
             target.write_text(original_source, encoding="utf-8")
             stdout = StringIO()
             rule = RuleMetadata(
-                code=RuleCode("PDF105"), name="summary-too-long", message="Docstring summary does not fit on one line", fix_availability=FixAvailability.NEVER, stable_since="0.3.0", setting_effects=()
+                code=RuleCode("PDF105"),
+                name="summary-too-long",
+                message="Docstring summary does not fit on one line",
+                fix_availability=FixAvailability.NEVER,
+                stable_since="0.3.0",
+                setting_effects=(),
+                incompatible_with=(),
             )
             called_args: list[tuple[bool, bool]] = []
 

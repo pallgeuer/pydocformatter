@@ -41,8 +41,9 @@ Rule classes register with their category through `@register_rule_to(PDF)` and d
 - `message`: The default diagnostic message. It may include format fields for per-finding customization.
 - `fix_availability`: A `FixAvailability` value describing whether automatic fixes are `Always`, `Sometimes`, or `Never` available at the rule level.
 - `setting_effects`: Immutable metadata mapping resolved setting fields and triggering values to `Ignored` or `Disabled` selection effects.
+- `incompatible_with`: An immutable tuple of `RuleCode` values for rules that cannot be selected together with this rule.
 
-`RuleBase` rejects subclasses without `meta`, or with non-`RuleMetadata` metadata, at class definition time. `RuleMetadata` rejects non-`RuleCode` codes, non-`FixAvailability` fix availability values, empty names, messages, or stable versions, and malformed setting-effect records. Category registration rejects rules whose code prefix differs from the category prefix and rejects duplicate rule codes from different classes.
+`RuleBase` rejects subclasses without `meta`, or with non-`RuleMetadata` metadata, at class definition time. `RuleMetadata` rejects non-`RuleCode` codes, non-`FixAvailability` fix availability values, empty names, messages, or stable versions, malformed setting-effect records, malformed incompatibility tuples, and duplicate incompatible codes. Category registration rejects rules whose code prefix differs from the category prefix and rejects duplicate rule codes from different classes.
 
 No rule application or fix method interface is specified yet. That interface will be added when rule execution is implemented.
 
@@ -73,6 +74,7 @@ Collection behavior:
 - Categories expose their rules in rule-code order and allow idempotent re-registration of the same rule class.
 - `matching_rules(selector)` returns matching rule classes in collection order.
 - `matching_rules_exist(selector)` returns whether any collected rule matches the selector.
+- Incompatibility declarations must reference collected rules, cannot reference the declaring rule itself, and must be declared mutually by both rules.
 
 Built-in categories use the default registry through `@register_rule_category`, and their rules use `@register_rule_to(category)`. Tests and custom rule packages can use an isolated `RuleRegistry` with `register_rule_category_to(registry)`, pass that registry to `import_package_rule_categories`, then call `registry.collection()`.
 
@@ -156,6 +158,19 @@ Global enabled rules are resolved per rule:
 - Select the rule only when the enabling selector strength is greater than the disabling selector strength.
 
 The output `rules` tuple preserves deterministic rule-code order after filtering.
+
+## Rule Incompatibilities
+
+After normal selection precedence and setting effects are resolved, selected rule incompatibilities are resolved once for the complete settings profile:
+
+- Rules are considered in deterministic `RuleCollection.rules` order.
+- A rule is retained unless it is incompatible with an earlier retained rule.
+- A discarded rule does not prevent a later compatible rule from being retained.
+- Selector source priority and specificity do not override collection ordering during this final pass.
+- Each discarded rule produces one operational error listing all earlier retained rules that conflict with it.
+- Per-file ignores run later and do not restore rules discarded by incompatibility resolution.
+
+The built-in opposing pairs (e.g. `PDF101`/`PDF102` and `PDF103`/`PDF104`) are mutually incompatible. Convention-specific setting effects keep each built-in convention profile conflict-free, but exact selection can restore ignored rules. Selecting both rules in either pair retains the lower ordered rule and reports the higher ordered rule as disabled.
 
 ## Per-File Ignores
 
@@ -260,6 +275,7 @@ Current error wording:
 - Invalid selector: `"{context} contains invalid selector: {selector}"`
 - Unknown selector: `"{context} contains unknown selector: {selector}"`
 - Fixability selector that only matches rules with no available fixes: `"{context} selector {selector!r} only matches rules with no available fixes"`
+- Incompatible selected rule: `"Selected rule {rule} is incompatible with earlier selected rule[s] {conflicts}; {rule} has been disabled"`
 
 Contexts include:
 

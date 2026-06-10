@@ -2,7 +2,9 @@
 
 Fix is always available.
 
-Rule is ignored if `docstring-convention` is `google`, `numpy`, or `pep257`.
+Rule is ignored if `docstring-convention` is `none`, `google`, `numpy`, or `pep257`.
+
+Rule is incompatible with `PDF104`.
 
 ## What it does
 Checks for multi-line docstrings whose closing triple quotes should share a line with the last content line.
@@ -11,7 +13,7 @@ Checks for multi-line docstrings whose closing triple quotes should share a line
 Projects that prefer compact docstrings can avoid a delimiter-only closing line when the configured style allows it.
 
 ## Ruff compatibility
-This rule is intended to provide the compact closing-quotes style not available from Ruff's `D209`. It conflicts with `PDF104`.
+This rule is intended to provide the compact closing-quotes style not available from Ruff's `D209`.
 
 ## Example
 ```python

@@ -73,6 +73,7 @@ class RuleMetadata:
         fix_availability (FixAvailability): Rule-level automatic fix availability.
         stable_since (str): pydocformatter version in which the rule became stable.
         setting_effects (tuple[RuleSettingEffects, ...]): Selection effects driven by resolved setting values.
+        incompatible_with (tuple[RuleCode, ...]): Rule codes that cannot be selected together with this rule.
     """
 
     code: RuleCode
@@ -81,6 +82,7 @@ class RuleMetadata:
     fix_availability: FixAvailability
     stable_since: str
     setting_effects: tuple[RuleSettingEffects, ...]
+    incompatible_with: tuple[RuleCode, ...]
 
     def __post_init__(self) -> None:
         """Validate rule metadata fields."""
@@ -98,6 +100,12 @@ class RuleMetadata:
             raise TypeError(f"{self.code}: Rule setting effects must be a tuple")
         if not all(isinstance(setting_effects, RuleSettingEffects) for setting_effects in self.setting_effects):
             raise TypeError(f"{self.code}: Rule setting effects must contain RuleSettingEffects instances")
+        if not isinstance(self.incompatible_with, tuple):
+            raise TypeError(f"{self.code}: Incompatible rule codes must be a tuple")
+        if not all(isinstance(rule_code, RuleCode) for rule_code in self.incompatible_with):
+            raise TypeError(f"{self.code}: Incompatible rule codes must contain RuleCode instances")
+        if len(set(self.incompatible_with)) != len(self.incompatible_with):
+            raise ValueError(f"{self.code}: Incompatible rule codes must not contain duplicates")
 
 
 @dataclasses.dataclass(frozen=True, order=True)

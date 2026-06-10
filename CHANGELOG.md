@@ -35,7 +35,8 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 
 - **Configuration:**
   - Added generic rule-selection effects driven by resolved setting values, with exact-selector restoration for ignored rules and unconditional removal for disabled rules.
-  - Added docstring-convention effects for `PDF101`, `PDF102`, and `PDF103` while keeping PCF rules convention-independent.
+  - Added mutually validated rule incompatibility metadata and deterministic conflict resolution that keeps the first selected rule and reports later conflicts as operational errors.
+  - Added docstring-convention effects for `PDF101` through `PDF104` while keeping PCF rules convention-independent.
   - Enabled comment list-item and block-quote formatting, structural preservation, and Python statement detection by default, while leaving heuristic disabled-code and expression detection disabled.
   - Added `output-format` for formatter configuration, currently supporting only `"grouped"`.
   - Added `legacy` for formatter configuration, defaulting to `false`.

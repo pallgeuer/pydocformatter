@@ -2,7 +2,9 @@
 
 Fix is always available.
 
-Rule is ignored if `docstring-convention` is `google`, `numpy`, or `pep257`.
+Rule is ignored if `docstring-convention` is `none`, `google`, `numpy`, or `pep257`.
+
+Rule is incompatible with `PDF101`.
 
 ## What it does
 Checks for multi-line docstrings whose opening triple quotes should be on their own line.
@@ -11,7 +13,7 @@ Checks for multi-line docstrings whose opening triple quotes should be on their 
 Projects that prefer expanded docstrings can keep delimiters visually separate from the content.
 
 ## Ruff compatibility
-This rule is intended to replace Ruff's `D212` or `D213` when the configured pydocformatter style puts opening quotes on a separate line. It conflicts with `PDF101`.
+This rule is intended to replace Ruff's `D212` or `D213` when the configured pydocformatter style puts opening quotes on a separate line.
 
 ## Example
 ```python

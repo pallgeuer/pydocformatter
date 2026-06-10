@@ -19,7 +19,10 @@ class PDF103MultilineClosingQuotesSameLine(RuleBase):
         setting_effects=(
             RuleSettingEffects(
                 setting="docstring_convention",
-                effects=(RuleSettingEffectValues(effect=RuleSettingEffect.IGNORED, values=(DocstringConvention.GOOGLE, DocstringConvention.NUMPY, DocstringConvention.PEP257)),),
+                effects=(
+                    RuleSettingEffectValues(effect=RuleSettingEffect.IGNORED, values=(DocstringConvention.NONE, DocstringConvention.GOOGLE, DocstringConvention.NUMPY, DocstringConvention.PEP257)),
+                ),
             ),
         ),
+        incompatible_with=(RuleCode("PDF104"),),
     )

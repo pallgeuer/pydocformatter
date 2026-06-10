@@ -56,6 +56,8 @@ class RuleBase:
     message = misc.alias_to_class_field("meta.message")
     fix_availability = misc.alias_to_class_field("meta.fix_availability")
     stable_since = misc.alias_to_class_field("meta.stable_since")
+    setting_effects = misc.alias_to_class_field("meta.setting_effects")
+    incompatible_with = misc.alias_to_class_field("meta.incompatible_with")
 
     def __init_subclass__(cls) -> None:
         """Require implemented rule classes to define metadata."""

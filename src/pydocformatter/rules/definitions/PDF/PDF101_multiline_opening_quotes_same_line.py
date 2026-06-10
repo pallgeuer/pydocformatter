@@ -22,4 +22,5 @@ class PDF101MultilineOpeningQuotesSameLine(RuleBase):
                 effects=(RuleSettingEffectValues(effect=RuleSettingEffect.IGNORED, values=(DocstringConvention.NUMPY, DocstringConvention.PEP257)),),
             ),
         ),
+        incompatible_with=(RuleCode("PDF102"),),
     )

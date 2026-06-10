@@ -4,6 +4,8 @@ Fix is always available. (Use `Fix is sometimes available.` or `Fix is not avail
 
 (Only if rule has `setting_effects` like ignored or disabled:) Rule is ignored if `docstring-convention` is `google` or `numpy`.
 
+(Only if rule has `incompatible_with`:) Rule is incompatible with `CODE`.
+
 ## What it does
 Describe the rule's check in one or two short paragraphs.
 

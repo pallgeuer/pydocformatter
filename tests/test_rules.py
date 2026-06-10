@@ -47,31 +47,57 @@ class TSTSettingEffectCategory(RuleCategoryBase):
     meta = RuleCategoryMetadata(prefix="TST", name="setting effects", url=None)
 
 
+class TSTIncompatibilityCategory(RuleCategoryBase):
+    meta = RuleCategoryMetadata(prefix="TST", name="incompatibilities", url=None)
+
+
 class PDF001SampleRule(RuleBase):
-    meta = RuleMetadata(code=RuleCode("PDF001"), name="reflow-required", message="Docstring chunk needs reflow", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0", setting_effects=())
+    meta = RuleMetadata(
+        code=RuleCode("PDF001"), name="reflow-required", message="Docstring chunk needs reflow", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0", setting_effects=(), incompatible_with=()
+    )
 
 
 class PDF105SampleRule(RuleBase):
     meta = RuleMetadata(
-        code=RuleCode("PDF105"), name="summary-too-long", message="Docstring summary does not fit on one line", fix_availability=FixAvailability.NEVER, stable_since="0.3.0", setting_effects=()
+        code=RuleCode("PDF105"),
+        name="summary-too-long",
+        message="Docstring summary does not fit on one line",
+        fix_availability=FixAvailability.NEVER,
+        stable_since="0.3.0",
+        setting_effects=(),
+        incompatible_with=(),
     )
 
 
 class PDF142SampleRule(RuleBase):
-    meta = RuleMetadata(code=RuleCode("PDF142"), name="specific-rule", message="Specific rule", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0", setting_effects=())
+    meta = RuleMetadata(code=RuleCode("PDF142"), name="specific-rule", message="Specific rule", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0", setting_effects=(), incompatible_with=())
 
 
 class PDF150SampleRule(RuleBase):
-    meta = RuleMetadata(code=RuleCode("PDF150"), name="sibling-rule", message="Sibling rule", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0", setting_effects=())
+    meta = RuleMetadata(code=RuleCode("PDF150"), name="sibling-rule", message="Sibling rule", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0", setting_effects=(), incompatible_with=())
 
 
 class PDF160SometimesFixableSampleRule(RuleBase):
-    meta = RuleMetadata(code=RuleCode("PDF160"), name="sometimes-fixable-rule", message="Sometimes fixable rule", fix_availability=FixAvailability.SOMETIMES, stable_since="0.3.0", setting_effects=())
+    meta = RuleMetadata(
+        code=RuleCode("PDF160"),
+        name="sometimes-fixable-rule",
+        message="Sometimes fixable rule",
+        fix_availability=FixAvailability.SOMETIMES,
+        stable_since="0.3.0",
+        setting_effects=(),
+        incompatible_with=(),
+    )
 
 
 class PCF001SampleRule(RuleBase):
     meta = RuleMetadata(
-        code=RuleCode("PCF001"), name="comment-reflow-required", message="Comment chunk needs reflow", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0", setting_effects=()
+        code=RuleCode("PCF001"),
+        name="comment-reflow-required",
+        message="Comment chunk needs reflow",
+        fix_availability=FixAvailability.ALWAYS,
+        stable_since="0.3.0",
+        setting_effects=(),
+        incompatible_with=(),
     )
 
 
@@ -88,6 +114,7 @@ class TST001IgnoredSampleRule(RuleBase):
                 effects=(RuleSettingEffectValues(effect=RuleSettingEffect.IGNORED, values=(DocstringConvention.GOOGLE,)),),
             ),
         ),
+        incompatible_with=(),
     )
 
 
@@ -108,6 +135,60 @@ class TST002DisabledSampleRule(RuleBase):
                 effects=(RuleSettingEffectValues(effect=RuleSettingEffect.IGNORED, values=(False,)),),
             ),
         ),
+        incompatible_with=(),
+    )
+
+
+class TST001FirstIncompatibleSampleRule(RuleBase):
+    meta = RuleMetadata(
+        code=RuleCode("TST001"),
+        name="first-incompatible",
+        message="First incompatible rule",
+        fix_availability=FixAvailability.ALWAYS,
+        stable_since="0.3.0",
+        setting_effects=(
+            RuleSettingEffects(
+                setting="docstring_convention",
+                effects=(RuleSettingEffectValues(effect=RuleSettingEffect.IGNORED, values=(DocstringConvention.GOOGLE,)),),
+            ),
+        ),
+        incompatible_with=(RuleCode("TST002"), RuleCode("TST004")),
+    )
+
+
+class TST002SecondIncompatibleSampleRule(RuleBase):
+    meta = RuleMetadata(
+        code=RuleCode("TST002"),
+        name="second-incompatible",
+        message="Second incompatible rule",
+        fix_availability=FixAvailability.ALWAYS,
+        stable_since="0.3.0",
+        setting_effects=(),
+        incompatible_with=(RuleCode("TST001"), RuleCode("TST003")),
+    )
+
+
+class TST003ThirdIncompatibleSampleRule(RuleBase):
+    meta = RuleMetadata(
+        code=RuleCode("TST003"),
+        name="third-incompatible",
+        message="Third incompatible rule",
+        fix_availability=FixAvailability.ALWAYS,
+        stable_since="0.3.0",
+        setting_effects=(),
+        incompatible_with=(RuleCode("TST002"), RuleCode("TST004")),
+    )
+
+
+class TST004FourthIncompatibleSampleRule(RuleBase):
+    meta = RuleMetadata(
+        code=RuleCode("TST004"),
+        name="fourth-incompatible",
+        message="Fourth incompatible rule",
+        fix_availability=FixAvailability.ALWAYS,
+        stable_since="0.3.0",
+        setting_effects=(),
+        incompatible_with=(RuleCode("TST001"), RuleCode("TST003")),
     )
 
 
@@ -120,6 +201,10 @@ rule_collection.register_rule_to(PDFFixAvailabilityCategory)(PDF105SampleRule)
 rule_collection.register_rule_to(PDFFixAvailabilityCategory)(PDF160SometimesFixableSampleRule)
 rule_collection.register_rule_to(TSTSettingEffectCategory)(TST001IgnoredSampleRule)
 rule_collection.register_rule_to(TSTSettingEffectCategory)(TST002DisabledSampleRule)
+rule_collection.register_rule_to(TSTIncompatibilityCategory)(TST001FirstIncompatibleSampleRule)
+rule_collection.register_rule_to(TSTIncompatibilityCategory)(TST002SecondIncompatibleSampleRule)
+rule_collection.register_rule_to(TSTIncompatibilityCategory)(TST003ThirdIncompatibleSampleRule)
+rule_collection.register_rule_to(TSTIncompatibilityCategory)(TST004FourthIncompatibleSampleRule)
 
 
 def sample_collection() -> rule_collection.RuleCollection:
@@ -140,6 +225,11 @@ def fix_availability_collection() -> rule_collection.RuleCollection:
 def setting_effect_collection() -> rule_collection.RuleCollection:
     """Return a synthetic collection for setting-effect tests."""
     return rule_collection.RuleCollection((TSTSettingEffectCategory,))
+
+
+def incompatibility_collection() -> rule_collection.RuleCollection:
+    """Return a synthetic collection for rule-incompatibility tests."""
+    return rule_collection.RuleCollection((TSTIncompatibilityCategory,))
 
 
 class TestRules(unittest.TestCase):
@@ -178,7 +268,7 @@ class TestRules(unittest.TestCase):
                 f"from {package_name}.PDF.PDF import PDF\n\n"
                 "@rule_collection.register_rule_to(PDF)\n"
                 "class PDF001Test(RuleBase):\n"
-                "    meta = RuleMetadata(code=RuleCode('PDF001'), name='test', message='Test', fix_availability=FixAvailability.ALWAYS, stable_since='0.3.0', setting_effects=())\n"
+                "    meta = RuleMetadata(code=RuleCode('PDF001'), name='test', message='Test', fix_availability=FixAvailability.ALWAYS, stable_since='0.3.0', setting_effects=(), incompatible_with=())\n"
             ),
             "PDF/PDF001_test.md": "# test (PDF001)\n",
         }
@@ -247,7 +337,7 @@ class TestRules(unittest.TestCase):
 
         @rule_collection.register_rule_to(PDFTestCategory)
         class PDF999TestRule(RuleBase):
-            meta = RuleMetadata(code=RuleCode("PDF999"), name="test-rule", message="Test rule", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0", setting_effects=())
+            meta = RuleMetadata(code=RuleCode("PDF999"), name="test-rule", message="Test rule", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0", setting_effects=(), incompatible_with=())
 
         registry.register(PDFTestCategory)
 
@@ -331,7 +421,7 @@ class TestRules(unittest.TestCase):
                 {
                     **valid_files,
                     "PDF/PDF001_test.py": valid_files["PDF/PDF001_test.py"]
-                    + "\nclass PDF002Test(RuleBase):\n    meta = RuleMetadata(code=RuleCode('PDF002'), name='test-two', message='Test two', fix_availability=FixAvailability.ALWAYS, stable_since='0.3.0', setting_effects=())\n",
+                    + "\nclass PDF002Test(RuleBase):\n    meta = RuleMetadata(code=RuleCode('PDF002'), name='test-two', message='Test two', fix_availability=FixAvailability.ALWAYS, stable_since='0.3.0', setting_effects=(), incompatible_with=())\n",
                 },
                 "must define exactly one RuleBase subclass",
             ),
@@ -373,7 +463,7 @@ class TestRules(unittest.TestCase):
             "from pydocformatter.rules.codes import RuleCode\n"
             "from pydocformatter.rules.models import FixAvailability, RuleMetadata\n\n"
             "class PDF002External(RuleBase):\n"
-            "    meta = RuleMetadata(code=RuleCode('PDF002'), name='external', message='External', fix_availability=FixAvailability.ALWAYS, stable_since='0.3.0', setting_effects=())\n"
+            "    meta = RuleMetadata(code=RuleCode('PDF002'), name='external', message='External', fix_availability=FixAvailability.ALWAYS, stable_since='0.3.0', setting_effects=(), incompatible_with=())\n"
         )
         files["PDF/PDF.py"] += "\nfrom synthetic_rule_support import PDF002External\nrule_collection.register_rule_to(PDF)(PDF002External)\n"
 
@@ -388,7 +478,7 @@ class TestRules(unittest.TestCase):
             "from pydocformatter.rules.codes import RuleCode\n"
             "from pydocformatter.rules.models import FixAvailability, RuleMetadata\n\n"
             "class PDF002PackageRule(RuleBase):\n"
-            "    meta = RuleMetadata(code=RuleCode('PDF002'), name='package-rule', message='Package rule', fix_availability=FixAvailability.ALWAYS, stable_since='0.3.0', setting_effects=())\n"
+            "    meta = RuleMetadata(code=RuleCode('PDF002'), name='package-rule', message='Package rule', fix_availability=FixAvailability.ALWAYS, stable_since='0.3.0', setting_effects=(), incompatible_with=())\n"
         )
         files["PDF/PDF.py"] += f"\nfrom {package_name}.PDF import PDF002PackageRule\nrule_collection.register_rule_to(PDF)(PDF002PackageRule)\n"
 
@@ -410,20 +500,24 @@ class TestRules(unittest.TestCase):
 
         @rule_collection.register_rule_to(PDFTestCategory)
         class PDF999FirstRule(RuleBase):
-            meta = RuleMetadata(code=RuleCode("PDF999"), name="first-rule", message="First rule", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0", setting_effects=())
+            meta = RuleMetadata(
+                code=RuleCode("PDF999"), name="first-rule", message="First rule", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0", setting_effects=(), incompatible_with=()
+            )
 
         with self.assertRaisesRegex(rule_collection.RuleCollectionError, "Duplicate rule code in category PDF: PDF999"):
 
             @rule_collection.register_rule_to(PDFTestCategory)
             class PDF999SecondRule(RuleBase):
-                meta = RuleMetadata(code=RuleCode("PDF999"), name="second-rule", message="Second rule", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0", setting_effects=())
+                meta = RuleMetadata(
+                    code=RuleCode("PDF999"), name="second-rule", message="Second rule", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0", setting_effects=(), incompatible_with=()
+                )
 
     def test_rule_category_allows_registering_the_same_rule_class_twice(self) -> None:
         class PDFTestCategory(RuleCategoryBase):
             meta = RuleCategoryMetadata(prefix="PDF", name="test PDF", url=None)
 
         class PDF999TestRule(RuleBase):
-            meta = RuleMetadata(code=RuleCode("PDF999"), name="test-rule", message="Test rule", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0", setting_effects=())
+            meta = RuleMetadata(code=RuleCode("PDF999"), name="test-rule", message="Test rule", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0", setting_effects=(), incompatible_with=())
 
         rule_collection.register_rule_to(PDFTestCategory)(PDF999TestRule)
         rule_collection.register_rule_to(PDFTestCategory)(PDF999TestRule)
@@ -474,7 +568,15 @@ class TestRules(unittest.TestCase):
         self.assertEqual(isolated_registry.collection().categories, (PDFIsolatedCategory,))
 
     def test_rule_metadata_derives_prefix_and_number_from_code(self) -> None:
-        rule = RuleMetadata(code=RuleCode("PDF001"), name="reflow-required", message="Docstring chunk needs reflow", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0", setting_effects=())
+        rule = RuleMetadata(
+            code=RuleCode("PDF001"),
+            name="reflow-required",
+            message="Docstring chunk needs reflow",
+            fix_availability=FixAvailability.ALWAYS,
+            stable_since="0.3.0",
+            setting_effects=(),
+            incompatible_with=(),
+        )
 
         self.assertEqual(tuple(field.name for field in dataclasses.fields(RuleCode)), ("tag", "prefix", "number_str", "number"))
         self.assertEqual(str(rule.code), "PDF001")
@@ -488,16 +590,19 @@ class TestRules(unittest.TestCase):
         self.assertFalse(hasattr(rule_models, "valid_rule_code_tag"))
         self.assertFalse(hasattr(rule_models, "split_rule_code"))
         self.assertEqual(rule.stable_since, "0.3.0")
-        self.assertEqual(tuple(field.name for field in dataclasses.fields(RuleMetadata)), ("code", "name", "message", "fix_availability", "stable_since", "setting_effects"))
+        self.assertEqual(tuple(field.name for field in dataclasses.fields(RuleMetadata)), ("code", "name", "message", "fix_availability", "stable_since", "setting_effects", "incompatible_with"))
         self.assertTrue(all(field.default is dataclasses.MISSING for field in dataclasses.fields(RuleMetadata)))
         self.assertEqual(rule.setting_effects, ())
+        self.assertEqual(rule.incompatible_with, ())
         self.assertIsInstance(hash(TST001IgnoredSampleRule.meta), int)
         self.assertIs(rule_codes.RuleCode, RuleCode)
         self.assertFalse(hasattr(rule_models, "RuleSelector"))
         self.assertEqual(rule_documentation.rule_fix_text(rule), "Fix is always available.")
         self.assertEqual(
             rule_documentation.rule_fix_text(
-                RuleMetadata(code=RuleCode("PDF999"), name="sometimes-rule", message="Sometimes rule", fix_availability=FixAvailability.SOMETIMES, stable_since="0.3.0", setting_effects=())
+                RuleMetadata(
+                    code=RuleCode("PDF999"), name="sometimes-rule", message="Sometimes rule", fix_availability=FixAvailability.SOMETIMES, stable_since="0.3.0", setting_effects=(), incompatible_with=()
+                )
             ),
             "Fix is sometimes available.",
         )
@@ -534,15 +639,21 @@ class TestRules(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Invalid rule code: ALL001"):
             RuleCode("ALL001")
         with self.assertRaisesRegex(TypeError, "Expected RuleCode, got str"):
-            RuleMetadata(code=typing.cast(typing.Any, "bad"), name="bad-rule", message="Bad rule", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0", setting_effects=())
+            RuleMetadata(
+                code=typing.cast(typing.Any, "bad"), name="bad-rule", message="Bad rule", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0", setting_effects=(), incompatible_with=()
+            )
         with self.assertRaisesRegex(TypeError, "Expected FixAvailability, got str"):
-            RuleMetadata(code=RuleCode("PDF001"), name="bad-rule", message="Bad rule", fix_availability=typing.cast(typing.Any, "Always"), stable_since="0.3.0", setting_effects=())
+            RuleMetadata(
+                code=RuleCode("PDF001"), name="bad-rule", message="Bad rule", fix_availability=typing.cast(typing.Any, "Always"), stable_since="0.3.0", setting_effects=(), incompatible_with=()
+            )
         with self.assertRaisesRegex(TypeError, "missing 1 required positional argument: 'stable_since'"):
-            RuleMetadata(code=RuleCode("PDF001"), name="bad-rule", message="Bad rule", fix_availability=FixAvailability.ALWAYS, setting_effects=())  # type: ignore[call-arg]
+            RuleMetadata(code=RuleCode("PDF001"), name="bad-rule", message="Bad rule", fix_availability=FixAvailability.ALWAYS, setting_effects=(), incompatible_with=())  # type: ignore[call-arg]
         with self.assertRaisesRegex(TypeError, "missing 1 required positional argument: 'setting_effects'"):
-            RuleMetadata(code=RuleCode("PDF001"), name="bad-rule", message="Bad rule", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0")  # type: ignore[call-arg]
+            RuleMetadata(code=RuleCode("PDF001"), name="bad-rule", message="Bad rule", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0", incompatible_with=())  # type: ignore[call-arg]
+        with self.assertRaisesRegex(TypeError, "missing 1 required positional argument: 'incompatible_with'"):
+            RuleMetadata(code=RuleCode("PDF001"), name="bad-rule", message="Bad rule", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0", setting_effects=())  # type: ignore[call-arg]
         with self.assertRaisesRegex(ValueError, "PDF001: Stable version must not be empty"):
-            RuleMetadata(code=RuleCode("PDF001"), name="bad-rule", message="Bad rule", fix_availability=FixAvailability.ALWAYS, stable_since="", setting_effects=())
+            RuleMetadata(code=RuleCode("PDF001"), name="bad-rule", message="Bad rule", fix_availability=FixAvailability.ALWAYS, stable_since="", setting_effects=(), incompatible_with=())
         with self.assertRaisesRegex(ValueError, "Rule setting name must not be empty"):
             RuleSettingEffects(setting="", effects=())
         with self.assertRaisesRegex(TypeError, "Expected RuleSettingEffect, got str"):
@@ -563,6 +674,37 @@ class TestRules(unittest.TestCase):
                 fix_availability=FixAvailability.ALWAYS,
                 stable_since="0.3.0",
                 setting_effects=typing.cast(typing.Any, ("bad",)),
+                incompatible_with=(),
+            )
+        with self.assertRaisesRegex(TypeError, "Incompatible rule codes must be a tuple"):
+            RuleMetadata(
+                code=RuleCode("PDF001"),
+                name="bad-rule",
+                message="Bad rule",
+                fix_availability=FixAvailability.ALWAYS,
+                stable_since="0.3.0",
+                setting_effects=(),
+                incompatible_with=typing.cast(typing.Any, [RuleCode("PDF002")]),
+            )
+        with self.assertRaisesRegex(TypeError, "Incompatible rule codes must contain RuleCode instances"):
+            RuleMetadata(
+                code=RuleCode("PDF001"),
+                name="bad-rule",
+                message="Bad rule",
+                fix_availability=FixAvailability.ALWAYS,
+                stable_since="0.3.0",
+                setting_effects=(),
+                incompatible_with=typing.cast(typing.Any, ("PDF002",)),
+            )
+        with self.assertRaisesRegex(ValueError, "Incompatible rule codes must not contain duplicates"):
+            RuleMetadata(
+                code=RuleCode("PDF001"),
+                name="bad-rule",
+                message="Bad rule",
+                fix_availability=FixAvailability.ALWAYS,
+                stable_since="0.3.0",
+                setting_effects=(),
+                incompatible_with=(RuleCode("PDF002"), RuleCode("PDF002")),
             )
 
     def test_rule_selector_validates_tag(self) -> None:
@@ -631,20 +773,81 @@ class TestRules(unittest.TestCase):
         with self.assertRaisesRegex(rule_collection.RuleCollectionError, "Duplicate rule category prefix: PDF"):
             rule_collection.RuleCollection((PDFFirstCategory, PDFSecondCategory))
 
+    def test_rule_collection_validates_rule_incompatibilities(self) -> None:
+        class TSTSelfCategory(RuleCategoryBase):
+            meta = RuleCategoryMetadata(prefix="TST", name="self incompatible", url=None)
+
+        @rule_collection.register_rule_to(TSTSelfCategory)
+        class TST001SelfRule(RuleBase):
+            meta = RuleMetadata(
+                code=RuleCode("TST001"),
+                name="self-incompatible",
+                message="Self incompatible",
+                fix_availability=FixAvailability.ALWAYS,
+                stable_since="0.3.0",
+                setting_effects=(),
+                incompatible_with=(RuleCode("TST001"),),
+            )
+
+        with self.assertRaisesRegex(rule_collection.RuleCollectionError, "Rule TST001 cannot be incompatible with itself"):
+            rule_collection.RuleCollection((TSTSelfCategory,))
+
+        class TSTUnknownCategory(RuleCategoryBase):
+            meta = RuleCategoryMetadata(prefix="TST", name="unknown incompatible", url=None)
+
+        @rule_collection.register_rule_to(TSTUnknownCategory)
+        class TST001UnknownRule(RuleBase):
+            meta = dataclasses.replace(TST001SelfRule.meta, incompatible_with=(RuleCode("TST999"),))
+
+        with self.assertRaisesRegex(rule_collection.RuleCollectionError, "Rule TST001 is incompatible with unknown rule code TST999"):
+            rule_collection.RuleCollection((TSTUnknownCategory,))
+
+        class TSTAsymmetricCategory(RuleCategoryBase):
+            meta = RuleCategoryMetadata(prefix="TST", name="asymmetric incompatibility", url=None)
+
+        @rule_collection.register_rule_to(TSTAsymmetricCategory)
+        class TST001AsymmetricRule(RuleBase):
+            meta = dataclasses.replace(TST001SelfRule.meta, incompatible_with=(RuleCode("TST002"),))
+
+        @rule_collection.register_rule_to(TSTAsymmetricCategory)
+        class TST002AsymmetricRule(RuleBase):
+            meta = RuleMetadata(
+                code=RuleCode("TST002"),
+                name="asymmetric-peer",
+                message="Asymmetric peer",
+                fix_availability=FixAvailability.ALWAYS,
+                stable_since="0.3.0",
+                setting_effects=(),
+                incompatible_with=(),
+            )
+
+        with self.assertRaisesRegex(rule_collection.RuleCollectionError, "Rule incompatibility between TST001 and TST002 must be declared by both rules"):
+            rule_collection.RuleCollection((TSTAsymmetricCategory,))
+
     def test_rule_base_class_properties_redirect_to_metadata(self) -> None:
         class PDF999TestRule(RuleBase):
-            meta = RuleMetadata(code=RuleCode("PDF999"), name="test-rule", message="Test rule", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0", setting_effects=())
+            meta = RuleMetadata(code=RuleCode("PDF999"), name="test-rule", message="Test rule", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0", setting_effects=(), incompatible_with=())
 
         rule = PDF999TestRule()
 
         self.assertEqual(
-            (PDF999TestRule.code, PDF999TestRule.prefix, PDF999TestRule.number_str, PDF999TestRule.number, PDF999TestRule.name, PDF999TestRule.message, PDF999TestRule.fix_availability),
-            ("PDF999", "PDF", "999", 999, "test-rule", "Test rule", FixAvailability.ALWAYS),
+            (
+                PDF999TestRule.code,
+                PDF999TestRule.prefix,
+                PDF999TestRule.number_str,
+                PDF999TestRule.number,
+                PDF999TestRule.name,
+                PDF999TestRule.message,
+                PDF999TestRule.fix_availability,
+                PDF999TestRule.setting_effects,
+                PDF999TestRule.incompatible_with,
+            ),
+            ("PDF999", "PDF", "999", 999, "test-rule", "Test rule", FixAvailability.ALWAYS, (), ()),
         )
         self.assertEqual(PDF999TestRule.stable_since, "0.3.0")
         self.assertEqual(
-            (rule.code, rule.prefix, rule.number_str, rule.number, rule.name, rule.message, rule.fix_availability, rule.stable_since),
-            ("PDF999", "PDF", "999", 999, "test-rule", "Test rule", FixAvailability.ALWAYS, "0.3.0"),
+            (rule.code, rule.prefix, rule.number_str, rule.number, rule.name, rule.message, rule.fix_availability, rule.stable_since, rule.setting_effects, rule.incompatible_with),
+            ("PDF999", "PDF", "999", 999, "test-rule", "Test rule", FixAvailability.ALWAYS, "0.3.0", (), ()),
         )
 
     def test_selectors_must_use_complete_rule_prefixes(self) -> None:
@@ -683,6 +886,7 @@ class TestRules(unittest.TestCase):
 
     def test_builtin_rule_setting_effect_matrix(self) -> None:
         convention_effects: dict[str, dict[DocstringConvention, RuleSettingEffect]] = {}
+        incompatibilities: dict[str, tuple[str, ...]] = {}
         for rule_class in rule_collection.RULE_COLLECTION.rules:
             rule_effects: dict[DocstringConvention, RuleSettingEffect] = {}
             for setting_effects in rule_class.meta.setting_effects:
@@ -691,6 +895,7 @@ class TestRules(unittest.TestCase):
                         for value in effect_values.values:
                             rule_effects[typing.cast(DocstringConvention, value)] = effect_values.effect
             convention_effects[rule_class.meta.code.tag] = rule_effects
+            incompatibilities[rule_class.meta.code.tag] = tuple(rule_code.tag for rule_code in rule_class.meta.incompatible_with)
 
         self.assertTrue(all(not effects for code, effects in convention_effects.items() if code.startswith("PCF")))
         self.assertEqual(
@@ -698,17 +903,41 @@ class TestRules(unittest.TestCase):
             {
                 "PDF101": {DocstringConvention.NUMPY: RuleSettingEffect.IGNORED, DocstringConvention.PEP257: RuleSettingEffect.IGNORED},
                 "PDF102": {
+                    DocstringConvention.NONE: RuleSettingEffect.IGNORED,
                     DocstringConvention.GOOGLE: RuleSettingEffect.IGNORED,
                     DocstringConvention.NUMPY: RuleSettingEffect.IGNORED,
                     DocstringConvention.PEP257: RuleSettingEffect.IGNORED,
                 },
                 "PDF103": {
+                    DocstringConvention.NONE: RuleSettingEffect.IGNORED,
                     DocstringConvention.GOOGLE: RuleSettingEffect.IGNORED,
                     DocstringConvention.NUMPY: RuleSettingEffect.IGNORED,
                     DocstringConvention.PEP257: RuleSettingEffect.IGNORED,
                 },
             },
         )
+        self.assertEqual(
+            {code: incompatible for code, incompatible in incompatibilities.items() if incompatible},
+            {
+                "PDF101": ("PDF102",),
+                "PDF102": ("PDF101",),
+                "PDF103": ("PDF104",),
+                "PDF104": ("PDF103",),
+            },
+        )
+
+    def test_builtin_opt_in_quote_placement_rules_ignore_every_docstring_convention(self) -> None:
+        rule_classes = {rule_class.meta.code.tag: rule_class for rule_class in rule_collection.RULE_COLLECTION.rules}
+
+        for code in ("PDF102", "PDF103"):
+            ignored_conventions: set[DocstringConvention] = set()
+            for setting_effects in rule_classes[code].meta.setting_effects:
+                if setting_effects.setting == "docstring_convention":
+                    for effect_values in setting_effects.effects:
+                        if effect_values.effect == RuleSettingEffect.IGNORED:
+                            ignored_conventions.update(typing.cast(DocstringConvention, value) for value in effect_values.values)
+
+            self.assertEqual(ignored_conventions, set(DocstringConvention))
 
     def test_rule_collection_does_not_expose_selector_convenience_indexes(self) -> None:
         collection = sample_collection()
@@ -819,6 +1048,46 @@ class TestRules(unittest.TestCase):
         self.assertEqual(tuple(rule.rule.code.tag for rule in ignored.rules), ("TST002",))
         self.assertEqual(disabled.rules, ())
 
+    def test_select_rules_keeps_first_rules_when_incompatibilities_conflict(self) -> None:
+        selection = rules_selection.select_rules(CheckSettings(select=("ALL",)), collection=incompatibility_collection())
+
+        self.assertEqual(tuple(rule.rule.code.tag for rule in selection.rules), ("TST001", "TST003"))
+        self.assertEqual(
+            selection.errors,
+            (
+                "Selected rule TST002 is incompatible with earlier selected rule TST001; TST002 has been disabled",
+                "Selected rule TST004 is incompatible with earlier selected rules TST001, TST003; TST004 has been disabled",
+            ),
+        )
+
+    def test_select_rules_applies_setting_effects_before_incompatibilities(self) -> None:
+        selection = rules_selection.select_rules(
+            CheckSettings(select=("ALL",), docstring_convention=DocstringConvention.GOOGLE),
+            collection=incompatibility_collection(),
+        )
+
+        self.assertEqual(tuple(rule.rule.code.tag for rule in selection.rules), ("TST002", "TST004"))
+        self.assertEqual(selection.errors, ("Selected rule TST003 is incompatible with earlier selected rule TST002; TST003 has been disabled",))
+
+    def test_select_rules_uses_collection_order_before_selector_strength_for_incompatibilities(self) -> None:
+        selection = rules_selection.select_rules(
+            CheckSettings(select=("TST001",), extend_select=("TST004",)),
+            collection=incompatibility_collection(),
+            field_priorities={"select": settings_core.CONFIG_FILE_SOURCE_PRIORITY, "extend_select": settings_core.ARGUMENT_SOURCE_PRIORITY},
+        )
+
+        self.assertEqual(tuple(rule.rule.code.tag for rule in selection.rules), ("TST001",))
+        self.assertEqual(selection.errors, ("Selected rule TST004 is incompatible with earlier selected rule TST001; TST004 has been disabled",))
+
+    def test_select_rules_does_not_restore_incompatible_rules_after_per_file_ignores(self) -> None:
+        selection = rules_selection.select_rules(
+            CheckSettings(select=("TST001", "TST004"), per_file_ignores=(("tests/*.py", ("TST001",)),)),
+            collection=incompatibility_collection(),
+        )
+
+        self.assertEqual(tuple(rule.rule.code.tag for rule in selection.rules), ("TST001",))
+        self.assertEqual(selection.for_path("tests/example.py"), ())
+
     def test_select_rules_applies_per_file_ignores_to_exactly_restored_ignored_rules(self) -> None:
         selection = rules_selection.select_rules(
             CheckSettings(select=("TST001",), docstring_convention=DocstringConvention.GOOGLE, per_file_ignores=(("tests/*.py", ("TST001",)),)),
@@ -845,6 +1114,7 @@ class TestRules(unittest.TestCase):
                         effects=(RuleSettingEffectValues(effect=RuleSettingEffect.IGNORED, values=(True,)),),
                     ),
                 ),
+                incompatible_with=(),
             )
 
         rule_collection.register_rule_to(TSTUnknownSettingEffectCategory)(TST999UnknownSettingEffectRule)
