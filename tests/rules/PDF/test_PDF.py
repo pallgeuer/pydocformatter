@@ -181,6 +181,14 @@ def test_value_lines_track_offsets_dedentation_and_source_lines() -> None:
     )
 
 
+def test_nested_tab_indentation_uses_the_docstring_visual_column() -> None:
+    source = 'class Outer:\n\tclass Inner:\n\t\tdef method(self):\n\t\t\t"""Summary.\n\t\t\tArgs:\n\t\t\t\tvalue: Description.\n\t\t\t"""\n'
+    structure = PDF.prepare(category_context(source, settings=CheckSettings(docstring_convention=DocstringConvention.GOOGLE))).docstrings[0].structure
+    assert tuple(line.text for line in structure.lines) == ("Summary.", "Args:", "\tvalue: Description.", "")
+    assert tuple(section.name for section in structure.sections) == ("Args",)
+    assert tuple(entry.names for entry in structure.entries) == (("value",),)
+
+
 def test_mixed_evaluated_newline_sequences_have_exact_offsets() -> None:
     docstring = PDF.prepare(category_context(r'"""first\r\nsecond\rthird\nfourth"""' + "\n")).docstrings[0]
     assert docstring.value_lines == ("first", "second", "third", "fourth")

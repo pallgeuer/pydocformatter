@@ -290,7 +290,7 @@ class _DefinitionCollector(cst.CSTVisitor):
                     node.evaluated_value,
                     settings=self.context.settings,
                     source_line_number=source_line_number,
-                    source_indent=code_range.start.column if isinstance(node, cst.SimpleString) else None,
+                    source_indent=_indent_width(self.source_lines[code_range.start.line - 1][: code_range.start.column]) if isinstance(node, cst.SimpleString) else None,
                 ),
             )
         )

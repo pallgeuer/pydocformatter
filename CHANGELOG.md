@@ -203,6 +203,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Kept extracted trailing comments separate from preceding standalone comments, required fenced-region closers to contain no trailing text, and normalized tab-equivalent block-quote prefixes in one formatting pass.
   - Preserved CRLF line endings when `PDF000` rewrites concatenated docstrings whose evaluated values contain newlines.
   - Kept protected docstring structures opaque to convention section and entry parsing, preserved semantic entries and reflow regions in source order, used visual indentation for literal blocks, and avoided ambiguous evaluated-to-source line mappings.
+  - Fixed semantic parsing of docstrings nested under multiple levels of tab indentation.
 
 - **Rule framework:**
   - Category preprocessing data is now refreshed after an earlier rule changes the module while remaining shared by later rules processing the same module version.
