@@ -921,7 +921,7 @@ def _strip_indent(text: str, width: int) -> str:
     while index < len(text) and text[index] in " \t" and column < width:
         column = ((column // 8) + 1) * 8 if text[index] == "\t" else column + 1
         index += 1
-    return text[index:]
+    return " " * max(column - width, 0) + text[index:]
 
 
 def serialize_simple_docstring(value: str) -> str:
