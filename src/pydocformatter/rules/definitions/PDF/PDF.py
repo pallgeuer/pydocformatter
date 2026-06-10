@@ -290,7 +290,16 @@ class _DefinitionCollector(cst.CSTVisitor):
                     node.evaluated_value,
                     settings=self.context.settings,
                     source_line_number=source_line_number,
-                    source_indent=_indent_width(self.source_lines[code_range.start.line - 1][: code_range.start.column]) if isinstance(node, cst.SimpleString) else None,
+                    source_indent=(
+                        _docstring_source_indent(
+                            statement,
+                            code_range=code_range,
+                            source_lines=self.source_lines,
+                            indent_width=self.context.settings.indent_width,
+                        )
+                        if isinstance(node, cst.SimpleString)
+                        else None
+                    ),
                 ),
             )
         )
@@ -912,6 +921,12 @@ def _indent_width(text: str) -> int:
 def _leading_width(text: str) -> int:
     """Return the tab-expanded width of leading whitespace."""
     return _indent_width(text[: len(text) - len(text.lstrip(" \t"))])
+
+
+def _docstring_source_indent(statement: cst.SimpleStatementLine | cst.SimpleStatementSuite, *, code_range: cst_metadata.CodeRange, source_lines: list[str], indent_width: int) -> int:
+    """Return the visual indentation margin for a simple docstring."""
+    source_indent = _leading_width(source_lines[code_range.start.line - 1])
+    return source_indent + indent_width if isinstance(statement, cst.SimpleStatementSuite) else source_indent
 
 
 def _strip_indent(text: str, width: int) -> str:

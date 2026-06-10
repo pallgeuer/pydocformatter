@@ -205,6 +205,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Kept protected docstring structures opaque to convention section and entry parsing, preserved semantic entries and reflow regions in source order, used visual indentation for literal blocks, and avoided ambiguous evaluated-to-source line mappings.
   - Fixed semantic parsing of docstrings nested under multiple levels of tab indentation.
   - Preserved residual visual indentation when a leading tab crosses the docstring dedent margin.
+  - Derived multiline simple-suite docstring margins from suite indentation instead of the literal's source column.
 
 - **Rule framework:**
   - Category preprocessing data is now refreshed after an earlier rule changes the module while remaining shared by later rules processing the same module version.

@@ -196,6 +196,27 @@ def test_tab_crossing_docstring_margin_preserves_residual_indentation() -> None:
     assert tuple((block.kind, block.start_line, block.end_line) for block in structure.blocks) == ((DocstringBlockKind.LITERAL_BLOCK, 0, 3),)
 
 
+def test_simple_suite_docstring_uses_suite_indentation_instead_of_literal_column() -> None:
+    source = 'def function(): """Summary::\n        Indented literal.\n    """\n'
+    structure = PDF.prepare(category_context(source)).docstrings[0].structure
+    assert tuple(line.text for line in structure.lines) == ("Summary::", "    Indented literal.", "")
+    assert tuple((block.kind, block.start_line, block.end_line) for block in structure.blocks) == ((DocstringBlockKind.LITERAL_BLOCK, 0, 3),)
+
+
+def test_nested_simple_suite_docstring_includes_enclosing_indentation() -> None:
+    source = 'class Outer:\n    def method(self): """Summary::\n            Indented literal.\n        """\n'
+    structure = PDF.prepare(category_context(source)).docstrings[0].structure
+    assert tuple(line.text for line in structure.lines) == ("Summary::", "    Indented literal.", "")
+    assert tuple((block.kind, block.start_line, block.end_line) for block in structure.blocks) == ((DocstringBlockKind.LITERAL_BLOCK, 0, 3),)
+
+
+def test_simple_suite_docstring_uses_configured_indentation_width() -> None:
+    source = 'def function(): """Summary::\n    Indented literal.\n  """\n'
+    structure = PDF.prepare(category_context(source, settings=CheckSettings(indent_width=2))).docstrings[0].structure
+    assert tuple(line.text for line in structure.lines) == ("Summary::", "  Indented literal.", "")
+    assert tuple((block.kind, block.start_line, block.end_line) for block in structure.blocks) == ((DocstringBlockKind.LITERAL_BLOCK, 0, 3),)
+
+
 def test_mixed_evaluated_newline_sequences_have_exact_offsets() -> None:
     docstring = PDF.prepare(category_context(r'"""first\r\nsecond\rthird\nfourth"""' + "\n")).docstrings[0]
     assert docstring.value_lines == ("first", "second", "third", "fourth")
