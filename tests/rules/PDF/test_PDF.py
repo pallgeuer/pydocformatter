@@ -682,6 +682,16 @@ def test_doctest_consumes_nonblank_transcript_but_stops_at_blank_line() -> None:
     )
 
 
+@pytest.mark.parametrize("prompt", (">>>> quoted", ">>>>>>> branch"))
+def test_doctest_prompt_requires_trailing_whitespace(prompt: str) -> None:
+    structure = structure_for(f"{prompt}\nfollowing prose")
+    assert tuple((block.kind, block.start_line, block.end_line) for block in structure.blocks) == (
+        (DocstringBlockKind.BLOCK_QUOTE, 0, 1),
+        (DocstringBlockKind.PARAGRAPH, 1, 2),
+    )
+    assert DocstringBlockKind.DOCTEST not in block_kinds(structure.blocks)
+
+
 def test_directives_and_literal_blocks_include_blank_lines_and_indented_bodies() -> None:
     directive = structure_for(".. warning:: title\n\n    First body line.\n        Nested.\nAfter.")
     literal = structure_for("Example::\n\n    value = 1\n    print(value)\nAfter.")

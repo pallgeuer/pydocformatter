@@ -445,7 +445,7 @@ class _DocstringParser:
                 index = block_end
                 self.summary_pending = False
                 continue
-            if self.settings.docstring_parse_doctests and text.lstrip().startswith(">>>"):
+            if self.settings.docstring_parse_doctests and _is_doctest_prompt(text):
                 block_end = index + 1
                 while block_end < end and self.lines[block_end].text.strip():
                     block_end += 1
@@ -514,7 +514,7 @@ class _DocstringParser:
         return (
             self._section_at(index, end) is not None
             or (self.settings.docstring_parse_code_fences and _FENCE_RE.match(text) is not None)
-            or (self.settings.docstring_parse_doctests and text.lstrip().startswith(">>>"))
+            or (self.settings.docstring_parse_doctests and _is_doctest_prompt(text))
             or (self.settings.docstring_parse_directives and _DIRECTIVE_RE.match(text) is not None)
             or (self.settings.docstring_parse_literal_blocks and text.rstrip().endswith("::") and self._has_indented_body(index, end))
             or (self.settings.docstring_parse_tables and self._table_end(index, end) is not None)
@@ -737,7 +737,7 @@ class _DocstringParser:
         text = self.lines[index].text
         if self.settings.docstring_parse_code_fences and (fence := _FENCE_RE.match(text)) is not None:
             return self._fence_end(index, end, fence.group("fence"))
-        if self.settings.docstring_parse_doctests and text.lstrip().startswith(">>>"):
+        if self.settings.docstring_parse_doctests and _is_doctest_prompt(text):
             block_end = index + 1
             while block_end < end and self.lines[block_end].text.strip():
                 block_end += 1
@@ -911,6 +911,11 @@ def _is_adornment(text: str) -> bool:
     """Return whether text is a heading or section adornment line."""
     stripped = text.strip()
     return len(stripped) >= 3 and len(set(stripped)) == 1 and stripped[0] in "-=~`^:#*+"
+
+
+def _is_doctest_prompt(text: str) -> bool:
+    """Return whether text starts with a whitespace-delimited doctest prompt."""
+    return text.lstrip().startswith(">>> ")
 
 
 def _indent_width(text: str) -> int:
