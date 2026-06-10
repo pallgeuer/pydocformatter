@@ -34,6 +34,8 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added `pydocfmt linter` to list rule-prefix linters in Ruff-style text or JSON output.
 
 - **Configuration:**
+  - Added generic rule-selection effects driven by resolved setting values, with exact-selector restoration for ignored rules and unconditional removal for disabled rules.
+  - Added docstring-convention effects for `PDF101`, `PDF102`, and `PDF103` while keeping PCF rules convention-independent.
   - Enabled comment list-item and block-quote formatting, structural preservation, and Python statement detection by default, while leaving heuristic disabled-code and expression detection disabled.
   - Added `output-format` for formatter configuration, currently supporting only `"grouped"`.
   - Added `legacy` for formatter configuration, defaulting to `false`.
@@ -79,8 +81,10 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 
 - **Rule framework:**
   - Split rule models, authoring contracts, execution, and line-ending utilities into focused modules while keeping formatter file and source orchestration separate.
+  - Moved rule codes and selectors into `pydocformatter.rules.codes` and added immutable, hashable setting-effect metadata to rule definitions.
   - Changed internal PDF and PCF classification types from string-compatible enums to ordinary enums.
   - Renamed PCF001 to `standalone-comment-formatting` and PCF002 to `trailing-comment-formatting` to reflect their spacing and wrapping behavior.
+  - Required rule and category definitions to explicitly provide `setting_effects` and `url` metadata, including empty or absent values.
 
 - **CLI:**
   - Made rule-based formatting the default and added `--legacy` for temporarily selecting the previous formatter implementation.
@@ -203,6 +207,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 - **Rule framework:**
   - Category preprocessing data is now refreshed after an earlier rule changes the module while remaining shared by later rules processing the same module version.
   - UTF-8 byte order marks are now preserved when automatic fixes rewrite source, and fixes that converge on the final permitted iteration no longer report a non-convergence error.
+  - Preserved exact rule-code overrides for setting-ignored rules when a higher-priority broad `extend-select` also selects the rule.
 
 - **Documentation:**
   - Updated README, contributing, release, pull request, and file-selection docs for the single-command workflow and latest file-selection behavior.

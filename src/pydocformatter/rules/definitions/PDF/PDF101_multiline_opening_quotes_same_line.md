@@ -2,6 +2,8 @@
 
 Fix is always available.
 
+Rule is ignored if `docstring-convention` is `numpy` or `pep257`.
+
 ## What it does
 Checks for multi-line docstrings whose opening triple quotes should share a line with the first content line.
 

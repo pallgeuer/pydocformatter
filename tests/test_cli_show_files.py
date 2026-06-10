@@ -15,11 +15,14 @@ import pydocformatter.cli.settings_check as settings_check
 import pydocformatter.legacy.pydocfmt as pydocfmt
 from pydocformatter.cli.settings_check import CheckSettings
 from pydocformatter.formatter import FormatterResult
-from pydocformatter.rules.models import FixAvailability, RuleCode, RuleFinding, RuleMetadata
+from pydocformatter.rules.codes import RuleCode
+from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetadata
 from pydocformatter.rules_selection import RuleSelection
 
-PDF001_RULE = RuleMetadata(code=RuleCode("PDF001"), name="reflow-required", message="Docstring chunk needs reflow", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0")
-PCF001_RULE = RuleMetadata(code=RuleCode("PCF001"), name="comment-formatting-needed", message="Comment needs formatting", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0")
+PDF001_RULE = RuleMetadata(code=RuleCode("PDF001"), name="reflow-required", message="Docstring chunk needs reflow", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0", setting_effects=())
+PCF001_RULE = RuleMetadata(
+    code=RuleCode("PCF001"), name="comment-formatting-needed", message="Comment needs formatting", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0", setting_effects=()
+)
 
 
 class TestCLIShowFiles(unittest.TestCase):
@@ -998,6 +1001,43 @@ class TestCLIShowFiles(unittest.TestCase):
         self.assertIn('line-ending = "lf"', output)
         self.assertIn("respect-gitignore = false", output)
 
+    def test_pydocfmt_check_show_rules_applies_conventions_and_manual_reenablements(self) -> None:
+        def shown_convention_rules(*args: str) -> tuple[str, ...]:
+            stdout = StringIO()
+            argv = ["pydocfmt", "--isolated", "check", "--show-rules", *args]
+            with (
+                unittest.mock.patch("sys.argv", argv),
+                contextlib.redirect_stdout(stdout),
+            ):
+                exit_code = pydocfmt_cli.main()
+            self.assertEqual(exit_code, 0)
+            return tuple(line.split(maxsplit=1)[0].removesuffix("*") for line in stdout.getvalue().splitlines() if line.startswith(("PDF101", "PDF102", "PDF103")))
+
+        broad_expectations = {
+            "none": ("PDF101", "PDF102", "PDF103"),
+            "google": ("PDF101",),
+            "numpy": (),
+            "pep257": (),
+        }
+        for convention, expected in broad_expectations.items():
+            with self.subTest(variation="broad", convention=convention):
+                self.assertEqual(shown_convention_rules("--docstring-convention", convention), expected)
+
+        for convention in broad_expectations:
+            with self.subTest(variation="exact-extend-select", convention=convention):
+                self.assertEqual(
+                    shown_convention_rules("--docstring-convention", convention, "--extend-select", "PDF101,PDF102,PDF103"),
+                    ("PDF101", "PDF102", "PDF103"),
+                )
+
+        self.assertEqual(shown_convention_rules("--docstring-convention", "google", "--extend-select", "PDF10"), ("PDF101",))
+        self.assertEqual(shown_convention_rules("--docstring-convention", "numpy", "--extend-select", "PDF10"), ())
+        self.assertEqual(shown_convention_rules("--docstring-convention", "google", "--select", "PDF102"), ("PDF102",))
+        self.assertEqual(
+            shown_convention_rules("--docstring-convention", "google", "--extend-select", "PDF102,PDF103", "--ignore", "PDF102"),
+            ("PDF101", "PDF103"),
+        )
+
     def test_pydocfmt_check_config_file_prints_resolved_settings(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
@@ -1469,7 +1509,9 @@ class TestCLIShowFiles(unittest.TestCase):
             formatted_source = "x = 2\n"
             target.write_text(original_source, encoding="utf-8")
             stdout = StringIO()
-            rule = RuleMetadata(code=RuleCode("PDF105"), name="summary-too-long", message="Docstring summary does not fit on one line", fix_availability=FixAvailability.NEVER, stable_since="0.3.0")
+            rule = RuleMetadata(
+                code=RuleCode("PDF105"), name="summary-too-long", message="Docstring summary does not fit on one line", fix_availability=FixAvailability.NEVER, stable_since="0.3.0", setting_effects=()
+            )
             called_args: list[tuple[bool, bool]] = []
 
             def fake_format(path: str, *, file: TextIO | None = None, settings: CheckSettings, rule_selection: RuleSelection, fix: bool, write: bool) -> FormatterResult:

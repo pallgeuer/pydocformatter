@@ -40,8 +40,9 @@ Rule classes register with their category through `@register_rule_to(PDF)` and d
 - `name`: A stable machine-readable name, such as `reflow-required`.
 - `message`: The default diagnostic message. It may include format fields for per-finding customization.
 - `fix_availability`: A `FixAvailability` value describing whether automatic fixes are `Always`, `Sometimes`, or `Never` available at the rule level.
+- `setting_effects`: Immutable metadata mapping resolved setting fields and triggering values to `Ignored` or `Disabled` selection effects.
 
-`RuleBase` rejects subclasses without `meta`, or with non-`RuleMetadata` metadata, at class definition time. `RuleMetadata` rejects non-`RuleCode` codes, non-`FixAvailability` fix availability values, and empty names, messages, or stable versions. Category registration rejects rules whose code prefix differs from the category prefix and rejects duplicate rule codes from different classes.
+`RuleBase` rejects subclasses without `meta`, or with non-`RuleMetadata` metadata, at class definition time. `RuleMetadata` rejects non-`RuleCode` codes, non-`FixAvailability` fix availability values, empty names, messages, or stable versions, and malformed setting-effect records. Category registration rejects rules whose code prefix differs from the category prefix and rejects duplicate rule codes from different classes.
 
 No rule application or fix method interface is specified yet. That interface will be added when rule execution is implemented.
 
@@ -125,6 +126,17 @@ Examples:
 - With default `select = ["ALL"]`, `extend-select = ["PDF14"]` and `ignore = ["PDF1"]` enables `PDF142` but disables `PDF150`.
 - A command-line `--select PDF1` enables `PDF142` even when a lower-priority config file has `ignore = ["PDF142"]`.
 - A command-line `--ignore PDF1` disables `PDF142` even when a lower-priority config file has `select = ["PDF142"]`.
+
+## Setting Effects
+
+After normal `select` and `ignore` precedence is resolved, each selected rule's metadata is evaluated against the resolved `CheckSettings` values. Effects from all declared setting fields are combined:
+
+- `Disabled` takes precedence over `Ignored`.
+- `Ignored` removes a rule selected through `ALL`, a category prefix, or a partial selector, but any participating exact rule-code selector restores it, including one retained alongside a higher-priority broad `extend-select`.
+- `Disabled` always removes a rule, including one selected by exact rule code.
+- Configured `ignore` selectors and matching per-file ignores still suppress an exactly restored ignored rule.
+- Setting effects do not change effective fixability.
+- A metadata field name that is not present on `CheckSettings` is a programming error identifying the rule and unknown field.
 
 ## Global Rule Selection
 

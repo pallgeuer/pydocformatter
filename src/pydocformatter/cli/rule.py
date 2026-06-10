@@ -9,8 +9,9 @@ import pydocformatter.cli.global_args as global_args
 import pydocformatter.rules.collection as rule_collection
 import pydocformatter.rules.documentation as rule_documentation
 import pydocformatter.utils.argparser as argparser
+from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase
-from pydocformatter.rules.models import FixAvailability, RuleCode
+from pydocformatter.rules.models import FixAvailability
 
 
 class RuleSourceLocationMetadata(TypedDict):

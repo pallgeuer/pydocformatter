@@ -7,8 +7,9 @@ import libcst as cst
 import libcst.metadata as cst_metadata
 
 from pydocformatter.cli.settings_check import CheckSettings
+from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase, RuleCategoryBase, RuleCategoryContext, RuleContext, RuleFixResult
-from pydocformatter.rules.models import RuleCode, RuleFinding, RuleMetadata
+from pydocformatter.rules.models import RuleFinding, RuleMetadata
 from pydocformatter.rules_selection import RuleSelection, SelectedRule
 
 MAX_FIX_ITERATIONS = 100

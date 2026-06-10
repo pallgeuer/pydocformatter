@@ -8,7 +8,8 @@ import libcst as cst
 import libcst.metadata as cst_metadata
 
 import pydocformatter.utils.misc as misc
-from pydocformatter.rules.models import RuleCategoryMetadata, RuleCode, RuleFinding, RuleMetadata
+from pydocformatter.rules.codes import RuleCode
+from pydocformatter.rules.models import RuleCategoryMetadata, RuleFinding, RuleMetadata
 
 if TYPE_CHECKING:
     from pydocformatter.cli.settings_check import CheckSettings

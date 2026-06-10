@@ -7,8 +7,9 @@ from collections.abc import Mapping
 import pydocformatter.rules.collection as rule_collection
 import pydocformatter.settings as settings_core
 from pydocformatter.cli.settings_check import CheckSettings
+from pydocformatter.rules.codes import ALL_RULE_SELECTOR_TAG, RuleCode, RuleSelector
 from pydocformatter.rules.collection import RuleCollection
-from pydocformatter.rules.models import ALL_RULE_SELECTOR_TAG, FixAvailability, RuleCode, RuleMetadata, RuleSelector
+from pydocformatter.rules.models import FixAvailability, RuleMetadata, RuleSettingEffect
 from pydocformatter.utils.globs import GlobPatternSet
 
 
@@ -28,6 +29,7 @@ class _SelectorStrength:
 
     priority: int
     specificity: int
+    exact_match: bool = dataclasses.field(default=False, compare=False)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -145,6 +147,7 @@ def select_rules(
         errors=errors,
     )
     enabled_strengths = _resolve_enabled_strengths(selected_strengths, ignored_strengths)
+    enabled_strengths = _apply_setting_effects(settings, enabled_strengths=enabled_strengths, collection=collection)
 
     fixable_strengths = _resolve_rule_strengths(
         _selector_groups(
@@ -207,6 +210,28 @@ def select_rules(
     )
     per_file_ignores = _resolve_per_file_ignores(settings, collection=collection, errors=errors, field_bases=field_bases)
     return RuleSelection(rules=selected_rules, per_file_ignores=per_file_ignores, errors=tuple(errors), collection=collection)
+
+
+def _apply_setting_effects(settings: CheckSettings, *, enabled_strengths: dict[RuleCode, _SelectorStrength], collection: RuleCollection) -> dict[RuleCode, _SelectorStrength]:
+    """Apply rule metadata effects triggered by resolved setting values."""
+    effective_strengths = enabled_strengths.copy()
+    for rule_class in collection.rules:
+        rule = rule_class.meta
+        if rule.code not in effective_strengths:
+            continue
+        triggered_effects: set[RuleSettingEffect] = set()
+        for setting_effects in rule.setting_effects:
+            try:
+                setting_value = getattr(settings, setting_effects.setting)
+            except AttributeError:
+                raise ValueError(f"{rule.code}: Unknown rule setting effect field: {setting_effects.setting}") from None
+            for effect_values in setting_effects.effects:
+                if setting_value in effect_values.values:
+                    triggered_effects.add(effect_values.effect)
+        enabled_strength = effective_strengths[rule.code]
+        if RuleSettingEffect.DISABLED in triggered_effects or (RuleSettingEffect.IGNORED in triggered_effects and not enabled_strength.exact_match):
+            del effective_strengths[rule.code]
+    return effective_strengths
 
 
 def _selector_groups(
@@ -291,9 +316,12 @@ def _resolve_rule_strengths(
                     errors.append(f"{context} selector {selector_tag!r} only matches rules with no available fixes")
                 matching_rules = fixable_rules
 
-            strength = _SelectorStrength(priority=selector_group.priority, specificity=_selector_specificity(selector))
+            selector_specificity = _selector_specificity(selector)
             for rule in matching_rules:
-                rule_strengths[rule.meta.code] = max(rule_strengths.get(rule.meta.code, _SelectorStrength(priority=-1, specificity=-1)), strength)
+                strength = _SelectorStrength(priority=selector_group.priority, specificity=selector_specificity, exact_match=selector.tag == rule.meta.code.tag)
+                previous_strength = rule_strengths.get(rule.meta.code, _SelectorStrength(priority=-1, specificity=-1))
+                strongest = max(previous_strength, strength)
+                rule_strengths[rule.meta.code] = dataclasses.replace(strongest, exact_match=previous_strength.exact_match or strength.exact_match)
     return rule_strengths
 
 

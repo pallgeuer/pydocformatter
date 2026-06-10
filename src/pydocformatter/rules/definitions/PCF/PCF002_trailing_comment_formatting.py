@@ -5,8 +5,9 @@ import libcst.metadata as cst_metadata
 import pydocformatter.rules.collection as rule_collection
 import pydocformatter.rules.definitions.PCF.PCF as PCF_definition
 import pydocformatter.rules.edits as rule_edits
+from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase, RuleContext, RuleFixResult
-from pydocformatter.rules.models import FixAvailability, RuleCode, RuleFinding, RuleMetadata
+from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetadata
 
 
 @rule_collection.register_rule_to(PCF_definition.PCF)
@@ -17,6 +18,7 @@ class PCF002TrailingCommentFormatting(RuleBase):
         message="Trailing comment needs formatting",
         fix_availability=FixAvailability.ALWAYS,
         stable_since="0.3.0",
+        setting_effects=(),
     )
 
     @classmethod

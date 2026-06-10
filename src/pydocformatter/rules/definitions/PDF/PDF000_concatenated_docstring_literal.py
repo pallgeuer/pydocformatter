@@ -3,8 +3,9 @@ from __future__ import annotations
 import pydocformatter.rules.collection as rule_collection
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 import pydocformatter.rules.edits as rule_edits
+from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase, RuleContext, RuleFixResult
-from pydocformatter.rules.models import FixAvailability, RuleCode, RuleFinding, RuleMetadata
+from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetadata
 
 
 @rule_collection.register_rule_to(PDF_definition.PDF)
@@ -15,6 +16,7 @@ class PDF000ConcatenatedDocstringLiteral(RuleBase):
         message="Docstring should use a single string literal",
         fix_availability=FixAvailability.ALWAYS,
         stable_since="0.3.0",
+        setting_effects=(),
     )
 
     @classmethod

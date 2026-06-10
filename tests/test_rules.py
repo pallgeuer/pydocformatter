@@ -13,6 +13,7 @@ from pathlib import Path
 
 import pydocformatter.cli.check as check
 import pydocformatter.file_selection as file_selection
+import pydocformatter.rules.codes as rule_codes
 import pydocformatter.rules.collection as rule_collection
 import pydocformatter.rules.definitions as rule_definitions
 import pydocformatter.rules.documentation as rule_documentation
@@ -20,9 +21,10 @@ import pydocformatter.rules.models as rule_models
 import pydocformatter.rules_selection as rules_selection
 import pydocformatter.settings as settings_core
 from pydocformatter.cli.global_args import GlobalArgs
-from pydocformatter.cli.settings_check import SETTINGS_SCHEMA, CheckSettings
+from pydocformatter.cli.settings_check import SETTINGS_SCHEMA, CheckSettings, DocstringConvention
+from pydocformatter.rules.codes import RuleCode, RuleSelector
 from pydocformatter.rules.definition import RuleBase, RuleCategoryBase
-from pydocformatter.rules.models import FixAvailability, RuleCategoryMetadata, RuleCode, RuleMetadata, RuleSelector
+from pydocformatter.rules.models import FixAvailability, RuleCategoryMetadata, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
 
 
 class PDFSampleCategory(RuleCategoryBase):
@@ -41,28 +43,72 @@ class PDFFixAvailabilityCategory(RuleCategoryBase):
     meta = RuleCategoryMetadata(prefix="PDF", name="fix availability PDF", url=None)
 
 
+class TSTSettingEffectCategory(RuleCategoryBase):
+    meta = RuleCategoryMetadata(prefix="TST", name="setting effects", url=None)
+
+
 class PDF001SampleRule(RuleBase):
-    meta = RuleMetadata(code=RuleCode("PDF001"), name="reflow-required", message="Docstring chunk needs reflow", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0")
+    meta = RuleMetadata(code=RuleCode("PDF001"), name="reflow-required", message="Docstring chunk needs reflow", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0", setting_effects=())
 
 
 class PDF105SampleRule(RuleBase):
-    meta = RuleMetadata(code=RuleCode("PDF105"), name="summary-too-long", message="Docstring summary does not fit on one line", fix_availability=FixAvailability.NEVER, stable_since="0.3.0")
+    meta = RuleMetadata(
+        code=RuleCode("PDF105"), name="summary-too-long", message="Docstring summary does not fit on one line", fix_availability=FixAvailability.NEVER, stable_since="0.3.0", setting_effects=()
+    )
 
 
 class PDF142SampleRule(RuleBase):
-    meta = RuleMetadata(code=RuleCode("PDF142"), name="specific-rule", message="Specific rule", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0")
+    meta = RuleMetadata(code=RuleCode("PDF142"), name="specific-rule", message="Specific rule", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0", setting_effects=())
 
 
 class PDF150SampleRule(RuleBase):
-    meta = RuleMetadata(code=RuleCode("PDF150"), name="sibling-rule", message="Sibling rule", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0")
+    meta = RuleMetadata(code=RuleCode("PDF150"), name="sibling-rule", message="Sibling rule", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0", setting_effects=())
 
 
 class PDF160SometimesFixableSampleRule(RuleBase):
-    meta = RuleMetadata(code=RuleCode("PDF160"), name="sometimes-fixable-rule", message="Sometimes fixable rule", fix_availability=FixAvailability.SOMETIMES, stable_since="0.3.0")
+    meta = RuleMetadata(code=RuleCode("PDF160"), name="sometimes-fixable-rule", message="Sometimes fixable rule", fix_availability=FixAvailability.SOMETIMES, stable_since="0.3.0", setting_effects=())
 
 
 class PCF001SampleRule(RuleBase):
-    meta = RuleMetadata(code=RuleCode("PCF001"), name="comment-reflow-required", message="Comment chunk needs reflow", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0")
+    meta = RuleMetadata(
+        code=RuleCode("PCF001"), name="comment-reflow-required", message="Comment chunk needs reflow", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0", setting_effects=()
+    )
+
+
+class TST001IgnoredSampleRule(RuleBase):
+    meta = RuleMetadata(
+        code=RuleCode("TST001"),
+        name="ignored-by-setting",
+        message="Ignored by setting",
+        fix_availability=FixAvailability.ALWAYS,
+        stable_since="0.3.0",
+        setting_effects=(
+            RuleSettingEffects(
+                setting="docstring_convention",
+                effects=(RuleSettingEffectValues(effect=RuleSettingEffect.IGNORED, values=(DocstringConvention.GOOGLE,)),),
+            ),
+        ),
+    )
+
+
+class TST002DisabledSampleRule(RuleBase):
+    meta = RuleMetadata(
+        code=RuleCode("TST002"),
+        name="disabled-by-setting",
+        message="Disabled by setting",
+        fix_availability=FixAvailability.ALWAYS,
+        stable_since="0.3.0",
+        setting_effects=(
+            RuleSettingEffects(
+                setting="docstring_convention",
+                effects=(RuleSettingEffectValues(effect=RuleSettingEffect.DISABLED, values=(DocstringConvention.GOOGLE,)),),
+            ),
+            RuleSettingEffects(
+                setting="docstring_parse_tables",
+                effects=(RuleSettingEffectValues(effect=RuleSettingEffect.IGNORED, values=(False,)),),
+            ),
+        ),
+    )
 
 
 rule_collection.register_rule_to(PDFSampleCategory)(PDF001SampleRule)
@@ -72,6 +118,8 @@ rule_collection.register_rule_to(PDFSpecificityCategory)(PDF142SampleRule)
 rule_collection.register_rule_to(PDFSpecificityCategory)(PDF150SampleRule)
 rule_collection.register_rule_to(PDFFixAvailabilityCategory)(PDF105SampleRule)
 rule_collection.register_rule_to(PDFFixAvailabilityCategory)(PDF160SometimesFixableSampleRule)
+rule_collection.register_rule_to(TSTSettingEffectCategory)(TST001IgnoredSampleRule)
+rule_collection.register_rule_to(TSTSettingEffectCategory)(TST002DisabledSampleRule)
 
 
 def sample_collection() -> rule_collection.RuleCollection:
@@ -87,6 +135,11 @@ def specificity_collection() -> rule_collection.RuleCollection:
 def fix_availability_collection() -> rule_collection.RuleCollection:
     """Return a synthetic rule collection for rule-level fix availability tests."""
     return rule_collection.RuleCollection((PDFFixAvailabilityCategory,))
+
+
+def setting_effect_collection() -> rule_collection.RuleCollection:
+    """Return a synthetic collection for setting-effect tests."""
+    return rule_collection.RuleCollection((TSTSettingEffectCategory,))
 
 
 class TestRules(unittest.TestCase):
@@ -114,17 +167,18 @@ class TestRules(unittest.TestCase):
                 "from pydocformatter.rules.models import RuleCategoryMetadata\n\n"
                 "@rule_collection.register_rule_category\n"
                 "class PDF(RuleCategoryBase):\n"
-                "    meta = RuleCategoryMetadata(prefix='PDF', name='test PDF')\n"
+                "    meta = RuleCategoryMetadata(prefix='PDF', name='test PDF', url=None)\n"
             ),
             "PDF/PDF.md": "# test PDF (PDF)\n",
             "PDF/PDF001_test.py": (
                 "import pydocformatter.rules.collection as rule_collection\n"
                 "from pydocformatter.rules.definition import RuleBase\n"
-                "from pydocformatter.rules.models import FixAvailability, RuleCode, RuleMetadata\n"
+                "from pydocformatter.rules.codes import RuleCode\n"
+                "from pydocformatter.rules.models import FixAvailability, RuleMetadata\n"
                 f"from {package_name}.PDF.PDF import PDF\n\n"
                 "@rule_collection.register_rule_to(PDF)\n"
                 "class PDF001Test(RuleBase):\n"
-                "    meta = RuleMetadata(code=RuleCode('PDF001'), name='test', message='Test', fix_availability=FixAvailability.ALWAYS, stable_since='0.3.0')\n"
+                "    meta = RuleMetadata(code=RuleCode('PDF001'), name='test', message='Test', fix_availability=FixAvailability.ALWAYS, stable_since='0.3.0', setting_effects=())\n"
             ),
             "PDF/PDF001_test.md": "# test (PDF001)\n",
         }
@@ -193,7 +247,7 @@ class TestRules(unittest.TestCase):
 
         @rule_collection.register_rule_to(PDFTestCategory)
         class PDF999TestRule(RuleBase):
-            meta = RuleMetadata(code=RuleCode("PDF999"), name="test-rule", message="Test rule", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0")
+            meta = RuleMetadata(code=RuleCode("PDF999"), name="test-rule", message="Test rule", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0", setting_effects=())
 
         registry.register(PDFTestCategory)
 
@@ -277,7 +331,7 @@ class TestRules(unittest.TestCase):
                 {
                     **valid_files,
                     "PDF/PDF001_test.py": valid_files["PDF/PDF001_test.py"]
-                    + "\nclass PDF002Test(RuleBase):\n    meta = RuleMetadata(code=RuleCode('PDF002'), name='test-two', message='Test two', fix_availability=FixAvailability.ALWAYS, stable_since='0.3.0')\n",
+                    + "\nclass PDF002Test(RuleBase):\n    meta = RuleMetadata(code=RuleCode('PDF002'), name='test-two', message='Test two', fix_availability=FixAvailability.ALWAYS, stable_since='0.3.0', setting_effects=())\n",
                 },
                 "must define exactly one RuleBase subclass",
             ),
@@ -316,9 +370,10 @@ class TestRules(unittest.TestCase):
         files = self._valid_rule_package_files(package_name)
         files["../synthetic_rule_support.py"] = (
             "from pydocformatter.rules.definition import RuleBase\n"
-            "from pydocformatter.rules.models import FixAvailability, RuleCode, RuleMetadata\n\n"
+            "from pydocformatter.rules.codes import RuleCode\n"
+            "from pydocformatter.rules.models import FixAvailability, RuleMetadata\n\n"
             "class PDF002External(RuleBase):\n"
-            "    meta = RuleMetadata(code=RuleCode('PDF002'), name='external', message='External', fix_availability=FixAvailability.ALWAYS, stable_since='0.3.0')\n"
+            "    meta = RuleMetadata(code=RuleCode('PDF002'), name='external', message='External', fix_availability=FixAvailability.ALWAYS, stable_since='0.3.0', setting_effects=())\n"
         )
         files["PDF/PDF.py"] += "\nfrom synthetic_rule_support import PDF002External\nrule_collection.register_rule_to(PDF)(PDF002External)\n"
 
@@ -330,9 +385,10 @@ class TestRules(unittest.TestCase):
         files = self._valid_rule_package_files(package_name)
         files["PDF/__init__.py"] = (
             "from pydocformatter.rules.definition import RuleBase\n"
-            "from pydocformatter.rules.models import FixAvailability, RuleCode, RuleMetadata\n\n"
+            "from pydocformatter.rules.codes import RuleCode\n"
+            "from pydocformatter.rules.models import FixAvailability, RuleMetadata\n\n"
             "class PDF002PackageRule(RuleBase):\n"
-            "    meta = RuleMetadata(code=RuleCode('PDF002'), name='package-rule', message='Package rule', fix_availability=FixAvailability.ALWAYS, stable_since='0.3.0')\n"
+            "    meta = RuleMetadata(code=RuleCode('PDF002'), name='package-rule', message='Package rule', fix_availability=FixAvailability.ALWAYS, stable_since='0.3.0', setting_effects=())\n"
         )
         files["PDF/PDF.py"] += f"\nfrom {package_name}.PDF import PDF002PackageRule\nrule_collection.register_rule_to(PDF)(PDF002PackageRule)\n"
 
@@ -354,20 +410,20 @@ class TestRules(unittest.TestCase):
 
         @rule_collection.register_rule_to(PDFTestCategory)
         class PDF999FirstRule(RuleBase):
-            meta = RuleMetadata(code=RuleCode("PDF999"), name="first-rule", message="First rule", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0")
+            meta = RuleMetadata(code=RuleCode("PDF999"), name="first-rule", message="First rule", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0", setting_effects=())
 
         with self.assertRaisesRegex(rule_collection.RuleCollectionError, "Duplicate rule code in category PDF: PDF999"):
 
             @rule_collection.register_rule_to(PDFTestCategory)
             class PDF999SecondRule(RuleBase):
-                meta = RuleMetadata(code=RuleCode("PDF999"), name="second-rule", message="Second rule", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0")
+                meta = RuleMetadata(code=RuleCode("PDF999"), name="second-rule", message="Second rule", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0", setting_effects=())
 
     def test_rule_category_allows_registering_the_same_rule_class_twice(self) -> None:
         class PDFTestCategory(RuleCategoryBase):
             meta = RuleCategoryMetadata(prefix="PDF", name="test PDF", url=None)
 
         class PDF999TestRule(RuleBase):
-            meta = RuleMetadata(code=RuleCode("PDF999"), name="test-rule", message="Test rule", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0")
+            meta = RuleMetadata(code=RuleCode("PDF999"), name="test-rule", message="Test rule", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0", setting_effects=())
 
         rule_collection.register_rule_to(PDFTestCategory)(PDF999TestRule)
         rule_collection.register_rule_to(PDFTestCategory)(PDF999TestRule)
@@ -418,7 +474,7 @@ class TestRules(unittest.TestCase):
         self.assertEqual(isolated_registry.collection().categories, (PDFIsolatedCategory,))
 
     def test_rule_metadata_derives_prefix_and_number_from_code(self) -> None:
-        rule = RuleMetadata(code=RuleCode("PDF001"), name="reflow-required", message="Docstring chunk needs reflow", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0")
+        rule = RuleMetadata(code=RuleCode("PDF001"), name="reflow-required", message="Docstring chunk needs reflow", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0", setting_effects=())
 
         self.assertEqual(tuple(field.name for field in dataclasses.fields(RuleCode)), ("tag", "prefix", "number_str", "number"))
         self.assertEqual(str(rule.code), "PDF001")
@@ -432,11 +488,17 @@ class TestRules(unittest.TestCase):
         self.assertFalse(hasattr(rule_models, "valid_rule_code_tag"))
         self.assertFalse(hasattr(rule_models, "split_rule_code"))
         self.assertEqual(rule.stable_since, "0.3.0")
-        self.assertEqual(tuple(field.name for field in dataclasses.fields(RuleMetadata)), ("code", "name", "message", "fix_availability", "stable_since"))
+        self.assertEqual(tuple(field.name for field in dataclasses.fields(RuleMetadata)), ("code", "name", "message", "fix_availability", "stable_since", "setting_effects"))
         self.assertTrue(all(field.default is dataclasses.MISSING for field in dataclasses.fields(RuleMetadata)))
+        self.assertEqual(rule.setting_effects, ())
+        self.assertIsInstance(hash(TST001IgnoredSampleRule.meta), int)
+        self.assertIs(rule_codes.RuleCode, RuleCode)
+        self.assertFalse(hasattr(rule_models, "RuleSelector"))
         self.assertEqual(rule_documentation.rule_fix_text(rule), "Fix is always available.")
         self.assertEqual(
-            rule_documentation.rule_fix_text(RuleMetadata(code=RuleCode("PDF999"), name="sometimes-rule", message="Sometimes rule", fix_availability=FixAvailability.SOMETIMES, stable_since="0.3.0")),
+            rule_documentation.rule_fix_text(
+                RuleMetadata(code=RuleCode("PDF999"), name="sometimes-rule", message="Sometimes rule", fix_availability=FixAvailability.SOMETIMES, stable_since="0.3.0", setting_effects=())
+            ),
             "Fix is sometimes available.",
         )
         self.assertEqual(str(FixAvailability.SOMETIMES), "Sometimes")
@@ -472,13 +534,36 @@ class TestRules(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Invalid rule code: ALL001"):
             RuleCode("ALL001")
         with self.assertRaisesRegex(TypeError, "Expected RuleCode, got str"):
-            RuleMetadata(code=typing.cast(typing.Any, "bad"), name="bad-rule", message="Bad rule", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0")
+            RuleMetadata(code=typing.cast(typing.Any, "bad"), name="bad-rule", message="Bad rule", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0", setting_effects=())
         with self.assertRaisesRegex(TypeError, "Expected FixAvailability, got str"):
-            RuleMetadata(code=RuleCode("PDF001"), name="bad-rule", message="Bad rule", fix_availability=typing.cast(typing.Any, "Always"), stable_since="0.3.0")
+            RuleMetadata(code=RuleCode("PDF001"), name="bad-rule", message="Bad rule", fix_availability=typing.cast(typing.Any, "Always"), stable_since="0.3.0", setting_effects=())
         with self.assertRaisesRegex(TypeError, "missing 1 required positional argument: 'stable_since'"):
-            RuleMetadata(code=RuleCode("PDF001"), name="bad-rule", message="Bad rule", fix_availability=FixAvailability.ALWAYS)  # type: ignore[call-arg]
+            RuleMetadata(code=RuleCode("PDF001"), name="bad-rule", message="Bad rule", fix_availability=FixAvailability.ALWAYS, setting_effects=())  # type: ignore[call-arg]
+        with self.assertRaisesRegex(TypeError, "missing 1 required positional argument: 'setting_effects'"):
+            RuleMetadata(code=RuleCode("PDF001"), name="bad-rule", message="Bad rule", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0")  # type: ignore[call-arg]
         with self.assertRaisesRegex(ValueError, "PDF001: Stable version must not be empty"):
-            RuleMetadata(code=RuleCode("PDF001"), name="bad-rule", message="Bad rule", fix_availability=FixAvailability.ALWAYS, stable_since="")
+            RuleMetadata(code=RuleCode("PDF001"), name="bad-rule", message="Bad rule", fix_availability=FixAvailability.ALWAYS, stable_since="", setting_effects=())
+        with self.assertRaisesRegex(ValueError, "Rule setting name must not be empty"):
+            RuleSettingEffects(setting="", effects=())
+        with self.assertRaisesRegex(TypeError, "Expected RuleSettingEffect, got str"):
+            RuleSettingEffectValues(effect=typing.cast(typing.Any, "Ignored"), values=(True,))
+        with self.assertRaisesRegex(ValueError, "triggering values must not be empty"):
+            RuleSettingEffectValues(effect=RuleSettingEffect.IGNORED, values=())
+        with self.assertRaisesRegex(TypeError, "triggering values must be a tuple"):
+            RuleSettingEffectValues(effect=RuleSettingEffect.IGNORED, values=typing.cast(typing.Any, [True]))
+        with self.assertRaisesRegex(TypeError, "triggering values must be hashable"):
+            RuleSettingEffectValues(effect=RuleSettingEffect.IGNORED, values=(typing.cast(typing.Any, []),))
+        with self.assertRaisesRegex(TypeError, "must contain RuleSettingEffectValues instances"):
+            RuleSettingEffects(setting="docstring_convention", effects=typing.cast(typing.Any, ("bad",)))
+        with self.assertRaisesRegex(TypeError, "Rule setting effects must contain RuleSettingEffects instances"):
+            RuleMetadata(
+                code=RuleCode("PDF001"),
+                name="bad-rule",
+                message="Bad rule",
+                fix_availability=FixAvailability.ALWAYS,
+                stable_since="0.3.0",
+                setting_effects=typing.cast(typing.Any, ("bad",)),
+            )
 
     def test_rule_selector_validates_tag(self) -> None:
         with self.assertRaisesRegex(ValueError, "Invalid rule selector: bad"):
@@ -505,6 +590,7 @@ class TestRules(unittest.TestCase):
             meta = metadata
 
         self.assertEqual(tuple(field.name for field in dataclasses.fields(RuleCategoryMetadata)), ("prefix", "name", "url"))
+        self.assertTrue(all(field.default is dataclasses.MISSING for field in dataclasses.fields(RuleCategoryMetadata)))
         self.assertEqual((metadata.prefix, metadata.name, metadata.url), ("PDF", "test PDF", None))
         self.assertEqual((PDFTestCategory.prefix, PDFTestCategory.name, PDFTestCategory.url), ("PDF", "test PDF", None))
         self.assertEqual((PDFTestCategory().prefix, PDFTestCategory().name, PDFTestCategory().url), ("PDF", "test PDF", None))
@@ -512,6 +598,8 @@ class TestRules(unittest.TestCase):
             RuleCategoryMetadata(prefix="bad", name="bad", url=None)
         with self.assertRaisesRegex(ValueError, "PDF: Rule category name must not be empty"):
             RuleCategoryMetadata(prefix="PDF", name="", url=None)
+        with self.assertRaisesRegex(TypeError, "missing 1 required positional argument: 'url'"):
+            RuleCategoryMetadata(prefix="PDF", name="test PDF")  # type: ignore[call-arg]
         with self.assertRaisesRegex(TypeError, "MissingMetaCategory must define RuleCategoryMetadata as 'meta'"):
 
             class MissingMetaCategory(RuleCategoryBase):
@@ -545,7 +633,7 @@ class TestRules(unittest.TestCase):
 
     def test_rule_base_class_properties_redirect_to_metadata(self) -> None:
         class PDF999TestRule(RuleBase):
-            meta = RuleMetadata(code=RuleCode("PDF999"), name="test-rule", message="Test rule", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0")
+            meta = RuleMetadata(code=RuleCode("PDF999"), name="test-rule", message="Test rule", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0", setting_effects=())
 
         rule = PDF999TestRule()
 
@@ -593,6 +681,35 @@ class TestRules(unittest.TestCase):
 
         self.assertEqual(collection.matching_rules(RuleSelector("PDF")), (PDF001SampleRule, PDF105SampleRule))
 
+    def test_builtin_rule_setting_effect_matrix(self) -> None:
+        convention_effects: dict[str, dict[DocstringConvention, RuleSettingEffect]] = {}
+        for rule_class in rule_collection.RULE_COLLECTION.rules:
+            rule_effects: dict[DocstringConvention, RuleSettingEffect] = {}
+            for setting_effects in rule_class.meta.setting_effects:
+                if setting_effects.setting == "docstring_convention":
+                    for effect_values in setting_effects.effects:
+                        for value in effect_values.values:
+                            rule_effects[typing.cast(DocstringConvention, value)] = effect_values.effect
+            convention_effects[rule_class.meta.code.tag] = rule_effects
+
+        self.assertTrue(all(not effects for code, effects in convention_effects.items() if code.startswith("PCF")))
+        self.assertEqual(
+            {code: effects for code, effects in convention_effects.items() if effects},
+            {
+                "PDF101": {DocstringConvention.NUMPY: RuleSettingEffect.IGNORED, DocstringConvention.PEP257: RuleSettingEffect.IGNORED},
+                "PDF102": {
+                    DocstringConvention.GOOGLE: RuleSettingEffect.IGNORED,
+                    DocstringConvention.NUMPY: RuleSettingEffect.IGNORED,
+                    DocstringConvention.PEP257: RuleSettingEffect.IGNORED,
+                },
+                "PDF103": {
+                    DocstringConvention.GOOGLE: RuleSettingEffect.IGNORED,
+                    DocstringConvention.NUMPY: RuleSettingEffect.IGNORED,
+                    DocstringConvention.PEP257: RuleSettingEffect.IGNORED,
+                },
+            },
+        )
+
     def test_rule_collection_does_not_expose_selector_convenience_indexes(self) -> None:
         collection = sample_collection()
 
@@ -613,6 +730,127 @@ class TestRules(unittest.TestCase):
         self.assertEqual(selection.errors, ())
         self.assertEqual(tuple(rule.rule.code.tag for rule in selection.rules), ("PDF001",))
         self.assertEqual(tuple(rule.fixable for rule in selection.rules), (True,))
+
+    def test_select_rules_applies_ignored_setting_effect_after_normal_precedence(self) -> None:
+        broad = rules_selection.select_rules(CheckSettings(select=("TST",), docstring_convention=DocstringConvention.GOOGLE), collection=setting_effect_collection())
+        exact = rules_selection.select_rules(CheckSettings(select=("TST001",), docstring_convention=DocstringConvention.GOOGLE), collection=setting_effect_collection())
+        explicitly_ignored = rules_selection.select_rules(
+            CheckSettings(select=("TST",), extend_select=("TST001",), ignore=("TST001",), docstring_convention=DocstringConvention.GOOGLE),
+            collection=setting_effect_collection(),
+        )
+        higher_priority_ignore = rules_selection.select_rules(
+            CheckSettings(select=("TST001",), ignore=("TST",), docstring_convention=DocstringConvention.GOOGLE),
+            collection=setting_effect_collection(),
+            field_priorities={"select": settings_core.CONFIG_FILE_SOURCE_PRIORITY, "ignore": settings_core.ARGUMENT_SOURCE_PRIORITY},
+        )
+
+        self.assertEqual(tuple(rule.rule.code.tag for rule in broad.rules), ())
+        self.assertEqual(tuple(rule.rule.code.tag for rule in exact.rules), ("TST001",))
+        self.assertEqual(explicitly_ignored.rules, ())
+        self.assertEqual(higher_priority_ignore.rules, ())
+
+    def test_select_rules_retains_exact_setting_effect_override_across_higher_priority_broad_extension(self) -> None:
+        selection = rules_selection.select_rules(
+            CheckSettings(select=("TST001",), extend_select=("TST",), docstring_convention=DocstringConvention.GOOGLE),
+            collection=setting_effect_collection(),
+            field_priorities={"select": settings_core.CONFIG_FILE_SOURCE_PRIORITY, "extend_select": settings_core.ARGUMENT_SOURCE_PRIORITY},
+        )
+
+        self.assertEqual(tuple(rule.rule.code.tag for rule in selection.rules), ("TST001",))
+        self.assertEqual(tuple((rule.enabled_priority, rule.enabled_specificity) for rule in selection.rules), ((settings_core.ARGUMENT_SOURCE_PRIORITY, len("TST")),))
+
+    def test_select_rules_retains_lower_priority_exact_setting_effect_override_when_broad_extension_outweighs_config_ignore(self) -> None:
+        selection = rules_selection.select_rules(
+            CheckSettings(select=("TST001",), extend_select=("TST",), ignore=("TST001",), docstring_convention=DocstringConvention.GOOGLE),
+            collection=setting_effect_collection(),
+            field_priorities={
+                "select": settings_core.CONFIG_FILE_SOURCE_PRIORITY,
+                "extend_select": settings_core.ARGUMENT_SOURCE_PRIORITY,
+                "ignore": settings_core.CONFIG_FILE_SOURCE_PRIORITY,
+            },
+        )
+
+        self.assertEqual(tuple(rule.rule.code.tag for rule in selection.rules), ("TST001",))
+
+    def test_select_rules_does_not_retain_skipped_lower_priority_exact_setting_effect_override(self) -> None:
+        selection = rules_selection.select_rules(
+            CheckSettings(select=("TST",), extend_select=("TST001",), docstring_convention=DocstringConvention.GOOGLE),
+            collection=setting_effect_collection(),
+            field_priorities={"select": settings_core.ARGUMENT_SOURCE_PRIORITY, "extend_select": settings_core.CONFIG_FILE_SOURCE_PRIORITY},
+        )
+
+        self.assertEqual(selection.rules, ())
+
+    def test_select_rules_applies_same_priority_broad_ignore_before_exact_setting_effect_override(self) -> None:
+        selection = rules_selection.select_rules(
+            CheckSettings(select=("TST001",), extend_select=("TST",), ignore=("TST",), docstring_convention=DocstringConvention.GOOGLE),
+            collection=setting_effect_collection(),
+            field_priorities={
+                "select": settings_core.CONFIG_FILE_SOURCE_PRIORITY,
+                "extend_select": settings_core.ARGUMENT_SOURCE_PRIORITY,
+                "ignore": settings_core.ARGUMENT_SOURCE_PRIORITY,
+            },
+        )
+
+        self.assertEqual(selection.rules, ())
+
+    def test_select_rules_applies_per_file_ignore_after_cross_priority_exact_setting_effect_override(self) -> None:
+        selection = rules_selection.select_rules(
+            CheckSettings(
+                select=("TST001",),
+                extend_select=("TST",),
+                docstring_convention=DocstringConvention.GOOGLE,
+                per_file_ignores=(("tests/*.py", ("TST001",)),),
+            ),
+            collection=setting_effect_collection(),
+            field_priorities={"select": settings_core.CONFIG_FILE_SOURCE_PRIORITY, "extend_select": settings_core.ARGUMENT_SOURCE_PRIORITY},
+        )
+
+        self.assertEqual(tuple(rule.rule.code.tag for rule in selection.rules), ("TST001",))
+        self.assertEqual(selection.for_path("tests/example.py"), ())
+
+    def test_select_rules_combines_multiple_setting_effects_with_disabled_precedence(self) -> None:
+        ignored = rules_selection.select_rules(CheckSettings(select=("TST002",), docstring_parse_tables=False), collection=setting_effect_collection())
+        disabled = rules_selection.select_rules(
+            CheckSettings(select=("TST002",), docstring_convention=DocstringConvention.GOOGLE, docstring_parse_tables=False),
+            collection=setting_effect_collection(),
+        )
+
+        self.assertEqual(tuple(rule.rule.code.tag for rule in ignored.rules), ("TST002",))
+        self.assertEqual(disabled.rules, ())
+
+    def test_select_rules_applies_per_file_ignores_to_exactly_restored_ignored_rules(self) -> None:
+        selection = rules_selection.select_rules(
+            CheckSettings(select=("TST001",), docstring_convention=DocstringConvention.GOOGLE, per_file_ignores=(("tests/*.py", ("TST001",)),)),
+            collection=setting_effect_collection(),
+        )
+
+        self.assertEqual(tuple(rule.rule.code.tag for rule in selection.rules), ("TST001",))
+        self.assertEqual(selection.for_path("tests/example.py"), ())
+
+    def test_select_rules_rejects_unknown_setting_effect_fields(self) -> None:
+        class TSTUnknownSettingEffectCategory(RuleCategoryBase):
+            meta = RuleCategoryMetadata(prefix="TST", name="unknown setting effect", url=None)
+
+        class TST999UnknownSettingEffectRule(RuleBase):
+            meta = RuleMetadata(
+                code=RuleCode("TST999"),
+                name="unknown-setting",
+                message="Unknown setting",
+                fix_availability=FixAvailability.ALWAYS,
+                stable_since="0.3.0",
+                setting_effects=(
+                    RuleSettingEffects(
+                        setting="unknown_setting",
+                        effects=(RuleSettingEffectValues(effect=RuleSettingEffect.IGNORED, values=(True,)),),
+                    ),
+                ),
+            )
+
+        rule_collection.register_rule_to(TSTUnknownSettingEffectCategory)(TST999UnknownSettingEffectRule)
+
+        with self.assertRaisesRegex(ValueError, "TST999: Unknown rule setting effect field: unknown_setting"):
+            rules_selection.select_rules(CheckSettings(select=("TST999",)), collection=rule_collection.RuleCollection((TSTUnknownSettingEffectCategory,)))
 
     def test_select_rules_prefers_more_specific_select_over_broader_ignore(self) -> None:
         selection = rules_selection.select_rules(
@@ -937,6 +1175,18 @@ class TestRules(unittest.TestCase):
             "PDF001* reflow-required (Docstring chunk needs reflow)\n"
             "PDF105 summary-too-long (Docstring summary does not fit on one line)\n",
         )
+
+    def test_print_rules_reflects_setting_aware_selection(self) -> None:
+        broad_output = StringIO()
+        exact_output = StringIO()
+
+        check.print_rules(rules_selection.select_rules(CheckSettings(docstring_convention=DocstringConvention.GOOGLE)), output=broad_output)
+        check.print_rules(rules_selection.select_rules(CheckSettings(select=("PDF102",), docstring_convention=DocstringConvention.GOOGLE)), output=exact_output)
+
+        self.assertIn("PDF101*", broad_output.getvalue())
+        self.assertNotIn("PDF102", broad_output.getvalue())
+        self.assertNotIn("PDF103", broad_output.getvalue())
+        self.assertIn("PDF102*", exact_output.getvalue())
 
     def test_print_rules_prints_operational_errors_before_rules(self) -> None:
         selection = rules_selection.select_rules(

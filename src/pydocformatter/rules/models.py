@@ -4,10 +4,9 @@ import dataclasses
 import enum
 import re
 
-_RULE_CODE_RE = re.compile(r"^([A-Z]+)([0-9]+)$")
+from pydocformatter.rules.codes import ALL_RULE_SELECTOR_TAG, RuleCode
+
 _RULE_PREFIX_RE = re.compile(r"^[A-Z]+$")
-_RULE_SELECTOR_RE = re.compile(r"^([A-Z]+)([0-9]*)$")
-ALL_RULE_SELECTOR_TAG = "ALL"
 
 
 class FixAvailability(enum.StrEnum):
@@ -18,77 +17,49 @@ class FixAvailability(enum.StrEnum):
     NEVER = "Never"
 
 
-@dataclasses.dataclass(frozen=True, order=True)
-class RuleCode:
-    """Parsed pydocformatter rule code."""
+class RuleSettingEffect(enum.StrEnum):
+    """Effect of a resolved setting value on rule selection."""
 
-    tag: str
-    prefix: str = dataclasses.field(init=False)
-    number_str: str = dataclasses.field(init=False)
-    number: int = dataclasses.field(init=False)
-
-    @staticmethod
-    def is_valid_tag(tag: str) -> bool:
-        """Return whether a string is a valid rule code tag."""
-        return _RULE_CODE_RE.fullmatch(tag) is not None and not tag.startswith(ALL_RULE_SELECTOR_TAG)
-
-    def __post_init__(self) -> None:
-        """Derive rule code parts from the full tag."""
-        match = _RULE_CODE_RE.fullmatch(self.tag)
-        if match is None or self.tag.startswith(ALL_RULE_SELECTOR_TAG):
-            raise ValueError(f"Invalid rule code: {self.tag}")
-        prefix, number_str = match.groups()
-        object.__setattr__(self, "prefix", prefix)
-        object.__setattr__(self, "number_str", number_str)
-        object.__setattr__(self, "number", int(number_str))
-
-    def __str__(self) -> str:
-        """Return the full rule code tag."""
-        return self.tag
-
-    def __format__(self, format_spec: str) -> str:
-        """Format the full rule code tag."""
-        return self.tag.__format__(format_spec)
+    IGNORED = "Ignored"
+    DISABLED = "Disabled"
 
 
 @dataclasses.dataclass(frozen=True, order=True)
-class RuleSelector:
-    """Parsed pydocformatter rule selector."""
+class RuleSettingEffectValues:
+    """Triggering values for one setting effect."""
 
-    tag: str
-    prefix: str = dataclasses.field(init=False)
-    number_str: str = dataclasses.field(init=False)
-
-    @staticmethod
-    def is_valid_tag(tag: str) -> bool:
-        """Return whether a string is a valid rule selector tag."""
-        return tag == ALL_RULE_SELECTOR_TAG or (_RULE_SELECTOR_RE.fullmatch(tag) is not None and not tag.startswith(ALL_RULE_SELECTOR_TAG))
+    effect: RuleSettingEffect
+    values: tuple[object, ...]
 
     def __post_init__(self) -> None:
-        """Derive selector parts from the full tag."""
-        if self.tag == ALL_RULE_SELECTOR_TAG:
-            prefix, number_str = ALL_RULE_SELECTOR_TAG, ""
-        else:
-            match = _RULE_SELECTOR_RE.fullmatch(self.tag)
-            if match is None or self.tag.startswith(ALL_RULE_SELECTOR_TAG):
-                raise ValueError(f"Invalid rule selector: {self.tag}")
-            prefix, number_str = match.groups()
-            if prefix is None or number_str is None:
-                raise ValueError(f"Invalid rule selector: {self.tag}")
-        object.__setattr__(self, "prefix", prefix)
-        object.__setattr__(self, "number_str", number_str)
+        """Validate the effect and its triggering values."""
+        if not isinstance(self.effect, RuleSettingEffect):
+            raise TypeError(f"Expected RuleSettingEffect, got {type(self.effect).__name__}")
+        if not isinstance(self.values, tuple):
+            raise TypeError("Rule setting effect triggering values must be a tuple")
+        if not self.values:
+            raise ValueError("Rule setting effect triggering values must not be empty")
+        try:
+            hash(self.values)
+        except TypeError:
+            raise TypeError("Rule setting effect triggering values must be hashable") from None
 
-    def selects_code(self, code: RuleCode) -> bool:
-        """Return whether this selector selects a rule code."""
-        return self.prefix == ALL_RULE_SELECTOR_TAG or (self.prefix == code.prefix and (not self.number_str or code.number_str.startswith(self.number_str)))
 
-    def __str__(self) -> str:
-        """Return the full rule selector tag."""
-        return self.tag
+@dataclasses.dataclass(frozen=True, order=True)
+class RuleSettingEffects:
+    """Selection effects associated with one resolved setting field."""
 
-    def __format__(self, format_spec: str) -> str:
-        """Format the full rule selector tag."""
-        return self.tag.__format__(format_spec)
+    setting: str
+    effects: tuple[RuleSettingEffectValues, ...]
+
+    def __post_init__(self) -> None:
+        """Validate the setting name and effect records."""
+        if not self.setting:
+            raise ValueError("Rule setting name must not be empty")
+        if not isinstance(self.effects, tuple):
+            raise TypeError("Rule setting effects must be a tuple")
+        if not all(isinstance(effect, RuleSettingEffectValues) for effect in self.effects):
+            raise TypeError("Rule setting effects must contain RuleSettingEffectValues instances")
 
 
 @dataclasses.dataclass(frozen=True, order=True)
@@ -101,6 +72,7 @@ class RuleMetadata:
         message (str): Default diagnostic message.
         fix_availability (FixAvailability): Rule-level automatic fix availability.
         stable_since (str): pydocformatter version in which the rule became stable.
+        setting_effects (tuple[RuleSettingEffects, ...]): Selection effects driven by resolved setting values.
     """
 
     code: RuleCode
@@ -108,6 +80,7 @@ class RuleMetadata:
     message: str
     fix_availability: FixAvailability
     stable_since: str
+    setting_effects: tuple[RuleSettingEffects, ...]
 
     def __post_init__(self) -> None:
         """Validate rule metadata fields."""
@@ -121,6 +94,10 @@ class RuleMetadata:
             raise ValueError(f"{self.code}: Rule message must not be empty")
         if not self.stable_since:
             raise ValueError(f"{self.code}: Stable version must not be empty")
+        if not isinstance(self.setting_effects, tuple):
+            raise TypeError(f"{self.code}: Rule setting effects must be a tuple")
+        if not all(isinstance(setting_effects, RuleSettingEffects) for setting_effects in self.setting_effects):
+            raise TypeError(f"{self.code}: Rule setting effects must contain RuleSettingEffects instances")
 
 
 @dataclasses.dataclass(frozen=True, order=True)
@@ -135,7 +112,7 @@ class RuleCategoryMetadata:
 
     prefix: str
     name: str
-    url: str | None = None
+    url: str | None
 
     def __post_init__(self) -> None:
         """Validate category metadata fields."""

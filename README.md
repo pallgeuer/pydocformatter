@@ -300,7 +300,7 @@ When `respect-gitignore` is enabled, pydocfmt aborts if gitignore filtering cann
 
 The `comment-*` settings affect the rule-based formatter. PCF001 defaults to formatting each standalone physical line independently; joining and structured-markup interpretation are opt-in. See `pydocfmt rule PCF001` and `pydocfmt rule PCF002` for exact detector precedence and protected-comment behavior.
 
-The `docstring-convention` setting never auto-detects a convention. Google and NumPy sections are only parsed when their matching convention is selected; `none` and `pep257` leave those section syntaxes as ordinary content. The `docstring-parse-*` settings control generic semantic structures independently.
+The `docstring-convention` setting never auto-detects a convention. Google and NumPy sections are only parsed when their matching convention is selected; `none` and `pep257` leave those section syntaxes as ordinary content. The resolved convention can also ignore incompatible PDF rules selected through broad selectors; selecting an exact rule code restores an ignored rule. The `docstring-parse-*` settings control generic semantic structures independently, and PCF rules are not affected by docstring conventions.
 
 Settings are resolved per path as defaults, then the closest containing `pyproject.toml` with `[tool.pydocfmt]`, then explicit `--config` files, then inline `--config` setting overrides, then dedicated command-line options. Parent config files are not merged into child config files. The highest-precedence specified value wins for each key, including `extend-include` and `extend-exclude`.
 

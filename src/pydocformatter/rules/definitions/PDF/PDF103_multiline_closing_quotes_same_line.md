@@ -2,6 +2,8 @@
 
 Fix is always available.
 
+Rule is ignored if `docstring-convention` is `google`, `numpy`, or `pep257`.
+
 ## What it does
 Checks for multi-line docstrings whose closing triple quotes should share a line with the last content line.
 

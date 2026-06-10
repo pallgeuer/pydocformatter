@@ -10,8 +10,9 @@ import pydocformatter.rules.collection as rule_collection
 import pydocformatter.rules.definitions.PCF.PCF as PCF_definition
 import pydocformatter.rules.edits as rule_edits
 from pydocformatter.cli.settings_check import CheckSettings
+from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase, RuleContext, RuleFixResult
-from pydocformatter.rules.models import FixAvailability, RuleCode, RuleFinding, RuleMetadata
+from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetadata
 
 _DISABLED_CODE_RE = re.compile(r"\s*(?:if|for|while|def|class|try|except|print|return)\b")
 _LIST_RE = re.compile(r"^(?P<indent>[ \t]*)(?P<marker>(?:[-+*]|\d+[.)]))[ \t]+(?P<text>\S.*)$")
@@ -33,6 +34,7 @@ class PCF001StandaloneCommentFormatting(RuleBase):
         message="Standalone comment needs formatting",
         fix_availability=FixAvailability.ALWAYS,
         stable_since="0.3.0",
+        setting_effects=(),
     )
 
     @classmethod
