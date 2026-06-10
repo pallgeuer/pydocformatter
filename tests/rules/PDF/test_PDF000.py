@@ -42,6 +42,16 @@ def test_fix_preserves_complex_evaluated_values() -> None:
     assert PDF000ConcatenatedDocstringLiteral.check(fixed_context) == ()
 
 
+def test_fix_keeps_non_ascii_code_points_escaped_for_ascii_source() -> None:
+    source = '# -*- coding: ascii -*-\n"\\u00e9" "\\u20ac" "\\U0001f600"\n'
+    _, context = contexts(source)
+    result = PDF000ConcatenatedDocstringLiteral.fix(context)
+    assert result.module.code == '# -*- coding: ascii -*-\n"""\\xe9\\u20ac\\U0001f600"""\n'
+    compile(result.module.code.encode("ascii"), "example.py", "exec")
+    _, fixed_context = contexts(result.module.code)
+    assert PDF.require_data(fixed_context).docstrings[0].value == "\xe9\u20ac\U0001f600"
+
+
 def test_fix_handles_multiple_docstring_owners_in_one_pass() -> None:
     source = '"module " "doc"\n\nclass Outer:\n    "class " "doc"\n\n    def method(self):\n        "method " "doc"\n\n    def unchanged(self):\n        """simple doc"""\n'
     _, context = contexts(source)

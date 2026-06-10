@@ -960,7 +960,7 @@ def serialize_simple_docstring(value: str) -> str:
             body.append("\\f")
         elif char == "\v":
             body.append("\\v")
-        elif char.isprintable():
+        elif codepoint < 0x80 and char.isprintable():
             body.append(char)
         elif codepoint <= 0xFF:
             body.append(f"\\x{codepoint:02x}")

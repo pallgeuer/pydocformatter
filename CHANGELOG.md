@@ -206,6 +206,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Fixed semantic parsing of docstrings nested under multiple levels of tab indentation.
   - Preserved residual visual indentation when a leading tab crosses the docstring dedent margin.
   - Derived multiline simple-suite docstring margins from suite indentation instead of the literal's source column.
+  - Kept non-ASCII code points escaped when normalizing concatenated docstrings so ASCII-compatible source encodings remain valid.
 
 - **Rule framework:**
   - Category preprocessing data is now refreshed after an earlier rule changes the module while remaining shared by later rules processing the same module version.

@@ -388,9 +388,9 @@ def test_directive_with_tab_indented_body_at_end_of_run_is_preserved() -> None:
 
 
 def test_unicode_code_points_each_count_as_one_width_column() -> None:
-    wide = pcf_helpers.format_pcf("# 表表表 alpha beta\n", line_length=12, comment_detect_statements=False)
+    wide = pcf_helpers.format_pcf("# \u8868\u8868\u8868 alpha beta\n", line_length=12, comment_detect_statements=False)
     combining = pcf_helpers.format_pcf("# e\u0301e\u0301e\u0301 alpha beta\n", line_length=12, comment_detect_statements=False)
-    assert wide.new_source == "# 表表表 alpha\n# beta\n"
+    assert wide.new_source == "# \u8868\u8868\u8868 alpha\n# beta\n"
     assert combining.new_source == "# e\u0301e\u0301e\u0301\n# alpha beta\n"
 
 
