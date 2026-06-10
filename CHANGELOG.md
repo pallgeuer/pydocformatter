@@ -12,8 +12,9 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 
 - **Docstring formatting:**
   - Added convention-aware semantic docstring preparation with explicit reflow regions and configurable recognition of lists, headings, doctests, code fences, block quotes, tables, directives, literal blocks, and Sphinx fields.
-  - Added `PDF000` to rewrite implicitly concatenated docstrings as equivalent simple triple-double-quoted literals.
   - Added the `docstring-convention` setting with `none`, `google`, `numpy`, and `pep257` modes.
+  - Added `PDF000` to rewrite implicitly concatenated docstrings as equivalent simple triple-double-quoted literals.
+  - Added `PDF001` to reflow safely mapped docstring summaries, paragraphs, section descriptions, Sphinx fields, list items, and block quotes.
 
 - **CLI:**
   - Added Ruff-style subcommands with `pydocfmt check` for read-only checks and `pydocfmt check --fix` for formatting.
@@ -53,6 +54,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added an empirical Ruff file-selection behavior specification at `docs/ruff_file_selection_spec.md`, covering config-relative glob bases, cwd-relative CLI overrides, gitignore behavior, explicit-file behavior, and per-file ignores.
   - Added a rule-selection specification at `docs/rule_selection_spec.md`, covering rule collection, selectors, fixability, and rule explanation output.
   - Added adjacent Markdown documentation for all built-in pydocformatter rules, including Ruff compatibility notes where relevant.
+  - Expanded the PDF001 documentation with explicit behavior notes, setting interactions, safety limits, and verified qualitative examples.
   - Added a reusable rule documentation Markdown template at `src/pydocformatter/rules/templates/rule_template.md`.
   - Added adjacent documentation for each rule category and a reusable rule category documentation template.
   - Added docstrings for public glob matching methods, the dependency-pin check tool, and important configuration, CLI, and file-selection helpers.
@@ -63,6 +65,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added regression coverage for Ruff-compatible file-selection and per-file-ignore pattern-base behavior.
   - Vastly expanded PCF rule tests across comment classification, run boundaries, structure preservation, code detection, width handling, line endings, mixed formatting, syntax-position safety, convergence, idempotence, and rule independence.
   - Vastly expanded PDF category preparation tests across docstring collection, source metadata, semantic sections and entries, protected structures, reflow regions, malformed inputs, and mixed edge cases.
+  - Added PDF001 regression coverage for short-line joining, protected structures, disabled structure parsing, simple-suite docstrings, and line-ending settings.
 
 - **Formatting:**
   - Added the LibCST-based rule execution framework with ordered category preprocessing, repeated automatic-fix passes, final read-only checks, and non-convergence diagnostics.
@@ -70,6 +73,9 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Implemented PCF001 standalone-comment formatting and PCF002 trailing-comment formatting with independent fixes, protected directive handling, tab-expanded widths, stable impossible-width behavior, and exact EOF preservation.
 
 ### Changed
+
+- **Docstring formatting:**
+  - Changed PDF001 Google-style entry wrapping to use fixed continuation indentation and to place descriptions on the following line when long entry prefixes leave too little room.
 
 - **Rule documentation:**
   - Expanded the PCF001 and PCF002 rule examples to demonstrate common spacing, wrapping, structure, protection, boundary, and extraction behavior.
@@ -82,6 +88,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 
 - **Rule framework:**
   - Split rule models, authoring contracts, execution, and line-ending utilities into focused modules while keeping formatter file and source orchestration separate.
+  - Moved shared modern-rule text wrapping and display-width helpers into a neutral rules helper module.
   - Moved rule codes and selectors into `pydocformatter.rules.codes` and added immutable, hashable setting-effect metadata to rule definitions.
   - Changed internal PDF and PCF classification types from string-compatible enums to ordinary enums.
   - Renamed PCF001 to `standalone-comment-formatting` and PCF002 to `trailing-comment-formatting` to reflect their spacing and wrapping behavior.
@@ -208,6 +215,9 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Preserved residual visual indentation when a leading tab crosses the docstring dedent margin.
   - Derived multiline simple-suite docstring margins from suite indentation instead of the literal's source column.
   - Kept non-ASCII code points escaped when normalizing concatenated docstrings so ASCII-compatible source encodings remain valid.
+  - Kept non-ASCII code points escaped when reflowing docstrings that were originally ASCII-compatible.
+  - Reflowed module docstrings whose evaluated value ends with a newline and whose closing delimiter is on a separate source line.
+  - Preserved tab-indented PDF001 continuation lines when form feeds precede a docstring or a leading tab crosses the docstring dedent margin.
   - Required whitespace after `>>>` when recognizing protected doctest prompts.
 
 - **Rule framework:**

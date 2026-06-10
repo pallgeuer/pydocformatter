@@ -2,9 +2,10 @@ import libcst as cst
 import libcst.metadata as cst_metadata
 import pytest
 
+import pydocformatter.rules.text_helpers as text_helpers
 from pydocformatter.cli.settings_check import CheckSettings
 from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
-from pydocformatter.rules.definitions.PCF.PCF import PCF, CommentKind, CommentPlacement, available_comment_width, display_width, render_comment, wrap_comment_text
+from pydocformatter.rules.definitions.PCF.PCF import PCF, CommentKind, CommentPlacement, available_comment_width, render_comment
 
 
 def category_context(source: str) -> RuleCategoryContext:
@@ -171,10 +172,10 @@ def test_source_for_handles_multiline_ranges_and_preserves_mixed_endings() -> No
 
 
 def test_comment_rendering_and_width_helpers_cover_tabs_tiny_widths_and_empty_content() -> None:
-    assert display_width("\t# text", tab_width=4) == 10
+    assert text_helpers.display_width("\t# text", tab_width=4) == 10
     assert available_comment_width("\t", line_length=12, tab_width=4, prefix="> ") == 4
-    assert wrap_comment_text("alpha beta", width=7, initial_indent="- ", subsequent_indent="  ") == ("- alpha", "  beta")
-    assert wrap_comment_text("alpha beta", width=0, initial_indent="> ") == ("> alpha beta",)
+    assert text_helpers.wrap_text("alpha beta", width=7, initial_indent="- ", subsequent_indent="  ") == ("- alpha", "  beta")
+    assert text_helpers.wrap_text("alpha beta", width=0, initial_indent="> ") == ("> alpha beta",)
     assert render_comment("", indent="    ") == "    #"
 
 

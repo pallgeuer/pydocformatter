@@ -3,13 +3,13 @@ from __future__ import annotations
 import dataclasses
 import enum
 import re
-import textwrap
 from collections.abc import Mapping
 
 import libcst as cst
 import libcst.metadata as cst_metadata
 
 import pydocformatter.rules.collection as rule_collection
+import pydocformatter.rules.text_helpers as text_helpers
 from pydocformatter.rules.definition import RuleCategoryBase, RuleCategoryContext, RuleContext
 from pydocformatter.rules.models import RuleCategoryMetadata
 
@@ -159,29 +159,9 @@ class PCF(RuleCategoryBase):
         return context.category_data
 
 
-def display_width(text: str, *, tab_width: int) -> int:
-    """Return the display width after expanding tabs to configured stops."""
-    return len(text.expandtabs(tab_width))
-
-
 def available_comment_width(indent: str, *, line_length: int, tab_width: int, prefix: str = "") -> int:
     """Return available content width after indentation and comment prefixes."""
-    return line_length - display_width(f"{indent}# {prefix}", tab_width=tab_width)
-
-
-def wrap_comment_text(text: str, *, width: int, initial_indent: str = "", subsequent_indent: str = "") -> tuple[str, ...]:
-    """Wrap normalized comment text, retaining it unwrapped for impossible widths."""
-    if width <= 0:
-        return (f"{initial_indent}{text}",)
-    wrapped = textwrap.wrap(
-        text,
-        width=width,
-        initial_indent=initial_indent,
-        subsequent_indent=subsequent_indent,
-        break_long_words=False,
-        break_on_hyphens=False,
-    )
-    return tuple(wrapped) or (initial_indent.rstrip(),)
+    return line_length - text_helpers.display_width(f"{indent}# {prefix}", tab_width=tab_width)
 
 
 def render_comment(content: str, *, indent: str = "", include_indent: bool = True) -> str:

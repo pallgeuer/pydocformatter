@@ -3,28 +3,192 @@
 Fix is always available.
 
 ## What it does
-Checks for docstring paragraphs, section entries, and other free-text chunks that are not wrapped according to the configured line length.
+Checks for docstring text regions whose normalized wrapping does not match the configured line length and indentation settings.
+
+This rule rewrites safely mapped simple string docstrings by replacing the complete string literal with an equivalent literal that preserves the original string prefix and quote delimiter. It can reflow summaries, paragraphs, convention section descriptions, Sphinx field descriptions, list items, and block quotes.
+
+PDF001 treats each reflowable semantic region independently. It joins consecutive physical lines in the same region before wrapping, so a finding can be emitted even when no individual input line is over the configured line length. Blank lines and protected structures remain region boundaries.
+
+The rule intentionally skips docstrings whose evaluated value cannot be mapped back to source text safely. This includes concatenated string docstrings, docstrings whose logical lines come from escape sequences such as `\n`, and simple literals that cannot be rendered back with the existing prefix and delimiter without changing their evaluated value.
 
 ## Why is this useful?
-Consistent wrapping keeps docstrings readable in editors, terminals, and generated documentation while preserving the surrounding Python code.
+Consistent wrapping keeps docstrings readable in editors, terminals, review diffs, and generated documentation. Reflowing semantic chunks instead of raw line ranges keeps summaries, paragraphs, parameter descriptions, fields, lists, and quoted text readable without disturbing protected examples or code-like content.
 
 ## Ruff compatibility
-This rule complements Ruff's docstring lint rules. Ruff reports many docstring style issues, while pydocformatter rewrites the docstring content that can be formatted mechanically.
+This rule complements Ruff's docstring lint rules. Ruff reports many docstring style issues, while pydocformatter rewrites docstring content that can be formatted mechanically.
 
-## Example
+PDF001 is closest in spirit to a formatter pass rather than a pure linter rule. It can change line breaks inside docstrings, but it does not add missing documentation, validate parameter coverage, or enforce a docstring convention.
+
+## Examples
+Canonical summary wrapping:
+
 ```python
 def area(radius: float) -> float:
     """Return the area for a circle with the supplied radius after validating that the radius is finite and non-negative."""
 ```
 
-Applying this rule produces:
+Applying this rule with `line-length = 72` produces:
+
 ```python
 def area(radius: float) -> float:
-    """Return the area for a circle with the supplied radius after validating
-    that the radius is finite and non-negative."""
+    """Return the area for a circle with the supplied radius after
+    validating that the radius is finite and non-negative."""
+```
+
+Short physical lines in the same summary are joined before wrapping, while paragraphs stay separated by blank lines:
+
+```python
+def normalize(text):
+    """Normalize whitespace
+    in short lines.
+
+    The long paragraph after the summary is wrapped independently from the summary and does not cross the blank line.
+    """
+```
+
+Applying this rule with `line-length = 72` produces:
+
+```python
+def normalize(text):
+    """Normalize whitespace in short lines.
+
+    The long paragraph after the summary is wrapped independently from
+    the summary and does not cross the blank line.
+    """
+```
+
+With `docstring-convention = "google"`, Google-style entries use fixed continuation indentation. If a long name or type prefix leaves too little first-line room, the description moves to the following line. Sphinx fields keep field-prefix hanging indentation:
+
+```python
+def fetch(path, payload, timeout):
+    """Fetch data.
+
+    Args:
+        path (str): A filesystem path with a description that should wrap using fixed continuation indentation.
+        payload (Mapping[str, Sequence[tuple[str, object, bytes, float]]]): Data to send with enough explanation to require another generated line.
+        timeout (float): Number of seconds to wait before failing.
+
+    :returns: The loaded bytes with enough explanation to require another generated line.
+    """
+```
+
+Applying this rule with `line-length = 78` and `docstring-convention = "google"` produces:
+
+```python
+def fetch(path, payload, timeout):
+    """Fetch data.
+
+    Args:
+        path (str): A filesystem path with a description that should wrap
+            using fixed continuation indentation.
+        payload (Mapping[str, Sequence[tuple[str, object, bytes, float]]]):
+            Data to send with enough explanation to require another generated
+            line.
+        timeout (float): Number of seconds to wait before failing.
+
+    :returns: The loaded bytes with enough explanation to require another
+              generated line.
+    """
+```
+
+With `docstring-convention = "numpy"`, NumPy section descriptions reflow under their existing indentation. List items and block quotes keep their semantic prefixes:
+
+```python
+def summarize(values):
+    """Summarize values.
+
+    Parameters
+    ----------
+    values : list[int]
+        Values to summarize with a description that should wrap under the existing indentation.
+
+    - A list item with enough words to wrap onto a continuation line using hanging indentation.
+    > A block quote with enough words to wrap onto a continuation line while preserving the quote prefix.
+    """
+```
+
+Applying this rule with `line-length = 66` and `docstring-convention = "numpy"` produces:
+
+```python
+def summarize(values):
+    """Summarize values.
+
+    Parameters
+    ----------
+    values : list[int]
+        Values to summarize with a description that should wrap
+        under the existing indentation.
+
+    - A list item with enough words to wrap onto a continuation
+      line using hanging indentation.
+    > A block quote with enough words to wrap onto a continuation
+    > line while preserving the quote prefix.
+    """
+```
+
+Protected structures, such as code fences, are left unchanged while adjacent prose still reflows:
+
+```python
+def example():
+    """Introductory prose that should wrap before the protected example.
+
+    ```python
+    result = call_with_a_very_long_argument_name_that_is_left_unchanged()
+    ```
+
+    Trailing prose that should wrap after the protected example as its own paragraph.
+    """
+```
+
+Applying this rule with `line-length = 66` produces:
+
+```python
+def example():
+    """Introductory prose that should wrap before the protected
+    example.
+
+    ```python
+    result = call_with_a_very_long_argument_name_that_is_left_unchanged()
+    ```
+
+    Trailing prose that should wrap after the protected example as
+    its own paragraph.
+    """
+```
+
+Disabling structural parsing makes matching lines fall back to ordinary paragraph reflow instead of list-item or block-quote reflow:
+
+```python
+def example():
+    """- A list item with enough words to wrap using normal paragraph rules.
+
+    > A block quote with enough words to wrap using normal paragraph rules.
+    """
+```
+
+Applying this rule with `line-length = 54`, `docstring-parse-list-items = false`, and `docstring-parse-block-quotes = false` produces:
+
+```python
+def example():
+    """- A list item with enough words to wrap using
+    normal paragraph rules.
+
+    > A block quote with enough words to wrap using
+    normal paragraph rules.
+    """
 ```
 
 ## Options
-- `line-length`
-- `indent-style`
-- `indent-width`
+- `line-length`: Maximum display width used when wrapping generated docstring lines.
+- `line-ending`: Line ending used inside rewritten docstring literals. Untouched source outside the replacement is preserved.
+- `indent-width`: Tab display width used for wrapping calculations and generated continuation indentation.
+- `docstring-convention`: Enables convention-aware parsing for Google or NumPy sections and entries.
+- `docstring-parse-list-items`: Controls whether list items are reflowed with list hanging indentation.
+- `docstring-parse-headings`: Controls whether Markdown and reStructuredText headings are protected.
+- `docstring-parse-doctests`: Controls whether doctest transcripts are protected.
+- `docstring-parse-code-fences`: Controls whether fenced code blocks are protected.
+- `docstring-parse-block-quotes`: Controls whether block quotes are reflowed with quote prefixes.
+- `docstring-parse-tables`: Controls whether Markdown and reStructuredText tables are protected.
+- `docstring-parse-directives`: Controls whether reStructuredText directives and their bodies are protected.
+- `docstring-parse-literal-blocks`: Controls whether literal blocks are protected.
+- `docstring-parse-sphinx-fields`: Controls whether Sphinx fields are reflowed as field descriptions.

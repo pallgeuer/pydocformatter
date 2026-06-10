@@ -22,7 +22,7 @@ Describe how this rule complements, replaces, or differs from relevant Ruff rule
 
 Applying this rule produces:
 ```python
-# Preferred formatting.
+# Preferred formatting. This output MUST be the actual tested output of applying the rule to the given input.
 ```
 
 ## Options

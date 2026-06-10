@@ -3,16 +3,20 @@
 Fix is always available.
 
 ## What it does
-Checks docstrings formed from implicitly concatenated string literals and replaces the complete expression with one triple-double-quoted string literal having the same evaluated value.
+Checks docstrings formed from implicitly concatenated string literals and replaces the complete concatenated expression with one triple-double-quoted string literal having the same evaluated value.
+
+A docstring is only the first string-valued expression in a module, class, or function body. PDF000 therefore applies to module, class, function, async function, and method docstrings, but it does not apply to assigned strings, later string expressions, or f-string expressions that are not string-valued docstrings.
+
+The replacement is value-preserving, not source-preserving. Raw-string prefixes, quote style, component-literal boundaries, backslash continuations, parentheses around the expression, and comments between component literals may disappear because the rule serializes the evaluated docstring value as one simple literal. Surrounding Python syntax, such as enclosing parentheses and single-line suites, is retained.
 
 ## Why is this useful?
-Later docstring formatting rules can safely rewrite one literal instead of preserving boundaries between adjacent literals.
+Implicitly concatenated docstrings have source-level boundaries that do not exist in the runtime docstring value. Normalizing them first gives later docstring formatting rules a single literal to inspect and rewrite, which avoids ambiguous edits around adjacent string tokens and comments between tokens.
 
 ## Ruff compatibility
-None.
+None. Ruff can flag some implicit string concatenation patterns in other contexts, but PDF000 is specific to Python docstring ownership and rewrites only recognized docstrings.
 
 ## Example
-The canonical case is a docstring composed of adjacent string literals:
+The canonical case is a function docstring composed of adjacent string literals:
 
 ```python
 def function():
@@ -26,34 +30,28 @@ def function():
     """First part. Second part."""
 ```
 
-The replacement preserves the evaluated string value, including escapes and differences between raw and ordinary source literals:
+Escapes, raw string prefixes, and non-ASCII code points are normalized through the evaluated value. For ASCII-compatible source output, non-ASCII code points are escaped:
 
 ```python
-def paths():
-    r"C:\Users" "\\" "name"
-
-def controls():
-    "First line\n" "Second line\tindented"
+# -*- coding: ascii -*-
+"\u00e9" "\u20ac" "\U0001f600"
 ```
 
 Applying this rule produces:
 
 ```python
-def paths():
-    """C:\\Users\\name"""
-
-def controls():
-    """First line
-Second line\tindented"""
+# -*- coding: ascii -*-
+"""\xe9\u20ac\U0001f600"""
 ```
 
-Parentheses and surrounding statement layout are retained while the complete concatenated string expression is replaced. Comments between the component literals disappear with those source-level boundaries:
+Parentheses and surrounding statement layout are retained while the complete concatenated string expression is replaced. Comments and backslash continuations between component literals disappear with those source-level boundaries:
 
 ```python
 def function():
     (
-        "Return the result "  # Introduce the result.
-        "after validation."
+        r"first\n"  # source comment
+        " second" \
+        "\tthird"
     )
 ```
 
@@ -62,43 +60,48 @@ Applying this rule produces:
 ```python
 def function():
     (
-        """Return the result after validation."""
+        """first\\n second\tthird"""
     )
 ```
 
-Module, class, and function docstrings are all handled, including docstrings in single-line suites:
+Module, class, and function docstrings are all handled in the same pass, including docstrings in single-line suites:
 
 ```python
-"Package " "documentation."
+"module " "doc"
 
 class Client:
-    "HTTP " "client."
+    "client " "doc"
 
-    def close(self): "Close " "the client."; self._closed = True
+    def close(self): "close " "client"; return None
 ```
 
 Applying this rule produces:
 
 ```python
-"""Package documentation."""
+"""module doc"""
 
 class Client:
-    """HTTP client."""
+    """client doc"""
 
-    def close(self): """Close the client."""; self._closed = True
+    def close(self): """close client"""; return None
 ```
 
-Only a string-valued first expression in a module, class, or function body is a docstring. Concatenated strings used elsewhere and already-simple docstrings are unchanged:
+Only a string-valued first expression in a module, class, or function body is a docstring. Concatenated strings used elsewhere, f-string expressions, and already-simple docstrings are unchanged:
 
 ```python
 def documented():
     """Already simple."""
     label = "first " "second"
 
+def formatted():
+    f"first" "second"
+
 def undocumented():
     initialize()
-    "Not " "a docstring."
+    "not " "a docstring"
 ```
+
+Applying this rule produces the same source.
 
 ## Options
 None.

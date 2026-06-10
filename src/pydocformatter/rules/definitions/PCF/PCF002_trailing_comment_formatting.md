@@ -18,11 +18,12 @@ Canonical spacing keeps short trailing comments predictable. Extracting long com
 Ruff can report overlong lines and spacing issues, but it does not extract and wrap trailing comments in this way. PCF002 leaves Ruff, type-checker, formatter, and security directives unchanged.
 
 ## Example
-Fitting trailing comments receive canonical spacing and lose trailing whitespace, while empty comments remain inline:
+The canonical case normalizes fitting trailing comments in place. Additional hashes after the syntactic `#` are preserved as comment content:
 
 ```python
 first = compute()#poor spacing
 second = compute() #
+third = compute()  ### heading-like content
 ```
 
 Applying this rule produces:
@@ -30,9 +31,24 @@ Applying this rule produces:
 ```python
 first = compute()  # poor spacing
 second = compute()  #
+third = compute()  # ## heading-like content
 ```
 
-The complete canonical code-plus-comment line determines whether a comment fits. Even a short comment moves when the code makes the combined line too long:
+Using `line-length = 42`, an overlong trailing comment moves above the code and wraps as a standalone block even when PCF001 is disabled:
+
+```python
+value = compute()  # This trailing comment has enough words that it must move above the code line.
+```
+
+Applying this rule produces:
+
+```python
+# This trailing comment has enough words
+# that it must move above the code line.
+value = compute()
+```
+
+Using `line-length = 40`, the complete canonical code-plus-comment line determines whether a comment fits. Even a short comment moves when the code makes the combined line too long:
 
 ```python
 very_long_variable_name = compute_expensive_value()  # why
@@ -44,7 +60,7 @@ Applying this rule produces:
 very_long_variable_name = compute_expensive_value()
 ```
 
-An overlong comment moves to the code line's indentation and wraps using the available width:
+Using `line-length = 32`, an overlong indented trailing comment moves to the code line's indentation and wraps using the available width:
 
 ```python
 if enabled:
@@ -60,11 +76,11 @@ if enabled:
     value = compute()
 ```
 
-When a moved comment would touch an existing same-indent standalone comment, a blank line keeps the independently authored comments separate:
+Using `line-length = 34`, when a moved comment would touch an existing same-indent standalone comment, a blank line keeps the independently authored comments separate:
 
 ```python
 # Existing note.
-value = compute()  # This extracted explanation is too long to remain inline.
+value = compute()  # Extracted explanation has enough words to require moving above code.
 ```
 
 Applying this rule produces:
@@ -72,8 +88,9 @@ Applying this rule produces:
 ```python
 # Existing note.
 
-# This extracted explanation is too long to
-# remain inline.
+# Extracted explanation has enough
+# words to require moving above
+# code.
 value = compute()
 ```
 
@@ -85,18 +102,24 @@ other = compute() # noqa
 secret = compute() # nosec
 ```
 
+Applying this rule produces the same source.
+
 Standalone structure and code-detection settings do not apply to trailing comments. Structure-like text is plain-wrapped after moving:
 
 ```python
-value = compute()  # - This trailing text is too long to remain inline.
+value = compute()  # - alpha beta gamma delta epsilon
+other = compute()  # > alpha beta gamma delta epsilon
 ```
 
 Applying this rule produces:
 
 ```python
-# - This trailing text is too long to
-# remain inline.
+# - alpha beta gamma
+# delta epsilon
 value = compute()
+# > alpha beta gamma
+# delta epsilon
+other = compute()
 ```
 
 ## Options

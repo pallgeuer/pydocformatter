@@ -5,6 +5,7 @@ import libcst.metadata as cst_metadata
 import pydocformatter.rules.collection as rule_collection
 import pydocformatter.rules.definitions.PCF.PCF as PCF_definition
 import pydocformatter.rules.edits as rule_edits
+import pydocformatter.rules.text_helpers as text_helpers
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase, RuleContext, RuleFixResult
 from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetadata
@@ -48,7 +49,7 @@ def _planned_changes(context: RuleContext) -> tuple[rule_edits.PlannedSourceChan
         code = comment.line_prefix.rstrip(" \t\f")
         content = comment.content
         inline = f"{code}  # {content}" if content else f"{code}  #"
-        if not content or PCF_definition.display_width(inline, tab_width=context.settings.indent_width) <= context.settings.line_length:
+        if not content or text_helpers.display_width(inline, tab_width=context.settings.indent_width) <= context.settings.line_length:
             replacement = inline
         else:
             width = PCF_definition.available_comment_width(
@@ -56,7 +57,7 @@ def _planned_changes(context: RuleContext) -> tuple[rule_edits.PlannedSourceChan
                 line_length=context.settings.line_length,
                 tab_width=context.settings.indent_width,
             )
-            wrapped = PCF_definition.wrap_comment_text(content, width=width)
+            wrapped = text_helpers.wrap_text(content, width=width)
             comment_lines = tuple(PCF_definition.render_comment(line, indent=comment.indent) for line in wrapped)
             if _requires_standalone_boundary(data, comment):
                 comment_lines = ("", *comment_lines)

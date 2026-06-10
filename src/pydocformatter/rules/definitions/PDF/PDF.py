@@ -70,6 +70,8 @@ class DocstringValueLine:
     end_offset: int
     raw_text: str
     text: str
+    raw_indent: str
+    text_indent: str
     source_line_number: int | None
 
 
@@ -599,7 +601,8 @@ class _DocstringParser:
             entry_end = self._entry_end(index, end, _indent_width(match.group("indent")))
             name = match.group("name").strip()
             type_text = match.groupdict().get("type")
-            description_lines = [match.group("description").strip()]
+            first_description = match.group("description").strip()
+            description_lines = [first_description] if first_description else []
             description_lines.extend(self.lines[line].text.strip() for line in range(index + 1, entry_end) if self.lines[line].text.strip())
             names = tuple(part.strip() for part in name.split(","))
             if kind in (DocstringEntryKind.RETURN, DocstringEntryKind.YIELD) and type_text is None:
@@ -615,9 +618,10 @@ class _DocstringParser:
             )
             entries.append(entry)
             prefix = self.lines[index].text[: match.start("description")]
-            self._add_reflow(
-                DocstringBlockKind.SECTION_ENTRY, index, entry_end, lines=tuple(description_lines), initial_indent=prefix, subsequent_indent=" " * len(prefix.expandtabs(self.settings.indent_width))
-            )
+            if description_lines and not first_description and not prefix.endswith((" ", "\t")):
+                prefix = f"{prefix} "
+            subsequent_indent = " " * (len(match.group("indent").expandtabs(self.settings.indent_width)) + self.settings.indent_width)
+            self._add_reflow(DocstringBlockKind.SECTION_ENTRY, index, entry_end, lines=tuple(description_lines), initial_indent=prefix, subsequent_indent=subsequent_indent)
             index = entry_end
         return tuple(entries)
 
@@ -862,17 +866,21 @@ def _value_lines(value: str, *, source_line_number: int | None, source_indent: i
     if not raw_lines:
         raw_lines.append((0, 0, ""))
     margin = source_indent if source_indent is not None else min((_leading_width(text) for _, _, text in raw_lines[1:] if text.strip()), default=0)
-    lines = [
-        DocstringValueLine(
-            index=index,
-            start_offset=line_start,
-            end_offset=line_end,
-            raw_text=raw_text,
-            text=raw_text.lstrip(" \t") if index == 0 else _strip_indent(raw_text, margin),
-            source_line_number=None if source_line_number is None else source_line_number + index,
+    lines: list[DocstringValueLine] = []
+    for index, (line_start, line_end, raw_text) in enumerate(raw_lines):
+        text = raw_text.lstrip(" \t") if index == 0 else _strip_indent(raw_text, margin)
+        lines.append(
+            DocstringValueLine(
+                index=index,
+                start_offset=line_start,
+                end_offset=line_end,
+                raw_text=raw_text,
+                text=text,
+                raw_indent=raw_text[: len(raw_text) - len(raw_text.lstrip(" \t"))],
+                text_indent=text[: len(text) - len(text.lstrip(" \t"))],
+                source_line_number=None if source_line_number is None else source_line_number + index,
+            )
         )
-        for index, (line_start, line_end, raw_text) in enumerate(raw_lines)
-    ]
     return tuple(lines)
 
 
@@ -946,15 +954,24 @@ def _strip_indent(text: str, width: int) -> str:
 
 def serialize_simple_docstring(value: str) -> str:
     """Serialize a string value as an equivalent triple-double-quoted literal."""
+    quote = '"""'
+    literal = f"{quote}{serialize_simple_string_body(value, quote=quote)}{quote}"
+    expression = cst.parse_expression(literal)
+    if not isinstance(expression, cst.SimpleString) or expression.evaluated_value != value:
+        raise ValueError("Failed to serialize docstring value as an equivalent simple literal")
+    return literal
+
+
+def serialize_simple_string_body(value: str, *, quote: str, line_ending: str = "\n") -> str:
+    """Serialize a simple string body using ASCII-compatible escapes."""
+    quote_char = "'" if "'" in quote else '"'
     body: list[str] = []
     for char in value:
         codepoint = ord(char)
         if char == "\\":
             body.append("\\\\")
-        elif char == '"':
-            body.append('\\"')
-        elif char == "\n":
-            body.append("\n")
+        elif char == quote_char:
+            body.append(f"\\{char}")
         elif char == "\r":
             body.append("\\r")
         elif char == "\t":
@@ -965,6 +982,8 @@ def serialize_simple_docstring(value: str) -> str:
             body.append("\\f")
         elif char == "\v":
             body.append("\\v")
+        elif char == "\n":
+            body.append(line_ending)
         elif codepoint < 0x80 and char.isprintable():
             body.append(char)
         elif codepoint <= 0xFF:
@@ -973,11 +992,7 @@ def serialize_simple_docstring(value: str) -> str:
             body.append(f"\\u{codepoint:04x}")
         else:
             body.append(f"\\U{codepoint:08x}")
-    literal = f'"""{"".join(body)}"""'
-    expression = cst.parse_expression(literal)
-    if not isinstance(expression, cst.SimpleString) or expression.evaluated_value != value:
-        raise ValueError("Failed to serialize docstring value as an equivalent simple literal")
-    return literal
+    return "".join(body)
 
 
 def _qualified_name(parent: DefinitionInfo, name: str) -> str:
@@ -1021,7 +1036,8 @@ def _simple_docstring_source_line_number(node: cst.SimpleString, *, source: str,
     if not isinstance(value, str):
         return None
     logical_line_count = len(_value_lines(value, source_line_number=None, source_indent=None))
-    if len(physical_lines) != logical_line_count:
+    has_separate_trailing_closing_delimiter = value.endswith(("\r\n", "\r", "\n")) and len(physical_lines) == logical_line_count + 1 and physical_lines[-1].source.strip() == node.quote
+    if len(physical_lines) != logical_line_count and not has_separate_trailing_closing_delimiter:
         return None
     if logical_line_count == 1:
         return code_range.start.line

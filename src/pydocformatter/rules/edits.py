@@ -24,6 +24,16 @@ class PlannedSourceChange:
     line_numbers: tuple[int, ...]
 
 
+@dataclasses.dataclass(frozen=True)
+class PlannedTextReplacement:
+    """Replacement text and the source lines reported for it."""
+
+    start_offset: int
+    end_offset: int
+    text: str
+    line_numbers: tuple[int, ...]
+
+
 def apply_planned_source_changes(module: cst.Module, changes: tuple[PlannedSourceChange, ...]) -> cst.Module:
     """Apply the source edits from planned changes to a module."""
     return apply_source_edits(module, tuple(change.edit for change in changes))
