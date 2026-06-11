@@ -16,6 +16,13 @@ Projects that prefer expanded docstrings can keep delimiters visually separate f
 This rule is intended to replace Ruff's `D212` or `D213` when the configured pydocformatter style puts opening quotes on a separate line.
 
 ## Example
+```pydocfmt-example
+[input]
+pass
+
+[output=unchanged]
+```
+
 ```python
 def area(radius: float) -> float:
     """Return the area.

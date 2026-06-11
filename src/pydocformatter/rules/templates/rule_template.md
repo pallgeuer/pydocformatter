@@ -16,13 +16,28 @@ Explain why the rule improves readability, consistency, compatibility, or safety
 Describe how this rule complements, replaces, or differs from relevant Ruff rules. Use "None." if there is no relevant Ruff interplay.
 
 ## Example
-```python
+This line says something about the following example:
+
+```pydocfmt-example
+[settings]
+line-length = 72
+
+[input]
 # Example that triggers the rule.
+
+[output]
+# Preferred formatting. This output MUST be the actual tested output of applying the rule to the given input.
 ```
 
-Applying this rule produces:
-```python
-# Preferred formatting. This output MUST be the actual tested output of applying the rule to the given input.
+Use `[output=unchanged]` instead of `[output]` when the exact input is expected to remain unchanged. Add a `[findings]` section after `[output]` or `[output=unchanged]` only when applying the rule is expected to leave non-fixed findings (e.g. each line under `[findings]` is something like `PDF105: 2` or `PDF001: 3-4, 8`):
+
+```pydocfmt-example
+[input]
+# Example that triggers a non-fixable finding.
+
+[output=unchanged]
+[findings]
+CODE101: 1-2, 7
 ```
 
 ## Options

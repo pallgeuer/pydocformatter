@@ -22,14 +22,15 @@ PDF001 is closest in spirit to a formatter pass rather than a pure linter rule. 
 ## Examples
 Canonical summary wrapping:
 
-```python
+```pydocfmt-example
+[settings]
+line-length = 72
+
+[input]
 def area(radius: float) -> float:
     """Return the area for a circle with the supplied radius after validating that the radius is finite and non-negative."""
-```
 
-Applying this rule with `line-length = 72` produces:
-
-```python
+[output]
 def area(radius: float) -> float:
     """Return the area for a circle with the supplied radius after
     validating that the radius is finite and non-negative."""
@@ -37,18 +38,19 @@ def area(radius: float) -> float:
 
 Short physical lines in the same summary are joined before wrapping, while paragraphs stay separated by blank lines:
 
-```python
+```pydocfmt-example
+[settings]
+line-length = 72
+
+[input]
 def normalize(text):
     """Normalize whitespace
     in short lines.
 
     The long paragraph after the summary is wrapped independently from the summary and does not cross the blank line.
     """
-```
 
-Applying this rule with `line-length = 72` produces:
-
-```python
+[output]
 def normalize(text):
     """Normalize whitespace in short lines.
 
@@ -57,9 +59,14 @@ def normalize(text):
     """
 ```
 
-With `docstring-convention = "google"`, Google-style entries use fixed continuation indentation. If a long name or type prefix leaves too little first-line room, the description moves to the following line. Sphinx fields keep field-prefix hanging indentation:
+Google-style entries use fixed continuation indentation. If a long name or type prefix leaves too little first-line room, the description moves to the following line. Sphinx fields keep field-prefix hanging indentation:
 
-```python
+```pydocfmt-example
+[settings]
+line-length = 78
+docstring-convention = "google"
+
+[input]
 def fetch(path, payload, timeout):
     """Fetch data.
 
@@ -70,11 +77,8 @@ def fetch(path, payload, timeout):
 
     :returns: The loaded bytes with enough explanation to require another generated line.
     """
-```
 
-Applying this rule with `line-length = 78` and `docstring-convention = "google"` produces:
-
-```python
+[output]
 def fetch(path, payload, timeout):
     """Fetch data.
 
@@ -91,9 +95,14 @@ def fetch(path, payload, timeout):
     """
 ```
 
-With `docstring-convention = "numpy"`, NumPy section descriptions reflow under their existing indentation. List items and block quotes keep their semantic prefixes:
+NumPy section descriptions reflow under their existing indentation. List items and block quotes keep their semantic prefixes:
 
-```python
+```pydocfmt-example
+[settings]
+line-length = 66
+docstring-convention = "numpy"
+
+[input]
 def summarize(values):
     """Summarize values.
 
@@ -105,11 +114,8 @@ def summarize(values):
     - A list item with enough words to wrap onto a continuation line using hanging indentation.
     > A block quote with enough words to wrap onto a continuation line while preserving the quote prefix.
     """
-```
 
-Applying this rule with `line-length = 66` and `docstring-convention = "numpy"` produces:
-
-```python
+[output]
 def summarize(values):
     """Summarize values.
 
@@ -128,7 +134,11 @@ def summarize(values):
 
 Protected structures, such as code fences, are left unchanged while adjacent prose still reflows:
 
-```python
+````pydocfmt-example
+[settings]
+line-length = 66
+
+[input]
 def example():
     """Introductory prose that should wrap before the protected example.
 
@@ -138,11 +148,8 @@ def example():
 
     Trailing prose that should wrap after the protected example as its own paragraph.
     """
-```
 
-Applying this rule with `line-length = 66` produces:
-
-```python
+[output]
 def example():
     """Introductory prose that should wrap before the protected
     example.
@@ -154,21 +161,24 @@ def example():
     Trailing prose that should wrap after the protected example as
     its own paragraph.
     """
-```
+````
 
 Disabling structural parsing makes matching lines fall back to ordinary paragraph reflow instead of list-item or block-quote reflow:
 
-```python
+```pydocfmt-example
+[settings]
+line-length = 54
+docstring-parse-list-items = false
+docstring-parse-block-quotes = false
+
+[input]
 def example():
     """- A list item with enough words to wrap using normal paragraph rules.
 
     > A block quote with enough words to wrap using normal paragraph rules.
     """
-```
 
-Applying this rule with `line-length = 54`, `docstring-parse-list-items = false`, and `docstring-parse-block-quotes = false` produces:
-
-```python
+[output]
 def example():
     """- A list item with enough words to wrap using
     normal paragraph rules.

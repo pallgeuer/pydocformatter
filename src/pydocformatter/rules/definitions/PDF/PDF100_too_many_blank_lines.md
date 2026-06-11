@@ -12,6 +12,13 @@ Predictable blank-line spacing makes summaries, descriptions, and sections visua
 This rule is intended to replace the fixable extra-blank-line cases covered by Ruff's `D205`; `PDF105` handles summaries that still span multiple lines.
 
 ## Example
+```pydocfmt-example
+[input]
+pass
+
+[output=unchanged]
+```
+
 ```python
 def area(radius: float) -> float:
     """Return the area.

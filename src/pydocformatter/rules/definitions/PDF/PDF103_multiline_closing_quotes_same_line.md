@@ -16,6 +16,13 @@ Projects that prefer compact docstrings can avoid a delimiter-only closing line 
 This rule is intended to provide the compact closing-quotes style not available from Ruff's `D209`.
 
 ## Example
+```pydocfmt-example
+[input]
+pass
+
+[output=unchanged]
+```
+
 ```python
 def area(radius: float) -> float:
     """Return the area.

@@ -12,6 +12,13 @@ Removing extra whitespace gives docstrings a predictable shape and avoids accide
 This rule is intended to replace the opening-quotes part of Ruff's `D210` when pydocformatter is responsible for docstring whitespace.
 
 ## Example
+```pydocfmt-example
+[input]
+pass
+
+[output=unchanged]
+```
+
 ```python
 def area(radius: float) -> float:
     """  Return the area."""

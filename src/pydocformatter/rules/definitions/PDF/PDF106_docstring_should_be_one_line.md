@@ -12,6 +12,13 @@ Single-line docstrings are easier to scan when their complete content fits comfo
 This rule is intended to replace Ruff's `D200` while respecting the configured line length before collapsing a docstring.
 
 ## Example
+```pydocfmt-example
+[input]
+pass
+
+[output=unchanged]
+```
+
 ```python
 def area(radius: float) -> float:
     """

@@ -20,72 +20,76 @@ Ruff can report overlong lines and spacing issues, but it does not extract and w
 ## Example
 The canonical case normalizes fitting trailing comments in place. Additional hashes after the syntactic `#` are preserved as comment content:
 
-```python
+```pydocfmt-example
+[input]
 first = compute()#poor spacing
 second = compute() #
 third = compute()  ### heading-like content
-```
 
-Applying this rule produces:
-
-```python
+[output]
 first = compute()  # poor spacing
 second = compute()  #
 third = compute()  # ## heading-like content
 ```
 
-Using `line-length = 42`, an overlong trailing comment moves above the code and wraps as a standalone block even when PCF001 is disabled:
+An overlong trailing comment moves above the code and wraps as a standalone block even when PCF001 is disabled:
 
-```python
+```pydocfmt-example
+[settings]
+line-length = 42
+
+[input]
 value = compute()  # This trailing comment has enough words that it must move above the code line.
-```
 
-Applying this rule produces:
-
-```python
+[output]
 # This trailing comment has enough words
 # that it must move above the code line.
 value = compute()
 ```
 
-Using `line-length = 40`, the complete canonical code-plus-comment line determines whether a comment fits. Even a short comment moves when the code makes the combined line too long:
+The complete canonical code-plus-comment line determines whether a comment fits. Even a short comment moves when the code makes the combined line too long:
 
-```python
+```pydocfmt-example
+[settings]
+line-length = 40
+
+[input]
 very_long_variable_name = compute_expensive_value()  # why
-```
 
-Applying this rule produces:
-```python
+[output]
 # why
 very_long_variable_name = compute_expensive_value()
 ```
 
-Using `line-length = 32`, an overlong indented trailing comment moves to the code line's indentation and wraps using the available width:
+An overlong indented trailing comment moves to the code line's indentation and wraps using the available width:
 
-```python
+```pydocfmt-example
+[settings]
+line-length = 32
+
+[input]
 if enabled:
     value = compute()  # This explanation has enough words to move and wrap.
-```
 
-Applying this rule produces:
-
-```python
+[output]
 if enabled:
-    # This explanation has enough words
-    # to move and wrap.
+    # This explanation has
+    # enough words to move and
+    # wrap.
     value = compute()
 ```
 
-Using `line-length = 34`, when a moved comment would touch an existing same-indent standalone comment, a blank line keeps the independently authored comments separate:
+When a moved comment would touch an existing same-indent standalone comment, a blank line keeps the independently authored comments separate:
 
-```python
+```pydocfmt-example
+[settings]
+line-length = 34
+
+[input]
 # Existing note.
 value = compute()  # Extracted explanation has enough words to require moving above code.
-```
 
-Applying this rule produces:
-
-```python
+[output]
 # Existing note.
 
 # Extracted explanation has enough
@@ -96,29 +100,31 @@ value = compute()
 
 Protected type comments and tool directives remain byte-for-byte unchanged, regardless of line length or spacing:
 
-```python
+```pydocfmt-example
+[input]
 value = compute() # type: ignore
 other = compute() # noqa
 secret = compute() # nosec
-```
 
-Applying this rule produces the same source.
+[output=unchanged]
+```
 
 Standalone structure and code-detection settings do not apply to trailing comments. Structure-like text is plain-wrapped after moving:
 
-```python
+```pydocfmt-example
+[settings]
+line-length = 30
+
+[input]
 value = compute()  # - alpha beta gamma delta epsilon
 other = compute()  # > alpha beta gamma delta epsilon
-```
 
-Applying this rule produces:
-
-```python
-# - alpha beta gamma
-# delta epsilon
+[output]
+# - alpha beta gamma delta
+# epsilon
 value = compute()
-# > alpha beta gamma
-# delta epsilon
+# > alpha beta gamma delta
+# epsilon
 other = compute()
 ```
 

@@ -12,6 +12,13 @@ Unexpected indentation makes docstrings harder to scan and can confuse tools tha
 This rule is intended to replace Ruff's `D207` and `D208` when pydocformatter is responsible for normalizing docstring indentation.
 
 ## Example
+```pydocfmt-example
+[input]
+pass
+
+[output=unchanged]
+```
+
 ```python
 def area(radius: float) -> float:
     """Return the area.

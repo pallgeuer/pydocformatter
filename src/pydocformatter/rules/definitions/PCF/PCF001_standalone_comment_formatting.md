@@ -20,63 +20,68 @@ The conservative ordinary-prose default corrects clear spacing and line-length i
 Ruff can report overlong comment lines and general whitespace issues, but does not provide equivalent configurable standalone-comment reflow. PCF001 complements those checks and should not be used to rewrite Ruff, type-checker, formatter, or security directives, which the PCF category protects.
 
 ## Example
-Using `line-length = 40`, the canonical case normalizes marker spacing and wraps an ordinary standalone comment:
+The canonical case normalizes marker spacing and wraps an ordinary standalone comment:
 
-```python
+```pydocfmt-example
+[settings]
+line-length = 40
+
+[input]
 #bad spacing
 # This standalone comment has enough words to wrap neatly around the configured limit.
-```
 
-Applying this rule produces:
-
-```python
+[output]
 # bad spacing
 # This standalone comment has enough
 # words to wrap neatly around the
 # configured limit.
 ```
 
-Using `line-length = 40`, ordinary physical prose lines are wrapped independently by default rather than joined with the next line:
+Ordinary physical prose lines are wrapped independently by default rather than joined with the next line:
 
-```python
+```pydocfmt-example
+[settings]
+line-length = 40
+
+[input]
 # First physical line with enough words to require wrapping by itself.
 # Second physical line stays separate.
-```
 
-Applying this rule produces:
-
-```python
+[output]
 # First physical line with enough words
 # to require wrapping by itself.
 # Second physical line stays separate.
 ```
 
-Using `line-length = 35` and `comment-join-standalone-lines = true`, consecutive ordinary prose lines in one run become one paragraph before wrapping:
+When standalone-line joining is enabled, consecutive ordinary prose lines in one run become one paragraph before wrapping:
 
-```python
+```pydocfmt-example
+[settings]
+line-length = 35
+comment-join-standalone-lines = true
+
+[input]
 # First prose line.
 # Second prose line with more words.
-```
 
-Applying this rule produces:
-
-```python
+[output]
 # First prose line. Second prose
 # line with more words.
 ```
 
-Using `line-length = 34`, list-item and block-quote formatting retain structural prefixes and align wrapped lines:
+List-item and block-quote formatting retain structural prefixes and align wrapped lines:
 
-```python
+```pydocfmt-example
+[settings]
+line-length = 34
+
+[input]
 # - A list item with enough words to wrap using hanging indentation.
 #   Its continuation is joined to the same item.
 # > A quoted paragraph with enough words
 # > to wrap while retaining its prefix.
-```
 
-Applying this rule produces:
-
-```python
+[output]
 # - A list item with enough words
 #   to wrap using hanging
 #   indentation. Its continuation
@@ -86,37 +91,47 @@ Applying this rule produces:
 # > its prefix.
 ```
 
-Using `line-length = 40`, preserved regions stay unchanged while adjacent prose still formats:
+Preserved regions stay unchanged while adjacent prose still formats:
 
-```python
+````pydocfmt-example
+[settings]
+line-length = 40
+
+[input]
 # Prose before a fence with enough words that it must wrap onto another line.
 # ```python
 #     value = compute()
 # ```
-```
 
-Applying this rule produces:
-
-```python
+[output]
 # Prose before a fence with enough words
 # that it must wrap onto another line.
 # ```python
 #     value = compute()
 # ```
-```
+````
 
-Using `line-length = 30`, enabled statement detection protects the whole consecutive standalone run, including prose in that run:
+Enabled statement detection protects the whole consecutive standalone run, including prose in that run:
 
-```python
+```pydocfmt-example
+[settings]
+line-length = 30
+
+[input]
 # value = compute()
 # prose that would otherwise wrap onto another line
+
+[output=unchanged]
 ```
 
-Applying this rule produces the same source.
+Standalone-line joining does not cross code, blank lines, protected comments, hash-only separators, or indentation boundaries:
 
-Using `line-length = 80` and `comment-join-standalone-lines = true`, joining does not cross code, blank lines, protected comments, hash-only separators, or indentation boundaries:
+```pydocfmt-example
+[settings]
+line-length = 80
+comment-join-standalone-lines = true
 
-```python
+[input]
 # first line
 value = 1
 # second line
@@ -130,9 +145,9 @@ if value:
     # sixth line
     pass
 # seventh line
-```
 
-Applying this rule produces the same source.
+[output=unchanged]
+```
 
 ## Structure settings
 - `comment-join-standalone-lines` defaults to `false`. When enabled, adjacent ordinary prose lines are joined with one space. Preserved structures, list items, and block quotes remain formatting boundaries.

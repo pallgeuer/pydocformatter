@@ -14,6 +14,13 @@ Projects that prefer expanded docstrings can keep the closing delimiter visually
 This rule is intended to replace Ruff's `D209` when pydocformatter is responsible for closing-quote placement.
 
 ## Example
+```pydocfmt-example
+[input]
+pass
+
+[output=unchanged]
+```
+
 ```python
 def area(radius: float) -> float:
     """Return the area.

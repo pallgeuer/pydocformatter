@@ -16,6 +16,13 @@ Projects that prefer compact docstrings can keep the opening delimiter and summa
 This rule is intended to replace Ruff's `D212` or `D213` when the configured pydocformatter style keeps opening quotes on the summary line.
 
 ## Example
+```pydocfmt-example
+[input]
+pass
+
+[output=unchanged]
+```
+
 ```python
 def area(radius: float) -> float:
     """

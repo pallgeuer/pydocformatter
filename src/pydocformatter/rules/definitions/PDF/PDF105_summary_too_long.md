@@ -12,6 +12,13 @@ A multi-line summary can be ambiguous: it may be a long summary that needs rewri
 This rule is intended to cover the non-fixable part of Ruff's `D205` behavior after pydocformatter has normalized fixable blank-line spacing.
 
 ## Example
+```pydocfmt-example
+[input]
+pass
+
+[output=unchanged]
+```
+
 ```python
 def area(radius: float) -> float:
     """Return the area for a circle

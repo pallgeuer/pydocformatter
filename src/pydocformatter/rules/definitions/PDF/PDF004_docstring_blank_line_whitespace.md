@@ -12,6 +12,13 @@ Whitespace-only blank lines make diffs noisy and hide formatting changes that sh
 This rule overlaps with Ruff's general blank-line whitespace checks, such as `W293`, but is scoped to docstring content handled by pydocformatter.
 
 ## Example
+```pydocfmt-example
+[input]
+pass
+
+[output=unchanged]
+```
+
 ```python
 def area(radius: float) -> float:
     """Return the area.

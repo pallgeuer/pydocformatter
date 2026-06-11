@@ -18,28 +18,24 @@ None. Ruff can flag some implicit string concatenation patterns in other context
 ## Example
 The canonical concatenation case is a function docstring composed of adjacent string literals:
 
-```python
+```pydocfmt-example
+[input]
 def function():
     "First part. " "Second part."
-```
 
-Applying this rule produces:
-
-```python
+[output]
 def function():
     """First part. Second part."""
 ```
 
 Normal whitespace escape spellings are converted to literal whitespace when the value stays unchanged:
 
-```python
+```pydocfmt-example
+[input]
 def function():
     """First line.\n\tIndented second line."""
-```
 
-Applying this rule produces:
-
-```python
+[output]
 def function():
     """First line.
 	Indented second line."""
@@ -47,52 +43,46 @@ def function():
 
 Reusable escape spellings and non-ASCII code points are preserved where possible, so ASCII-compatible source output stays ASCII-compatible without canonicalizing the exact escape form:
 
-```python
+```pydocfmt-example
+[input]
 # -*- coding: ascii -*-
 "\u00e9" "\u20ac" "\U0001f600"
-```
 
-Applying this rule produces:
-
-```python
+[output]
 # -*- coding: ascii -*-
 """\u00e9\u20ac\U0001f600"""
 ```
 
 Parentheses and surrounding statement layout are retained while the complete concatenated string expression is replaced. Comments and backslash continuations between component literals disappear with those source-level boundaries:
 
-```python
+```pydocfmt-example
+[input]
 def function():
     (
         r"first\n"  # source comment
         " second" \
         "\tthird"
     )
-```
 
-Applying this rule produces:
-
-```python
+[output]
 def function():
     (
-        """first\\n second\tthird"""
+        """first\\n second	third"""
     )
 ```
 
 Module, class, and function docstrings are all handled in the same pass, including docstrings in single-line suites:
 
-```python
+```pydocfmt-example
+[input]
 "module " "doc"
 
 class Client:
     "client " "doc"
 
     def close(self): "close " "client"; return None
-```
 
-Applying this rule produces:
-
-```python
+[output]
 """module doc"""
 
 class Client:
@@ -103,7 +93,8 @@ class Client:
 
 Only a string-valued first expression in a module, class, or function body is a docstring. Concatenated strings used elsewhere, f-string expressions, raw strings containing literal backslash text, and already-normal simple docstrings are unchanged:
 
-```python
+```pydocfmt-example
+[input]
 def documented():
     """Already simple."""
     label = "first " "second"
@@ -114,9 +105,9 @@ def formatted():
 def undocumented():
     initialize()
     "not " "a docstring"
-```
 
-Applying this rule produces the same source.
+[output=unchanged]
+```
 
 ## Options
 None.
