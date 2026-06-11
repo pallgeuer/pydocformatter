@@ -19,6 +19,7 @@ import pydocformatter.rules.codes as rule_codes
 import pydocformatter.rules.collection as rule_collection
 import pydocformatter.rules.definition as rule_base
 import pydocformatter.rules.models as rule_models
+import pydocformatter.rules.registration as rule_registration
 import pydocformatter.rules.runner as rule_runner
 import pydocformatter.rules_selection as rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, LineEnding
@@ -361,7 +362,7 @@ class TestFormatterResults(unittest.TestCase):
                 prepare_sources.append(context.module.code)
                 return context.module.code
 
-        @rule_collection.register_rule_to(TST)
+        @rule_registration.register_rule_to(TST)
         class TST001InsertLeadingLine(rule_base.RuleBase):
             meta = rule_models.RuleMetadata(
                 code=rule_codes.RuleCode("TST001"),
@@ -379,7 +380,7 @@ class TestFormatterResults(unittest.TestCase):
                     return rule_base.RuleFixResult(module=context.module)
                 return rule_base.RuleFixResult(module=context.module.with_changes(header=(cst.EmptyLine(),)), fixed_findings=(rule_models.RuleFinding(rule=cls.meta, line_numbers=(1,)),))
 
-        @rule_collection.register_rule_to(TST)
+        @rule_registration.register_rule_to(TST)
         class TST002FindName(rule_base.RuleBase):
             meta = rule_models.RuleMetadata(
                 code=rule_codes.RuleCode("TST002"),
@@ -432,7 +433,7 @@ class TestFormatterResults(unittest.TestCase):
                 prepared_data.append(data)
                 return data
 
-        @rule_collection.register_rule_to(TST)
+        @rule_registration.register_rule_to(TST)
         class TST001InsertLeadingLine(rule_base.RuleBase):
             meta = rule_models.RuleMetadata(
                 code=rule_codes.RuleCode("TST001"),
@@ -450,7 +451,7 @@ class TestFormatterResults(unittest.TestCase):
                     return rule_base.RuleFixResult(module=context.module)
                 return rule_base.RuleFixResult(module=context.module.with_changes(header=(cst.EmptyLine(),)), fixed_findings=(rule_models.RuleFinding(rule=cls.meta, line_numbers=(1,)),))
 
-        @rule_collection.register_rule_to(TST)
+        @rule_registration.register_rule_to(TST)
         class TST002ObserveCategoryData(rule_base.RuleBase):
             meta = rule_models.RuleMetadata(
                 code=rule_codes.RuleCode("TST002"),
@@ -468,7 +469,7 @@ class TestFormatterResults(unittest.TestCase):
                 observed_data.append(context.category_data)
                 return rule_base.RuleFixResult(module=context.module)
 
-        @rule_collection.register_rule_to(TST)
+        @rule_registration.register_rule_to(TST)
         class TST003ObserveCategoryDataAgain(rule_base.RuleBase):
             meta = rule_models.RuleMetadata(
                 code=rule_codes.RuleCode("TST003"),
@@ -520,7 +521,7 @@ class TestFormatterResults(unittest.TestCase):
         class TST(rule_base.RuleCategoryBase):
             meta = rule_models.RuleCategoryMetadata(prefix="TST", name="test", url=None)
 
-        @rule_collection.register_rule_to(TST)
+        @rule_registration.register_rule_to(TST)
         class TST001InsertLeadingLine(rule_base.RuleBase):
             meta = rule_models.RuleMetadata(
                 code=rule_codes.RuleCode("TST001"),
@@ -547,7 +548,7 @@ class TestFormatterResults(unittest.TestCase):
         class TST(rule_base.RuleCategoryBase):
             meta = rule_models.RuleCategoryMetadata(prefix="TST", name="test", url=None)
 
-        @rule_collection.register_rule_to(TST)
+        @rule_registration.register_rule_to(TST)
         class TST001InsertLeadingLine(rule_base.RuleBase):
             meta = rule_models.RuleMetadata(
                 code=rule_codes.RuleCode("TST001"),
@@ -576,7 +577,7 @@ class TestFormatterResults(unittest.TestCase):
         class TST(rule_base.RuleCategoryBase):
             meta = rule_models.RuleCategoryMetadata(prefix="TST", name="test", url=None)
 
-        @rule_collection.register_rule_to(TST)
+        @rule_registration.register_rule_to(TST)
         class TST001Check(rule_base.RuleBase):
             meta = rule_models.RuleMetadata(
                 code=rule_codes.RuleCode("TST001"), name="check", message="Check", fix_availability=rule_models.FixAvailability.NEVER, stable_since="0.3.0", setting_effects=(), incompatible_with=()
@@ -603,7 +604,7 @@ class TestFormatterResults(unittest.TestCase):
                 del original_node
                 return updated_node.with_changes(value="2" if updated_node.value == "1" else "1")
 
-        @rule_collection.register_rule_to(TST)
+        @rule_registration.register_rule_to(TST)
         class TST001Toggle(rule_base.RuleBase):
             meta = rule_models.RuleMetadata(
                 code=rule_codes.RuleCode("TST001"), name="toggle", message="Toggle", fix_availability=rule_models.FixAvailability.ALWAYS, stable_since="0.3.0", setting_effects=(), incompatible_with=()
@@ -638,7 +639,7 @@ class TestFormatterResults(unittest.TestCase):
                 del original_node
                 return updated_node.with_changes(value=str(int(updated_node.value) + 1))
 
-        @rule_collection.register_rule_to(TST)
+        @rule_registration.register_rule_to(TST)
         class TST001IncrementToFour(rule_base.RuleBase):
             meta = rule_models.RuleMetadata(
                 code=rule_codes.RuleCode("TST001"),

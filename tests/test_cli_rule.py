@@ -19,7 +19,7 @@ class TestCLIRule(unittest.TestCase):
 
         output = stdout.getvalue()
         self.assertEqual(exit_code, 0)
-        self.assertTrue(output.startswith("# reflow-required (PDF001)\n\nFix is always available.\n\n## What it does\n"))
+        self.assertTrue(output.startswith("# reflow-required (PDF001)\n\nFix is sometimes available.\n\n## What it does\n"))
         self.assertIn("## Ruff compatibility\n", output)
         self.assertNotIn("Derived from", output)
 

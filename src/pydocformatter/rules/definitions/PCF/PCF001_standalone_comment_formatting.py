@@ -6,10 +6,10 @@ import textwrap
 
 import libcst.metadata as cst_metadata
 
-import pydocformatter.rules.collection as rule_collection
+import pydocformatter.rules.definition_helpers.text_layout as text_layout
 import pydocformatter.rules.definitions.PCF.PCF as PCF_definition
 import pydocformatter.rules.edits as rule_edits
-import pydocformatter.rules.text_helpers as text_helpers
+import pydocformatter.rules.registration as rule_registration
 from pydocformatter.cli.settings_check import CheckSettings
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase, RuleContext, RuleFixResult
@@ -27,7 +27,7 @@ _REST_GRID_BORDER_RE = re.compile(r"^[ \t]*\+(?:[-=]+\+)+[ \t]*$")
 _REST_SIMPLE_BORDER_RE = re.compile(r"^[ \t]*(?:={3,}|-{3,})(?:[ \t]+(?:={3,}|-{3,}))*[ \t]*$")
 
 
-@rule_collection.register_rule_to(PCF_definition.PCF)
+@rule_registration.register_rule_to(PCF_definition.PCF)
 class PCF001StandaloneCommentFormatting(RuleBase):
     meta = RuleMetadata(
         code=RuleCode("PCF001"),
@@ -112,7 +112,7 @@ def _change_for_unit(
 def _wrap_plain(content: str, *, indent: str, settings: CheckSettings) -> tuple[str, ...]:
     """Wrap ordinary normalized comment content."""
     width = PCF_definition.available_comment_width(indent, line_length=settings.line_length, tab_width=settings.indent_width)
-    return text_helpers.wrap_text(content, width=width)
+    return text_layout.wrap_text(content, width=width)
 
 
 def _format_list_item(
@@ -137,9 +137,9 @@ def _format_list_item(
             break
         texts.append(body.strip())
         end += 1
-    width = settings.line_length - text_helpers.display_width(f"{run.indent}# ", tab_width=settings.indent_width)
+    width = settings.line_length - text_layout.display_width(f"{run.indent}# ", tab_width=settings.indent_width)
     subsequent = " " * len(prefix)
-    lines = text_helpers.wrap_text(" ".join(texts), width=width, initial_indent=prefix, subsequent_indent=subsequent)
+    lines = text_layout.wrap_text(" ".join(texts), width=width, initial_indent=prefix, subsequent_indent=subsequent)
     return end, lines
 
 
@@ -163,14 +163,14 @@ def _format_block_quote(
             break
         texts.append(next_match.group("text").strip())
         end += 1
-    width = settings.line_length - text_helpers.display_width(f"{run.indent}# ", tab_width=settings.indent_width)
-    lines = text_helpers.wrap_text(" ".join(texts), width=width, initial_indent=prefix, subsequent_indent=prefix)
+    width = settings.line_length - text_layout.display_width(f"{run.indent}# ", tab_width=settings.indent_width)
+    lines = text_layout.wrap_text(" ".join(texts), width=width, initial_indent=prefix, subsequent_indent=prefix)
     return end, lines
 
 
 def _expanded_structure_prefix(prefix: str, *, indent: str, tab_width: int) -> str:
     """Expand tabs in a generated structure prefix at its source column."""
-    base_width = text_helpers.display_width(f"{indent}# ", tab_width=tab_width)
+    base_width = text_layout.display_width(f"{indent}# ", tab_width=tab_width)
     return (" " * base_width + prefix).expandtabs(tab_width)[base_width:]
 
 

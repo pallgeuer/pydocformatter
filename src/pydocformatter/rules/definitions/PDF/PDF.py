@@ -8,7 +8,7 @@ import libcst as cst
 import libcst.metadata as cst_metadata
 
 import pydocformatter.cli.settings_check as settings_check
-import pydocformatter.rules.collection as rule_collection
+import pydocformatter.rules.registration as rule_registration
 from pydocformatter.rules.definition import RuleCategoryBase, RuleCategoryContext, RuleContext
 from pydocformatter.rules.models import RuleCategoryMetadata
 
@@ -72,6 +72,8 @@ class DocstringValueLine:
     text: str
     raw_indent: str
     text_indent: str
+    text_raw_start_column: int
+    text_virtual_prefix_length: int
     source_line_number: int | None
 
 
@@ -88,6 +90,15 @@ class DocstringEntry:
 
 
 @dataclasses.dataclass(frozen=True)
+class ReflowRegionLine:
+    """One reflowable text line with its evaluated-value span."""
+
+    text: str
+    start_offset: int
+    end_offset: int
+
+
+@dataclasses.dataclass(frozen=True)
 class ReflowRegion:
     """A contiguous semantic region whose lines may be merged before wrapping."""
 
@@ -96,7 +107,7 @@ class ReflowRegion:
     end_line: int
     start_offset: int
     end_offset: int
-    lines: tuple[str, ...]
+    lines: tuple[ReflowRegionLine, ...]
     initial_indent: str
     subsequent_indent: str
 
@@ -307,7 +318,7 @@ class _DefinitionCollector(cst.CSTVisitor):
         )
 
 
-@rule_collection.register_rule_category
+@rule_registration.register_rule_category
 class PDF(RuleCategoryBase):
     """Docstring formatting rule category."""
 
@@ -506,7 +517,7 @@ class _DocstringParser:
                 block_end += 1
             kind = DocstringBlockKind.SUMMARY if self.summary_pending else DocstringBlockKind.PARAGRAPH
             blocks.append(DocstringBlock(kind, index, block_end))
-            self._add_reflow(kind, index, block_end, lines=tuple(self.lines[line].text.strip() for line in range(index, block_end)), initial_indent="", subsequent_indent="")
+            self._add_reflow(kind, index, block_end, lines=self._stripped_reflow_lines(index, block_end), initial_indent="", subsequent_indent="")
             self.summary_pending = False
             index = block_end
         return blocks
@@ -602,8 +613,12 @@ class _DocstringParser:
             name = match.group("name").strip()
             type_text = match.groupdict().get("type")
             first_description = match.group("description").strip()
-            description_lines = [first_description] if first_description else []
-            description_lines.extend(self.lines[line].text.strip() for line in range(index + 1, entry_end) if self.lines[line].text.strip())
+            description_reflow_lines = []
+            first_description_line = self._reflow_line_from_text_span(index, match.start("description"), len(self.lines[index].text))
+            if first_description_line is not None and first_description_line.text:
+                description_reflow_lines.append(first_description_line)
+            description_reflow_lines.extend(self._stripped_reflow_lines(index + 1, entry_end, skip_empty=True))
+            description_lines = [line.text for line in description_reflow_lines]
             names = tuple(part.strip() for part in name.split(","))
             if kind in (DocstringEntryKind.RETURN, DocstringEntryKind.YIELD) and type_text is None:
                 names = ()
@@ -621,7 +636,7 @@ class _DocstringParser:
             prefix = f'{unit}{self.lines[index].text[len(match.group("indent")) : match.start("description")]}'
             if description_lines and not first_description and not prefix.endswith((" ", "\t")):
                 prefix = f"{prefix} "
-            self._add_reflow(DocstringBlockKind.SECTION_ENTRY, index, entry_end, lines=tuple(description_lines), initial_indent=prefix, subsequent_indent=unit * 2)
+            self._add_reflow(DocstringBlockKind.SECTION_ENTRY, index, entry_end, lines=tuple(description_reflow_lines), initial_indent=prefix, subsequent_indent=unit * 2)
             index = entry_end
         return tuple(entries)
 
@@ -638,7 +653,8 @@ class _DocstringParser:
             match = _NUMPY_ENTRY_RE.match(text)
             if match is not None:
                 entry_end = self._entry_end(index, end, _indent_width(match.group("indent")))
-                description_lines = [self.lines[line].text.strip() for line in range(index + 1, entry_end) if self.lines[line].text.strip()]
+                description_reflow_lines = self._stripped_reflow_lines(index + 1, entry_end, skip_empty=True)
+                description_lines = [line.text for line in description_reflow_lines]
                 entry = DocstringEntry(
                     kind=kind,
                     names=tuple(part.strip() for part in match.group("name").split(",")),
@@ -653,7 +669,7 @@ class _DocstringParser:
                         DocstringBlockKind.SECTION_ENTRY,
                         index + 1,
                         entry_end,
-                        lines=tuple(description_lines),
+                        lines=tuple(description_reflow_lines),
                         initial_indent=_indent_unit(self.settings),
                         subsequent_indent=_indent_unit(self.settings),
                     )
@@ -661,7 +677,8 @@ class _DocstringParser:
                 continue
             if kind in (DocstringEntryKind.RETURN, DocstringEntryKind.YIELD, DocstringEntryKind.EXCEPTION) and text.strip():
                 entry_end = self._entry_end(index, end, _leading_width(text))
-                description_lines = [self.lines[line].text.strip() for line in range(index + 1, entry_end) if self.lines[line].text.strip()]
+                description_reflow_lines = self._stripped_reflow_lines(index + 1, entry_end, skip_empty=True)
+                description_lines = [line.text for line in description_reflow_lines]
                 entries.append(
                     DocstringEntry(
                         kind=kind,
@@ -677,7 +694,7 @@ class _DocstringParser:
                         DocstringBlockKind.SECTION_ENTRY,
                         index + 1,
                         entry_end,
-                        lines=tuple(description_lines),
+                        lines=tuple(description_reflow_lines),
                         initial_indent=_indent_unit(self.settings),
                         subsequent_indent=_indent_unit(self.settings),
                     )
@@ -690,33 +707,43 @@ class _DocstringParser:
         block_end = self._entry_end(start, end, _indent_width(match.group("indent")))
         field = match.group("field").lower()
         argument = (match.group("argument") or "").strip()
-        description_lines = [match.group("description").strip()]
-        description_lines.extend(self.lines[line].text.strip() for line in range(start + 1, block_end) if self.lines[line].text.strip())
+        first_description_line = self._reflow_line_from_text_span(start, match.start("description"), len(self.lines[start].text))
+        description_reflow_lines = []
+        if first_description_line is not None:
+            description_reflow_lines.append(first_description_line)
+        description_reflow_lines.extend(self._stripped_reflow_lines(start + 1, block_end, skip_empty=True))
+        description_lines = [line.text for line in description_reflow_lines]
         kind = _sphinx_entry_kind(field)
         entry = DocstringEntry(kind=kind, names=(argument,) if argument else (), type_text=None, description=" ".join(description_lines).strip(), start_line=start, end_line=block_end)
         self.entries.append(entry)
         prefix = self.lines[start].text[: match.start("description")]
         self._add_reflow(
-            DocstringBlockKind.SPHINX_FIELD, start, block_end, lines=tuple(description_lines), initial_indent=prefix, subsequent_indent=" " * len(prefix.expandtabs(self.settings.indent_width))
+            DocstringBlockKind.SPHINX_FIELD,
+            start,
+            block_end,
+            lines=tuple(description_reflow_lines),
+            initial_indent=prefix,
+            subsequent_indent=" " * len(prefix.expandtabs(self.settings.indent_width)),
         )
         return DocstringBlock(DocstringBlockKind.SPHINX_FIELD, start, block_end, entry=entry), block_end
 
     def _parse_list_item(self, start: int, end: int, match: re.Match[str]) -> tuple[DocstringBlock, int]:
         block_end = self._list_item_end(start, end, match)
         prefix = f'{match.group("indent")}{match.group("marker")} '
-        lines = (match.group("text").strip(), *(self.lines[line].text.strip() for line in range(start + 1, block_end)))
+        first_line = self._reflow_line_from_text_span(start, match.start("text"), len(self.lines[start].text))
+        lines = (() if first_line is None else (first_line,)) + self._stripped_reflow_lines(start + 1, block_end)
         self._add_reflow(DocstringBlockKind.LIST_ITEM, start, block_end, lines=tuple(lines), initial_indent=prefix, subsequent_indent=" " * len(prefix.expandtabs(self.settings.indent_width)))
         return DocstringBlock(DocstringBlockKind.LIST_ITEM, start, block_end), block_end
 
     def _parse_block_quote(self, start: int, end: int, match: re.Match[str]) -> tuple[DocstringBlock, int]:
         prefix = f'{match.group("indent")}{match.group("quote")}'
         block_end = self._block_quote_end(start, end, prefix)
-        texts = [self.lines[line].text[len(prefix) :].strip() for line in range(start, block_end)]
+        texts = tuple(line for line in (self._reflow_line_from_text_span(line, len(prefix), len(self.lines[line].text)) for line in range(start, block_end)) if line is not None)
         self._add_reflow(DocstringBlockKind.BLOCK_QUOTE, start, block_end, lines=tuple(texts), initial_indent=prefix, subsequent_indent=prefix)
         return DocstringBlock(DocstringBlockKind.BLOCK_QUOTE, start, block_end), block_end
 
-    def _add_reflow(self, kind: DocstringBlockKind, start: int, end: int, *, lines: tuple[str, ...], initial_indent: str, subsequent_indent: str) -> None:
-        if not lines or not any(lines):
+    def _add_reflow(self, kind: DocstringBlockKind, start: int, end: int, *, lines: tuple[ReflowRegionLine, ...], initial_indent: str, subsequent_indent: str) -> None:
+        if not lines or not any(line.text for line in lines):
             return
         self.reflow_regions.append(
             ReflowRegion(
@@ -730,6 +757,26 @@ class _DocstringParser:
                 subsequent_indent=subsequent_indent,
             )
         )
+
+    def _stripped_reflow_lines(self, start: int, end: int, *, skip_empty: bool = False) -> tuple[ReflowRegionLine, ...]:
+        lines: list[ReflowRegionLine] = []
+        for index in range(start, end):
+            line = self._reflow_line_from_text_span(index, 0, len(self.lines[index].text))
+            if line is not None and (line.text or not skip_empty):
+                lines.append(line)
+        return tuple(lines)
+
+    def _reflow_line_from_text_span(self, line_index: int, start_column: int, end_column: int) -> ReflowRegionLine | None:
+        line = self.lines[line_index]
+        while start_column < end_column and line.text[start_column].isspace():
+            start_column += 1
+        while end_column > start_column and line.text[end_column - 1].isspace():
+            end_column -= 1
+        if start_column > end_column:
+            return None
+        start_offset = _value_offset_for_text_column(line, start_column)
+        end_offset = _value_offset_for_text_column(line, end_column)
+        return ReflowRegionLine(text=line.text[start_column:end_column], start_offset=start_offset, end_offset=end_offset)
 
     def _fence_end(self, start: int, end: int, opening: str) -> int:
         index = start + 1
@@ -880,7 +927,12 @@ def _value_lines(value: str, *, source_line_number: int | None, source_indent: i
     margin = source_indent if source_indent is not None else min((_leading_width(text) for _, _, text in raw_lines[1:] if text.strip()), default=0)
     lines: list[DocstringValueLine] = []
     for index, (line_start, line_end, raw_text) in enumerate(raw_lines):
-        text = raw_text.lstrip(" \t") if index == 0 else _strip_indent(raw_text, margin)
+        if index == 0:
+            text_raw_start_column = len(raw_text) - len(raw_text.lstrip(" \t"))
+            text_virtual_prefix_length = 0
+            text = raw_text[text_raw_start_column:]
+        else:
+            text, text_raw_start_column, text_virtual_prefix_length = _strip_indent_with_mapping(raw_text, margin)
         lines.append(
             DocstringValueLine(
                 index=index,
@@ -890,6 +942,8 @@ def _value_lines(value: str, *, source_line_number: int | None, source_indent: i
                 text=text,
                 raw_indent=raw_text[: len(raw_text) - len(raw_text.lstrip(" \t"))],
                 text_indent=text[: len(text) - len(text.lstrip(" \t"))],
+                text_raw_start_column=text_raw_start_column,
+                text_virtual_prefix_length=text_virtual_prefix_length,
                 source_line_number=None if source_line_number is None else source_line_number + index,
             )
         )
@@ -961,55 +1015,24 @@ def _docstring_source_indent(statement: cst.SimpleStatementLine | cst.SimpleStat
 
 def _strip_indent(text: str, width: int) -> str:
     """Strip up to a tab-expanded indentation width from text."""
+    stripped, _, _ = _strip_indent_with_mapping(text, width)
+    return stripped
+
+
+def _strip_indent_with_mapping(text: str, width: int) -> tuple[str, int, int]:
+    """Strip indentation and return the raw/virtual mapping for text column zero."""
     index = 0
     column = 0
     while index < len(text) and text[index] in " \t" and column < width:
         column = ((column // 8) + 1) * 8 if text[index] == "\t" else column + 1
         index += 1
-    return " " * max(column - width, 0) + text[index:]
+    virtual_prefix = max(column - width, 0)
+    return " " * virtual_prefix + text[index:], index, virtual_prefix
 
 
-def serialize_simple_docstring(value: str) -> str:
-    """Serialize a string value as an equivalent triple-double-quoted literal."""
-    quote = '"""'
-    literal = f"{quote}{serialize_simple_string_body(value, quote=quote)}{quote}"
-    expression = cst.parse_expression(literal)
-    if not isinstance(expression, cst.SimpleString) or expression.evaluated_value != value:
-        raise ValueError("Failed to serialize docstring value as an equivalent simple literal")
-    return literal
-
-
-def serialize_simple_string_body(value: str, *, quote: str, line_ending: str = "\n") -> str:
-    """Serialize a simple string body using ASCII-compatible escapes."""
-    quote_char = "'" if "'" in quote else '"'
-    body: list[str] = []
-    for char in value:
-        codepoint = ord(char)
-        if char == "\\":
-            body.append("\\\\")
-        elif char == quote_char:
-            body.append(f"\\{char}")
-        elif char == "\r":
-            body.append("\\r")
-        elif char == "\t":
-            body.append("\\t")
-        elif char == "\b":
-            body.append("\\b")
-        elif char == "\f":
-            body.append("\\f")
-        elif char == "\v":
-            body.append("\\v")
-        elif char == "\n":
-            body.append(line_ending)
-        elif codepoint < 0x80 and char.isprintable():
-            body.append(char)
-        elif codepoint <= 0xFF:
-            body.append(f"\\x{codepoint:02x}")
-        elif codepoint <= 0xFFFF:
-            body.append(f"\\u{codepoint:04x}")
-        else:
-            body.append(f"\\U{codepoint:08x}")
-    return "".join(body)
+def _value_offset_for_text_column(line: DocstringValueLine, column: int) -> int:
+    """Return the evaluated-value offset for a line.text column."""
+    return line.start_offset + line.text_raw_start_column + max(column - line.text_virtual_prefix_length, 0)
 
 
 def _qualified_name(parent: DefinitionInfo, name: str) -> str:

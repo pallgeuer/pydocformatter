@@ -1,5 +1,6 @@
 import libcst as cst
 import libcst.metadata as cst_metadata
+import pytest
 
 from pydocformatter.cli.settings_check import CheckSettings
 from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
@@ -46,10 +47,34 @@ def test_fix_keeps_non_ascii_code_points_escaped_for_ascii_source() -> None:
     source = '# -*- coding: ascii -*-\n"\\u00e9" "\\u20ac" "\\U0001f600"\n'
     _, context = contexts(source)
     result = PDF000ConcatenatedDocstringLiteral.fix(context)
-    assert result.module.code == '# -*- coding: ascii -*-\n"""\\xe9\\u20ac\\U0001f600"""\n'
+    assert result.module.code == '# -*- coding: ascii -*-\n"""\\u00e9\\u20ac\\U0001f600"""\n'
     compile(result.module.code.encode("ascii"), "example.py", "exec")
     _, fixed_context = contexts(result.module.code)
     assert PDF.require_data(fixed_context).docstrings[0].value == "\xe9\u20ac\U0001f600"
+
+
+def test_fix_preserves_mixed_literal_and_escaped_non_ascii_spellings() -> None:
+    source = '"café " "\\xe9" "\\u00e9"\n'
+    _, context = contexts(source)
+    result = PDF000ConcatenatedDocstringLiteral.fix(context)
+
+    assert result.module.code == '"""café \\xe9\\u00e9"""\n'
+    _, fixed_context = contexts(result.module.code)
+    assert PDF.require_data(fixed_context).docstrings[0].value == "café \xe9\xe9"
+
+
+@pytest.mark.filterwarnings("ignore:invalid escape sequence.*:DeprecationWarning")
+def test_unsupported_escape_reports_non_fixable_finding_without_crashing() -> None:
+    source = r'"bad \z" " words"' + "\n"
+    _, context = contexts(source)
+
+    findings = PDF000ConcatenatedDocstringLiteral.check(context)
+    result = PDF000ConcatenatedDocstringLiteral.fix(context)
+
+    assert tuple(finding.line_numbers for finding in findings) == ((1,),)
+    assert [finding.fixable for finding in findings] == [False]
+    assert result.module is context.module
+    assert result.fixed_findings == ()
 
 
 def test_fix_handles_multiple_docstring_owners_in_one_pass() -> None:
@@ -79,12 +104,12 @@ def test_fix_preserves_single_line_suite_statements() -> None:
     assert result.module.code == 'def function(): """first second"""; return 1\n'
 
 
-def test_fix_preserves_crlf_and_multiline_evaluated_value() -> None:
+def test_fix_preserves_crlf_and_escaped_newline_spelling() -> None:
     source = 'def function():\r\n    ("first\\n"\r\n     "second")\r\n'
     category, context = contexts(source)
     result = PDF000ConcatenatedDocstringLiteral.fix(context)
     assert result.fixed_findings[0].line_numbers == (2, 3)
-    assert result.module.code == 'def function():\r\n    ("""first\r\nsecond""")\r\n'
+    assert result.module.code == 'def function():\r\n    ("""first\\nsecond""")\r\n'
     fixed_category, _ = contexts(result.module.code)
     assert PDF.prepare(fixed_category).docstrings[0].value == "first\nsecond"
     assert category.module.config_for_parsing.default_newline == "\r\n"

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import pydocformatter.rules.collection as rule_collection
+import pydocformatter.rules.registration as rule_registration
 from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase
@@ -8,7 +8,7 @@ from pydocformatter.rules.definitions.PDF.PDF import PDF
 from pydocformatter.rules.models import FixAvailability, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
 
 
-@rule_collection.register_rule_to(PDF)
+@rule_registration.register_rule_to(PDF)
 class PDF102MultilineOpeningQuotesSepLine(RuleBase):
     meta = RuleMetadata(
         code=RuleCode("PDF102"),

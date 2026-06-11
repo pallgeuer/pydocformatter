@@ -1,15 +1,15 @@
 # reflow-required (PDF001)
 
-Fix is always available.
+Fix is sometimes available.
 
 ## What it does
 Checks for docstring text regions whose normalized wrapping does not match the configured line length and indentation settings.
 
-This rule rewrites safely mapped simple string docstrings by replacing the complete string literal with an equivalent literal that preserves the original string prefix and quote delimiter. It can reflow summaries, paragraphs, convention section descriptions, Sphinx field descriptions, list items, and block quotes.
+This rule rewrites safely mapped simple string docstrings by replacing the complete string literal with an equivalent literal that preserves the original string prefix, quote delimiter, and reusable source spellings for moved text. It can reflow summaries, paragraphs, convention section descriptions, Sphinx field descriptions, list items, and block quotes.
 
 PDF001 treats each reflowable semantic region independently. It joins consecutive physical lines in the same region before wrapping, so a finding can be emitted even when no individual input line is over the configured line length. Blank lines and protected structures remain region boundaries.
 
-The rule intentionally skips docstrings whose evaluated value cannot be mapped back to source text safely. This includes concatenated string docstrings, docstrings whose logical lines come from escape sequences such as `\n`, and simple literals that cannot be rendered back with the existing prefix and delimiter without changing their evaluated value.
+The rule intentionally skips docstrings whose evaluated value cannot be mapped back to source text safely. This includes concatenated string docstrings and docstrings whose logical lines come from escape sequences such as `\n`. If a docstring needs reflow but cannot be rendered back with the existing prefix and delimiter without changing its evaluated value, the finding is reported without an automatic fix.
 
 ## Why is this useful?
 Consistent wrapping keeps docstrings readable in editors, terminals, review diffs, and generated documentation. Reflowing semantic chunks instead of raw line ranges keeps summaries, paragraphs, parameter descriptions, fields, lists, and quoted text readable without disturbing protected examples or code-like content.

@@ -4,7 +4,11 @@ import pytest
 
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention
 from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
-from pydocformatter.rules.definitions.PDF.PDF import PDF, DefinitionKind, DocstringBlock, DocstringBlockKind, DocstringEntryKind, DocstringKind, DocstringStructure
+from pydocformatter.rules.definitions.PDF.PDF import PDF, DefinitionKind, DocstringBlock, DocstringBlockKind, DocstringEntryKind, DocstringKind, DocstringStructure, ReflowRegionLine
+
+
+def reflow_texts(lines: tuple[ReflowRegionLine, ...]) -> tuple[str, ...]:
+    return tuple(line.text for line in lines)
 
 
 def category_context(source: str, *, settings: CheckSettings | None = None) -> RuleCategoryContext:
@@ -226,7 +230,17 @@ def test_mixed_evaluated_newline_sequences_have_exact_offsets() -> None:
         (14, 19, "third", None),
         (20, 26, "fourth", None),
     )
-    assert docstring.structure.reflow_regions[0].lines == ("first", "second", "third", "fourth")
+    assert reflow_texts(docstring.structure.reflow_regions[0].lines) == ("first", "second", "third", "fourth")
+
+
+def test_reflow_region_lines_carry_description_offsets_when_text_matches_prefix() -> None:
+    value = "Args:\n    x: x words around enough to wrap after a matching entry name."
+    structure = structure_for(value, settings=CheckSettings(docstring_convention=DocstringConvention.GOOGLE))
+    region = structure.reflow_regions[0]
+
+    assert reflow_texts(region.lines) == ("x words around enough to wrap after a matching entry name.",)
+    assert region.lines[0].start_offset == value.index("x words")
+    assert region.lines[0].start_offset != value.index("x:")
 
 
 def test_trailing_evaluated_newline_does_not_create_a_phantom_logical_line() -> None:
@@ -264,7 +278,7 @@ def test_summary_paragraph_blank_and_verbatim_blocks_preserve_ranges() -> None:
         (DocstringBlockKind.BLANK, 5, 6),
         (DocstringBlockKind.VERBATIM, 6, 8),
     )
-    assert tuple((region.kind, region.lines, region.start_offset, region.end_offset) for region in structure.reflow_regions) == (
+    assert tuple((region.kind, reflow_texts(region.lines), region.start_offset, region.end_offset) for region in structure.reflow_regions) == (
         (DocstringBlockKind.SUMMARY, ("Summary first", "summary second"), 0, 28),
         (DocstringBlockKind.PARAGRAPH, ("Paragraph first", "paragraph second"), 30, 62),
     )
@@ -453,7 +467,7 @@ def test_google_sections_parse_entries_and_reflow_descriptions() -> None:
         (DocstringEntryKind.PARAMETER, ("value",), "int", "A value described on two physical lines."),
         (DocstringEntryKind.RETURN, (), "str", "The result."),
     )
-    assert tuple(region.lines for region in structure.reflow_regions) == (("Summary.",), ("A value described on", "two physical lines."), ("The result.",))
+    assert tuple(reflow_texts(region.lines) for region in structure.reflow_regions) == (("Summary.",), ("A value described on", "two physical lines."), ("The result.",))
 
 
 def test_numpy_sections_are_only_parsed_for_numpy_convention() -> None:
@@ -522,7 +536,7 @@ def test_numpy_parameter_entries_support_multiple_names_stars_and_multiline_desc
         (("*args",), "tuple[str, ...]", "Positional values.", 5, 7),
         (("**kwargs",), "dict[str, object]", "", 7, 8),
     )
-    assert tuple((region.start_line, region.end_line, region.lines, region.initial_indent, region.subsequent_indent) for region in structure.reflow_regions) == (
+    assert tuple((region.start_line, region.end_line, reflow_texts(region.lines), region.initial_indent, region.subsequent_indent) for region in structure.reflow_regions) == (
         (3, 5, ("First description line.", "Second description line."), "    ", "    "),
         (6, 7, ("Positional values.",), "    ", "    "),
     )
@@ -633,7 +647,7 @@ def test_sphinx_field_continuation_and_tabbed_prefix_have_exact_reflow_indentati
     entry = structure.entries[0]
     region = structure.reflow_regions[0]
     assert entry.description == "First line. Second line."
-    assert region.lines == ("First line.", "Second line.")
+    assert reflow_texts(region.lines) == ("First line.", "Second line.")
     assert region.initial_indent == "\t:param value: "
     assert region.subsequent_indent == " " * 16
 
@@ -679,7 +693,7 @@ def test_empty_list_item_is_classified_without_an_empty_reflow_region() -> None:
 def test_block_quote_depth_and_spacing_split_distinct_reflow_regions() -> None:
     structure = structure_for("> first\n> second\n>> nested\n>  differently spaced")
     assert tuple((block.start_line, block.end_line) for block in structure.blocks) == ((0, 2), (2, 3), (3, 4))
-    assert tuple((region.lines, region.initial_indent, region.subsequent_indent) for region in structure.reflow_regions) == (
+    assert tuple((reflow_texts(region.lines), region.initial_indent, region.subsequent_indent) for region in structure.reflow_regions) == (
         (("first", "second"), "> ", "> "),
         (("nested",), ">> ", ">> "),
         (("differently spaced",), ">  ", ">  "),
@@ -847,7 +861,7 @@ def test_disabling_all_generic_recognizers_produces_one_plain_reflow_region() ->
     structure = structure_for(value, settings=settings)
     assert tuple((block.kind, block.start_line, block.end_line) for block in structure.blocks) == ((DocstringBlockKind.SUMMARY, 0, 5),)
     assert structure.entries == ()
-    assert tuple((region.kind, region.lines) for region in structure.reflow_regions) == ((DocstringBlockKind.SUMMARY, tuple(value.splitlines())),)
+    assert tuple((region.kind, reflow_texts(region.lines)) for region in structure.reflow_regions) == ((DocstringBlockKind.SUMMARY, tuple(value.splitlines())),)
 
 
 def test_convention_sections_remain_enabled_when_all_generic_recognizers_are_disabled() -> None:

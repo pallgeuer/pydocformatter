@@ -76,6 +76,13 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 
 - **Docstring formatting:**
   - Changed PDF001 Google-style entry wrapping to use fixed continuation indentation and to place descriptions on the following line when long entry prefixes leave too little room.
+  - Centralized docstring string-literal rendering for `PDF000` and `PDF001`, preserving reusable escape spellings and literal non-ASCII characters while reporting unsafe rewrites as non-fixable findings.
+
+### Fixed
+
+- **Docstring formatting:**
+  - Fixed PDF001 source mapping for reflow regions whose text also appears earlier on the same raw docstring line.
+  - Removed dead string-literal escape handling and tightened edge-case wrapping for source-aware docstring text.
 
 - **Rule documentation:**
   - Expanded the PCF001 and PCF002 rule examples to demonstrate common spacing, wrapping, structure, protection, boundary, and extraction behavior.
@@ -83,6 +90,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 
 - **Developer workflow:**
   - Changed the mypy pre-commit hook to use the locked project environment through `uv run mypy`.
+  - Split rule registration decorators from rule collection discovery so rule category modules can be imported directly without eager collection initialization.
   - Added an explicit test package boundary and moved reusable PCF test helpers out of `conftest.py`, allowing mypy to check multiple directory-scoped pytest configurations without exclusions.
   - Organized rule tests by category and rule code under `tests/rules/`.
 

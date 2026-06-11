@@ -7,8 +7,6 @@ from pathlib import Path
 
 import pytest
 
-import pydocformatter.rules.collection  # noqa: Explicitly initialize the rule registry
-
 
 @pytest.fixture(scope="session", autouse=True)
 def isolated_test_root(tmp_path_factory: pytest.TempPathFactory) -> Generator[Path, None, None]:

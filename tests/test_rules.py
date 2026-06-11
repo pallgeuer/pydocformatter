@@ -4,6 +4,7 @@ import importlib
 import inspect
 import os
 import pkgutil
+import subprocess
 import sys
 import tempfile
 import typing
@@ -18,6 +19,7 @@ import pydocformatter.rules.collection as rule_collection
 import pydocformatter.rules.definitions as rule_definitions
 import pydocformatter.rules.documentation as rule_documentation
 import pydocformatter.rules.models as rule_models
+import pydocformatter.rules.registration as rule_registration
 import pydocformatter.rules_selection as rules_selection
 import pydocformatter.settings as settings_core
 from pydocformatter.cli.global_args import GlobalArgs
@@ -192,19 +194,19 @@ class TST004FourthIncompatibleSampleRule(RuleBase):
     )
 
 
-rule_collection.register_rule_to(PDFSampleCategory)(PDF001SampleRule)
-rule_collection.register_rule_to(PDFSampleCategory)(PDF105SampleRule)
-rule_collection.register_rule_to(PCFSampleCategory)(PCF001SampleRule)
-rule_collection.register_rule_to(PDFSpecificityCategory)(PDF142SampleRule)
-rule_collection.register_rule_to(PDFSpecificityCategory)(PDF150SampleRule)
-rule_collection.register_rule_to(PDFFixAvailabilityCategory)(PDF105SampleRule)
-rule_collection.register_rule_to(PDFFixAvailabilityCategory)(PDF160SometimesFixableSampleRule)
-rule_collection.register_rule_to(TSTSettingEffectCategory)(TST001IgnoredSampleRule)
-rule_collection.register_rule_to(TSTSettingEffectCategory)(TST002DisabledSampleRule)
-rule_collection.register_rule_to(TSTIncompatibilityCategory)(TST001FirstIncompatibleSampleRule)
-rule_collection.register_rule_to(TSTIncompatibilityCategory)(TST002SecondIncompatibleSampleRule)
-rule_collection.register_rule_to(TSTIncompatibilityCategory)(TST003ThirdIncompatibleSampleRule)
-rule_collection.register_rule_to(TSTIncompatibilityCategory)(TST004FourthIncompatibleSampleRule)
+rule_registration.register_rule_to(PDFSampleCategory)(PDF001SampleRule)
+rule_registration.register_rule_to(PDFSampleCategory)(PDF105SampleRule)
+rule_registration.register_rule_to(PCFSampleCategory)(PCF001SampleRule)
+rule_registration.register_rule_to(PDFSpecificityCategory)(PDF142SampleRule)
+rule_registration.register_rule_to(PDFSpecificityCategory)(PDF150SampleRule)
+rule_registration.register_rule_to(PDFFixAvailabilityCategory)(PDF105SampleRule)
+rule_registration.register_rule_to(PDFFixAvailabilityCategory)(PDF160SometimesFixableSampleRule)
+rule_registration.register_rule_to(TSTSettingEffectCategory)(TST001IgnoredSampleRule)
+rule_registration.register_rule_to(TSTSettingEffectCategory)(TST002DisabledSampleRule)
+rule_registration.register_rule_to(TSTIncompatibilityCategory)(TST001FirstIncompatibleSampleRule)
+rule_registration.register_rule_to(TSTIncompatibilityCategory)(TST002SecondIncompatibleSampleRule)
+rule_registration.register_rule_to(TSTIncompatibilityCategory)(TST003ThirdIncompatibleSampleRule)
+rule_registration.register_rule_to(TSTIncompatibilityCategory)(TST004FourthIncompatibleSampleRule)
 
 
 def sample_collection() -> rule_collection.RuleCollection:
@@ -252,21 +254,21 @@ class TestRules(unittest.TestCase):
             "__init__.py": "",
             "PDF/__init__.py": "",
             "PDF/PDF.py": (
-                "import pydocformatter.rules.collection as rule_collection\n"
+                "import pydocformatter.rules.registration as rule_registration\n"
                 "from pydocformatter.rules.definition import RuleCategoryBase\n"
                 "from pydocformatter.rules.models import RuleCategoryMetadata\n\n"
-                "@rule_collection.register_rule_category\n"
+                "@rule_registration.register_rule_category\n"
                 "class PDF(RuleCategoryBase):\n"
                 "    meta = RuleCategoryMetadata(prefix='PDF', name='test PDF', url=None)\n"
             ),
             "PDF/PDF.md": "# test PDF (PDF)\n",
             "PDF/PDF001_test.py": (
-                "import pydocformatter.rules.collection as rule_collection\n"
+                "import pydocformatter.rules.registration as rule_registration\n"
                 "from pydocformatter.rules.definition import RuleBase\n"
                 "from pydocformatter.rules.codes import RuleCode\n"
                 "from pydocformatter.rules.models import FixAvailability, RuleMetadata\n"
                 f"from {package_name}.PDF.PDF import PDF\n\n"
-                "@rule_collection.register_rule_to(PDF)\n"
+                "@rule_registration.register_rule_to(PDF)\n"
                 "class PDF001Test(RuleBase):\n"
                 "    meta = RuleMetadata(code=RuleCode('PDF001'), name='test', message='Test', fix_availability=FixAvailability.ALWAYS, stable_since='0.3.0', setting_effects=(), incompatible_with=())\n"
             ),
@@ -283,15 +285,15 @@ class TestRules(unittest.TestCase):
             for relative_path, content in files.items():
                 cls._write(package_root / relative_path, content)
 
-            previous_registry = rule_collection.DEFAULT_RULE_REGISTRY
-            rule_collection.DEFAULT_RULE_REGISTRY = rule_collection.RuleRegistry()
+            previous_registry = rule_registration.DEFAULT_RULE_REGISTRY
+            rule_registration.DEFAULT_RULE_REGISTRY = rule_registration.RuleRegistry()
             sys.path.insert(0, str(root))
             importlib.invalidate_caches()
             try:
                 package = importlib.import_module(package_name)
                 rule_collection.import_package_rule_categories(package=package)
             finally:
-                rule_collection.DEFAULT_RULE_REGISTRY = previous_registry
+                rule_registration.DEFAULT_RULE_REGISTRY = previous_registry
                 sys.path.remove(str(root))
                 for module_name in tuple(sys.modules):
                     if module_name == package_name or module_name.startswith(f"{package_name}.") or module_name == "synthetic_rule_support":
@@ -329,36 +331,64 @@ class TestRules(unittest.TestCase):
             self.assertTrue(explanation.startswith(f"# {rule_class.meta.name} ({rule_class.meta.code})\n\n"))
             self.assertIn(f"\n\n{rule_documentation.rule_fix_text(rule_class.meta)}\n\n", explanation)
 
+    def test_rule_modules_import_before_collection_without_changing_default_collection(self) -> None:
+        source_root = Path(__file__).parents[1] / "src"
+        environment = {**os.environ, "PYTHONPATH": str(source_root)}
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                (
+                    "from pydocformatter.rules.definitions.PCF.PCF import PCF\n"
+                    "from pydocformatter.rules.definitions.PDF.PDF001_reflow_required import PDF001ReflowRequired\n"
+                    "from pydocformatter.rules.definitions.PDF.PDF import PDF\n"
+                    "import sys\n"
+                    "assert 'pydocformatter.rules.collection' not in sys.modules\n"
+                    "import pydocformatter.rules.collection as rule_collection\n"
+                    "codes = {str(rule.meta.code) for rule in rule_collection.RULE_COLLECTION.rules}\n"
+                    "assert {'PCF001', 'PCF002', 'PDF000', 'PDF001', 'PDF106'} <= codes\n"
+                    "print(PCF.meta.prefix, PDF.meta.prefix)\n"
+                ),
+            ],
+            check=True,
+            env=environment,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+
+        self.assertEqual(result.stdout, "PCF PDF\n")
+
     def test_rule_registry_collects_categories_and_rules(self) -> None:
-        registry = rule_collection.RuleRegistry()
+        registry = rule_registration.RuleRegistry()
 
         class PDFTestCategory(RuleCategoryBase):
             meta = RuleCategoryMetadata(prefix="PDF", name="test PDF", url=None)
 
-        @rule_collection.register_rule_to(PDFTestCategory)
+        @rule_registration.register_rule_to(PDFTestCategory)
         class PDF999TestRule(RuleBase):
             meta = RuleMetadata(code=RuleCode("PDF999"), name="test-rule", message="Test rule", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0", setting_effects=(), incompatible_with=())
 
         registry.register(PDFTestCategory)
 
         self.assertEqual(registry.category_classes, {PDFTestCategory})
-        self.assertEqual(registry.collection().categories, (PDFTestCategory,))
-        self.assertEqual(registry.collection().category_class, {"PDF": PDFTestCategory})
-        self.assertEqual(registry.collection().rules, (PDF999TestRule,))
-        self.assertEqual(registry.collection().rule_class, {RuleCode("PDF999"): PDF999TestRule})
+        self.assertEqual(rule_collection.RuleCollection.from_registry(registry).categories, (PDFTestCategory,))
+        self.assertEqual(rule_collection.RuleCollection.from_registry(registry).category_class, {"PDF": PDFTestCategory})
+        self.assertEqual(rule_collection.RuleCollection.from_registry(registry).rules, (PDF999TestRule,))
+        self.assertEqual(rule_collection.RuleCollection.from_registry(registry).rule_class, {RuleCode("PDF999"): PDF999TestRule})
 
     def test_register_rule_category_decorator_collects_category_in_default_registry(self) -> None:
-        previous_registry = rule_collection.DEFAULT_RULE_REGISTRY
-        rule_collection.DEFAULT_RULE_REGISTRY = rule_collection.RuleRegistry()
+        previous_registry = rule_registration.DEFAULT_RULE_REGISTRY
+        rule_registration.DEFAULT_RULE_REGISTRY = rule_registration.RuleRegistry()
         try:
 
-            @rule_collection.register_rule_category
+            @rule_registration.register_rule_category
             class PDFTestCategory(RuleCategoryBase):
                 meta = RuleCategoryMetadata(prefix="PDF", name="test PDF", url=None)
 
-            collection = rule_collection.DEFAULT_RULE_REGISTRY.collection()
+            collection = rule_collection.RuleCollection.from_registry(rule_registration.DEFAULT_RULE_REGISTRY)
         finally:
-            rule_collection.DEFAULT_RULE_REGISTRY = previous_registry
+            rule_registration.DEFAULT_RULE_REGISTRY = previous_registry
 
         self.assertEqual(collection.categories, (PDFTestCategory,))
 
@@ -398,7 +428,7 @@ class TestRules(unittest.TestCase):
             ),
             (
                 "unregistered category",
-                {**valid_files, "PDF/PDF.py": valid_files["PDF/PDF.py"].replace("@rule_collection.register_rule_category\n", "")},
+                {**valid_files, "PDF/PDF.py": valid_files["PDF/PDF.py"].replace("@rule_registration.register_rule_category\n", "")},
                 "is not registered with the rule registry",
             ),
             (
@@ -432,7 +462,7 @@ class TestRules(unittest.TestCase):
             ),
             (
                 "unregistered rule",
-                {**valid_files, "PDF/PDF001_test.py": valid_files["PDF/PDF001_test.py"].replace("@rule_collection.register_rule_to(PDF)\n", "")},
+                {**valid_files, "PDF/PDF001_test.py": valid_files["PDF/PDF001_test.py"].replace("@rule_registration.register_rule_to(PDF)\n", "")},
                 "is not registered with category PDF",
             ),
             (
@@ -452,7 +482,7 @@ class TestRules(unittest.TestCase):
             ),
         )
         for name, files, message in cases:
-            with self.subTest(name=name), self.assertRaisesRegex(rule_collection.RuleCollectionError, message):
+            with self.subTest(name=name), self.assertRaisesRegex(rule_registration.RuleError, message):
                 self._import_synthetic_rule_package(files)
 
     def test_import_package_rule_categories_rejects_registered_rules_outside_category_package(self) -> None:
@@ -465,9 +495,9 @@ class TestRules(unittest.TestCase):
             "class PDF002External(RuleBase):\n"
             "    meta = RuleMetadata(code=RuleCode('PDF002'), name='external', message='External', fix_availability=FixAvailability.ALWAYS, stable_since='0.3.0', setting_effects=(), incompatible_with=())\n"
         )
-        files["PDF/PDF.py"] += "\nfrom synthetic_rule_support import PDF002External\nrule_collection.register_rule_to(PDF)(PDF002External)\n"
+        files["PDF/PDF.py"] += "\nfrom synthetic_rule_support import PDF002External\nrule_registration.register_rule_to(PDF)(PDF002External)\n"
 
-        with self.assertRaisesRegex(rule_collection.RuleCollectionError, "contains rules from outside package"):
+        with self.assertRaisesRegex(rule_registration.RuleError, "contains rules from outside package"):
             self._import_synthetic_rule_package(files)
 
     def test_import_package_rule_categories_rejects_registered_rules_without_rule_modules(self) -> None:
@@ -480,33 +510,33 @@ class TestRules(unittest.TestCase):
             "class PDF002PackageRule(RuleBase):\n"
             "    meta = RuleMetadata(code=RuleCode('PDF002'), name='package-rule', message='Package rule', fix_availability=FixAvailability.ALWAYS, stable_since='0.3.0', setting_effects=(), incompatible_with=())\n"
         )
-        files["PDF/PDF.py"] += f"\nfrom {package_name}.PDF import PDF002PackageRule\nrule_collection.register_rule_to(PDF)(PDF002PackageRule)\n"
+        files["PDF/PDF.py"] += f"\nfrom {package_name}.PDF import PDF002PackageRule\nrule_registration.register_rule_to(PDF)(PDF002PackageRule)\n"
 
-        with self.assertRaisesRegex(rule_collection.RuleCollectionError, "registered rules without matching rule modules"):
+        with self.assertRaisesRegex(rule_registration.RuleError, "registered rules without matching rule modules"):
             self._import_synthetic_rule_package(files)
 
     def test_register_rule_category_to_collects_category_in_bound_registry(self) -> None:
-        registry = rule_collection.RuleRegistry()
+        registry = rule_registration.RuleRegistry()
 
-        @rule_collection.register_rule_category_to(registry)
+        @rule_registration.register_rule_category_to(registry)
         class PDFTestCategory(RuleCategoryBase):
             meta = RuleCategoryMetadata(prefix="PDF", name="test PDF", url=None)
 
-        self.assertEqual(registry.collection().categories, (PDFTestCategory,))
+        self.assertEqual(rule_collection.RuleCollection.from_registry(registry).categories, (PDFTestCategory,))
 
     def test_rule_category_rejects_duplicate_rule_codes_from_different_classes(self) -> None:
         class PDFTestCategory(RuleCategoryBase):
             meta = RuleCategoryMetadata(prefix="PDF", name="test PDF", url=None)
 
-        @rule_collection.register_rule_to(PDFTestCategory)
+        @rule_registration.register_rule_to(PDFTestCategory)
         class PDF999FirstRule(RuleBase):
             meta = RuleMetadata(
                 code=RuleCode("PDF999"), name="first-rule", message="First rule", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0", setting_effects=(), incompatible_with=()
             )
 
-        with self.assertRaisesRegex(rule_collection.RuleCollectionError, "Duplicate rule code in category PDF: PDF999"):
+        with self.assertRaisesRegex(rule_registration.RuleError, "Duplicate rule code in category PDF: PDF999"):
 
-            @rule_collection.register_rule_to(PDFTestCategory)
+            @rule_registration.register_rule_to(PDFTestCategory)
             class PDF999SecondRule(RuleBase):
                 meta = RuleMetadata(
                     code=RuleCode("PDF999"), name="second-rule", message="Second rule", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0", setting_effects=(), incompatible_with=()
@@ -519,8 +549,8 @@ class TestRules(unittest.TestCase):
         class PDF999TestRule(RuleBase):
             meta = RuleMetadata(code=RuleCode("PDF999"), name="test-rule", message="Test rule", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0", setting_effects=(), incompatible_with=())
 
-        rule_collection.register_rule_to(PDFTestCategory)(PDF999TestRule)
-        rule_collection.register_rule_to(PDFTestCategory)(PDF999TestRule)
+        rule_registration.register_rule_to(PDFTestCategory)(PDF999TestRule)
+        rule_registration.register_rule_to(PDFTestCategory)(PDF999TestRule)
 
         self.assertEqual(PDFTestCategory.ordered_rules(), (PDF999TestRule,))
 
@@ -533,15 +563,15 @@ class TestRules(unittest.TestCase):
         self.assertEqual(collection.categories, (PDFTestCategory,))
 
     def test_rule_registry_and_collection_reject_direct_rules(self) -> None:
-        registry = rule_collection.RuleRegistry()
+        registry = rule_registration.RuleRegistry()
 
-        with self.assertRaisesRegex(rule_collection.RuleCollectionError, "Registered rule category must inherit RuleCategoryBase"):
+        with self.assertRaisesRegex(rule_registration.RuleError, "Registered rule category must inherit RuleCategoryBase"):
             registry.register(typing.cast(type[RuleCategoryBase], PDF001SampleRule))
-        with self.assertRaisesRegex(rule_collection.RuleCollectionError, "Collected rule category must inherit RuleCategoryBase"):
+        with self.assertRaisesRegex(rule_registration.RuleError, "Collected rule category must inherit RuleCategoryBase"):
             rule_collection.RuleCollection((typing.cast(type[RuleCategoryBase], PDF001SampleRule),))
 
     def test_rule_registry_is_frozen_but_keeps_mutable_registration_state(self) -> None:
-        registry = rule_collection.RuleRegistry()
+        registry = rule_registration.RuleRegistry()
 
         class PDFTestCategory(RuleCategoryBase):
             meta = RuleCategoryMetadata(prefix="PDF", name="test PDF", url=None)
@@ -550,22 +580,22 @@ class TestRules(unittest.TestCase):
 
         with self.assertRaises(dataclasses.FrozenInstanceError):
             setattr(registry, "category_classes", set())
-        self.assertEqual(registry.collection().categories, (PDFTestCategory,))
+        self.assertEqual(rule_collection.RuleCollection.from_registry(registry).categories, (PDFTestCategory,))
 
     def test_rule_registries_are_isolated(self) -> None:
-        default_registry = rule_collection.RuleRegistry()
-        isolated_registry = rule_collection.RuleRegistry()
+        default_registry = rule_registration.RuleRegistry()
+        isolated_registry = rule_registration.RuleRegistry()
 
-        @rule_collection.register_rule_category_to(default_registry)
+        @rule_registration.register_rule_category_to(default_registry)
         class PDFDefaultCategory(RuleCategoryBase):
             meta = RuleCategoryMetadata(prefix="PDF", name="default PDF", url=None)
 
-        @rule_collection.register_rule_category_to(isolated_registry)
+        @rule_registration.register_rule_category_to(isolated_registry)
         class PDFIsolatedCategory(RuleCategoryBase):
             meta = RuleCategoryMetadata(prefix="PDF", name="isolated PDF", url=None)
 
-        self.assertEqual(default_registry.collection().categories, (PDFDefaultCategory,))
-        self.assertEqual(isolated_registry.collection().categories, (PDFIsolatedCategory,))
+        self.assertEqual(rule_collection.RuleCollection.from_registry(default_registry).categories, (PDFDefaultCategory,))
+        self.assertEqual(rule_collection.RuleCollection.from_registry(isolated_registry).categories, (PDFIsolatedCategory,))
 
     def test_rule_metadata_derives_prefix_and_number_from_code(self) -> None:
         rule = RuleMetadata(
@@ -756,12 +786,12 @@ class TestRules(unittest.TestCase):
         class PDFTestCategory(RuleCategoryBase):
             meta = RuleCategoryMetadata(prefix="PDF", name="test PDF", url=None)
 
-        with self.assertRaisesRegex(rule_collection.RuleCollectionError, "Rule category must inherit RuleCategoryBase"):
-            rule_collection.register_rule_to(typing.cast(type[RuleCategoryBase], object))
-        with self.assertRaisesRegex(rule_collection.RuleCollectionError, "Registered rule must inherit RuleBase"):
-            rule_collection.register_rule_to(PDFTestCategory)(typing.cast(type[RuleBase], object))
-        with self.assertRaisesRegex(rule_collection.RuleCollectionError, "Rule code prefix 'PCF' does not match rule category prefix 'PDF'"):
-            rule_collection.register_rule_to(PDFTestCategory)(PCF001SampleRule)
+        with self.assertRaisesRegex(rule_registration.RuleError, "Rule category must inherit RuleCategoryBase"):
+            rule_registration.register_rule_to(typing.cast(type[RuleCategoryBase], object))
+        with self.assertRaisesRegex(rule_registration.RuleError, "Registered rule must inherit RuleBase"):
+            rule_registration.register_rule_to(PDFTestCategory)(typing.cast(type[RuleBase], object))
+        with self.assertRaisesRegex(rule_registration.RuleError, "Rule code prefix 'PCF' does not match rule category prefix 'PDF'"):
+            rule_registration.register_rule_to(PDFTestCategory)(PCF001SampleRule)
 
     def test_rule_collection_rejects_duplicate_category_prefixes(self) -> None:
         class PDFFirstCategory(RuleCategoryBase):
@@ -770,14 +800,14 @@ class TestRules(unittest.TestCase):
         class PDFSecondCategory(RuleCategoryBase):
             meta = RuleCategoryMetadata(prefix="PDF", name="second PDF", url=None)
 
-        with self.assertRaisesRegex(rule_collection.RuleCollectionError, "Duplicate rule category prefix: PDF"):
+        with self.assertRaisesRegex(rule_registration.RuleError, "Duplicate rule category prefix: PDF"):
             rule_collection.RuleCollection((PDFFirstCategory, PDFSecondCategory))
 
     def test_rule_collection_validates_rule_incompatibilities(self) -> None:
         class TSTSelfCategory(RuleCategoryBase):
             meta = RuleCategoryMetadata(prefix="TST", name="self incompatible", url=None)
 
-        @rule_collection.register_rule_to(TSTSelfCategory)
+        @rule_registration.register_rule_to(TSTSelfCategory)
         class TST001SelfRule(RuleBase):
             meta = RuleMetadata(
                 code=RuleCode("TST001"),
@@ -789,27 +819,27 @@ class TestRules(unittest.TestCase):
                 incompatible_with=(RuleCode("TST001"),),
             )
 
-        with self.assertRaisesRegex(rule_collection.RuleCollectionError, "Rule TST001 cannot be incompatible with itself"):
+        with self.assertRaisesRegex(rule_registration.RuleError, "Rule TST001 cannot be incompatible with itself"):
             rule_collection.RuleCollection((TSTSelfCategory,))
 
         class TSTUnknownCategory(RuleCategoryBase):
             meta = RuleCategoryMetadata(prefix="TST", name="unknown incompatible", url=None)
 
-        @rule_collection.register_rule_to(TSTUnknownCategory)
+        @rule_registration.register_rule_to(TSTUnknownCategory)
         class TST001UnknownRule(RuleBase):
             meta = dataclasses.replace(TST001SelfRule.meta, incompatible_with=(RuleCode("TST999"),))
 
-        with self.assertRaisesRegex(rule_collection.RuleCollectionError, "Rule TST001 is incompatible with unknown rule code TST999"):
+        with self.assertRaisesRegex(rule_registration.RuleError, "Rule TST001 is incompatible with unknown rule code TST999"):
             rule_collection.RuleCollection((TSTUnknownCategory,))
 
         class TSTAsymmetricCategory(RuleCategoryBase):
             meta = RuleCategoryMetadata(prefix="TST", name="asymmetric incompatibility", url=None)
 
-        @rule_collection.register_rule_to(TSTAsymmetricCategory)
+        @rule_registration.register_rule_to(TSTAsymmetricCategory)
         class TST001AsymmetricRule(RuleBase):
             meta = dataclasses.replace(TST001SelfRule.meta, incompatible_with=(RuleCode("TST002"),))
 
-        @rule_collection.register_rule_to(TSTAsymmetricCategory)
+        @rule_registration.register_rule_to(TSTAsymmetricCategory)
         class TST002AsymmetricRule(RuleBase):
             meta = RuleMetadata(
                 code=RuleCode("TST002"),
@@ -821,7 +851,7 @@ class TestRules(unittest.TestCase):
                 incompatible_with=(),
             )
 
-        with self.assertRaisesRegex(rule_collection.RuleCollectionError, "Rule incompatibility between TST001 and TST002 must be declared by both rules"):
+        with self.assertRaisesRegex(rule_registration.RuleError, "Rule incompatibility between TST001 and TST002 must be declared by both rules"):
             rule_collection.RuleCollection((TSTAsymmetricCategory,))
 
     def test_rule_base_class_properties_redirect_to_metadata(self) -> None:
@@ -866,8 +896,8 @@ class TestRules(unittest.TestCase):
         class PDFReverseRegistrationCategory(RuleCategoryBase):
             meta = RuleCategoryMetadata(prefix="PDF", name="reverse PDF", url=None)
 
-        rule_collection.register_rule_to(PDFReverseRegistrationCategory)(PDF105SampleRule)
-        rule_collection.register_rule_to(PDFReverseRegistrationCategory)(PDF001SampleRule)
+        rule_registration.register_rule_to(PDFReverseRegistrationCategory)(PDF105SampleRule)
+        rule_registration.register_rule_to(PDFReverseRegistrationCategory)(PDF001SampleRule)
         collection = sample_collection()
 
         self.assertEqual(collection.categories, (PCFSampleCategory, PDFSampleCategory))
@@ -1117,7 +1147,7 @@ class TestRules(unittest.TestCase):
                 incompatible_with=(),
             )
 
-        rule_collection.register_rule_to(TSTUnknownSettingEffectCategory)(TST999UnknownSettingEffectRule)
+        rule_registration.register_rule_to(TSTUnknownSettingEffectCategory)(TST999UnknownSettingEffectRule)
 
         with self.assertRaisesRegex(ValueError, "TST999: Unknown rule setting effect field: unknown_setting"):
             rules_selection.select_rules(CheckSettings(select=("TST999",)), collection=rule_collection.RuleCollection((TSTUnknownSettingEffectCategory,)))

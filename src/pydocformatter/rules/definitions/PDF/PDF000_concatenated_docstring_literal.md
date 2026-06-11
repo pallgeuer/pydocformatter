@@ -1,13 +1,13 @@
 # concatenated-docstring-literal (PDF000)
 
-Fix is always available.
+Fix is sometimes available.
 
 ## What it does
 Checks docstrings formed from implicitly concatenated string literals and replaces the complete concatenated expression with one triple-double-quoted string literal having the same evaluated value.
 
 A docstring is only the first string-valued expression in a module, class, or function body. PDF000 therefore applies to module, class, function, async function, and method docstrings, but it does not apply to assigned strings, later string expressions, or f-string expressions that are not string-valued docstrings.
 
-The replacement is value-preserving, not source-preserving. Raw-string prefixes, quote style, component-literal boundaries, backslash continuations, parentheses around the expression, and comments between component literals may disappear because the rule serializes the evaluated docstring value as one simple literal. Surrounding Python syntax, such as enclosing parentheses and single-line suites, is retained.
+The replacement is value-preserving and keeps reusable source spellings for individual string characters where possible. Raw-string prefixes, quote style, component-literal boundaries, backslash continuations, parentheses around the expression, and comments between component literals may disappear because the rule emits one simple literal. Surrounding Python syntax, such as enclosing parentheses and single-line suites, is retained.
 
 ## Why is this useful?
 Implicitly concatenated docstrings have source-level boundaries that do not exist in the runtime docstring value. Normalizing them first gives later docstring formatting rules a single literal to inspect and rewrite, which avoids ambiguous edits around adjacent string tokens and comments between tokens.
@@ -30,7 +30,7 @@ def function():
     """First part. Second part."""
 ```
 
-Escapes, raw string prefixes, and non-ASCII code points are normalized through the evaluated value. For ASCII-compatible source output, non-ASCII code points are escaped:
+Reusable escape spellings and non-ASCII code points are preserved where possible, so ASCII-compatible source output stays ASCII-compatible without canonicalizing the exact escape form:
 
 ```python
 # -*- coding: ascii -*-
@@ -41,7 +41,7 @@ Applying this rule produces:
 
 ```python
 # -*- coding: ascii -*-
-"""\xe9\u20ac\U0001f600"""
+"""\u00e9\u20ac\U0001f600"""
 ```
 
 Parentheses and surrounding statement layout are retained while the complete concatenated string expression is replaced. Comments and backslash continuations between component literals disappear with those source-level boundaries:

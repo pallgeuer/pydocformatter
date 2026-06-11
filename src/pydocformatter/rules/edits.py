@@ -5,7 +5,7 @@ import dataclasses
 import libcst as cst
 import libcst.metadata as cst_metadata
 
-from pydocformatter.rules.models import RuleFinding, RuleMetadata
+from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetadata
 
 
 @dataclasses.dataclass(frozen=True)
@@ -39,9 +39,11 @@ def apply_planned_source_changes(module: cst.Module, changes: tuple[PlannedSourc
     return apply_source_edits(module, tuple(change.edit for change in changes))
 
 
-def findings_for_planned_source_changes(rule: RuleMetadata, changes: tuple[PlannedSourceChange, ...]) -> tuple[RuleFinding, ...]:
+def findings_for_planned_source_changes(rule: RuleMetadata, changes: tuple[PlannedSourceChange, ...], *, instance_fixable: bool | None = None) -> tuple[RuleFinding, ...]:
     """Return rule findings for planned source changes."""
-    return tuple(RuleFinding(rule=rule, line_numbers=change.line_numbers) for change in changes)
+    if rule.fix_availability == FixAvailability.SOMETIMES and instance_fixable is None:
+        raise ValueError(f"{rule.code}: Findings for sometimes-fixable rules must specify instance_fixable")
+    return tuple(RuleFinding(rule=rule, line_numbers=change.line_numbers, instance_fixable=instance_fixable) for change in changes)
 
 
 def apply_source_edits(module: cst.Module, edits: tuple[SourceEdit, ...]) -> cst.Module:

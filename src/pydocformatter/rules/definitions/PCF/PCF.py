@@ -8,8 +8,8 @@ from collections.abc import Mapping
 import libcst as cst
 import libcst.metadata as cst_metadata
 
-import pydocformatter.rules.collection as rule_collection
-import pydocformatter.rules.text_helpers as text_helpers
+import pydocformatter.rules.definition_helpers.text_layout as text_layout
+import pydocformatter.rules.registration as rule_registration
 from pydocformatter.rules.definition import RuleCategoryBase, RuleCategoryContext, RuleContext
 from pydocformatter.rules.models import RuleCategoryMetadata
 
@@ -119,7 +119,7 @@ class _CommentCollector(cst.CSTVisitor):
         self.comments.append(node)
 
 
-@rule_collection.register_rule_category
+@rule_registration.register_rule_category
 class PCF(RuleCategoryBase):
     """Comment formatting rule category."""
 
@@ -161,7 +161,7 @@ class PCF(RuleCategoryBase):
 
 def available_comment_width(indent: str, *, line_length: int, tab_width: int, prefix: str = "") -> int:
     """Return available content width after indentation and comment prefixes."""
-    return line_length - text_helpers.display_width(f"{indent}# {prefix}", tab_width=tab_width)
+    return line_length - text_layout.display_width(f"{indent}# {prefix}", tab_width=tab_width)
 
 
 def render_comment(content: str, *, indent: str = "", include_indent: bool = True) -> str:

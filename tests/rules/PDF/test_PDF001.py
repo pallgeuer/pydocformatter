@@ -1,5 +1,6 @@
 import libcst as cst
 import libcst.metadata as cst_metadata
+import pytest
 
 import pydocformatter.formatter as formatter
 import pydocformatter.rules_selection as rules_selection
@@ -225,13 +226,55 @@ def test_fix_keeps_non_ascii_code_points_escaped_for_ascii_source() -> None:
     assert not format_pdf001(new_source, settings=CheckSettings(select=("PDF001",), line_length=58)).modified
 
 
-def test_unsafe_existing_literal_syntax_is_skipped_without_findings() -> None:
+def test_reflows_escaped_delimiters_and_backslashes_when_source_spelling_is_preserved() -> None:
     source = "def delimiter():\n    '''A docstring containing an escaped delimiter \\'\\'\\' and enough words to need wrapping.'''\n\ndef backslash():\n    \"\"\"A docstring containing a literal backslash \\\\ and enough words to need wrapping.\"\"\"\n"
     result = format_pdf001(source, settings=CheckSettings(select=("PDF001",), line_length=50))
 
+    assert (
+        result.new_source
+        == "def delimiter():\n    '''A docstring containing an escaped delimiter\n    \\'\\'\\' and enough words to need wrapping.'''\n\ndef backslash():\n    \"\"\"A docstring containing a literal backslash \\\\\n    and enough words to need wrapping.\"\"\"\n"
+    )
+    assert result.fixed_findings[PDF001ReflowRequired.meta] == 2
+    assert not result.unfixed_findings
+
+
+def test_reflow_preserves_mixed_literal_and_escaped_non_ascii_spellings() -> None:
+    source = 'def function():\n    """café \\xe9 words around enough to wrap."""\n'
+    result = format_pdf001(source, settings=CheckSettings(select=("PDF001",), line_length=40))
+
+    assert result.new_source == 'def function():\n    """café \\xe9 words around enough to\n    wrap."""\n'
+    assert not format_pdf001(result.new_source, settings=CheckSettings(select=("PDF001",), line_length=40)).modified
+
+
+def test_reflow_uses_region_offsets_when_description_matches_entry_prefix() -> None:
+    source = 'def function(x):\n    """Do work.\n\n    Args:\n        x: x words around enough to wrap after a matching entry name.\n    """\n'
+    result = format_pdf001(source, settings=CheckSettings(select=("PDF001",), line_length=52, docstring_convention=DocstringConvention.GOOGLE))
+
+    assert result.modified
+    assert result.new_source == 'def function(x):\n    """Do work.\n\n    Args:\n        x: x words around enough to wrap after a\n            matching entry name.\n    """\n'
+    assert not format_pdf001(result.new_source, settings=CheckSettings(select=("PDF001",), line_length=52, docstring_convention=DocstringConvention.GOOGLE)).modified
+
+
+def test_reflow_counts_escaped_non_ascii_source_width_when_wrapping() -> None:
+    escaped = 'def function():\n    """\\xe9\\xe9\\xe9 tail words"""\n'
+    literal = 'def function():\n    """ééé tail words"""\n'
+
+    escaped_result = format_pdf001(escaped, settings=CheckSettings(select=("PDF001",), line_length=20))
+    literal_result = format_pdf001(literal, settings=CheckSettings(select=("PDF001",), line_length=20))
+
+    assert escaped_result.new_source == 'def function():\n    """\\xe9\\xe9\\xe9\n    tail words"""\n'
+    assert literal_result.new_source == literal
+
+
+@pytest.mark.filterwarnings("ignore:invalid escape sequence.*:DeprecationWarning")
+def test_unsupported_escape_reports_non_fixable_finding_without_crashing() -> None:
+    source = "def function():\n    " + r'"""bad \z words enough to wrap around the target line width."""' + "\n"
+    result = format_pdf001(source, settings=CheckSettings(select=("PDF001",), line_length=40))
+
     assert result.new_source == source
     assert not result.fixed_findings
-    assert not result.unfixed_findings
+    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((2,),)
+    assert [finding.fixable for finding in result.unfixed_findings] == [False]
 
 
 def test_check_mode_reports_all_reflowable_docstrings_without_modifying_source() -> None:
