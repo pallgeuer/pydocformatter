@@ -1,22 +1,22 @@
-# concatenated-docstring-literal (PDF000)
+# docstring-literal-normalization (PDF000)
 
 Fix is sometimes available.
 
 ## What it does
-Checks docstrings formed from implicitly concatenated string literals and replaces the complete concatenated expression with one triple-double-quoted string literal having the same evaluated value.
+Checks docstring literals that can be normalized without changing their evaluated value. The rule replaces implicitly concatenated string literals with one triple-double-quoted string literal and converts normal whitespace escapes such as `\n` and `\t` to literal whitespace where this is safe.
 
 A docstring is only the first string-valued expression in a module, class, or function body. PDF000 therefore applies to module, class, function, async function, and method docstrings, but it does not apply to assigned strings, later string expressions, or f-string expressions that are not string-valued docstrings.
 
 The replacement is value-preserving and keeps reusable source spellings for individual string characters where possible. Raw-string prefixes, quote style, component-literal boundaries, backslash continuations, parentheses around the expression, and comments between component literals may disappear because the rule emits one simple literal. Surrounding Python syntax, such as enclosing parentheses and single-line suites, is retained.
 
 ## Why is this useful?
-Implicitly concatenated docstrings have source-level boundaries that do not exist in the runtime docstring value. Normalizing them first gives later docstring formatting rules a single literal to inspect and rewrite, which avoids ambiguous edits around adjacent string tokens and comments between tokens.
+Implicitly concatenated docstrings have source-level boundaries that do not exist in the runtime docstring value. Escaped whitespace such as `\n` has logical line structure that does not appear as physical source lines. Normalizing these forms first gives later docstring formatting rules a single literal with explicit source lines to inspect and rewrite, which avoids ambiguous edits around adjacent string tokens, comments between tokens, and hidden line breaks.
 
 ## Ruff compatibility
 None. Ruff can flag some implicit string concatenation patterns in other contexts, but PDF000 is specific to Python docstring ownership and rewrites only recognized docstrings.
 
 ## Example
-The canonical case is a function docstring composed of adjacent string literals:
+The canonical concatenation case is a function docstring composed of adjacent string literals:
 
 ```python
 def function():
@@ -28,6 +28,21 @@ Applying this rule produces:
 ```python
 def function():
     """First part. Second part."""
+```
+
+Normal whitespace escape spellings are converted to literal whitespace when the value stays unchanged:
+
+```python
+def function():
+    """First line.\n\tIndented second line."""
+```
+
+Applying this rule produces:
+
+```python
+def function():
+    """First line.
+	Indented second line."""
 ```
 
 Reusable escape spellings and non-ASCII code points are preserved where possible, so ASCII-compatible source output stays ASCII-compatible without canonicalizing the exact escape form:
@@ -86,7 +101,7 @@ class Client:
     def close(self): """close client"""; return None
 ```
 
-Only a string-valued first expression in a module, class, or function body is a docstring. Concatenated strings used elsewhere, f-string expressions, and already-simple docstrings are unchanged:
+Only a string-valued first expression in a module, class, or function body is a docstring. Concatenated strings used elsewhere, f-string expressions, raw strings containing literal backslash text, and already-normal simple docstrings are unchanged:
 
 ```python
 def documented():

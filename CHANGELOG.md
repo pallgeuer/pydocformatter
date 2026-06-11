@@ -75,6 +75,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 ### Changed
 
 - **Docstring formatting:**
+  - Changed `PDF000` to normalize safe `\n` and `\t` whitespace escape spellings in docstrings, including non-concatenated docstrings, without changing evaluated docstring values.
   - Changed PDF001 Google-style entry wrapping to use fixed continuation indentation and to place descriptions on the following line when long entry prefixes leave too little room.
   - Centralized docstring string-literal rendering for `PDF000` and `PDF001`, preserving reusable escape spellings and literal non-ASCII characters while reporting unsafe rewrites as non-fixable findings.
 

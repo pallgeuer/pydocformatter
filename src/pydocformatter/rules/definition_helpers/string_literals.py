@@ -92,6 +92,20 @@ def render_simple_string_from_fragments(
     return render_simple_string_from_body_source(node.prefix, node.quote, body, expected_value=expected_value)
 
 
+def literalized_whitespace_fragments(fragments: tuple[StringValueFragment, ...], *, line_ending: str) -> tuple[StringValueFragment, ...]:
+    """Return fragments with safe normal whitespace escapes rendered literally."""
+    literalized: list[StringValueFragment] = []
+    for index, fragment in enumerate(fragments):
+        previous = fragments[index - 1] if index > 0 else None
+        literalized.append(_literalized_whitespace_fragment(fragment, previous=previous, line_ending=line_ending))
+    return tuple(literalized)
+
+
+def retarget_fragments(fragments: tuple[StringValueFragment, ...], *, quote: str, line_ending: str) -> tuple[StringValueFragment, ...]:
+    """Return fragments that can be reused in a literal with another quote style."""
+    return tuple(_retarget_fragment(fragment, quote=quote, line_ending=line_ending) for fragment in fragments)
+
+
 def render_simple_string_from_body_source(prefix: str, quote: str, body_source: str, *, expected_value: str) -> str | None:
     """Render and validate a simple string from an already escaped body."""
     rendered = f"{prefix}{quote}{body_source}{quote}"
@@ -280,6 +294,14 @@ def _retarget_fragment(fragment: StringValueFragment, *, quote: str, line_ending
     if rendered is not None:
         return fragment
     return StringValueFragment(value=fragment.value, source=_escape_char(fragment.value, quote=quote, line_ending=line_ending, escape_non_ascii=False))
+
+
+def _literalized_whitespace_fragment(fragment: StringValueFragment, *, previous: StringValueFragment | None, line_ending: str) -> StringValueFragment:
+    if fragment.value == "\n" and fragment.source == r"\n" and (previous is None or previous.value != "\r"):
+        return StringValueFragment(value=fragment.value, source=line_ending)
+    if fragment.value == "\t" and fragment.source == r"\t":
+        return StringValueFragment(value=fragment.value, source="\t")
+    return fragment
 
 
 def _escape_char(char: str, *, quote: str, line_ending: str = "\n", escape_non_ascii: bool) -> str:

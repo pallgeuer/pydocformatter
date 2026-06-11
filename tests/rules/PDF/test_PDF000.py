@@ -2,7 +2,9 @@ import libcst as cst
 import libcst.metadata as cst_metadata
 import pytest
 
-from pydocformatter.cli.settings_check import CheckSettings
+import pydocformatter.formatter as formatter
+import pydocformatter.rules_selection as rules_selection
+from pydocformatter.cli.settings_check import CheckSettings, LineEnding
 from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
 from pydocformatter.rules.definitions.PDF.PDF import PDF, DocstringKind
 from pydocformatter.rules.definitions.PDF.PDF000_concatenated_docstring_literal import PDF000ConcatenatedDocstringLiteral
@@ -18,6 +20,12 @@ def contexts(source: str) -> tuple[RuleCategoryContext, RuleContext]:
     return category, RuleContext(**category.__dict__, category_data=PDF.prepare(category), effectively_fixable=True)
 
 
+def format_pdf000(source: str, *, settings: CheckSettings | None = None, fix: bool = True) -> formatter.FormatterResult:
+    """Format source with PDF000 selected."""
+    resolved_settings = CheckSettings(select=("PDF000",)) if settings is None else settings
+    return formatter.format_source(source, "example.py", settings=resolved_settings, rule_selection=rules_selection.select_rules(resolved_settings), fix=fix)
+
+
 def test_check_and_fix_concatenated_docstring() -> None:
     _, context = contexts('def function():\n    ("first " "second")\n')
     findings = PDF000ConcatenatedDocstringLiteral.check(context)
@@ -29,6 +37,88 @@ def test_check_and_fix_concatenated_docstring() -> None:
     prepared = PDF.prepare(fixed_category)
     assert prepared.docstrings[0].kind == DocstringKind.SIMPLE
     assert prepared.docstrings[0].value == "first second"
+
+
+def test_fix_literalizes_normal_whitespace_escapes_in_simple_docstring() -> None:
+    _, context = contexts('def function():\n    """first\\n\\tsecond"""\n')
+
+    findings = PDF000ConcatenatedDocstringLiteral.check(context)
+    result = PDF000ConcatenatedDocstringLiteral.fix(context)
+
+    assert tuple(finding.line_numbers for finding in findings) == ((2,),)
+    assert result.module.code == 'def function():\n    """first\n\tsecond"""\n'
+    _, fixed_context = contexts(result.module.code)
+    fixed = PDF.require_data(fixed_context).docstrings[0]
+    assert fixed.kind == DocstringKind.SIMPLE
+    assert fixed.value == "first\n\tsecond"
+    assert PDF000ConcatenatedDocstringLiteral.check(fixed_context) == ()
+
+
+def test_fix_requotes_simple_single_quoted_docstring_when_literalizing_newline() -> None:
+    _, context = contexts('def function():\n    "first\\n\\tsecond"\n')
+
+    result = PDF000ConcatenatedDocstringLiteral.fix(context)
+
+    assert result.module.code == 'def function():\n    """first\n\tsecond"""\n'
+    _, fixed_context = contexts(result.module.code)
+    assert PDF.require_data(fixed_context).docstrings[0].value == "first\n\tsecond"
+
+
+def test_fix_requotes_simple_docstring_with_target_delimiter_in_one_pass() -> None:
+    source = 'def function():\n    \'first\\n\\tcontains """ delimiter\'\n'
+
+    result = format_pdf000(source)
+
+    assert result.fixed_findings[PDF000ConcatenatedDocstringLiteral.meta] == 1
+    assert result.new_source == 'def function():\n    """first\n\tcontains \\"\\"\\" delimiter"""\n'
+    assert not format_pdf000(result.new_source).modified
+    _, fixed_context = contexts(result.new_source)
+    assert PDF.require_data(fixed_context).docstrings[0].value == 'first\n\tcontains """ delimiter'
+
+
+def test_fix_literalizes_simple_docstring_newline_in_single_line_suite() -> None:
+    _, context = contexts('def function(): "first\\nsecond"; return 1\n')
+
+    result = PDF000ConcatenatedDocstringLiteral.fix(context)
+
+    assert tuple(finding.line_numbers for finding in result.fixed_findings) == ((1,),)
+    assert result.module.code == 'def function(): """first\nsecond"""; return 1\n'
+    _, fixed_context = contexts(result.module.code)
+    assert PDF.require_data(fixed_context).docstrings[0].value == "first\nsecond"
+
+
+def test_fix_literalizes_normal_whitespace_escapes_in_concatenated_docstring() -> None:
+    _, context = contexts('def function():\n    ("first\\n" "\\tsecond")\n')
+
+    result = PDF000ConcatenatedDocstringLiteral.fix(context)
+
+    assert result.module.code == 'def function():\n    ("""first\n\tsecond""")\n'
+    _, fixed_context = contexts(result.module.code)
+    fixed = PDF.require_data(fixed_context).docstrings[0]
+    assert fixed.kind == DocstringKind.SIMPLE
+    assert fixed.value == "first\n\tsecond"
+
+
+def test_fix_uses_configured_line_ending_for_literalized_newline() -> None:
+    source = 'def function():\n    """first\\nsecond"""\n'
+    settings = CheckSettings(select=("PDF000",), line_ending=LineEnding.CR_LF)
+
+    result = format_pdf000(source, settings=settings)
+
+    assert result.new_source == 'def function():\n    """first\r\nsecond"""\n'
+    _, fixed_context = contexts(result.new_source)
+    assert PDF.require_data(fixed_context).docstrings[0].value == "first\nsecond"
+
+
+def test_fix_leaves_carriage_return_newline_escape_split_across_components_unchanged() -> None:
+    _, context = contexts('def function():\n    ("first\\r" "\\nsecond")\n')
+
+    result = PDF000ConcatenatedDocstringLiteral.fix(context)
+
+    assert result.module.code == 'def function():\n    ("""first\\r\\nsecond""")\n'
+    _, fixed_context = contexts(result.module.code)
+    assert PDF.require_data(fixed_context).docstrings[0].value == "first\r\nsecond"
+    assert PDF000ConcatenatedDocstringLiteral.check(fixed_context) == ()
 
 
 def test_fix_preserves_complex_evaluated_values() -> None:
@@ -77,6 +167,20 @@ def test_unsupported_escape_reports_non_fixable_finding_without_crashing() -> No
     assert result.fixed_findings == ()
 
 
+@pytest.mark.filterwarnings("ignore:invalid escape sequence.*:DeprecationWarning")
+def test_fixable_simple_docstring_and_nonfixable_concatenation_are_reported_independently() -> None:
+    source = '"""first\\nsecond"""\n\n\ndef unsupported():\n    "bad \\z" " words"\n'
+    _, context = contexts(source)
+
+    findings = PDF000ConcatenatedDocstringLiteral.check(context)
+    result = PDF000ConcatenatedDocstringLiteral.fix(context)
+
+    assert tuple(finding.line_numbers for finding in findings) == ((1,), (5,))
+    assert [finding.fixable for finding in findings] == [True, False]
+    assert tuple(finding.line_numbers for finding in result.fixed_findings) == ((1,),)
+    assert result.module.code == '"""first\nsecond"""\n\n\ndef unsupported():\n    "bad \\z" " words"\n'
+
+
 def test_fix_handles_multiple_docstring_owners_in_one_pass() -> None:
     source = '"module " "doc"\n\nclass Outer:\n    "class " "doc"\n\n    def method(self):\n        "method " "doc"\n\n    def unchanged(self):\n        """simple doc"""\n'
     _, context = contexts(source)
@@ -93,7 +197,7 @@ def test_fix_replaces_complete_multiline_expression_and_reports_its_source_span(
     findings = PDF000ConcatenatedDocstringLiteral.check(context)
     result = PDF000ConcatenatedDocstringLiteral.fix(context)
     assert findings[0].line_numbers == (3, 4, 5)
-    assert result.module.code == 'def function():\n    (\n        """first\\\\n second\\tthird"""\n    )\n    return None\n'
+    assert result.module.code == 'def function():\n    (\n        """first\\\\n second\tthird"""\n    )\n    return None\n'
     _, fixed_context = contexts(result.module.code)
     assert PDF.require_data(fixed_context).docstrings[0].value == "first\\n second\tthird"
 
@@ -109,15 +213,41 @@ def test_fix_preserves_crlf_and_escaped_newline_spelling() -> None:
     category, context = contexts(source)
     result = PDF000ConcatenatedDocstringLiteral.fix(context)
     assert result.fixed_findings[0].line_numbers == (2, 3)
-    assert result.module.code == 'def function():\r\n    ("""first\\nsecond""")\r\n'
+    assert result.module.code == 'def function():\r\n    ("""first\r\nsecond""")\r\n'
     fixed_category, _ = contexts(result.module.code)
     assert PDF.prepare(fixed_category).docstrings[0].value == "first\nsecond"
     assert category.module.config_for_parsing.default_newline == "\r\n"
 
 
+def test_fix_leaves_raw_string_and_carriage_return_escape_values_unchanged() -> None:
+    _, raw_context = contexts('def raw():\n    r"first\\nsecond"\n')
+    _, carriage_return_context = contexts('def carriage_return():\n    """first\\r\\nsecond"""\n')
+
+    assert PDF000ConcatenatedDocstringLiteral.check(raw_context) == ()
+    assert PDF000ConcatenatedDocstringLiteral.fix(raw_context).module is raw_context.module
+    assert PDF000ConcatenatedDocstringLiteral.check(carriage_return_context) == ()
+    assert PDF000ConcatenatedDocstringLiteral.fix(carriage_return_context).module is carriage_return_context.module
+
+
+@pytest.mark.filterwarnings("ignore:invalid escape sequence.*:DeprecationWarning")
+def test_unsupported_escape_in_simple_docstring_is_ignored() -> None:
+    _, context = contexts('def function():\n    """bad \\z words"""\n')
+
+    assert PDF000ConcatenatedDocstringLiteral.check(context) == ()
+    assert PDF000ConcatenatedDocstringLiteral.fix(context).module is context.module
+
+
 def test_ignores_concatenations_that_are_not_string_valued_first_expressions() -> None:
     source = 'def formatted():\n    f"first" "second"\n\ndef assigned():\n    value = "first" "second"\n\ndef later():\n    pass\n    "first" "second"\n'
     _, context = contexts(source)
+    assert PDF000ConcatenatedDocstringLiteral.check(context) == ()
+    assert PDF000ConcatenatedDocstringLiteral.fix(context).module is context.module
+
+
+def test_ignores_simple_string_escapes_that_are_not_docstrings() -> None:
+    source = 'def assigned():\n    value = "first\\nsecond"\n\ndef later():\n    pass\n    "first\\nsecond"\n'
+    _, context = contexts(source)
+
     assert PDF000ConcatenatedDocstringLiteral.check(context) == ()
     assert PDF000ConcatenatedDocstringLiteral.fix(context).module is context.module
 

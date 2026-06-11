@@ -41,6 +41,31 @@ def test_render_simple_string_from_fragments_preserves_mixed_spellings() -> None
     assert rendered == '"""é \\xe9 words"""'
 
 
+def test_literalized_whitespace_fragments_convert_normal_whitespace_escapes() -> None:
+    fragments = (
+        string_literals.StringValueFragment(value="a", source="a"),
+        string_literals.StringValueFragment(value="\n", source=r"\n"),
+        string_literals.StringValueFragment(value="\t", source=r"\t"),
+    )
+
+    literalized = string_literals.literalized_whitespace_fragments(fragments, line_ending="\r\n")
+
+    assert tuple(fragment.value for fragment in literalized) == ("a", "\n", "\t")
+    assert tuple(fragment.source for fragment in literalized) == ("a", "\r\n", "\t")
+
+
+def test_literalized_whitespace_fragments_leave_other_escape_spellings_unchanged() -> None:
+    fragments = (
+        string_literals.StringValueFragment(value="\r", source=r"\r"),
+        string_literals.StringValueFragment(value="\n", source=r"\n"),
+        string_literals.StringValueFragment(value="\n", source=r"\x0a"),
+        string_literals.StringValueFragment(value="\f", source=r"\f"),
+        string_literals.StringValueFragment(value="\v", source=r"\v"),
+    )
+
+    assert string_literals.literalized_whitespace_fragments(fragments, line_ending="\n") == fragments
+
+
 def test_concatenated_fragments_preserve_component_escape_spellings_in_target_literal() -> None:
     node = concatenated_string('"é " "\\xe9 " "\\u00e9"')
     fragments = string_literals.fragments_for_concatenated_string(node, target_quote='"""', line_ending="\n")
@@ -49,6 +74,21 @@ def test_concatenated_fragments_preserve_component_escape_spellings_in_target_li
     rendered = string_literals.render_simple_string_from_body_source("", '"""', "".join(fragment.source for fragment in fragments), expected_value="é é é")
 
     assert rendered == '"""é \\xe9 \\u00e9"""'
+
+
+def test_retarget_fragments_escapes_target_delimiter_without_reescaping_literal_whitespace() -> None:
+    fragments = (
+        string_literals.StringValueFragment(value="\n", source="\n"),
+        string_literals.StringValueFragment(value="\t", source="\t"),
+        string_literals.StringValueFragment(value='"', source='"'),
+        string_literals.StringValueFragment(value='"', source='"'),
+        string_literals.StringValueFragment(value='"', source='"'),
+    )
+
+    retargeted = string_literals.retarget_fragments(fragments, quote='"""', line_ending="\n")
+
+    assert tuple(fragment.value for fragment in retargeted) == ("\n", "\t", '"', '"', '"')
+    assert tuple(fragment.source for fragment in retargeted) == ("\n", "\t", r"\"", r"\"", r"\"")
 
 
 def test_render_value_as_simple_string_uses_explicit_non_ascii_policy() -> None:
