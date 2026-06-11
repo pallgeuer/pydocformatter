@@ -86,6 +86,8 @@ skip = [".github", ".eggs", ".git", ".hg", ".mypy_cache", ".tox", ".venv", "html
 [tool.pydocfmt]
 legacy = true
 line-length = 120
+indent-style = "space"
+docstring-convention = "google"
 
 [tool.mypy]
 files = ["src/pydocformatter", "tests"]
