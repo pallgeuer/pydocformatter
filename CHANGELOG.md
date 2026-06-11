@@ -51,7 +51,6 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 
 - **Documentation:**
   - Added a Ruff file-selection compatibility specification at `docs/file_selection_spec.md`, including exact defaults, precedence rules, force-exclude behavior, config-relative glob bases, and explicit pydocformatter deviations.
-  - Added an empirical Ruff file-selection behavior specification at `docs/ruff_file_selection_spec.md`, covering config-relative glob bases, cwd-relative CLI overrides, gitignore behavior, explicit-file behavior, and per-file ignores.
   - Added a rule-selection specification at `docs/rule_selection_spec.md`, covering rule collection, selectors, fixability, and rule explanation output.
   - Added adjacent Markdown documentation for all built-in pydocformatter rules, including Ruff compatibility notes where relevant.
   - Expanded the PDF001 documentation with explicit behavior notes, setting interactions, safety limits, and verified qualitative examples.
@@ -62,6 +61,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 
 - **Developer workflow:**
   - Added a pytest pre-commit hook that runs the test suite before commits.
+  - Added pytest coverage that checks the pydocformatter rule tables in `docs/formatting_rules.md` against actual rule metadata.
   - Added regression coverage for Ruff-compatible file-selection and per-file-ignore pattern-base behavior.
   - Vastly expanded PCF rule tests across comment classification, run boundaries, structure preservation, code detection, width handling, line endings, mixed formatting, syntax-position safety, convergence, idempotence, and rule independence.
   - Vastly expanded PDF category preparation tests across docstring collection, source metadata, semantic sections and entries, protected structures, reflow regions, malformed inputs, and mixed edge cases.
@@ -90,6 +90,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Rephrased rule example results to describe the effect of applying each rule.
 
 - **Developer workflow:**
+  - Included top-level Markdown documentation files from `docs/` in source distributions.
   - Changed the mypy pre-commit hook to use the locked project environment through `uv run mypy`.
   - Split rule registration decorators from rule collection discovery so rule category modules can be imported directly without eager collection initialization.
   - Added an explicit test package boundary and moved reusable PCF test helpers out of `conftest.py`, allowing mypy to check multiple directory-scoped pytest configurations without exclusions.
@@ -273,6 +274,9 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Preserved untouched line endings when formatting only selected docstring or comment spans.
 
 ### Removed
+
+- **Documentation:**
+  - Removed the internal empirical Ruff file-selection design notes at `docs/ruff_file_selection_spec.md`.
 
 - **CLI:**
   - Removed legacy top-level formatting and check forms such as `pydocfmt` and `pydocfmt --check`; use `pydocfmt check --fix` or `pydocfmt check`.

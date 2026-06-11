@@ -56,6 +56,9 @@ where = ["src"]
 [tool.setuptools.package-data]
 "pydocformatter.rules" = ["*.md", "**/*.md"]
 
+[tool.setuptools.data-files]
+"docs" = ["docs/*.md"]
+
 [dependency-groups]
 test = [
     "pytest==9.0.3",
