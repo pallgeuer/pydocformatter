@@ -1,6 +1,6 @@
 # reflow-required (PDF001)
 
-Fix is sometimes available.
+Fix is usually available.
 
 ## What it does
 Checks for docstring text regions whose normalized wrapping does not match the configured line length and indentation settings.

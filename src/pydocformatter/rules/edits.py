@@ -41,8 +41,8 @@ def apply_planned_source_changes(module: cst.Module, changes: tuple[PlannedSourc
 
 def findings_for_planned_source_changes(rule: RuleMetadata, changes: tuple[PlannedSourceChange, ...], *, instance_fixable: bool | None = None) -> tuple[RuleFinding, ...]:
     """Return rule findings for planned source changes."""
-    if rule.fix_availability == FixAvailability.SOMETIMES and instance_fixable is None:
-        raise ValueError(f"{rule.code}: Findings for sometimes-fixable rules must specify instance_fixable")
+    if rule.fix_availability in {FixAvailability.USUALLY, FixAvailability.SOMETIMES} and instance_fixable is None:
+        raise ValueError(f"{rule.code}: Findings for {rule.fix_availability.lower()}-fixable rules must specify instance_fixable")
     return tuple(RuleFinding(rule=rule, line_numbers=change.line_numbers, instance_fixable=instance_fixable) for change in changes)
 
 

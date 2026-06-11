@@ -39,7 +39,7 @@ Rule classes register with their category through `@register_rule_to(PDF)` and d
 - `code`: A `RuleCode`, such as `PDF001`.
 - `name`: A stable machine-readable name, such as `reflow-required`.
 - `message`: The default diagnostic message. It may include format fields for per-finding customization.
-- `fix_availability`: A `FixAvailability` value describing whether automatic fixes are `Always`, `Sometimes`, or `Never` available at the rule level.
+- `fix_availability`: A `FixAvailability` value describing whether automatic fixes are `Always`, `Usually`, `Sometimes`, or `Never` available at the rule level.
 - `setting_effects`: Immutable metadata mapping resolved setting fields and triggering values to `Ignored` or `Disabled` selection effects.
 - `incompatible_with`: An immutable tuple of `RuleCode` values for rules that cannot be selected together with this rule.
 
@@ -252,11 +252,11 @@ Effective fixability uses the same source-priority and specificity model as rule
 - Treat the rule as configured-fixable only when the fixable selector strength is greater than the unfixable selector strength.
 - Intersect configured fixability with the rule's `RuleMetadata.fix_availability`.
 
-Settings cannot make a rule with `fix_availability = FixAvailability.NEVER` fixable. Rules with `FixAvailability.ALWAYS` and `FixAvailability.SOMETIMES` both have available fixes for selector purposes.
+Settings cannot make a rule with `fix_availability = FixAvailability.NEVER` fixable. Rules with `FixAvailability.ALWAYS`, `FixAvailability.USUALLY`, and `FixAvailability.SOMETIMES` all have available fixes for selector purposes.
 
 A selector in `fixable` or `extend-fixable` that matches only rules with no available fixes is an operational error unless the selector is `ALL`. This means the default `fixable = ["ALL"]` does not warn merely because some collected rules have `FixAvailability.NEVER`.
 
-Rule findings still expose boolean fixability because each finding is either fixable or not. Findings for `FixAvailability.SOMETIMES` rules must provide per-instance fixability.
+Rule findings still expose boolean fixability because each finding is either fixable or not. Findings for `FixAvailability.USUALLY` and `FixAvailability.SOMETIMES` rules must provide per-instance fixability.
 
 Examples:
 

@@ -20,7 +20,7 @@ class PDF001ReflowRequired(RuleBase):
         code=RuleCode("PDF001"),
         name="reflow-required",
         message="Docstring chunk needs reflow",
-        fix_availability=FixAvailability.SOMETIMES,
+        fix_availability=FixAvailability.USUALLY,
         stable_since="0.3.0",
         setting_effects=(),
         incompatible_with=(),

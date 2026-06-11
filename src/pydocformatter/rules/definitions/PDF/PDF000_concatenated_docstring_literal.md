@@ -1,6 +1,6 @@
 # docstring-literal-normalization (PDF000)
 
-Fix is sometimes available.
+Fix is usually available.
 
 ## What it does
 Checks docstring literals that can be normalized without changing their evaluated value. The rule replaces implicitly concatenated string literals with one triple-double-quoted string literal and converts normal whitespace escapes such as `\n` and `\t` to literal whitespace where this is safe.

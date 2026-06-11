@@ -17,7 +17,7 @@ class PDF000ConcatenatedDocstringLiteral(RuleBase):
         code=RuleCode("PDF000"),
         name="docstring-literal-normalization",
         message="Docstring literal should be normalized",
-        fix_availability=FixAvailability.SOMETIMES,
+        fix_availability=FixAvailability.USUALLY,
         stable_since="0.3.0",
         setting_effects=(),
         incompatible_with=(),

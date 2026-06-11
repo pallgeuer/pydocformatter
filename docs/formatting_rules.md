@@ -1,5 +1,50 @@
 # Formatting Rules
 
+## pydocformatter Rules
+
+### pydocformatter comments (PCF)
+
+|  Code  | Name                          | Message                             | Fixable  | Stable Since | Comment                                                                                                    |
+|:------:|:------------------------------|:------------------------------------|:--------:|:------------:|:-----------------------------------------------------------------------------------------------------------|
+| PCF001 | standalone-comment-formatting | Standalone comment needs formatting |  Always  |    0.3.0     | Formats standalone comments with conservative physical-line defaults and optional structure/code detection |
+| PCF002 | trailing-comment-formatting   | Trailing comment needs formatting   |  Always  |    0.3.0     | Normalizes trailing comments or extracts overlong comments into independently formatted standalone blocks  |
+
+### pydocformatter docstrings (PDF)
+
+|  Code  | Name                               | Message                                                                   | Fixable  |  None   | Google  |  NumPy  | PEP257  | Stable Since | Ruff Rules         | Rules                 | Comment                                                                                                                                                     |
+|:------:|:-----------------------------------|:--------------------------------------------------------------------------|:--------:|:-------:|:-------:|:-------:|:-------:|:------------:|--------------------|-----------------------|:------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| PDF000 | docstring-literal-normalization    | Docstring literal should be normalized                                    | Usually  |    -    |    -    |    -    |    -    |    0.3.0     |                    |                       | Normalizes docstring literals by rewriting implicit concatenations and literalizing safe normal whitespace escapes                                          |
+| PDF001 | reflow-required                    | Docstring chunk needs reflow                                              | Usually  |    -    |    -    |    -    |    -    |    0.3.0     |                    |                       | Reflows docstring chunks                                                                                                                                    |
+| PDF002 | incorrect-indentation              | Docstring line is incorrectly indented                                    |  Always  |    -    |    -    |    -    |    -    |    0.3.0     | Disable D207, D208 |                       | Corrects docstring line indentation                                                                                                                         |
+| PDF003 | docstring-trailing-whitespace      | Non-empty docstring line has trailing whitespace                          |  Always  |    -    |    -    |    -    |    -    |    0.3.0     | Related to W291    |                       | Removes trailing whitespace from non-empty docstring lines                                                                                                  |
+| PDF004 | docstring-blank-line-whitespace    | Blank docstring line has whitespace                                       |  Always  |    -    |    -    |    -    |    -    |    0.3.0     | Related to W293    |                       | Removes whitespace from blank docstring lines                                                                                                               |
+| PDF005 | opening-quotes-whitespace          | Docstring has extra whitespace after opening quotes                       |  Always  |    -    |    -    |    -    |    -    |    0.3.0     | Disable D210       |                       | Removes whitespace on the first line between opening quotes and any content, if this does not possibly create issues                                        |
+| PDF006 | closing-quotes-whitespace          | Docstring has extra whitespace before closing quotes                      |  Always  |    -    |    -    |    -    |    -    |    0.3.0     | Disable D210       |                       | Removes whitespace on the last line between any content and closing quotes, if this does not possible create issues                                         |
+| PDF100 | too-many-blank-lines               | Docstring has too many blank lines                                        |  Always  |    -    |    -    |    -    |    -    |    0.3.0     | Disable D205       |                       | Collapses unexpected extra blank lines around chunks in a docstring (1 blank line between chunks, 0 blank lines above first chunk and below last chunk)     |
+| PDF101 | multiline-opening-quotes-same-line | Multi-line docstring opening quotes should be on the same line as content |  Always  |    -    |    -    | Ignored | Ignored |    0.3.0     | Disable D212, D213 | Conflicts with PDF102 | For multi-content-line docstrings, ensures the opening quotes are on the same line as the first non-blank content line                                      |
+| PDF102 | multiline-opening-quotes-sep-line  | Multi-line docstring opening quotes should be on a separate line          |  Always  | Ignored | Ignored | Ignored | Ignored |    0.3.0     | Disable D212, D213 | Conflicts with PDF101 | For multi-content-line docstrings, ensures the opening quotes are on their own separate line                                                                |
+| PDF103 | multiline-closing-quotes-same-line | Multi-line docstring closing quotes should be on the same line as content |  Always  | Ignored | Ignored | Ignored | Ignored |    0.3.0     | Disable D209       | Conflicts with PDF104 | For multi-content-line docstrings, ensures the closing quotes are on the same line as the last non-blank content line                                       |
+| PDF104 | multiline-closing-quotes-sep-line  | Multi-line docstring closing quotes should be on a separate line          |  Always  |    -    |    -    |    -    |    -    |    0.3.0     | Disable D209       | Conflicts with PDF103 | For multi-content-line docstrings, ensures the closing quotes are on their own separate line                                                                |
+| PDF105 | summary-too-long                   | Docstring summary does not fit on one line                                |  Never   |    -    |    -    |    -    |    -    |    0.3.0     | Disable D205       |                       | Warns if the docstring summary spans multiple lines                                                                                                         |
+| PDF106 | docstring-should-be-one-line       | Docstring with one content line should be one line                        |  Always  |    -    |    -    |    -    |    -    |    0.3.0     | Disable D200       |                       | Avoids having starting/ending triple quotes on their own line when the entire docstring is a summary that fits (including both triple quotes) onto one line |
+
+## Rule Configuration
+
+`pydocfmt` accepts Ruff-style rule configuration under `[tool.pydocfmt]`:
+
+```toml
+[tool.pydocfmt]
+select = ["ALL"]
+extend-select = []
+ignore = []
+fixable = ["ALL"]
+extend-fixable = []
+unfixable = []
+
+[tool.pydocfmt.per-file-ignores]
+"tests/*.py" = ["PCF001"]
+```
+
 ## Ruff Rules
 
 The pydocformatter tool aims to tightly complement Ruff in the formatting and linting of Python docstrings and comments.
@@ -68,50 +113,3 @@ FROM: ([A-Z]+[0-9]{3})\t([a-z-]+)\t([^\n]+)\t(\nRule has been stable since v?([0
 | DOC403 | [docstring-extraneous-yields](https://docs.astral.sh/ruff/rules/docstring-extraneous-yields/)                       | Docstring has a "Yields" section but the function doesn't yield anything                 |         |     0.5.7     |              |                            |                                                                                                                                                                                     |
 | DOC501 | [docstring-missing-exception](https://docs.astral.sh/ruff/rules/docstring-missing-exception/)                       | Raised exception {id} missing from docstring                                             |         |     0.5.5     |              |                            |                                                                                                                                                                                     |
 | DOC502 | [docstring-extraneous-exception](https://docs.astral.sh/ruff/rules/docstring-extraneous-exception/)                 | Raised exception is not explicitly raised: {id}                                          |         |     0.5.5     |              |                            |                                                                                                                                                                                     |
-
-## pydocformatter Rules
-
-### pydocformatter comments (PCF)
-
-|  Code  | Name                          | Message                             | Fixable | Stable Since | Comment                                                                                                    |
-|:------:|:------------------------------|:------------------------------------|:-------:|:------------:|:-----------------------------------------------------------------------------------------------------------|
-| PCF001 | standalone-comment-formatting | Standalone comment needs formatting | Always  |    0.3.0     | Formats standalone comments with conservative physical-line defaults and optional structure/code detection |
-| PCF002 | trailing-comment-formatting   | Trailing comment needs formatting   | Always  |    0.3.0     | Normalizes trailing comments or extracts overlong comments into independently formatted standalone blocks  |
-
-### pydocformatter docstrings (PDF)
-
-|  Code  | Name                               | Message                                                                   | Fixable |  None   | Google  |  NumPy  | PEP257  | Stable Since | Ruff Rules         | Rules                 | Comment                                                                                                                                                     |
-|:------:|:-----------------------------------|:--------------------------------------------------------------------------|:-------:|:-------:|:-------:|:-------:|:-------:|:------------:|--------------------|-----------------------|:------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| PDF000 | docstring-literal-normalization    | Docstring literal should be normalized                                    |  Some   |    -    |    -    |    -    |    -    |    0.3.0     |                    |                       | Normalizes docstring literals by rewriting implicit concatenations and literalizing safe normal whitespace escapes                                          |
-| PDF001 | reflow-required                    | Docstring chunk needs reflow                                              | Always  |    -    |    -    |    -    |    -    |    0.3.0     |                    |                       | Reflows docstring chunks                                                                                                                                    |
-| PDF002 | incorrect-indentation              | Docstring line is incorrectly indented                                    | Always  |    -    |    -    |    -    |    -    |    0.3.0     | Disable D207, D208 |                       | Corrects docstring line indentation                                                                                                                         |
-| PDF003 | docstring-trailing-whitespace      | Non-empty docstring line has trailing whitespace                          | Always  |    -    |    -    |    -    |    -    |    0.3.0     | Related to W291    |                       | Removes trailing whitespace from non-empty docstring lines                                                                                                  |
-| PDF004 | docstring-blank-line-whitespace    | Blank docstring line has whitespace                                       | Always  |    -    |    -    |    -    |    -    |    0.3.0     | Related to W293    |                       | Removes whitespace from blank docstring lines                                                                                                               |
-| PDF005 | opening-quotes-whitespace          | Docstring has extra whitespace after opening quotes                       | Always  |    -    |    -    |    -    |    -    |    0.3.0     | Disable D210       |                       | Removes whitespace on the first line between opening quotes and any content, if this does not possibly create issues                                        |
-| PDF006 | closing-quotes-whitespace          | Docstring has extra whitespace before closing quotes                      | Always  |    -    |    -    |    -    |    -    |    0.3.0     | Disable D210       |                       | Removes whitespace on the last line between any content and closing quotes, if this does not possible create issues                                         |
-| PDF100 | too-many-blank-lines               | Docstring has too many blank lines                                        | Always  |    -    |    -    |    -    |    -    |    0.3.0     | Disable D205       |                       | Collapses unexpected extra blank lines around chunks in a docstring (1 blank line between chunks, 0 blank lines above first chunk and below last chunk)     |
-| PDF101 | multiline-opening-quotes-same-line | Multi-line docstring opening quotes should be on the same line as content | Always  |    -    |    -    | Ignored | Ignored |    0.3.0     | Disable D212, D213 | Conflicts with PDF102 | For multi-content-line docstrings, ensures the opening quotes are on the same line as the first non-blank content line                                      |
-| PDF102 | multiline-opening-quotes-sep-line  | Multi-line docstring opening quotes should be on a separate line          | Always  | Ignored | Ignored | Ignored | Ignored |    0.3.0     | Disable D212, D213 | Conflicts with PDF101 | For multi-content-line docstrings, ensures the opening quotes are on their own separate line                                                                |
-| PDF103 | multiline-closing-quotes-same-line | Multi-line docstring closing quotes should be on the same line as content | Always  | Ignored | Ignored | Ignored | Ignored |    0.3.0     | Disable D209       | Conflicts with PDF104 | For multi-content-line docstrings, ensures the closing quotes are on the same line as the last non-blank content line                                       |
-| PDF104 | multiline-closing-quotes-sep-line  | Multi-line docstring closing quotes should be on a separate line          | Always  |    -    |    -    |    -    |    -    |    0.3.0     | Disable D209       | Conflicts with PDF103 | For multi-content-line docstrings, ensures the closing quotes are on their own separate line                                                                |
-| PDF105 | summary-too-long                   | Docstring summary does not fit on one line                                |  Never  |    -    |    -    |    -    |    -    |    0.3.0     | Disable D205       |                       | Warns if the docstring summary spans multiple lines                                                                                                         |
-| PDF106 | docstring-should-be-one-line       | Docstring with one content line should be one line                        | Always  |    -    |    -    |    -    |    -    |    0.3.0     | Disable D200       |                       | Avoids having starting/ending triple quotes on their own line when the entire docstring is a summary that fits (including both triple quotes) onto one line |
-
-[//]: # (TODO: Complete the tables)
-
-## Rule Configuration
-
-`pydocfmt` accepts Ruff-style rule configuration under `[tool.pydocfmt]`:
-
-```toml
-[tool.pydocfmt]
-select = ["ALL"]
-extend-select = []
-ignore = []
-fixable = ["ALL"]
-extend-fixable = []
-unfixable = []
-
-[tool.pydocfmt.per-file-ignores]
-"tests/*.py" = ["PCF001"]
-```

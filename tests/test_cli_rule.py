@@ -19,7 +19,7 @@ class TestCLIRule(unittest.TestCase):
 
         output = stdout.getvalue()
         self.assertEqual(exit_code, 0)
-        self.assertTrue(output.startswith("# reflow-required (PDF001)\n\nFix is sometimes available.\n\n## What it does\n"))
+        self.assertTrue(output.startswith("# reflow-required (PDF001)\n\nFix is usually available.\n\n## What it does\n"))
         self.assertIn("## Ruff compatibility\n", output)
         self.assertNotIn("Derived from", output)
 
@@ -45,6 +45,20 @@ class TestCLIRule(unittest.TestCase):
         self.assertNotIn("Fix is not available.", output["explanation"])
         self.assertIn("## Ruff compatibility\n", output["explanation"])
         self.assertTrue(output["source_location"]["file"].endswith("PDF105_summary_too_long.py"))
+
+    def test_pydocfmt_rule_prints_usually_fixable_rule_json(self) -> None:
+        stdout = StringIO()
+        argv = ["pydocfmt", "rule", "--output-format", "json", "PDF001"]
+        with (
+            unittest.mock.patch("sys.argv", argv),
+            contextlib.redirect_stdout(stdout),
+        ):
+            exit_code = pydocfmt_cli.main()
+
+        output = json.loads(stdout.getvalue())
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(output["fix"], "Fix is usually available.")
+        self.assertEqual(output["fix_availability"], "Usually")
 
     def test_pydocfmt_rule_prints_all_rules(self) -> None:
         stdout = StringIO()

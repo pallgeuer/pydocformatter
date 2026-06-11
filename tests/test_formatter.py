@@ -155,6 +155,16 @@ class TestFormatterResults(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Findings for sometimes-fixable rules must specify instance_fixable"):
             _ = RuleFinding(rule=rule, line_numbers=(4,)).fixable
 
+    def test_rule_finding_requires_instance_fixability_for_usually_fixable_rules(self) -> None:
+        rule = RuleMetadata(
+            code=RuleCode("PDF999"), name="usually-rule", message="Usually rule", fix_availability=FixAvailability.USUALLY, stable_since="0.3.0", setting_effects=(), incompatible_with=()
+        )
+
+        self.assertTrue(RuleFinding(rule=rule, line_numbers=(2,), instance_fixable=True).fixable)
+        self.assertFalse(RuleFinding(rule=rule, line_numbers=(3,), instance_fixable=False).fixable)
+        with self.assertRaisesRegex(ValueError, "Findings for usually-fixable rules must specify instance_fixable"):
+            _ = RuleFinding(rule=rule, line_numbers=(4,)).fixable
+
     def test_grouped_output_merges_matching_findings_and_prints_summary(self) -> None:
         result = FormatterResult(
             path="a.py",

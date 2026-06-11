@@ -1,6 +1,6 @@
 # rule-name (CODE)
 
-Fix is always available. (Use `Fix is sometimes available.` or `Fix is not available.` when that matches the rule metadata.)
+Fix is always available. (Use `Fix is usually available.`, `Fix is sometimes available.`, or `Fix is not available.` when that matches the rule metadata.)
 
 (Only if rule has `setting_effects` like ignored or disabled:) Rule is ignored if `docstring-convention` is `google` or `numpy`.
 

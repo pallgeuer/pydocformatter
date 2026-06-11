@@ -91,6 +91,18 @@ class PDF160SometimesFixableSampleRule(RuleBase):
     )
 
 
+class PDF170UsuallyFixableSampleRule(RuleBase):
+    meta = RuleMetadata(
+        code=RuleCode("PDF170"),
+        name="usually-fixable-rule",
+        message="Usually fixable rule",
+        fix_availability=FixAvailability.USUALLY,
+        stable_since="0.3.0",
+        setting_effects=(),
+        incompatible_with=(),
+    )
+
+
 class PCF001SampleRule(RuleBase):
     meta = RuleMetadata(
         code=RuleCode("PCF001"),
@@ -201,6 +213,7 @@ rule_registration.register_rule_to(PDFSpecificityCategory)(PDF142SampleRule)
 rule_registration.register_rule_to(PDFSpecificityCategory)(PDF150SampleRule)
 rule_registration.register_rule_to(PDFFixAvailabilityCategory)(PDF105SampleRule)
 rule_registration.register_rule_to(PDFFixAvailabilityCategory)(PDF160SometimesFixableSampleRule)
+rule_registration.register_rule_to(PDFFixAvailabilityCategory)(PDF170UsuallyFixableSampleRule)
 rule_registration.register_rule_to(TSTSettingEffectCategory)(TST001IgnoredSampleRule)
 rule_registration.register_rule_to(TSTSettingEffectCategory)(TST002DisabledSampleRule)
 rule_registration.register_rule_to(TSTIncompatibilityCategory)(TST001FirstIncompatibleSampleRule)
@@ -631,11 +644,20 @@ class TestRules(unittest.TestCase):
         self.assertEqual(
             rule_documentation.rule_fix_text(
                 RuleMetadata(
+                    code=RuleCode("PDF999"), name="usually-rule", message="Usually rule", fix_availability=FixAvailability.USUALLY, stable_since="0.3.0", setting_effects=(), incompatible_with=()
+                )
+            ),
+            "Fix is usually available.",
+        )
+        self.assertEqual(
+            rule_documentation.rule_fix_text(
+                RuleMetadata(
                     code=RuleCode("PDF999"), name="sometimes-rule", message="Sometimes rule", fix_availability=FixAvailability.SOMETIMES, stable_since="0.3.0", setting_effects=(), incompatible_with=()
                 )
             ),
             "Fix is sometimes available.",
         )
+        self.assertEqual(str(FixAvailability.USUALLY), "Usually")
         self.assertEqual(str(FixAvailability.SOMETIMES), "Sometimes")
         self.assertFalse(hasattr(rule, "matches_selector"))
         self.assertFalse(hasattr(rule, "matches_selector_parts"))
@@ -1318,14 +1340,14 @@ class TestRules(unittest.TestCase):
         self.assertEqual(tuple((rule.rule.code.tag, rule.fixable) for rule in higher_priority_unfixable.rules), (("PDF142", False), ("PDF150", True)))
         self.assertEqual(tuple((rule.rule.code.tag, rule.fixable) for rule in lower_priority_extend_fixable.rules), (("PDF142", True), ("PDF150", False)))
 
-    def test_select_rules_treats_sometimes_fixable_rules_as_having_available_fixes(self) -> None:
+    def test_select_rules_treats_per_instance_fixable_rules_as_having_available_fixes(self) -> None:
         selection = rules_selection.select_rules(
-            CheckSettings(select=("PDF160",), fixable=("PDF160",)),
+            CheckSettings(select=("PDF160", "PDF170"), fixable=("PDF160", "PDF170")),
             collection=fix_availability_collection(),
         )
 
         self.assertEqual(selection.errors, ())
-        self.assertEqual(tuple((rule.rule.code.tag, rule.fixable) for rule in selection.rules), (("PDF160", True),))
+        self.assertEqual(tuple((rule.rule.code.tag, rule.fixable) for rule in selection.rules), (("PDF160", True), ("PDF170", True)))
 
     def test_select_rules_reports_selector_operational_errors(self) -> None:
         selection = rules_selection.select_rules(

@@ -13,6 +13,7 @@ class FixAvailability(enum.StrEnum):
     """Rule-level automatic fix availability."""
 
     ALWAYS = "Always"
+    USUALLY = "Usually"
     SOMETIMES = "Sometimes"
     NEVER = "Never"
 
@@ -168,8 +169,8 @@ class RuleFinding:
             return True
         elif self.rule.fix_availability == FixAvailability.NEVER:
             return False
-        elif self.rule.fix_availability == FixAvailability.SOMETIMES:
-            raise ValueError(f"{self.rule.code}: Findings for sometimes-fixable rules must specify instance_fixable")
+        elif self.rule.fix_availability in {FixAvailability.USUALLY, FixAvailability.SOMETIMES}:
+            raise ValueError(f"{self.rule.code}: Findings for {self.rule.fix_availability.lower()}-fixable rules must specify instance_fixable")
         else:
             raise AssertionError(f"Unexpected fix availability: {self.rule.fix_availability}")
 

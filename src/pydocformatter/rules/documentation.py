@@ -16,6 +16,8 @@ def rule_fix_text(rule: RuleMetadata) -> str:
     """Return user-facing fix availability text for one rule."""
     if rule.fix_availability == FixAvailability.ALWAYS:
         return "Fix is always available."
+    elif rule.fix_availability == FixAvailability.USUALLY:
+        return "Fix is usually available."
     elif rule.fix_availability == FixAvailability.SOMETIMES:
         return "Fix is sometimes available."
     elif rule.fix_availability == FixAvailability.NEVER:

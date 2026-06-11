@@ -41,6 +41,18 @@ class TestSourceEdits(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "must specify instance_fixable"):
             rule_edits.findings_for_planned_source_changes(rule, changes)
 
+    def test_usually_fixable_findings_require_explicit_instance_fixability(self) -> None:
+        rule = RuleMetadata(code=RuleCode("PDF999"), name="test-rule", message="Test message", fix_availability=FixAvailability.USUALLY, stable_since="0.3.0", setting_effects=(), incompatible_with=())
+        changes = (
+            rule_edits.PlannedSourceChange(
+                edit=rule_edits.SourceEdit(cst_metadata.CodeRange(start=cst_metadata.CodePosition(1, 0), end=cst_metadata.CodePosition(1, 0)), ""),
+                line_numbers=(1,),
+            ),
+        )
+
+        with self.assertRaisesRegex(ValueError, "must specify instance_fixable"):
+            rule_edits.findings_for_planned_source_changes(rule, changes)
+
     def test_empty_edits_return_original_module(self) -> None:
         module = cst.parse_module("x = 1\n")
 
