@@ -66,6 +66,16 @@ def test_reflows_google_and_sphinx_field_descriptions() -> None:
     )
 
 
+def test_reflows_malformed_google_section_entries_with_canonical_indentation() -> None:
+    source = 'def function(value):\n    """Do work.\n\n      Args:\n          value: Description words long enough to wrap around the target line width for checking indentation.\n    """\n'
+    result = format_pdf001(source, settings=CheckSettings(select=("PDF001",), line_length=72, docstring_convention=DocstringConvention.GOOGLE))
+
+    assert (
+        result.new_source
+        == 'def function(value):\n    """Do work.\n\n      Args:\n        value: Description words long enough to wrap around the target\n            line width for checking indentation.\n    """\n'
+    )
+
+
 def test_reflows_long_google_entry_prefix_with_description_on_following_lines() -> None:
     source = 'def function(value):\n    """Do work.\n\n    Args:\n        value (Mapping[str, Sequence[tuple[str, object, bytes, float]]]): A value with enough descriptive words to require wrapping after a long type prefix.\n    """\n'
     result = format_pdf001(source, settings=CheckSettings(select=("PDF001",), line_length=76, docstring_convention=DocstringConvention.GOOGLE))
@@ -105,6 +115,16 @@ def test_reflows_numpy_descriptions_list_items_and_block_quotes() -> None:
     assert (
         result.new_source
         == 'def function(value):\n    """Do work.\n\n    Parameters\n    ----------\n    value : int\n        A value with a long description that should wrap using the\n        existing indentation.\n\n    - A list item with enough words to require wrapping with hanging\n      indentation.\n    > A block quote with enough words to require prefix preserving\n    > wrapping.\n    """\n'
+    )
+
+
+def test_reflows_malformed_numpy_section_descriptions_with_canonical_indentation() -> None:
+    source = 'def function(value):\n    """Do work.\n\n      Parameters\n      ----------\n      value : int\n          Description words long enough to wrap around the target line width for checking indentation.\n    """\n'
+    result = format_pdf001(source, settings=CheckSettings(select=("PDF001",), line_length=72, docstring_convention=DocstringConvention.NUMPY))
+
+    assert (
+        result.new_source
+        == 'def function(value):\n    """Do work.\n\n      Parameters\n      ----------\n      value : int\n        Description words long enough to wrap around the target line\n        width for checking indentation.\n    """\n'
     )
 
 

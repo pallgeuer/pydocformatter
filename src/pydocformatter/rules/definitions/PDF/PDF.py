@@ -526,12 +526,12 @@ class _DocstringParser:
             or (self.settings.docstring_parse_block_quotes and _BLOCK_QUOTE_RE.match(text) is not None)
         )
 
-    def _section_at(self, index: int, end: int) -> str | None:
+    def _section_at(self, index: int, end: int, *, max_indent: int | None = None) -> str | None:
         convention = self.settings.docstring_convention
         if convention not in (settings_check.DocstringConvention.GOOGLE, settings_check.DocstringConvention.NUMPY):
             return None
         text = self.lines[index].text
-        if text[:1].isspace():
+        if max_indent is not None and _leading_width(text) > max_indent:
             return None
         stripped = text.strip()
         candidate = stripped[:-1].rstrip() if stripped.endswith(":") else stripped
@@ -548,7 +548,7 @@ class _DocstringParser:
         content_start = start + 1
         if content_start < end and _is_adornment(self.lines[content_start].text):
             content_start += 1
-        section_end = self._section_end(content_start, end)
+        section_end = self._section_end(content_start, end, _leading_width(self.lines[start].text))
         entries = self._section_entries(name, content_start, section_end)
         children: list[DocstringBlock] = [DocstringBlock(DocstringBlockKind.SECTION_HEADER, start, content_start)]
         if entries:
@@ -617,11 +617,11 @@ class _DocstringParser:
                 end_line=entry_end,
             )
             entries.append(entry)
-            prefix = self.lines[index].text[: match.start("description")]
+            unit = _indent_unit(self.settings)
+            prefix = f'{unit}{self.lines[index].text[len(match.group("indent")) : match.start("description")]}'
             if description_lines and not first_description and not prefix.endswith((" ", "\t")):
                 prefix = f"{prefix} "
-            subsequent_indent = " " * (len(match.group("indent").expandtabs(self.settings.indent_width)) + self.settings.indent_width)
-            self._add_reflow(DocstringBlockKind.SECTION_ENTRY, index, entry_end, lines=tuple(description_lines), initial_indent=prefix, subsequent_indent=subsequent_indent)
+            self._add_reflow(DocstringBlockKind.SECTION_ENTRY, index, entry_end, lines=tuple(description_lines), initial_indent=prefix, subsequent_indent=unit * 2)
             index = entry_end
         return tuple(entries)
 
@@ -649,8 +649,14 @@ class _DocstringParser:
                 )
                 entries.append(entry)
                 if description_lines:
-                    indent = self.lines[index + 1].text[: len(self.lines[index + 1].text) - len(self.lines[index + 1].text.lstrip(" \t"))]
-                    self._add_reflow(DocstringBlockKind.SECTION_ENTRY, index + 1, entry_end, lines=tuple(description_lines), initial_indent=indent, subsequent_indent=indent)
+                    self._add_reflow(
+                        DocstringBlockKind.SECTION_ENTRY,
+                        index + 1,
+                        entry_end,
+                        lines=tuple(description_lines),
+                        initial_indent=_indent_unit(self.settings),
+                        subsequent_indent=_indent_unit(self.settings),
+                    )
                 index = entry_end
                 continue
             if kind in (DocstringEntryKind.RETURN, DocstringEntryKind.YIELD, DocstringEntryKind.EXCEPTION) and text.strip():
@@ -667,8 +673,14 @@ class _DocstringParser:
                     )
                 )
                 if description_lines:
-                    indent = self.lines[index + 1].text[: len(self.lines[index + 1].text) - len(self.lines[index + 1].text.lstrip(" \t"))]
-                    self._add_reflow(DocstringBlockKind.SECTION_ENTRY, index + 1, entry_end, lines=tuple(description_lines), initial_indent=indent, subsequent_indent=indent)
+                    self._add_reflow(
+                        DocstringBlockKind.SECTION_ENTRY,
+                        index + 1,
+                        entry_end,
+                        lines=tuple(description_lines),
+                        initial_indent=_indent_unit(self.settings),
+                        subsequent_indent=_indent_unit(self.settings),
+                    )
                 index = entry_end
                 continue
             index += 1
@@ -728,10 +740,10 @@ class _DocstringParser:
             index += 1
         return end
 
-    def _section_end(self, start: int, end: int) -> int:
+    def _section_end(self, start: int, end: int, section_indent: int) -> int:
         index = start
         while index < end:
-            if self._section_at(index, end) is not None:
+            if self._section_at(index, end, max_indent=section_indent) is not None:
                 return index
             protected_end = self._protected_block_end(index, end)
             index = protected_end if protected_end is not None else index + 1
@@ -934,6 +946,11 @@ def _indent_width(text: str) -> int:
 def _leading_width(text: str) -> int:
     """Return the tab-expanded width of leading whitespace."""
     return _indent_width(text[: len(text) - len(text.lstrip(" \t"))])
+
+
+def _indent_unit(settings: settings_check.CheckSettings) -> str:
+    """Return one generated indentation unit."""
+    return "\t" if settings.indent_style == settings_check.IndentStyle.TAB else " " * settings.indent_width
 
 
 def _docstring_source_indent(statement: cst.SimpleStatementLine | cst.SimpleStatementSuite, *, code_range: cst_metadata.CodeRange, source_lines: list[str], indent_width: int) -> int:

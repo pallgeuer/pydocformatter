@@ -394,6 +394,21 @@ def test_indented_google_section_name_is_entry_description_text() -> None:
     )
 
 
+def test_indented_google_section_headers_are_recognized_as_malformed_sections() -> None:
+    value = "Summary.\n\n  Args:\n      value: Description.\n\n  Returns:\n      str: Result."
+    structure = structure_for(value, settings=CheckSettings(docstring_convention=DocstringConvention.GOOGLE))
+
+    assert tuple(section.name for section in structure.sections) == ("Args", "Returns")
+    assert tuple((entry.kind, entry.names, entry.type_text, entry.description) for entry in structure.entries) == (
+        (DocstringEntryKind.PARAMETER, ("value",), None, "Description."),
+        (DocstringEntryKind.RETURN, (), "str", "Result."),
+    )
+    assert tuple((region.initial_indent, region.subsequent_indent) for region in structure.reflow_regions if region.kind == DocstringBlockKind.SECTION_ENTRY) == (
+        ("    value: ", "        "),
+        ("    str: ", "        "),
+    )
+
+
 def test_nested_protected_blocks_are_not_folded_into_google_entry_descriptions() -> None:
     value = "Args:\n    value: Description.\n        - First choice.\n        - Second choice.\n        ```text\n        value: code, not prose\n        ```\n    other: Other description."
     structure = structure_for(value, settings=CheckSettings(docstring_convention=DocstringConvention.GOOGLE))
@@ -448,6 +463,18 @@ def test_numpy_sections_are_only_parsed_for_numpy_convention() -> None:
     assert tuple(section.name for section in numpy.sections) == ("Parameters",)
     assert tuple((entry.kind, entry.names, entry.type_text, entry.description) for entry in numpy.entries) == ((DocstringEntryKind.PARAMETER, ("value",), "int", "A value."),)
     assert google.sections == ()
+
+
+def test_indented_numpy_section_headers_are_recognized_as_malformed_sections() -> None:
+    value = "Summary.\n\n  Parameters\n  ----------\n  value : int\n      Description.\n\n  Returns\n  -------\n  str\n      Result."
+    structure = structure_for(value, settings=CheckSettings(docstring_convention=DocstringConvention.NUMPY))
+
+    assert tuple(section.name for section in structure.sections) == ("Parameters", "Returns")
+    assert tuple((entry.kind, entry.names, entry.type_text, entry.description) for entry in structure.entries) == (
+        (DocstringEntryKind.PARAMETER, ("value",), "int", "Description."),
+        (DocstringEntryKind.RETURN, (), "str", "Result."),
+    )
+    assert tuple((region.initial_indent, region.subsequent_indent) for region in structure.reflow_regions if region.kind == DocstringBlockKind.SECTION_ENTRY) == (("    ", "    "), ("    ", "    "))
 
 
 @pytest.mark.parametrize("header", ("Parameters\n----------", "PARAMETERS\n==========", "Other Parameters", "Returns"))
