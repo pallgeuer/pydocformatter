@@ -314,6 +314,6 @@ def _raw_generated_line(docstring: PDF_definition.DocstringInfo, line_index: int
 
 def _fallback_line_prefix(source: str, *, docstring: PDF_definition.DocstringInfo) -> str:
     """Return the generated body-line prefix when no prior body line exists."""
-    source_line = PDF_definition._source_lines(source)[docstring.range.start.line - 1]
+    source_line = PDF_definition.source_lines(source)[docstring.range.start.line - 1]
     prefix = source_line[: docstring.range.start.column]
     return prefix if prefix.strip() == "" else " " * docstring.range.start.column

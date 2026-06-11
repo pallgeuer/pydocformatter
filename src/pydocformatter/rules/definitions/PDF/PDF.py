@@ -131,6 +131,7 @@ class DocstringSection:
     start_line: int
     end_line: int
     header_line: int
+    content_start_line: int
     entries: tuple[DocstringEntry, ...]
 
 
@@ -207,7 +208,7 @@ class _DefinitionCollector(cst.CSTVisitor):
     def __init__(self, context: RuleCategoryContext) -> None:
         super().__init__()
         self.context = context
-        self.source_lines = _source_lines(context.module.code)
+        self.source_lines = source_lines(context.module.code)
         self.definitions: list[DefinitionInfo] = []
         self.docstrings: list[DocstringInfo] = []
         self.stack: list[DefinitionInfo] = []
@@ -473,7 +474,7 @@ class _DocstringParser:
                 self.summary_pending = False
                 continue
             if self.settings.docstring_parse_literal_blocks and text.rstrip().endswith("::") and self._has_indented_body(index, end):
-                block_end = self._indented_body_end(index, end, _leading_width(text))
+                block_end = self._indented_body_end(index, end, leading_width(text))
                 blocks.append(DocstringBlock(DocstringBlockKind.LITERAL_BLOCK, index, block_end))
                 index = block_end
                 self.summary_pending = False
@@ -542,7 +543,7 @@ class _DocstringParser:
         if convention not in (settings_check.DocstringConvention.GOOGLE, settings_check.DocstringConvention.NUMPY):
             return None
         text = self.lines[index].text
-        if max_indent is not None and _leading_width(text) > max_indent:
+        if max_indent is not None and leading_width(text) > max_indent:
             return None
         stripped = text.strip()
         candidate = stripped[:-1].rstrip() if stripped.endswith(":") else stripped
@@ -559,7 +560,7 @@ class _DocstringParser:
         content_start = start + 1
         if content_start < end and _is_adornment(self.lines[content_start].text):
             content_start += 1
-        section_end = self._section_end(content_start, end, _leading_width(self.lines[start].text))
+        section_end = self._section_end(content_start, end, leading_width(self.lines[start].text))
         entries = self._section_entries(name, content_start, section_end)
         children: list[DocstringBlock] = [DocstringBlock(DocstringBlockKind.SECTION_HEADER, start, content_start)]
         if entries:
@@ -582,7 +583,7 @@ class _DocstringParser:
             self.summary_pending = False
             children.extend(self._parse_range(content_start, section_end))
             self.summary_pending = previous_summary
-        section = DocstringSection(name=name, start_line=start, end_line=section_end, header_line=start, entries=entries)
+        section = DocstringSection(name=name, start_line=start, end_line=section_end, header_line=start, content_start_line=content_start, entries=entries)
         self.sections.append(section)
         self.entries.extend(entries)
         return DocstringBlock(DocstringBlockKind.SECTION, start, section_end, children=tuple(children)), section_end
@@ -632,7 +633,7 @@ class _DocstringParser:
                 end_line=entry_end,
             )
             entries.append(entry)
-            unit = _indent_unit(self.settings)
+            unit = indent_unit(self.settings)
             prefix = f'{unit}{self.lines[index].text[len(match.group("indent")) : match.start("description")]}'
             if description_lines and not first_description and not prefix.endswith((" ", "\t")):
                 prefix = f"{prefix} "
@@ -670,13 +671,13 @@ class _DocstringParser:
                         index + 1,
                         entry_end,
                         lines=tuple(description_reflow_lines),
-                        initial_indent=_indent_unit(self.settings),
-                        subsequent_indent=_indent_unit(self.settings),
+                        initial_indent=indent_unit(self.settings),
+                        subsequent_indent=indent_unit(self.settings),
                     )
                 index = entry_end
                 continue
             if kind in (DocstringEntryKind.RETURN, DocstringEntryKind.YIELD, DocstringEntryKind.EXCEPTION) and text.strip():
-                entry_end = self._entry_end(index, end, _leading_width(text))
+                entry_end = self._entry_end(index, end, leading_width(text))
                 description_reflow_lines = self._stripped_reflow_lines(index + 1, entry_end, skip_empty=True)
                 description_lines = [line.text for line in description_reflow_lines]
                 entries.append(
@@ -695,8 +696,8 @@ class _DocstringParser:
                         index + 1,
                         entry_end,
                         lines=tuple(description_reflow_lines),
-                        initial_indent=_indent_unit(self.settings),
-                        subsequent_indent=_indent_unit(self.settings),
+                        initial_indent=indent_unit(self.settings),
+                        subsequent_indent=indent_unit(self.settings),
                     )
                 index = entry_end
                 continue
@@ -808,7 +809,7 @@ class _DocstringParser:
         if self.settings.docstring_parse_directives and (directive := _DIRECTIVE_RE.match(text)) is not None:
             return self._indented_body_end(index, end, _indent_width(directive.group("indent")))
         if self.settings.docstring_parse_literal_blocks and text.rstrip().endswith("::") and self._has_indented_body(index, end):
-            return self._indented_body_end(index, end, _leading_width(text))
+            return self._indented_body_end(index, end, leading_width(text))
         if self.settings.docstring_parse_tables and (table_end := self._table_end(index, end)) is not None:
             return table_end
         if self.settings.docstring_parse_headings and self._is_heading(index, end):
@@ -827,7 +828,7 @@ class _DocstringParser:
         block_end = start + 1
         while block_end < end:
             text = self.lines[block_end].text
-            if not text.strip() or _LIST_RE.match(text) is not None or _leading_width(text) <= base_indent:
+            if not text.strip() or _LIST_RE.match(text) is not None or leading_width(text) <= base_indent:
                 break
             block_end += 1
         return block_end
@@ -847,15 +848,15 @@ class _DocstringParser:
             next_index += 1
         if next_index >= end:
             return False
-        base_indent = _leading_width(self.lines[index].text)
-        next_indent = _leading_width(self.lines[next_index].text)
+        base_indent = leading_width(self.lines[index].text)
+        next_indent = leading_width(self.lines[next_index].text)
         return next_indent > base_indent
 
     def _indented_body_end(self, start: int, end: int, base_indent: int) -> int:
         index = start + 1
         while index < end:
             text = self.lines[index].text
-            indent = _leading_width(text)
+            indent = leading_width(text)
             if text.strip() and indent <= base_indent:
                 break
             index += 1
@@ -865,7 +866,7 @@ class _DocstringParser:
         index = start + 1
         while index < end:
             text = self.lines[index].text
-            if not text.strip() or _leading_width(text) <= base_indent or self._protected_block_end(index, end) is not None:
+            if not text.strip() or leading_width(text) <= base_indent or self._protected_block_end(index, end) is not None:
                 break
             index += 1
         return index
@@ -876,7 +877,7 @@ class _DocstringParser:
             text = self.lines[index].text
             if not text.strip():
                 break
-            indent = _leading_width(text)
+            indent = leading_width(text)
             if indent <= base_indent:
                 break
             index += 1
@@ -924,7 +925,7 @@ def _value_lines(value: str, *, source_line_number: int | None, source_indent: i
             start += newline.end()
     if not raw_lines:
         raw_lines.append((0, 0, ""))
-    margin = source_indent if source_indent is not None else min((_leading_width(text) for _, _, text in raw_lines[1:] if text.strip()), default=0)
+    margin = source_indent if source_indent is not None else min((leading_width(text) for _, _, text in raw_lines[1:] if text.strip()), default=0)
     lines: list[DocstringValueLine] = []
     for index, (line_start, line_end, raw_text) in enumerate(raw_lines):
         if index == 0:
@@ -932,7 +933,7 @@ def _value_lines(value: str, *, source_line_number: int | None, source_indent: i
             text_virtual_prefix_length = 0
             text = raw_text[text_raw_start_column:]
         else:
-            text, text_raw_start_column, text_virtual_prefix_length = _strip_indent_with_mapping(raw_text, margin)
+            text, text_raw_start_column, text_virtual_prefix_length = strip_indent_with_mapping(raw_text, margin)
         lines.append(
             DocstringValueLine(
                 index=index,
@@ -997,29 +998,29 @@ def _indent_width(text: str) -> int:
     return len(text.expandtabs(8))
 
 
-def _leading_width(text: str) -> int:
+def leading_width(text: str) -> int:
     """Return the tab-expanded width of leading whitespace."""
     return _indent_width(text[: len(text) - len(text.lstrip(" \t"))])
 
 
-def _indent_unit(settings: settings_check.CheckSettings) -> str:
+def indent_unit(settings: settings_check.CheckSettings) -> str:
     """Return one generated indentation unit."""
     return "\t" if settings.indent_style == settings_check.IndentStyle.TAB else " " * settings.indent_width
 
 
 def _docstring_source_indent(statement: cst.SimpleStatementLine | cst.SimpleStatementSuite, *, code_range: cst_metadata.CodeRange, source_lines: list[str], indent_width: int) -> int:
     """Return the visual indentation margin for a simple docstring."""
-    source_indent = _leading_width(source_lines[code_range.start.line - 1])
+    source_indent = leading_width(source_lines[code_range.start.line - 1])
     return source_indent + indent_width if isinstance(statement, cst.SimpleStatementSuite) else source_indent
 
 
-def _strip_indent(text: str, width: int) -> str:
+def strip_indent(text: str, width: int) -> str:
     """Strip up to a tab-expanded indentation width from text."""
-    stripped, _, _ = _strip_indent_with_mapping(text, width)
+    stripped, _, _ = strip_indent_with_mapping(text, width)
     return stripped
 
 
-def _strip_indent_with_mapping(text: str, width: int) -> tuple[str, int, int]:
+def strip_indent_with_mapping(text: str, width: int) -> tuple[str, int, int]:
     """Strip indentation and return the raw/virtual mapping for text column zero."""
     index = 0
     column = 0
@@ -1102,7 +1103,7 @@ def _physical_lines(code_range: cst_metadata.CodeRange, source: str) -> tuple[Do
     )
 
 
-def _source_lines(source: str) -> list[str]:
+def source_lines(source: str) -> list[str]:
     """Split source into lines retaining only Python physical line endings."""
     lines: list[str] = []
     line_start = 0

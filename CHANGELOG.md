@@ -15,6 +15,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added the `docstring-convention` setting with `none`, `google`, `numpy`, and `pep257` modes.
   - Added `PDF000` to rewrite implicitly concatenated docstrings as equivalent simple triple-double-quoted literals.
   - Added `PDF001` to reflow safely mapped docstring summaries, paragraphs, section descriptions, Sphinx fields, list items, and block quotes.
+  - Added `PDF002` to normalize safely mapped multi-line simple docstring indentation, including convention-aware Google and NumPy section indentation.
 
 - **CLI:**
   - Added Ruff-style subcommands with `pydocfmt check` for read-only checks and `pydocfmt check --fix` for formatting.
@@ -83,6 +84,8 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 ### Fixed
 
 - **Docstring formatting:**
+  - Fixed PDF002 to leave first-line Google and NumPy sections unchanged instead of partially reindenting their entries or adornments away from the section header.
+  - Fixed PDF002 to preserve the canonical margin for under-indented same-line closing quotes.
   - Fixed PDF001 source mapping for reflow regions whose text also appears earlier on the same raw docstring line.
   - Removed dead string-literal escape handling and tightened edge-case wrapping for source-aware docstring text.
 
