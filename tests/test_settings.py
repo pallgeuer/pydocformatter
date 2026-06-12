@@ -284,6 +284,7 @@ class TestSettings(unittest.TestCase):
 
     def test_setting_definitions_are_iterable_by_group(self) -> None:
         formatting_fields = tuple(definition.field for definition in pydocformatter_settings.SETTINGS_SCHEMA.definitions if definition.group == SettingsGroup.FORMATTING)
+        docstring_formatting_fields = tuple(definition.field for definition in pydocformatter_settings.SETTINGS_SCHEMA.definitions if definition.group == SettingsGroup.DOCSTRING_FORMATTING)
         comment_formatting_fields = tuple(definition.field for definition in pydocformatter_settings.SETTINGS_SCHEMA.definitions if definition.group == SettingsGroup.COMMENT_FORMATTING)
         rule_selection_fields = tuple(definition.field for definition in pydocformatter_settings.SETTINGS_SCHEMA.definitions if definition.group == SettingsGroup.RULE_SELECTION)
         file_selection_fields = tuple(definition.field for definition in pydocformatter_settings.SETTINGS_SCHEMA.definitions if definition.group == SettingsGroup.FILE_SELECTION)
@@ -297,6 +298,22 @@ class TestSettings(unittest.TestCase):
                 "line_ending",
                 "indent_style",
                 "indent_width",
+            ),
+        )
+        self.assertEqual(
+            docstring_formatting_fields,
+            (
+                "docstring_convention",
+                "docstring_blank_line_style",
+                "docstring_parse_list_items",
+                "docstring_parse_headings",
+                "docstring_parse_doctests",
+                "docstring_parse_code_fences",
+                "docstring_parse_block_quotes",
+                "docstring_parse_tables",
+                "docstring_parse_directives",
+                "docstring_parse_literal_blocks",
+                "docstring_parse_sphinx_fields",
             ),
         )
         self.assertEqual(
@@ -347,6 +364,8 @@ class TestSettings(unittest.TestCase):
 
         group_titles = tuple(group.title for group in parser._action_groups)
         self.assertLess(group_titles.index(SettingsGroup.FORMATTING.value), group_titles.index(SettingsGroup.COMMENT_FORMATTING.value))
+        self.assertLess(group_titles.index(SettingsGroup.FORMATTING.value), group_titles.index(SettingsGroup.DOCSTRING_FORMATTING.value))
+        self.assertLess(group_titles.index(SettingsGroup.DOCSTRING_FORMATTING.value), group_titles.index(SettingsGroup.COMMENT_FORMATTING.value))
         self.assertLess(group_titles.index(SettingsGroup.COMMENT_FORMATTING.value), group_titles.index(SettingsGroup.RULE_SELECTION.value))
         self.assertLess(group_titles.index(SettingsGroup.RULE_SELECTION.value), group_titles.index(SettingsGroup.FILE_SELECTION.value))
         option_strings = {option for action in parser._actions for option in action.option_strings}
@@ -785,17 +804,25 @@ class TestSettings(unittest.TestCase):
         for convention in pydocformatter_settings.DocstringConvention:
             config = pydocformatter_settings.SETTINGS_SCHEMA.load(field_overrides={"docstring_convention": convention.value})
             self.assertEqual(config.docstring_convention, convention)
+        for blank_line_style in pydocformatter_settings.DocstringBlankLineStyle:
+            config = pydocformatter_settings.SETTINGS_SCHEMA.load(field_overrides={"docstring_blank_line_style": blank_line_style.value})
+            self.assertEqual(config.docstring_blank_line_style, blank_line_style)
 
         configured = pydocformatter_settings.SETTINGS_SCHEMA.load(
-            global_values=pydocformatter_global_args.GlobalArgs(isolated=True, config_options=('docstring-convention = "google"\ndocstring-parse-tables = false',))
+            global_values=pydocformatter_global_args.GlobalArgs(
+                isolated=True,
+                config_options=('docstring-convention = "google"\ndocstring-blank-line-style = "aligned"\ndocstring-parse-tables = false',),
+            )
         )
         overridden = pydocformatter_settings.SETTINGS_SCHEMA.load(
             global_values=pydocformatter_global_args.GlobalArgs(isolated=True),
-            args=argparse.Namespace(docstring_convention="numpy", docstring_parse_tables=False),
+            args=argparse.Namespace(docstring_convention="numpy", docstring_blank_line_style="blank", docstring_parse_tables=False),
         )
         self.assertEqual(configured.docstring_convention, pydocformatter_settings.DocstringConvention.GOOGLE)
+        self.assertEqual(configured.docstring_blank_line_style, pydocformatter_settings.DocstringBlankLineStyle.ALIGNED)
         self.assertFalse(configured.docstring_parse_tables)
         self.assertEqual(overridden.docstring_convention, pydocformatter_settings.DocstringConvention.NUMPY)
+        self.assertEqual(overridden.docstring_blank_line_style, pydocformatter_settings.DocstringBlankLineStyle.BLANK)
         self.assertFalse(overridden.docstring_parse_tables)
 
         config = pydocformatter_settings.SETTINGS_SCHEMA.load(

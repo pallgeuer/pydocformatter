@@ -8,6 +8,8 @@ import libcst as cst
 import libcst.metadata as cst_metadata
 
 import pydocformatter.cli.settings_check as settings_check
+import pydocformatter.rules.definition_helpers.string_literals as string_literals
+import pydocformatter.rules.edits as rule_edits
 import pydocformatter.rules.registration as rule_registration
 from pydocformatter.rules.definition import RuleCategoryBase, RuleCategoryContext, RuleContext
 from pydocformatter.rules.models import RuleCategoryMetadata
@@ -1006,6 +1008,117 @@ def leading_width(text: str) -> int:
 def indent_unit(settings: settings_check.CheckSettings) -> str:
     """Return one generated indentation unit."""
     return "\t" if settings.indent_style == settings_check.IndentStyle.TAB else " " * settings.indent_width
+
+
+def has_space_tab_content(text: str) -> bool:
+    """Return whether text contains content other than spaces and tabs."""
+    return bool(text.strip(" \t"))
+
+
+def is_same_line_closing_delimiter_prefix(docstring: DocstringInfo, line: DocstringValueLine) -> bool:
+    """Return whether a value line prefixes same-line closing quotes."""
+    return line.index == len(docstring.structure.lines) - 1 and docstring.value != "" and not docstring.value.endswith(("\r\n", "\r", "\n"))
+
+
+def is_safely_mapped_simple_docstring(docstring: DocstringInfo, *, require_multiline: bool = False) -> bool:
+    """Return whether a simple docstring can be safely rewritten by evaluated line."""
+    return (
+        docstring.kind is DocstringKind.SIMPLE
+        and isinstance(docstring.node, cst.SimpleString)
+        and (not require_multiline or len(docstring.structure.lines) > 1)
+        and all(line.source_line_number is not None for line in docstring.structure.lines)
+    )
+
+
+def docstring_value_fragments(docstring: DocstringInfo, *, line_ending: str) -> tuple[string_literals.StringValueFragment, ...] | None:
+    """Return source fragments for a safely rewritable simple docstring."""
+    if not isinstance(docstring.node, cst.SimpleString):
+        return None
+    return string_literals.value_fragments_for_simple_string(docstring.node, line_ending=line_ending)
+
+
+def docstring_canonical_margin(docstring: DocstringInfo, *, context: RuleContext, source_lines: list[str] | None = None) -> str:
+    """Return the raw indentation margin for continuation and aligned blank lines."""
+    lines = source_lines if source_lines is not None else source_lines_from_context(context)
+    source_line = lines[docstring.range.start.line - 1]
+    line_indent = source_line[: len(source_line) - len(source_line.lstrip(" \t"))]
+    if isinstance(docstring.statement, cst.SimpleStatementSuite):
+        return f"{line_indent}{indent_unit(context.settings)}"
+    prefix = source_line[: docstring.range.start.column]
+    return prefix if prefix.strip() == "" else line_indent
+
+
+def source_lines_from_context(context: RuleContext | RuleCategoryContext) -> list[str]:
+    """Return source lines for a rule or category context."""
+    return source_lines(context.module.code)
+
+
+def planned_simple_docstring_line_change(
+    docstring: DocstringInfo,
+    *,
+    context: RuleContext,
+    raw_line_targets: tuple[str | None, ...],
+) -> rule_edits.PlannedSourceChange | None:
+    """Return one whole-literal replacement for changed raw evaluated lines."""
+    if len(raw_line_targets) != len(docstring.structure.lines):
+        raise ValueError("Raw line targets must match the docstring line count")
+    replacements = tuple(
+        rule_edits.PlannedTextReplacement(
+            start_offset=line.start_offset,
+            end_offset=line.end_offset,
+            text=target,
+            line_numbers=(line.source_line_number,),
+        )
+        for line, target in zip(docstring.structure.lines, raw_line_targets)
+        if target is not None and line.source_line_number is not None and line.raw_text != target
+    )
+    if not replacements:
+        return None
+    # Safe simple docstrings map evaluated line text back to source body text modulo newline spelling.
+    value_lines = [target if target is not None else line.raw_text for line, target in zip(docstring.structure.lines, raw_line_targets)]
+    return planned_simple_docstring_source_change(docstring, context=context, replacements=replacements, value_lines=value_lines)
+
+
+def planned_simple_docstring_source_change(
+    docstring: DocstringInfo,
+    *,
+    context: RuleContext,
+    replacements: tuple[rule_edits.PlannedTextReplacement, ...],
+    value_lines: list[str],
+) -> rule_edits.PlannedSourceChange | None:
+    """Return one whole-literal replacement from evaluated-value replacements."""
+    if not replacements:
+        return None
+    fragments = docstring_value_fragments(docstring, line_ending=context.line_ending)
+    if fragments is None or not isinstance(docstring.node, cst.SimpleString):
+        return None
+    value = join_docstring_value_lines(docstring, value_lines)
+    source_chunks: list[str] = []
+    cursor = 0
+    for replacement in replacements:
+        source_chunks.append(string_literals.source_for_value_slice(fragments, cursor, replacement.start_offset))
+        source_chunks.append(replacement.text)
+        cursor = replacement.end_offset
+    source_chunks.append(string_literals.source_for_value_slice(fragments, cursor, len(fragments)))
+    rendered = string_literals.render_simple_string_from_body_source(docstring.node.prefix, docstring.node.quote, "".join(source_chunks), expected_value=value)
+    if rendered is None or rendered == docstring.source:
+        return None
+    return rule_edits.PlannedSourceChange(
+        edit=rule_edits.SourceEdit(range=docstring.range, replacement=rendered),
+        line_numbers=tuple(line_number for replacement in replacements for line_number in replacement.line_numbers),
+    )
+
+
+def join_docstring_value_lines(docstring: DocstringInfo, lines: list[str]) -> str:
+    """Join replacement logical lines with the original evaluated newline spellings."""
+    chunks: list[str] = []
+    for index, (line_info, line) in enumerate(zip(docstring.structure.lines, lines)):
+        chunks.append(line)
+        if index + 1 < len(lines):
+            chunks.append(docstring.value[line_info.end_offset : docstring.structure.lines[index + 1].start_offset])
+        else:
+            chunks.append(docstring.value[line_info.end_offset :])
+    return "".join(chunks)
 
 
 def _docstring_source_indent(statement: cst.SimpleStatementLine | cst.SimpleStatementSuite, *, code_range: cst_metadata.CodeRange, source_lines: list[str], indent_width: int) -> int:

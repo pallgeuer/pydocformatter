@@ -73,6 +73,22 @@ PDF001: 5-3
         )
 
 
+def test_parse_rule_markdown_examples_rejects_output_matching_input() -> None:
+    """Unchanged examples must use the explicit unchanged output marker."""
+    with pytest.raises(rule_documentation.RuleMarkdownExampleParseError, match=r"use \[output=unchanged\]"):
+        rule_documentation.parse_rule_markdown_examples(
+            """```pydocfmt-example
+[input]
+value = "kept"
+
+[output]
+value = "kept"
+```
+""",
+            rule_code="PDF000",
+        )
+
+
 def test_parse_rule_markdown_examples_preserves_section_source_text() -> None:
     """Section parsing keeps byte-relevant source text inside the section body."""
     examples = rule_documentation.parse_rule_markdown_examples(

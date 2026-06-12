@@ -123,6 +123,8 @@ def _parse_example_block(body: str, *, rule_code: str, example_number: int) -> R
         output_source = input_source
     else:
         output_source = sections["output"]
+        if output_source == input_source:
+            raise RuleMarkdownExampleParseError(f"{rule_code} example {example_number}: use [output=unchanged] when output is identical to input")
     findings = _parse_findings(sections.get("findings", ""), rule_code=rule_code, example_number=example_number)
     return RuleMarkdownExample(settings_text=settings_text, input_source=input_source, output_source=output_source, findings=findings)
 

@@ -94,6 +94,7 @@ If no files or directories are specified, `pydocfmt check` checks the current di
 
 **Docstring formatting:**
 - `--docstring-convention {none,google,numpy,pep257}`: Convention used to parse semantic docstring sections (default: none)
+- `--docstring-blank-line-style {blank,aligned}`: Whitespace style for blank docstring lines (default: blank)
 - `--docstring-parse-list-items`, `--no-docstring-parse-list-items`: Toggle parsing docstring list items (default: enabled)
 - `--docstring-parse-headings`, `--no-docstring-parse-headings`: Toggle parsing docstring headings (default: enabled)
 - `--docstring-parse-doctests`, `--no-docstring-parse-doctests`: Toggle parsing and protecting doctest regions (default: enabled)
@@ -217,6 +218,7 @@ line-ending = "auto"
 indent-style = "space"
 indent-width = 4
 docstring-convention = "none"
+docstring-blank-line-style = "blank"
 docstring-parse-list-items = true
 docstring-parse-headings = true
 docstring-parse-doctests = true
@@ -261,6 +263,7 @@ force-exclude = false
 - `indent-style`: Generated docstring section indentation style; one of `"space"` or `"tab"` (default: `"space"`)
 - `indent-width`: Generated docstring section indentation width and tab expansion width used when measuring comments (default: 4)
 - `docstring-convention`: Docstring convention; one of `"none"`, `"google"`, `"numpy"`, or `"pep257"` (default: `"none"`)
+- `docstring-blank-line-style`: Blank docstring line whitespace style used by PDF004; one of `"blank"` or `"aligned"` (default: `"blank"`)
 - `docstring-parse-list-items`: Parse docstring list items as distinct structures (default: `true`)
 - `docstring-parse-headings`: Parse Markdown and reStructuredText docstring headings (default: `true`)
 - `docstring-parse-doctests`: Parse and protect doctest regions in docstrings (default: `true`)

@@ -16,6 +16,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added `PDF000` to rewrite implicitly concatenated docstrings as equivalent simple triple-double-quoted literals.
   - Added `PDF001` to reflow safely mapped docstring summaries, paragraphs, section descriptions, Sphinx fields, list items, and block quotes.
   - Added `PDF002` to normalize safely mapped multi-line simple docstring indentation, including convention-aware Google and NumPy section indentation.
+  - Added `PDF003` and `PDF004` to normalize safely mapped docstring trailing whitespace and blank-line whitespace.
 
 - **CLI:**
   - Added Ruff-style subcommands with `pydocfmt check` for read-only checks and `pydocfmt check --fix` for formatting.
@@ -44,6 +45,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added `legacy` for formatter configuration, defaulting to `false`.
   - Added Ruff-style `line-ending` configuration with `"auto"`, `"lf"`, `"cr-lf"`, and `"native"` values.
   - Added `indent-style` and `indent-width` for generated docstring section indentation, with Ruff-style defaults of `"space"` and `4`.
+  - Added `docstring-blank-line-style` with `"blank"` and `"aligned"` modes for PDF004 blank-line whitespace normalization.
   - Added Ruff-style rule settings under `[tool.pydocfmt]`: `select`, `ignore`, `extend-select`, `per-file-ignores`, `extend-per-file-ignores`, `fixable`, `unfixable`, and `extend-fixable`.
   - Added `respect-gitignore` for formatter configuration, defaulting to `true`.
   - Added explicit config-file support for `--config PATH`, including pyproject-style `[tool.pydocfmt]` files and dedicated top-level pydocfmt TOML files.
@@ -64,6 +66,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added a pytest pre-commit hook that runs the test suite before commits.
   - Added pytest coverage that checks the pydocformatter rule tables in `docs/formatting_rules.md` against actual rule metadata.
   - Added pytest coverage that executes structured examples from built-in rule Markdown documentation.
+  - Added validation that structured rule Markdown examples use `[output=unchanged]` when the documented output is identical to the input.
   - Added regression coverage for Ruff-compatible file-selection and per-file-ignore pattern-base behavior.
   - Vastly expanded PCF rule tests across comment classification, run boundaries, structure preservation, code detection, width handling, line endings, mixed formatting, syntax-position safety, convergence, idempotence, and rule independence.
   - Vastly expanded PDF category preparation tests across docstring collection, source metadata, semantic sections and entries, protected structures, reflow regions, malformed inputs, and mixed edge cases.
@@ -86,6 +89,8 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 - **Docstring formatting:**
   - Fixed PDF002 to leave first-line Google and NumPy sections unchanged instead of partially reindenting their entries or adornments away from the section header.
   - Fixed PDF002 to preserve the canonical margin for under-indented same-line closing quotes.
+  - Fixed PDF003 and PDF004 to treat only spaces and tabs as removable docstring line whitespace, preserving other evaluated whitespace characters.
+  - Fixed PDF004 to leave empty docstrings unchanged instead of inserting indentation before the closing quotes.
   - Fixed PDF001 source mapping for reflow regions whose text also appears earlier on the same raw docstring line.
   - Removed dead string-literal escape handling and tightened edge-case wrapping for source-aware docstring text.
 

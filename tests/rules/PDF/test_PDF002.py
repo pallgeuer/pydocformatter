@@ -104,6 +104,13 @@ def test_blank_line_normalization_accepts_empty_and_canonical_states() -> None:
     assert result.new_source == 'def function():\n    """Summary.\n\n    \n\n    Done.\n    """\n'
 
 
+def test_non_space_tab_whitespace_lines_are_not_blank_indentation_lines() -> None:
+    source = 'def function():\n    """Summary.\n\xa0\n\x0c\n      Done.\n    """\n'
+    result = format_pdf002(source)
+
+    assert result.new_source == 'def function():\n    """Summary.\n\xa0\n\x0c\n    Done.\n    """\n'
+
+
 def test_google_sections_use_canonical_header_entry_and_continuation_indentation() -> None:
     source = 'def function(value):\n    """Summary.\n\n      Args:\n          value: Description.\n              Continued description.\n    """\n'
     result = format_pdf002(source, settings=CheckSettings(select=("PDF002",), docstring_convention=DocstringConvention.GOOGLE))
