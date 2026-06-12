@@ -698,6 +698,86 @@ class TestSettings(unittest.TestCase):
         self.assertEqual(config.fixable, ("ALL",))
         self.assertEqual(config.per_file_ignores, (("tests/*.py", ("PCF001",)),))
 
+    def test_nested_docstring_table_settings_are_loaded_from_pyproject(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "pyproject.toml").write_text(
+                '[tool.pydocfmt.docstring]\nconvention = "google"\nblank-line-style = "aligned"\nparse-tables = false\n',
+                encoding="utf-8",
+            )
+            previous_cwd = os.getcwd()
+            os.chdir(root)
+            try:
+                config = pydocformatter_settings.SETTINGS_SCHEMA.load()
+            finally:
+                os.chdir(previous_cwd)
+
+        self.assertEqual(config.docstring_convention, pydocformatter_settings.DocstringConvention.GOOGLE)
+        self.assertEqual(config.docstring_blank_line_style, pydocformatter_settings.DocstringBlankLineStyle.ALIGNED)
+        self.assertFalse(config.docstring_parse_tables)
+
+    def test_nested_comment_table_settings_are_loaded_from_dedicated_config_file(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            config_path = root / "pydocfmt.toml"
+            config_path.write_text(
+                "[comment]\njoin-standalone-lines = true\npreserve-tables = false\ndetect-expressions = true\n",
+                encoding="utf-8",
+            )
+
+            config = pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(config_options=(str(config_path),)))
+
+        self.assertTrue(config.comment_join_standalone_lines)
+        self.assertFalse(config.comment_preserve_tables)
+        self.assertTrue(config.comment_detect_expressions)
+
+    def test_nested_setting_tables_are_loaded_from_inline_config_options(self) -> None:
+        config = pydocformatter_settings.SETTINGS_SCHEMA.load(
+            global_values=pydocformatter_global_args.GlobalArgs(
+                config_options=('docstring.convention = "numpy"\ncomment.detect-code = true',),
+                isolated=True,
+            )
+        )
+
+        self.assertEqual(config.docstring_convention, pydocformatter_settings.DocstringConvention.NUMPY)
+        self.assertTrue(config.comment_detect_code)
+
+    def test_nested_setting_table_rejects_duplicate_flat_key(self) -> None:
+        with self.assertRaisesRegex(SettingsError, "sets docstring-convention more than once"):
+            pydocformatter_settings.SETTINGS_SCHEMA.load(
+                global_values=pydocformatter_global_args.GlobalArgs(
+                    config_options=('docstring-convention = "google"\n[docstring]\nconvention = "numpy"',),
+                    isolated=True,
+                )
+            )
+
+    def test_nested_setting_table_rejects_unknown_flattened_key(self) -> None:
+        with self.assertRaisesRegex(SettingsError, "docstring-unknown"):
+            pydocformatter_settings.SETTINGS_SCHEMA.load(
+                global_values=pydocformatter_global_args.GlobalArgs(
+                    config_options=("[docstring]\nunknown = true",),
+                    isolated=True,
+                )
+            )
+
+    def test_nested_setting_table_rejects_deeper_tables(self) -> None:
+        with self.assertRaisesRegex(SettingsError, "docstring-parse must not be a table"):
+            pydocformatter_settings.SETTINGS_SCHEMA.load(
+                global_values=pydocformatter_global_args.GlobalArgs(
+                    config_options=("[docstring.parse]\ntables = false",),
+                    isolated=True,
+                )
+            )
+
+    def test_unrelated_nested_setting_table_is_rejected(self) -> None:
+        with self.assertRaisesRegex(SettingsError, "formatting"):
+            pydocformatter_settings.SETTINGS_SCHEMA.load(
+                global_values=pydocformatter_global_args.GlobalArgs(
+                    config_options=("[formatting]\nline-length = 99",),
+                    isolated=True,
+                )
+            )
+
     def test_inline_per_file_rule_settings_are_applied(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)

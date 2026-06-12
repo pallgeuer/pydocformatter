@@ -27,7 +27,7 @@
 
 ### File Selection and Configuration
 - **Ruff-style file selection:** Supports glob-based include/exclude rules, default excludes, `force-exclude`, and `.gitignore`-aware discovery
-- **Single config table:** Reads `[tool.pydocfmt]` from auto-discovered `pyproject.toml` files
+- **Ruff-style configuration:** Reads `[tool.pydocfmt]` and its docstring/comment subtables from auto-discovered `pyproject.toml` files
 - **File-selection preview:** Reports included and ignored files, including excluded directories and gitignored paths
 - **Line-aware check diagnostics:** Reports affected files with line numbers and compressed line ranges in check mode
 
@@ -217,28 +217,6 @@ line-length = 88
 line-ending = "auto"
 indent-style = "space"
 indent-width = 4
-docstring-convention = "none"
-docstring-blank-line-style = "blank"
-docstring-parse-list-items = true
-docstring-parse-headings = true
-docstring-parse-doctests = true
-docstring-parse-code-fences = true
-docstring-parse-block-quotes = true
-docstring-parse-tables = true
-docstring-parse-directives = true
-docstring-parse-literal-blocks = true
-docstring-parse-sphinx-fields = true
-comment-join-standalone-lines = false
-comment-format-list-items = true
-comment-preserve-headings = true
-comment-preserve-doctests = true
-comment-preserve-code-fences = true
-comment-format-block-quotes = true
-comment-preserve-tables = true
-comment-preserve-directives = true
-comment-detect-code = false
-comment-detect-statements = true
-comment-detect-expressions = false
 select = ["ALL"]
 ignore = []
 extend-select = []
@@ -253,7 +231,35 @@ exclude = [".venv", "dist"]
 extend-exclude = ["generated"]
 respect-gitignore = true
 force-exclude = false
+
+[tool.pydocfmt.docstring]
+convention = "none"
+blank-line-style = "blank"
+parse-list-items = true
+parse-headings = true
+parse-doctests = true
+parse-code-fences = true
+parse-block-quotes = true
+parse-tables = true
+parse-directives = true
+parse-literal-blocks = true
+parse-sphinx-fields = true
+
+[tool.pydocfmt.comment]
+join-standalone-lines = false
+format-list-items = true
+preserve-headings = true
+preserve-doctests = true
+preserve-code-fences = true
+format-block-quotes = true
+preserve-tables = true
+preserve-directives = true
+detect-code = false
+detect-statements = true
+detect-expressions = false
 ```
+
+For TOML configuration, `[tool.pydocfmt.docstring]` and `[tool.pydocfmt.comment]` are the intended way to specify docstring and comment settings. The flat hyphenated forms, such as `docstring-convention = "google"` and `comment-preserve-tables = false`, also work for compatibility, but do not specify both forms for the same setting in one configuration. CLI flags, `pydocfmt config`, and resolved settings output continue to use the flat hyphenated names.
 
 **Configuration Options:**
 - `output-format`: Output format for rule findings; currently only `"grouped"` is supported (default: `"grouped"`)

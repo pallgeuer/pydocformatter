@@ -834,6 +834,7 @@ def _apply_toml_section_profile(
     schema: SettingsSchema[SettingsT], profile: SettingsProfile[SettingsT], *, section: dict[str, Any], context: str, source_base: str, source_priority: int
 ) -> SettingsProfile[SettingsT]:
     """Apply one TOML configuration section to a settings profile."""
+    section = _flatten_prefixed_toml_setting_tables(section, prefixes=("docstring", "comment"), context=context)
     schema_toml_keys = set(definition.key for definition in schema.definitions if definition.available_in_toml)
     unknown_keys = [key for key in section if key not in schema_toml_keys]
     if unknown_keys:
@@ -843,6 +844,25 @@ def _apply_toml_section_profile(
 
     values = {definition.field: section[definition.key] for definition in schema.definitions if definition.available_in_toml and definition.key in section}
     return _apply_field_values_profile(schema, profile, values=values, context=context, key_based=True, source_base=source_base, source_priority=source_priority)
+
+
+def _flatten_prefixed_toml_setting_tables(section: dict[str, Any], *, prefixes: tuple[str, ...], context: str) -> dict[str, Any]:
+    """Return a TOML section with supported one-level prefix tables flattened."""
+    flattened = dict(section)
+    for prefix in prefixes:
+        if prefix not in flattened:
+            continue
+        table = flattened.pop(prefix)
+        if not isinstance(table, dict):
+            raise SettingsError(f"{context}.{prefix} must be a table")
+        for key, value in table.items():
+            flat_key = f"{prefix}-{key}"
+            if isinstance(value, dict):
+                raise SettingsError(f"{context}.{flat_key} must not be a table")
+            if flat_key in flattened:
+                raise SettingsError(f"{context} sets {flat_key} more than once")
+            flattened[flat_key] = value
+    return flattened
 
 
 def _validated_field_updates(schema: SettingsSchema[SettingsT], *, values: Mapping[str, Any], context: str, key_based: bool) -> dict[str, Any]:

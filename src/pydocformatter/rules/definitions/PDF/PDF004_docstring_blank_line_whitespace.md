@@ -81,8 +81,8 @@ For simple-suite docstrings, aligned blank lines use one configured indent unit 
 
 ```pydocfmt-example
 [settings]
-docstring-blank-line-style = "aligned"
 indent-width = 2
+docstring-blank-line-style = "aligned"
 
 [input]
 def area(radius: float) -> float: """Return the area.

@@ -277,9 +277,9 @@ Generated convention indentation can use tabs while preserving the source line's
 
 ```pydocfmt-example
 [settings]
-docstring-convention = "google"
 indent-style = "tab"
 indent-width = 2
+docstring-convention = "google"
 
 [input]
 class Example:
