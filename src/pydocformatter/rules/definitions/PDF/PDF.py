@@ -511,6 +511,7 @@ class _DocstringParser:
                 block_end = index + 1
                 while block_end < end and (not self.lines[block_end].text.strip() or self.lines[block_end].text[:1].isspace()):
                     block_end += 1
+                block_end = self._trim_trailing_blank_lines(index, block_end)
                 blocks.append(DocstringBlock(DocstringBlockKind.VERBATIM, index, block_end))
                 index = block_end
                 self.summary_pending = False
@@ -862,6 +863,12 @@ class _DocstringParser:
             if text.strip() and indent <= base_indent:
                 break
             index += 1
+        return self._trim_trailing_blank_lines(start, index)
+
+    def _trim_trailing_blank_lines(self, start: int, end: int) -> int:
+        index = end
+        while index > start + 1 and not self.lines[index - 1].text.strip():
+            index -= 1
         return index
 
     def _entry_end(self, start: int, end: int, base_indent: int) -> int:

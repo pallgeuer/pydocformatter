@@ -197,28 +197,28 @@ def test_tab_crossing_docstring_margin_preserves_residual_indentation() -> None:
     source = 'def function():\n    """Summary::\n\tIndented literal.\n    """\n'
     structure = PDF.prepare(category_context(source)).docstrings[0].structure
     assert tuple(line.text for line in structure.lines) == ("Summary::", "    Indented literal.", "")
-    assert tuple((block.kind, block.start_line, block.end_line) for block in structure.blocks) == ((DocstringBlockKind.LITERAL_BLOCK, 0, 3),)
+    assert tuple((block.kind, block.start_line, block.end_line) for block in structure.blocks) == ((DocstringBlockKind.LITERAL_BLOCK, 0, 2), (DocstringBlockKind.BLANK, 2, 3))
 
 
 def test_simple_suite_docstring_uses_suite_indentation_instead_of_literal_column() -> None:
     source = 'def function(): """Summary::\n        Indented literal.\n    """\n'
     structure = PDF.prepare(category_context(source)).docstrings[0].structure
     assert tuple(line.text for line in structure.lines) == ("Summary::", "    Indented literal.", "")
-    assert tuple((block.kind, block.start_line, block.end_line) for block in structure.blocks) == ((DocstringBlockKind.LITERAL_BLOCK, 0, 3),)
+    assert tuple((block.kind, block.start_line, block.end_line) for block in structure.blocks) == ((DocstringBlockKind.LITERAL_BLOCK, 0, 2), (DocstringBlockKind.BLANK, 2, 3))
 
 
 def test_nested_simple_suite_docstring_includes_enclosing_indentation() -> None:
     source = 'class Outer:\n    def method(self): """Summary::\n            Indented literal.\n        """\n'
     structure = PDF.prepare(category_context(source)).docstrings[0].structure
     assert tuple(line.text for line in structure.lines) == ("Summary::", "    Indented literal.", "")
-    assert tuple((block.kind, block.start_line, block.end_line) for block in structure.blocks) == ((DocstringBlockKind.LITERAL_BLOCK, 0, 3),)
+    assert tuple((block.kind, block.start_line, block.end_line) for block in structure.blocks) == ((DocstringBlockKind.LITERAL_BLOCK, 0, 2), (DocstringBlockKind.BLANK, 2, 3))
 
 
 def test_simple_suite_docstring_uses_configured_indentation_width() -> None:
     source = 'def function(): """Summary::\n    Indented literal.\n  """\n'
     structure = PDF.prepare(category_context(source, settings=CheckSettings(indent_width=2))).docstrings[0].structure
     assert tuple(line.text for line in structure.lines) == ("Summary::", "  Indented literal.", "")
-    assert tuple((block.kind, block.start_line, block.end_line) for block in structure.blocks) == ((DocstringBlockKind.LITERAL_BLOCK, 0, 3),)
+    assert tuple((block.kind, block.start_line, block.end_line) for block in structure.blocks) == ((DocstringBlockKind.LITERAL_BLOCK, 0, 2), (DocstringBlockKind.BLANK, 2, 3))
 
 
 def test_mixed_evaluated_newline_sequences_have_exact_offsets() -> None:
@@ -281,6 +281,18 @@ def test_summary_paragraph_blank_and_verbatim_blocks_preserve_ranges() -> None:
     assert tuple((region.kind, reflow_texts(region.lines), region.start_offset, region.end_offset) for region in structure.reflow_regions) == (
         (DocstringBlockKind.SUMMARY, ("Summary first", "summary second"), 0, 28),
         (DocstringBlockKind.PARAGRAPH, ("Paragraph first", "paragraph second"), 30, 62),
+    )
+
+
+def test_verbatim_blocks_exclude_trailing_blank_lines() -> None:
+    structure = structure_for("Summary.\n\n    indented\n    verbatim\n\n\nBody.")
+
+    assert tuple((block.kind, block.start_line, block.end_line) for block in structure.blocks) == (
+        (DocstringBlockKind.SUMMARY, 0, 1),
+        (DocstringBlockKind.BLANK, 1, 2),
+        (DocstringBlockKind.VERBATIM, 2, 4),
+        (DocstringBlockKind.BLANK, 4, 6),
+        (DocstringBlockKind.PARAGRAPH, 6, 7),
     )
 
 
@@ -808,8 +820,10 @@ def test_directives_literal_blocks_and_tables_are_opaque_to_section_entry_parsin
     assert structure.entries == ()
     assert tuple((child.kind, child.start_line, child.end_line) for child in structure.blocks[0].children) == (
         (DocstringBlockKind.SECTION_HEADER, 0, 1),
-        (DocstringBlockKind.DIRECTIVE, 1, 4),
-        (DocstringBlockKind.LITERAL_BLOCK, 4, 8),
+        (DocstringBlockKind.DIRECTIVE, 1, 3),
+        (DocstringBlockKind.BLANK, 3, 4),
+        (DocstringBlockKind.LITERAL_BLOCK, 4, 7),
+        (DocstringBlockKind.BLANK, 7, 8),
         (DocstringBlockKind.TABLE, 8, 11),
     )
 

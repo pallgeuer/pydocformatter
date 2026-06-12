@@ -18,6 +18,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added `PDF002` to normalize safely mapped multi-line simple docstring indentation, including convention-aware Google and NumPy section indentation.
   - Added `PDF003` and `PDF004` to normalize safely mapped docstring trailing whitespace and blank-line whitespace.
   - Added `PDF005` and `PDF006` to normalize quote-adjacent whitespace around safely mapped simple docstring content.
+  - Added `PDF100` to collapse excess blank lines around docstring chunks and collapse blank-only docstrings to empty docstrings.
 
 - **CLI:**
   - Added Ruff-style subcommands with `pydocfmt check` for read-only checks and `pydocfmt check --fix` for formatting.
@@ -85,6 +86,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 - **Docstring formatting:**
   - Changed `PDF000` to normalize safe `\n` and `\t` whitespace escape spellings in docstrings, including non-concatenated docstrings, without changing evaluated docstring values.
   - Changed PDF001 Google-style entry wrapping to use fixed continuation indentation and to place descriptions on the following line when long entry prefixes leave too little room.
+  - Changed directive and literal-block parsing so trailing blank lines are represented as ordinary docstring blank-line blocks instead of part of the protected body.
   - Centralized docstring string-literal rendering for `PDF000` and `PDF001`, preserving reusable escape spellings and literal non-ASCII characters while reporting unsafe rewrites as non-fixable findings.
 
 ### Fixed
