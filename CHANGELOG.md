@@ -17,6 +17,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added `PDF001` to reflow safely mapped docstring summaries, paragraphs, section descriptions, Sphinx fields, list items, and block quotes.
   - Added `PDF002` to normalize safely mapped multi-line simple docstring indentation, including convention-aware Google and NumPy section indentation.
   - Added `PDF003` and `PDF004` to normalize safely mapped docstring trailing whitespace and blank-line whitespace.
+  - Added `PDF005` and `PDF006` to normalize quote-adjacent whitespace around safely mapped simple docstring content.
 
 - **CLI:**
   - Added Ruff-style subcommands with `pydocfmt check` for read-only checks and `pydocfmt check --fix` for formatting.
@@ -57,6 +58,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added a rule-selection specification at `docs/rule_selection_spec.md`, covering rule collection, selectors, fixability, and rule explanation output.
   - Added adjacent Markdown documentation for all built-in pydocformatter rules, including Ruff compatibility notes where relevant.
   - Expanded the PDF001 documentation with explicit behavior notes, setting interactions, safety limits, and verified qualitative examples.
+  - Expanded the PDF005 and PDF006 documentation with explicit behavior boundaries, safety notes, and verified qualitative examples.
   - Added a reusable rule documentation Markdown template at `src/pydocformatter/rules/templates/rule_template.md`.
   - Added adjacent documentation for each rule category and a reusable rule category documentation template.
   - Added docstrings for public glob matching methods, the dependency-pin check tool, and important configuration, CLI, and file-selection helpers.
