@@ -8,9 +8,9 @@ from pydocformatter.rules.models import FixAvailability, RuleMetadata
 
 
 @rule_registration.register_rule_to(PDF)
-class PDF107DocstringShouldBeOneLine(RuleBase):
+class PDF106DocstringShouldBeOneLine(RuleBase):
     meta = RuleMetadata(
-        code=RuleCode("PDF107"),
+        code=RuleCode("PDF106"),
         name="docstring-should-be-one-line",
         message="Docstring with one content line should be one line",
         fix_availability=FixAvailability.ALWAYS,

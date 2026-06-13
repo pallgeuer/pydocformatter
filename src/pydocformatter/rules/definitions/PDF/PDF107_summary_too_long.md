@@ -1,4 +1,4 @@
-# summary-too-long (PDF106)
+# summary-too-long (PDF107)
 
 Fix is not available.
 
@@ -26,11 +26,7 @@ def area(radius: float) -> float:
     """
 ```
 
-Applying this rule produces:
-```python
-def area(radius: float) -> float:
-    """Return the area for a circle after validating the radius."""
-```
+Applying this rule causes a finding.
 
 ## Options
 - `line-length`

@@ -1,9 +1,10 @@
-# docstring-should-be-one-line (PDF107)
+# docstring-should-be-one-line (PDF106)
 
 Fix is always available.
 
 ## What it does
-Checks for docstrings with one content line that can fit on a single physical line including the triple quotes.
+Checks for docstrings with one content line that can fit on a single physical line including both triple quotes.
+<!-- TODO: Ensure this rule cannot enter a loop with other rules when the content fits without triple quotes but not with triple quotes, including quote-edge spacing cases. -->
 
 ## Why is this useful?
 Single-line docstrings are easier to scan when their complete content fits comfortably on one line.

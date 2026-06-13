@@ -40,40 +40,49 @@ def test_removes_closing_whitespace_from_one_line_and_multiline_docstrings() -> 
     assert not format_pdf006(result.new_source).modified
 
 
-def test_reduces_unsafe_trailing_whitespace_to_one_space() -> None:
+def test_escapes_quote_collision_before_closing_quotes() -> None:
     source = 'def quote_one():\n    """Summary "  """\n\ndef quote_two():\n    """Summary ""  """\n\ndef backslash():\n    r"""Path \\  """\n'
     result = format_pdf006(source)
 
-    assert result.new_source == 'def quote_one():\n    """Summary " """\n\ndef quote_two():\n    """Summary "" """\n\ndef backslash():\n    r"""Path \\ """\n'
+    assert result.new_source == 'def quote_one():\n    """Summary \\""""\n\ndef quote_two():\n    """Summary \\"\\""""\n\ndef backslash():\n    r"""Path \\ """\n'
     assert result.fixed_findings[PDF006ClosingQuotesWhitespace.meta] == 3
     assert not format_pdf006(result.new_source).modified
 
 
-def test_required_single_separator_is_unchanged() -> None:
+def test_single_separator_quote_collision_is_escaped_when_possible() -> None:
     source = 'def quote_one():\n    """Summary " """\n\ndef quote_two():\n    """Summary "" """\n\ndef backslash():\n    r"""Path \\ """\n'
     result = format_pdf006(source)
 
-    assert result.new_source == source
-    assert not result.fixed_findings
+    assert result.new_source == 'def quote_one():\n    """Summary \\""""\n\ndef quote_two():\n    """Summary \\"\\""""\n\ndef backslash():\n    r"""Path \\ """\n'
+    assert result.fixed_findings[PDF006ClosingQuotesWhitespace.meta] == 2
     assert not result.unfixed_findings
 
 
-def test_single_quote_delimiter_fallbacks_and_escaped_backslash_trim() -> None:
+def test_single_quote_delimiter_escapes_and_escaped_backslash_trim() -> None:
     source = "def quote_one():\n    '''Summary '  '''\n\ndef quote_two():\n    '''Summary ''  '''\n\ndef backslash():\n    \"\"\"Path \\\\  \"\"\"\n"
     result = format_pdf006(source)
 
-    assert result.new_source == "def quote_one():\n    '''Summary ' '''\n\ndef quote_two():\n    '''Summary '' '''\n\ndef backslash():\n    \"\"\"Path \\\\\"\"\"\n"
+    assert result.new_source == "def quote_one():\n    '''Summary \\''''\n\ndef quote_two():\n    '''Summary \\'\\''''\n\ndef backslash():\n    \"\"\"Path \\\\\"\"\"\n"
     assert result.fixed_findings[PDF006ClosingQuotesWhitespace.meta] == 3
     assert not result.errors
     assert not format_pdf006(result.new_source).modified
 
 
-def test_single_quote_required_single_separator_is_unchanged() -> None:
+def test_single_quote_single_separator_is_escaped_when_possible() -> None:
     source = "def quote_one():\n    '''Summary ' '''\n\ndef quote_two():\n    '''Summary '' '''\n"
     result = format_pdf006(source)
 
-    assert result.new_source == source
-    assert not result.fixed_findings
+    assert result.new_source == "def quote_one():\n    '''Summary \\''''\n\ndef quote_two():\n    '''Summary \\'\\''''\n"
+    assert result.fixed_findings[PDF006ClosingQuotesWhitespace.meta] == 2
+    assert not result.unfixed_findings
+
+
+def test_single_character_quote_delimiter_with_escaped_quote_trims_safely() -> None:
+    source = "def function():\n    'Summary \\'  '\n"
+    result = format_pdf006(source)
+
+    assert result.new_source == "def function():\n    'Summary \\''\n"
+    assert result.fixed_findings[PDF006ClosingQuotesWhitespace.meta] == 1
     assert not result.unfixed_findings
 
 

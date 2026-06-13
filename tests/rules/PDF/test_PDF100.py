@@ -45,6 +45,14 @@ def test_collapses_leading_internal_and_trailing_extra_blank_lines() -> None:
     assert PDF100TooManyBlankLines.check(fixed_context) == ()
 
 
+def test_preserves_first_line_content_whitespace_when_collapsing_later_blank_lines() -> None:
+    source = 'def function():\n    """  Summary with leading spaces.\n\n\n    Body.\n    """\n'
+    result = format_pdf100(source)
+
+    assert result.new_source == 'def function():\n    """  Summary with leading spaces.\n\n    Body.\n    """\n'
+    assert result.fixed_findings[PDF100TooManyBlankLines.meta] == 1
+
+
 def test_does_not_insert_missing_blank_lines_or_change_single_blank_lines() -> None:
     source = 'def missing():\n    """Summary.\n    Body.\n    """\n\ndef single():\n    """Summary.\n\n    Body.\n    """\n'
     result = format_pdf100(source)

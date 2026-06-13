@@ -5,7 +5,7 @@ Fix is always available.
 ## What it does
 Checks for spaces and tabs between content and same-line closing quotes on the final evaluated docstring line. The fix normally removes that whitespace while leaving the content, quote style, string prefix, remaining source spelling, and line endings otherwise unchanged.
 
-If removing all quote-adjacent whitespace would produce invalid Python, or would make the literal parse as something other than the intended single simple string, PDF006 keeps exactly one ASCII space before the closing quotes instead. This separator is needed when the final content would otherwise collide with the closing delimiter, such as content ending in an unescaped delimiter quote or an odd run of backslashes.
+If removing all quote-adjacent whitespace would collide with the closing delimiter, PDF006 first tries to escape delimiter quote characters while preserving the evaluated docstring value. If no value-preserving spelling is available while keeping the original prefix and delimiter, PDF006 keeps exactly one ASCII space before the closing quotes instead, such as for raw strings ending in an odd run of backslashes.
 
 PDF006 only looks at the final evaluated docstring line, and only when the closing quotes are on that same evaluated line. It does not change spaces or tabs after opening quotes, and it does not change trailing whitespace on non-final evaluated lines.
 
@@ -64,7 +64,7 @@ def area(radius: float) -> float:
     """  Return the area."""
 ```
 
-If removing all whitespace would collide with the closing delimiter, PDF006 keeps one separator space. This can happen for content ending in one or two delimiter quote characters, or for raw strings ending in an odd run of backslashes:
+If removing all whitespace would collide with the closing delimiter, PDF006 escapes delimiter quote characters when that preserves the evaluated value. Raw strings ending in an odd run of backslashes still keep one separator space:
 
 ```pydocfmt-example
 [input]
@@ -79,16 +79,16 @@ def path_hint() -> str:
 
 [output]
 def quote_one() -> str:
-    """Return " """
+    """Return \""""
 
 def quote_two() -> str:
-    """Return "" """
+    """Return \"\""""
 
 def path_hint() -> str:
     r"""Return C:\temp\ """
 ```
 
-An already-required single separator space is unchanged:
+An existing single separator for a delimiter quote collision is also removed by escaping when possible, while the raw backslash fallback remains unchanged:
 
 ```pydocfmt-example
 [input]
@@ -101,7 +101,15 @@ def quote_two() -> str:
 def path_hint() -> str:
     r"""Return C:\temp\ """
 
-[output=unchanged]
+[output]
+def quote_one() -> str:
+    """Return \""""
+
+def quote_two() -> str:
+    """Return \"\""""
+
+def path_hint() -> str:
+    r"""Return C:\temp\ """
 ```
 
 Trailing whitespace before an evaluated newline is left for PDF003:
@@ -170,7 +178,7 @@ def path_hint() -> str:
     r'''Return C:\temp.'''
 ```
 
-Triple-single-quoted docstrings use the same separator fallback when content ends in single delimiter quote characters:
+Triple-single-quoted docstrings use the same escaping behavior when content ends in single delimiter quote characters:
 
 ```pydocfmt-example
 [input]
@@ -182,10 +190,10 @@ def quote_two() -> str:
 
 [output]
 def quote_one() -> str:
-    '''Return ' '''
+    '''Return \''''
 
 def quote_two() -> str:
-    '''Return '' '''
+    '''Return \'\''''
 ```
 
 Concatenated docstrings and docstrings with escaped newlines are skipped because the exact source line ownership is ambiguous for this rule:

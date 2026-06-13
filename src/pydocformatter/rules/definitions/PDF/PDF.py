@@ -147,6 +147,23 @@ class FinalConventionSectionSpacing:
 
 
 @dataclasses.dataclass(frozen=True)
+class DocstringOutputLine:
+    """One output logical docstring line for whole-literal rendering."""
+
+    original: DocstringValueLine | None = None
+    source: str | None = None
+    value: str | None = None
+    strip_docstring_margin: bool = False
+
+
+class DocstringOutputSeparatorFallback(enum.Enum):
+    """Separator fallback direction for whole-literal rendering."""
+
+    OPENING = "opening"
+    CLOSING = "closing"
+
+
+@dataclasses.dataclass(frozen=True)
 class DocstringStructure:
     """Convention-aware semantic structure prepared for one docstring."""
 
@@ -1104,7 +1121,7 @@ def has_space_tab_content(text: str) -> bool:
 
 def is_same_line_closing_delimiter_prefix(docstring: DocstringInfo, line: DocstringValueLine) -> bool:
     """Return whether a value line prefixes same-line closing quotes."""
-    return line.index == len(docstring.structure.lines) - 1 and docstring.value != "" and not docstring.value.endswith(("\r\n", "\r", "\n"))
+    return line.index == len(docstring.structure.lines) - 1 and docstring.value != "" and not docstring_value_ends_with_newline(docstring)
 
 
 def is_safely_mapped_simple_docstring(docstring: DocstringInfo, *, require_multiline: bool = False) -> bool:
@@ -1112,7 +1129,7 @@ def is_safely_mapped_simple_docstring(docstring: DocstringInfo, *, require_multi
     return (
         docstring.kind is DocstringKind.SIMPLE
         and isinstance(docstring.node, cst.SimpleString)
-        and (not require_multiline or len(docstring.structure.lines) > 1)
+        and (not require_multiline or len(docstring.physical_lines) > 1)
         and all(line.source_line_number is not None for line in docstring.structure.lines)
     )
 
@@ -1194,6 +1211,177 @@ def planned_simple_docstring_source_change(
         edit=rule_edits.SourceEdit(range=docstring.range, replacement=rendered),
         line_numbers=tuple(line_number for replacement in replacements for line_number in replacement.line_numbers),
     )
+
+
+def planned_simple_docstring_output_change(
+    docstring: DocstringInfo,
+    *,
+    context: RuleContext,
+    output_lines: tuple[DocstringOutputLine, ...],
+    line_numbers: tuple[int, ...],
+    preserve_trailing_newline: bool | None = None,
+    separator_fallback: DocstringOutputSeparatorFallback | None = None,
+) -> rule_edits.PlannedSourceChange | None:
+    """Return one whole-literal replacement from target output lines."""
+    if not isinstance(docstring.node, cst.SimpleString):
+        return None
+    fragments = docstring_value_fragments(docstring, line_ending=context.line_ending)
+    if fragments is None:
+        return None
+    keep_trailing_newline = docstring_value_ends_with_newline(docstring) if preserve_trailing_newline is None else preserve_trailing_newline
+    body_source = _output_body_source(output_lines, fragments=fragments, line_ending=context.line_ending, preserve_trailing_newline=keep_trailing_newline)
+    expected_value = _output_expected_value(output_lines, preserve_trailing_newline=keep_trailing_newline)
+    rendered = _render_output_with_separator_fallback(docstring, body_source=body_source, expected_value=expected_value, separator_fallback=separator_fallback)
+    if rendered is None or rendered == docstring.source:
+        return None
+    return rule_edits.PlannedSourceChange(
+        edit=rule_edits.SourceEdit(range=docstring.range, replacement=rendered),
+        line_numbers=line_numbers,
+    )
+
+
+def docstring_content_indexes(docstring: DocstringInfo) -> tuple[int, ...]:
+    """Return logical line indexes containing non-space-tab text."""
+    return tuple(line.index for line in docstring.structure.lines if line.text.strip(" \t"))
+
+
+def docstring_value_line_numbers(lines: tuple[DocstringValueLine, ...]) -> tuple[int, ...]:
+    """Return deduplicated source line numbers for changed logical lines."""
+    return tuple(dict.fromkeys(line.source_line_number for line in lines if line.source_line_number is not None))
+
+
+def docstring_value_ends_with_newline(docstring: DocstringInfo) -> bool:
+    """Return whether an evaluated docstring value ends with a newline."""
+    return docstring.value.endswith(("\r\n", "\r", "\n"))
+
+
+def _render_output_body_source(docstring: DocstringInfo, *, body_source: str, expected_value: str) -> str | None:
+    """Render output body source using the docstring's original literal spelling."""
+    if not isinstance(docstring.node, cst.SimpleString):
+        return None
+    return string_literals.render_simple_string_from_body_source(docstring.node.prefix, docstring.node.quote, body_source, expected_value=expected_value)
+
+
+def _render_output_with_separator_fallback(
+    docstring: DocstringInfo,
+    *,
+    body_source: str,
+    expected_value: str,
+    separator_fallback: DocstringOutputSeparatorFallback | None,
+) -> str | None:
+    """Render output source, applying separator fallback strategy when configured."""
+    if separator_fallback is DocstringOutputSeparatorFallback.OPENING:
+        return _opening_separator_rendered_output(docstring, body_source=body_source, expected_value=expected_value)
+    if separator_fallback is DocstringOutputSeparatorFallback.CLOSING:
+        return _closing_separator_rendered_output(docstring, body_source=body_source, expected_value=expected_value)
+    return _render_output_body_source(docstring, body_source=body_source, expected_value=expected_value)
+
+
+def _opening_separator_rendered_output(docstring: DocstringInfo, *, body_source: str, expected_value: str) -> str | None:
+    """Render output with opening quote separator precedence."""
+    rendered = _render_output_body_source(docstring, body_source=body_source, expected_value=expected_value)
+    if rendered is None:
+        fallback_body_source, fallback_expected_value = _separator_fallback_output(body_source, expected_value, separator_fallback=DocstringOutputSeparatorFallback.OPENING)
+        return _render_output_body_source(docstring, body_source=fallback_body_source, expected_value=fallback_expected_value)
+    return _opening_quote_separator_output(docstring, body_source=body_source, expected_value=expected_value) or rendered
+
+
+def _closing_separator_rendered_output(docstring: DocstringInfo, *, body_source: str, expected_value: str) -> str | None:
+    """Render output with closing quote separator precedence."""
+    rendered = _render_output_body_source(docstring, body_source=body_source, expected_value=expected_value)
+    if rendered is not None:
+        return rendered
+    rendered = _closing_quote_separator_output(docstring, body_source=body_source, expected_value=expected_value)
+    if rendered is not None:
+        return rendered
+    fallback_body_source, fallback_expected_value = _separator_fallback_output(body_source, expected_value, separator_fallback=DocstringOutputSeparatorFallback.CLOSING)
+    return _render_output_body_source(docstring, body_source=fallback_body_source, expected_value=fallback_expected_value)
+
+
+def _opening_quote_separator_output(docstring: DocstringInfo, *, body_source: str, expected_value: str) -> str | None:
+    """Render an escaped leading quote to keep opening delimiter and content distinct."""
+    if not isinstance(docstring.node, cst.SimpleString) or "r" in docstring.node.prefix.lower():
+        return None
+    quote_char = "'" if "'" in docstring.node.quote else '"'
+    if not body_source.startswith(quote_char):
+        return None
+    return _render_output_body_source(docstring, body_source=f"\\{body_source[0]}{body_source[1:]}", expected_value=expected_value)
+
+
+def escaped_closing_quote_body_source(node: cst.SimpleString, body_source: str) -> str | None:
+    """Return body source with trailing delimiter quotes escaped where possible."""
+    if "r" in node.prefix.lower():
+        return None
+    quote_char = "'" if "'" in node.quote else '"'
+    trailing_quotes = len(body_source) - len(body_source.rstrip(quote_char))
+    if trailing_quotes <= 0:
+        return None
+    escape_count = min(trailing_quotes, len(node.quote) - 1)
+    if escape_count <= 0:
+        return None
+    escaped_quotes = ("\\" + quote_char) * escape_count
+    return f"{body_source[:-escape_count]}{escaped_quotes}"
+
+
+def _closing_quote_separator_output(docstring: DocstringInfo, *, body_source: str, expected_value: str) -> str | None:
+    """Render escaped trailing quotes to keep closing delimiter and content distinct."""
+    if not isinstance(docstring.node, cst.SimpleString):
+        return None
+    escaped_body_source = escaped_closing_quote_body_source(docstring.node, body_source)
+    if escaped_body_source is None:
+        return None
+    return _render_output_body_source(docstring, body_source=escaped_body_source, expected_value=expected_value)
+
+
+def _separator_fallback_output(body_source: str, expected_value: str, *, separator_fallback: DocstringOutputSeparatorFallback) -> tuple[str, str]:
+    """Return a one-space separator fallback body and value."""
+    if separator_fallback is DocstringOutputSeparatorFallback.OPENING:
+        return f" {body_source}", f" {expected_value}"
+    if separator_fallback is DocstringOutputSeparatorFallback.CLOSING:
+        return f"{body_source} ", f"{expected_value} "
+    raise ValueError(f"Unsupported separator fallback: {separator_fallback!r}")
+
+
+def _output_body_source(
+    output_lines: tuple[DocstringOutputLine, ...],
+    *,
+    fragments: tuple[string_literals.StringValueFragment, ...],
+    line_ending: str,
+    preserve_trailing_newline: bool,
+) -> str:
+    """Return replacement literal body source from output lines."""
+    chunks: list[str] = []
+    for index, output_line in enumerate(output_lines):
+        if index:
+            chunks.append(line_ending)
+        if output_line.original is None:
+            if output_line.source is None:
+                raise ValueError("Synthesized output lines require source text")
+            chunks.append(output_line.source)
+        else:
+            chunks.append(docstring_line_source(output_line.original, fragments=fragments, strip_docstring_margin=output_line.strip_docstring_margin))
+    if preserve_trailing_newline:
+        chunks.append(line_ending)
+    return "".join(chunks)
+
+
+def _output_expected_value(output_lines: tuple[DocstringOutputLine, ...], *, preserve_trailing_newline: bool) -> str:
+    """Return replacement evaluated value from output lines."""
+    chunks: list[str] = []
+    for index, output_line in enumerate(output_lines):
+        if index:
+            chunks.append("\n")
+        if output_line.original is None:
+            if output_line.value is None:
+                raise ValueError("Synthesized output lines require evaluated text")
+            chunks.append(output_line.value)
+        elif output_line.strip_docstring_margin:
+            chunks.append(output_line.original.text)
+        else:
+            chunks.append(output_line.original.raw_text)
+    if preserve_trailing_newline:
+        chunks.append("\n")
+    return "".join(chunks)
 
 
 def join_docstring_value_lines(docstring: DocstringInfo, lines: list[str]) -> str:

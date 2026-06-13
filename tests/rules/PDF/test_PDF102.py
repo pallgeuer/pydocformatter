@@ -1,0 +1,169 @@
+import libcst as cst
+import libcst.metadata as cst_metadata
+
+import pydocformatter.formatter as formatter
+import pydocformatter.rules_selection as rules_selection
+from pydocformatter.cli.settings_check import CheckSettings, LineEnding
+from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
+from pydocformatter.rules.definitions.PDF.PDF import PDF
+from pydocformatter.rules.definitions.PDF.PDF102_multiline_opening_quotes_same_line import PDF102MultilineOpeningQuotesSameLine
+from pydocformatter.rules.definitions.PDF.PDF104_multiline_closing_quotes_same_line import PDF104MultilineClosingQuotesSameLine
+
+
+def contexts(source: str, *, settings: CheckSettings | None = None) -> tuple[RuleCategoryContext, RuleContext]:
+    """Return matching category and rule contexts for source."""
+    module = cst.parse_module(source)
+    wrapper = cst_metadata.MetadataWrapper(module, unsafe_skip_copy=True)
+    category = RuleCategoryContext(
+        path="example.py",
+        settings=CheckSettings(select=("PDF102",)) if settings is None else settings,
+        module=module,
+        metadata_wrapper=wrapper,
+        positions=wrapper.resolve(cst_metadata.PositionProvider),
+        line_ending="\r\n" if "\r\n" in source else "\n",
+    )
+    return category, RuleContext(**category.__dict__, category_data=PDF.prepare(category), effectively_fixable=True)
+
+
+def format_pdf102(source: str, *, settings: CheckSettings | None = None, fix: bool = True) -> formatter.FormatterResult:
+    """Format source with PDF102 selected."""
+    resolved_settings = CheckSettings(select=("PDF102",)) if settings is None else settings
+    return formatter.format_source(source, "example.py", settings=resolved_settings, rule_selection=rules_selection.select_rules(resolved_settings), fix=fix)
+
+
+def test_moves_first_content_line_onto_opening_quotes() -> None:
+    source = 'def function():\n    """\n\n    Summary.\n\n    Body.\n    """\n'
+    result = format_pdf102(source)
+
+    assert result.new_source == 'def function():\n    """Summary.\n\n    Body.\n    """\n'
+    assert result.fixed_findings[PDF102MultilineOpeningQuotesSameLine.meta] == 1
+    assert not format_pdf102(result.new_source).modified
+
+
+def test_removes_space_tab_only_lines_before_first_content() -> None:
+    source = 'def function():\n    """  \n\t\n    Summary.\n\n    Body.\n    """\n'
+    result = format_pdf102(source)
+
+    assert result.new_source == 'def function():\n    """Summary.\n\n    Body.\n    """\n'
+    assert result.fixed_findings[PDF102MultilineOpeningQuotesSameLine.meta] == 1
+    assert not format_pdf102(result.new_source).modified
+
+
+def test_non_space_tab_whitespace_is_content_when_choosing_first_line() -> None:
+    source = 'def function():\n    """\n    \xa0\n    Body.\n    """\n'
+    result = format_pdf102(source)
+
+    assert result.new_source == 'def function():\n    """\xa0\n    Body.\n    """\n'
+    assert result.fixed_findings[PDF102MultilineOpeningQuotesSameLine.meta] == 1
+    assert not format_pdf102(result.new_source).modified
+
+
+def test_preserves_raw_prefix_quote_delimiter_and_rewrites_nested_decorated_async_docstrings() -> None:
+    source = "def outer():\n    r'''\n    Path C:\\\\temp.\n\n    Body.\n    '''\n\n    @decorator\n    async def inner():\n        \"\"\"\n        Inner.\n\n        Body.\n        \"\"\"\n"
+    result = format_pdf102(source)
+
+    assert result.new_source == "def outer():\n    r'''Path C:\\\\temp.\n\n    Body.\n    '''\n\n    @decorator\n    async def inner():\n        \"\"\"Inner.\n\n        Body.\n        \"\"\"\n"
+    assert result.fixed_findings[PDF102MultilineOpeningQuotesSameLine.meta] == 2
+    assert not format_pdf102(result.new_source).modified
+
+
+def test_moves_single_content_line_onto_opening_quotes() -> None:
+    source = 'def function():\n    """\n    Summary.\n    """\n'
+    result = format_pdf102(source)
+
+    assert result.new_source == 'def function():\n    """Summary.\n    """\n'
+    assert result.fixed_findings[PDF102MultilineOpeningQuotesSameLine.meta] == 1
+    assert not format_pdf102(result.new_source).modified
+
+
+def test_escapes_leading_content_quote_when_moving_onto_opening_quotes() -> None:
+    source = 'def function():\n    """\n    "quoted start.\n    Body.\n    """\n'
+    result = format_pdf102(source)
+
+    assert result.new_source == 'def function():\n    """\\"quoted start.\n    Body.\n    """\n'
+    assert result.fixed_findings[PDF102MultilineOpeningQuotesSameLine.meta] == 1
+    assert not format_pdf102(result.new_source).modified
+
+
+def test_leaves_already_same_line_and_single_physical_line_docstrings() -> None:
+    source = 'def same():\n    """Summary.\n\n    Body.\n    """\n\ndef one_line():\n    """Summary."""\n'
+    result = format_pdf102(source)
+
+    assert result.new_source == source
+    assert not result.fixed_findings
+    assert not result.unfixed_findings
+
+
+def test_module_parenthesized_simple_suite_and_crlf_line_endings() -> None:
+    source = '"""\r\nModule.\r\n\r\nBody.\r\n"""\r\n\r\nclass Parenthesized:\r\n    ("""\r\n    Class.\r\n\r\n    Body.\r\n    """)\r\n\r\ndef simple(): """\r\n    Summary.\r\n\r\n    Body.\r\n    """; return None\r\n'
+    settings = CheckSettings(select=("PDF102",), line_ending=LineEnding.CR_LF)
+    result = format_pdf102(source, settings=settings)
+
+    assert (
+        result.new_source
+        == '"""Module.\r\n\r\nBody.\r\n"""\r\n\r\nclass Parenthesized:\r\n    ("""Class.\r\n\r\n    Body.\r\n    """)\r\n\r\ndef simple(): """Summary.\r\n\r\n    Body.\r\n    """; return None\r\n'
+    )
+    assert result.fixed_findings[PDF102MultilineOpeningQuotesSameLine.meta] == 3
+    assert not format_pdf102(result.new_source, settings=settings).modified
+
+
+def test_check_fix_line_numbers_and_fix_false_findings_agree() -> None:
+    source = 'def first():\n    """\n    Summary.\n\n    Body.\n    """\n\ndef second():\n    """\n\n    Other.\n\n    Body.\n    """\n'
+    _, context = contexts(source)
+    findings = PDF102MultilineOpeningQuotesSameLine.check(context)
+    fixed = PDF102MultilineOpeningQuotesSameLine.fix(context)
+    check_only = format_pdf102(source, fix=False)
+
+    assert tuple(finding.line_numbers for finding in findings) == ((2, 3), (9, 10, 11))
+    assert tuple(finding.line_numbers for finding in fixed.fixed_findings) == ((2, 3), (9, 10, 11))
+    assert tuple(finding.line_numbers for finding in check_only.unfixed_findings) == ((2, 3), (9, 10, 11))
+    _, fixed_context = contexts(fixed.module.code)
+    assert PDF102MultilineOpeningQuotesSameLine.check(fixed_context) == ()
+
+
+def test_skips_concatenated_escaped_and_non_docstring_strings() -> None:
+    source = 'def concatenated():\n    ("\\n"\n     "Summary.\\n"\n     "Body.")\n\ndef escaped():\n    """\\nSummary.\\nBody."""\n\ndef not_docstring():\n    value = 1\n    """\n    Summary.\n\n    Body.\n    """\n'
+    result = format_pdf102(source)
+
+    assert result.new_source == source
+    assert not result.fixed_findings
+    assert not result.unfixed_findings
+
+
+def test_skips_multiline_docstring_with_non_raw_escape_source_mapping() -> None:
+    source = 'def function():\n    """\n    Summary\\t.\n\n    Body.\n    """\n'
+    result = format_pdf102(source)
+
+    assert result.new_source == source
+    assert not result.fixed_findings
+    assert not result.unfixed_findings
+
+
+def test_pdf000_can_literalize_escaped_newline_before_pdf102_moves_content() -> None:
+    source = 'def function():\n    """\\nSummary.\\nBody."""\n'
+    settings = CheckSettings(select=("PDF000", "PDF102"))
+    result = formatter.format_source(source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
+
+    assert result.new_source == 'def function():\n    """Summary.\nBody."""\n'
+    assert result.fixed_findings[PDF102MultilineOpeningQuotesSameLine.meta] == 1
+
+
+def test_pdf102_and_pdf105_normalize_both_quote_placements_together() -> None:
+    source = 'def function():\n    """\n    Summary.\n\n    Body."""\n'
+    settings = CheckSettings(select=("PDF102", "PDF105"))
+    result = formatter.format_source(source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
+
+    assert result.new_source == 'def function():\n    """Summary.\n\n    Body.\n    """\n'
+    assert result.fixed_findings[PDF102MultilineOpeningQuotesSameLine.meta] == 1
+    assert not formatter.format_source(result.new_source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True).modified
+
+
+def test_pdf102_and_pdf104_can_collapse_single_content_line_multiline_docstring() -> None:
+    source = 'def function():\n    """\n    Summary.\n    """\n'
+    settings = CheckSettings(select=("PDF102", "PDF104"))
+    result = formatter.format_source(source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
+
+    assert result.new_source == 'def function():\n    """Summary."""\n'
+    assert result.fixed_findings[PDF102MultilineOpeningQuotesSameLine.meta] == 1
+    assert result.fixed_findings[PDF104MultilineClosingQuotesSameLine.meta] == 1
+    assert not formatter.format_source(result.new_source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True).modified

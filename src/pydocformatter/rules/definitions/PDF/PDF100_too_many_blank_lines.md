@@ -25,7 +25,7 @@ PDF100 only rewrites safely mapped simple docstring literals. It skips concatena
 Predictable blank-line spacing keeps summaries, descriptions, sections, and protected examples visually distinct without adding vertical noise.
 
 ## Ruff compatibility
-This rule is intended to replace the fixable extra-blank-line cases covered by Ruff's `D205`; `PDF106` handles summaries that still span multiple lines.
+This rule is intended to replace the fixable extra-blank-line cases covered by Ruff's `D205`; `PDF107` handles summaries that still span multiple lines.
 
 ## Examples
 Extra blank lines before the first chunk, between chunks, and after the last chunk are removed:

@@ -20,6 +20,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added `PDF005` and `PDF006` to normalize quote-adjacent whitespace around safely mapped simple docstring content.
   - Added `PDF100` to collapse excess blank lines around docstring chunks and collapse blank-only docstrings to empty docstrings.
   - Added `PDF101` to insert safe missing blank lines before recognized docstring structures and convention sections.
+  - Added `PDF102` through `PDF105` to normalize multi-line docstring opening and closing quote placement.
 
 - **CLI:**
   - Added Ruff-style subcommands with `pydocfmt check` for read-only checks and `pydocfmt check --fix` for formatting.
@@ -87,8 +88,11 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 
 - **Docstring formatting:**
   - Changed `PDF000` to normalize safe `\n` and `\t` whitespace escape spellings in docstrings, including non-concatenated docstrings, without changing evaluated docstring values.
+  - Changed `PDF102` through `PDF105` to also normalize single-content-line docstrings when the docstring literal itself spans multiple lines.
+  - Changed same-line quote placement for `PDF102` and `PDF104` to keep one separator space when needed for valid Python source.
   - Changed `PDF100` to remove blank lines after Google/NumPy section headers and between consecutive convention entries.
   - Renumbered the existing `PDF101` through `PDF106` rule stubs to `PDF102` through `PDF107`.
+  - Swapped `PDF106` and `PDF107` so `PDF106` is `docstring-should-be-one-line` and `PDF107` is `summary-too-long`.
   - Changed PDF001 Google-style entry wrapping to use fixed continuation indentation and to place descriptions on the following line when long entry prefixes leave too little room.
   - Changed directive and literal-block parsing so trailing blank lines are represented as ordinary docstring blank-line blocks instead of part of the protected body.
   - Centralized docstring string-literal rendering for `PDF000` and `PDF001`, preserving reusable escape spellings and literal non-ASCII characters while reporting unsafe rewrites as non-fixable findings.
@@ -96,6 +100,10 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 ### Fixed
 
 - **Docstring formatting:**
+  - Fixed PDF100, PDF101, PDF104, and PDF105 to preserve genuine leading spaces or tabs on first-line docstring content while rewriting surrounding docstring structure.
+  - Fixed PDF104 to move bare closing quotes after single-content-line docstrings whose literal spans multiple physical lines.
+  - Fixed PDF102 to keep a distinct, value-preserving source spelling when moving content that starts with the docstring delimiter quote character onto the opening quote line.
+  - Fixed PDF006 and PDF104 to escape delimiter-quote collisions before falling back to a value-changing separator space.
   - Fixed PDF101 to avoid inserting a trailing blank line after a header-only final Google or NumPy section.
   - Fixed PDF002 to leave first-line Google and NumPy sections unchanged instead of partially reindenting their entries or adornments away from the section header.
   - Fixed PDF002 to preserve the canonical margin for under-indented same-line closing quotes.

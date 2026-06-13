@@ -1,11 +1,8 @@
 from __future__ import annotations
 
-import dataclasses
-
 import libcst as cst
 
 import pydocformatter.cli.settings_check as settings_check
-import pydocformatter.rules.definition_helpers.string_literals as string_literals
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 import pydocformatter.rules.edits as rule_edits
 import pydocformatter.rules.registration as rule_registration
@@ -42,16 +39,6 @@ class PDF101MissingBlankLine(RuleBase):
         return RuleFixResult(module=module, fixed_findings=findings)
 
 
-@dataclasses.dataclass(frozen=True)
-class _OutputLine:
-    """One output logical docstring line."""
-
-    original: PDF_definition.DocstringValueLine | None = None
-    source: str | None = None
-    value: str | None = None
-    finding_line_number: int | None = None
-
-
 def _planned_changes(context: RuleContext) -> tuple[rule_edits.PlannedSourceChange, ...]:
     """Return all safe missing blank-line insertions."""
     data = PDF_definition.PDF.require_data(context)
@@ -65,24 +52,23 @@ def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo, *, co
         return None
     if not isinstance(docstring.node, cst.SimpleString):
         return None
-    fragments = PDF_definition.docstring_value_fragments(docstring, line_ending=context.line_ending)
-    if fragments is None:
-        return None
     insert_before = _insertions_before_lines(docstring)
     insert_after = _insertions_after_lines(docstring, context=context)
     if not insert_before and not insert_after:
         return None
     canonical_margin = PDF_definition.docstring_canonical_margin(docstring, context=context, source_lines=source_lines)
     blank_source = _blank_line_source(context, canonical_margin=canonical_margin)
-    output_lines = _output_lines(docstring, insert_before=insert_before, insert_after=insert_after, blank_source=blank_source, canonical_margin=canonical_margin)
-    body_source = _body_source(output_lines, docstring=docstring, fragments=fragments, line_ending=context.line_ending)
-    expected_value = _expected_value(output_lines, docstring=docstring)
-    rendered = string_literals.render_simple_string_from_body_source(docstring.node.prefix, docstring.node.quote, body_source, expected_value=expected_value)
-    if rendered is None or rendered == docstring.source:
-        return None
-    line_numbers = tuple(line.finding_line_number for line in output_lines if line.finding_line_number is not None)
-    return rule_edits.PlannedSourceChange(
-        edit=rule_edits.SourceEdit(range=docstring.range, replacement=rendered),
+    output_lines, line_numbers = _output_lines_and_line_numbers(
+        docstring,
+        insert_before=insert_before,
+        insert_after=insert_after,
+        blank_source=blank_source,
+        canonical_margin=canonical_margin,
+    )
+    return PDF_definition.planned_simple_docstring_output_change(
+        docstring,
+        context=context,
+        output_lines=output_lines,
         line_numbers=tuple(dict.fromkeys(line_numbers)),
     )
 
@@ -151,64 +137,27 @@ def _blank_line_source(context: RuleContext, *, canonical_margin: str) -> str:
     return ""
 
 
-def _output_lines(
+def _output_lines_and_line_numbers(
     docstring: PDF_definition.DocstringInfo,
     *,
     insert_before: frozenset[int],
     insert_after: frozenset[int],
     blank_source: str,
     canonical_margin: str,
-) -> tuple[_OutputLine, ...]:
-    """Return replacement logical lines with inserted blank lines."""
-    lines: list[_OutputLine] = []
+) -> tuple[tuple[PDF_definition.DocstringOutputLine, ...], tuple[int, ...]]:
+    """Return replacement logical lines and changed source line numbers."""
+    lines: list[PDF_definition.DocstringOutputLine] = []
+    line_numbers: list[int] = []
     for line in docstring.structure.lines:
         if line.index in insert_before:
-            lines.append(_OutputLine(source=blank_source, value=blank_source, finding_line_number=line.source_line_number))
-        lines.append(_OutputLine(original=line))
+            lines.append(PDF_definition.DocstringOutputLine(source=blank_source, value=blank_source))
+            if line.source_line_number is not None:
+                line_numbers.append(line.source_line_number)
+        lines.append(PDF_definition.DocstringOutputLine(original=line))
         if line.index in insert_after:
-            lines.append(_OutputLine(source=blank_source, value=blank_source, finding_line_number=line.source_line_number))
-            if line.index == len(docstring.structure.lines) - 1 and not docstring.value.endswith(("\r\n", "\r", "\n")):
-                lines.append(_OutputLine(source=canonical_margin, value=canonical_margin))
-    return tuple(lines)
-
-
-def _body_source(
-    output_lines: tuple[_OutputLine, ...],
-    *,
-    docstring: PDF_definition.DocstringInfo,
-    fragments: tuple[string_literals.StringValueFragment, ...],
-    line_ending: str,
-) -> str:
-    """Return replacement literal body source."""
-    chunks: list[str] = []
-    for index, output_line in enumerate(output_lines):
-        if index:
-            chunks.append(line_ending)
-        if output_line.original is None:
-            if output_line.source is None:
-                raise ValueError("Synthesized output lines require source text")
-            chunks.append(output_line.source)
-        else:
-            chunks.append(PDF_definition.docstring_line_source(output_line.original, fragments=fragments, strip_docstring_margin=index == 0))
-    if docstring.value.endswith(("\r\n", "\r", "\n")):
-        chunks.append(line_ending)
-    return "".join(chunks)
-
-
-def _expected_value(output_lines: tuple[_OutputLine, ...], *, docstring: PDF_definition.DocstringInfo) -> str:
-    """Return replacement evaluated docstring value."""
-    chunks: list[str] = []
-    for index, output_line in enumerate(output_lines):
-        if index:
-            chunks.append("\n")
-        if output_line.original is None:
-            if output_line.value is None:
-                raise ValueError("Synthesized output lines require evaluated text")
-            chunks.append(output_line.value)
-        elif index == 0:
-            chunks.append(output_line.original.text)
-        else:
-            chunks.append(output_line.original.raw_text)
-    if docstring.value.endswith(("\r\n", "\r", "\n")):
-        chunks.append("\n")
-    return "".join(chunks)
+            lines.append(PDF_definition.DocstringOutputLine(source=blank_source, value=blank_source))
+            if line.source_line_number is not None:
+                line_numbers.append(line.source_line_number)
+            if line.index == len(docstring.structure.lines) - 1 and not PDF_definition.docstring_value_ends_with_newline(docstring):
+                lines.append(PDF_definition.DocstringOutputLine(source=canonical_margin, value=canonical_margin))
+    return tuple(lines), tuple(line_numbers)

@@ -4,7 +4,17 @@ import pytest
 
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention
 from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
-from pydocformatter.rules.definitions.PDF.PDF import PDF, DefinitionKind, DocstringBlock, DocstringBlockKind, DocstringEntryKind, DocstringKind, DocstringStructure, ReflowRegionLine
+from pydocformatter.rules.definitions.PDF.PDF import (
+    PDF,
+    DefinitionKind,
+    DocstringBlock,
+    DocstringBlockKind,
+    DocstringEntryKind,
+    DocstringKind,
+    DocstringStructure,
+    ReflowRegionLine,
+    escaped_closing_quote_body_source,
+)
 
 
 def reflow_texts(lines: tuple[ReflowRegionLine, ...]) -> tuple[str, ...]:
@@ -91,6 +101,12 @@ def test_require_data_validates_category_data_type() -> None:
     assert PDF.require_data(rule_context(context, data)) is data
     with pytest.raises(TypeError, match="require PDFCategoryData"):
         PDF.require_data(rule_context(context, None))
+
+
+def test_escaped_closing_quote_body_source_skips_single_character_delimiter() -> None:
+    node = cst.ensure_type(cst.parse_expression("'Summary'"), cst.SimpleString)
+
+    assert escaped_closing_quote_body_source(node, "Say '") is None
 
 
 def block_kinds(blocks: tuple[DocstringBlock, ...]) -> tuple[DocstringBlockKind, ...]:

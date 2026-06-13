@@ -16,7 +16,7 @@ Generated blank-line text follows `docstring-blank-line-style`: `blank` inserts 
 PDF101 deliberately avoids guesses. It does not split ambiguous prose, does not split a multi-line summary, does not insert separators before unrecognized text, and does not rewrite concatenated docstrings or simple literals whose evaluated lines cannot be safely mapped back to source lines.
 
 ## Why is this useful?
-Blank lines make boundaries between summaries, descriptions, structures, and sections explicit. This rule covers the cases where the parser has already identified the boundary, while leaving ambiguous prose for a human or a warning rule such as PDF106.
+Blank lines make boundaries between summaries, descriptions, structures, and sections explicit. This rule covers the cases where the parser has already identified the boundary, while leaving ambiguous prose for a human or a warning rule such as PDF107.
 
 ## Ruff compatibility
 This rule covers fixable missing-blank-line cases from Ruff's `D205`, `D410`, `D411`, and optionally `D413` when pydocformatter can prove that a blank line is required. `D413`-style final-section spacing is controlled by `docstring-blank-line-after-last-section`.

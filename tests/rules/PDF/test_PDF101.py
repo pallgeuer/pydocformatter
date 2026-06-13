@@ -41,6 +41,15 @@ def test_inserts_blank_line_between_summary_and_google_section() -> None:
     assert not format_source(result.new_source, settings=settings).modified
 
 
+def test_preserves_first_line_content_whitespace_when_inserting_separator() -> None:
+    source = 'def function(value):\n    """  Summary with leading spaces.\n    Args:\n        value: Description.\n    """\n'
+    settings = CheckSettings(select=("PDF101",), docstring_convention=DocstringConvention.GOOGLE)
+    result = format_source(source, settings=settings)
+
+    assert result.new_source == 'def function(value):\n    """  Summary with leading spaces.\n\n    Args:\n        value: Description.\n    """\n'
+    assert result.fixed_findings[PDF101MissingBlankLine.meta] == 1
+
+
 def test_inserts_blank_line_between_summary_and_recognized_structure() -> None:
     source = 'def function():\n    """Summary.\n    - item\n      detail\n    """\n'
     result = format_source(source)

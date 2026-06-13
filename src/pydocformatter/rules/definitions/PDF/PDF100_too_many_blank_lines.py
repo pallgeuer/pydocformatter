@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import libcst as cst
 
-import pydocformatter.rules.definition_helpers.string_literals as string_literals
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 import pydocformatter.rules.edits as rule_edits
 import pydocformatter.rules.registration as rule_registration
@@ -54,29 +53,27 @@ def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo, *, co
     if not isinstance(docstring.node, cst.SimpleString):
         return None
     retained_lines = _retained_line_indexes(docstring.structure.blocks)
+    output_lines: tuple[PDF_definition.DocstringOutputLine, ...]
     if retained_lines is None:
         retained_lines = ()
+        output_lines = ()
     else:
         canonical_margin = PDF_definition.docstring_canonical_margin(docstring, context=context, source_lines=source_lines)
         retained_lines = _with_configured_final_section_blank(docstring, retained_lines, context=context)
         retained_lines = _with_closing_quote_prefix_line(
             docstring, retained_lines, canonical_margin=canonical_margin, keep_final_section_blank=context.settings.docstring_blank_line_after_last_section
         )
+        output_lines = _output_lines(docstring, retained_lines)
     retained_line_set = set(retained_lines)
     changed_line_numbers = tuple(line.source_line_number for line in docstring.structure.lines if line.index not in retained_line_set and line.source_line_number is not None)
     if not changed_line_numbers:
         return None
-    fragments = PDF_definition.docstring_value_fragments(docstring, line_ending=context.line_ending)
-    if fragments is None:
-        return None
-    body_source = _body_source(docstring, retained_lines, fragments=fragments, line_ending=context.line_ending)
-    expected_value = _expected_value(docstring, retained_lines)
-    rendered = string_literals.render_simple_string_from_body_source(docstring.node.prefix, docstring.node.quote, body_source, expected_value=expected_value)
-    if rendered is None or rendered == docstring.source:
-        return None
-    return rule_edits.PlannedSourceChange(
-        edit=rule_edits.SourceEdit(range=docstring.range, replacement=rendered),
+    return PDF_definition.planned_simple_docstring_output_change(
+        docstring,
+        context=context,
+        output_lines=output_lines,
         line_numbers=changed_line_numbers,
+        preserve_trailing_newline=bool(retained_lines) and PDF_definition.docstring_value_ends_with_newline(docstring),
     )
 
 
@@ -130,48 +127,13 @@ def _should_drop_blank_separator(
     return previous_block.kind is PDF_definition.DocstringBlockKind.SECTION_ENTRY and next_block.kind is PDF_definition.DocstringBlockKind.SECTION_ENTRY
 
 
-def _body_source(
-    docstring: PDF_definition.DocstringInfo,
-    retained_lines: tuple[int, ...],
-    *,
-    fragments: tuple[string_literals.StringValueFragment, ...],
-    line_ending: str,
-) -> str:
-    """Return replacement literal body source for retained logical lines."""
-    if not retained_lines:
-        return ""
-    lines = docstring.structure.lines
-    chunks: list[str] = []
-    for output_index, line_index in enumerate(retained_lines):
-        if output_index:
-            chunks.append(line_ending)
-        line = lines[line_index]
-        chunks.append(PDF_definition.docstring_line_source(line, fragments=fragments, strip_docstring_margin=output_index == 0))
-    if _preserve_trailing_newline(docstring, retained_lines):
-        chunks.append(line_ending)
-    return "".join(chunks)
-
-
-def _expected_value(docstring: PDF_definition.DocstringInfo, retained_lines: tuple[int, ...]) -> str:
-    """Return replacement evaluated docstring value."""
-    if not retained_lines:
-        return ""
-    lines = docstring.structure.lines
-    chunks: list[str] = []
-    for output_index, line_index in enumerate(retained_lines):
-        if output_index:
-            chunks.append("\n")
-        chunks.append(lines[line_index].text if output_index == 0 else lines[line_index].raw_text)
-    if _preserve_trailing_newline(docstring, retained_lines):
-        chunks.append("\n")
-    return "".join(chunks)
-
-
-def _preserve_trailing_newline(docstring: PDF_definition.DocstringInfo, retained_lines: tuple[int, ...]) -> bool:
-    """Return whether a trailing evaluated newline should remain before closing quotes."""
-    if not retained_lines:
-        return False
-    return docstring.value.endswith(("\r\n", "\r", "\n"))
+def _output_lines(docstring: PDF_definition.DocstringInfo, retained_lines: tuple[int, ...]) -> tuple[PDF_definition.DocstringOutputLine, ...]:
+    """Return replacement logical lines for retained docstring indexes."""
+    return tuple(
+        PDF_definition.DocstringOutputLine(original=line, strip_docstring_margin=output_index == 0 and line.index != 0)
+        for output_index, line_index in enumerate(retained_lines)
+        for line in (docstring.structure.lines[line_index],)
+    )
 
 
 def _with_configured_final_section_blank(docstring: PDF_definition.DocstringInfo, retained_lines: tuple[int, ...], *, context: RuleContext) -> tuple[int, ...]:
