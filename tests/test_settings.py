@@ -305,6 +305,7 @@ class TestSettings(unittest.TestCase):
             (
                 "docstring_convention",
                 "docstring_blank_line_style",
+                "docstring_blank_line_after_last_section",
                 "docstring_parse_list_items",
                 "docstring_parse_headings",
                 "docstring_parse_doctests",
@@ -702,7 +703,7 @@ class TestSettings(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             (root / "pyproject.toml").write_text(
-                '[tool.pydocfmt.docstring]\nconvention = "google"\nblank-line-style = "aligned"\nparse-tables = false\n',
+                '[tool.pydocfmt.docstring]\nconvention = "google"\nblank-line-style = "aligned"\nblank-line-after-last-section = true\nparse-tables = false\n',
                 encoding="utf-8",
             )
             previous_cwd = os.getcwd()
@@ -714,6 +715,7 @@ class TestSettings(unittest.TestCase):
 
         self.assertEqual(config.docstring_convention, pydocformatter_settings.DocstringConvention.GOOGLE)
         self.assertEqual(config.docstring_blank_line_style, pydocformatter_settings.DocstringBlankLineStyle.ALIGNED)
+        self.assertTrue(config.docstring_blank_line_after_last_section)
         self.assertFalse(config.docstring_parse_tables)
 
     def test_nested_comment_table_settings_are_loaded_from_dedicated_config_file(self) -> None:
@@ -891,18 +893,20 @@ class TestSettings(unittest.TestCase):
         configured = pydocformatter_settings.SETTINGS_SCHEMA.load(
             global_values=pydocformatter_global_args.GlobalArgs(
                 isolated=True,
-                config_options=('docstring-convention = "google"\ndocstring-blank-line-style = "aligned"\ndocstring-parse-tables = false',),
+                config_options=('docstring-convention = "google"\ndocstring-blank-line-style = "aligned"\ndocstring-blank-line-after-last-section = true\ndocstring-parse-tables = false',),
             )
         )
         overridden = pydocformatter_settings.SETTINGS_SCHEMA.load(
             global_values=pydocformatter_global_args.GlobalArgs(isolated=True),
-            args=argparse.Namespace(docstring_convention="numpy", docstring_blank_line_style="blank", docstring_parse_tables=False),
+            args=argparse.Namespace(docstring_convention="numpy", docstring_blank_line_style="blank", docstring_blank_line_after_last_section=False, docstring_parse_tables=False),
         )
         self.assertEqual(configured.docstring_convention, pydocformatter_settings.DocstringConvention.GOOGLE)
         self.assertEqual(configured.docstring_blank_line_style, pydocformatter_settings.DocstringBlankLineStyle.ALIGNED)
+        self.assertTrue(configured.docstring_blank_line_after_last_section)
         self.assertFalse(configured.docstring_parse_tables)
         self.assertEqual(overridden.docstring_convention, pydocformatter_settings.DocstringConvention.NUMPY)
         self.assertEqual(overridden.docstring_blank_line_style, pydocformatter_settings.DocstringBlankLineStyle.BLANK)
+        self.assertFalse(overridden.docstring_blank_line_after_last_section)
         self.assertFalse(overridden.docstring_parse_tables)
 
         config = pydocformatter_settings.SETTINGS_SCHEMA.load(
@@ -1345,19 +1349,19 @@ class TestSettings(unittest.TestCase):
     def test_toml_map_cli_repeated_patterns_append_values(self) -> None:
         args = argparse.Namespace(
             per_file_ignores=[
-                '{"tests/*.py" = ["PDF100"], "src/*.py" = ["PDF101"]}',
-                '{"tests/*.py" = ["PDF105"]}',
+                '{"tests/*.py" = ["PDF100"], "src/*.py" = ["PDF102"]}',
+                '{"tests/*.py" = ["PDF106"]}',
             ],
         )
 
         config = pydocformatter_settings.SETTINGS_SCHEMA.load(args=args)
 
-        self.assertEqual(config.per_file_ignores, (("tests/*.py", ("PDF100", "PDF105")), ("src/*.py", ("PDF101",))))
+        self.assertEqual(config.per_file_ignores, (("tests/*.py", ("PDF100", "PDF106")), ("src/*.py", ("PDF102",))))
 
     def test_rule_selection_cli_comma_lists_strip_whitespace_as_documented_delta(self) -> None:
-        config = pydocformatter_settings.SETTINGS_SCHEMA.load(args=argparse.Namespace(select=["PDF100, PDF105"]))
+        config = pydocformatter_settings.SETTINGS_SCHEMA.load(args=argparse.Namespace(select=["PDF100, PDF106"]))
 
-        self.assertEqual(config.select, ("PDF100", "PDF105"))
+        self.assertEqual(config.select, ("PDF100", "PDF106"))
 
     def test_explicit_overrides_override_argparse_namespace_overrides(self) -> None:
         config = pydocformatter_settings.SETTINGS_SCHEMA.load(

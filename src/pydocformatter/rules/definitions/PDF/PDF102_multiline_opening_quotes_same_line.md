@@ -1,10 +1,10 @@
-# multiline-opening-quotes-same-line (PDF101)
+# multiline-opening-quotes-same-line (PDF102)
 
 Fix is always available.
 
 Rule is ignored if `docstring-convention` is `numpy` or `pep257`.
 
-Rule is incompatible with `PDF102`.
+Rule is incompatible with `PDF103`.
 
 ## What it does
 Checks for multi-line docstrings whose opening triple quotes should share a line with the first content line.

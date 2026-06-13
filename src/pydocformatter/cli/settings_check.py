@@ -101,6 +101,8 @@ class CheckSettings:
         indent_width (int): Number of spaces per generated docstring indentation level, or the visual width of a tab.
         docstring_convention (DocstringConvention): Convention used to parse semantic docstring sections.
         docstring_blank_line_style (DocstringBlankLineStyle): Whitespace style used by PDF004 for blank docstring lines.
+        docstring_blank_line_after_last_section (bool): Whether PDF100 and PDF101 keep one blank line after the last
+            convention section.
         docstring_parse_list_items (bool): Whether list items are parsed as distinct docstring structures.
         docstring_parse_headings (bool): Whether Markdown and reStructuredText headings are parsed.
         docstring_parse_doctests (bool): Whether doctest regions are parsed and protected.
@@ -148,6 +150,7 @@ class CheckSettings:
     indent_width: int = 4
     docstring_convention: DocstringConvention = DocstringConvention.NONE
     docstring_blank_line_style: DocstringBlankLineStyle = DocstringBlankLineStyle.BLANK
+    docstring_blank_line_after_last_section: bool = False
     docstring_parse_list_items: bool = True
     docstring_parse_headings: bool = True
     docstring_parse_doctests: bool = True
@@ -214,6 +217,8 @@ class CheckSettingsOverrides(TypedDict, total=False):
         indent_width (int): Number of spaces per generated docstring indentation level, or the visual width of a tab.
         docstring_convention (DocstringConvention): Convention used to parse semantic docstring sections.
         docstring_blank_line_style (DocstringBlankLineStyle): Whitespace style used by PDF004 for blank docstring lines.
+        docstring_blank_line_after_last_section (bool): Whether PDF100 and PDF101 keep one blank line after the last
+            convention section.
         docstring_parse_list_items (bool): Whether list items are parsed as distinct docstring structures.
         docstring_parse_headings (bool): Whether Markdown and reStructuredText headings are parsed.
         docstring_parse_doctests (bool): Whether doctest regions are parsed and protected.
@@ -261,6 +266,7 @@ class CheckSettingsOverrides(TypedDict, total=False):
     indent_width: int
     docstring_convention: DocstringConvention
     docstring_blank_line_style: DocstringBlankLineStyle
+    docstring_blank_line_after_last_section: bool
     docstring_parse_list_items: bool
     docstring_parse_headings: bool
     docstring_parse_doctests: bool
@@ -377,6 +383,13 @@ SETTINGS_SCHEMA = SettingsSchema(
             group=SettingsGroup.DOCSTRING_FORMATTING,
             help="Whitespace style for blank docstring lines.",
             documentation='Blank docstring line whitespace style used by PDF004; one of "blank" or "aligned".',
+        ),
+        SettingDefinition(
+            field="docstring_blank_line_after_last_section",
+            value_type=bool,
+            group=SettingsGroup.DOCSTRING_FORMATTING,
+            help="Keep one blank line after the last docstring section.",
+            documentation="Whether PDF100 and PDF101 keep one blank line after the last recognized Google or NumPy docstring section.",
         ),
         SettingDefinition(
             field="docstring_parse_list_items",

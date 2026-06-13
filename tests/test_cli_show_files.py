@@ -1019,14 +1019,14 @@ class TestCLIShowFiles(unittest.TestCase):
             ):
                 exit_code = pydocfmt_cli.main()
             output = stdout.getvalue()
-            rules = tuple(line.split(maxsplit=1)[0].removesuffix("*") for line in output.splitlines() if line.startswith(("PDF101", "PDF102", "PDF103", "PDF104")))
+            rules = tuple(line.split(maxsplit=1)[0].removesuffix("*") for line in output.splitlines() if line.startswith(("PDF101", "PDF102", "PDF103", "PDF104", "PDF105")))
             return exit_code, rules, output
 
         broad_expectations = {
-            "none": (0, ("PDF101", "PDF104")),
-            "google": (0, ("PDF101", "PDF104")),
-            "numpy": (0, ("PDF104",)),
-            "pep257": (0, ("PDF104",)),
+            "none": (0, ("PDF101", "PDF102", "PDF105")),
+            "google": (0, ("PDF101", "PDF102", "PDF105")),
+            "numpy": (0, ("PDF101", "PDF105")),
+            "pep257": (0, ("PDF101", "PDF105")),
         }
         for convention, (expected_exit_code, expected_rules) in broad_expectations.items():
             with self.subTest(variation="broad", convention=convention):
@@ -1036,14 +1036,14 @@ class TestCLIShowFiles(unittest.TestCase):
 
         for convention in broad_expectations:
             with self.subTest(variation="exact-extend-select", convention=convention):
-                exit_code, rules, output = show_convention_rules("--docstring-convention", convention, "--extend-select", "PDF101,PDF102,PDF103,PDF104")
-                self.assertEqual((exit_code, rules, output.count("has been disabled")), (1, ("PDF101", "PDF103"), 2))
+                exit_code, rules, output = show_convention_rules("--docstring-convention", convention, "--extend-select", "PDF102,PDF103,PDF104,PDF105")
+                self.assertEqual((exit_code, rules, output.count("has been disabled")), (1, ("PDF101", "PDF102", "PDF104"), 2))
 
-        self.assertEqual(show_convention_rules("--docstring-convention", "google", "--extend-select", "PDF10")[:2], (0, ("PDF101", "PDF104")))
-        self.assertEqual(show_convention_rules("--docstring-convention", "numpy", "--extend-select", "PDF10")[:2], (0, ("PDF104",)))
-        self.assertEqual(show_convention_rules("--docstring-convention", "google", "--select", "PDF102")[:2], (0, ("PDF102",)))
-        exit_code, rules, output = show_convention_rules("--docstring-convention", "google", "--extend-select", "PDF102,PDF103", "--ignore", "PDF102")
-        self.assertEqual((exit_code, rules, output.count("has been disabled")), (1, ("PDF101", "PDF103"), 1))
+        self.assertEqual(show_convention_rules("--docstring-convention", "google", "--extend-select", "PDF10")[:2], (0, ("PDF101", "PDF102", "PDF105")))
+        self.assertEqual(show_convention_rules("--docstring-convention", "numpy", "--extend-select", "PDF10")[:2], (0, ("PDF101", "PDF105")))
+        self.assertEqual(show_convention_rules("--docstring-convention", "google", "--select", "PDF103")[:2], (0, ("PDF103",)))
+        exit_code, rules, output = show_convention_rules("--docstring-convention", "google", "--extend-select", "PDF103,PDF104", "--ignore", "PDF103")
+        self.assertEqual((exit_code, rules, output.count("has been disabled")), (1, ("PDF101", "PDF102", "PDF104"), 1))
 
     def test_pydocfmt_check_config_file_prints_resolved_settings(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -1517,7 +1517,7 @@ class TestCLIShowFiles(unittest.TestCase):
             target.write_text(original_source, encoding="utf-8")
             stdout = StringIO()
             rule = RuleMetadata(
-                code=RuleCode("PDF105"),
+                code=RuleCode("PDF106"),
                 name="summary-too-long",
                 message="Docstring summary does not fit on one line",
                 fix_availability=FixAvailability.NEVER,
@@ -1558,7 +1558,7 @@ class TestCLIShowFiles(unittest.TestCase):
             self.assertIn(f"+++ {target}", output)
             self.assertIn("-x = 1", output)
             self.assertIn("+x = 2", output)
-            self.assertNotIn("PDF105", output)
+            self.assertNotIn("PDF106", output)
 
     def test_pydocfmt_diff_exit_zero_suppresses_diff_exit_status(self) -> None:
         with tempfile.TemporaryDirectory() as td:

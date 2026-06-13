@@ -11,7 +11,9 @@ PDF100 keeps at most one blank line between adjacent semantic chunks. It removes
 
 A chunk is any non-blank semantic block recognized by the docstring parser, including summaries, paragraphs, sections, section entries, lists, headings, doctests, code fences, literal blocks, directives, tables, block quotes, Sphinx fields, and verbatim blocks. Blank lines inside opaque protected blocks are preserved, while blank-line runs around those protected blocks are still collapsed. Directive and literal-block bodies keep their internal blank lines, but trailing blank runs after their indented bodies are treated as exterior spacing between chunks.
 
-With Google or NumPy conventions enabled, the same spacing policy is applied recursively inside recognized sections. This means extra blank lines between a section header and its first entry are collapsed to one blank line, and extra blank lines between entries and following section content are removed when the parser treats them as excess spacing inside the section.
+With Google or NumPy conventions enabled, spacing is applied recursively inside recognized sections. Extra blank lines between a section header and its first body item are removed entirely, and extra blank lines between consecutive convention entries are removed entirely. Other blank-line runs inside sections are still collapsed to one retained blank line unless they are inside opaque protected content.
+
+The `docstring-blank-line-after-last-section` setting changes the trailing spacing rule for the final recognized Google or NumPy section. It defaults to `false`, so PDF100 removes blank lines after the final section. When enabled, PDF100 collapses trailing blank-line runs after the final recognized section to exactly one blank line instead. The setting has no effect unless the active `docstring-convention` parses the final block as a Google or NumPy section.
 
 When the closing quotes are already on their own canonical indentation line, PDF100 preserves that final quote-prefix line while removing extra blank lines before it. If the final whitespace-only line before the closing quotes is not at the canonical docstring margin, PDF100 treats it as excess blank content and removes it, which can move same-line closing quotes onto the preceding content line.
 
@@ -23,7 +25,7 @@ PDF100 only rewrites safely mapped simple docstring literals. It skips concatena
 Predictable blank-line spacing keeps summaries, descriptions, sections, and protected examples visually distinct without adding vertical noise.
 
 ## Ruff compatibility
-This rule is intended to replace the fixable extra-blank-line cases covered by Ruff's `D205`; `PDF105` handles summaries that still span multiple lines.
+This rule is intended to replace the fixable extra-blank-line cases covered by Ruff's `D205`; `PDF106` handles summaries that still span multiple lines.
 
 ## Examples
 Extra blank lines before the first chunk, between chunks, and after the last chunk are removed:
@@ -163,7 +165,7 @@ def example() -> None:
     """
 ````
 
-With Google-style section parsing enabled, extra blank lines inside sections are collapsed recursively:
+With Google-style section parsing enabled, section headers and consecutive convention entries use compact spacing:
 
 ```pydocfmt-example
 [settings]
@@ -188,14 +190,40 @@ def area(radius: float) -> float:
     """Return the area.
 
     Args:
-
         radius: Circle radius.
     Returns:
         float: Area.
     """
 ```
 
-NumPy-style sections are handled the same way when NumPy convention parsing is enabled:
+The final-section setting controls whether one trailing blank after the last recognized section is retained:
+
+```pydocfmt-example
+[settings]
+docstring-convention = "google"
+docstring-blank-line-after-last-section = true
+
+[input]
+def area(radius: float) -> float:
+    """Return the area.
+
+    Args:
+        radius: Circle radius.
+
+
+    """
+
+[output]
+def area(radius: float) -> float:
+    """Return the area.
+
+    Args:
+        radius: Circle radius.
+
+    """
+```
+
+NumPy-style section parsing applies the same compact spacing after section underlines:
 
 ```pydocfmt-example
 [settings]
@@ -225,7 +253,6 @@ def area(radius: float) -> float:
 
     Parameters
     ----------
-
     radius : float
         Circle radius.
     Returns
@@ -282,7 +309,8 @@ def concatenated() -> None:
 When `PDF000` is also selected outside this rule-specific example context, it can literalize escaped blank lines before PDF100 collapses them in a later rule pass.
 
 ## Options
-- `docstring-convention`: Enables recursive spacing inside recognized Google or NumPy sections. `none` and `pep257` leave convention-specific section headers as ordinary generic chunks.
+- `docstring-convention`: Enables recursive spacing inside recognized Google or NumPy sections, including compact section header/content and consecutive entry spacing. `none` and `pep257` leave convention-specific section headers as ordinary generic chunks.
+- `docstring-blank-line-after-last-section`: Keeps exactly one trailing blank line after the final recognized Google or NumPy section when enabled; removes final-section trailing blanks when disabled.
 - `docstring-parse-list-items`: Controls whether list items are distinct chunks.
 - `docstring-parse-headings`: Controls whether Markdown and reStructuredText headings are distinct chunks.
 - `docstring-parse-doctests`: Controls whether doctest transcripts are protected chunks.

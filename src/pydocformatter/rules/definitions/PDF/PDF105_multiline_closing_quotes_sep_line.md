@@ -1,8 +1,8 @@
-# multiline-closing-quotes-sep-line (PDF104)
+# multiline-closing-quotes-sep-line (PDF105)
 
 Fix is always available.
 
-Rule is incompatible with `PDF103`.
+Rule is incompatible with `PDF104`.
 
 ## What it does
 Checks for multi-line docstrings whose closing triple quotes should be on their own line.

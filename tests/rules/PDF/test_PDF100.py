@@ -55,12 +55,57 @@ def test_does_not_insert_missing_blank_lines_or_change_single_blank_lines() -> N
 
 
 def test_collapses_blank_lines_between_google_section_children() -> None:
-    source = 'def function(value):\n    """Summary.\n\n    Args:\n\n\n        value: Description.\n\n\n    Returns:\n        str: Result.\n    """\n'
+    source = 'def function(value):\n    """Summary.\n\n    Args:\n\n\n        value: Description.\n\n\n        other: Other description.\n\n\n    Returns:\n        str: Result.\n    """\n'
     result = format_pdf100(source, settings=CheckSettings(select=("PDF100",), docstring_convention=DocstringConvention.GOOGLE))
 
-    assert result.new_source == 'def function(value):\n    """Summary.\n\n    Args:\n\n        value: Description.\n    Returns:\n        str: Result.\n    """\n'
+    assert result.new_source == 'def function(value):\n    """Summary.\n\n    Args:\n        value: Description.\n        other: Other description.\n    Returns:\n        str: Result.\n    """\n'
     assert result.fixed_findings[PDF100TooManyBlankLines.meta] == 1
     assert not format_pdf100(result.new_source, settings=CheckSettings(select=("PDF100",), docstring_convention=DocstringConvention.GOOGLE)).modified
+
+
+def test_final_google_section_blank_line_is_removed_by_default() -> None:
+    source = 'def function(value):\n    """Summary.\n\n    Args:\n        value: Description.\n\n\n    """\n'
+    settings = CheckSettings(select=("PDF100",), docstring_convention=DocstringConvention.GOOGLE)
+    result = format_pdf100(source, settings=settings)
+
+    assert result.new_source == 'def function(value):\n    """Summary.\n\n    Args:\n        value: Description.\n    """\n'
+    assert result.fixed_findings[PDF100TooManyBlankLines.meta] == 1
+    assert not format_pdf100(result.new_source, settings=settings).modified
+
+
+def test_final_google_section_blank_line_is_preserved_when_enabled() -> None:
+    source = 'def function(value):\n    """Summary.\n\n    Args:\n        value: Description.\n\n\n    """\n'
+    settings = CheckSettings(select=("PDF100",), docstring_convention=DocstringConvention.GOOGLE, docstring_blank_line_after_last_section=True)
+    result = format_pdf100(source, settings=settings)
+
+    assert result.new_source == 'def function(value):\n    """Summary.\n\n    Args:\n        value: Description.\n\n    """\n'
+    assert result.fixed_findings[PDF100TooManyBlankLines.meta] == 1
+    assert not format_pdf100(result.new_source, settings=settings).modified
+
+
+def test_final_numpy_section_blank_line_follows_setting() -> None:
+    source = 'def function(value):\n    """Summary.\n\n    Parameters\n    ----------\n    value : int\n        Description.\n\n\n    """\n'
+    default_settings = CheckSettings(select=("PDF100",), docstring_convention=DocstringConvention.NUMPY)
+    enabled_settings = CheckSettings(select=("PDF100",), docstring_convention=DocstringConvention.NUMPY, docstring_blank_line_after_last_section=True)
+    default_result = format_pdf100(source, settings=default_settings)
+    enabled_result = format_pdf100(source, settings=enabled_settings)
+
+    assert default_result.new_source == 'def function(value):\n    """Summary.\n\n    Parameters\n    ----------\n    value : int\n        Description.\n    """\n'
+    assert enabled_result.new_source == 'def function(value):\n    """Summary.\n\n    Parameters\n    ----------\n    value : int\n        Description.\n\n    """\n'
+    assert default_result.fixed_findings[PDF100TooManyBlankLines.meta] == 1
+    assert enabled_result.fixed_findings[PDF100TooManyBlankLines.meta] == 1
+    assert not format_pdf100(default_result.new_source, settings=default_settings).modified
+    assert not format_pdf100(enabled_result.new_source, settings=enabled_settings).modified
+
+
+def test_final_section_setting_does_not_preserve_convention_like_trailing_blank_without_matching_convention() -> None:
+    source = 'def function(value):\n    """Summary.\n\n    Args:\n        value: Description.\n\n\n    """\n'
+    settings = CheckSettings(select=("PDF100",), docstring_convention=DocstringConvention.NONE, docstring_blank_line_after_last_section=True)
+    result = format_pdf100(source, settings=settings)
+
+    assert result.new_source == 'def function(value):\n    """Summary.\n\n    Args:\n        value: Description.\n    """\n'
+    assert result.fixed_findings[PDF100TooManyBlankLines.meta] == 1
+    assert not format_pdf100(result.new_source, settings=settings).modified
 
 
 def test_protected_block_internal_blank_lines_are_preserved() -> None:
@@ -232,16 +277,25 @@ def test_pdf000_can_literalize_escaped_blank_lines_before_pdf100_collapses_them(
 
 
 def test_collapses_blank_lines_between_numpy_section_children() -> None:
-    source = 'def function(value):\n    """Summary.\n\n    Parameters\n    ----------\n\n\n    value : int\n        Description.\n\n\n    Returns\n    -------\n    bool\n        Result.\n    """\n'
+    source = 'def function(value):\n    """Summary.\n\n    Parameters\n    ----------\n\n\n    value : int\n        Description.\n\n\n    other : str\n        Other description.\n\n\n    Returns\n    -------\n    bool\n        Result.\n    """\n'
     settings = CheckSettings(select=("PDF100",), docstring_convention=DocstringConvention.NUMPY)
     result = format_pdf100(source, settings=settings)
 
     assert (
         result.new_source
-        == 'def function(value):\n    """Summary.\n\n    Parameters\n    ----------\n\n    value : int\n        Description.\n    Returns\n    -------\n    bool\n        Result.\n    """\n'
+        == 'def function(value):\n    """Summary.\n\n    Parameters\n    ----------\n    value : int\n        Description.\n    other : str\n        Other description.\n    Returns\n    -------\n    bool\n        Result.\n    """\n'
     )
     assert result.fixed_findings[PDF100TooManyBlankLines.meta] == 1
     assert not format_pdf100(result.new_source, settings=settings).modified
+
+
+def test_convention_like_sections_keep_generic_spacing_when_convention_is_none() -> None:
+    source = 'def function(value):\n    """Summary.\n\n    Args:\n\n\n        value: Description.\n\n\n        other: Other description.\n    """\n'
+    result = format_pdf100(source, settings=CheckSettings(select=("PDF100",), docstring_convention=DocstringConvention.NONE))
+
+    assert result.new_source == 'def function(value):\n    """Summary.\n\n    Args:\n\n        value: Description.\n\n\n        other: Other description.\n    """\n'
+    assert result.fixed_findings[PDF100TooManyBlankLines.meta] == 1
+    assert not format_pdf100(result.new_source, settings=CheckSettings(select=("PDF100",), docstring_convention=DocstringConvention.NONE)).modified
 
 
 def test_disabled_code_fence_parsing_allows_fence_internal_blank_lines_to_collapse() -> None:

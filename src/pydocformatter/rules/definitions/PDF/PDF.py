@@ -138,6 +138,15 @@ class DocstringSection:
 
 
 @dataclasses.dataclass(frozen=True)
+class FinalConventionSectionSpacing:
+    """Spacing facts for the final recognized convention section."""
+
+    section: DocstringBlock
+    final_content_line: int | None
+    trailing_blank_line: int | None
+
+
+@dataclasses.dataclass(frozen=True)
 class DocstringStructure:
     """Convention-aware semantic structure prepared for one docstring."""
 
@@ -347,6 +356,77 @@ class PDF(RuleCategoryBase):
         return context.category_data
 
 
+def convention_parses_sections(convention: settings_check.DocstringConvention) -> bool:
+    """Return whether a docstring convention recognizes named sections."""
+    return convention in (settings_check.DocstringConvention.GOOGLE, settings_check.DocstringConvention.NUMPY)
+
+
+def final_convention_section(docstring: DocstringInfo) -> DocstringBlock | None:
+    """Return the final top-level convention section, if there is one."""
+    if not convention_parses_sections(docstring.structure.convention):
+        return None
+    non_blank_blocks = tuple(block for block in docstring.structure.blocks if block.kind is not DocstringBlockKind.BLANK)
+    if not non_blank_blocks or non_blank_blocks[-1].kind is not DocstringBlockKind.SECTION:
+        return None
+    return non_blank_blocks[-1]
+
+
+def final_convention_section_spacing(docstring: DocstringInfo) -> FinalConventionSectionSpacing | None:
+    """Return final convention section content and trailing blank facts."""
+    section = final_convention_section(docstring)
+    if section is None:
+        return None
+    return FinalConventionSectionSpacing(
+        section=section,
+        final_content_line=_final_section_content_line(docstring, section),
+        trailing_blank_line=_final_section_trailing_blank_line(docstring, section),
+    )
+
+
+def docstring_line_source(
+    line: DocstringValueLine,
+    *,
+    fragments: tuple[string_literals.StringValueFragment, ...],
+    strip_docstring_margin: bool,
+) -> str:
+    """Return source spelling for a logical docstring line."""
+    if not strip_docstring_margin:
+        return string_literals.source_for_value_slice(fragments, line.start_offset, line.end_offset)
+    start_offset = line.start_offset + line.text_raw_start_column
+    return f"{' ' * line.text_virtual_prefix_length}{string_literals.source_for_value_slice(fragments, start_offset, line.end_offset)}"
+
+
+def _final_section_content_line(docstring: DocstringInfo, section: DocstringBlock) -> int | None:
+    """Return the final non-header, non-blank line in a convention section."""
+    header = next((child for child in section.children if child.kind is DocstringBlockKind.SECTION_HEADER), None)
+    header_lines = range(header.start_line, header.end_line) if header is not None else range(0)
+    for index in range(section.end_line - 1, section.start_line - 1, -1):
+        if index in header_lines:
+            continue
+        if docstring.structure.lines[index].text.strip():
+            return index
+    return None
+
+
+def _final_section_trailing_blank_line(docstring: DocstringInfo, section: DocstringBlock) -> int | None:
+    """Return the retained trailing blank line after final section content."""
+    trailing_child_blank = section.children[-1] if section.children and section.children[-1].kind is DocstringBlockKind.BLANK else None
+    if trailing_child_blank is not None:
+        return _first_non_closing_quote_prefix_line(docstring, start=trailing_child_blank.start_line, end=trailing_child_blank.end_line)
+    blank_block = next((block for block in docstring.structure.blocks if block.start_line == section.end_line and block.kind is DocstringBlockKind.BLANK), None)
+    if blank_block is None:
+        return None
+    return _first_non_closing_quote_prefix_line(docstring, start=blank_block.start_line, end=blank_block.end_line)
+
+
+def _first_non_closing_quote_prefix_line(docstring: DocstringInfo, *, start: int, end: int) -> int | None:
+    """Return the first blank line that is not only a same-line closing quote prefix."""
+    for index in range(start, end):
+        if not is_same_line_closing_delimiter_prefix(docstring, docstring.structure.lines[index]):
+            return index
+    return None
+
+
 _GOOGLE_SECTIONS = {
     "args",
     "arguments",
@@ -543,7 +623,7 @@ class _DocstringParser:
 
     def _section_at(self, index: int, end: int, *, max_indent: int | None = None) -> str | None:
         convention = self.settings.docstring_convention
-        if convention not in (settings_check.DocstringConvention.GOOGLE, settings_check.DocstringConvention.NUMPY):
+        if not convention_parses_sections(convention):
             return None
         text = self.lines[index].text
         if max_indent is not None and leading_width(text) > max_indent:

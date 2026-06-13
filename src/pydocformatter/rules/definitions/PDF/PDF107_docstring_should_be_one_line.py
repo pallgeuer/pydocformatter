@@ -8,13 +8,13 @@ from pydocformatter.rules.models import FixAvailability, RuleMetadata
 
 
 @rule_registration.register_rule_to(PDF)
-class PDF104MultilineClosingQuotesSepLine(RuleBase):
+class PDF107DocstringShouldBeOneLine(RuleBase):
     meta = RuleMetadata(
-        code=RuleCode("PDF104"),
-        name="multiline-closing-quotes-sep-line",
-        message="Multi-line docstring closing quotes should be on a separate line",
+        code=RuleCode("PDF107"),
+        name="docstring-should-be-one-line",
+        message="Docstring with one content line should be one line",
         fix_availability=FixAvailability.ALWAYS,
         stable_since="0.3.0",
         setting_effects=(),
-        incompatible_with=(RuleCode("PDF103"),),
+        incompatible_with=(),
     )

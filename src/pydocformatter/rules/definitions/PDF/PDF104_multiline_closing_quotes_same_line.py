@@ -9,11 +9,11 @@ from pydocformatter.rules.models import FixAvailability, RuleMetadata, RuleSetti
 
 
 @rule_registration.register_rule_to(PDF)
-class PDF102MultilineOpeningQuotesSepLine(RuleBase):
+class PDF104MultilineClosingQuotesSameLine(RuleBase):
     meta = RuleMetadata(
-        code=RuleCode("PDF102"),
-        name="multiline-opening-quotes-sep-line",
-        message="Multi-line docstring opening quotes should be on a separate line",
+        code=RuleCode("PDF104"),
+        name="multiline-closing-quotes-same-line",
+        message="Multi-line docstring closing quotes should be on the same line as content",
         fix_availability=FixAvailability.ALWAYS,
         stable_since="0.3.0",
         setting_effects=(
@@ -24,5 +24,5 @@ class PDF102MultilineOpeningQuotesSepLine(RuleBase):
                 ),
             ),
         ),
-        incompatible_with=(RuleCode("PDF101"),),
+        incompatible_with=(RuleCode("PDF105"),),
     )

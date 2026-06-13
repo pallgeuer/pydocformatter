@@ -1,10 +1,10 @@
-# multiline-opening-quotes-sep-line (PDF102)
+# multiline-opening-quotes-sep-line (PDF103)
 
 Fix is always available.
 
 Rule is ignored if `docstring-convention` is `none`, `google`, `numpy`, or `pep257`.
 
-Rule is incompatible with `PDF101`.
+Rule is incompatible with `PDF102`.
 
 ## What it does
 Checks for multi-line docstrings whose opening triple quotes should be on their own line.

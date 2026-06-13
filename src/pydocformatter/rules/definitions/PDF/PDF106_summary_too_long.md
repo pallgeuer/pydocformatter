@@ -1,4 +1,4 @@
-# summary-too-long (PDF105)
+# summary-too-long (PDF106)
 
 Fix is not available.
 

@@ -8,9 +8,9 @@ from pydocformatter.rules.models import FixAvailability, RuleMetadata
 
 
 @rule_registration.register_rule_to(PDF)
-class PDF105SummaryTooLong(RuleBase):
+class PDF106SummaryTooLong(RuleBase):
     meta = RuleMetadata(
-        code=RuleCode("PDF105"),
+        code=RuleCode("PDF106"),
         name="summary-too-long",
         message="Docstring summary does not fit on one line",
         fix_availability=FixAvailability.NEVER,

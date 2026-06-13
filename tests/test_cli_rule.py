@@ -25,7 +25,7 @@ class TestCLIRule(unittest.TestCase):
 
     def test_pydocfmt_rule_prints_rule_json(self) -> None:
         stdout = StringIO()
-        argv = ["pydocfmt", "rule", "--output-format", "json", "PDF105"]
+        argv = ["pydocfmt", "rule", "--output-format", "json", "PDF106"]
         with (
             unittest.mock.patch("sys.argv", argv),
             contextlib.redirect_stdout(stdout),
@@ -35,16 +35,16 @@ class TestCLIRule(unittest.TestCase):
         output = json.loads(stdout.getvalue())
         self.assertEqual(exit_code, 0)
         self.assertEqual(output["name"], "summary-too-long")
-        self.assertEqual(output["code"], "PDF105")
+        self.assertEqual(output["code"], "PDF106")
         self.assertEqual(output["linter"], "pydocformatter")
         self.assertEqual(output["fix"], "Fix is not available.")
         self.assertEqual(output["fix_availability"], "Never")
         self.assertEqual(output["status"], {"Stable": {"since": "v0.3.0"}})
         self.assertTrue(output["explanation"].startswith("## What it does\n"))
-        self.assertNotIn("# summary-too-long (PDF105)", output["explanation"])
+        self.assertNotIn("# summary-too-long (PDF106)", output["explanation"])
         self.assertNotIn("Fix is not available.", output["explanation"])
         self.assertIn("## Ruff compatibility\n", output["explanation"])
-        self.assertTrue(output["source_location"]["file"].endswith("PDF105_summary_too_long.py"))
+        self.assertTrue(output["source_location"]["file"].endswith("PDF106_summary_too_long.py"))
 
     def test_pydocfmt_rule_prints_usually_fixable_rule_json(self) -> None:
         stdout = StringIO()
@@ -72,7 +72,7 @@ class TestCLIRule(unittest.TestCase):
         output = stdout.getvalue()
         self.assertEqual(exit_code, 0)
         self.assertIn("# standalone-comment-formatting (PCF001)\n", output)
-        self.assertIn("# docstring-should-be-one-line (PDF106)\n", output)
+        self.assertIn("# docstring-should-be-one-line (PDF107)\n", output)
         self.assertLess(output.index("# standalone-comment-formatting (PCF001)"), output.index("# reflow-required (PDF001)"))
 
     def test_pydocfmt_rule_prints_all_rules_json(self) -> None:
@@ -87,7 +87,7 @@ class TestCLIRule(unittest.TestCase):
         output = json.loads(stdout.getvalue())
         self.assertEqual(exit_code, 0)
         self.assertEqual(output[0]["code"], "PCF001")
-        self.assertEqual(output[-1]["code"], "PDF106")
+        self.assertEqual(output[-1]["code"], "PDF107")
 
     def test_pydocfmt_rule_rejects_missing_rule(self) -> None:
         stdout = StringIO()

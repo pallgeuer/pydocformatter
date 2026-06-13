@@ -13,7 +13,7 @@ This document specifies how `pydocfmt` discovers rule definitions and resolves r
 - **D4: Fixability selector validation.**
   pydocformatter reports an operational error when a `fixable` or `extend-fixable` selector matches only rules whose `FixAvailability` is `Never`. Ruff accepts such selectors and simply has no fix to apply for those rules.
 - **D5: Command-line comma-list whitespace.**
-  pydocformatter strips whitespace around entries in dedicated command-line comma-list options, so `--select "PDF100, PDF105"` is accepted as `PDF100` and `PDF105`. Ruff rejects whitespace-containing selector entries such as ` F841`.
+  pydocformatter strips whitespace around entries in dedicated command-line comma-list options, so `--select "PDF100, PDF106"` is accepted as `PDF100` and `PDF106`. Ruff rejects whitespace-containing selector entries such as ` F841`.
 
 ## Rule Definitions
 
@@ -170,7 +170,7 @@ After normal selection precedence and setting effects are resolved, selected rul
 - Each discarded rule produces one operational error listing all earlier retained rules that conflict with it.
 - Per-file ignores run later and do not restore rules discarded by incompatibility resolution.
 
-The built-in opposing pairs (e.g. `PDF101`/`PDF102` and `PDF103`/`PDF104`) are mutually incompatible. Convention-specific setting effects keep each built-in convention profile conflict-free, but exact selection can restore ignored rules. Selecting both rules in either pair retains the lower ordered rule and reports the higher ordered rule as disabled.
+The built-in opposing pairs (e.g. `PDF102`/`PDF103` and `PDF104`/`PDF105`) are mutually incompatible. Convention-specific setting effects keep each built-in convention profile conflict-free, but exact selection can restore ignored rules. Selecting both rules in either pair retains the lower ordered rule and reports the higher ordered rule as disabled.
 
 ## Per-File Ignores
 
@@ -215,7 +215,7 @@ Examples:
 Rule-selection CLI list options accept comma-separated selector values per option occurrence:
 
 ```bash
-pydocfmt check --select PDF100,PDF105 --ignore PDF106
+pydocfmt check --select PDF100,PDF106 --ignore PDF107
 ```
 
 Whitespace around command-line comma-list entries is stripped before validation. This is a pydocformatter CLI parsing delta from Ruff, which treats the whitespace as part of the selector.
@@ -223,13 +223,13 @@ Whitespace around command-line comma-list entries is stripped before validation.
 Repeated list option occurrences append values within the command-line layer:
 
 ```bash
-pydocfmt check --select PDF100 --select PDF105
+pydocfmt check --select PDF100 --select PDF106
 ```
 
 Repeated TOML-map option occurrences merge entries within the command-line layer. If the same pattern appears more than once in repeated `--per-file-ignores` or `--extend-per-file-ignores` values, the selector lists are appended:
 
 ```bash
-pydocfmt check --per-file-ignores '{"tests/*.py" = ["PDF100"]}' --per-file-ignores '{"tests/*.py" = ["PDF105"]}'
+pydocfmt check --per-file-ignores '{"tests/*.py" = ["PDF100"]}' --per-file-ignores '{"tests/*.py" = ["PDF106"]}'
 ```
 
 As with other settings, the resolved command-line value for a field replaces lower-priority values for the same field.

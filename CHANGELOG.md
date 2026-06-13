@@ -19,6 +19,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added `PDF003` and `PDF004` to normalize safely mapped docstring trailing whitespace and blank-line whitespace.
   - Added `PDF005` and `PDF006` to normalize quote-adjacent whitespace around safely mapped simple docstring content.
   - Added `PDF100` to collapse excess blank lines around docstring chunks and collapse blank-only docstrings to empty docstrings.
+  - Added `PDF101` to insert safe missing blank lines before recognized docstring structures and convention sections.
 
 - **CLI:**
   - Added Ruff-style subcommands with `pydocfmt check` for read-only checks and `pydocfmt check --fix` for formatting.
@@ -42,13 +43,14 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added generic rule-selection effects driven by resolved setting values, with exact-selector restoration for ignored rules and unconditional removal for disabled rules.
   - Added TOML-only `[tool.pydocfmt.docstring]` and `[tool.pydocfmt.comment]` tables as the preferred spelling for docstring and comment settings, with flat `docstring-*` and `comment-*` keys still supported as mutually exclusive compatibility forms.
   - Added mutually validated rule incompatibility metadata and deterministic conflict resolution that keeps the first selected rule and reports later conflicts as operational errors.
-  - Added docstring-convention effects for `PDF101` through `PDF104` while keeping PCF rules convention-independent.
+  - Added docstring-convention effects for `PDF102` through `PDF105` while keeping PCF rules convention-independent.
   - Enabled comment list-item and block-quote formatting, structural preservation, and Python statement detection by default, while leaving heuristic disabled-code and expression detection disabled.
   - Added `output-format` for formatter configuration, currently supporting only `"grouped"`.
   - Added `legacy` for formatter configuration, defaulting to `false`.
   - Added Ruff-style `line-ending` configuration with `"auto"`, `"lf"`, `"cr-lf"`, and `"native"` values.
   - Added `indent-style` and `indent-width` for generated docstring section indentation, with Ruff-style defaults of `"space"` and `4`.
   - Added `docstring-blank-line-style` with `"blank"` and `"aligned"` modes for PDF004 blank-line whitespace normalization.
+  - Added `docstring-blank-line-after-last-section` to control whether PDF100 and PDF101 keep one blank line after the final recognized Google or NumPy docstring section.
   - Added Ruff-style rule settings under `[tool.pydocfmt]`: `select`, `ignore`, `extend-select`, `per-file-ignores`, `extend-per-file-ignores`, `fixable`, `unfixable`, and `extend-fixable`.
   - Added `respect-gitignore` for formatter configuration, defaulting to `true`.
   - Added explicit config-file support for `--config PATH`, including pyproject-style `[tool.pydocfmt]` files and dedicated top-level pydocfmt TOML files.
@@ -85,6 +87,8 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 
 - **Docstring formatting:**
   - Changed `PDF000` to normalize safe `\n` and `\t` whitespace escape spellings in docstrings, including non-concatenated docstrings, without changing evaluated docstring values.
+  - Changed `PDF100` to remove blank lines after Google/NumPy section headers and between consecutive convention entries.
+  - Renumbered the existing `PDF101` through `PDF106` rule stubs to `PDF102` through `PDF107`.
   - Changed PDF001 Google-style entry wrapping to use fixed continuation indentation and to place descriptions on the following line when long entry prefixes leave too little room.
   - Changed directive and literal-block parsing so trailing blank lines are represented as ordinary docstring blank-line blocks instead of part of the protected body.
   - Centralized docstring string-literal rendering for `PDF000` and `PDF001`, preserving reusable escape spellings and literal non-ASCII characters while reporting unsafe rewrites as non-fixable findings.
@@ -92,6 +96,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 ### Fixed
 
 - **Docstring formatting:**
+  - Fixed PDF101 to avoid inserting a trailing blank line after a header-only final Google or NumPy section.
   - Fixed PDF002 to leave first-line Google and NumPy sections unchanged instead of partially reindenting their entries or adornments away from the section header.
   - Fixed PDF002 to preserve the canonical margin for under-indented same-line closing quotes.
   - Fixed PDF003 and PDF004 to treat only spaces and tabs as removable docstring line whitespace, preserving other evaluated whitespace characters.

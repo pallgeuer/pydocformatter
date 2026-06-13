@@ -1,0 +1,214 @@
+from __future__ import annotations
+
+import dataclasses
+
+import libcst as cst
+
+import pydocformatter.cli.settings_check as settings_check
+import pydocformatter.rules.definition_helpers.string_literals as string_literals
+import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
+import pydocformatter.rules.edits as rule_edits
+import pydocformatter.rules.registration as rule_registration
+from pydocformatter.rules.codes import RuleCode
+from pydocformatter.rules.definition import RuleBase, RuleContext, RuleFixResult
+from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetadata
+
+
+@rule_registration.register_rule_to(PDF_definition.PDF)
+class PDF101MissingBlankLine(RuleBase):
+    meta = RuleMetadata(
+        code=RuleCode("PDF101"),
+        name="missing-blank-line",
+        message="Docstring is missing a blank line",
+        fix_availability=FixAvailability.ALWAYS,
+        stable_since="0.3.0",
+        setting_effects=(),
+        incompatible_with=(),
+    )
+
+    @classmethod
+    def check(cls, context: RuleContext) -> tuple[RuleFinding, ...]:
+        """Return findings for safely insertable missing blank lines."""
+        return rule_edits.findings_for_planned_source_changes(cls.meta, _planned_changes(context))
+
+    @classmethod
+    def fix(cls, context: RuleContext) -> RuleFixResult:
+        """Insert safely required missing blank lines."""
+        changes = _planned_changes(context)
+        if not changes:
+            return RuleFixResult(module=context.module)
+        module = rule_edits.apply_planned_source_changes(context.module, changes)
+        findings = rule_edits.findings_for_planned_source_changes(cls.meta, changes)
+        return RuleFixResult(module=module, fixed_findings=findings)
+
+
+@dataclasses.dataclass(frozen=True)
+class _OutputLine:
+    """One output logical docstring line."""
+
+    original: PDF_definition.DocstringValueLine | None = None
+    source: str | None = None
+    value: str | None = None
+    finding_line_number: int | None = None
+
+
+def _planned_changes(context: RuleContext) -> tuple[rule_edits.PlannedSourceChange, ...]:
+    """Return all safe missing blank-line insertions."""
+    data = PDF_definition.PDF.require_data(context)
+    source_lines = PDF_definition.source_lines_from_context(context)
+    return tuple(change for docstring in data.docstrings if (change := _planned_change_for_docstring(docstring, context=context, source_lines=source_lines)) is not None)
+
+
+def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo, *, context: RuleContext, source_lines: list[str]) -> rule_edits.PlannedSourceChange | None:
+    """Return one whole-literal replacement for a docstring."""
+    if not PDF_definition.is_safely_mapped_simple_docstring(docstring):
+        return None
+    if not isinstance(docstring.node, cst.SimpleString):
+        return None
+    fragments = PDF_definition.docstring_value_fragments(docstring, line_ending=context.line_ending)
+    if fragments is None:
+        return None
+    insert_before = _insertions_before_lines(docstring)
+    insert_after = _insertions_after_lines(docstring, context=context)
+    if not insert_before and not insert_after:
+        return None
+    canonical_margin = PDF_definition.docstring_canonical_margin(docstring, context=context, source_lines=source_lines)
+    blank_source = _blank_line_source(context, canonical_margin=canonical_margin)
+    output_lines = _output_lines(docstring, insert_before=insert_before, insert_after=insert_after, blank_source=blank_source, canonical_margin=canonical_margin)
+    body_source = _body_source(output_lines, docstring=docstring, fragments=fragments, line_ending=context.line_ending)
+    expected_value = _expected_value(output_lines, docstring=docstring)
+    rendered = string_literals.render_simple_string_from_body_source(docstring.node.prefix, docstring.node.quote, body_source, expected_value=expected_value)
+    if rendered is None or rendered == docstring.source:
+        return None
+    line_numbers = tuple(line.finding_line_number for line in output_lines if line.finding_line_number is not None)
+    return rule_edits.PlannedSourceChange(
+        edit=rule_edits.SourceEdit(range=docstring.range, replacement=rendered),
+        line_numbers=tuple(dict.fromkeys(line_numbers)),
+    )
+
+
+def _insertions_before_lines(docstring: PDF_definition.DocstringInfo) -> frozenset[int]:
+    """Return logical line indexes before which a blank line should be inserted."""
+    indexes: set[int] = set()
+    blocks = docstring.structure.blocks
+    for previous_block, block in zip(blocks, blocks[1:]):
+        if previous_block.kind is PDF_definition.DocstringBlockKind.BLANK or block.kind is PDF_definition.DocstringBlockKind.BLANK:
+            continue
+        if _previous_logical_line_is_blank(docstring, block.start_line):
+            continue
+        if _needs_blank_before_block(previous_block, block):
+            indexes.add(block.start_line)
+    return frozenset(indexes)
+
+
+def _insertions_after_lines(docstring: PDF_definition.DocstringInfo, *, context: RuleContext) -> frozenset[int]:
+    """Return logical line indexes after which a blank line should be inserted."""
+    if not context.settings.docstring_blank_line_after_last_section:
+        return frozenset()
+    final_spacing = PDF_definition.final_convention_section_spacing(docstring)
+    if final_spacing is None or final_spacing.final_content_line is None:
+        return frozenset()
+    if final_spacing.trailing_blank_line is not None:
+        return frozenset()
+    return frozenset({final_spacing.final_content_line})
+
+
+def _needs_blank_before_block(previous_block: PDF_definition.DocstringBlock, block: PDF_definition.DocstringBlock) -> bool:
+    """Return whether adjacent top-level blocks require a blank separator."""
+    if block.kind is PDF_definition.DocstringBlockKind.SECTION:
+        return True
+    if previous_block.kind is PDF_definition.DocstringBlockKind.SUMMARY and previous_block.end_line - previous_block.start_line == 1 and _is_recognized_structure(block):
+        return True
+    return False
+
+
+def _previous_logical_line_is_blank(docstring: PDF_definition.DocstringInfo, line_index: int) -> bool:
+    """Return whether the line immediately before an index is blank."""
+    return line_index > 0 and not docstring.structure.lines[line_index - 1].text.strip()
+
+
+def _is_recognized_structure(block: PDF_definition.DocstringBlock) -> bool:
+    """Return whether a block is structured enough to safely separate from a summary."""
+    return block.kind in {
+        PDF_definition.DocstringBlockKind.SECTION,
+        PDF_definition.DocstringBlockKind.LIST_ITEM,
+        PDF_definition.DocstringBlockKind.HEADING,
+        PDF_definition.DocstringBlockKind.DOCTEST,
+        PDF_definition.DocstringBlockKind.CODE_FENCE,
+        PDF_definition.DocstringBlockKind.BLOCK_QUOTE,
+        PDF_definition.DocstringBlockKind.TABLE,
+        PDF_definition.DocstringBlockKind.DIRECTIVE,
+        PDF_definition.DocstringBlockKind.LITERAL_BLOCK,
+        PDF_definition.DocstringBlockKind.SPHINX_FIELD,
+        PDF_definition.DocstringBlockKind.VERBATIM,
+    }
+
+
+def _blank_line_source(context: RuleContext, *, canonical_margin: str) -> str:
+    """Return source text for a generated blank line."""
+    if context.settings.docstring_blank_line_style == settings_check.DocstringBlankLineStyle.ALIGNED:
+        return canonical_margin
+    return ""
+
+
+def _output_lines(
+    docstring: PDF_definition.DocstringInfo,
+    *,
+    insert_before: frozenset[int],
+    insert_after: frozenset[int],
+    blank_source: str,
+    canonical_margin: str,
+) -> tuple[_OutputLine, ...]:
+    """Return replacement logical lines with inserted blank lines."""
+    lines: list[_OutputLine] = []
+    for line in docstring.structure.lines:
+        if line.index in insert_before:
+            lines.append(_OutputLine(source=blank_source, value=blank_source, finding_line_number=line.source_line_number))
+        lines.append(_OutputLine(original=line))
+        if line.index in insert_after:
+            lines.append(_OutputLine(source=blank_source, value=blank_source, finding_line_number=line.source_line_number))
+            if line.index == len(docstring.structure.lines) - 1 and not docstring.value.endswith(("\r\n", "\r", "\n")):
+                lines.append(_OutputLine(source=canonical_margin, value=canonical_margin))
+    return tuple(lines)
+
+
+def _body_source(
+    output_lines: tuple[_OutputLine, ...],
+    *,
+    docstring: PDF_definition.DocstringInfo,
+    fragments: tuple[string_literals.StringValueFragment, ...],
+    line_ending: str,
+) -> str:
+    """Return replacement literal body source."""
+    chunks: list[str] = []
+    for index, output_line in enumerate(output_lines):
+        if index:
+            chunks.append(line_ending)
+        if output_line.original is None:
+            if output_line.source is None:
+                raise ValueError("Synthesized output lines require source text")
+            chunks.append(output_line.source)
+        else:
+            chunks.append(PDF_definition.docstring_line_source(output_line.original, fragments=fragments, strip_docstring_margin=index == 0))
+    if docstring.value.endswith(("\r\n", "\r", "\n")):
+        chunks.append(line_ending)
+    return "".join(chunks)
+
+
+def _expected_value(output_lines: tuple[_OutputLine, ...], *, docstring: PDF_definition.DocstringInfo) -> str:
+    """Return replacement evaluated docstring value."""
+    chunks: list[str] = []
+    for index, output_line in enumerate(output_lines):
+        if index:
+            chunks.append("\n")
+        if output_line.original is None:
+            if output_line.value is None:
+                raise ValueError("Synthesized output lines require evaluated text")
+            chunks.append(output_line.value)
+        elif index == 0:
+            chunks.append(output_line.original.text)
+        else:
+            chunks.append(output_line.original.raw_text)
+    if docstring.value.endswith(("\r\n", "\r", "\n")):
+        chunks.append("\n")
+    return "".join(chunks)

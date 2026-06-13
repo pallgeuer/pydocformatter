@@ -30,8 +30,8 @@ from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetada
 PDF001_RULE = RuleMetadata(
     code=RuleCode("PDF001"), name="reflow-required", message="Docstring chunk needs reflow", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0", setting_effects=(), incompatible_with=()
 )
-PDF105_RULE = RuleMetadata(
-    code=RuleCode("PDF105"),
+PDF106_RULE = RuleMetadata(
+    code=RuleCode("PDF106"),
     name="summary-too-long",
     message="Docstring summary does not fit on one line",
     fix_availability=FixAvailability.NEVER,
@@ -90,7 +90,7 @@ class TestFormatterResults(unittest.TestCase):
         modified = FormatterResult(path="a.py", old_source="", new_source="", modified=True, fixed_findings=collections.Counter({PDF001_RULE: 1}), unfixed_findings=(), errors=())
         finding = RuleFinding(
             rule=RuleMetadata(
-                code=RuleCode("PDF105"),
+                code=RuleCode("PDF106"),
                 name="summary-too-long",
                 message="Docstring summary does not fit on one line",
                 fix_availability=FixAvailability.NEVER,
@@ -174,7 +174,7 @@ class TestFormatterResults(unittest.TestCase):
             fixed_findings=collections.Counter(),
             unfixed_findings=(
                 RuleFinding(rule=PDF001_RULE, line_numbers=(2, 2, 3)),
-                RuleFinding(rule=PDF105_RULE, line_numbers=(5,)),
+                RuleFinding(rule=PDF106_RULE, line_numbers=(5,)),
                 RuleFinding(rule=PDF001_RULE, line_numbers=(8,)),
             ),
             errors=(),
@@ -189,7 +189,7 @@ class TestFormatterResults(unittest.TestCase):
             [
                 "a.py:",
                 "  PDF001* Docstring chunk needs reflow. Lines 2-3, 8",
-                "  PDF105 Docstring summary does not fit on one line. Line 5",
+                "  PDF106 Docstring summary does not fit on one line. Line 5",
                 "",
                 "Found 3 rule check errors (2 fixable).",
             ],
@@ -202,7 +202,7 @@ class TestFormatterResults(unittest.TestCase):
             new_source="",
             modified=True,
             fixed_findings=collections.Counter({PDF001_RULE: 50, PCF100_RULE: 1}),
-            unfixed_findings=(RuleFinding(rule=PDF105_RULE, line_numbers=(5,)),),
+            unfixed_findings=(RuleFinding(rule=PDF106_RULE, line_numbers=(5,)),),
             errors=(),
         )
 
@@ -216,7 +216,7 @@ class TestFormatterResults(unittest.TestCase):
                 "a.py:",
                 "  PCF100* Comment needs formatting. Fixed 1 time.",
                 "  PDF001* Docstring chunk needs reflow. Fixed 50 times.",
-                "  PDF105 Docstring summary does not fit on one line. Line 5",
+                "  PDF106 Docstring summary does not fit on one line. Line 5",
                 "",
                 "Fixed 51 rule check errors and left 1 more unfixed (0 fixable).",
             ],
@@ -289,7 +289,7 @@ class TestFormatterResults(unittest.TestCase):
             new_source="",
             modified=True,
             fixed_findings=collections.Counter({PDF001_RULE: 2}),
-            unfixed_findings=(RuleFinding(rule=PDF105_RULE, line_numbers=(1,)),),
+            unfixed_findings=(RuleFinding(rule=PDF106_RULE, line_numbers=(1,)),),
             errors=(),
         )
 
@@ -306,7 +306,7 @@ class TestFormatterResults(unittest.TestCase):
             new_source="",
             modified=False,
             fixed_findings=collections.Counter(),
-            unfixed_findings=(RuleFinding(rule=PDF001_RULE, line_numbers=(1,)), RuleFinding(rule=PDF105_RULE, line_numbers=(2,))),
+            unfixed_findings=(RuleFinding(rule=PDF001_RULE, line_numbers=(1,)), RuleFinding(rule=PDF106_RULE, line_numbers=(2,))),
             errors=(),
         )
 
@@ -808,7 +808,7 @@ class TestFormatterResults(unittest.TestCase):
             target = root / "a.py"
             target.write_text("x = 1\n", encoding="utf-8")
             rule = RuleMetadata(
-                code=RuleCode("PDF105"),
+                code=RuleCode("PDF106"),
                 name="summary-too-long",
                 message="Docstring summary does not fit on one line",
                 fix_availability=FixAvailability.NEVER,
@@ -863,7 +863,7 @@ class TestFormatterResults(unittest.TestCase):
             target = root / "a.py"
             target.write_text("x = 1\n", encoding="utf-8")
             rule = RuleMetadata(
-                code=RuleCode("PDF105"),
+                code=RuleCode("PDF106"),
                 name="summary-too-long",
                 message="Docstring summary does not fit on one line",
                 fix_availability=FixAvailability.NEVER,

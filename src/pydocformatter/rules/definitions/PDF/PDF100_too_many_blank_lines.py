@@ -58,7 +58,10 @@ def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo, *, co
         retained_lines = ()
     else:
         canonical_margin = PDF_definition.docstring_canonical_margin(docstring, context=context, source_lines=source_lines)
-        retained_lines = _with_closing_quote_prefix_line(docstring, retained_lines, canonical_margin=canonical_margin)
+        retained_lines = _with_configured_final_section_blank(docstring, retained_lines, context=context)
+        retained_lines = _with_closing_quote_prefix_line(
+            docstring, retained_lines, canonical_margin=canonical_margin, keep_final_section_blank=context.settings.docstring_blank_line_after_last_section
+        )
     retained_line_set = set(retained_lines)
     changed_line_numbers = tuple(line.source_line_number for line in docstring.structure.lines if line.index not in retained_line_set and line.source_line_number is not None)
     if not changed_line_numbers:
@@ -77,7 +80,7 @@ def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo, *, co
     )
 
 
-def _retained_line_indexes(blocks: tuple[PDF_definition.DocstringBlock, ...]) -> tuple[int, ...] | None:
+def _retained_line_indexes(blocks: tuple[PDF_definition.DocstringBlock, ...], *, parent_kind: PDF_definition.DocstringBlockKind | None = None) -> tuple[int, ...] | None:
     """Return retained logical lines, or None if a blank-only range becomes empty."""
     if not blocks:
         return ()
@@ -88,11 +91,15 @@ def _retained_line_indexes(blocks: tuple[PDF_definition.DocstringBlock, ...]) ->
     retained: list[int] = []
     first_chunk = non_blank_indexes[0]
     last_chunk = non_blank_indexes[-1]
-    for block in blocks[first_chunk : last_chunk + 1]:
+    previous_block: PDF_definition.DocstringBlock | None = None
+    for index, block in enumerate(blocks[first_chunk : last_chunk + 1], start=first_chunk):
         if block.kind is PDF_definition.DocstringBlockKind.BLANK:
-            retained.append(block.start_line)
+            next_block = _next_non_blank_block(blocks, index + 1, last_chunk + 1)
+            if not _should_drop_blank_separator(parent_kind, previous_block, next_block):
+                retained.append(block.start_line)
             continue
-        child_lines = _retained_line_indexes(block.children)
+        previous_block = block
+        child_lines = _retained_line_indexes(block.children, parent_kind=block.kind)
         if child_lines is None:
             child_lines = ()
         if child_lines:
@@ -100,6 +107,27 @@ def _retained_line_indexes(blocks: tuple[PDF_definition.DocstringBlock, ...]) ->
         else:
             retained.extend(range(block.start_line, block.end_line))
     return tuple(retained)
+
+
+def _next_non_blank_block(blocks: tuple[PDF_definition.DocstringBlock, ...], start: int, end: int) -> PDF_definition.DocstringBlock | None:
+    """Return the next non-blank sibling block in a bounded range."""
+    for block in blocks[start:end]:
+        if block.kind is not PDF_definition.DocstringBlockKind.BLANK:
+            return block
+    return None
+
+
+def _should_drop_blank_separator(
+    parent_kind: PDF_definition.DocstringBlockKind | None,
+    previous_block: PDF_definition.DocstringBlock | None,
+    next_block: PDF_definition.DocstringBlock | None,
+) -> bool:
+    """Return whether convention section spacing requires no blank separator."""
+    if parent_kind is not PDF_definition.DocstringBlockKind.SECTION or previous_block is None or next_block is None:
+        return False
+    if previous_block.kind is PDF_definition.DocstringBlockKind.SECTION_HEADER:
+        return True
+    return previous_block.kind is PDF_definition.DocstringBlockKind.SECTION_ENTRY and next_block.kind is PDF_definition.DocstringBlockKind.SECTION_ENTRY
 
 
 def _body_source(
@@ -118,7 +146,7 @@ def _body_source(
         if output_index:
             chunks.append(line_ending)
         line = lines[line_index]
-        chunks.append(_line_source(line, fragments=fragments, strip_docstring_margin=output_index == 0))
+        chunks.append(PDF_definition.docstring_line_source(line, fragments=fragments, strip_docstring_margin=output_index == 0))
     if _preserve_trailing_newline(docstring, retained_lines):
         chunks.append(line_ending)
     return "".join(chunks)
@@ -146,7 +174,27 @@ def _preserve_trailing_newline(docstring: PDF_definition.DocstringInfo, retained
     return docstring.value.endswith(("\r\n", "\r", "\n"))
 
 
-def _with_closing_quote_prefix_line(docstring: PDF_definition.DocstringInfo, retained_lines: tuple[int, ...], *, canonical_margin: str) -> tuple[int, ...]:
+def _with_configured_final_section_blank(docstring: PDF_definition.DocstringInfo, retained_lines: tuple[int, ...], *, context: RuleContext) -> tuple[int, ...]:
+    """Preserve one trailing blank after the final convention section when configured."""
+    if not context.settings.docstring_blank_line_after_last_section:
+        return retained_lines
+    final_spacing = PDF_definition.final_convention_section_spacing(docstring)
+    if final_spacing is None or final_spacing.final_content_line is None or final_spacing.trailing_blank_line is None:
+        return retained_lines
+    if final_spacing.trailing_blank_line in retained_lines:
+        return retained_lines
+    # Rendering follows retained line order; this blank is after final section content, and any closing-quote prefix
+    # line is appended later.
+    return (*retained_lines, final_spacing.trailing_blank_line)
+
+
+def _with_closing_quote_prefix_line(
+    docstring: PDF_definition.DocstringInfo,
+    retained_lines: tuple[int, ...],
+    *,
+    canonical_margin: str,
+    keep_final_section_blank: bool,
+) -> tuple[int, ...]:
     """Preserve a final same-line closing-quote prefix after content."""
     if not retained_lines:
         return retained_lines
@@ -157,17 +205,12 @@ def _with_closing_quote_prefix_line(docstring: PDF_definition.DocstringInfo, ret
         return retained_lines
     if retained_lines[-1] == final_line.index:
         return retained_lines
+    if not keep_final_section_blank and _is_final_section_trailing_blank(docstring, final_line.index):
+        return retained_lines
     return (*retained_lines, final_line.index)
 
 
-def _line_source(
-    line: PDF_definition.DocstringValueLine,
-    *,
-    fragments: tuple[string_literals.StringValueFragment, ...],
-    strip_docstring_margin: bool,
-) -> str:
-    """Return source spelling for a retained logical line."""
-    if not strip_docstring_margin:
-        return string_literals.source_for_value_slice(fragments, line.start_offset, line.end_offset)
-    start_offset = line.start_offset + line.text_raw_start_column
-    return f"{' ' * line.text_virtual_prefix_length}{string_literals.source_for_value_slice(fragments, start_offset, line.end_offset)}"
+def _is_final_section_trailing_blank(docstring: PDF_definition.DocstringInfo, line_index: int) -> bool:
+    """Return whether a line is a blank immediately after the final convention section."""
+    final_spacing = PDF_definition.final_convention_section_spacing(docstring)
+    return final_spacing is not None and final_spacing.section.end_line == line_index

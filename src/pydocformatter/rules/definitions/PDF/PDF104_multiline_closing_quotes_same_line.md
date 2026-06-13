@@ -1,10 +1,10 @@
-# multiline-closing-quotes-same-line (PDF103)
+# multiline-closing-quotes-same-line (PDF104)
 
 Fix is always available.
 
 Rule is ignored if `docstring-convention` is `none`, `google`, `numpy`, or `pep257`.
 
-Rule is incompatible with `PDF104`.
+Rule is incompatible with `PDF105`.
 
 ## What it does
 Checks for multi-line docstrings whose closing triple quotes should share a line with the last content line.
