@@ -3,6 +3,7 @@ from __future__ import annotations
 import dataclasses
 import enum
 import re
+from collections.abc import Iterator
 
 import libcst as cst
 import libcst.metadata as cst_metadata
@@ -161,6 +162,7 @@ class DocstringOutputSeparatorFallback(enum.Enum):
 
     OPENING = "opening"
     CLOSING = "closing"
+    BOTH = "both"
 
 
 @dataclasses.dataclass(frozen=True)
@@ -1274,6 +1276,12 @@ def _render_output_with_separator_fallback(
         return _opening_separator_rendered_output(docstring, body_source=body_source, expected_value=expected_value)
     if separator_fallback is DocstringOutputSeparatorFallback.CLOSING:
         return _closing_separator_rendered_output(docstring, body_source=body_source, expected_value=expected_value)
+    if separator_fallback is DocstringOutputSeparatorFallback.BOTH:
+        rendered = _render_output_body_source(docstring, body_source=body_source, expected_value=expected_value)
+        if rendered is not None:
+            return rendered
+        fallback_body_source, fallback_expected_value = _separator_fallback_output(body_source, expected_value, separator_fallback=separator_fallback)
+        return _render_output_body_source(docstring, body_source=fallback_body_source, expected_value=fallback_expected_value)
     return _render_output_body_source(docstring, body_source=body_source, expected_value=expected_value)
 
 
@@ -1288,30 +1296,31 @@ def render_simple_docstring_body_with_separator_fallbacks(docstring: DocstringIn
     return None
 
 
-def simple_docstring_body_source_candidates(node: cst.SimpleString, body_source: str, *, expected_value: str) -> tuple[tuple[str, str], ...]:
-    """Return source-body candidates ordered by value preservation before separator fallback."""
-    candidates: list[tuple[str, str]] = []
+def simple_docstring_body_source_candidates(node: cst.SimpleString, body_source: str, *, expected_value: str) -> Iterator[tuple[str, str]]:
+    """Yield source-body candidates ordered by value preservation before separator fallback."""
+    seen: set[tuple[str, str]] = set()
+
+    def candidate_once(candidate: tuple[str, str]) -> Iterator[tuple[str, str]]:
+        if candidate not in seen:
+            seen.add(candidate)
+            yield candidate
+
     escaped_opening = escaped_opening_quote_body_source(node, body_source)
     escaped_closing = escaped_closing_quote_body_source(node, body_source)
     if escaped_opening is not None:
         escaped_both = escaped_closing_quote_body_source(node, escaped_opening)
         if escaped_both is not None:
-            candidates.append((escaped_both, expected_value))
-        candidates.append((escaped_opening, expected_value))
+            yield from candidate_once((escaped_both, expected_value))
+        yield from candidate_once((escaped_opening, expected_value))
     if escaped_closing is not None:
         escaped_closing_opening = escaped_opening_quote_body_source(node, escaped_closing)
         if escaped_closing_opening is not None:
-            candidates.append((escaped_closing_opening, expected_value))
-        candidates.append((escaped_closing, expected_value))
-    candidates.append((body_source, expected_value))
-    candidates.extend(
-        (
-            _separator_fallback_output(body_source, expected_value, separator_fallback=DocstringOutputSeparatorFallback.OPENING),
-            _separator_fallback_output(body_source, expected_value, separator_fallback=DocstringOutputSeparatorFallback.CLOSING),
-            (f" {body_source} ", f" {expected_value} "),
-        )
-    )
-    return tuple(dict.fromkeys(candidates))
+            yield from candidate_once((escaped_closing_opening, expected_value))
+        yield from candidate_once((escaped_closing, expected_value))
+    yield from candidate_once((body_source, expected_value))
+    yield from candidate_once(_separator_fallback_output(body_source, expected_value, separator_fallback=DocstringOutputSeparatorFallback.OPENING))
+    yield from candidate_once(_separator_fallback_output(body_source, expected_value, separator_fallback=DocstringOutputSeparatorFallback.CLOSING))
+    yield from candidate_once(_separator_fallback_output(body_source, expected_value, separator_fallback=DocstringOutputSeparatorFallback.BOTH))
 
 
 def _opening_separator_rendered_output(docstring: DocstringInfo, *, body_source: str, expected_value: str) -> str | None:
@@ -1386,6 +1395,8 @@ def _separator_fallback_output(body_source: str, expected_value: str, *, separat
         return f" {body_source}", f" {expected_value}"
     if separator_fallback is DocstringOutputSeparatorFallback.CLOSING:
         return f"{body_source} ", f"{expected_value} "
+    if separator_fallback is DocstringOutputSeparatorFallback.BOTH:
+        return f" {body_source} ", f" {expected_value} "
     raise ValueError(f"Unsupported separator fallback: {separator_fallback!r}")
 
 
