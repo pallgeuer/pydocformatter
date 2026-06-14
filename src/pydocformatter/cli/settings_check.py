@@ -35,11 +35,11 @@ DEFAULT_RULE_FIXABLE = (ALL_RULE_SELECTOR_TAG,)
 
 
 class IndentStyle(enum.StrEnum):
-    """Indentation styles for generated docstring sections.
+    """Indentation styles for generated and normalized docstring indentation.
 
     Attributes:
-        SPACE (IndentStyle): Use spaces for generated section indentation.
-        TAB (IndentStyle): Use tabs for generated section indentation.
+        SPACE (IndentStyle): Use spaces for generated and normalized docstring indentation.
+        TAB (IndentStyle): Use tabs for generated docstring indentation.
     """
 
     SPACE = "space"
@@ -97,7 +97,7 @@ class CheckSettings:
         legacy (bool): Whether to use the legacy formatter implementation.
         line_length (int): Maximum line length used when wrapping docstrings or comments.
         line_ending (LineEnding): Line ending used when rewriting files.
-        indent_style (IndentStyle): Indentation style used for generated docstring section indentation.
+        indent_style (IndentStyle): Indentation style used for generated and normalized docstring indentation.
         indent_width (int): Number of spaces per generated docstring indentation level, or the visual width of a tab.
         docstring_convention (DocstringConvention): Convention used to parse semantic docstring sections.
         docstring_blank_line_style (DocstringBlankLineStyle): Whitespace style used by PDF004 for blank docstring lines.
@@ -213,7 +213,7 @@ class CheckSettingsOverrides(TypedDict, total=False):
         legacy (bool): Whether to use the legacy formatter implementation.
         line_length (int): Maximum line length used when wrapping docstrings or comments.
         line_ending (LineEnding): Line ending used when rewriting files.
-        indent_style (IndentStyle): Indentation style used for generated docstring section indentation.
+        indent_style (IndentStyle): Indentation style used for generated and normalized docstring indentation.
         indent_width (int): Number of spaces per generated docstring indentation level, or the visual width of a tab.
         docstring_convention (DocstringConvention): Convention used to parse semantic docstring sections.
         docstring_blank_line_style (DocstringBlankLineStyle): Whitespace style used by PDF004 for blank docstring lines.
@@ -358,17 +358,17 @@ SETTINGS_SCHEMA = SettingsSchema(
             field="indent_style",
             value_type=IndentStyle,
             group=SettingsGroup.FORMATTING,
-            help="Indentation style for generated docstring sections.",
-            documentation='Generated docstring section indentation style; one of "space" or "tab".',
+            help="Indentation style for generated and normalized docstring indentation.",
+            documentation='Generated and normalized docstring indentation style; one of "space" or "tab".',
         ),
         SettingDefinition(
             field="indent_width",
             value_type=int,
             group=SettingsGroup.FORMATTING,
-            help="Indentation width for generated docstring sections.",
+            help="Indentation width for generated docstring indentation and measurement.",
             validator=settings_core.validate_int(min_value=1, max_value=255),
             cli={"metavar": "WIDTH"},
-            documentation="Generated docstring section indentation width and tab expansion width used when measuring comments.",
+            documentation="Generated docstring indentation width and tab expansion width used when measuring docstrings and comments.",
         ),
         SettingDefinition(
             field="docstring_convention",

@@ -19,7 +19,7 @@ Blank continuation lines may be empty or exactly the canonical margin. Empty and
 
 With `docstring-convention = "google"`, recognized section headers align to the canonical margin, entry first lines align one configured indent unit under it, and entry continuation lines align two configured indent units under it. With `docstring-convention = "numpy"`, recognized section headers, underline adornments, and entry declaration lines align to the canonical margin, and entry descriptions align one configured indent unit under it.
 
-The configured `indent-style` and `indent-width` settings affect generated convention entry indentation and single-line-suite canonical margins. They do not replace the raw base indentation already used by the surrounding source line.
+The configured `indent-style` and `indent-width` settings affect generated convention entry indentation, single-line-suite canonical margins, and rewritten docstring line indentation. With `indent-style = "space"`, PDF002 expands tabs in rewritten docstring indentation to spaces while preserving visual indentation width. This does not rewrite indentation outside the docstring literal, such as the source indentation before the opening quotes.
 
 The rule skips single-line docstrings, concatenated docstrings, non-docstring string expressions, and simple docstrings whose evaluated lines cannot be mapped unambiguously to physical source lines. Non-raw multi-line docstrings containing backslash escapes are skipped conservatively because an escape sequence may contribute evaluated content at the boundary where indentation would otherwise be rewritten.
 
@@ -27,7 +27,7 @@ The rule skips single-line docstrings, concatenated docstrings, non-docstring st
 Consistent indentation keeps docstrings easy to scan and helps documentation tools parse convention sections predictably.
 
 ## Ruff compatibility
-This rule is intended to replace Ruff's `D207` and `D208` when pydocformatter is responsible for normalizing docstring indentation. Parenthesized docstrings whose opening quotes are indented on their own line intentionally use the quote column as the canonical margin.
+This rule is intended to replace Ruff's `D206`, `D207`, `D208`, `D214`, and `D215` when pydocformatter is responsible for normalizing docstring indentation. `D206`-style tab expansion applies only when `indent-style = "space"`; with `indent-style = "tab"`, generated docstring indentation may use tabs. Parenthesized docstrings whose opening quotes are indented on their own line intentionally use the quote column as the canonical margin.
 
 ## Examples
 Plain continuation lines are aligned to the docstring's canonical margin:
@@ -302,6 +302,24 @@ class Example:
         """
 ```
 
+With space indentation configured, tabs in rewritten docstring indentation are expanded to spaces while tabs inside the content are kept:
+
+```pydocfmt-example
+[input]
+def describe():
+    """Describe the value.
+	First detail.
+		Second detail	with tabbed content.
+    """
+
+[output]
+def describe():
+    """Describe the value.
+    First detail.
+            Second detail	with tabbed content.
+    """
+```
+
 With no convention parsing, convention-looking text is ordinary content and only shared-margin normalization applies:
 
 ```pydocfmt-example
@@ -351,6 +369,6 @@ def not_a_docstring():
 ```
 
 ## Options
-- `indent-style`: Indentation style used for generated convention indentation units.
-- `indent-width`: Indentation width used for generated convention indentation units and single-line-suite docstring margins.
+- `indent-style`: Indentation style used for generated convention indentation units and rewritten docstring indentation.
+- `indent-width`: Indentation width used for generated convention indentation units, single-line-suite docstring margins, and indentation measurement.
 - `docstring-convention`: Enables Google or NumPy section-aware indentation. With `none` or `pep257`, convention-looking text is treated as ordinary continuation content.

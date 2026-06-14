@@ -60,7 +60,7 @@ def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo, *, co
         rule_edits.PlannedTextReplacement(
             start_offset=line.start_offset,
             end_offset=line.end_offset,
-            text=_source_for_target_line(line, target, fragments=fragments),
+            text=_source_for_target_line(line, target, context=context, fragments=fragments),
             line_numbers=(line.source_line_number,),
         )
         for line, target in zip(docstring.structure.lines, line_targets)
@@ -84,6 +84,7 @@ class _LineTarget:
 
 def _target_raw_lines(docstring: PDF_definition.DocstringInfo, *, canonical_margin: str, context: RuleContext) -> tuple[_LineTarget, ...]:
     """Return target evaluated raw text for each docstring line."""
+    canonical_margin = _style_normalized_indent(canonical_margin, context=context)
     targets: list[_LineTarget | None] = [None] * len(docstring.structure.lines)
     targets[0] = _LineTarget(docstring.structure.lines[0].raw_text, 0, "")
     for line in docstring.structure.lines[1:]:
@@ -98,6 +99,10 @@ def _target_raw_lines(docstring: PDF_definition.DocstringInfo, *, canonical_marg
     for line in docstring.structure.lines[1:]:
         if targets[line.index] is None:
             targets[line.index] = _LineTarget(line.raw_text, 0, "")
+        if context.settings.indent_style == settings_check.IndentStyle.SPACE:
+            line_target = targets[line.index]
+            if line_target is not None:
+                targets[line.index] = dataclasses.replace(line_target, raw_text=_space_normalized_target_text(line_target, context=context))
     return tuple(target if target is not None else _LineTarget("", 0, "") for target in targets)
 
 
@@ -183,10 +188,32 @@ def _source_for_target_line(
     line: PDF_definition.DocstringValueLine,
     target: _LineTarget,
     *,
+    context: RuleContext,
     fragments: tuple[string_literals.StringValueFragment, ...],
 ) -> str:
     """Return source spelling for a target line while preserving suffix spelling."""
     if not PDF_definition.has_space_tab_content(line.raw_text):
         return target.raw_text
     _, raw_index, virtual_prefix = PDF_definition.strip_indent_with_mapping(line.raw_text, max(target.strip_width, 0))
-    return f"{target.prefix}{' ' * virtual_prefix}{string_literals.source_for_value_slice(fragments, line.start_offset + raw_index, line.end_offset)}"
+    suffix = f"{' ' * virtual_prefix}{string_literals.source_for_value_slice(fragments, line.start_offset + raw_index, line.end_offset)}"
+    if context.settings.indent_style == settings_check.IndentStyle.SPACE:
+        suffix_content = suffix.lstrip(" \t")
+        suffix = f"{_style_normalized_indent(suffix, context=context)}{suffix_content}"
+    return f"{target.prefix}{suffix}"
+
+
+def _style_normalized_indent(indent: str, *, context: RuleContext) -> str:
+    """Return indentation using the configured style where PDF002 owns generation."""
+    if context.settings.indent_style == settings_check.IndentStyle.TAB:
+        return indent
+    return " " * PDF_definition.leading_width(indent)
+
+
+def _space_normalized_target_text(target: _LineTarget, *, context: RuleContext) -> str:
+    """Return target text with residual leading tabs expanded after the generated prefix."""
+    if target.prefix and target.raw_text.startswith(target.prefix):
+        suffix = target.raw_text[len(target.prefix) :]
+        suffix_content = suffix.lstrip(" \t")
+        return f"{target.prefix}{_style_normalized_indent(suffix, context=context)}{suffix_content}"
+    content = target.raw_text.lstrip(" \t")
+    return f"{_style_normalized_indent(target.raw_text, context=context)}{content}"

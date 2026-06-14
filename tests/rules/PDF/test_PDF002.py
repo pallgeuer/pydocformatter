@@ -97,6 +97,35 @@ def test_tab_crossing_common_margin_preserves_residual_relative_indentation() ->
     assert result.new_source == 'def function():\n    """Summary.\n    Alpha.\n        Nested.\n    """\n'
 
 
+def test_space_indent_style_expands_tabs_in_plain_continuation_indentation() -> None:
+    source = 'def function():\n    """Summary.\n\tAlpha.\n\t\tNested.\n    """\n'
+    result = format_pdf002(source)
+
+    assert result.new_source == 'def function():\n    """Summary.\n    Alpha.\n            Nested.\n    """\n'
+    assert not format_pdf002(result.new_source).modified
+
+
+def test_space_indent_style_leaves_tabs_inside_content_unchanged() -> None:
+    source = 'def function():\n    """Summary.\n\tAlpha\tBeta.\n    """\n'
+    result = format_pdf002(source)
+
+    assert result.new_source == 'def function():\n    """Summary.\n    Alpha\tBeta.\n    """\n'
+
+
+def test_space_indent_style_expands_tabbed_docstring_base_without_changing_opening_line() -> None:
+    source = 'class Example:\n\tdef method(self):\n\t\t"""Summary.\n\t\tBody.\n\t\t"""\n'
+    result = format_pdf002(source)
+
+    assert result.new_source == 'class Example:\n\tdef method(self):\n\t\t"""Summary.\n                Body.\n                """\n'
+
+
+def test_tab_indent_style_preserves_plain_docstring_tab_indentation() -> None:
+    source = 'class Example:\n\tdef method(self):\n\t\t"""Summary.\n\t\tBody.\n\t\t"""\n'
+    result = format_pdf002(source, settings=CheckSettings(select=("PDF002",), indent_style=IndentStyle.TAB))
+
+    assert result.new_source == source
+
+
 def test_blank_line_normalization_accepts_empty_and_canonical_states() -> None:
     source = 'def function():\n    """Summary.\n\n      \n  \n    Done.\n    """\n'
     result = format_pdf002(source)

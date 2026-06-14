@@ -93,6 +93,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Changed `PDF102` through `PDF105` to also normalize single-content-line docstrings when the docstring literal itself spans multiple lines.
   - Changed same-line quote placement for `PDF102` and `PDF104` to keep one separator space when needed for valid Python source.
   - Changed `PDF100` to remove blank lines after Google/NumPy section headers and between consecutive convention entries.
+  - Changed `PDF002` to replace Ruff `D206` by expanding tabs in rewritten docstring indentation when `indent-style = "space"`.
   - Renumbered the existing `PDF101` through `PDF106` rule stubs to `PDF102` through `PDF107`.
   - Swapped `PDF106` and `PDF107` so `PDF106` is `docstring-should-be-one-line` and `PDF107` is `summary-too-long`.
   - Changed PDF001 Google-style entry wrapping to use fixed continuation indentation and to place descriptions on the following line when long entry prefixes leave too little room.
