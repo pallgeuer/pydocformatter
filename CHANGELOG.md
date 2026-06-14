@@ -21,6 +21,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added `PDF100` to collapse excess blank lines around docstring chunks and collapse blank-only docstrings to empty docstrings.
   - Added `PDF101` to insert safe missing blank lines before recognized docstring structures and convention sections.
   - Added `PDF102` through `PDF105` to normalize multi-line docstring opening and closing quote placement.
+  - Added `PDF106` and `PDF107` to collapse safe summary-only docstrings that fit on one line and report summaries that remain multi-line.
 
 - **CLI:**
   - Added Ruff-style subcommands with `pydocfmt check` for read-only checks and `pydocfmt check --fix` for formatting.
@@ -64,6 +65,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added adjacent Markdown documentation for all built-in pydocformatter rules, including Ruff compatibility notes where relevant.
   - Expanded the PDF001 documentation with explicit behavior notes, setting interactions, safety limits, and verified qualitative examples.
   - Expanded the PDF005 and PDF006 documentation with explicit behavior boundaries, safety notes, and verified qualitative examples.
+  - Expanded the PDF106 and PDF107 documentation with explicit behavior boundaries, setting interactions, safety notes, and verified qualitative examples.
   - Added a reusable rule documentation Markdown template at `src/pydocformatter/rules/templates/rule_template.md`.
   - Added adjacent documentation for each rule category and a reusable rule category documentation template.
   - Added docstrings for public glob matching methods, the dependency-pin check tool, and important configuration, CLI, and file-selection helpers.
@@ -96,6 +98,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Changed PDF001 Google-style entry wrapping to use fixed continuation indentation and to place descriptions on the following line when long entry prefixes leave too little room.
   - Changed directive and literal-block parsing so trailing blank lines are represented as ordinary docstring blank-line blocks instead of part of the protected body.
   - Centralized docstring string-literal rendering for `PDF000` and `PDF001`, preserving reusable escape spellings and literal non-ASCII characters while reporting unsafe rewrites as non-fixable findings.
+  - Centralized quote-collision rendering for `PDF106` so one-line docstring collapse reuses the shared PDF escape and separator fallback behavior.
 
 ### Fixed
 
@@ -115,6 +118,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 
 - **Rule documentation:**
   - Expanded the PCF001 and PCF002 rule examples to demonstrate common spacing, wrapping, structure, protection, boundary, and extraction behavior.
+  - Documented that PDF106 separator fallback can add a leading or trailing space to the evaluated `__doc__` value when value-preserving escaping is impossible.
   - Documented that PDF001 delimiter-aware wrapping does not reserve width for unchanged source after a same-line closing docstring delimiter.
   - Rephrased rule example results to describe the effect of applying each rule.
   - Kept planned PDF rule examples in ordinary Python fences until their formatter behavior is implemented and can be tested as structured examples.

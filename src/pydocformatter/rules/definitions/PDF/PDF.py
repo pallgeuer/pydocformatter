@@ -1277,6 +1277,43 @@ def _render_output_with_separator_fallback(
     return _render_output_body_source(docstring, body_source=body_source, expected_value=expected_value)
 
 
+def render_simple_docstring_body_with_separator_fallbacks(docstring: DocstringInfo, *, body_source: str, expected_value: str) -> str | None:
+    """Render output source after trying value-preserving quote escapes and separator fallbacks."""
+    if not isinstance(docstring.node, cst.SimpleString):
+        return None
+    for candidate_body, candidate_value in simple_docstring_body_source_candidates(docstring.node, body_source, expected_value=expected_value):
+        rendered = _render_output_body_source(docstring, body_source=candidate_body, expected_value=candidate_value)
+        if rendered is not None:
+            return rendered
+    return None
+
+
+def simple_docstring_body_source_candidates(node: cst.SimpleString, body_source: str, *, expected_value: str) -> tuple[tuple[str, str], ...]:
+    """Return source-body candidates ordered by value preservation before separator fallback."""
+    candidates: list[tuple[str, str]] = []
+    escaped_opening = escaped_opening_quote_body_source(node, body_source)
+    escaped_closing = escaped_closing_quote_body_source(node, body_source)
+    if escaped_opening is not None:
+        escaped_both = escaped_closing_quote_body_source(node, escaped_opening)
+        if escaped_both is not None:
+            candidates.append((escaped_both, expected_value))
+        candidates.append((escaped_opening, expected_value))
+    if escaped_closing is not None:
+        escaped_closing_opening = escaped_opening_quote_body_source(node, escaped_closing)
+        if escaped_closing_opening is not None:
+            candidates.append((escaped_closing_opening, expected_value))
+        candidates.append((escaped_closing, expected_value))
+    candidates.append((body_source, expected_value))
+    candidates.extend(
+        (
+            _separator_fallback_output(body_source, expected_value, separator_fallback=DocstringOutputSeparatorFallback.OPENING),
+            _separator_fallback_output(body_source, expected_value, separator_fallback=DocstringOutputSeparatorFallback.CLOSING),
+            (f" {body_source} ", f" {expected_value} "),
+        )
+    )
+    return tuple(dict.fromkeys(candidates))
+
+
 def _opening_separator_rendered_output(docstring: DocstringInfo, *, body_source: str, expected_value: str) -> str | None:
     """Render output with opening quote separator precedence."""
     rendered = _render_output_body_source(docstring, body_source=body_source, expected_value=expected_value)
@@ -1300,12 +1337,22 @@ def _closing_separator_rendered_output(docstring: DocstringInfo, *, body_source:
 
 def _opening_quote_separator_output(docstring: DocstringInfo, *, body_source: str, expected_value: str) -> str | None:
     """Render an escaped leading quote to keep opening delimiter and content distinct."""
-    if not isinstance(docstring.node, cst.SimpleString) or "r" in docstring.node.prefix.lower():
+    if not isinstance(docstring.node, cst.SimpleString):
         return None
-    quote_char = "'" if "'" in docstring.node.quote else '"'
+    escaped_body_source = escaped_opening_quote_body_source(docstring.node, body_source)
+    if escaped_body_source is None:
+        return None
+    return _render_output_body_source(docstring, body_source=escaped_body_source, expected_value=expected_value)
+
+
+def escaped_opening_quote_body_source(node: cst.SimpleString, body_source: str) -> str | None:
+    """Return body source with a leading delimiter quote escaped where possible."""
+    if "r" in node.prefix.lower():
+        return None
+    quote_char = "'" if "'" in node.quote else '"'
     if not body_source.startswith(quote_char):
         return None
-    return _render_output_body_source(docstring, body_source=f"\\{body_source[0]}{body_source[1:]}", expected_value=expected_value)
+    return f"\\{body_source}"
 
 
 def escaped_closing_quote_body_source(node: cst.SimpleString, body_source: str) -> str | None:
