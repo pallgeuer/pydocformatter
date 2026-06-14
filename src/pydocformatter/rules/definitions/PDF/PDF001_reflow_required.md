@@ -11,6 +11,8 @@ PDF001 treats each reflowable semantic region independently. It joins consecutiv
 
 The rule intentionally skips docstrings whose evaluated value cannot be mapped back to source text safely. This includes concatenated string docstrings and docstrings whose logical lines come from escape sequences such as `\n`. If a docstring needs reflow but cannot be rendered back with the existing prefix and delimiter without changing its evaluated value, the finding is reported without an automatic fix.
 
+PDF001 accounts for the docstring opening and closing delimiters when wrapping generated docstring lines. It does not account for unchanged Python source that follows the closing delimiter on the same physical line, such as `; return None` in a single-line suite.
+
 ## Why is this useful?
 Consistent wrapping keeps docstrings readable in editors, terminals, review diffs, and generated documentation. Reflowing semantic chunks instead of raw line ranges keeps summaries, paragraphs, parameter descriptions, fields, lists, and quoted text readable without disturbing protected examples or code-like content.
 

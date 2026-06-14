@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
+import functools
 
 import libcst as cst
 
@@ -160,8 +161,25 @@ def wrap_source_words(
     initial_indent: str = "",
     subsequent_indent: str = "",
     tab_width: int,
+    initial_width: int | None = None,
+    subsequent_width: int | None = None,
+    final_suffix_width: int = 0,
 ) -> tuple[WrappedSourceLine, ...]:
-    """Wrap words using their final source spelling for width calculations."""
+    """Wrap words using their final source spelling for width calculations.
+
+    When variable budgets are supplied, `width` is only the fallback for unspecified initial or subsequent widths, and
+    `final_suffix_width` is reserved on the final generated line.
+    """
+    if initial_width is not None or subsequent_width is not None or final_suffix_width:
+        return _wrap_source_words_with_variable_widths(
+            words,
+            initial_width=width if initial_width is None else initial_width,
+            subsequent_width=width if subsequent_width is None else subsequent_width,
+            final_suffix_width=final_suffix_width,
+            initial_indent=initial_indent,
+            subsequent_indent=subsequent_indent,
+            tab_width=tab_width,
+        )
     if not words:
         stripped = initial_indent.rstrip()
         return (WrappedSourceLine(value=stripped, source=stripped),)
@@ -199,6 +217,49 @@ def wrap_source_words(
             )
         )
     return tuple(lines)
+
+
+def _wrap_source_words_with_variable_widths(
+    words: tuple[SourceWord, ...],
+    *,
+    initial_width: int,
+    subsequent_width: int,
+    final_suffix_width: int,
+    initial_indent: str,
+    subsequent_indent: str,
+    tab_width: int,
+) -> tuple[WrappedSourceLine, ...]:
+    """Wrap words when first, continuation, or final physical lines have different budgets."""
+    if not words:
+        stripped = initial_indent.rstrip()
+        return (WrappedSourceLine(value=stripped, source=stripped),)
+
+    def line(indent: str, line_words: tuple[SourceWord, ...]) -> WrappedSourceLine:
+        return WrappedSourceLine(value=f"{indent}{' '.join(word.value for word in line_words)}", source=f"{indent}{' '.join(word.source for word in line_words)}")
+
+    def fits(candidate: WrappedSourceLine, *, first_line: bool, final_line: bool, single_word: bool) -> bool:
+        limit = initial_width if first_line else subsequent_width
+        if final_line:
+            limit -= final_suffix_width
+        return single_word or (limit > 0 and text_layout.display_width(candidate.source, tab_width=tab_width) <= limit)
+
+    @functools.cache
+    def best(start: int, first_line: bool) -> tuple[WrappedSourceLine, ...]:
+        chosen: tuple[WrappedSourceLine, ...] | None = None
+        indent = initial_indent if first_line else subsequent_indent
+        for end in range(len(words), start, -1):
+            candidate_words = words[start:end]
+            candidate = line(indent, candidate_words)
+            if not fits(candidate, first_line=first_line, final_line=end == len(words), single_word=end == start + 1):
+                continue
+            remainder = () if end == len(words) else best(end, False)
+            wrapped = (candidate, *remainder)
+            if chosen is None or len(wrapped) < len(chosen):
+                chosen = wrapped
+        assert chosen is not None
+        return chosen
+
+    return best(0, True)
 
 
 def fragments_for_concatenated_string(node: cst.ConcatenatedString, *, target_quote: str, line_ending: str) -> tuple[StringValueFragment, ...] | None:

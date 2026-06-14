@@ -31,6 +31,11 @@ def format_pdf001(source: str, *, settings: CheckSettings | None = None, fix: bo
     return formatter.format_source(source, "example.py", settings=resolved_settings, rule_selection=rules_selection.select_rules(resolved_settings), fix=fix)
 
 
+def assert_physical_lines_fit(source: str, *, line_length: int) -> None:
+    """Assert that all generated physical source lines fit within a character budget."""
+    assert all(len(line.rstrip("\r\n")) <= line_length for line in source.splitlines(keepends=True))
+
+
 def test_check_and_fix_single_line_summary() -> None:
     source = 'def area(radius):\n    """Return the area for a circle with the supplied radius after validating that the radius is finite and non-negative."""\n'
     _, context = contexts(source, settings=CheckSettings(select=("PDF001",), line_length=72))
@@ -51,7 +56,7 @@ def test_reflows_multiline_summary_and_paragraph_without_crossing_blank_lines() 
 
     assert (
         result.new_source
-        == 'def function():\n    """Summary text that should wrap together with the next summary\n    line and keep the paragraph separate.\n\n    Paragraph text that is long enough to wrap independently\n    from the summary paragraph.\n    """\n'
+        == 'def function():\n    """Summary text that should wrap together with the next\n    summary line and keep the paragraph separate.\n\n    Paragraph text that is long enough to wrap independently\n    from the summary paragraph.\n    """\n'
     )
     assert result.fixed_findings[PDF001ReflowRequired.meta] == 1
     assert not format_pdf001(result.new_source, settings=CheckSettings(select=("PDF001",), line_length=64)).modified
@@ -140,7 +145,7 @@ def test_fix_preserves_crlf_for_generated_lines() -> None:
     source = 'def function():\r\n    """Summary text with enough words to wrap onto another line."""\r\n'
     result = format_pdf001(source, settings=CheckSettings(select=("PDF001",), line_length=48, line_ending=LineEnding.CR_LF))
 
-    assert result.new_source == 'def function():\r\n    """Summary text with enough words to wrap onto\r\n    another line."""\r\n'
+    assert result.new_source == 'def function():\r\n    """Summary text with enough words to wrap\r\n    onto another line."""\r\n'
 
 
 def test_ambiguous_and_concatenated_docstrings_are_skipped() -> None:
@@ -173,7 +178,7 @@ def test_disabled_structure_settings_fall_back_to_plain_reflow() -> None:
 
     assert (
         result.new_source
-        == 'def function():\n    """- A list item with enough words to require\n    wrapping with hanging indentation.\n\n    > A block quote with enough words to require\n    prefix preserving wrapping.\n    """\n'
+        == 'def function():\n    """- A list item with enough words to\n    require wrapping with hanging indentation.\n\n    > A block quote with enough words to require\n    prefix preserving wrapping.\n    """\n'
     )
 
 
@@ -208,7 +213,7 @@ def test_preserves_raw_prefix_and_single_quote_delimiter_when_rendering_is_safe(
     source = "def function():\n    r'''A raw docstring with backslash \\n characters and enough words to wrap safely.'''\n"
     result = format_pdf001(source, settings=CheckSettings(select=("PDF001",), line_length=60))
 
-    assert result.new_source == "def function():\n    r'''A raw docstring with backslash \\n characters and enough\n    words to wrap safely.'''\n"
+    assert result.new_source == "def function():\n    r'''A raw docstring with backslash \\n characters and\n    enough words to wrap safely.'''\n"
 
 
 def test_fix_keeps_non_ascii_code_points_escaped_for_ascii_source() -> None:
@@ -232,7 +237,7 @@ def test_reflows_escaped_delimiters_and_backslashes_when_source_spelling_is_pres
 
     assert (
         result.new_source
-        == "def delimiter():\n    '''A docstring containing an escaped delimiter\n    \\'\\'\\' and enough words to need wrapping.'''\n\ndef backslash():\n    \"\"\"A docstring containing a literal backslash \\\\\n    and enough words to need wrapping.\"\"\"\n"
+        == "def delimiter():\n    '''A docstring containing an escaped delimiter\n    \\'\\'\\' and enough words to need wrapping.'''\n\ndef backslash():\n    \"\"\"A docstring containing a literal backslash\n    \\\\ and enough words to need wrapping.\"\"\"\n"
     )
     assert result.fixed_findings[PDF001ReflowRequired.meta] == 2
     assert not result.unfixed_findings
@@ -244,6 +249,43 @@ def test_reflow_preserves_mixed_literal_and_escaped_non_ascii_spellings() -> Non
 
     assert result.new_source == 'def function():\n    """café \\xe9 words around enough to\n    wrap."""\n'
     assert not format_pdf001(result.new_source, settings=CheckSettings(select=("PDF001",), line_length=40)).modified
+
+
+def test_reflow_counts_opening_delimiter_width_for_first_physical_line() -> None:
+    source = 'def f():\n    """alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu nu xi omicron."""\n'
+    result = format_pdf001(source, settings=CheckSettings(select=("PDF001",), line_length=40))
+
+    assert result.new_source == 'def f():\n    """alpha beta gamma delta epsilon\n    zeta eta theta iota kappa lambda mu\n    nu xi omicron."""\n'
+    assert_physical_lines_fit(result.new_source, line_length=40)
+
+
+def test_reflow_counts_module_docstring_opening_delimiter_width() -> None:
+    source = '"""alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu nu xi omicron."""\n'
+    result = format_pdf001(source, settings=CheckSettings(select=("PDF001",), line_length=40))
+
+    assert result.new_source == '"""alpha beta gamma delta epsilon zeta\neta theta iota kappa lambda mu nu xi\nomicron."""\n'
+    assert_physical_lines_fit(result.new_source, line_length=40)
+
+
+def test_reflow_counts_prefixed_and_single_quote_opening_delimiter_widths() -> None:
+    raw = 'def f():\n    r"""alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu nu xi omicron"""\n'
+    single_quoted = "def f():\n    '''alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu nu xi omicron.'''\n"
+
+    raw_result = format_pdf001(raw, settings=CheckSettings(select=("PDF001",), line_length=40))
+    single_quoted_result = format_pdf001(single_quoted, settings=CheckSettings(select=("PDF001",), line_length=40))
+
+    assert raw_result.new_source == 'def f():\n    r"""alpha beta gamma delta epsilon\n    zeta eta theta iota kappa lambda mu\n    nu xi omicron"""\n'
+    assert single_quoted_result.new_source == "def f():\n    '''alpha beta gamma delta epsilon\n    zeta eta theta iota kappa lambda mu\n    nu xi omicron.'''\n"
+    assert_physical_lines_fit(raw_result.new_source, line_length=40)
+    assert_physical_lines_fit(single_quoted_result.new_source, line_length=40)
+
+
+def test_reflow_counts_same_line_closing_delimiter_width_when_pdf001_renders_it() -> None:
+    source = 'def f():\n    """alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu nu xi omicron pi rho sigma tau"""\n'
+    result = format_pdf001(source, settings=CheckSettings(select=("PDF001",), line_length=30))
+
+    assert result.new_source == 'def f():\n    """alpha beta gamma delta\n    epsilon zeta eta theta\n    iota kappa lambda mu nu xi\n    omicron pi rho sigma\n    tau"""\n'
+    assert_physical_lines_fit(result.new_source, line_length=30)
 
 
 def test_reflow_uses_region_offsets_when_description_matches_entry_prefix() -> None:
@@ -263,7 +305,7 @@ def test_reflow_counts_escaped_non_ascii_source_width_when_wrapping() -> None:
     literal_result = format_pdf001(literal, settings=CheckSettings(select=("PDF001",), line_length=20))
 
     assert escaped_result.new_source == 'def function():\n    """\\xe9\\xe9\\xe9\n    tail words"""\n'
-    assert literal_result.new_source == literal
+    assert literal_result.new_source == 'def function():\n    """ééé tail\n    words"""\n'
 
 
 @pytest.mark.filterwarnings("ignore:invalid escape sequence.*:DeprecationWarning")
@@ -286,7 +328,7 @@ def test_check_mode_reports_all_reflowable_docstrings_without_modifying_source()
     assert not check_result.modified
     assert tuple(finding.line_numbers for finding in check_result.unfixed_findings) == ((1,), (4,))
     assert fix_result.fixed_findings[PDF001ReflowRequired.meta] == 2
-    assert fix_result.new_source == '"""Module docstring with enough words to\nrequire wrapping."""\n\ndef function():\n    """Function docstring with enough words\n    to require wrapping."""\n'
+    assert fix_result.new_source == '"""Module docstring with enough words to\nrequire wrapping."""\n\ndef function():\n    """Function docstring with enough\n    words to require wrapping."""\n'
 
 
 def test_reflows_module_docstring_with_trailing_newline_and_separate_closing_delimiter() -> None:
@@ -343,11 +385,11 @@ def test_single_line_suite_docstring_reflow_uses_literal_column_for_generated_li
     source = 'def function(): """Summary text with enough words to wrap onto a second source line."""; return None\n'
     result = format_pdf001(source, settings=CheckSettings(select=("PDF001",), line_length=48))
 
-    assert result.new_source == 'def function(): """Summary text with enough words\n                to wrap onto a second source\n                line."""; return None\n'
+    assert result.new_source == 'def function(): """Summary text with enough\n                words to wrap onto a second\n                source line."""; return None\n'
 
 
 def test_lf_line_ending_setting_only_controls_generated_docstring_lines() -> None:
     source = 'def function():\r\n    """Summary text with enough words to wrap onto another line."""\r\nvalue = 1\r\n'
     result = format_pdf001(source, settings=CheckSettings(select=("PDF001",), line_length=48, line_ending=LineEnding.LF))
 
-    assert result.new_source == 'def function():\r\n    """Summary text with enough words to wrap onto\n    another line."""\r\nvalue = 1\r\n'
+    assert result.new_source == 'def function():\r\n    """Summary text with enough words to wrap\n    onto another line."""\r\nvalue = 1\r\n'

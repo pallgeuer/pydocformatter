@@ -100,6 +100,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 ### Fixed
 
 - **Docstring formatting:**
+  - Fixed PDF001 to account for opening and same-line closing docstring quote delimiters when wrapping generated docstring source lines.
   - Fixed PDF100, PDF101, PDF104, and PDF105 to preserve genuine leading spaces or tabs on first-line docstring content while rewriting surrounding docstring structure.
   - Fixed PDF104 to move bare closing quotes after single-content-line docstrings whose literal spans multiple physical lines.
   - Fixed PDF102 to keep a distinct, value-preserving source spelling when moving content that starts with the docstring delimiter quote character onto the opening quote line.
@@ -114,6 +115,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 
 - **Rule documentation:**
   - Expanded the PCF001 and PCF002 rule examples to demonstrate common spacing, wrapping, structure, protection, boundary, and extraction behavior.
+  - Documented that PDF001 delimiter-aware wrapping does not reserve width for unchanged source after a same-line closing docstring delimiter.
   - Rephrased rule example results to describe the effect of applying each rule.
   - Kept planned PDF rule examples in ordinary Python fences until their formatter behavior is implemented and can be tested as structured examples.
 

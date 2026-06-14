@@ -114,5 +114,23 @@ def test_wrap_source_words_non_positive_width_uses_one_word_per_line() -> None:
     assert tuple(line.source for line in wrapped) == ("> alpha", "  beta")
 
 
+def test_wrap_source_words_allows_distinct_initial_width() -> None:
+    words = tuple(string_literals.SourceWord(value=word, source=word) for word in ("alpha", "beta", "gamma"))
+
+    wrapped = string_literals.wrap_source_words(words, width=16, initial_width=9, subsequent_width=16, tab_width=4)
+
+    assert tuple(line.value for line in wrapped) == ("alpha", "beta gamma")
+    assert tuple(line.source for line in wrapped) == ("alpha", "beta gamma")
+
+
+def test_wrap_source_words_reserves_final_suffix_width() -> None:
+    words = tuple(string_literals.SourceWord(value=word, source=word) for word in ("alpha", "beta", "gamma"))
+
+    wrapped = string_literals.wrap_source_words(words, width=16, final_suffix_width=3, tab_width=4)
+
+    assert tuple(line.value for line in wrapped) == ("alpha beta", "gamma")
+    assert tuple(line.source for line in wrapped) == ("alpha beta", "gamma")
+
+
 def test_render_simple_string_from_body_source_returns_none_for_invalid_literal() -> None:
     assert string_literals.render_simple_string_from_body_source("", '"""', 'bad """ delimiter', expected_value='bad """ delimiter') is None

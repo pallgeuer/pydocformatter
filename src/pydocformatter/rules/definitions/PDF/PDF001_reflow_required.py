@@ -122,15 +122,17 @@ def _replacement_for_region(
         return None
     initial_base = _line_base_prefix(docstring, region.start_line, first_generated_line=True, fallback_prefix=fallback_prefix)
     subsequent_base = _line_base_prefix(docstring, region.start_line, first_generated_line=False, fallback_prefix=fallback_prefix)
-    width = min(
-        context.settings.line_length - text_layout.display_width(initial_base, tab_width=context.settings.indent_width),
-        context.settings.line_length - text_layout.display_width(subsequent_base, tab_width=context.settings.indent_width),
-    )
+    initial_width = context.settings.line_length - text_layout.display_width(initial_base, tab_width=context.settings.indent_width) - _opening_delimiter_width(docstring, region, context=context)
+    subsequent_width = context.settings.line_length - text_layout.display_width(subsequent_base, tab_width=context.settings.indent_width)
+    final_suffix_width = _closing_delimiter_width(docstring, region)
+    width = min(initial_width, subsequent_width)
     if _should_split_google_entry_prefix(region, width=width, tab_width=context.settings.indent_width):
         wrapped = _wrapped_region_lines(
             docstring,
             region,
-            width=width,
+            initial_width=subsequent_width,
+            subsequent_width=subsequent_width,
+            final_suffix_width=final_suffix_width,
             initial_indent=region.subsequent_indent,
             subsequent_indent=region.subsequent_indent,
             tab_width=context.settings.indent_width,
@@ -149,7 +151,9 @@ def _replacement_for_region(
     wrapped = _wrapped_region_lines(
         docstring,
         region,
-        width=width,
+        initial_width=initial_width,
+        subsequent_width=subsequent_width,
+        final_suffix_width=final_suffix_width,
         initial_indent=region.initial_indent,
         subsequent_indent=region.subsequent_indent,
         tab_width=context.settings.indent_width,
@@ -165,6 +169,21 @@ def _replacement_for_region(
         fallback_prefix=fallback_prefix,
         line_ending=context.line_ending,
     )
+
+
+def _opening_delimiter_width(docstring: PDF_definition.DocstringInfo, region: PDF_definition.ReflowRegion, *, context: RuleContext) -> int:
+    """Return physical source width before first generated value text."""
+    if region.start_line != 0 or not isinstance(docstring.node, cst.SimpleString):
+        return 0
+    source_line = PDF_definition.source_lines(context.module.code)[docstring.range.start.line - 1]
+    return text_layout.display_width(f"{source_line[: docstring.range.start.column]}{docstring.node.prefix}{docstring.node.quote}", tab_width=context.settings.indent_width)
+
+
+def _closing_delimiter_width(docstring: PDF_definition.DocstringInfo, region: PDF_definition.ReflowRegion) -> int:
+    """Return closing delimiter width when PDF001 keeps it on the final generated line."""
+    if region.end_offset != len(docstring.value) or PDF_definition.docstring_value_ends_with_newline(docstring) or not isinstance(docstring.node, cst.SimpleString):
+        return 0
+    return len(docstring.node.quote)
 
 
 def _should_split_google_entry_prefix(region: PDF_definition.ReflowRegion, *, width: int, tab_width: int) -> bool:
@@ -193,7 +212,9 @@ def _wrapped_region_lines(
     docstring: PDF_definition.DocstringInfo,
     region: PDF_definition.ReflowRegion,
     *,
-    width: int,
+    initial_width: int,
+    subsequent_width: int,
+    final_suffix_width: int,
     initial_indent: str,
     subsequent_indent: str,
     tab_width: int,
@@ -211,17 +232,23 @@ def _wrapped_region_lines(
                     len(line.text),
                 )
             ),
-            width=max(1, width),
+            width=max(1, min(initial_width, subsequent_width)),
             initial_indent=initial_indent,
             subsequent_indent=subsequent_indent,
             tab_width=tab_width,
+            initial_width=initial_width,
+            subsequent_width=subsequent_width,
+            final_suffix_width=final_suffix_width,
         )
     return string_literals.wrap_source_words(
         _source_words_for_region(region, fragments=fragments),
-        width=max(1, width),
+        width=max(1, min(initial_width, subsequent_width)),
         initial_indent=initial_indent,
         subsequent_indent=subsequent_indent,
         tab_width=tab_width,
+        initial_width=initial_width,
+        subsequent_width=subsequent_width,
+        final_suffix_width=final_suffix_width,
     )
 
 
