@@ -83,9 +83,9 @@ def semicolon():
 
 [output=unchanged]
 [findings]
-PDF301: 2
-PDF301: 6
-PDF301: 10
+PDF301: Line 2
+PDF301: Line 6
+PDF301: Line 10
 ```
 
 Empty docstrings, underlined title-style summaries, parser-recognized section-only docstrings, Sphinx field-only docstrings, and summaries ending with a backslash are skipped. Recognized NumPy section headings such as `Parameters` followed by an underline are section headers, not summaries:

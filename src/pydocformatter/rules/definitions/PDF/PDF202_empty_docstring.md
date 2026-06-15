@@ -23,7 +23,7 @@ def value():
 
 [output=unchanged]
 [findings]
-PDF202: 2
+PDF202: Line 2
 ```
 
 The rule checks the evaluated docstring value, so escaped whitespace and concatenated whitespace-only docstrings are also empty:
@@ -40,8 +40,8 @@ def concatenated():
 
 [output=unchanged]
 [findings]
-PDF202: 2
-PDF202: 6-7
+PDF202: Line 2
+PDF202: Lines 6-7
 ```
 
 Empty docstrings are reported wherever Python recognizes a real module, class, or function docstring:
@@ -58,8 +58,8 @@ class Example:
 
 [output=unchanged]
 [findings]
-PDF202: 1
-PDF202: 5-7
+PDF202: Line 1
+PDF202: Lines 5-7
 ```
 
 Absent docstrings and later string expressions are not reported:

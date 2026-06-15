@@ -66,7 +66,70 @@ pass
 
 [output=unchanged]
 [findings]
-PDF101: 5-3
+PDF101: Lines 5-3
+```
+""",
+            rule_code="PDF101",
+        )
+
+
+def test_parse_rule_markdown_examples_rejects_mismatched_finding_line_labels() -> None:
+    """Finding line labels must match singular and plural line references."""
+    with pytest.raises(rule_documentation.RuleMarkdownExampleParseError, match="expected 'Line'"):
+        rule_documentation.parse_rule_markdown_examples(
+            """```pydocfmt-example
+[input]
+pass
+
+[output=unchanged]
+[findings]
+PDF101: Lines 5
+```
+""",
+            rule_code="PDF101",
+        )
+
+    with pytest.raises(rule_documentation.RuleMarkdownExampleParseError, match="expected 'Lines'"):
+        rule_documentation.parse_rule_markdown_examples(
+            """```pydocfmt-example
+[input]
+pass
+
+[output=unchanged]
+[findings]
+PDF101: Line 3-4
+```
+""",
+            rule_code="PDF101",
+        )
+
+
+def test_parse_rule_markdown_examples_treats_degenerate_ranges_as_single_lines() -> None:
+    """A degenerate finding range is singular because it expands to one line."""
+    examples = rule_documentation.parse_rule_markdown_examples(
+        """```pydocfmt-example
+[input]
+pass
+
+[output=unchanged]
+[findings]
+PDF101: Line 4-4
+```
+""",
+        rule_code="PDF101",
+    )
+
+    assert examples[0].findings == ((RuleCode("PDF101"), (4,)),)
+
+    with pytest.raises(rule_documentation.RuleMarkdownExampleParseError, match="expected 'Line'"):
+        rule_documentation.parse_rule_markdown_examples(
+            """```pydocfmt-example
+[input]
+pass
+
+[output=unchanged]
+[findings]
+PDF101: Lines 4-4
 ```
 """,
             rule_code="PDF101",

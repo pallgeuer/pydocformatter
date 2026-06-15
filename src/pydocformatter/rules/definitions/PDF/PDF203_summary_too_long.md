@@ -29,7 +29,7 @@ def area(radius: float) -> float:
 
 [output=unchanged]
 [findings]
-PDF203: 2-3
+PDF203: Lines 2-3
 ```
 
 When PDF203 is selected by itself, `line-length` does not make it reflow or suppress a multi-line summary:
@@ -46,7 +46,7 @@ def area(radius: float) -> float:
 
 [output=unchanged]
 [findings]
-PDF203: 2-3
+PDF203: Lines 2-3
 ```
 
 Multiple docstring shapes can be reported in one file. Line numbers point to the mapped summary source lines, falling back to the physical docstring line for escaped newline summaries:
@@ -65,9 +65,9 @@ def escaped() -> None:
 
 [output=unchanged]
 [findings]
-PDF203: 1-2
-PDF203: 5-6
-PDF203: 9
+PDF203: Lines 1-2
+PDF203: Lines 5-6
+PDF203: Line 9
 ```
 
 One-line summaries followed by a blank-line-separated body, paragraph, or recognized section are not reported:
@@ -150,7 +150,7 @@ def list_item() -> None:
 
 [output=unchanged]
 [findings]
-PDF203: 2-3
+PDF203: Lines 2-3
 ```
 
 Ambiguous prose without a blank line after a one-line opening sentence is reported because it may be either a wrapped summary or a missing summary/body separator:
@@ -164,7 +164,7 @@ def area(radius: float) -> float:
 
 [output=unchanged]
 [findings]
-PDF203: 2-3
+PDF203: Lines 2-3
 ```
 
 ## Options

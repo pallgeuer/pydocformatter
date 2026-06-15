@@ -65,6 +65,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added a Ruff file-selection compatibility specification at `docs/file_selection_spec.md`, including exact defaults, precedence rules, force-exclude behavior, config-relative glob bases, and explicit pydocformatter deviations.
   - Added a rule-selection specification at `docs/rule_selection_spec.md`, covering rule collection, selectors, fixability, and rule explanation output.
   - Added adjacent Markdown documentation for all built-in pydocformatter rules, including Ruff compatibility notes where relevant.
+  - Changed non-fixable findings in rule examples to label singular and plural line references explicitly.
   - Expanded the PDF101 documentation with explicit behavior notes, setting interactions, safety limits, and verified qualitative examples.
   - Expanded the PDF104 and PDF105 documentation with explicit behavior boundaries, safety notes, and verified qualitative examples.
   - Expanded the PDF110 and PDF203 documentation with explicit behavior boundaries, setting interactions, safety notes, and verified qualitative examples.

@@ -15,7 +15,7 @@ TEMPLATE_PATH = pathlib.Path(__file__).with_name("templates") / "rule_template.m
 CATEGORY_TEMPLATE_PATH = pathlib.Path(__file__).with_name("templates") / "rule_category_template.md"
 _EXAMPLE_OPENING_FENCE_RE = re.compile(r"^(?P<fence>`{3,})pydocfmt-example[^\n]*$")
 _SECTION_MARKERS = frozenset(("settings", "input", "output", "output=unchanged", "findings"))
-_FINDING_RE = re.compile(r"^(?P<code>[A-Z]+[0-9]+): (?P<lines>[0-9][0-9, -]*)$")
+_FINDING_RE = re.compile(r"^(?P<code>[A-Z]+[0-9]+): (?P<label>Line|Lines) (?P<lines>[0-9][0-9, -]*)$")
 
 
 class RuleMarkdownExampleParseError(ValueError):
@@ -184,7 +184,9 @@ def _parse_findings(findings_text: str, *, rule_code: str, example_number: int) 
         match = _FINDING_RE.fullmatch(line)
         if match is None:
             raise RuleMarkdownExampleParseError(f"{rule_code} example {example_number}: invalid finding line: {line!r}")
-        findings.append((RuleCode(match.group("code")), _parse_line_numbers(match.group("lines"), rule_code=rule_code, example_number=example_number)))
+        line_numbers = _parse_line_numbers(match.group("lines"), rule_code=rule_code, example_number=example_number)
+        _validate_finding_line_label(match.group("label"), line_numbers, rule_code=rule_code, example_number=example_number)
+        findings.append((RuleCode(match.group("code")), line_numbers))
     return tuple(findings)
 
 
@@ -203,6 +205,13 @@ def _parse_line_numbers(text: str, *, rule_code: str, example_number: int) -> tu
         else:
             line_numbers.append(int(part))
     return tuple(line_numbers)
+
+
+def _validate_finding_line_label(label: str, line_numbers: tuple[int, ...], *, rule_code: str, example_number: int) -> None:
+    """Validate the singular or plural finding line label."""
+    expected_label = "Line" if len(line_numbers) == 1 else "Lines"
+    if label != expected_label:
+        raise RuleMarkdownExampleParseError(f"{rule_code} example {example_number}: expected {expected_label!r} for finding lines, got {label!r}")
 
 
 def load_rule_category_explanation(category_class: type[object]) -> str:

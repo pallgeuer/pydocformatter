@@ -97,7 +97,7 @@ def quoted():
 
 [output=unchanged]
 [findings]
-PDF001: 2-4
+PDF001: Lines 2-4
 ```
 
 Docstrings that already use triple double quotes, concatenated docstrings, and later string expressions are unchanged:
