@@ -380,6 +380,11 @@ def convention_parses_sections(convention: settings_check.DocstringConvention) -
     return convention in (settings_check.DocstringConvention.GOOGLE, settings_check.DocstringConvention.NUMPY)
 
 
+def is_adornment(text: str) -> bool:
+    """Return whether text is a heading or section adornment line."""
+    return _is_adornment(text)
+
+
 def final_convention_section(docstring: DocstringInfo) -> DocstringBlock | None:
     """Return the final top-level convention section, if there is one."""
     if not convention_parses_sections(docstring.structure.convention):

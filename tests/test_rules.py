@@ -966,6 +966,8 @@ class TestRules(unittest.TestCase):
                     DocstringConvention.NUMPY: RuleSettingEffect.IGNORED,
                     DocstringConvention.PEP257: RuleSettingEffect.IGNORED,
                 },
+                "PDF300": {DocstringConvention.GOOGLE: RuleSettingEffect.IGNORED},
+                "PDF301": {DocstringConvention.NUMPY: RuleSettingEffect.IGNORED, DocstringConvention.PEP257: RuleSettingEffect.IGNORED},
             },
         )
         self.assertEqual(
