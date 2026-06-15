@@ -14,13 +14,14 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added convention-aware semantic docstring preparation with explicit reflow regions and configurable recognition of lists, headings, doctests, code fences, block quotes, tables, directives, literal blocks, and Sphinx fields.
   - Added the `docstring-convention` setting with `none`, `google`, `numpy`, and `pep257` modes.
   - Added `PDF000` to rewrite implicitly concatenated docstrings as equivalent simple triple-double-quoted literals.
+  - Added `PDF001` and `PDF002` to normalize simple docstring quote style and report non-raw docstrings with source backslashes, suppressing ASCII-only non-ASCII character escape spellings and using automatic fixes only when the rewrite preserves the evaluated docstring value.
   - Added `PDF101` to reflow safely mapped docstring summaries, paragraphs, section descriptions, Sphinx fields, list items, and block quotes.
   - Added `PDF100` to normalize safely mapped multi-line simple docstring indentation, including convention-aware Google and NumPy section indentation.
   - Added `PDF102` and `PDF103` to normalize safely mapped docstring trailing whitespace and blank-line whitespace.
   - Added `PDF104` and `PDF105` to normalize quote-adjacent whitespace around safely mapped simple docstring content.
   - Added `PDF200` to collapse excess blank lines around docstring chunks and collapse blank-only docstrings to empty docstrings.
   - Added `PDF201` to insert safe missing blank lines before recognized docstring structures and convention sections.
-  - Added `PDF001`, `PDF002`, `PDF202`, `PDF300` through `PDF305`, `PDF400` through `PDF405`, and `PDF500` through `PDF507` as implementation-pending stubs for the remaining Ruff docstring style and validation rules.
+  - Added `PDF202`, `PDF300` through `PDF305`, `PDF400` through `PDF405`, and `PDF500` through `PDF507` as implementation-pending stubs for the remaining Ruff docstring style and validation rules.
   - Added `PDF106` through `PDF109` to normalize multi-line docstring opening and closing quote placement.
   - Added `PDF110` and `PDF203` to collapse safe summary-only docstrings that fit on one line and report summaries that remain multi-line.
 

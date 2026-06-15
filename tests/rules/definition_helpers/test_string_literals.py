@@ -96,6 +96,36 @@ def test_render_value_as_simple_string_uses_explicit_non_ascii_policy() -> None:
     assert string_literals.render_value_as_simple_string("café", escape_non_ascii=True) == '"""caf\\xe9"""'
 
 
+def test_parse_simple_string_escape_returns_value_source_and_end() -> None:
+    cases = (
+        (r"\n tail", 0, "\n", r"\n", 2),
+        (r"\x41 tail", 0, "A", r"\x41", 4),
+        (r"\u0041 tail", 0, "A", r"\u0041", 6),
+        (r"\U00000041 tail", 0, "A", r"\U00000041", 10),
+        (r"\101 tail", 0, "A", r"\101", 4),
+        (r"\N{LATIN CAPITAL LETTER A} tail", 0, "A", r"\N{LATIN CAPITAL LETTER A}", 26),
+        ("prefix \\t tail", 7, "\t", r"\t", 9),
+    )
+
+    for body, start, value, source, end in cases:
+        parsed = string_literals.parse_simple_string_escape(body, start)
+
+        assert parsed == string_literals.StringEscape(value=value, source=source, end=end)
+
+
+def test_parse_simple_string_escape_handles_line_continuations() -> None:
+    assert string_literals.parse_simple_string_escape("\\\nnext", 0) == string_literals.StringEscape(value="", source="", end=2)
+    assert string_literals.parse_simple_string_escape("\\\r\nnext", 0) == string_literals.StringEscape(value="", source="", end=3)
+
+
+def test_parse_simple_string_escape_returns_none_for_invalid_escape() -> None:
+    assert string_literals.parse_simple_string_escape("\\", 0) is None
+    assert string_literals.parse_simple_string_escape(r"\x4", 0) is None
+    assert string_literals.parse_simple_string_escape(r"\u004g", 0) is None
+    assert string_literals.parse_simple_string_escape(r"\N{NOT A NAME}", 0) is None
+    assert string_literals.parse_simple_string_escape(r"\d", 0) is None
+
+
 def test_wrap_source_words_counts_escape_source_widths() -> None:
     words = (string_literals.SourceWord(value="éé", source="\\xe9\\xe9"), string_literals.SourceWord(value="tail", source="tail"))
 

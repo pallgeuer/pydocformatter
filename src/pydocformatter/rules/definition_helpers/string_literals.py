@@ -17,6 +17,15 @@ class StringValueFragment:
 
 
 @dataclasses.dataclass(frozen=True)
+class StringEscape:
+    """One parsed escape sequence in a simple string body."""
+
+    value: str
+    source: str
+    end: int
+
+
+@dataclasses.dataclass(frozen=True)
 class SourceWord:
     """One whitespace-delimited evaluated word with source spelling."""
 
@@ -49,7 +58,7 @@ _SIMPLE_ESCAPE_SOURCES = {value: f"\\{source}" for source, value in _SIMPLE_ESCA
 
 def value_fragments_for_simple_string(node: cst.SimpleString, *, line_ending: str) -> tuple[StringValueFragment, ...] | None:
     """Return source spellings for each evaluated character in a simple string."""
-    body = _simple_string_body_source(node)
+    body = simple_string_body_source(node)
     if body is None:
         return None
     raw = "r" in node.prefix.lower()
@@ -71,15 +80,25 @@ def value_fragments_for_simple_string(node: cst.SimpleString, *, line_ending: st
             fragments.append(StringValueFragment(value=char, source=char))
             index += 1
         else:
-            parsed = _parse_escape(body, index)
+            parsed = parse_simple_string_escape(body, index)
             if parsed is None:
                 return None
-            value, source, index = parsed
-            if value:
-                if len(value) != 1:
-                    raise AssertionError(f"Expected a single-character escape value, got {value!r}")
-                fragments.append(StringValueFragment(value=value, source=source))
+            index = parsed.end
+            if parsed.value:
+                if len(parsed.value) != 1:
+                    raise AssertionError(f"Expected a single-character escape value, got {parsed.value!r}")
+                fragments.append(StringValueFragment(value=parsed.value, source=parsed.source))
     return tuple(fragments)
+
+
+def simple_string_body_source(node: cst.SimpleString) -> str | None:
+    """Return the exact source body between a simple string's delimiters."""
+    value = node.value
+    prefix_length = len(node.prefix)
+    quote = node.quote
+    if not value[prefix_length:].startswith(quote) or not value.endswith(quote):
+        return None
+    return value[prefix_length + len(quote) : -len(quote)]
 
 
 def render_simple_string_from_fragments(
@@ -292,42 +311,34 @@ def _iter_simple_string_parts(node: cst.ConcatenatedString) -> tuple[cst.SimpleS
     return tuple(parts)
 
 
-def _simple_string_body_source(node: cst.SimpleString) -> str | None:
-    value = node.value
-    prefix_length = len(node.prefix)
-    quote = node.quote
-    if not value[prefix_length:].startswith(quote) or not value.endswith(quote):
-        return None
-    return value[prefix_length + len(quote) : -len(quote)]
-
-
-def _parse_escape(body: str, start: int) -> tuple[str, str, int] | None:
+def parse_simple_string_escape(body: str, start: int) -> StringEscape | None:
+    """Return the parsed escape at start in a simple string body."""
     if start + 1 >= len(body):
         return None
     escaped = body[start + 1]
     if escaped == "\r":
         if start + 2 < len(body) and body[start + 2] == "\n":
-            return "", "", start + 3
-        return "", "", start + 2
+            return StringEscape(value="", source="", end=start + 3)
+        return StringEscape(value="", source="", end=start + 2)
     if escaped == "\n":
-        return "", "", start + 2
+        return StringEscape(value="", source="", end=start + 2)
     if escaped in _SIMPLE_ESCAPES:
-        return _SIMPLE_ESCAPES[escaped], body[start : start + 2], start + 2
+        return StringEscape(value=_SIMPLE_ESCAPES[escaped], source=body[start : start + 2], end=start + 2)
     if escaped == "x" and _has_hex_digits(body, start + 2, 2):
         source = body[start : start + 4]
-        return chr(int(body[start + 2 : start + 4], 16)), source, start + 4
+        return StringEscape(value=chr(int(body[start + 2 : start + 4], 16)), source=source, end=start + 4)
     if escaped == "u" and _has_hex_digits(body, start + 2, 4):
         source = body[start : start + 6]
-        return chr(int(body[start + 2 : start + 6], 16)), source, start + 6
+        return StringEscape(value=chr(int(body[start + 2 : start + 6], 16)), source=source, end=start + 6)
     if escaped == "U" and _has_hex_digits(body, start + 2, 8):
         source = body[start : start + 10]
-        return chr(int(body[start + 2 : start + 10], 16)), source, start + 10
+        return StringEscape(value=chr(int(body[start + 2 : start + 10], 16)), source=source, end=start + 10)
     if escaped in "01234567":
         end = start + 2
         while end < min(start + 4, len(body)) and body[end] in "01234567":
             end += 1
         source = body[start:end]
-        return chr(int(body[start + 1 : end], 8)), source, end
+        return StringEscape(value=chr(int(body[start + 1 : end], 8)), source=source, end=end)
     if escaped == "N":
         end = body.find("}", start + 2)
         if end == -1 or start + 2 >= len(body) or body[start + 2] != "{":
@@ -335,11 +346,12 @@ def _parse_escape(body: str, start: int) -> tuple[str, str, int] | None:
         source = body[start : end + 1]
         try:
             expression = cst.parse_expression(f'"{source}"')
+            evaluated_value = expression.evaluated_value if isinstance(expression, cst.SimpleString) else None
         except Exception:
             return None
-        if not isinstance(expression, cst.SimpleString) or not isinstance(expression.evaluated_value, str) or len(expression.evaluated_value) != 1:
+        if not isinstance(evaluated_value, str) or len(evaluated_value) != 1:
             return None
-        return expression.evaluated_value, source, end + 1
+        return StringEscape(value=evaluated_value, source=source, end=end + 1)
     return None
 
 
