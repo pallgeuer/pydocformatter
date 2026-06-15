@@ -100,8 +100,8 @@ class CheckSettings:
         indent_style (IndentStyle): Indentation style used for generated and normalized docstring indentation.
         indent_width (int): Number of spaces per generated docstring indentation level, or the visual width of a tab.
         docstring_convention (DocstringConvention): Convention used to parse semantic docstring sections.
-        docstring_blank_line_style (DocstringBlankLineStyle): Whitespace style used by PDF004 for blank docstring lines.
-        docstring_blank_line_after_last_section (bool): Whether PDF100 and PDF101 keep one blank line after the last
+        docstring_blank_line_style (DocstringBlankLineStyle): Whitespace style used by PDF103 for blank docstring lines.
+        docstring_blank_line_after_last_section (bool): Whether PDF200 and PDF201 keep one blank line after the last
             convention section.
         docstring_parse_list_items (bool): Whether list items are parsed as distinct docstring structures.
         docstring_parse_headings (bool): Whether Markdown and reStructuredText headings are parsed.
@@ -216,8 +216,8 @@ class CheckSettingsOverrides(TypedDict, total=False):
         indent_style (IndentStyle): Indentation style used for generated and normalized docstring indentation.
         indent_width (int): Number of spaces per generated docstring indentation level, or the visual width of a tab.
         docstring_convention (DocstringConvention): Convention used to parse semantic docstring sections.
-        docstring_blank_line_style (DocstringBlankLineStyle): Whitespace style used by PDF004 for blank docstring lines.
-        docstring_blank_line_after_last_section (bool): Whether PDF100 and PDF101 keep one blank line after the last
+        docstring_blank_line_style (DocstringBlankLineStyle): Whitespace style used by PDF103 for blank docstring lines.
+        docstring_blank_line_after_last_section (bool): Whether PDF200 and PDF201 keep one blank line after the last
             convention section.
         docstring_parse_list_items (bool): Whether list items are parsed as distinct docstring structures.
         docstring_parse_headings (bool): Whether Markdown and reStructuredText headings are parsed.
@@ -382,14 +382,14 @@ SETTINGS_SCHEMA = SettingsSchema(
             value_type=DocstringBlankLineStyle,
             group=SettingsGroup.DOCSTRING_FORMATTING,
             help="Whitespace style for blank docstring lines.",
-            documentation='Blank docstring line whitespace style used by PDF004; one of "blank" or "aligned".',
+            documentation='Blank docstring line whitespace style used by PDF103; one of "blank" or "aligned".',
         ),
         SettingDefinition(
             field="docstring_blank_line_after_last_section",
             value_type=bool,
             group=SettingsGroup.DOCSTRING_FORMATTING,
             help="Keep one blank line after the last docstring section.",
-            documentation="Whether PDF100 and PDF101 keep one blank line after the last recognized Google or NumPy docstring section.",
+            documentation="Whether PDF200 and PDF201 keep one blank line after the last recognized Google or NumPy docstring section.",
         ),
         SettingDefinition(
             field="docstring_parse_list_items",

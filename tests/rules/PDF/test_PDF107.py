@@ -1,15 +1,13 @@
 import libcst as cst
 import libcst.metadata as cst_metadata
-import pytest
 
 import pydocformatter.formatter as formatter
 import pydocformatter.rules_selection as rules_selection
-from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention
+from pydocformatter.cli.settings_check import CheckSettings, IndentStyle, LineEnding
 from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
 from pydocformatter.rules.definitions.PDF.PDF import PDF
-from pydocformatter.rules.definitions.PDF.PDF001_reflow_required import PDF001ReflowRequired
-from pydocformatter.rules.definitions.PDF.PDF101_missing_blank_line import PDF101MissingBlankLine
-from pydocformatter.rules.definitions.PDF.PDF107_summary_too_long import PDF107SummaryTooLong
+from pydocformatter.rules.definitions.PDF.PDF107_multiline_opening_quotes_sep_line import PDF107MultilineOpeningQuotesSepLine
+from pydocformatter.rules.definitions.PDF.PDF109_multiline_closing_quotes_sep_line import PDF109MultilineClosingQuotesSepLine
 
 
 def contexts(source: str, *, settings: CheckSettings | None = None) -> tuple[RuleCategoryContext, RuleContext]:
@@ -24,159 +22,136 @@ def contexts(source: str, *, settings: CheckSettings | None = None) -> tuple[Rul
         positions=wrapper.resolve(cst_metadata.PositionProvider),
         line_ending="\r\n" if "\r\n" in source else "\n",
     )
-    return category, RuleContext(**category.__dict__, category_data=PDF.prepare(category), effectively_fixable=False)
+    return category, RuleContext(**category.__dict__, category_data=PDF.prepare(category), effectively_fixable=True)
 
 
-def format_source(source: str, *, settings: CheckSettings | None = None, fix: bool = True) -> formatter.FormatterResult:
-    """Format source with supplied settings."""
+def format_pdf103(source: str, *, settings: CheckSettings | None = None, fix: bool = True) -> formatter.FormatterResult:
+    """Format source with PDF107 selected."""
     resolved_settings = CheckSettings(select=("PDF107",)) if settings is None else settings
     return formatter.format_source(source, "example.py", settings=resolved_settings, rule_selection=rules_selection.select_rules(resolved_settings), fix=fix)
 
 
-def test_reports_multiline_summary_without_changing_source() -> None:
-    source = 'def function():\n    """Summary line\n    continuation line.\n    """\n'
-    result = format_source(source)
+def test_moves_first_content_line_below_opening_quotes() -> None:
+    source = 'def function():\n    """Summary.\n\n    Body.\n    """\n'
+    result = format_pdf103(source)
 
-    assert result.new_source == source
-    assert not result.fixed_findings
-    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((2, 3),)
-    assert not result.unfixed_findings[0].fixable
-
-
-def test_pdf001_can_reflow_short_multiline_summary_before_pdf107_checks() -> None:
-    source = 'def function():\n    """Summary line\n    continuation line.\n    """\n'
-    settings = CheckSettings(select=("PDF001", "PDF107"), line_length=88)
-    result = format_source(source, settings=settings)
-
-    assert result.new_source == 'def function():\n    """Summary line continuation line.\n    """\n'
-    assert result.fixed_findings[PDF001ReflowRequired.meta] == 1
-    assert not result.unfixed_findings
+    assert result.new_source == 'def function():\n    """\n    Summary.\n\n    Body.\n    """\n'
+    assert result.fixed_findings[PDF107MultilineOpeningQuotesSepLine.meta] == 1
+    assert not format_pdf103(result.new_source).modified
 
 
-def test_pdf107_reports_summary_that_remains_multiline_after_reflow() -> None:
-    source = 'def function():\n    """supercalifragilisticexpialidocious\n    words after it.\n    """\n'
-    settings = CheckSettings(select=("PDF001", "PDF107"), line_length=28)
-    result = format_source(source, settings=settings)
+def test_strips_quote_adjacent_space_tabs_from_moved_first_line() -> None:
+    source = 'def function():\n    """ \t Summary.\n\n    Body.\n    """\n'
+    result = format_pdf103(source)
 
-    assert result.new_source == source
-    assert not result.fixed_findings
-    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((2, 3),)
-    assert result.unfixed_findings[0].rule == PDF107SummaryTooLong.meta
+    assert result.new_source == 'def function():\n    """\n    Summary.\n\n    Body.\n    """\n'
+    assert result.fixed_findings[PDF107MultilineOpeningQuotesSepLine.meta] == 1
+    assert not format_pdf103(result.new_source).modified
 
 
-def test_does_not_report_one_line_summary_body_or_recognized_structures() -> None:
-    source = (
-        'def body():\n    """Summary.\n\n    Body.\n    """\n\n'
-        'def section(value):\n    """Summary.\n\n    Args:\n        value: Description.\n    """\n\n'
-        'def list_item():\n    """Summary.\n\n    - item\n    """\n'
-    )
-    result = format_source(source, settings=CheckSettings(select=("PDF107",), docstring_convention=DocstringConvention.GOOGLE))
+def test_preserves_quote_adjacent_non_space_tab_whitespace_on_moved_first_line() -> None:
+    source = 'def function():\n    """\xa0Summary.\n\n    Body.\n    """\n'
+    result = format_pdf103(source)
 
-    assert result.new_source == source
-    assert not result.fixed_findings
-    assert not result.unfixed_findings
+    assert result.new_source == 'def function():\n    """\n    \xa0Summary.\n\n    Body.\n    """\n'
+    assert result.fixed_findings[PDF107MultilineOpeningQuotesSepLine.meta] == 1
+    assert not format_pdf103(result.new_source).modified
 
 
-def test_does_not_report_multiline_paragraph_or_section_entry_after_summary() -> None:
-    source = (
-        'def paragraph():\n    """Summary.\n\n    Body line one\n    body line two.\n    """\n\n'
-        'def section(value):\n    """Summary.\n\n    Args:\n        value: Description line one\n            continuation line.\n    """\n'
-    )
-    result = format_source(source, settings=CheckSettings(select=("PDF107",), docstring_convention=DocstringConvention.GOOGLE))
+def test_moves_single_content_line_below_opening_quotes() -> None:
+    source = 'def function():\n    """Summary.\n    """\n'
+    result = format_pdf103(source)
+
+    assert result.new_source == 'def function():\n    """\n    Summary.\n    """\n'
+    assert result.fixed_findings[PDF107MultilineOpeningQuotesSepLine.meta] == 1
+    assert not format_pdf103(result.new_source).modified
+
+
+def test_leaves_already_separate_and_single_physical_line_docstrings() -> None:
+    source = 'def separate():\n    """\n    Summary.\n\n    Body.\n    """\n\ndef one_line():\n    """Summary."""\n'
+    result = format_pdf103(source)
 
     assert result.new_source == source
     assert not result.fixed_findings
     assert not result.unfixed_findings
 
 
-def test_reports_ambiguous_missing_blank_line_prose() -> None:
-    source = 'def function():\n    """Summary.\n    Body might be a continued summary.\n    """\n'
-    result = format_source(source)
+def test_parenthesized_and_simple_suite_docstrings_use_canonical_margin() -> None:
+    source = 'class Parenthesized:\n    (\n        """Class.\n\n        Body.\n        """\n    )\n\ndef simple(): """Summary.\nBody.\n"""; return None\n'
+    result = format_pdf103(source, settings=CheckSettings(select=("PDF107",), indent_width=2))
 
-    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((2, 3),)
-
-
-def test_pdf101_can_separate_recognized_structure_before_pdf107_checks() -> None:
-    source = 'def function():\n    """Summary.\n    - item\n    """\n'
-    settings = CheckSettings(select=("PDF101", "PDF107"))
-    result = format_source(source, settings=settings)
-
-    assert result.new_source == 'def function():\n    """Summary.\n\n    - item\n    """\n'
-    assert result.fixed_findings[PDF101MissingBlankLine.meta] == 1
-    assert not result.unfixed_findings
+    assert result.new_source == 'class Parenthesized:\n    (\n        """\n        Class.\n\n        Body.\n        """\n    )\n\ndef simple(): """\n  Summary.\nBody.\n"""; return None\n'
+    assert result.fixed_findings[PDF107MultilineOpeningQuotesSepLine.meta] == 2
+    assert not format_pdf103(result.new_source, settings=CheckSettings(select=("PDF107",), indent_width=2)).modified
 
 
-def test_disabled_structure_parsing_can_make_structure_text_reportable() -> None:
-    source = 'def function():\n    """Summary.\n    - item\n    """\n'
-    settings = CheckSettings(select=("PDF101", "PDF107"), docstring_parse_list_items=False)
-    result = format_source(source, settings=settings)
+def test_tab_simple_suite_uses_configured_tab_margin() -> None:
+    source = 'def function(): """Summary.\nBody.\n"""\n'
+    settings = CheckSettings(select=("PDF107",), indent_style=IndentStyle.TAB)
+    result = format_pdf103(source, settings=settings)
 
-    assert result.new_source == source
-    assert not result.fixed_findings
-    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((2, 3),)
-
-
-def test_disabled_code_fence_parsing_can_make_fence_text_reportable() -> None:
-    source = 'def function():\n    """```python\n    print(value)\n    ```\n    """\n'
-    parsed = format_source(source)
-    disabled = format_source(source, settings=CheckSettings(select=("PDF107",), docstring_parse_code_fences=False, docstring_parse_headings=False))
-
-    assert parsed.new_source == source
-    assert not parsed.unfixed_findings
-    assert disabled.new_source == source
-    assert tuple(finding.line_numbers for finding in disabled.unfixed_findings) == ((2, 3, 4),)
+    assert result.new_source == 'def function(): """\n\tSummary.\nBody.\n"""\n'
+    assert result.fixed_findings[PDF107MultilineOpeningQuotesSepLine.meta] == 1
 
 
-@pytest.mark.parametrize(
-    ("settings", "content", "expected_lines"),
-    (
-        (CheckSettings(select=("PDF107",), docstring_parse_headings=False), "# Heading\n    Continuation.", (2, 3)),
-        (CheckSettings(select=("PDF107",), docstring_parse_directives=False), ".. note:: Title\n    Continuation.", (2, 3)),
-        (CheckSettings(select=("PDF107",), docstring_parse_sphinx_fields=False), ":param value: Description.\n    Continuation.", (2, 3)),
-        (CheckSettings(select=("PDF107",), docstring_parse_list_items=False), "- item\n    Continuation.", (2, 3)),
-        (CheckSettings(select=("PDF107",), docstring_parse_block_quotes=False), "> quote\n    > continuation", (2, 3)),
-        (CheckSettings(select=("PDF107",), docstring_parse_tables=False), "| A | B |\n    | --- | --- |\n    | 1 | 2 |", (2, 3, 4)),
-        (CheckSettings(select=("PDF107",), docstring_parse_doctests=False, docstring_parse_block_quotes=False), ">>> call()\n    result", (2, 3)),
-    ),
-)
-def test_disabled_structure_parsing_can_make_first_block_reportable(settings: CheckSettings, content: str, expected_lines: tuple[int, ...]) -> None:
-    source = f'def function():\n    """{content}\n    """\n'
+def test_preserves_crlf_for_generated_opening_separator() -> None:
+    source = 'def function():\r\n    """Summary.\r\n\r\n    Body.\r\n    """\r\n'
+    settings = CheckSettings(select=("PDF107",), line_ending=LineEnding.CR_LF)
+    result = format_pdf103(source, settings=settings)
 
-    parsed = format_source(source)
-    disabled = format_source(source, settings=settings)
-
-    assert parsed.new_source == source
-    assert not parsed.unfixed_findings
-    assert disabled.new_source == source
-    assert tuple(finding.line_numbers for finding in disabled.unfixed_findings) == (expected_lines,)
-    assert not disabled.unfixed_findings[0].fixable
+    assert result.new_source == 'def function():\r\n    """\r\n    Summary.\r\n\r\n    Body.\r\n    """\r\n'
+    assert result.fixed_findings[PDF107MultilineOpeningQuotesSepLine.meta] == 1
+    assert not format_pdf103(result.new_source, settings=settings).modified
 
 
-def test_reports_concatenated_and_escaped_newline_summary_physical_lines() -> None:
-    source = 'def concatenated():\n    ("Summary line\\n"\n     "continuation line.")\n\ndef escaped():\n    """Summary line\\ncontinuation line."""\n'
-    result = format_source(source)
-
-    assert result.new_source == source
-    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((2, 3), (6,))
-
-
-def test_reports_ambiguous_escaped_body_docstring_summary_physical_lines() -> None:
-    source = 'def function():\n    """Summary line\n    continuation.\n\n    Body with tab\\t escape here.\n    """\n'
-    result = format_source(source)
-
-    assert result.new_source == source
-    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((2, 3),)
-
-
-def test_check_and_fix_false_findings_agree() -> None:
-    source = 'def function():\n    """Summary line\n    continuation line.\n    """\n'
+def test_check_fix_line_numbers_and_fix_false_findings_agree() -> None:
+    source = 'def first():\n    """Summary.\n\n    Body.\n    """\n\ndef second():\n    """  Other.\n\n    Body.\n    """\n'
     _, context = contexts(source)
-    findings = PDF107SummaryTooLong.check(context)
-    check_only = format_source(source, fix=False)
-    fix_enabled = format_source(source, fix=True)
+    findings = PDF107MultilineOpeningQuotesSepLine.check(context)
+    fixed = PDF107MultilineOpeningQuotesSepLine.fix(context)
+    check_only = format_pdf103(source, fix=False)
 
-    assert tuple(finding.line_numbers for finding in findings) == ((2, 3),)
-    assert tuple(finding.line_numbers for finding in check_only.unfixed_findings) == ((2, 3),)
-    assert tuple(finding.line_numbers for finding in fix_enabled.unfixed_findings) == ((2, 3),)
-    assert check_only.new_source == source
-    assert fix_enabled.new_source == source
+    assert tuple(finding.line_numbers for finding in findings) == ((2,), (8,))
+    assert tuple(finding.line_numbers for finding in fixed.fixed_findings) == ((2,), (8,))
+    assert tuple(finding.line_numbers for finding in check_only.unfixed_findings) == ((2,), (8,))
+    _, fixed_context = contexts(fixed.module.code)
+    assert PDF107MultilineOpeningQuotesSepLine.check(fixed_context) == ()
+
+
+def test_preserves_raw_prefix_quote_delimiter_and_skips_unsafe_shapes() -> None:
+    source = "def raw():\n    r'''Path C:\\\\temp.\n    Body.'''\n\ndef escaped():\n    '''Summary.\\nBody.'''\n\ndef concatenated():\n    ('Summary.\\n'\n     'Body.')\n"
+    result = format_pdf103(source)
+
+    assert result.new_source == "def raw():\n    r'''\n    Path C:\\\\temp.\n    Body.'''\n\ndef escaped():\n    '''Summary.\\nBody.'''\n\ndef concatenated():\n    ('Summary.\\n'\n     'Body.')\n"
+    assert result.fixed_findings[PDF107MultilineOpeningQuotesSepLine.meta] == 1
+
+
+def test_pdf103_and_pdf104_normalize_compact_opt_in_pair_together() -> None:
+    source = 'def function():\n    """Summary.\n\n    Body.\n    """\n'
+    settings = CheckSettings(select=("PDF107", "PDF108"))
+    result = formatter.format_source(source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
+
+    assert result.new_source == 'def function():\n    """\n    Summary.\n\n    Body."""\n'
+    assert result.fixed_findings[PDF107MultilineOpeningQuotesSepLine.meta] == 1
+    assert not formatter.format_source(result.new_source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True).modified
+
+
+def test_pdf103_and_pdf105_normalize_expanded_opt_in_pair_together() -> None:
+    source = 'def function():\n    """Summary.\n\n    Body."""\n'
+    settings = CheckSettings(select=("PDF107", "PDF109"))
+    result = formatter.format_source(source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
+
+    assert result.new_source == 'def function():\n    """\n    Summary.\n\n    Body.\n    """\n'
+    assert result.fixed_findings[PDF107MultilineOpeningQuotesSepLine.meta] == 1
+    assert result.fixed_findings[PDF109MultilineClosingQuotesSepLine.meta] == 1
+    assert not formatter.format_source(result.new_source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True).modified
+
+
+def test_pdf103_and_pdf105_leave_single_physical_line_docstring_unchanged() -> None:
+    source = 'def function():\n    """Summary."""\n'
+    settings = CheckSettings(select=("PDF107", "PDF109"))
+    result = formatter.format_source(source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
+
+    assert result.new_source == source
+    assert not result.fixed_findings
+    assert not result.unfixed_findings

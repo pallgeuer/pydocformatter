@@ -29,7 +29,7 @@ line-length = 72
 # Preferred formatting. This output MUST be the actual tested output of applying the rule to the given input.
 ```
 
-Use `[output=unchanged]` instead of `[output]` when the exact input is expected to remain unchanged. Add a `[findings]` section after `[output]` or `[output=unchanged]` only when applying the rule is expected to leave non-fixed findings (e.g. each line under `[findings]` is something like `PDF106: 2` or `PDF001: 3-4, 8`):
+Use `[output=unchanged]` instead of `[output]` when the exact input is expected to remain unchanged. Add a `[findings]` section after `[output]` or `[output=unchanged]` only when applying the rule is expected to leave non-fixed findings (e.g. each line under `[findings]` is something like `PDF110: 2` or `PDF101: 3-4, 8`):
 
 ```pydocfmt-example
 [input]

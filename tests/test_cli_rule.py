@@ -10,7 +10,7 @@ import pydocformatter.cli.main as pydocfmt_cli
 class TestCLIRule(unittest.TestCase):
     def test_pydocfmt_rule_prints_rule_markdown(self) -> None:
         stdout = StringIO()
-        argv = ["pydocfmt", "rule", "PDF001"]
+        argv = ["pydocfmt", "rule", "PDF101"]
         with (
             unittest.mock.patch("sys.argv", argv),
             contextlib.redirect_stdout(stdout),
@@ -19,13 +19,13 @@ class TestCLIRule(unittest.TestCase):
 
         output = stdout.getvalue()
         self.assertEqual(exit_code, 0)
-        self.assertTrue(output.startswith("# reflow-required (PDF001)\n\nFix is usually available.\n\n## What it does\n"))
+        self.assertTrue(output.startswith("# reflow-required (PDF101)\n\nFix is usually available.\n\n## What it does\n"))
         self.assertIn("## Ruff compatibility\n", output)
         self.assertNotIn("Derived from", output)
 
     def test_pydocfmt_rule_prints_rule_json(self) -> None:
         stdout = StringIO()
-        argv = ["pydocfmt", "rule", "--output-format", "json", "PDF107"]
+        argv = ["pydocfmt", "rule", "--output-format", "json", "PDF203"]
         with (
             unittest.mock.patch("sys.argv", argv),
             contextlib.redirect_stdout(stdout),
@@ -35,20 +35,20 @@ class TestCLIRule(unittest.TestCase):
         output = json.loads(stdout.getvalue())
         self.assertEqual(exit_code, 0)
         self.assertEqual(output["name"], "summary-too-long")
-        self.assertEqual(output["code"], "PDF107")
+        self.assertEqual(output["code"], "PDF203")
         self.assertEqual(output["linter"], "pydocformatter")
         self.assertEqual(output["fix"], "Fix is not available.")
         self.assertEqual(output["fix_availability"], "Never")
         self.assertEqual(output["status"], {"Stable": {"since": "v0.3.0"}})
         self.assertTrue(output["explanation"].startswith("## What it does\n"))
-        self.assertNotIn("# summary-too-long (PDF107)", output["explanation"])
+        self.assertNotIn("# summary-too-long (PDF203)", output["explanation"])
         self.assertNotIn("Fix is not available.", output["explanation"])
         self.assertIn("## Ruff compatibility\n", output["explanation"])
-        self.assertTrue(output["source_location"]["file"].endswith("PDF107_summary_too_long.py"))
+        self.assertTrue(output["source_location"]["file"].endswith("PDF203_summary_too_long.py"))
 
     def test_pydocfmt_rule_prints_usually_fixable_rule_json(self) -> None:
         stdout = StringIO()
-        argv = ["pydocfmt", "rule", "--output-format", "json", "PDF001"]
+        argv = ["pydocfmt", "rule", "--output-format", "json", "PDF101"]
         with (
             unittest.mock.patch("sys.argv", argv),
             contextlib.redirect_stdout(stdout),
@@ -72,8 +72,8 @@ class TestCLIRule(unittest.TestCase):
         output = stdout.getvalue()
         self.assertEqual(exit_code, 0)
         self.assertIn("# standalone-comment-formatting (PCF001)\n", output)
-        self.assertIn("# docstring-should-be-one-line (PDF106)\n", output)
-        self.assertLess(output.index("# standalone-comment-formatting (PCF001)"), output.index("# reflow-required (PDF001)"))
+        self.assertIn("# docstring-should-be-one-line (PDF110)\n", output)
+        self.assertLess(output.index("# standalone-comment-formatting (PCF001)"), output.index("# reflow-required (PDF101)"))
 
     def test_pydocfmt_rule_prints_all_rules_json(self) -> None:
         stdout = StringIO()
@@ -87,7 +87,7 @@ class TestCLIRule(unittest.TestCase):
         output = json.loads(stdout.getvalue())
         self.assertEqual(exit_code, 0)
         self.assertEqual(output[0]["code"], "PCF001")
-        self.assertEqual(output[-1]["code"], "PDF107")
+        self.assertEqual(output[-1]["code"], "PDF507")
 
     def test_pydocfmt_rule_rejects_missing_rule(self) -> None:
         stdout = StringIO()
@@ -122,7 +122,7 @@ class TestCLIRule(unittest.TestCase):
     def test_pydocfmt_rule_rejects_rule_with_all(self) -> None:
         stdout = StringIO()
         stderr = StringIO()
-        argv = ["pydocfmt", "rule", "PDF001", "--all"]
+        argv = ["pydocfmt", "rule", "PDF101", "--all"]
         with (
             unittest.mock.patch("sys.argv", argv),
             contextlib.redirect_stdout(stdout),

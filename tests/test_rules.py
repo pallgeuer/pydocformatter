@@ -53,15 +53,15 @@ class TSTIncompatibilityCategory(RuleCategoryBase):
     meta = RuleCategoryMetadata(prefix="TST", name="incompatibilities", url=None)
 
 
-class PDF001SampleRule(RuleBase):
+class PDF101SampleRule(RuleBase):
     meta = RuleMetadata(
-        code=RuleCode("PDF001"), name="reflow-required", message="Docstring chunk needs reflow", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0", setting_effects=(), incompatible_with=()
+        code=RuleCode("PDF101"), name="reflow-required", message="Docstring chunk needs reflow", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0", setting_effects=(), incompatible_with=()
     )
 
 
-class PDF106SampleRule(RuleBase):
+class PDF110SampleRule(RuleBase):
     meta = RuleMetadata(
-        code=RuleCode("PDF106"),
+        code=RuleCode("PDF110"),
         name="summary-too-long",
         message="Docstring summary does not fit on one line",
         fix_availability=FixAvailability.NEVER,
@@ -206,12 +206,12 @@ class TST004FourthIncompatibleSampleRule(RuleBase):
     )
 
 
-rule_registration.register_rule_to(PDFSampleCategory)(PDF001SampleRule)
-rule_registration.register_rule_to(PDFSampleCategory)(PDF106SampleRule)
+rule_registration.register_rule_to(PDFSampleCategory)(PDF101SampleRule)
+rule_registration.register_rule_to(PDFSampleCategory)(PDF110SampleRule)
 rule_registration.register_rule_to(PCFSampleCategory)(PCF001SampleRule)
 rule_registration.register_rule_to(PDFSpecificityCategory)(PDF142SampleRule)
 rule_registration.register_rule_to(PDFSpecificityCategory)(PDF150SampleRule)
-rule_registration.register_rule_to(PDFFixAvailabilityCategory)(PDF106SampleRule)
+rule_registration.register_rule_to(PDFFixAvailabilityCategory)(PDF110SampleRule)
 rule_registration.register_rule_to(PDFFixAvailabilityCategory)(PDF160SometimesFixableSampleRule)
 rule_registration.register_rule_to(PDFFixAvailabilityCategory)(PDF170UsuallyFixableSampleRule)
 rule_registration.register_rule_to(TSTSettingEffectCategory)(TST001IgnoredSampleRule)
@@ -275,17 +275,17 @@ class TestRules(unittest.TestCase):
                 "    meta = RuleCategoryMetadata(prefix='PDF', name='test PDF', url=None)\n"
             ),
             "PDF/PDF.md": "# test PDF (PDF)\n",
-            "PDF/PDF001_test.py": (
+            "PDF/PDF101_test.py": (
                 "import pydocformatter.rules.registration as rule_registration\n"
                 "from pydocformatter.rules.definition import RuleBase\n"
                 "from pydocformatter.rules.codes import RuleCode\n"
                 "from pydocformatter.rules.models import FixAvailability, RuleMetadata\n"
                 f"from {package_name}.PDF.PDF import PDF\n\n"
                 "@rule_registration.register_rule_to(PDF)\n"
-                "class PDF001Test(RuleBase):\n"
-                "    meta = RuleMetadata(code=RuleCode('PDF001'), name='test', message='Test', fix_availability=FixAvailability.ALWAYS, stable_since='0.3.0', setting_effects=(), incompatible_with=())\n"
+                "class PDF101Test(RuleBase):\n"
+                "    meta = RuleMetadata(code=RuleCode('PDF101'), name='test', message='Test', fix_availability=FixAvailability.ALWAYS, stable_since='0.3.0', setting_effects=(), incompatible_with=())\n"
             ),
-            "PDF/PDF001_test.md": "# test (PDF001)\n",
+            "PDF/PDF101_test.md": "# test (PDF101)\n",
         }
 
     @classmethod
@@ -353,13 +353,13 @@ class TestRules(unittest.TestCase):
                 "-c",
                 (
                     "from pydocformatter.rules.definitions.PCF.PCF import PCF\n"
-                    "from pydocformatter.rules.definitions.PDF.PDF001_reflow_required import PDF001ReflowRequired\n"
+                    "from pydocformatter.rules.definitions.PDF.PDF101_reflow_required import PDF101ReflowRequired\n"
                     "from pydocformatter.rules.definitions.PDF.PDF import PDF\n"
                     "import sys\n"
                     "assert 'pydocformatter.rules.collection' not in sys.modules\n"
                     "import pydocformatter.rules.collection as rule_collection\n"
                     "codes = {str(rule.meta.code) for rule in rule_collection.RULE_COLLECTION.rules}\n"
-                    "assert {'PCF001', 'PCF002', 'PDF000', 'PDF001', 'PDF107'} <= codes\n"
+                    "assert {'PCF001', 'PCF002', 'PDF000', 'PDF101', 'PDF203'} <= codes\n"
                     "print(PCF.meta.prefix, PDF.meta.prefix)\n"
                 ),
             ],
@@ -451,7 +451,7 @@ class TestRules(unittest.TestCase):
             ),
             (
                 "rule module without name suffix",
-                {**valid_files, "PDF/PDF002.py": ""},
+                {**valid_files, "PDF/PDF100.py": ""},
                 "Unexpected module in rule category package",
             ),
             (
@@ -463,19 +463,19 @@ class TestRules(unittest.TestCase):
                 "multiple rule classes",
                 {
                     **valid_files,
-                    "PDF/PDF001_test.py": valid_files["PDF/PDF001_test.py"]
-                    + "\nclass PDF002Test(RuleBase):\n    meta = RuleMetadata(code=RuleCode('PDF002'), name='test-two', message='Test two', fix_availability=FixAvailability.ALWAYS, stable_since='0.3.0', setting_effects=(), incompatible_with=())\n",
+                    "PDF/PDF101_test.py": valid_files["PDF/PDF101_test.py"]
+                    + "\nclass PDF100Test(RuleBase):\n    meta = RuleMetadata(code=RuleCode('PDF100'), name='test-two', message='Test two', fix_availability=FixAvailability.ALWAYS, stable_since='0.3.0', setting_effects=(), incompatible_with=())\n",
                 },
                 "must define exactly one RuleBase subclass",
             ),
             (
                 "rule module code mismatch",
-                {**valid_files, "PDF/PDF001_test.py": valid_files["PDF/PDF001_test.py"].replace("RuleCode('PDF001')", "RuleCode('PDF002')")},
+                {**valid_files, "PDF/PDF101_test.py": valid_files["PDF/PDF101_test.py"].replace("RuleCode('PDF101')", "RuleCode('PDF100')")},
                 "does not match rule code",
             ),
             (
                 "unregistered rule",
-                {**valid_files, "PDF/PDF001_test.py": valid_files["PDF/PDF001_test.py"].replace("@rule_registration.register_rule_to(PDF)\n", "")},
+                {**valid_files, "PDF/PDF101_test.py": valid_files["PDF/PDF101_test.py"].replace("@rule_registration.register_rule_to(PDF)\n", "")},
                 "is not registered with category PDF",
             ),
             (
@@ -485,8 +485,8 @@ class TestRules(unittest.TestCase):
             ),
             (
                 "missing rule documentation",
-                {path: content for path, content in valid_files.items() if path != "PDF/PDF001_test.md"},
-                "missing adjacent documentation PDF001_test.md",
+                {path: content for path, content in valid_files.items() if path != "PDF/PDF101_test.md"},
+                "missing adjacent documentation PDF101_test.md",
             ),
             (
                 "orphan documentation",
@@ -505,10 +505,10 @@ class TestRules(unittest.TestCase):
             "from pydocformatter.rules.definition import RuleBase\n"
             "from pydocformatter.rules.codes import RuleCode\n"
             "from pydocformatter.rules.models import FixAvailability, RuleMetadata\n\n"
-            "class PDF002External(RuleBase):\n"
-            "    meta = RuleMetadata(code=RuleCode('PDF002'), name='external', message='External', fix_availability=FixAvailability.ALWAYS, stable_since='0.3.0', setting_effects=(), incompatible_with=())\n"
+            "class PDF100External(RuleBase):\n"
+            "    meta = RuleMetadata(code=RuleCode('PDF100'), name='external', message='External', fix_availability=FixAvailability.ALWAYS, stable_since='0.3.0', setting_effects=(), incompatible_with=())\n"
         )
-        files["PDF/PDF.py"] += "\nfrom synthetic_rule_support import PDF002External\nrule_registration.register_rule_to(PDF)(PDF002External)\n"
+        files["PDF/PDF.py"] += "\nfrom synthetic_rule_support import PDF100External\nrule_registration.register_rule_to(PDF)(PDF100External)\n"
 
         with self.assertRaisesRegex(rule_registration.RuleError, "contains rules from outside package"):
             self._import_synthetic_rule_package(files)
@@ -520,10 +520,10 @@ class TestRules(unittest.TestCase):
             "from pydocformatter.rules.definition import RuleBase\n"
             "from pydocformatter.rules.codes import RuleCode\n"
             "from pydocformatter.rules.models import FixAvailability, RuleMetadata\n\n"
-            "class PDF002PackageRule(RuleBase):\n"
-            "    meta = RuleMetadata(code=RuleCode('PDF002'), name='package-rule', message='Package rule', fix_availability=FixAvailability.ALWAYS, stable_since='0.3.0', setting_effects=(), incompatible_with=())\n"
+            "class PDF100PackageRule(RuleBase):\n"
+            "    meta = RuleMetadata(code=RuleCode('PDF100'), name='package-rule', message='Package rule', fix_availability=FixAvailability.ALWAYS, stable_since='0.3.0', setting_effects=(), incompatible_with=())\n"
         )
-        files["PDF/PDF.py"] += f"\nfrom {package_name}.PDF import PDF002PackageRule\nrule_registration.register_rule_to(PDF)(PDF002PackageRule)\n"
+        files["PDF/PDF.py"] += f"\nfrom {package_name}.PDF import PDF100PackageRule\nrule_registration.register_rule_to(PDF)(PDF100PackageRule)\n"
 
         with self.assertRaisesRegex(rule_registration.RuleError, "registered rules without matching rule modules"):
             self._import_synthetic_rule_package(files)
@@ -579,9 +579,9 @@ class TestRules(unittest.TestCase):
         registry = rule_registration.RuleRegistry()
 
         with self.assertRaisesRegex(rule_registration.RuleError, "Registered rule category must inherit RuleCategoryBase"):
-            registry.register(typing.cast(type[RuleCategoryBase], PDF001SampleRule))
+            registry.register(typing.cast(type[RuleCategoryBase], PDF101SampleRule))
         with self.assertRaisesRegex(rule_registration.RuleError, "Collected rule category must inherit RuleCategoryBase"):
-            rule_collection.RuleCollection((typing.cast(type[RuleCategoryBase], PDF001SampleRule),))
+            rule_collection.RuleCollection((typing.cast(type[RuleCategoryBase], PDF101SampleRule),))
 
     def test_rule_registry_is_frozen_but_keeps_mutable_registration_state(self) -> None:
         registry = rule_registration.RuleRegistry()
@@ -613,8 +613,8 @@ class TestRules(unittest.TestCase):
     def test_rule_metadata_derives_prefix_and_number_from_code(self) -> None:
         rule = RuleMetadata(
             code=RuleCode("PDF001"),
-            name="reflow-required",
-            message="Docstring chunk needs reflow",
+            name="docstring-quote-style",
+            message="Docstring should use triple double quotes",
             fix_availability=FixAvailability.ALWAYS,
             stable_since="0.3.0",
             setting_effects=(),
@@ -663,7 +663,7 @@ class TestRules(unittest.TestCase):
         self.assertFalse(hasattr(rule, "matches_selector_parts"))
 
     def test_rule_selector_selects_code(self) -> None:
-        code = RuleCode("PDF106")
+        code = RuleCode("PDF101")
 
         selector = RuleSelector("PDF10")
 
@@ -682,7 +682,7 @@ class TestRules(unittest.TestCase):
         self.assertTrue(RuleSelector("PDF").selects_code(code))
         self.assertTrue(RuleSelector("PDF1").selects_code(code))
         self.assertTrue(selector.selects_code(code))
-        self.assertFalse(RuleSelector("PDF107").selects_code(code))
+        self.assertFalse(RuleSelector("PDF203").selects_code(code))
         self.assertFalse(RuleSelector("P").selects_code(code))
 
     def test_rule_metadata_validates_rule_code(self) -> None:
@@ -696,16 +696,16 @@ class TestRules(unittest.TestCase):
             )
         with self.assertRaisesRegex(TypeError, "Expected FixAvailability, got str"):
             RuleMetadata(
-                code=RuleCode("PDF001"), name="bad-rule", message="Bad rule", fix_availability=typing.cast(typing.Any, "Always"), stable_since="0.3.0", setting_effects=(), incompatible_with=()
+                code=RuleCode("PDF101"), name="bad-rule", message="Bad rule", fix_availability=typing.cast(typing.Any, "Always"), stable_since="0.3.0", setting_effects=(), incompatible_with=()
             )
         with self.assertRaisesRegex(TypeError, "missing 1 required positional argument: 'stable_since'"):
-            RuleMetadata(code=RuleCode("PDF001"), name="bad-rule", message="Bad rule", fix_availability=FixAvailability.ALWAYS, setting_effects=(), incompatible_with=())  # type: ignore[call-arg]
+            RuleMetadata(code=RuleCode("PDF101"), name="bad-rule", message="Bad rule", fix_availability=FixAvailability.ALWAYS, setting_effects=(), incompatible_with=())  # type: ignore[call-arg]
         with self.assertRaisesRegex(TypeError, "missing 1 required positional argument: 'setting_effects'"):
-            RuleMetadata(code=RuleCode("PDF001"), name="bad-rule", message="Bad rule", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0", incompatible_with=())  # type: ignore[call-arg]
+            RuleMetadata(code=RuleCode("PDF101"), name="bad-rule", message="Bad rule", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0", incompatible_with=())  # type: ignore[call-arg]
         with self.assertRaisesRegex(TypeError, "missing 1 required positional argument: 'incompatible_with'"):
-            RuleMetadata(code=RuleCode("PDF001"), name="bad-rule", message="Bad rule", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0", setting_effects=())  # type: ignore[call-arg]
-        with self.assertRaisesRegex(ValueError, "PDF001: Stable version must not be empty"):
-            RuleMetadata(code=RuleCode("PDF001"), name="bad-rule", message="Bad rule", fix_availability=FixAvailability.ALWAYS, stable_since="", setting_effects=(), incompatible_with=())
+            RuleMetadata(code=RuleCode("PDF101"), name="bad-rule", message="Bad rule", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0", setting_effects=())  # type: ignore[call-arg]
+        with self.assertRaisesRegex(ValueError, "PDF101: Stable version must not be empty"):
+            RuleMetadata(code=RuleCode("PDF101"), name="bad-rule", message="Bad rule", fix_availability=FixAvailability.ALWAYS, stable_since="", setting_effects=(), incompatible_with=())
         with self.assertRaisesRegex(ValueError, "Rule setting name must not be empty"):
             RuleSettingEffects(setting="", effects=())
         with self.assertRaisesRegex(TypeError, "Expected RuleSettingEffect, got str"):
@@ -720,7 +720,7 @@ class TestRules(unittest.TestCase):
             RuleSettingEffects(setting="docstring_convention", effects=typing.cast(typing.Any, ("bad",)))
         with self.assertRaisesRegex(TypeError, "Rule setting effects must contain RuleSettingEffects instances"):
             RuleMetadata(
-                code=RuleCode("PDF001"),
+                code=RuleCode("PDF101"),
                 name="bad-rule",
                 message="Bad rule",
                 fix_availability=FixAvailability.ALWAYS,
@@ -730,33 +730,33 @@ class TestRules(unittest.TestCase):
             )
         with self.assertRaisesRegex(TypeError, "Incompatible rule codes must be a tuple"):
             RuleMetadata(
-                code=RuleCode("PDF001"),
+                code=RuleCode("PDF101"),
                 name="bad-rule",
                 message="Bad rule",
                 fix_availability=FixAvailability.ALWAYS,
                 stable_since="0.3.0",
                 setting_effects=(),
-                incompatible_with=typing.cast(typing.Any, [RuleCode("PDF002")]),
+                incompatible_with=typing.cast(typing.Any, [RuleCode("PDF100")]),
             )
         with self.assertRaisesRegex(TypeError, "Incompatible rule codes must contain RuleCode instances"):
             RuleMetadata(
-                code=RuleCode("PDF001"),
+                code=RuleCode("PDF101"),
                 name="bad-rule",
                 message="Bad rule",
                 fix_availability=FixAvailability.ALWAYS,
                 stable_since="0.3.0",
                 setting_effects=(),
-                incompatible_with=typing.cast(typing.Any, ("PDF002",)),
+                incompatible_with=typing.cast(typing.Any, ("PDF100",)),
             )
         with self.assertRaisesRegex(ValueError, "Incompatible rule codes must not contain duplicates"):
             RuleMetadata(
-                code=RuleCode("PDF001"),
+                code=RuleCode("PDF101"),
                 name="bad-rule",
                 message="Bad rule",
                 fix_availability=FixAvailability.ALWAYS,
                 stable_since="0.3.0",
                 setting_effects=(),
-                incompatible_with=(RuleCode("PDF002"), RuleCode("PDF002")),
+                incompatible_with=(RuleCode("PDF100"), RuleCode("PDF100")),
             )
 
     def test_rule_selector_validates_tag(self) -> None:
@@ -918,23 +918,23 @@ class TestRules(unittest.TestCase):
         class PDFReverseRegistrationCategory(RuleCategoryBase):
             meta = RuleCategoryMetadata(prefix="PDF", name="reverse PDF", url=None)
 
-        rule_registration.register_rule_to(PDFReverseRegistrationCategory)(PDF106SampleRule)
-        rule_registration.register_rule_to(PDFReverseRegistrationCategory)(PDF001SampleRule)
+        rule_registration.register_rule_to(PDFReverseRegistrationCategory)(PDF110SampleRule)
+        rule_registration.register_rule_to(PDFReverseRegistrationCategory)(PDF101SampleRule)
         collection = sample_collection()
 
         self.assertEqual(collection.categories, (PCFSampleCategory, PDFSampleCategory))
         self.assertEqual(tuple(collection.category_class.values()), collection.categories)
-        self.assertEqual(collection.rules, (PCF001SampleRule, PDF001SampleRule, PDF106SampleRule))
+        self.assertEqual(collection.rules, (PCF001SampleRule, PDF101SampleRule, PDF110SampleRule))
         self.assertEqual(tuple(collection.rule_class.values()), collection.rules)
         self.assertEqual(PCFSampleCategory.ordered_rules(), (PCF001SampleRule,))
-        self.assertEqual(PDFSampleCategory.ordered_rules(), (PDF001SampleRule, PDF106SampleRule))
+        self.assertEqual(PDFSampleCategory.ordered_rules(), (PDF101SampleRule, PDF110SampleRule))
         self.assertEqual(tuple(PDFSampleCategory.ordered_code_class_map().values()), PDFSampleCategory.ordered_rules())
-        self.assertEqual(PDFReverseRegistrationCategory.ordered_rules(), (PDF001SampleRule, PDF106SampleRule))
+        self.assertEqual(PDFReverseRegistrationCategory.ordered_rules(), (PDF101SampleRule, PDF110SampleRule))
 
     def test_rule_collection_matching_rules_returns_rule_classes(self) -> None:
         collection = sample_collection()
 
-        self.assertEqual(collection.matching_rules(RuleSelector("PDF")), (PDF001SampleRule, PDF106SampleRule))
+        self.assertEqual(collection.matching_rules(RuleSelector("PDF")), (PDF101SampleRule, PDF110SampleRule))
 
     def test_builtin_rule_setting_effect_matrix(self) -> None:
         convention_effects: dict[str, dict[DocstringConvention, RuleSettingEffect]] = {}
@@ -953,14 +953,14 @@ class TestRules(unittest.TestCase):
         self.assertEqual(
             {code: effects for code, effects in convention_effects.items() if effects},
             {
-                "PDF102": {DocstringConvention.NUMPY: RuleSettingEffect.IGNORED, DocstringConvention.PEP257: RuleSettingEffect.IGNORED},
-                "PDF103": {
+                "PDF106": {DocstringConvention.NUMPY: RuleSettingEffect.IGNORED, DocstringConvention.PEP257: RuleSettingEffect.IGNORED},
+                "PDF107": {
                     DocstringConvention.NONE: RuleSettingEffect.IGNORED,
                     DocstringConvention.GOOGLE: RuleSettingEffect.IGNORED,
                     DocstringConvention.NUMPY: RuleSettingEffect.IGNORED,
                     DocstringConvention.PEP257: RuleSettingEffect.IGNORED,
                 },
-                "PDF104": {
+                "PDF108": {
                     DocstringConvention.NONE: RuleSettingEffect.IGNORED,
                     DocstringConvention.GOOGLE: RuleSettingEffect.IGNORED,
                     DocstringConvention.NUMPY: RuleSettingEffect.IGNORED,
@@ -971,17 +971,17 @@ class TestRules(unittest.TestCase):
         self.assertEqual(
             {code: incompatible for code, incompatible in incompatibilities.items() if incompatible},
             {
-                "PDF102": ("PDF103",),
-                "PDF103": ("PDF102",),
-                "PDF104": ("PDF105",),
-                "PDF105": ("PDF104",),
+                "PDF106": ("PDF107",),
+                "PDF107": ("PDF106",),
+                "PDF108": ("PDF109",),
+                "PDF109": ("PDF108",),
             },
         )
 
     def test_builtin_opt_in_quote_placement_rules_ignore_every_docstring_convention(self) -> None:
         rule_classes = {rule_class.meta.code.tag: rule_class for rule_class in rule_collection.RULE_COLLECTION.rules}
 
-        for code in ("PDF103", "PDF104"):
+        for code in ("PDF107", "PDF108"):
             ignored_conventions: set[DocstringConvention] = set()
             for setting_effects in rule_classes[code].meta.setting_effects:
                 if setting_effects.setting == "docstring_convention":
@@ -1004,12 +1004,12 @@ class TestRules(unittest.TestCase):
 
     def test_select_rules_resolves_selection_and_fixability(self) -> None:
         selection = rules_selection.select_rules(
-            CheckSettings(select=("PDF",), ignore=("PDF106",), fixable=("PDF",), unfixable=("PDF106",)),
+            CheckSettings(select=("PDF",), ignore=("PDF110",), fixable=("PDF",), unfixable=("PDF110",)),
             collection=sample_collection(),
         )
 
         self.assertEqual(selection.errors, ())
-        self.assertEqual(tuple(rule.rule.code.tag for rule in selection.rules), ("PDF001",))
+        self.assertEqual(tuple(rule.rule.code.tag for rule in selection.rules), ("PDF101",))
         self.assertEqual(tuple(rule.fixable for rule in selection.rules), (True,))
 
     def test_select_rules_applies_ignored_setting_effect_after_normal_precedence(self) -> None:
@@ -1284,10 +1284,10 @@ class TestRules(unittest.TestCase):
             try:
                 profile = SETTINGS_SCHEMA.load_profile(
                     args=argparse.Namespace(
-                        select=["PDF100,PDF106"],
+                        select=["PDF200,PDF110"],
                         per_file_ignores=[
-                            '{"a.py" = ["PDF100"]}',
-                            '{"a.py" = ["PDF106"]}',
+                            '{"a.py" = ["PDF200"]}',
+                            '{"a.py" = ["PDF110"]}',
                         ],
                     ),
                     path=str(target),
@@ -1297,8 +1297,8 @@ class TestRules(unittest.TestCase):
 
         selection = rules_selection.select_rules(profile.settings, profile=profile)
 
-        self.assertEqual(profile.settings.per_file_ignores, (("a.py", ("PDF100", "PDF106")),))
-        self.assertEqual(tuple(rule.rule.code.tag for rule in selection.rules), ("PDF100", "PDF106"))
+        self.assertEqual(profile.settings.per_file_ignores, (("a.py", ("PDF200", "PDF110")),))
+        self.assertEqual(tuple(rule.rule.code.tag for rule in selection.rules), ("PDF110", "PDF200"))
         self.assertEqual(tuple(rule.rule.code.tag for rule in selection.for_path(str(target))), ())
 
     def test_select_rules_applies_fixability_specificity(self) -> None:
@@ -1351,31 +1351,31 @@ class TestRules(unittest.TestCase):
 
     def test_select_rules_reports_selector_operational_errors(self) -> None:
         selection = rules_selection.select_rules(
-            CheckSettings(select=("BAD", "bad"), fixable=("PDF106",)),
+            CheckSettings(select=("BAD", "bad"), fixable=("PDF110",)),
             collection=sample_collection(),
         )
 
         self.assertIn("rule selection contains unknown selector: BAD", selection.errors)
         self.assertIn("rule selection contains invalid selector: bad", selection.errors)
-        self.assertIn("fixable rules selector 'PDF106' only matches rules with no available fixes", selection.errors)
+        self.assertIn("fixable rules selector 'PDF110' only matches rules with no available fixes", selection.errors)
 
     def test_select_rules_applies_per_file_ignores(self) -> None:
         selection = rules_selection.select_rules(
-            CheckSettings(select=("ALL",), per_file_ignores=(("tests/*.py", ("PDF001",)),)),
+            CheckSettings(select=("ALL",), per_file_ignores=(("tests/*.py", ("PDF101",)),)),
             collection=sample_collection(),
         )
 
-        self.assertEqual(tuple(rule.rule.code.tag for rule in selection.for_path("src/a.py")), ("PCF001", "PDF001", "PDF106"))
-        self.assertEqual(tuple(rule.rule.code.tag for rule in selection.for_path("tests/a.py")), ("PCF001", "PDF106"))
+        self.assertEqual(tuple(rule.rule.code.tag for rule in selection.for_path("src/a.py")), ("PCF001", "PDF101", "PDF110"))
+        self.assertEqual(tuple(rule.rule.code.tag for rule in selection.for_path("tests/a.py")), ("PCF001", "PDF110"))
 
     def test_ruff_spec_negated_per_file_ignore_patterns_ignore_everywhere_else(self) -> None:
         selection = rules_selection.select_rules(
-            CheckSettings(select=("PDF",), per_file_ignores=(("!src/*.py", ("PDF001",)), ("!tests/*.py", ("PDF106",)))),
+            CheckSettings(select=("PDF",), per_file_ignores=(("!src/*.py", ("PDF101",)), ("!tests/*.py", ("PDF110",)))),
             collection=sample_collection(),
         )
 
-        self.assertEqual(tuple(rule.rule.code.tag for rule in selection.for_path("src/a.py")), ("PDF001",))
-        self.assertEqual(tuple(rule.rule.code.tag for rule in selection.for_path("tests/a.py")), ("PDF106",))
+        self.assertEqual(tuple(rule.rule.code.tag for rule in selection.for_path("src/a.py")), ("PDF101",))
+        self.assertEqual(tuple(rule.rule.code.tag for rule in selection.for_path("tests/a.py")), ("PDF110",))
         self.assertEqual(tuple(rule.rule.code.tag for rule in selection.for_path("a.py")), ())
 
     def test_ruff_spec_per_file_ignores_are_auto_config_directory_relative(self) -> None:
@@ -1386,19 +1386,19 @@ class TestRules(unittest.TestCase):
             previous_cwd = os.getcwd()
             os.chdir(root / "src")
             try:
-                self._write(root / "pyproject.toml", '[tool.pydocfmt]\nselect = ["PDF001"]\nper-file-ignores = {"src/pkg/*.py" = ["PDF001"]}\n')
+                self._write(root / "pyproject.toml", '[tool.pydocfmt]\nselect = ["PDF101"]\nper-file-ignores = {"src/pkg/*.py" = ["PDF101"]}\n')
                 matching_profile = SETTINGS_SCHEMA.load_profile(path=str(target))
-                self._write(root / "pyproject.toml", '[tool.pydocfmt]\nselect = ["PDF001"]\nper-file-ignores = {"pkg/*.py" = ["PDF001"]}\n')
+                self._write(root / "pyproject.toml", '[tool.pydocfmt]\nselect = ["PDF101"]\nper-file-ignores = {"pkg/*.py" = ["PDF101"]}\n')
                 non_matching_profile = SETTINGS_SCHEMA.load_profile(path=str(target))
-                self._write(root / "pyproject.toml", '[tool.pydocfmt]\nselect = ["PDF001"]\nper-file-ignores = {"*.py" = ["PDF001"]}\n')
+                self._write(root / "pyproject.toml", '[tool.pydocfmt]\nselect = ["PDF101"]\nper-file-ignores = {"*.py" = ["PDF101"]}\n')
                 bare_star_profile = SETTINGS_SCHEMA.load_profile(path=str(target))
-                self._write(root / "pyproject.toml", '[tool.pydocfmt]\nselect = ["PDF001"]\nper-file-ignores = {"a.py" = ["PDF001"]}\n')
+                self._write(root / "pyproject.toml", '[tool.pydocfmt]\nselect = ["PDF101"]\nper-file-ignores = {"a.py" = ["PDF101"]}\n')
                 bare_literal_profile = SETTINGS_SCHEMA.load_profile(path=str(target))
             finally:
                 os.chdir(previous_cwd)
 
         self.assertEqual(self._active_rule_tags_for_path(matching_profile, target), ())
-        self.assertEqual(self._active_rule_tags_for_path(non_matching_profile, target), ("PDF001",))
+        self.assertEqual(self._active_rule_tags_for_path(non_matching_profile, target), ("PDF101",))
         self.assertEqual(self._active_rule_tags_for_path(bare_star_profile, target), ())
         self.assertEqual(self._active_rule_tags_for_path(bare_literal_profile, target), ())
 
@@ -1411,15 +1411,15 @@ class TestRules(unittest.TestCase):
             previous_cwd = os.getcwd()
             os.chdir(root / "src" / "pkg")
             try:
-                self._write(root / "src" / "pyproject.toml", '[tool.pydocfmt]\nselect = ["PDF001"]\nper-file-ignores = {"pkg/*.py" = ["PDF001"]}\n')
+                self._write(root / "src" / "pyproject.toml", '[tool.pydocfmt]\nselect = ["PDF101"]\nper-file-ignores = {"pkg/*.py" = ["PDF101"]}\n')
                 matching_profile = SETTINGS_SCHEMA.load_profile(path=str(target))
-                self._write(root / "src" / "pyproject.toml", '[tool.pydocfmt]\nselect = ["PDF001"]\nper-file-ignores = {"src/pkg/*.py" = ["PDF001"]}\n')
+                self._write(root / "src" / "pyproject.toml", '[tool.pydocfmt]\nselect = ["PDF101"]\nper-file-ignores = {"src/pkg/*.py" = ["PDF101"]}\n')
                 non_matching_profile = SETTINGS_SCHEMA.load_profile(path=str(target))
             finally:
                 os.chdir(previous_cwd)
 
         self.assertEqual(self._active_rule_tags_for_path(matching_profile, target), ())
-        self.assertEqual(self._active_rule_tags_for_path(non_matching_profile, target), ("PDF001",))
+        self.assertEqual(self._active_rule_tags_for_path(non_matching_profile, target), ("PDF101",))
 
     def test_ruff_spec_explicit_config_per_file_ignores_are_current_directory_relative(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -1428,7 +1428,7 @@ class TestRules(unittest.TestCase):
             config = root / "config" / "pydocfmt.toml"
             target = repo / "src" / "pkg" / "a.py"
             self._write(target)
-            self._write(config, 'select = ["PDF001"]\nper-file-ignores = {"src/pkg/*.py" = ["PDF001"]}\n')
+            self._write(config, 'select = ["PDF101"]\nper-file-ignores = {"src/pkg/*.py" = ["PDF101"]}\n')
 
             previous_cwd = os.getcwd()
             os.chdir(repo)
@@ -1440,13 +1440,13 @@ class TestRules(unittest.TestCase):
             os.chdir(repo / "src")
             try:
                 non_matching_profile = SETTINGS_SCHEMA.load_profile(global_values=GlobalArgs(config_options=(str(config),)), path=str(target))
-                self._write(config, 'select = ["PDF001"]\nper-file-ignores = {"pkg/*.py" = ["PDF001"]}\n')
+                self._write(config, 'select = ["PDF101"]\nper-file-ignores = {"pkg/*.py" = ["PDF101"]}\n')
                 changed_pattern_profile = SETTINGS_SCHEMA.load_profile(global_values=GlobalArgs(config_options=(str(config),)), path=str(target))
             finally:
                 os.chdir(previous_cwd)
 
         self.assertEqual(self._active_rule_tags_for_path(matching_profile, target), ())
-        self.assertEqual(self._active_rule_tags_for_path(non_matching_profile, target), ("PDF001",))
+        self.assertEqual(self._active_rule_tags_for_path(non_matching_profile, target), ("PDF101",))
         self.assertEqual(self._active_rule_tags_for_path(changed_pattern_profile, target), ())
 
     def test_ruff_spec_cli_per_file_ignores_are_current_directory_relative(self) -> None:
@@ -1454,24 +1454,24 @@ class TestRules(unittest.TestCase):
             root = Path(td)
             target = root / "src" / "pkg" / "a.py"
             self._write(target)
-            self._write(root / "pyproject.toml", '[tool.pydocfmt]\nselect = ["PDF001"]\n')
+            self._write(root / "pyproject.toml", '[tool.pydocfmt]\nselect = ["PDF101"]\n')
             previous_cwd = os.getcwd()
             os.chdir(root / "src")
             try:
-                matching_profile = SETTINGS_SCHEMA.load_profile(args=argparse.Namespace(per_file_ignores=['{"pkg/*.py" = ["PDF001"]}']), path=str(target))
-                non_matching_profile = SETTINGS_SCHEMA.load_profile(args=argparse.Namespace(per_file_ignores=['{"src/pkg/*.py" = ["PDF001"]}']), path=str(target))
+                matching_profile = SETTINGS_SCHEMA.load_profile(args=argparse.Namespace(per_file_ignores=['{"pkg/*.py" = ["PDF101"]}']), path=str(target))
+                non_matching_profile = SETTINGS_SCHEMA.load_profile(args=argparse.Namespace(per_file_ignores=['{"src/pkg/*.py" = ["PDF101"]}']), path=str(target))
             finally:
                 os.chdir(previous_cwd)
 
         self.assertEqual(self._active_rule_tags_for_path(matching_profile, target), ())
-        self.assertEqual(self._active_rule_tags_for_path(non_matching_profile, target), ("PDF001",))
+        self.assertEqual(self._active_rule_tags_for_path(non_matching_profile, target), ("PDF101",))
 
     def test_ruff_spec_per_file_ignores_apply_to_explicit_files(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             target = root / "src" / "pkg" / "a.py"
             self._write(target)
-            self._write(root / "pyproject.toml", '[tool.pydocfmt]\nselect = ["PDF001"]\nper-file-ignores = {"src/pkg/*.py" = ["PDF001"]}\n')
+            self._write(root / "pyproject.toml", '[tool.pydocfmt]\nselect = ["PDF101"]\nper-file-ignores = {"src/pkg/*.py" = ["PDF101"]}\n')
             previous_cwd = os.getcwd()
             os.chdir(root / "src")
             try:
@@ -1494,8 +1494,8 @@ class TestRules(unittest.TestCase):
         self.assertEqual(
             output.getvalue(),
             "PCF001 comment-reflow-required (Comment chunk needs reflow)\n"
-            "PDF001* reflow-required (Docstring chunk needs reflow)\n"
-            "PDF106 summary-too-long (Docstring summary does not fit on one line)\n",
+            "PDF101* reflow-required (Docstring chunk needs reflow)\n"
+            "PDF110 summary-too-long (Docstring summary does not fit on one line)\n",
         )
 
     def test_print_rules_reflects_setting_aware_selection(self) -> None:
@@ -1503,16 +1503,16 @@ class TestRules(unittest.TestCase):
         exact_output = StringIO()
 
         check.print_rules(rules_selection.select_rules(CheckSettings(docstring_convention=DocstringConvention.GOOGLE)), output=broad_output)
-        check.print_rules(rules_selection.select_rules(CheckSettings(select=("PDF103",), docstring_convention=DocstringConvention.GOOGLE)), output=exact_output)
+        check.print_rules(rules_selection.select_rules(CheckSettings(select=("PDF107",), docstring_convention=DocstringConvention.GOOGLE)), output=exact_output)
 
-        self.assertIn("PDF102*", broad_output.getvalue())
-        self.assertNotIn("PDF103", broad_output.getvalue())
-        self.assertNotIn("PDF104", broad_output.getvalue())
-        self.assertIn("PDF103*", exact_output.getvalue())
+        self.assertIn("PDF106*", broad_output.getvalue())
+        self.assertNotIn("PDF107", broad_output.getvalue())
+        self.assertNotIn("PDF108", broad_output.getvalue())
+        self.assertIn("PDF107*", exact_output.getvalue())
 
     def test_print_rules_prints_operational_errors_before_rules(self) -> None:
         selection = rules_selection.select_rules(
-            CheckSettings(select=("BAD",), fixable=("PDF106",)),
+            CheckSettings(select=("BAD",), fixable=("PDF110",)),
             collection=sample_collection(),
         )
         output = StringIO()
@@ -1521,7 +1521,7 @@ class TestRules(unittest.TestCase):
 
         self.assertEqual(
             output.getvalue(),
-            "ERROR: rule selection contains unknown selector: BAD\n" "ERROR: fixable rules selector 'PDF106' only matches rules with no available fixes\n" "\n" "No active rules.\n",
+            "ERROR: rule selection contains unknown selector: BAD\n" "ERROR: fixable rules selector 'PDF110' only matches rules with no available fixes\n" "\n" "No active rules.\n",
         )
 
     def test_print_rules_prints_empty_message_without_active_rules(self) -> None:
@@ -1534,14 +1534,14 @@ class TestRules(unittest.TestCase):
 
     def test_print_rules_ignores_per_file_rule_ignores(self) -> None:
         selection = rules_selection.select_rules(
-            CheckSettings(select=("ALL",), per_file_ignores=(("tests/*.py", ("PDF001",)),)),
+            CheckSettings(select=("ALL",), per_file_ignores=(("tests/*.py", ("PDF101",)),)),
             collection=sample_collection(),
         )
         output = StringIO()
 
         check.print_rules(selection, output=output)
 
-        self.assertIn("PDF001* reflow-required (Docstring chunk needs reflow)\n", output.getvalue())
+        self.assertIn("PDF101* reflow-required (Docstring chunk needs reflow)\n", output.getvalue())
 
 
 if __name__ == "__main__":

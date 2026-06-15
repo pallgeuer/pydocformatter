@@ -13,7 +13,7 @@ This document specifies how `pydocfmt` discovers rule definitions and resolves r
 - **D4: Fixability selector validation.**
   pydocformatter reports an operational error when a `fixable` or `extend-fixable` selector matches only rules whose `FixAvailability` is `Never`. Ruff accepts such selectors and simply has no fix to apply for those rules.
 - **D5: Command-line comma-list whitespace.**
-  pydocformatter strips whitespace around entries in dedicated command-line comma-list options, so `--select "PDF100, PDF106"` is accepted as `PDF100` and `PDF106`. Ruff rejects whitespace-containing selector entries such as ` F841`.
+  pydocformatter strips whitespace around entries in dedicated command-line comma-list options, so `--select "PDF200, PDF110"` is accepted as `PDF200` and `PDF110`. Ruff rejects whitespace-containing selector entries such as ` F841`.
 
 ## Rule Definitions
 
@@ -31,12 +31,12 @@ The class is also named after the prefix and defines `RuleCategoryMetadata` cont
 Each implemented rule should be defined as one `RuleBase` subclass, normally in a module grouped by prefix:
 
 ```text
-src/pydocformatter/rules/definitions/PDF/PDF001_reflow_required.py
+src/pydocformatter/rules/definitions/PDF/PDF101_reflow_required.py
 ```
 
 Rule classes register with their category through `@register_rule_to(PDF)` and define a `meta` class attribute containing `RuleMetadata`:
 
-- `code`: A `RuleCode`, such as `PDF001`.
+- `code`: A `RuleCode`, such as `PDF101`.
 - `name`: A stable machine-readable name, such as `reflow-required`.
 - `message`: The default diagnostic message. It may include format fields for per-finding customization.
 - `fix_availability`: A `FixAvailability` value describing whether automatic fixes are `Always`, `Usually`, `Sometimes`, or `Never` available at the rule level.
@@ -87,7 +87,7 @@ With default settings, a custom empty catalog resolves to an empty active rulese
 Rule selectors are:
 
 - `ALL`: Matches all collected rules.
-- Full rule code: `PDF001`.
+- Full rule code: `PDF101`.
 - Complete prefix: `PDF`.
 - Complete prefix plus leading digits: `PDF10`, matching rule codes whose numeric string starts with `10`.
 
@@ -170,7 +170,7 @@ After normal selection precedence and setting effects are resolved, selected rul
 - Each discarded rule produces one operational error listing all earlier retained rules that conflict with it.
 - Per-file ignores run later and do not restore rules discarded by incompatibility resolution.
 
-The built-in opposing pairs (e.g. `PDF102`/`PDF103` and `PDF104`/`PDF105`) are mutually incompatible. Convention-specific setting effects keep each built-in convention profile conflict-free, but exact selection can restore ignored rules. Selecting both rules in either pair retains the lower ordered rule and reports the higher ordered rule as disabled.
+The built-in opposing pairs (e.g. `PDF106`/`PDF107` and `PDF108`/`PDF109`) are mutually incompatible. Convention-specific setting effects keep each built-in convention profile conflict-free, but exact selection can restore ignored rules. Selecting both rules in either pair retains the lower ordered rule and reports the higher ordered rule as disabled.
 
 ## Per-File Ignores
 
@@ -205,7 +205,7 @@ Examples:
 - `select = ["PDF14"]` with `per-file-ignores = {"tests/*.py" = ["PDF1"]}` removes `PDF142` for matching files.
 - `select = ["PDF1"]` with `per-file-ignores = {"tests/*.py" = ["PDF14"]}` removes `PDF142` for matching files and keeps `PDF150`.
 - `select = ["PDF14"]` with `per-file-ignores = {"tests/*.py" = ["PDF14"]}` removes `PDF142` for matching files.
-- `select = ["PDF"]` with `per-file-ignores = {"!src/*.py" = ["PDF001"]}` removes `PDF001` everywhere except files matching `src/*.py`.
+- `select = ["PDF"]` with `per-file-ignores = {"!src/*.py" = ["PDF101"]}` removes `PDF101` everywhere except files matching `src/*.py`.
 - A lower-priority config-file `per-file-ignores` entry still suppresses a rule selected by a higher-priority command-line `--select`; per-file ignores apply after global rule selection.
 
 `pydocfmt check --show-rules` prints the global active rules and does not apply per-file ignores.
@@ -215,7 +215,7 @@ Examples:
 Rule-selection CLI list options accept comma-separated selector values per option occurrence:
 
 ```bash
-pydocfmt check --select PDF100,PDF106 --ignore PDF107
+pydocfmt check --select PDF200,PDF110 --ignore PDF203
 ```
 
 Whitespace around command-line comma-list entries is stripped before validation. This is a pydocformatter CLI parsing delta from Ruff, which treats the whitespace as part of the selector.
@@ -223,13 +223,13 @@ Whitespace around command-line comma-list entries is stripped before validation.
 Repeated list option occurrences append values within the command-line layer:
 
 ```bash
-pydocfmt check --select PDF100 --select PDF106
+pydocfmt check --select PDF200 --select PDF110
 ```
 
 Repeated TOML-map option occurrences merge entries within the command-line layer. If the same pattern appears more than once in repeated `--per-file-ignores` or `--extend-per-file-ignores` values, the selector lists are appended:
 
 ```bash
-pydocfmt check --per-file-ignores '{"tests/*.py" = ["PDF100"]}' --per-file-ignores '{"tests/*.py" = ["PDF106"]}'
+pydocfmt check --per-file-ignores '{"tests/*.py" = ["PDF200"]}' --per-file-ignores '{"tests/*.py" = ["PDF110"]}'
 ```
 
 As with other settings, the resolved command-line value for a field replaces lower-priority values for the same field.
@@ -329,12 +329,12 @@ Only global rule selection is displayed. Per-file ignores are intentionally not 
 
 `pydocfmt rule [RULE|--all]` exposes Ruff-style rule explanations.
 
-- `RULE` must be an exact uppercase rule code, such as `PDF001`; rule names and lowercase codes are invalid.
+- `RULE` must be an exact uppercase rule code, such as `PDF101`; rule names and lowercase codes are invalid.
 - `--all` prints all collected rules in rule-code order and cannot be combined with `RULE`.
 - `--output-format text` prints the adjacent Markdown rule document directly.
 - `--output-format json` prints Ruff-style metadata for one rule, or a list of metadata objects with `--all`; its `explanation` field omits the Markdown title and fixability paragraph.
 
-Rule documents live next to their rule definition modules with the same basename and a `.md` extension. For example, `src/pydocformatter/rules/definitions/PDF/PDF001_reflow_required.py` is documented by `src/pydocformatter/rules/definitions/PDF/PDF001_reflow_required.md`. New rule docs should follow `src/pydocformatter/rules/templates/rule_template.md`.
+Rule documents live next to their rule definition modules with the same basename and a `.md` extension. For example, `src/pydocformatter/rules/definitions/PDF/PDF101_reflow_required.py` is documented by `src/pydocformatter/rules/definitions/PDF/PDF101_reflow_required.md`. New rule docs should follow `src/pydocformatter/rules/templates/rule_template.md`.
 
 ## CLI Linter Listing
 

@@ -14,14 +14,15 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added convention-aware semantic docstring preparation with explicit reflow regions and configurable recognition of lists, headings, doctests, code fences, block quotes, tables, directives, literal blocks, and Sphinx fields.
   - Added the `docstring-convention` setting with `none`, `google`, `numpy`, and `pep257` modes.
   - Added `PDF000` to rewrite implicitly concatenated docstrings as equivalent simple triple-double-quoted literals.
-  - Added `PDF001` to reflow safely mapped docstring summaries, paragraphs, section descriptions, Sphinx fields, list items, and block quotes.
-  - Added `PDF002` to normalize safely mapped multi-line simple docstring indentation, including convention-aware Google and NumPy section indentation.
-  - Added `PDF003` and `PDF004` to normalize safely mapped docstring trailing whitespace and blank-line whitespace.
-  - Added `PDF005` and `PDF006` to normalize quote-adjacent whitespace around safely mapped simple docstring content.
-  - Added `PDF100` to collapse excess blank lines around docstring chunks and collapse blank-only docstrings to empty docstrings.
-  - Added `PDF101` to insert safe missing blank lines before recognized docstring structures and convention sections.
-  - Added `PDF102` through `PDF105` to normalize multi-line docstring opening and closing quote placement.
-  - Added `PDF106` and `PDF107` to collapse safe summary-only docstrings that fit on one line and report summaries that remain multi-line.
+  - Added `PDF101` to reflow safely mapped docstring summaries, paragraphs, section descriptions, Sphinx fields, list items, and block quotes.
+  - Added `PDF100` to normalize safely mapped multi-line simple docstring indentation, including convention-aware Google and NumPy section indentation.
+  - Added `PDF102` and `PDF103` to normalize safely mapped docstring trailing whitespace and blank-line whitespace.
+  - Added `PDF104` and `PDF105` to normalize quote-adjacent whitespace around safely mapped simple docstring content.
+  - Added `PDF200` to collapse excess blank lines around docstring chunks and collapse blank-only docstrings to empty docstrings.
+  - Added `PDF201` to insert safe missing blank lines before recognized docstring structures and convention sections.
+  - Added `PDF001`, `PDF002`, `PDF202`, `PDF300` through `PDF305`, `PDF400` through `PDF405`, and `PDF500` through `PDF507` as implementation-pending stubs for the remaining Ruff docstring style and validation rules.
+  - Added `PDF106` through `PDF109` to normalize multi-line docstring opening and closing quote placement.
+  - Added `PDF110` and `PDF203` to collapse safe summary-only docstrings that fit on one line and report summaries that remain multi-line.
 
 - **CLI:**
   - Added Ruff-style subcommands with `pydocfmt check` for read-only checks and `pydocfmt check --fix` for formatting.
@@ -45,14 +46,14 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added generic rule-selection effects driven by resolved setting values, with exact-selector restoration for ignored rules and unconditional removal for disabled rules.
   - Added TOML-only `[tool.pydocfmt.docstring]` and `[tool.pydocfmt.comment]` tables as the preferred spelling for docstring and comment settings, with flat `docstring-*` and `comment-*` keys still supported as mutually exclusive compatibility forms.
   - Added mutually validated rule incompatibility metadata and deterministic conflict resolution that keeps the first selected rule and reports later conflicts as operational errors.
-  - Added docstring-convention effects for `PDF102` through `PDF105` while keeping PCF rules convention-independent.
+  - Added docstring-convention effects for `PDF106` through `PDF109` while keeping PCF rules convention-independent.
   - Enabled comment list-item and block-quote formatting, structural preservation, and Python statement detection by default, while leaving heuristic disabled-code and expression detection disabled.
   - Added `output-format` for formatter configuration, currently supporting only `"grouped"`.
   - Added `legacy` for formatter configuration, defaulting to `false`.
   - Added Ruff-style `line-ending` configuration with `"auto"`, `"lf"`, `"cr-lf"`, and `"native"` values.
   - Added `indent-style` and `indent-width` for generated docstring section indentation, with Ruff-style defaults of `"space"` and `4`.
-  - Added `docstring-blank-line-style` with `"blank"` and `"aligned"` modes for PDF004 blank-line whitespace normalization.
-  - Added `docstring-blank-line-after-last-section` to control whether PDF100 and PDF101 keep one blank line after the final recognized Google or NumPy docstring section.
+  - Added `docstring-blank-line-style` with `"blank"` and `"aligned"` modes for PDF103 blank-line whitespace normalization.
+  - Added `docstring-blank-line-after-last-section` to control whether PDF200 and PDF201 keep one blank line after the final recognized Google or NumPy docstring section.
   - Added Ruff-style rule settings under `[tool.pydocfmt]`: `select`, `ignore`, `extend-select`, `per-file-ignores`, `extend-per-file-ignores`, `fixable`, `unfixable`, and `extend-fixable`.
   - Added `respect-gitignore` for formatter configuration, defaulting to `true`.
   - Added explicit config-file support for `--config PATH`, including pyproject-style `[tool.pydocfmt]` files and dedicated top-level pydocfmt TOML files.
@@ -63,9 +64,9 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added a Ruff file-selection compatibility specification at `docs/file_selection_spec.md`, including exact defaults, precedence rules, force-exclude behavior, config-relative glob bases, and explicit pydocformatter deviations.
   - Added a rule-selection specification at `docs/rule_selection_spec.md`, covering rule collection, selectors, fixability, and rule explanation output.
   - Added adjacent Markdown documentation for all built-in pydocformatter rules, including Ruff compatibility notes where relevant.
-  - Expanded the PDF001 documentation with explicit behavior notes, setting interactions, safety limits, and verified qualitative examples.
-  - Expanded the PDF005 and PDF006 documentation with explicit behavior boundaries, safety notes, and verified qualitative examples.
-  - Expanded the PDF106 and PDF107 documentation with explicit behavior boundaries, setting interactions, safety notes, and verified qualitative examples.
+  - Expanded the PDF101 documentation with explicit behavior notes, setting interactions, safety limits, and verified qualitative examples.
+  - Expanded the PDF104 and PDF105 documentation with explicit behavior boundaries, safety notes, and verified qualitative examples.
+  - Expanded the PDF110 and PDF203 documentation with explicit behavior boundaries, setting interactions, safety notes, and verified qualitative examples.
   - Added a reusable rule documentation Markdown template at `src/pydocformatter/rules/templates/rule_template.md`.
   - Added adjacent documentation for each rule category and a reusable rule category documentation template.
   - Added docstrings for public glob matching methods, the dependency-pin check tool, and important configuration, CLI, and file-selection helpers.
@@ -79,7 +80,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added regression coverage for Ruff-compatible file-selection and per-file-ignore pattern-base behavior.
   - Vastly expanded PCF rule tests across comment classification, run boundaries, structure preservation, code detection, width handling, line endings, mixed formatting, syntax-position safety, convergence, idempotence, and rule independence.
   - Vastly expanded PDF category preparation tests across docstring collection, source metadata, semantic sections and entries, protected structures, reflow regions, malformed inputs, and mixed edge cases.
-  - Added PDF001 regression coverage for short-line joining, protected structures, disabled structure parsing, simple-suite docstrings, and line-ending settings.
+  - Added PDF101 regression coverage for short-line joining, protected structures, disabled structure parsing, simple-suite docstrings, and line-ending settings.
 
 - **Formatting:**
   - Added the LibCST-based rule execution framework with ordered category preprocessing, repeated automatic-fix passes, final read-only checks, and non-convergence diagnostics.
@@ -90,37 +91,36 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 
 - **Docstring formatting:**
   - Changed `PDF000` to normalize safe `\n` and `\t` whitespace escape spellings in docstrings, including non-concatenated docstrings, without changing evaluated docstring values.
-  - Changed `PDF102` through `PDF105` to also normalize single-content-line docstrings when the docstring literal itself spans multiple lines.
-  - Changed same-line quote placement for `PDF102` and `PDF104` to keep one separator space when needed for valid Python source.
-  - Changed `PDF100` to remove blank lines after Google/NumPy section headers and between consecutive convention entries.
-  - Changed `PDF002` to replace Ruff `D206` by expanding tabs in rewritten docstring indentation when `indent-style = "space"`.
-  - Renumbered the existing `PDF101` through `PDF106` rule stubs to `PDF102` through `PDF107`.
-  - Swapped `PDF106` and `PDF107` so `PDF106` is `docstring-should-be-one-line` and `PDF107` is `summary-too-long`.
-  - Changed PDF001 Google-style entry wrapping to use fixed continuation indentation and to place descriptions on the following line when long entry prefixes leave too little room.
+  - Changed `PDF106` through `PDF109` to also normalize single-content-line docstrings when the docstring literal itself spans multiple lines.
+  - Changed same-line quote placement for `PDF106` and `PDF108` to keep one separator space when needed for valid Python source.
+  - Changed `PDF200` to remove blank lines after Google/NumPy section headers and between consecutive convention entries.
+  - Changed `PDF100` to replace Ruff `D206` by expanding tabs in rewritten docstring indentation when `indent-style = "space"`.
+  - Renumbered PDF rules into topic-based ranges, keeping literal normalization in `PDF0xx`, core source formatting in `PDF1xx`, blank-line checks in `PDF2xx`, first-line style in `PDF3xx`, section style in `PDF4xx`, and signature/docstring validation in `PDF5xx`.
+  - Changed PDF101 Google-style entry wrapping to use fixed continuation indentation and to place descriptions on the following line when long entry prefixes leave too little room.
   - Changed directive and literal-block parsing so trailing blank lines are represented as ordinary docstring blank-line blocks instead of part of the protected body.
-  - Centralized docstring string-literal rendering for `PDF000` and `PDF001`, preserving reusable escape spellings and literal non-ASCII characters while reporting unsafe rewrites as non-fixable findings.
-  - Centralized quote-collision rendering for `PDF106` so one-line docstring collapse reuses the shared PDF escape and separator fallback behavior.
+  - Centralized docstring string-literal rendering for `PDF000` and `PDF101`, preserving reusable escape spellings and literal non-ASCII characters while reporting unsafe rewrites as non-fixable findings.
+  - Centralized quote-collision rendering for `PDF110` so one-line docstring collapse reuses the shared PDF escape and separator fallback behavior.
 
 ### Fixed
 
 - **Docstring formatting:**
-  - Fixed PDF001 to account for opening and same-line closing docstring quote delimiters when wrapping generated docstring source lines.
-  - Fixed PDF100, PDF101, PDF104, and PDF105 to preserve genuine leading spaces or tabs on first-line docstring content while rewriting surrounding docstring structure.
-  - Fixed PDF104 to move bare closing quotes after single-content-line docstrings whose literal spans multiple physical lines.
-  - Fixed PDF102 to keep a distinct, value-preserving source spelling when moving content that starts with the docstring delimiter quote character onto the opening quote line.
-  - Fixed PDF006 and PDF104 to escape delimiter-quote collisions before falling back to a value-changing separator space.
-  - Fixed PDF101 to avoid inserting a trailing blank line after a header-only final Google or NumPy section.
-  - Fixed PDF002 to leave first-line Google and NumPy sections unchanged instead of partially reindenting their entries or adornments away from the section header.
-  - Fixed PDF002 to preserve the canonical margin for under-indented same-line closing quotes.
-  - Fixed PDF003 and PDF004 to treat only spaces and tabs as removable docstring line whitespace, preserving other evaluated whitespace characters.
-  - Fixed PDF004 to leave empty docstrings unchanged instead of inserting indentation before the closing quotes.
-  - Fixed PDF001 source mapping for reflow regions whose text also appears earlier on the same raw docstring line.
+  - Fixed PDF101 to account for opening and same-line closing docstring quote delimiters when wrapping generated docstring source lines.
+  - Fixed PDF200, PDF201, PDF108, and PDF109 to preserve genuine leading spaces or tabs on first-line docstring content while rewriting surrounding docstring structure.
+  - Fixed PDF108 to move bare closing quotes after single-content-line docstrings whose literal spans multiple physical lines.
+  - Fixed PDF106 to keep a distinct, value-preserving source spelling when moving content that starts with the docstring delimiter quote character onto the opening quote line.
+  - Fixed PDF105 and PDF108 to escape delimiter-quote collisions before falling back to a value-changing separator space.
+  - Fixed PDF201 to avoid inserting a trailing blank line after a header-only final Google or NumPy section.
+  - Fixed PDF100 to leave first-line Google and NumPy sections unchanged instead of partially reindenting their entries or adornments away from the section header.
+  - Fixed PDF100 to preserve the canonical margin for under-indented same-line closing quotes.
+  - Fixed PDF102 and PDF103 to treat only spaces and tabs as removable docstring line whitespace, preserving other evaluated whitespace characters.
+  - Fixed PDF103 to leave empty docstrings unchanged instead of inserting indentation before the closing quotes.
+  - Fixed PDF101 source mapping for reflow regions whose text also appears earlier on the same raw docstring line.
   - Removed dead string-literal escape handling and tightened edge-case wrapping for source-aware docstring text.
 
 - **Rule documentation:**
   - Expanded the PCF001 and PCF002 rule examples to demonstrate common spacing, wrapping, structure, protection, boundary, and extraction behavior.
-  - Documented that PDF106 separator fallback can add a leading or trailing space to the evaluated `__doc__` value when value-preserving escaping is impossible.
-  - Documented that PDF001 delimiter-aware wrapping does not reserve width for unchanged source after a same-line closing docstring delimiter.
+  - Documented that PDF110 separator fallback can add a leading or trailing space to the evaluated `__doc__` value when value-preserving escaping is impossible.
+  - Documented that PDF101 delimiter-aware wrapping does not reserve width for unchanged source after a same-line closing docstring delimiter.
   - Rephrased rule example results to describe the effect of applying each rule.
   - Kept planned PDF rule examples in ordinary Python fences until their formatter behavior is implemented and can be tested as structured examples.
 
@@ -263,7 +263,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Kept non-ASCII code points escaped when normalizing concatenated docstrings so ASCII-compatible source encodings remain valid.
   - Kept non-ASCII code points escaped when reflowing docstrings that were originally ASCII-compatible.
   - Reflowed module docstrings whose evaluated value ends with a newline and whose closing delimiter is on a separate source line.
-  - Preserved tab-indented PDF001 continuation lines when form feeds precede a docstring or a leading tab crosses the docstring dedent margin.
+  - Preserved tab-indented PDF101 continuation lines when form feeds precede a docstring or a leading tab crosses the docstring dedent margin.
   - Required whitespace after `>>>` when recognizing protected doctest prompts.
 
 - **Rule framework:**

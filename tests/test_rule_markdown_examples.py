@@ -66,10 +66,10 @@ pass
 
 [output=unchanged]
 [findings]
-PDF001: 5-3
+PDF101: 5-3
 ```
 """,
-            rule_code="PDF001",
+            rule_code="PDF101",
         )
 
 

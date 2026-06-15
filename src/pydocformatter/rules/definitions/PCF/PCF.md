@@ -16,6 +16,13 @@ Comments remain readable and consistently spaced without rewriting directives or
 
 Physical standalone runs contain consecutive, same-indent, regular, non-empty comments. Empty comments, hash-only separators, protected comments, indentation changes, and nonconsecutive source lines end a run. PCF001 may subdivide a run further according to its enabled structure settings.
 
+## Code ranges
+PCF rules currently occupy one contiguous range because the category covers comment formatting only.
+
+| Range    | Topic              | Notes                                             |
+|:---------|:-------------------|:--------------------------------------------------|
+| `PCF0xx` | Comment formatting | Standalone and trailing comment formatting rules. |
+
 ## Related tooling
 Ruff can report comment line-length and whitespace issues, but does not provide equivalent configurable comment reflow and trailing-comment extraction.
 

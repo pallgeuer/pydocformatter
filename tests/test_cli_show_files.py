@@ -19,8 +19,8 @@ from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetadata
 from pydocformatter.rules_selection import RuleSelection
 
-PDF001_RULE = RuleMetadata(
-    code=RuleCode("PDF001"), name="reflow-required", message="Docstring chunk needs reflow", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0", setting_effects=(), incompatible_with=()
+PDF101_RULE = RuleMetadata(
+    code=RuleCode("PDF101"), name="reflow-required", message="Docstring chunk needs reflow", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0", setting_effects=(), incompatible_with=()
 )
 PCF001_RULE = RuleMetadata(
     code=RuleCode("PCF001"),
@@ -534,7 +534,7 @@ class TestCLIShowFiles(unittest.TestCase):
                 "--select",
                 "PCF,PDF",
                 "--ignore",
-                "PCF002,PDF001",
+                "PCF002,PDF101",
                 "--fixable",
                 "ALL",
                 "--unfixable",
@@ -554,7 +554,7 @@ class TestCLIShowFiles(unittest.TestCase):
 
             self.assertEqual(exit_code, 0)
             self.assertEqual(called_settings[0].select, ("PCF", "PDF"))
-            self.assertEqual(called_settings[0].ignore, ("PCF002", "PDF001"))
+            self.assertEqual(called_settings[0].ignore, ("PCF002", "PDF101"))
             self.assertEqual(called_settings[0].fixable, ("ALL",))
             self.assertEqual(called_settings[0].unfixable, ("PCF001",))
             self.assertEqual(called_settings[0].per_file_ignores, (("tests/*.py", ("PCF001",)),))
@@ -1019,14 +1019,14 @@ class TestCLIShowFiles(unittest.TestCase):
             ):
                 exit_code = pydocfmt_cli.main()
             output = stdout.getvalue()
-            rules = tuple(line.split(maxsplit=1)[0].removesuffix("*") for line in output.splitlines() if line.startswith(("PDF101", "PDF102", "PDF103", "PDF104", "PDF105")))
+            rules = tuple(line.split(maxsplit=1)[0].removesuffix("*") for line in output.splitlines() if line.startswith(("PDF201", "PDF106", "PDF107", "PDF108", "PDF109")))
             return exit_code, rules, output
 
         broad_expectations = {
-            "none": (0, ("PDF101", "PDF102", "PDF105")),
-            "google": (0, ("PDF101", "PDF102", "PDF105")),
-            "numpy": (0, ("PDF101", "PDF105")),
-            "pep257": (0, ("PDF101", "PDF105")),
+            "none": (0, ("PDF106", "PDF109", "PDF201")),
+            "google": (0, ("PDF106", "PDF109", "PDF201")),
+            "numpy": (0, ("PDF109", "PDF201")),
+            "pep257": (0, ("PDF109", "PDF201")),
         }
         for convention, (expected_exit_code, expected_rules) in broad_expectations.items():
             with self.subTest(variation="broad", convention=convention):
@@ -1036,14 +1036,14 @@ class TestCLIShowFiles(unittest.TestCase):
 
         for convention in broad_expectations:
             with self.subTest(variation="exact-extend-select", convention=convention):
-                exit_code, rules, output = show_convention_rules("--docstring-convention", convention, "--extend-select", "PDF102,PDF103,PDF104,PDF105")
-                self.assertEqual((exit_code, rules, output.count("has been disabled")), (1, ("PDF101", "PDF102", "PDF104"), 2))
+                exit_code, rules, output = show_convention_rules("--docstring-convention", convention, "--extend-select", "PDF106,PDF107,PDF108,PDF109")
+                self.assertEqual((exit_code, rules, output.count("has been disabled")), (1, ("PDF106", "PDF108", "PDF201"), 2))
 
-        self.assertEqual(show_convention_rules("--docstring-convention", "google", "--extend-select", "PDF10")[:2], (0, ("PDF101", "PDF102", "PDF105")))
-        self.assertEqual(show_convention_rules("--docstring-convention", "numpy", "--extend-select", "PDF10")[:2], (0, ("PDF101", "PDF105")))
-        self.assertEqual(show_convention_rules("--docstring-convention", "google", "--select", "PDF103")[:2], (0, ("PDF103",)))
-        exit_code, rules, output = show_convention_rules("--docstring-convention", "google", "--extend-select", "PDF103,PDF104", "--ignore", "PDF103")
-        self.assertEqual((exit_code, rules, output.count("has been disabled")), (1, ("PDF101", "PDF102", "PDF104"), 1))
+        self.assertEqual(show_convention_rules("--docstring-convention", "google", "--extend-select", "PDF10")[:2], (0, ("PDF106", "PDF109", "PDF201")))
+        self.assertEqual(show_convention_rules("--docstring-convention", "numpy", "--extend-select", "PDF10")[:2], (0, ("PDF109", "PDF201")))
+        self.assertEqual(show_convention_rules("--docstring-convention", "google", "--select", "PDF107")[:2], (0, ("PDF107",)))
+        exit_code, rules, output = show_convention_rules("--docstring-convention", "google", "--extend-select", "PDF107,PDF108", "--ignore", "PDF107")
+        self.assertEqual((exit_code, rules, output.count("has been disabled")), (1, ("PDF106", "PDF108", "PDF201"), 1))
 
     def test_pydocfmt_check_config_file_prints_resolved_settings(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -1517,7 +1517,7 @@ class TestCLIShowFiles(unittest.TestCase):
             target.write_text(original_source, encoding="utf-8")
             stdout = StringIO()
             rule = RuleMetadata(
-                code=RuleCode("PDF106"),
+                code=RuleCode("PDF110"),
                 name="summary-too-long",
                 message="Docstring summary does not fit on one line",
                 fix_availability=FixAvailability.NEVER,
@@ -1535,7 +1535,7 @@ class TestCLIShowFiles(unittest.TestCase):
                     old_source=original_source,
                     new_source=formatted_source,
                     modified=True,
-                    fixed_findings=collections.Counter({PDF001_RULE: 1}),
+                    fixed_findings=collections.Counter({PDF101_RULE: 1}),
                     unfixed_findings=(RuleFinding(rule=rule, line_numbers=(1,)),),
                     errors=(),
                 )
@@ -1558,7 +1558,7 @@ class TestCLIShowFiles(unittest.TestCase):
             self.assertIn(f"+++ {target}", output)
             self.assertIn("-x = 1", output)
             self.assertIn("+x = 2", output)
-            self.assertNotIn("PDF106", output)
+            self.assertNotIn("PDF110", output)
 
     def test_pydocfmt_diff_exit_zero_suppresses_diff_exit_status(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -1569,7 +1569,7 @@ class TestCLIShowFiles(unittest.TestCase):
 
             def fake_format(path: str, *, file: TextIO | None = None, settings: CheckSettings, rule_selection: RuleSelection, fix: bool, write: bool) -> FormatterResult:
                 del file, settings, rule_selection, fix, write
-                return FormatterResult(path=path, old_source="x = 1\n", new_source="x = 2\n", modified=True, fixed_findings=collections.Counter({PDF001_RULE: 1}), unfixed_findings=(), errors=())
+                return FormatterResult(path=path, old_source="x = 1\n", new_source="x = 2\n", modified=True, fixed_findings=collections.Counter({PDF101_RULE: 1}), unfixed_findings=(), errors=())
 
             argv = ["pydocfmt", "check", "--diff", "--exit-zero", str(target)]
 
@@ -1612,7 +1612,7 @@ class TestCLIShowFiles(unittest.TestCase):
             def fake_format(path: str, *, file: TextIO | None = None, settings: CheckSettings, rule_selection: RuleSelection, fix: bool, write: bool) -> FormatterResult:
                 del file, settings, rule_selection, fix, write
                 return FormatterResult(
-                    path=path, old_source="x = 1\n", new_source="x = 2\n", modified=True, fixed_findings=collections.Counter({PDF001_RULE: 1, PCF001_RULE: 2}), unfixed_findings=(), errors=()
+                    path=path, old_source="x = 1\n", new_source="x = 2\n", modified=True, fixed_findings=collections.Counter({PDF101_RULE: 1, PCF001_RULE: 2}), unfixed_findings=(), errors=()
                 )
 
             argv = ["pydocfmt", "check", "--diff", "--output-file", str(output_file), str(target)]
@@ -1657,7 +1657,7 @@ class TestCLIShowFiles(unittest.TestCase):
             del settings, rule_selection, fix, write
             assert file is not None
             assert file.read() == source
-            return FormatterResult(path=path, old_source=source, new_source="x = 2\n", modified=True, fixed_findings=collections.Counter({PDF001_RULE: 1}), unfixed_findings=(), errors=())
+            return FormatterResult(path=path, old_source=source, new_source="x = 2\n", modified=True, fixed_findings=collections.Counter({PDF101_RULE: 1}), unfixed_findings=(), errors=())
 
         argv = ["pydocfmt", "check", "--fix", "--diff", "--stdin-filename", "virtual.py"]
 
@@ -1791,7 +1791,7 @@ class TestCLIShowFiles(unittest.TestCase):
             assert write
             assert file is not None
             assert file.read() == source
-            return FormatterResult(path="-", old_source=source, new_source=formatted_source, modified=True, fixed_findings=collections.Counter({PDF001_RULE: 1}), unfixed_findings=(), errors=())
+            return FormatterResult(path="-", old_source=source, new_source=formatted_source, modified=True, fixed_findings=collections.Counter({PDF101_RULE: 1}), unfixed_findings=(), errors=())
 
         argv = ["pydocfmt", "check", "--fix", "-", "--line-length", "72"]
 
@@ -1806,7 +1806,7 @@ class TestCLIShowFiles(unittest.TestCase):
 
         self.assertEqual(exit_code, 0)
         self.assertEqual(stdout.getvalue(), formatted_source)
-        self.assertEqual(stderr.getvalue(), "-:\n  PDF001* Docstring chunk needs reflow. Fixed 1 time.\n\nFixed 1 rule check error.\n")
+        self.assertEqual(stderr.getvalue(), "-:\n  PDF101* Docstring chunk needs reflow. Fixed 1 time.\n\nFixed 1 rule check error.\n")
 
     def test_pydocfmt_fix_stdin_with_output_file_writes_diagnostics_to_file(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -1823,7 +1823,7 @@ class TestCLIShowFiles(unittest.TestCase):
                 assert write
                 assert file is not None
                 assert file.read() == source
-                return FormatterResult(path="-", old_source=source, new_source=formatted_source, modified=True, fixed_findings=collections.Counter({PDF001_RULE: 1}), unfixed_findings=(), errors=())
+                return FormatterResult(path="-", old_source=source, new_source=formatted_source, modified=True, fixed_findings=collections.Counter({PDF101_RULE: 1}), unfixed_findings=(), errors=())
 
             argv = ["pydocfmt", "check", "--fix", "-", "--line-length", "72", "--output-file", str(output_file)]
 
@@ -1839,7 +1839,7 @@ class TestCLIShowFiles(unittest.TestCase):
             self.assertEqual(exit_code, 0)
             self.assertEqual(stdout.getvalue(), formatted_source)
             self.assertEqual(stderr.getvalue(), "")
-            self.assertEqual(output_file.read_text(encoding="utf-8"), "-:\n  PDF001* Docstring chunk needs reflow. Fixed 1 time.\n\nFixed 1 rule check error.\n")
+            self.assertEqual(output_file.read_text(encoding="utf-8"), "-:\n  PDF101* Docstring chunk needs reflow. Fixed 1 time.\n\nFixed 1 rule check error.\n")
 
     def test_pydocfmt_output_file_redirects_check_errors_and_creates_parent(self) -> None:
         with tempfile.TemporaryDirectory() as td:

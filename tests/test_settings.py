@@ -510,9 +510,9 @@ class TestSettings(unittest.TestCase):
             os.chdir(root)
             try:
                 profile = pydocformatter_settings.SETTINGS_SCHEMA.load_profile(
-                    global_values=pydocformatter_global_args.GlobalArgs(config_options=('ignore = ["PDF001"]',)),
+                    global_values=pydocformatter_global_args.GlobalArgs(config_options=('ignore = ["PDF101"]',)),
                     args=argparse.Namespace(extend_select=["PCF"]),
-                    field_overrides=CheckSettingsOverrides(fixable=("PDF001",)),
+                    field_overrides=CheckSettingsOverrides(fixable=("PDF101",)),
                 )
             finally:
                 os.chdir(previous_cwd)
@@ -684,7 +684,7 @@ class TestSettings(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             (root / "pyproject.toml").write_text(
-                "[tool.pydocfmt]\n" 'select = ["PDF", "PCF"]\n' 'ignore = ["PDF001"]\n' 'fixable = ["ALL"]\n' "[tool.pydocfmt.per-file-ignores]\n" '"tests/*.py" = ["PCF001"]\n',
+                "[tool.pydocfmt]\n" 'select = ["PDF", "PCF"]\n' 'ignore = ["PDF101"]\n' 'fixable = ["ALL"]\n' "[tool.pydocfmt.per-file-ignores]\n" '"tests/*.py" = ["PCF001"]\n',
                 encoding="utf-8",
             )
             previous_cwd = os.getcwd()
@@ -695,7 +695,7 @@ class TestSettings(unittest.TestCase):
                 os.chdir(previous_cwd)
 
         self.assertEqual(config.select, ("PDF", "PCF"))
-        self.assertEqual(config.ignore, ("PDF001",))
+        self.assertEqual(config.ignore, ("PDF101",))
         self.assertEqual(config.fixable, ("ALL",))
         self.assertEqual(config.per_file_ignores, (("tests/*.py", ("PCF001",)),))
 
@@ -1349,19 +1349,19 @@ class TestSettings(unittest.TestCase):
     def test_toml_map_cli_repeated_patterns_append_values(self) -> None:
         args = argparse.Namespace(
             per_file_ignores=[
-                '{"tests/*.py" = ["PDF100"], "src/*.py" = ["PDF102"]}',
-                '{"tests/*.py" = ["PDF106"]}',
+                '{"tests/*.py" = ["PDF200"], "src/*.py" = ["PDF106"]}',
+                '{"tests/*.py" = ["PDF110"]}',
             ],
         )
 
         config = pydocformatter_settings.SETTINGS_SCHEMA.load(args=args)
 
-        self.assertEqual(config.per_file_ignores, (("tests/*.py", ("PDF100", "PDF106")), ("src/*.py", ("PDF102",))))
+        self.assertEqual(config.per_file_ignores, (("tests/*.py", ("PDF200", "PDF110")), ("src/*.py", ("PDF106",))))
 
     def test_rule_selection_cli_comma_lists_strip_whitespace_as_documented_delta(self) -> None:
-        config = pydocformatter_settings.SETTINGS_SCHEMA.load(args=argparse.Namespace(select=["PDF100, PDF106"]))
+        config = pydocformatter_settings.SETTINGS_SCHEMA.load(args=argparse.Namespace(select=["PDF200, PDF110"]))
 
-        self.assertEqual(config.select, ("PDF100", "PDF106"))
+        self.assertEqual(config.select, ("PDF200", "PDF110"))
 
     def test_explicit_overrides_override_argparse_namespace_overrides(self) -> None:
         config = pydocformatter_settings.SETTINGS_SCHEMA.load(
