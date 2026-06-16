@@ -168,4 +168,5 @@ PDF203: Lines 2-3
 ```
 
 ## Options
-None.
+- `docstring-convention`: Controls whether Google and NumPy sections are recognized instead of treated as summary text.
+- `docstring-parse-*`: Controls whether generic structures such as lists, headings, doctests, directives, Sphinx fields, block quotes, code fences, and tables are protected from summary-length checks.

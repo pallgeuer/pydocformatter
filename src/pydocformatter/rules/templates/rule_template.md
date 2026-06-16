@@ -41,4 +41,6 @@ CODE101: Lines 1-2, 7
 ```
 
 ## Options
-- `related-setting`
+List only settings that materially change this rule's user-visible behavior, such as ignored state, finding targets, fix output, or examples. Do not list settings only because shared category preparation reads them. Group setting families like `docstring-parse-*` when every setting has the same effect for this rule. Use `None.` when no setting is directly material.
+
+- `related-setting`: Describe the behavior this setting changes for this rule.

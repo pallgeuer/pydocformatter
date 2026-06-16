@@ -142,4 +142,5 @@ def title():
 ```
 
 ## Options
-None.
+- `docstring-convention`: Ignores PDF301 for broad rule selections under the NumPy and PEP 257 conventions.
+- `docstring-parse-headings`: Controls whether Markdown and reStructuredText headings are protected from summary punctuation checks.

@@ -2,17 +2,25 @@
 
 Fix is not available.
 
+Rule is ignored if `docstring-convention` is `numpy`.
+
 ## What it does
-Implementation pending. This rule is reserved for reporting function and method docstring summaries that duplicate the function signature.
+Checks function and method docstring summaries that include the function name immediately followed by `(`.
+
+PDF303 reports only when the name starts the first summary line or is preceded by a space, tab, semicolon, or comma. The comparison is case-sensitive and the opening parenthesis must immediately follow the function name, so `value(count)` is a signature summary but `Value(count)`, `module.value(count)`, and `value (count)` are not.
+
+It skips module and class docstrings, empty docstrings, docstrings without a parsed summary, text after the first summary line, and parser-recognized structures such as sections, Sphinx fields, headings, lists, doctests, code fences, block quotes, tables, directives, literal blocks, and verbatim blocks.
 
 ## Why is this useful?
-Repeating a signature in the summary usually duplicates information already present in source and generated API documentation.
+Repeating a signature in the summary duplicates information already present in source and generated API documentation.
 
 ## Ruff compatibility
-This rule is intended to replace Ruff's `D402`.
+This rule replaces Ruff's `D402`. Like Ruff, it applies to functions and methods and is ignored by default for the NumPy convention.
+
+The signature-matching heuristic is Ruff-compatible: it looks for the exact function name followed immediately by `(`, with either the start of the line or a space, tab, semicolon, or comma before the name. Unlike Ruff, PDF303 applies that heuristic only after pydocformatter has selected a parsed summary line. This means parser-recognized structures such as Sphinx fields, lists, doctests, headings, and code blocks are protected by default instead of being checked as Ruff's first trimmed docstring line.
 
 ## Example
-The pending implementation will eventually report signature-like summaries. For now, the rule is a no-op:
+PDF303 reports summaries that repeat the function signature and leaves source unchanged:
 
 ```pydocfmt-example
 [input]
@@ -20,7 +28,72 @@ def value(count: int) -> str:
     """value(count: int) -> str"""
 
 [output=unchanged]
+[findings]
+PDF303: Line 2
+```
+
+The signature can also appear later in the first summary line after a supported separator:
+
+```pydocfmt-example
+[input]
+def value(count: int) -> str:
+    """Return; value(count)"""
+
+def empty() -> None:
+    """empty()"""
+
+[output=unchanged]
+[findings]
+PDF303: Line 2
+PDF303: Line 5
+```
+
+Names that are not signature-like are accepted:
+
+```pydocfmt-example
+[input]
+def value(count: int) -> str:
+    """Return the value."""
+
+def qualified(count: int) -> str:
+    """module.qualified(count)"""
+
+def spaced(count: int) -> str:
+    """spaced (count)"""
+
+def mismatched(count: int) -> str:
+    """MISMATCHED(count)"""
+
+[output=unchanged]
+```
+
+Only the first summary line is checked:
+
+```pydocfmt-example
+[input]
+def value(count: int) -> str:
+    """Return the value.
+    value(count)
+    """
+
+[output=unchanged]
+```
+
+Parser-recognized structures are protected. Disabling the matching parser setting can make the same text become a summary target:
+
+```pydocfmt-example
+[settings]
+docstring-parse-sphinx-fields = false
+
+[input]
+def value(count: int) -> str:
+    """:return: value(count)"""
+
+[output=unchanged]
+[findings]
+PDF303: Line 2
 ```
 
 ## Options
-None.
+- `docstring-convention`: Ignores PDF303 for broad rule selections under the NumPy convention.
+- `docstring-parse-*`: Controls whether generic structures such as headings, Sphinx fields, lists, doctests, code fences, block quotes, tables, directives, and literal blocks are protected from summary-style checks.

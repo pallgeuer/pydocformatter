@@ -92,6 +92,8 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 ### Changed
 
 - **Docstring formatting:**
+  - Implemented `PDF302` through `PDF305`, replacing their previous stub behavior with first-summary-line diagnostics, safe first-word capitalization fixes, and Ruff-style convention-selection effects.
+  - Changed summary first-word normalization to preserve Unicode alphanumeric characters when removing punctuation, avoiding false positives such as `This\u00e9`.
   - Implemented `PDF202`, `PDF300`, and `PDF301`, replacing their previous stub behavior with empty-docstring diagnostics, safe summary-punctuation fixes, and parser-recognized section and Sphinx-field skips for the active settings.
   - Changed `PDF000` to normalize safe `\n` and `\t` whitespace escape spellings in docstrings, including non-concatenated docstrings, without changing evaluated docstring values.
   - Changed `PDF106` through `PDF109` to also normalize single-content-line docstrings when the docstring literal itself spans multiple lines.
@@ -107,6 +109,8 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 ### Fixed
 
 - **Docstring formatting:**
+  - Fixed PDF302 to skip property getter, setter, and deleter accessor docstrings.
+  - Fixed PDF302 third-person summary detection to avoid invalid generated forms such as `trys` and `processs`, and to recognize `has`.
   - Fixed PDF101 to account for opening and same-line closing docstring quote delimiters when wrapping generated docstring source lines.
   - Fixed PDF300 and PDF301 to let `docstring-parse-headings` consistently control underlined heading-style summaries.
   - Fixed PDF200, PDF201, PDF108, and PDF109 to preserve genuine leading spaces or tabs on first-line docstring content while rewriting surrounding docstring structure.

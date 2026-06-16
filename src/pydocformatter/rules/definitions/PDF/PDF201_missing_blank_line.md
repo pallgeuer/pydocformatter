@@ -249,12 +249,4 @@ def concatenated() -> None:
 - `docstring-convention`: Enables Google and NumPy section recognition. `none` and `pep257` leave convention section syntax as generic docstring content, though other enabled generic structure parsers can still recognize headings, lists, and other structures.
 - `docstring-blank-line-style`: Controls the source whitespace used on inserted blank lines.
 - `docstring-blank-line-after-last-section`: Requires one trailing blank line after the final recognized Google or NumPy section when enabled.
-- `docstring-parse-list-items`: Controls whether list items are recognized as structures after a summary.
-- `docstring-parse-headings`: Controls whether Markdown and reStructuredText headings are recognized as structures after a summary.
-- `docstring-parse-doctests`: Controls whether doctest transcripts are recognized as structures after a summary.
-- `docstring-parse-code-fences`: Controls whether Markdown fenced code blocks are recognized as structures after a summary.
-- `docstring-parse-block-quotes`: Controls whether Markdown block quotes are recognized as structures after a summary.
-- `docstring-parse-tables`: Controls whether Markdown and reStructuredText tables are recognized as structures after a summary.
-- `docstring-parse-directives`: Controls whether reStructuredText directives are recognized as structures after a summary.
-- `docstring-parse-literal-blocks`: Controls whether reStructuredText literal blocks are recognized as structures after a summary.
-- `docstring-parse-sphinx-fields`: Controls whether Sphinx fields are recognized as structures after a summary.
+- `docstring-parse-*`: Controls whether generic structures such as lists, headings, doctests, code fences, block quotes, tables, directives, literal blocks, and Sphinx fields are recognized as structures after a summary.

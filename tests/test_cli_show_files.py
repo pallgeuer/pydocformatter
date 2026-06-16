@@ -1460,7 +1460,7 @@ class TestCLIShowFiles(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             target = root / "a.py"
-            target.write_text('def foo():\n    """Does something."""\n    pass\n', encoding="utf-8")
+            target.write_text('def foo():\n    """Do something."""\n    pass\n', encoding="utf-8")
             stdout = StringIO()
             argv = ["pydocfmt", "check", str(target)]
 
@@ -1890,7 +1890,7 @@ class TestCLIShowFiles(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             target = root / "a.py"
-            target.write_text('def foo():\n    """Does something."""\n    pass\n', encoding="utf-8")
+            target.write_text('def foo():\n    """Do something."""\n    pass\n', encoding="utf-8")
             output_file = root / "reports" / "errors.txt"
             stdout = StringIO()
             argv = ["pydocfmt", "check", str(target), "--output-file", str(output_file)]

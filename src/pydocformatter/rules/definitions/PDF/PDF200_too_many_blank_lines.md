@@ -311,12 +311,4 @@ When `PDF000` is also selected outside this rule-specific example context, it ca
 ## Options
 - `docstring-convention`: Enables recursive spacing inside recognized Google or NumPy sections, including compact section header/content and consecutive entry spacing. `none` and `pep257` leave convention-specific section headers as ordinary generic chunks.
 - `docstring-blank-line-after-last-section`: Keeps exactly one trailing blank line after the final recognized Google or NumPy section when enabled; removes final-section trailing blanks when disabled.
-- `docstring-parse-list-items`: Controls whether list items are distinct chunks.
-- `docstring-parse-headings`: Controls whether Markdown and reStructuredText headings are distinct chunks.
-- `docstring-parse-doctests`: Controls whether doctest transcripts are protected chunks.
-- `docstring-parse-code-fences`: Controls whether Markdown fenced code blocks are protected chunks.
-- `docstring-parse-block-quotes`: Controls whether Markdown block quotes are distinct chunks.
-- `docstring-parse-tables`: Controls whether Markdown and reStructuredText tables are protected chunks.
-- `docstring-parse-directives`: Controls whether reStructuredText directives and their indented bodies are protected chunks.
-- `docstring-parse-literal-blocks`: Controls whether reStructuredText literal blocks and their indented bodies are protected chunks.
-- `docstring-parse-sphinx-fields`: Controls whether Sphinx fields are distinct chunks.
+- `docstring-parse-*`: Controls whether generic structures such as lists, headings, doctests, code fences, block quotes, tables, directives, literal blocks, and Sphinx fields are distinct or protected chunks for blank-line collapsing.

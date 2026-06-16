@@ -3,6 +3,7 @@ from __future__ import annotations
 import dataclasses
 import enum
 import re
+import typing
 from collections.abc import Iterator
 
 import libcst as cst
@@ -221,11 +222,22 @@ class DocstringInfo:
 
 
 @dataclasses.dataclass(frozen=True)
+class SummaryLineTarget:
+    """One parsed summary line targeted by first-line style rules."""
+
+    docstring: DocstringInfo
+    block: DocstringBlock
+    line: DocstringValueLine
+
+
+@dataclasses.dataclass(frozen=True)
 class PDFCategoryData:
     """Prepared definitions and docstrings shared by PDF rules."""
 
     definitions: tuple[DefinitionInfo, ...]
     docstrings: tuple[DocstringInfo, ...]
+    summary_line_targets: tuple[SummaryLineTarget, ...]
+    summary_terminal_line_targets: tuple[SummaryLineTarget, ...]
 
     def docstring_for(self, definition: DefinitionInfo) -> DocstringInfo | None:
         """Return the docstring owned by a definition, if one exists."""
@@ -365,7 +377,13 @@ class PDF(RuleCategoryBase):
         del cls
         collector = _DefinitionCollector(context)
         context.module.visit(collector)
-        return PDFCategoryData(definitions=tuple(collector.definitions), docstrings=tuple(collector.docstrings))
+        docstrings = tuple(collector.docstrings)
+        return PDFCategoryData(
+            definitions=tuple(collector.definitions),
+            docstrings=docstrings,
+            summary_line_targets=summary_first_line_targets(docstrings),
+            summary_terminal_line_targets=summary_terminal_line_targets(docstrings),
+        )
 
     @classmethod
     def require_data(cls, context: RuleContext) -> PDFCategoryData:
@@ -882,8 +900,8 @@ class _DocstringParser:
             end_column -= 1
         if start_column > end_column:
             return None
-        start_offset = _value_offset_for_text_column(line, start_column)
-        end_offset = _value_offset_for_text_column(line, end_column)
+        start_offset = value_offset_for_text_column(line, start_column)
+        end_offset = value_offset_for_text_column(line, end_column)
         return ReflowRegionLine(text=line.text[start_column:end_column], start_offset=start_offset, end_offset=end_offset)
 
     def _fence_end(self, start: int, end: int, opening: str) -> int:
@@ -1257,6 +1275,65 @@ def docstring_value_line_numbers(lines: tuple[DocstringValueLine, ...]) -> tuple
     return tuple(dict.fromkeys(line.source_line_number for line in lines if line.source_line_number is not None))
 
 
+def summary_first_line_targets(docstrings: tuple[DocstringInfo, ...]) -> tuple[SummaryLineTarget, ...]:
+    """Return first non-adornment summary lines for parsed top-level summaries."""
+    targets: list[SummaryLineTarget] = []
+    for docstring in docstrings:
+        block = first_summary_block(docstring)
+        if block is None:
+            continue
+        line = first_non_adornment_line(docstring, block.start_line, block.end_line)
+        if line is not None:
+            targets.append(SummaryLineTarget(docstring=docstring, block=block, line=line))
+    return tuple(targets)
+
+
+def summary_terminal_line_targets(docstrings: tuple[DocstringInfo, ...]) -> tuple[SummaryLineTarget, ...]:
+    """Return final non-adornment summary lines for parsed top-level summaries."""
+    targets: list[SummaryLineTarget] = []
+    for docstring in docstrings:
+        block = first_summary_block(docstring)
+        if block is None:
+            continue
+        line = final_non_adornment_line(docstring, block.start_line, block.end_line)
+        if line is not None:
+            targets.append(SummaryLineTarget(docstring=docstring, block=block, line=line))
+    return tuple(targets)
+
+
+def first_summary_block(docstring: DocstringInfo) -> DocstringBlock | None:
+    """Return the first non-blank block when it is a parsed top-level summary."""
+    first_block = next((block for block in docstring.structure.blocks if block.kind is not DocstringBlockKind.BLANK), None)
+    if first_block is None or first_block.kind is not DocstringBlockKind.SUMMARY:
+        return None
+    return first_block
+
+
+def first_non_adornment_line(docstring: DocstringInfo, start: int, end: int) -> DocstringValueLine | None:
+    """Return the first non-empty, non-adornment logical line in a summary block."""
+    for index in range(start, end):
+        line = docstring.structure.lines[index]
+        if line.text.strip(" \t") and not is_adornment(line.text):
+            return line
+    return None
+
+
+def final_non_adornment_line(docstring: DocstringInfo, start: int, end: int) -> DocstringValueLine | None:
+    """Return the final non-empty, non-adornment logical line in a summary block."""
+    for index in range(end - 1, start - 1, -1):
+        line = docstring.structure.lines[index]
+        if line.text.strip(" \t") and not is_adornment(line.text):
+            return line
+    return None
+
+
+def docstring_line_numbers(docstring: DocstringInfo, line: DocstringValueLine) -> tuple[int, ...]:
+    """Return concrete source lines for a docstring value line."""
+    if line.source_line_number is not None:
+        return docstring_value_line_numbers((line,))
+    return tuple(source_line.line_number for source_line in docstring.physical_lines)
+
+
 def docstring_value_ends_with_newline(docstring: DocstringInfo) -> bool:
     """Return whether an evaluated docstring value ends with a newline."""
     return docstring.value.endswith(("\r\n", "\r", "\n"))
@@ -1482,9 +1559,21 @@ def strip_indent_with_mapping(text: str, width: int) -> tuple[str, int, int]:
     return " " * virtual_prefix + text[index:], index, virtual_prefix
 
 
-def _value_offset_for_text_column(line: DocstringValueLine, column: int) -> int:
+@typing.overload
+def value_offset_for_text_column(line: DocstringValueLine, column: int, *, require_source_text: typing.Literal[False] = False) -> int: ...
+
+
+@typing.overload
+def value_offset_for_text_column(line: DocstringValueLine, column: int, *, require_source_text: typing.Literal[True]) -> int | None: ...
+
+
+def value_offset_for_text_column(line: DocstringValueLine, column: int, *, require_source_text: bool = False) -> int | None:
     """Return the evaluated-value offset for a line.text column."""
-    return line.start_offset + line.text_raw_start_column + max(column - line.text_virtual_prefix_length, 0)
+    unclamped_raw_column = line.text_raw_start_column + column - line.text_virtual_prefix_length
+    if require_source_text and (unclamped_raw_column < line.text_raw_start_column or unclamped_raw_column > len(line.raw_text)):
+        return None
+    raw_column = line.text_raw_start_column + max(column - line.text_virtual_prefix_length, 0)
+    return line.start_offset + raw_column
 
 
 def _qualified_name(parent: DefinitionInfo, name: str) -> str:
