@@ -406,6 +406,7 @@ def test_google_parameter_entries_support_stars_dotted_names_types_and_empty_des
         ("Yields", "tuple[int, int]: Pair.", DocstringEntryKind.YIELD, (), "tuple[int, int]"),
         ("Raises", "ValueError: Invalid value.", DocstringEntryKind.EXCEPTION, ("ValueError",), None),
         ("Warns", "RuntimeWarning: Possibly unstable.", DocstringEntryKind.EXCEPTION, ("RuntimeWarning",), None),
+        ("Warnings", "RuntimeWarning: Possibly unstable.", DocstringEntryKind.FIELD, ("RuntimeWarning",), None),
         ("Attributes", "name (str): Public name.", DocstringEntryKind.ATTRIBUTE, ("name",), "str"),
         ("Methods", "run: Execute it.", DocstringEntryKind.METHOD, ("run",), None),
         ("Notes", "topic: General note.", DocstringEntryKind.FIELD, ("topic",), None),

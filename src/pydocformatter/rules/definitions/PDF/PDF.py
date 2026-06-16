@@ -403,6 +403,36 @@ def is_adornment(text: str) -> bool:
     return _is_adornment(text)
 
 
+def canonical_section_name(convention: settings_check.DocstringConvention, name: str) -> str | None:
+    """Return the canonical spelling for a recognized convention section."""
+    normalized = name.lower()
+    if convention == settings_check.DocstringConvention.GOOGLE and normalized in _GOOGLE_SECTIONS:
+        return normalized.title()
+    if convention == settings_check.DocstringConvention.NUMPY and normalized in _NUMPY_SECTIONS:
+        return normalized.title()
+    return None
+
+
+def section_order_rank(convention: settings_check.DocstringConvention, section_name: str) -> int | None:
+    """Return the ordering rank for a convention section, if it is ordered."""
+    normalized = section_name.lower()
+    if convention == settings_check.DocstringConvention.GOOGLE:
+        return _GOOGLE_ORDER_RANKS.get(normalized)
+    if convention == settings_check.DocstringConvention.NUMPY:
+        return _NUMPY_ORDER_RANKS.get(normalized)
+    return None
+
+
+def repeated_section_key(convention: settings_check.DocstringConvention, section_name: str) -> str:
+    """Return the repeated-section identity key for a convention section."""
+    normalized = section_name.lower()
+    if convention == settings_check.DocstringConvention.GOOGLE:
+        return _GOOGLE_REPEATED_SECTION_KEYS.get(normalized, normalized)
+    if convention == settings_check.DocstringConvention.NUMPY:
+        return _NUMPY_REPEATED_SECTION_KEYS.get(normalized, normalized)
+    return normalized
+
+
 def final_convention_section(docstring: DocstringInfo) -> DocstringBlock | None:
     """Return the final top-level convention section, if there is one."""
     if not convention_parses_sections(docstring.structure.convention):
@@ -519,6 +549,54 @@ _NUMPY_SECTIONS = {
     "warnings",
     "warns",
     "yields",
+}
+# Google style defines entry-section ordering, but does not define a canonical order for narrative admonition sections.
+_GOOGLE_ORDER_RANKS = {
+    "args": 0,
+    "arguments": 0,
+    "keyword args": 0,
+    "keyword arguments": 0,
+    "other args": 0,
+    "other arguments": 0,
+    "return": 1,
+    "returns": 1,
+    "yield": 1,
+    "yields": 1,
+    "raises": 2,
+    "warns": 2,
+}
+_NUMPY_ORDER_RANKS = {
+    "short summary": 0,
+    "extended summary": 1,
+    "parameters": 2,
+    "returns": 3,
+    "yields": 4,
+    "receives": 5,
+    "other parameters": 6,
+    "other params": 6,
+    "raises": 7,
+    "warns": 8,
+    "warnings": 8,
+    "see also": 9,
+    "notes": 10,
+    "references": 11,
+    "examples": 12,
+    "attributes": 13,
+    "methods": 14,
+}
+_GOOGLE_REPEATED_SECTION_KEYS = {
+    "arguments": "args",
+    "examples": "example",
+    "keyword arguments": "keyword args",
+    "notes": "note",
+    "other arguments": "other args",
+    "returns": "return",
+    "warnings": "warning",
+    "yields": "yield",
+}
+_NUMPY_REPEATED_SECTION_KEYS = {
+    "other params": "other parameters",
+    "warnings": "warns",
 }
 _LIST_RE = re.compile(r"^(?P<indent>[ \t]*)(?P<marker>(?:[-+*]|\d+[.)]))[ \t]+(?P<text>.*)$")
 _BLOCK_QUOTE_RE = re.compile(r"^(?P<indent>[ \t]*)(?P<quote>(?:>[ \t]*)+)(?P<text>.*)$")
@@ -723,7 +801,7 @@ class _DocstringParser:
     def _google_entries(self, section_name: str, start: int, end: int) -> tuple[DocstringEntry, ...]:
         entries: list[DocstringEntry] = []
         index = start
-        kind = _entry_kind(section_name)
+        kind = _entry_kind(self.settings.docstring_convention, section_name)
         while index < end:
             protected_end = self._protected_block_end(index, end)
             if protected_end is not None:
@@ -769,7 +847,7 @@ class _DocstringParser:
     def _numpy_entries(self, section_name: str, start: int, end: int) -> tuple[DocstringEntry, ...]:
         entries: list[DocstringEntry] = []
         index = start
-        kind = _entry_kind(section_name)
+        kind = _entry_kind(self.settings.docstring_convention, section_name)
         while index < end:
             protected_end = self._protected_block_end(index, end)
             if protected_end is not None:
@@ -1082,7 +1160,7 @@ def _value_lines(value: str, *, source_line_number: int | None, source_indent: i
     return tuple(lines)
 
 
-def _entry_kind(section_name: str) -> DocstringEntryKind:
+def _entry_kind(convention: settings_check.DocstringConvention, section_name: str) -> DocstringEntryKind:
     """Return the semantic entry kind for a convention section."""
     normalized = section_name.lower()
     if normalized in {"args", "arguments", "keyword args", "keyword arguments", "other args", "other arguments", "parameters", "other parameters", "other params", "receives"}:
@@ -1091,7 +1169,7 @@ def _entry_kind(section_name: str) -> DocstringEntryKind:
         return DocstringEntryKind.RETURN
     if normalized in {"yield", "yields"}:
         return DocstringEntryKind.YIELD
-    if normalized in {"raises", "warns", "warnings"}:
+    if normalized in {"raises", "warns"} or (convention == settings_check.DocstringConvention.NUMPY and normalized == "warnings"):
         return DocstringEntryKind.EXCEPTION
     if normalized == "attributes":
         return DocstringEntryKind.ATTRIBUTE

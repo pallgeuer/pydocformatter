@@ -9,17 +9,17 @@ from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetada
 
 
 @rule_registration.register_rule_to(PDF)
-class PDF400SectionNameCapitalization(RuleBase):
+class PDF402SectionNameTrailingColon(RuleBase):
     meta = RuleMetadata(
-        code=RuleCode("PDF400"),
-        name="section-name-capitalization",
-        message="Docstring section name should be properly capitalized",
+        code=RuleCode("PDF402"),
+        name="section-name-trailing-colon",
+        message="Docstring section name should end with a colon",
         fix_availability=FixAvailability.SOMETIMES,
         stable_since="0.3.0",
         setting_effects=(
             RuleSettingEffects(
                 setting="docstring_convention",
-                effects=(RuleSettingEffectValues(effect=RuleSettingEffect.IGNORED, values=section_style.SECTION_IGNORED_CONVENTIONS),),
+                effects=(RuleSettingEffectValues(effect=RuleSettingEffect.IGNORED, values=section_style.GOOGLE_IGNORED_CONVENTIONS),),
             ),
         ),
         incompatible_with=(),
@@ -27,10 +27,10 @@ class PDF400SectionNameCapitalization(RuleBase):
 
     @classmethod
     def check(cls, context: RuleContext) -> tuple[RuleFinding, ...]:
-        """Return findings for non-canonical convention section capitalization."""
-        return section_style.findings_for_results(section_style.capitalization_results(context, rule=cls.meta))
+        """Return findings for Google section names missing a trailing colon."""
+        return section_style.findings_for_results(section_style.colon_results(context, rule=cls.meta))
 
     @classmethod
     def fix(cls, context: RuleContext) -> RuleFixResult:
-        """Capitalize safely mapped convention section names."""
-        return section_style.fix_result_for_results(context, cls.meta, section_style.capitalization_results(context, rule=cls.meta))
+        """Add safe missing Google section-name colons."""
+        return section_style.fix_result_for_results(context, cls.meta, section_style.colon_results(context, rule=cls.meta))

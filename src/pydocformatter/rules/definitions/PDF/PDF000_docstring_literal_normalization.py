@@ -12,7 +12,7 @@ from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetada
 
 
 @rule_registration.register_rule_to(PDF_definition.PDF)
-class PDF000ConcatenatedDocstringLiteral(RuleBase):
+class PDF000DocstringLiteralNormalization(RuleBase):
     meta = RuleMetadata(
         code=RuleCode("PDF000"),
         name="docstring-literal-normalization",
@@ -55,7 +55,7 @@ def _finding_for_docstring(docstring: PDF_definition.DocstringInfo, *, context: 
     planned_change = _planned_change_for_docstring(docstring, context=context)
     if planned_change is None and docstring.kind != PDF_definition.DocstringKind.CONCATENATED:
         return None
-    return RuleFinding(rule=PDF000ConcatenatedDocstringLiteral.meta, line_numbers=_line_numbers(docstring), instance_fixable=planned_change is not None)
+    return RuleFinding(rule=PDF000DocstringLiteralNormalization.meta, line_numbers=_line_numbers(docstring), instance_fixable=planned_change is not None)
 
 
 def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo, *, context: RuleContext) -> rule_edits.PlannedSourceChange | None:

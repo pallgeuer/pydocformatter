@@ -344,6 +344,24 @@ class TestRules(unittest.TestCase):
             self.assertTrue(explanation.startswith(f"# {rule_class.meta.name} ({rule_class.meta.code})\n\n"))
             self.assertIn(f"\n\n{rule_documentation.rule_fix_text(rule_class.meta)}\n\n", explanation)
 
+    def test_builtin_rule_file_and_class_names_match_rule_content(self) -> None:
+        for rule_class in rule_collection.RULE_COLLECTION.rules:
+            rule = rule_class.meta
+            with self.subTest(code=str(rule.code)):
+                source_file = inspect.getsourcefile(rule_class)
+                self.assertIsNotNone(source_file)
+                source_path = Path(typing.cast(str, source_file))
+                expected_python_stem = f"{rule.code}_{rule.name.replace('-', '_')}"
+                self.assertEqual(source_path.stem, expected_python_stem)
+                self.assertEqual(rule_class.__name__, f"{rule.code}{''.join(part.capitalize() for part in rule.name.split('-'))}")
+
+                heading = rule_documentation.load_rule_explanation(rule_class).splitlines()[0]
+                heading_name, separator, heading_code = heading.removeprefix("# ").rpartition(" (")
+                self.assertEqual(separator, " (")
+                self.assertTrue(heading_code.endswith(")"))
+                expected_markdown_stem = f"{heading_code.removesuffix(')')}_{heading_name.replace('-', '_')}"
+                self.assertEqual(source_path.with_suffix(".md").stem, expected_markdown_stem)
+
     def test_rule_modules_import_before_collection_without_changing_default_collection(self) -> None:
         source_root = Path(__file__).parents[1] / "src"
         environment = {**os.environ, "PYTHONPATH": str(source_root)}
@@ -971,6 +989,13 @@ class TestRules(unittest.TestCase):
                 "PDF302": {DocstringConvention.GOOGLE: RuleSettingEffect.IGNORED},
                 "PDF303": {DocstringConvention.NUMPY: RuleSettingEffect.IGNORED},
                 "PDF305": {DocstringConvention.GOOGLE: RuleSettingEffect.IGNORED, DocstringConvention.PEP257: RuleSettingEffect.IGNORED},
+                "PDF400": {DocstringConvention.NONE: RuleSettingEffect.IGNORED, DocstringConvention.PEP257: RuleSettingEffect.IGNORED},
+                "PDF401": {DocstringConvention.NONE: RuleSettingEffect.IGNORED, DocstringConvention.NUMPY: RuleSettingEffect.IGNORED, DocstringConvention.PEP257: RuleSettingEffect.IGNORED},
+                "PDF402": {DocstringConvention.NONE: RuleSettingEffect.IGNORED, DocstringConvention.NUMPY: RuleSettingEffect.IGNORED, DocstringConvention.PEP257: RuleSettingEffect.IGNORED},
+                "PDF403": {DocstringConvention.NONE: RuleSettingEffect.IGNORED, DocstringConvention.GOOGLE: RuleSettingEffect.IGNORED, DocstringConvention.PEP257: RuleSettingEffect.IGNORED},
+                "PDF404": {DocstringConvention.NONE: RuleSettingEffect.IGNORED, DocstringConvention.PEP257: RuleSettingEffect.IGNORED},
+                "PDF405": {DocstringConvention.NONE: RuleSettingEffect.IGNORED, DocstringConvention.PEP257: RuleSettingEffect.IGNORED},
+                "PDF406": {DocstringConvention.NONE: RuleSettingEffect.IGNORED, DocstringConvention.PEP257: RuleSettingEffect.IGNORED},
             },
         )
         self.assertEqual(
