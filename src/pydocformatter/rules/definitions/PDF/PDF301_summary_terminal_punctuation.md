@@ -7,13 +7,13 @@ Rule is ignored if `docstring-convention` is `numpy` or `pep257`.
 ## What it does
 Checks that the docstring summary punctuation target ends with terminal punctuation: a period, question mark, exclamation point, or Unicode ellipsis (`\u2026`).
 
-The target is the final non-empty line of the first logical summary paragraph. Empty docstrings, underlined title-style summaries, parser-recognized section-only docstrings, Sphinx field-only docstrings, and targets ending with a backslash are skipped. The automatic fix only inserts a period at the end of the trimmed target line; summaries ending with `,`, `:`, or `;` are reported but not changed.
+The target is the final non-adornment line of the first logical summary paragraph. Empty docstrings, parser-recognized section-only docstrings, Sphinx field-only docstrings, and targets ending with a backslash are skipped. Underlined title-style summaries are skipped when `docstring-parse-headings` is enabled. The automatic fix only inserts a period at the end of the trimmed target line; summaries ending with `,`, `:`, or `;` are reported but not changed.
 
 ## Why is this useful?
 Terminal punctuation keeps summary lines sentence-like without forcing every valid question or exclamation into a period.
 
 ## Ruff compatibility
-This rule replaces Ruff's `D415`. Use `PDF300` for the stricter period-only form. Unlike Ruff's unsafe fix, this rule does not report or fix underlined title-style summaries.
+This rule replaces Ruff's `D415`. Use `PDF300` for the stricter period-only form. Unlike Ruff's unsafe fix, this rule does not report or fix underlined title-style summaries when heading parsing is enabled.
 
 ## Examples
 Missing terminal punctuation is fixed by inserting a period:
@@ -50,7 +50,7 @@ def ellipsis():
 [output=unchanged]
 ```
 
-For multi-line summaries, the target is the final non-empty line of the first summary paragraph:
+For multi-line summaries, the target is the final non-adornment line of the first summary paragraph:
 
 ```pydocfmt-example
 [input]
@@ -88,7 +88,7 @@ PDF301: Line 6
 PDF301: Line 10
 ```
 
-Empty docstrings, underlined title-style summaries, parser-recognized section-only docstrings, Sphinx field-only docstrings, and summaries ending with a backslash are skipped. Recognized NumPy section headings such as `Parameters` followed by an underline are section headers, not summaries:
+Empty docstrings, parser-recognized section-only docstrings, Sphinx field-only docstrings, and summaries ending with a backslash are skipped. With heading parsing enabled, underlined title-style summaries are also skipped. Recognized NumPy section headings such as `Parameters` followed by an underline are section headers, not summaries:
 
 ```pydocfmt-example
 [settings]
@@ -120,6 +120,25 @@ def backslash():
     """Path C:\\"""
 
 [output=unchanged]
+```
+
+When heading parsing is disabled, an underlined title-style summary is treated as summary text, and the underline adornment is not the punctuation target:
+
+```pydocfmt-example
+[settings]
+docstring-parse-headings = false
+
+[input]
+def title():
+    """Result summary
+    ==============
+    """
+
+[output]
+def title():
+    """Result summary.
+    ==============
+    """
 ```
 
 ## Options

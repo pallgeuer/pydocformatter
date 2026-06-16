@@ -131,17 +131,26 @@ def test_first_atx_heading_is_protected_unless_heading_parsing_is_disabled() -> 
     assert unprotected.fixed_findings[PDF301SummaryTerminalPunctuation.meta] == 1
 
 
-def test_skips_underlined_title_style_summary_even_when_heading_parsing_is_disabled() -> None:
+def test_underlined_title_style_summary_obeys_heading_parsing_setting() -> None:
     source = 'def function():\n    """Title\n    =====\n    """\n'
     default = format_source(source)
     disabled = format_source(source, settings=CheckSettings(select=("PDF301",), docstring_parse_headings=False))
 
     assert default.new_source == source
-    assert disabled.new_source == source
+    assert disabled.new_source == 'def function():\n    """Title.\n    =====\n    """\n'
     assert not default.fixed_findings
-    assert not disabled.fixed_findings
+    assert disabled.fixed_findings[PDF301SummaryTerminalPunctuation.meta] == 1
     assert not default.unfixed_findings
     assert not disabled.unfixed_findings
+
+
+def test_disabled_heading_parsing_punctuates_final_content_line_before_trailing_adornment() -> None:
+    source = 'def function():\n    """Title\n    detail\n    =====\n    """\n'
+    result = format_source(source, settings=CheckSettings(select=("PDF301",), docstring_parse_headings=False))
+
+    assert result.new_source == 'def function():\n    """Title\n    detail.\n    =====\n    """\n'
+    assert result.fixed_findings[PDF301SummaryTerminalPunctuation.meta] == 1
+    assert not result.unfixed_findings
 
 
 def test_sphinx_field_skip_requires_actual_field_marker() -> None:

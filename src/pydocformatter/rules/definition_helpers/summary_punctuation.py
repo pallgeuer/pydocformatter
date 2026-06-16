@@ -57,30 +57,19 @@ def _target_line(docstring: PDF_definition.DocstringInfo) -> PDF_definition.Docs
     if first_block is None:
         return None
     if first_block.kind is PDF_definition.DocstringBlockKind.SUMMARY:
-        if _is_underlined_summary(docstring, first_block):
-            return None
         return _final_non_empty_line(docstring, first_block.start_line, first_block.end_line)
     return None
 
 
 def _final_non_empty_line(docstring: PDF_definition.DocstringInfo, start: int, end: int) -> PDF_definition.DocstringValueLine | None:
-    """Return the final non-empty logical line in a summary block."""
+    """Return the final non-adornment logical line in a summary block."""
     for index in range(end - 1, start - 1, -1):
         line = docstring.structure.lines[index]
         if line.text.strip(" \t"):
             if PDF_definition.is_adornment(line.text):
-                return None
+                continue
             return line
     return None
-
-
-def _is_underlined_summary(docstring: PDF_definition.DocstringInfo, block: PDF_definition.DocstringBlock) -> bool:
-    """Return whether a summary block starts with a title followed by an underline."""
-    return (
-        block.end_line - block.start_line >= 2
-        and bool(docstring.structure.lines[block.start_line].text.strip(" \t"))
-        and PDF_definition.is_adornment(docstring.structure.lines[block.start_line + 1].text)
-    )
 
 
 def _planned_change(

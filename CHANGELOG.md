@@ -108,6 +108,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 
 - **Docstring formatting:**
   - Fixed PDF101 to account for opening and same-line closing docstring quote delimiters when wrapping generated docstring source lines.
+  - Fixed PDF300 and PDF301 to let `docstring-parse-headings` consistently control underlined heading-style summaries.
   - Fixed PDF200, PDF201, PDF108, and PDF109 to preserve genuine leading spaces or tabs on first-line docstring content while rewriting surrounding docstring structure.
   - Fixed PDF108 to move bare closing quotes after single-content-line docstrings whose literal spans multiple physical lines.
   - Fixed PDF106 to keep a distinct, value-preserving source spelling when moving content that starts with the docstring delimiter quote character onto the opening quote line.
