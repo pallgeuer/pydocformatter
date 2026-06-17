@@ -89,6 +89,10 @@ def test_reports_but_does_not_fix_unsafe_source_mappings() -> None:
     assert result.new_source == source
     assert not result.fixed_findings
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((2, 3), (7,))
+    assert tuple(finding.message for finding in result.unfixed_findings) == (
+        "Docstring summary first word 'return' should be capitalized",
+        "Docstring summary first word 'return' should be capitalized",
+    )
     assert [finding.fixable for finding in result.unfixed_findings] == [False, False]
 
 
@@ -160,6 +164,7 @@ def test_check_and_fix_false_findings_agree() -> None:
     check_only = format_source(source, fix=False)
 
     assert tuple(finding.line_numbers for finding in findings) == ((2,),)
+    assert tuple(finding.message for finding in findings) == ("Docstring summary first word 'return' should be capitalized",)
     assert [finding.fixable for finding in findings] == [True]
     assert tuple(finding.line_numbers for finding in fixed.fixed_findings) == ((2,),)
     assert fixed.module.code == 'def function():\n    """Return value."""\n'

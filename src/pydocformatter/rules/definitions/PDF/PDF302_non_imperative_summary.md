@@ -27,7 +27,7 @@ def value():
 
 [output=unchanged]
 [findings]
-PDF302: Line 2
+PDF302: Line 2: Docstring summary first word 'Returns' is not imperative
 ```
 
 Normalization makes capitalization and simple surrounding punctuation irrelevant:
@@ -42,8 +42,8 @@ def quoted():
 
 [output=unchanged]
 [findings]
-PDF302: Line 2
-PDF302: Line 5
+PDF302: Line 2: Docstring summary first word 'returns' is not imperative
+PDF302: Line 5: Docstring summary first word ''Returns'' is not imperative
 ```
 
 Imperative summaries and unknown first words are accepted:
@@ -80,7 +80,7 @@ class Value:
 
 [output=unchanged]
 [findings]
-PDF302: Line 14
+PDF302: Line 14: Docstring summary first word 'Returns' is not imperative
 ```
 
 Parser-recognized structures are protected. Disabling the matching parser setting can make the same text become a summary target:
@@ -97,7 +97,7 @@ def value():
 
 [output=unchanged]
 [findings]
-PDF302: Line 2
+PDF302: Line 2: Docstring summary first word 'Returns' is not imperative
 ```
 
 ## Options

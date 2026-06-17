@@ -80,6 +80,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added pytest coverage that checks the pydocformatter rule tables in `docs/formatting_rules.md` against actual rule metadata.
   - Added pytest coverage that checks Git-tracked Markdown pipe tables for padded cell widths and separator alignment.
   - Added pytest coverage that executes structured examples from built-in rule Markdown documentation.
+  - Added exact diagnostic message checks to structured rule Markdown examples.
   - Added validation that structured rule Markdown examples use `[output=unchanged]` when the documented output is identical to the input.
   - Added regression coverage for Ruff-compatible file-selection and per-file-ignore pattern-base behavior.
   - Vastly expanded PCF rule tests across comment classification, run boundaries, structure preservation, code detection, width handling, line endings, mixed formatting, syntax-position safety, convergence, idempotence, and rule independence.
@@ -94,7 +95,9 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 ### Changed
 
 - **Docstring formatting:**
+  - Added instance-specific diagnostic messages for parameter consistency, section-style, and selected summary-style rule findings where the offending parameter, section, function, word, or span length is useful context.
   - Renumbered section-style rules so `PDF402` is section-name trailing-colon, `PDF403` is section underline-format, `PDF404` is empty-section, and `PDF405` is section-order, and aligned built-in rule filenames and class names with rule metadata.
+  - Implemented `PDF500` and `PDF501`, replacing their previous stub behavior with parsed docstring/signature parameter consistency diagnostics and configurable PDF500 activation.
   - Implemented `PDF400` through `PDF405`, replacing their previous stub behavior with convention-aware section capitalization fixes, Google section trailing-content fixes, NumPy underline normalization, and section content/order diagnostics.
   - Changed Google `Warning` and `Warnings` section parsing to treat them as admonition-style fields, while Google `Warns` and NumPy `Warns`/`Warnings` remain warning-exception sections.
   - Implemented `PDF302` through `PDF305`, replacing their previous stub behavior with first-summary-line diagnostics, safe first-word capitalization fixes, and Ruff-style convention-selection effects.
@@ -114,6 +117,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 ### Fixed
 
 - **Docstring formatting:**
+  - Fixed PDF500 and PDF501 to recognize typed Sphinx parameter fields such as `:param int value:` as documentation for the final parameter name.
   - Fixed `PDF406` to allow Google `Warning`/`Warnings` admonition sections alongside the distinct `Warns` warning-documentation section.
   - Fixed `PDF401` to split Google section trailing content when whitespace appears before the section-name colon.
   - Fixed PDF302 to skip property getter, setter, and deleter accessor docstrings.

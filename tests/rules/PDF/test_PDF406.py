@@ -18,6 +18,7 @@ def test_reports_repeated_google_sections_without_fixing() -> None:
     assert not result.fixed_findings
     assert tuple(finding.rule for finding in result.unfixed_findings) == (PDF406RepeatedSection.meta,)
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((7,),)
+    assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring section 'Args' repeats earlier section 'Args'",)
 
 
 def test_reports_each_repeated_google_section_after_first() -> None:
@@ -36,6 +37,10 @@ def test_reports_google_section_alias_repeats() -> None:
     assert result.new_source == source
     assert not result.fixed_findings
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((7,), (13,))
+    assert tuple(finding.message for finding in result.unfixed_findings) == (
+        "Docstring section 'Arguments' repeats earlier section 'Args'",
+        "Docstring section 'Returns' repeats earlier section 'Return'",
+    )
 
 
 def test_reports_google_argument_subsection_alias_repeats() -> None:

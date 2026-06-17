@@ -61,9 +61,9 @@ def colon():
 
 [output=unchanged]
 [findings]
-PDF300: Line 2
-PDF300: Line 6
-PDF300: Line 10
+PDF300: Line 2: Docstring summary should end with a period
+PDF300: Line 6: Docstring summary should end with a period
+PDF300: Line 10: Docstring summary should end with a period
 ```
 
 Empty docstrings, parser-recognized section-only docstrings, Sphinx field-only docstrings, and summaries ending with a backslash are skipped. With heading parsing enabled, underlined title-style summaries are also skipped. Recognized NumPy section headings such as `Parameters` followed by an underline are section headers, not summaries:

@@ -122,7 +122,7 @@ def value(arg):
 
 [output=unchanged]
 [findings]
-PDF400: Lines 2-4
+PDF400: Lines 2-4: Docstring section name 'args' should be capitalized as 'Args'
 ```
 
 ## Options

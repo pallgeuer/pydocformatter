@@ -32,7 +32,12 @@ def _finding_for_docstring(docstring: PDF_definition.DocstringInfo) -> RuleFindi
     summary = next((block for block in docstring.structure.blocks if block.kind is PDF_definition.DocstringBlockKind.SUMMARY), None)
     if summary is None or summary.end_line - summary.start_line <= 1:
         return None
-    return RuleFinding(rule=PDF203SummaryTooLong.meta, line_numbers=_summary_line_numbers(docstring, summary))
+    line_count = summary.end_line - summary.start_line
+    return RuleFinding(
+        rule=PDF203SummaryTooLong.meta,
+        line_numbers=_summary_line_numbers(docstring, summary),
+        instance_message=f"Docstring summary spans {line_count} lines and does not fit on one line",
+    )
 
 
 def _summary_line_numbers(docstring: PDF_definition.DocstringInfo, summary: PDF_definition.DocstringBlock) -> tuple[int, ...]:

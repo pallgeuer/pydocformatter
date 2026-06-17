@@ -40,6 +40,7 @@ def test_reports_multiline_summary_without_changing_source() -> None:
     assert result.new_source == source
     assert not result.fixed_findings
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((2, 3),)
+    assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring summary spans 2 lines and does not fit on one line",)
     assert not result.unfixed_findings[0].fixable
 
 

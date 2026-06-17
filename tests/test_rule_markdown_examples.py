@@ -66,7 +66,7 @@ pass
 
 [output=unchanged]
 [findings]
-PDF101: Lines 5-3
+PDF101: Lines 5-3: Example message
 ```
 """,
             rule_code="PDF101",
@@ -83,7 +83,7 @@ pass
 
 [output=unchanged]
 [findings]
-PDF101: Lines 5
+PDF101: Lines 5: Example message
 ```
 """,
             rule_code="PDF101",
@@ -97,7 +97,7 @@ pass
 
 [output=unchanged]
 [findings]
-PDF101: Line 3-4
+PDF101: Line 3-4: Example message
 ```
 """,
             rule_code="PDF101",
@@ -113,13 +113,13 @@ pass
 
 [output=unchanged]
 [findings]
-PDF101: Line 4-4
+PDF101: Line 4-4: Example message
 ```
 """,
         rule_code="PDF101",
     )
 
-    assert examples[0].findings == ((RuleCode("PDF101"), (4,)),)
+    assert examples[0].findings == ((RuleCode("PDF101"), (4,), "Example message"),)
 
     with pytest.raises(rule_documentation.RuleMarkdownExampleParseError, match="expected 'Line'"):
         rule_documentation.parse_rule_markdown_examples(
@@ -129,11 +129,64 @@ pass
 
 [output=unchanged]
 [findings]
-PDF101: Lines 4-4
+PDF101: Lines 4-4: Example message
 ```
 """,
             rule_code="PDF101",
         )
+
+
+def test_parse_rule_markdown_examples_requires_finding_messages() -> None:
+    """Finding lines must include the exact expected message."""
+    with pytest.raises(rule_documentation.RuleMarkdownExampleParseError, match="invalid finding line"):
+        rule_documentation.parse_rule_markdown_examples(
+            """```pydocfmt-example
+[input]
+pass
+
+[output=unchanged]
+[findings]
+PDF101: Line 4
+```
+""",
+            rule_code="PDF101",
+        )
+
+    with pytest.raises(rule_documentation.RuleMarkdownExampleParseError, match="invalid finding line"):
+        rule_documentation.parse_rule_markdown_examples(
+            """```pydocfmt-example
+[input]
+pass
+
+[output=unchanged]
+[findings]
+PDF101: Line 4: 
+```
+""",
+            rule_code="PDF101",
+        )
+
+
+def test_parse_rule_markdown_examples_preserves_exact_finding_messages() -> None:
+    """Finding messages are parsed exactly and duplicate finding locations are preserved."""
+    examples = rule_documentation.parse_rule_markdown_examples(
+        """```pydocfmt-example
+[input]
+pass
+
+[output=unchanged]
+[findings]
+PDF101: Line 4: First exact message
+PDF101: Line 4: Second exact message: with colon
+```
+""",
+        rule_code="PDF101",
+    )
+
+    assert examples[0].findings == (
+        (RuleCode("PDF101"), (4,), "First exact message"),
+        (RuleCode("PDF101"), (4,), "Second exact message: with colon"),
+    )
 
 
 def test_parse_rule_markdown_examples_rejects_output_matching_input() -> None:
@@ -192,6 +245,6 @@ def _settings_for_example(rule_code: str, example: rule_documentation.RuleMarkdo
     )
 
 
-def _finding_key(findings: tuple[rule_models.RuleFinding, ...]) -> tuple[tuple[RuleCode, tuple[int, ...]], ...]:
+def _finding_key(findings: tuple[rule_models.RuleFinding, ...]) -> tuple[tuple[RuleCode, tuple[int, ...], str], ...]:
     """Return the comparable shape for formatter findings."""
-    return tuple((finding.rule.code, finding.line_numbers) for finding in findings)
+    return tuple((finding.rule.code, finding.line_numbers, finding.message) for finding in findings)

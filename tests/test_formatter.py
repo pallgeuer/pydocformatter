@@ -195,6 +195,36 @@ class TestFormatterResults(unittest.TestCase):
             ],
         )
 
+    def test_grouped_output_keeps_different_instance_messages_separate(self) -> None:
+        result = FormatterResult(
+            path="a.py",
+            old_source="",
+            new_source="",
+            modified=False,
+            fixed_findings=collections.Counter(),
+            unfixed_findings=(
+                RuleFinding(rule=PDF101_RULE, line_numbers=(2,), instance_message="First issue"),
+                RuleFinding(rule=PDF101_RULE, line_numbers=(2,), instance_message="Second issue"),
+                RuleFinding(rule=PDF101_RULE, line_numbers=(3,), instance_message="First issue"),
+            ),
+            errors=(),
+        )
+
+        output = StringIO()
+        with contextlib.redirect_stdout(output):
+            check_command.print_results_grouped([], [result], output=None)
+
+        self.assertEqual(
+            output.getvalue().splitlines(),
+            [
+                "a.py:",
+                "  PDF101* First issue. Lines 2-3",
+                "  PDF101* Second issue. Line 2",
+                "",
+                "Found 3 rule check errors (3 fixable).",
+            ],
+        )
+
     def test_grouped_output_prints_fixed_findings_before_unfixed_findings(self) -> None:
         result = FormatterResult(
             path="a.py",

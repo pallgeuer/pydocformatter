@@ -53,22 +53,36 @@ def capitalization_results(context: RuleContext, *, rule: RuleMetadata) -> tuple
         value_lines = [line.raw_text for line in docstring.structure.lines]
         replacement_line_numbers: list[int] = []
         unfixable_line_numbers: list[int] = []
+        replacement_messages: list[str] = []
+        unfixable_messages: list[str] = []
         for section in docstring.structure.sections:
             canonical = canonical_section_name(docstring.structure.convention, section.name)
             if canonical is None or canonical == section.name:
                 continue
+            message = f"Docstring section name '{section.name}' should be capitalized as '{canonical}'"
             line = docstring.structure.lines[section.header_line]
             replacement = _replacement_for_section_name(line, section.name, canonical)
             if replacement is None:
                 unfixable_line_numbers.extend(_line_numbers(docstring, line))
+                unfixable_messages.append(message)
                 continue
             replacements.append(replacement)
             replacement_line_numbers.extend(_line_numbers(docstring, line))
+            replacement_messages.append(message)
             _replace_value_line_span(value_lines, line, replacement, canonical)
         if not replacements and not unfixable_line_numbers:
             continue
         change = _planned_replacement_change(docstring, context=context, replacements=tuple(replacements), value_lines=value_lines)
-        results.extend(_replacement_results(rule, replacement_line_numbers=replacement_line_numbers, unfixable_line_numbers=unfixable_line_numbers, change=change))
+        results.extend(
+            _replacement_results(
+                rule,
+                replacement_line_numbers=replacement_line_numbers,
+                unfixable_line_numbers=unfixable_line_numbers,
+                change=change,
+                replacement_messages=replacement_messages,
+                unfixable_messages=unfixable_messages,
+            )
+        )
     return tuple(results)
 
 
@@ -81,6 +95,7 @@ def trailing_content_results(context: RuleContext, *, rule: RuleMetadata) -> tup
             continue
         output_lines: list[PDF_definition.DocstringOutputLine] = []
         line_numbers: list[int] = []
+        messages: list[str] = []
         protected_indexes = _protected_or_parsed_line_indexes(docstring)
         changed = False
         for line in docstring.structure.lines:
@@ -88,15 +103,16 @@ def trailing_content_results(context: RuleContext, *, rule: RuleMetadata) -> tup
             if target is None:
                 output_lines.append(PDF_definition.DocstringOutputLine(original=line))
                 continue
-            header, content = target
+            header, content, name = target
             line_numbers.extend(_line_numbers(docstring, line))
+            messages.append(f"Docstring section '{name}' should be followed by a line break")
             output_lines.append(PDF_definition.DocstringOutputLine(source=header, value=header))
             output_lines.append(PDF_definition.DocstringOutputLine(source=content, value=content))
             changed = True
         if not changed:
             continue
         change = _planned_output_change(docstring, context=context, output_lines=tuple(output_lines), line_numbers=tuple(line_numbers))
-        results.append(_result(rule, line_numbers, change=change))
+        results.append(_result(rule, line_numbers, change=change, instance_message=_combined_instance_message(messages)))
     return tuple(results)
 
 
@@ -109,6 +125,7 @@ def underline_results(context: RuleContext, *, rule: RuleMetadata) -> tuple[Sect
             continue
         output_lines: list[PDF_definition.DocstringOutputLine] = []
         line_numbers: list[int] = []
+        messages: list[str] = []
         section_by_header = {section.header_line: section for section in docstring.structure.sections}
         skip_indexes: set[int] = set()
         changed = False
@@ -125,13 +142,14 @@ def underline_results(context: RuleContext, *, rule: RuleMetadata) -> tuple[Sect
             if underline is None:
                 continue
             line_numbers.extend(_line_numbers(docstring, line))
+            messages.append(f"Docstring section '{section.name}' underline should be normalized")
             output_lines.append(PDF_definition.DocstringOutputLine(source=underline, value=underline))
             skip_indexes.update(skipped)
             changed = True
         if not changed:
             continue
         change = _planned_output_change(docstring, context=context, output_lines=tuple(output_lines), line_numbers=tuple(line_numbers))
-        results.append(_result(rule, line_numbers, change=change))
+        results.append(_result(rule, line_numbers, change=change, instance_message=_combined_instance_message(messages)))
     return tuple(results)
 
 
@@ -143,7 +161,13 @@ def empty_section_findings(context: RuleContext, *, rule: RuleMetadata) -> tuple
         for section in docstring.structure.sections:
             if not _section_has_content(docstring, section):
                 line = docstring.structure.lines[section.header_line]
-                findings.append(RuleFinding(rule=rule, line_numbers=_line_numbers(docstring, line)))
+                findings.append(
+                    RuleFinding(
+                        rule=rule,
+                        line_numbers=_line_numbers(docstring, line),
+                        instance_message=f"Docstring section '{section.name}' should not be empty",
+                    )
+                )
     return tuple(findings)
 
 
@@ -153,15 +177,23 @@ def section_order_findings(context: RuleContext, *, rule: RuleMetadata) -> tuple
     findings: list[RuleFinding] = []
     for docstring in data.docstrings:
         max_rank = -1
+        max_rank_section_name = ""
         for section in docstring.structure.sections:
             rank = _section_order_rank(docstring.structure.convention, section.name)
             if rank is None:
                 continue
             if rank < max_rank:
                 line = docstring.structure.lines[section.header_line]
-                findings.append(RuleFinding(rule=rule, line_numbers=_line_numbers(docstring, line)))
+                findings.append(
+                    RuleFinding(
+                        rule=rule,
+                        line_numbers=_line_numbers(docstring, line),
+                        instance_message=f"Docstring section '{section.name}' should appear before '{max_rank_section_name}'",
+                    )
+                )
             else:
                 max_rank = rank
+                max_rank_section_name = section.name
     return tuple(findings)
 
 
@@ -170,14 +202,20 @@ def repeated_section_findings(context: RuleContext, *, rule: RuleMetadata) -> tu
     data = PDF_definition.PDF.require_data(context)
     findings: list[RuleFinding] = []
     for docstring in data.docstrings:
-        seen_keys: set[str] = set()
+        seen_keys: dict[str, str] = {}
         for section in docstring.structure.sections:
             key = _repeated_section_key(docstring.structure.convention, section.name)
             if key in seen_keys:
                 line = docstring.structure.lines[section.header_line]
-                findings.append(RuleFinding(rule=rule, line_numbers=_line_numbers(docstring, line)))
+                findings.append(
+                    RuleFinding(
+                        rule=rule,
+                        line_numbers=_line_numbers(docstring, line),
+                        instance_message=f"Docstring section '{section.name}' repeats earlier section '{seen_keys[key]}'",
+                    )
+                )
             else:
-                seen_keys.add(key)
+                seen_keys[key] = section.name
     return tuple(findings)
 
 
@@ -192,28 +230,42 @@ def colon_results(context: RuleContext, *, rule: RuleMetadata) -> tuple[SectionS
         value_lines = [line.raw_text for line in docstring.structure.lines]
         replacement_line_numbers: list[int] = []
         unfixable_line_numbers: list[int] = []
+        replacement_messages: list[str] = []
+        unfixable_messages: list[str] = []
         for section in docstring.structure.sections:
             line = docstring.structure.lines[section.header_line]
             if line.text.strip().endswith(":"):
                 continue
+            message = f"Docstring section '{section.name}' should end with a colon"
             # Parsed Google section headers contain only the section name and optional trailing whitespace; PDF401
             # handles same-line section content.
             replacement = _replacement_for_section_suffix(line, section.name, ":")
             if replacement is None:
                 unfixable_line_numbers.extend(_line_numbers(docstring, line))
+                unfixable_messages.append(message)
                 continue
             replacements.append(replacement)
             replacement_line_numbers.extend(_line_numbers(docstring, line))
+            replacement_messages.append(message)
             _replace_value_line_span(value_lines, line, replacement, ":")
         if not replacements and not unfixable_line_numbers:
             continue
         change = _planned_replacement_change(docstring, context=context, replacements=tuple(replacements), value_lines=value_lines)
-        results.extend(_replacement_results(rule, replacement_line_numbers=replacement_line_numbers, unfixable_line_numbers=unfixable_line_numbers, change=change))
+        results.extend(
+            _replacement_results(
+                rule,
+                replacement_line_numbers=replacement_line_numbers,
+                unfixable_line_numbers=unfixable_line_numbers,
+                change=change,
+                replacement_messages=replacement_messages,
+                unfixable_messages=unfixable_messages,
+            )
+        )
     return tuple(results)
 
 
-def _result(rule: RuleMetadata, line_numbers: tuple[int, ...] | list[int], *, change: rule_edits.PlannedSourceChange | None) -> SectionStyleResult:
-    return SectionStyleResult(finding=RuleFinding(rule=rule, line_numbers=tuple(dict.fromkeys(line_numbers)), instance_fixable=change is not None), change=change)
+def _result(rule: RuleMetadata, line_numbers: tuple[int, ...] | list[int], *, change: rule_edits.PlannedSourceChange | None, instance_message: str | None = None) -> SectionStyleResult:
+    return SectionStyleResult(finding=RuleFinding(rule=rule, line_numbers=tuple(dict.fromkeys(line_numbers)), instance_fixable=change is not None, instance_message=instance_message), change=change)
 
 
 def _replacement_results(
@@ -222,15 +274,30 @@ def _replacement_results(
     replacement_line_numbers: list[int],
     unfixable_line_numbers: list[int],
     change: rule_edits.PlannedSourceChange | None,
+    replacement_messages: list[str],
+    unfixable_messages: list[str],
 ) -> tuple[SectionStyleResult, ...]:
     if not replacement_line_numbers:
-        return (_result(rule, unfixable_line_numbers, change=None),)
+        return (_result(rule, unfixable_line_numbers, change=None, instance_message=_combined_instance_message(unfixable_messages)),)
     if change is None:
-        return (_result(rule, tuple(replacement_line_numbers) + tuple(unfixable_line_numbers), change=None),)
-    results = [_result(rule, change.line_numbers, change=change)]
+        return (
+            _result(
+                rule,
+                tuple(replacement_line_numbers) + tuple(unfixable_line_numbers),
+                change=None,
+                instance_message=_combined_instance_message(replacement_messages + unfixable_messages),
+            ),
+        )
+    results = [_result(rule, change.line_numbers, change=change, instance_message=_combined_instance_message(replacement_messages))]
     if unfixable_line_numbers:
-        results.append(_result(rule, unfixable_line_numbers, change=None))
+        results.append(_result(rule, unfixable_line_numbers, change=None, instance_message=_combined_instance_message(unfixable_messages)))
     return tuple(results)
+
+
+def _combined_instance_message(messages: list[str]) -> str | None:
+    if not messages:
+        return None
+    return "; ".join(dict.fromkeys(messages))
 
 
 def _line_numbers(docstring: PDF_definition.DocstringInfo, line: PDF_definition.DocstringValueLine) -> tuple[int, ...]:
@@ -291,7 +358,7 @@ def _planned_output_change(
     return PDF_definition.planned_simple_docstring_output_change(docstring, context=context, output_lines=output_lines, line_numbers=line_numbers)
 
 
-def _google_trailing_content_target(line: PDF_definition.DocstringValueLine, *, context: RuleContext) -> tuple[str, str] | None:
+def _google_trailing_content_target(line: PDF_definition.DocstringValueLine, *, context: RuleContext) -> tuple[str, str, str] | None:
     match = _GOOGLE_TRAILING_CONTENT_RE.match(line.text)
     if match is None:
         return None
@@ -302,7 +369,7 @@ def _google_trailing_content_target(line: PDF_definition.DocstringValueLine, *, 
     raw_indent = line.raw_text[: line.text_raw_start_column + len(match.group("indent")) - line.text_virtual_prefix_length]
     header = f"{raw_indent}{name}:"
     content = f"{raw_indent}{PDF_definition.indent_unit(context.settings)}{match.group('content').strip()}"
-    return header, content
+    return header, content, name
 
 
 def _protected_or_parsed_line_indexes(docstring: PDF_definition.DocstringInfo) -> set[int]:

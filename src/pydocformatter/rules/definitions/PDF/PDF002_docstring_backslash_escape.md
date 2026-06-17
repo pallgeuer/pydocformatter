@@ -62,10 +62,10 @@ def named_escape():
 
 [output=unchanged]
 [findings]
-PDF002: Line 2
-PDF002: Line 5
-PDF002: Line 8
-PDF002: Line 11
+PDF002: Line 2: Docstring with backslashes should use a raw string prefix
+PDF002: Line 5: Docstring with backslashes should use a raw string prefix
+PDF002: Line 8: Docstring with backslashes should use a raw string prefix
+PDF002: Line 11: Docstring with backslashes should use a raw string prefix
 ```
 
 A manual fix is to spell the intended evaluated characters directly, removing the source backslashes that made the docstrings look like raw-string candidates:
@@ -119,7 +119,7 @@ def mixed():
 
 [output=unchanged]
 [findings]
-PDF002: Line 2
+PDF002: Line 2: Docstring with backslashes should use a raw string prefix
 ```
 
 A manual fix is to keep the literal backslash spelling in a raw docstring while spelling the newline as an actual line break:
@@ -144,7 +144,7 @@ def mixed():
 
 [output=unchanged]
 [findings]
-PDF002: Lines 3-4
+PDF002: Lines 3-4: Docstring with backslashes should use a raw string prefix
 ```
 
 Escaped delimiters, escaped backslashes, and backslash line continuations are also non-fixable:
@@ -163,9 +163,9 @@ second"""
 
 [output=unchanged]
 [findings]
-PDF002: Line 2
-PDF002: Line 5
-PDF002: Line 8
+PDF002: Line 2: Docstring with backslashes should use a raw string prefix
+PDF002: Line 5: Docstring with backslashes should use a raw string prefix
+PDF002: Line 8: Docstring with backslashes should use a raw string prefix
 ```
 
 A manual fix depends on the intended value: use raw strings for literal backslashes, remove unnecessary quote escapes, and replace line continuations with the value they actually produce:
@@ -196,7 +196,7 @@ def raw_prefix():
 
 [output=unchanged]
 [findings]
-PDF002: Line 2
+PDF002: Line 2: Docstring with backslashes should use a raw string prefix
 ```
 
 A manual fix is to choose the raw prefix directly when Python 2 compatibility spelling is not needed:

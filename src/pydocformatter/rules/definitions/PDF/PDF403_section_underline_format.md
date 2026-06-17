@@ -142,7 +142,7 @@ def value(arg):
 
 [output=unchanged]
 [findings]
-PDF403: Lines 2-6
+PDF403: Lines 2-6: Docstring section 'Parameters' underline should be normalized
 ```
 
 ## Options

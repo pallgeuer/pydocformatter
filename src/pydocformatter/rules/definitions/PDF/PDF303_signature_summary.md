@@ -29,7 +29,7 @@ def value(count: int) -> str:
 
 [output=unchanged]
 [findings]
-PDF303: Line 2
+PDF303: Line 2: Docstring summary should not include signature for function 'value'
 ```
 
 The signature can also appear later in the first summary line after a supported separator:
@@ -44,8 +44,8 @@ def empty() -> None:
 
 [output=unchanged]
 [findings]
-PDF303: Line 2
-PDF303: Line 5
+PDF303: Line 2: Docstring summary should not include signature for function 'value'
+PDF303: Line 5: Docstring summary should not include signature for function 'empty'
 ```
 
 Names that are not signature-like are accepted:
@@ -91,7 +91,7 @@ def value(count: int) -> str:
 
 [output=unchanged]
 [findings]
-PDF303: Line 2
+PDF303: Line 2: Docstring summary should not include signature for function 'value'
 ```
 
 ## Options

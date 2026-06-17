@@ -141,7 +141,7 @@ def value(arg):
 
 [output=unchanged]
 [findings]
-PDF402: Lines 2-4
+PDF402: Lines 2-4: Docstring section 'Args' should end with a colon
 ```
 
 ## Options

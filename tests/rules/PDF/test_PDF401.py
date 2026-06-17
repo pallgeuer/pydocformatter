@@ -66,6 +66,7 @@ def test_reports_unsafe_google_section_trailing_content_without_fixing() -> None
     assert result.new_source == source
     assert not result.fixed_findings
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((2, 3),)
+    assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring section 'Args' should be followed by a line break",)
 
 
 def test_uses_configured_indentation_when_moving_trailing_content() -> None:

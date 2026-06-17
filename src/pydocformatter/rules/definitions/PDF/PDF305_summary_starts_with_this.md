@@ -29,7 +29,7 @@ def value():
 
 [output=unchanged]
 [findings]
-PDF305: Line 2
+PDF305: Line 2: Docstring summary should not start with "This"
 ```
 
 Normalization makes capitalization and simple surrounding punctuation irrelevant:
@@ -47,9 +47,9 @@ def colon():
 
 [output=unchanged]
 [findings]
-PDF305: Line 2
-PDF305: Line 5
-PDF305: Line 8
+PDF305: Line 2: Docstring summary should not start with "This"
+PDF305: Line 5: Docstring summary should not start with "This"
+PDF305: Line 8: Docstring summary should not start with "This"
 ```
 
 The rule also applies to module and class docstrings:
@@ -63,8 +63,8 @@ class Value:
 
 [output=unchanged]
 [findings]
-PDF305: Line 1
-PDF305: Line 4
+PDF305: Line 1: Docstring summary should not start with "This"
+PDF305: Line 4: Docstring summary should not start with "This"
 ```
 
 Other first words are accepted:
@@ -97,7 +97,7 @@ def value():
 
 [output=unchanged]
 [findings]
-PDF305: Line 2
+PDF305: Line 2: Docstring summary should not start with "This"
 ```
 
 ## Options

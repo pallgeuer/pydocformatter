@@ -39,7 +39,7 @@ def value(arg):
 
 [output=unchanged]
 [findings]
-PDF406: Line 7
+PDF406: Line 7: Docstring section 'Args' repeats earlier section 'Args'
 ```
 
 Every repeat after the first matching section is reported:
@@ -64,8 +64,8 @@ def value(arg):
 
 [output=unchanged]
 [findings]
-PDF406: Line 7
-PDF406: Line 10
+PDF406: Line 7: Docstring section 'Args' repeats earlier section 'Args'
+PDF406: Line 10: Docstring section 'Args' repeats earlier section 'Args'
 ```
 
 Google spelling variants for the same semantic section are also reported:
@@ -87,7 +87,7 @@ def value(arg):
 
 [output=unchanged]
 [findings]
-PDF406: Line 7
+PDF406: Line 7: Docstring section 'Arguments' repeats earlier section 'Args'
 ```
 
 Several alias families may be reported in one docstring:
@@ -124,9 +124,9 @@ def value(arg):
 
 [output=unchanged]
 [findings]
-PDF406: Line 7
-PDF406: Line 13
-PDF406: Line 22
+PDF406: Line 7: Docstring section 'Examples' repeats earlier section 'Example'
+PDF406: Line 13: Docstring section 'Returns' repeats earlier section 'Return'
+PDF406: Line 22: Docstring section 'Warnings' repeats earlier section 'Warning'
 ```
 
 Different recognized sections are allowed, even when they share a related role or the same order rank:
@@ -168,7 +168,7 @@ def value(arg):
 
 [output=unchanged]
 [findings]
-PDF406: Line 7
+PDF406: Line 7: Docstring section 'Args' repeats earlier section 'Args'
 ```
 
 Section-like text inside protected structures is not counted when that structure parser is enabled:
@@ -215,7 +215,7 @@ def value(arg):
 
 [output=unchanged]
 [findings]
-PDF406: Line 9
+PDF406: Line 9: Docstring section 'Args' repeats earlier section 'Args'
 ```
 
 PDF406 also reports repeated NumPy sections:
@@ -241,7 +241,7 @@ def value(arg):
 
 [output=unchanged]
 [findings]
-PDF406: Line 9
+PDF406: Line 9: Docstring section 'Parameters' repeats earlier section 'Parameters'
 ```
 
 NumPy spelling variants for the same section are reported:
@@ -267,7 +267,7 @@ def value(arg):
 
 [output=unchanged]
 [findings]
-PDF406: Line 9
+PDF406: Line 9: Docstring section 'Other Params' repeats earlier section 'Other Parameters'
 ```
 
 Convention recognition matters. A Google-style colon section is not counted as a NumPy section:
@@ -308,7 +308,7 @@ def value(arg):
 
 [output=unchanged]
 [findings]
-PDF406: Lines 2-6
+PDF406: Lines 2-6: Docstring section 'Args' repeats earlier section 'Args'
 ```
 
 ## Options

@@ -96,6 +96,8 @@ If no files or directories are specified, `pydocfmt check` checks the current di
 - `--docstring-convention {none,google,numpy,pep257}`: Convention used to parse semantic docstring sections (default: none)
 - `--docstring-blank-line-style {blank,aligned}`: Whitespace style for blank docstring lines (default: blank)
 - `--docstring-blank-line-after-last-section`, `--no-docstring-blank-line-after-last-section`: Toggle keeping one blank line after the last recognized Google or NumPy docstring section (default: disabled)
+- `--docstring-missing-parameter-documentation {has-parameter-section,non-summary-docstrings,all-docstrings}`: When PDF500 reports missing parameter documentation (default: has-parameter-section)
+- `--docstring-missing-parameter-public-only`, `--no-docstring-missing-parameter-public-only`: Toggle limiting broad PDF500 missing-parameter checks to public functions (default: enabled)
 - `--docstring-parse-list-items`, `--no-docstring-parse-list-items`: Toggle parsing docstring list items (default: enabled)
 - `--docstring-parse-headings`, `--no-docstring-parse-headings`: Toggle parsing docstring headings (default: enabled)
 - `--docstring-parse-doctests`, `--no-docstring-parse-doctests`: Toggle parsing and protecting doctest regions (default: enabled)
@@ -237,6 +239,8 @@ force-exclude = false
 convention = "none"
 blank-line-style = "blank"
 blank-line-after-last-section = false
+missing-parameter-documentation = "has-parameter-section"
+missing-parameter-public-only = true
 parse-list-items = true
 parse-headings = true
 parse-doctests = true
@@ -271,8 +275,10 @@ For TOML configuration, `[tool.pydocfmt.docstring]` and `[tool.pydocfmt.comment]
 - `indent-style`: Generated docstring section indentation style; one of `"space"` or `"tab"` (default: `"space"`)
 - `indent-width`: Generated docstring section indentation width and tab expansion width used when measuring comments (default: 4)
 - `docstring-convention`: Docstring convention; one of `"none"`, `"google"`, `"numpy"`, or `"pep257"` (default: `"none"`)
-- `docstring-blank-line-style`: Blank docstring line whitespace style used by PDF004; one of `"blank"` or `"aligned"` (default: `"blank"`)
-- `docstring-blank-line-after-last-section`: Whether PDF100 and PDF101 keep one blank line after the last recognized Google or NumPy docstring section (default: `false`)
+- `docstring-blank-line-style`: Blank docstring line whitespace style used by PDF103; one of `"blank"` or `"aligned"` (default: `"blank"`)
+- `docstring-blank-line-after-last-section`: Whether PDF200 and PDF201 keep one blank line after the last recognized Google or NumPy docstring section (default: `false`)
+- `docstring-missing-parameter-documentation`: When PDF500 reports missing parameter documentation; one of `"has-parameter-section"`, `"non-summary-docstrings"`, or `"all-docstrings"` (default: `"has-parameter-section"`)
+- `docstring-missing-parameter-public-only`: Whether broad PDF500 missing-parameter checks only apply to public functions and methods (default: `true`)
 - `docstring-parse-list-items`: Parse docstring list items as distinct structures (default: `true`)
 - `docstring-parse-headings`: Parse Markdown and reStructuredText docstring headings (default: `true`)
 - `docstring-parse-doctests`: Parse and protect doctest regions in docstrings (default: `true`)

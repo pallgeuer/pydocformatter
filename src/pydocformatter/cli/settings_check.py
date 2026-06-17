@@ -78,6 +78,14 @@ class DocstringBlankLineStyle(enum.StrEnum):
     ALIGNED = "aligned"
 
 
+class DocstringMissingParameterDocumentation(enum.StrEnum):
+    """Activation policies for missing parameter documentation diagnostics."""
+
+    HAS_PARAMETER_SECTION = "has-parameter-section"
+    NON_SUMMARY_DOCSTRINGS = "non-summary-docstrings"
+    ALL_DOCSTRINGS = "all-docstrings"
+
+
 class OutputFormat(enum.StrEnum):
     """Output formats for rule findings.
 
@@ -103,6 +111,10 @@ class CheckSettings:
         docstring_blank_line_style (DocstringBlankLineStyle): Whitespace style used by PDF103 for blank docstring lines.
         docstring_blank_line_after_last_section (bool): Whether PDF200 and PDF201 keep one blank line after the last
             convention section.
+        docstring_missing_parameter_documentation (DocstringMissingParameterDocumentation): When PDF500 reports missing
+            function parameter documentation.
+        docstring_missing_parameter_public_only (bool): Whether broad PDF500 missing-parameter checks are limited to
+            public functions and methods.
         docstring_parse_list_items (bool): Whether list items are parsed as distinct docstring structures.
         docstring_parse_headings (bool): Whether Markdown and reStructuredText headings are parsed.
         docstring_parse_doctests (bool): Whether doctest regions are parsed and protected.
@@ -151,6 +163,8 @@ class CheckSettings:
     docstring_convention: DocstringConvention = DocstringConvention.NONE
     docstring_blank_line_style: DocstringBlankLineStyle = DocstringBlankLineStyle.BLANK
     docstring_blank_line_after_last_section: bool = False
+    docstring_missing_parameter_documentation: DocstringMissingParameterDocumentation = DocstringMissingParameterDocumentation.HAS_PARAMETER_SECTION
+    docstring_missing_parameter_public_only: bool = True
     docstring_parse_list_items: bool = True
     docstring_parse_headings: bool = True
     docstring_parse_doctests: bool = True
@@ -267,6 +281,8 @@ class CheckSettingsOverrides(TypedDict, total=False):
     docstring_convention: DocstringConvention
     docstring_blank_line_style: DocstringBlankLineStyle
     docstring_blank_line_after_last_section: bool
+    docstring_missing_parameter_documentation: DocstringMissingParameterDocumentation
+    docstring_missing_parameter_public_only: bool
     docstring_parse_list_items: bool
     docstring_parse_headings: bool
     docstring_parse_doctests: bool
@@ -390,6 +406,20 @@ SETTINGS_SCHEMA = SettingsSchema(
             group=SettingsGroup.DOCSTRING_FORMATTING,
             help="Keep one blank line after the last docstring section.",
             documentation="Whether PDF200 and PDF201 keep one blank line after the last recognized Google or NumPy docstring section.",
+        ),
+        SettingDefinition(
+            field="docstring_missing_parameter_documentation",
+            value_type=DocstringMissingParameterDocumentation,
+            group=SettingsGroup.DOCSTRING_FORMATTING,
+            help="When PDF500 reports missing function parameter documentation.",
+            documentation='When PDF500 reports missing function parameter documentation; one of "has-parameter-section", "non-summary-docstrings", or "all-docstrings".',
+        ),
+        SettingDefinition(
+            field="docstring_missing_parameter_public_only",
+            value_type=bool,
+            group=SettingsGroup.DOCSTRING_FORMATTING,
+            help="Limit broad PDF500 missing-parameter checks to public functions.",
+            documentation="Whether PDF500 broad missing-parameter checks only apply to public functions and methods; explicit parameter documentation is always checked for consistency.",
         ),
         SettingDefinition(
             field="docstring_parse_list_items",

@@ -83,9 +83,9 @@ def semicolon():
 
 [output=unchanged]
 [findings]
-PDF301: Line 2
-PDF301: Line 6
-PDF301: Line 10
+PDF301: Line 2: Docstring summary should end with terminal punctuation
+PDF301: Line 6: Docstring summary should end with terminal punctuation
+PDF301: Line 10: Docstring summary should end with terminal punctuation
 ```
 
 Empty docstrings, parser-recognized section-only docstrings, Sphinx field-only docstrings, and summaries ending with a backslash are skipped. With heading parsing enabled, underlined title-style summaries are also skipped. Recognized NumPy section headings such as `Parameters` followed by an underline are section headers, not summaries:

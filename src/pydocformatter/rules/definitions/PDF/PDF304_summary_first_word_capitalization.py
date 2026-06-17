@@ -58,7 +58,17 @@ def _results(context: RuleContext, *, rule: RuleMetadata) -> tuple[_Capitalizati
             continue
         capitalized_word = f"{word.word[0].upper()}{word.word[1:]}"
         change = _planned_change(word, replacement=capitalized_word, context=context)
-        results.append(_CapitalizationResult(finding=RuleFinding(rule=rule, line_numbers=summary_style.line_numbers(word), instance_fixable=change is not None), change=change))
+        results.append(
+            _CapitalizationResult(
+                finding=RuleFinding(
+                    rule=rule,
+                    line_numbers=summary_style.line_numbers(word),
+                    instance_fixable=change is not None,
+                    instance_message=f"Docstring summary first word '{word.word}' should be capitalized",
+                ),
+                change=change,
+            )
+        )
     return tuple(results)
 
 

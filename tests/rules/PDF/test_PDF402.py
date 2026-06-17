@@ -63,6 +63,7 @@ def test_reports_unsafe_missing_google_section_name_colon_without_fixing() -> No
     assert result.new_source == source
     assert not result.fixed_findings
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((2, 3, 4),)
+    assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring section 'Args' should end with a colon",)
 
 
 def test_ignored_outside_google_convention() -> None:

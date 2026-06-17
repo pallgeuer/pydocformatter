@@ -18,6 +18,10 @@ def test_reports_empty_google_sections_without_fixing() -> None:
     assert not result.fixed_findings
     assert tuple(finding.rule for finding in result.unfixed_findings) == (PDF404EmptySection.meta, PDF404EmptySection.meta)
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((4,), (6,))
+    assert tuple(finding.message for finding in result.unfixed_findings) == (
+        "Docstring section 'Args' should not be empty",
+        "Docstring section 'Returns' should not be empty",
+    )
 
 
 def test_reports_adjacent_header_only_google_sections() -> None:

@@ -306,6 +306,8 @@ class TestSettings(unittest.TestCase):
                 "docstring_convention",
                 "docstring_blank_line_style",
                 "docstring_blank_line_after_last_section",
+                "docstring_missing_parameter_documentation",
+                "docstring_missing_parameter_public_only",
                 "docstring_parse_list_items",
                 "docstring_parse_headings",
                 "docstring_parse_doctests",
@@ -889,24 +891,40 @@ class TestSettings(unittest.TestCase):
         for blank_line_style in pydocformatter_settings.DocstringBlankLineStyle:
             config = pydocformatter_settings.SETTINGS_SCHEMA.load(field_overrides={"docstring_blank_line_style": blank_line_style.value})
             self.assertEqual(config.docstring_blank_line_style, blank_line_style)
+        for missing_parameter_documentation in pydocformatter_settings.DocstringMissingParameterDocumentation:
+            config = pydocformatter_settings.SETTINGS_SCHEMA.load(field_overrides={"docstring_missing_parameter_documentation": missing_parameter_documentation.value})
+            self.assertEqual(config.docstring_missing_parameter_documentation, missing_parameter_documentation)
 
         configured = pydocformatter_settings.SETTINGS_SCHEMA.load(
             global_values=pydocformatter_global_args.GlobalArgs(
                 isolated=True,
-                config_options=('docstring-convention = "google"\ndocstring-blank-line-style = "aligned"\ndocstring-blank-line-after-last-section = true\ndocstring-parse-tables = false',),
+                config_options=(
+                    'docstring-convention = "google"\ndocstring-blank-line-style = "aligned"\ndocstring-blank-line-after-last-section = true\ndocstring-missing-parameter-documentation = "all-docstrings"\ndocstring-missing-parameter-public-only = false\ndocstring-parse-tables = false',
+                ),
             )
         )
         overridden = pydocformatter_settings.SETTINGS_SCHEMA.load(
             global_values=pydocformatter_global_args.GlobalArgs(isolated=True),
-            args=argparse.Namespace(docstring_convention="numpy", docstring_blank_line_style="blank", docstring_blank_line_after_last_section=False, docstring_parse_tables=False),
+            args=argparse.Namespace(
+                docstring_convention="numpy",
+                docstring_blank_line_style="blank",
+                docstring_blank_line_after_last_section=False,
+                docstring_missing_parameter_documentation="non-summary-docstrings",
+                docstring_missing_parameter_public_only=True,
+                docstring_parse_tables=False,
+            ),
         )
         self.assertEqual(configured.docstring_convention, pydocformatter_settings.DocstringConvention.GOOGLE)
         self.assertEqual(configured.docstring_blank_line_style, pydocformatter_settings.DocstringBlankLineStyle.ALIGNED)
         self.assertTrue(configured.docstring_blank_line_after_last_section)
+        self.assertEqual(configured.docstring_missing_parameter_documentation, pydocformatter_settings.DocstringMissingParameterDocumentation.ALL_DOCSTRINGS)
+        self.assertFalse(configured.docstring_missing_parameter_public_only)
         self.assertFalse(configured.docstring_parse_tables)
         self.assertEqual(overridden.docstring_convention, pydocformatter_settings.DocstringConvention.NUMPY)
         self.assertEqual(overridden.docstring_blank_line_style, pydocformatter_settings.DocstringBlankLineStyle.BLANK)
         self.assertFalse(overridden.docstring_blank_line_after_last_section)
+        self.assertEqual(overridden.docstring_missing_parameter_documentation, pydocformatter_settings.DocstringMissingParameterDocumentation.NON_SUMMARY_DOCSTRINGS)
+        self.assertTrue(overridden.docstring_missing_parameter_public_only)
         self.assertFalse(overridden.docstring_parse_tables)
 
         config = pydocformatter_settings.SETTINGS_SCHEMA.load(

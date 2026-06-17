@@ -35,7 +35,13 @@ class PDF303SignatureSummary(RuleBase):
             if not summary_style.is_function_docstring(target.docstring):
                 continue
             if _contains_signature(target.line.text, target.docstring.owner.name):
-                findings.append(RuleFinding(rule=cls.meta, line_numbers=summary_style.line_numbers(target)))
+                findings.append(
+                    RuleFinding(
+                        rule=cls.meta,
+                        line_numbers=summary_style.line_numbers(target),
+                        instance_message=f"Docstring summary should not include signature for function '{target.docstring.owner.name}'",
+                    )
+                )
         return tuple(findings)
 
 

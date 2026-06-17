@@ -31,7 +31,7 @@ def value(arg):
 
 [output=unchanged]
 [findings]
-PDF404: Line 4
+PDF404: Line 4: Docstring section 'Args' should not be empty
 ```
 
 Adjacent header-only sections are separate findings:
@@ -50,8 +50,8 @@ def value(arg):
 
 [output=unchanged]
 [findings]
-PDF404: Line 4
-PDF404: Line 5
+PDF404: Line 4: Docstring section 'Args' should not be empty
+PDF404: Line 5: Docstring section 'Returns' should not be empty
 ```
 
 NumPy sections are checked after their underline:
@@ -70,7 +70,7 @@ def value(arg):
 
 [output=unchanged]
 [findings]
-PDF404: Line 4
+PDF404: Line 4: Docstring section 'Parameters' should not be empty
 ```
 
 Any non-blank section body counts as content, including protected or structured content:

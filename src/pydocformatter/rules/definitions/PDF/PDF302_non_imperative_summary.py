@@ -40,5 +40,5 @@ class PDF302NonImperativeSummary(RuleBase):
                 continue
             normalized = summary_style.normalize_word(word.word)
             if normalized and imperative_mood.is_non_imperative(normalized):
-                findings.append(RuleFinding(rule=cls.meta, line_numbers=summary_style.line_numbers(word)))
+                findings.append(RuleFinding(rule=cls.meta, line_numbers=summary_style.line_numbers(word), instance_message=f"Docstring summary first word '{word.word}' is not imperative"))
         return tuple(findings)

@@ -662,6 +662,22 @@ def test_sphinx_field_aliases_map_to_semantic_entry_kinds(field: str, expected_k
 
 
 @pytest.mark.parametrize(
+    ("field", "expected_names", "expected_type"),
+    (
+        (":param int first: Description.", ("first",), "int"),
+        (":param int\tfirst: Description.", ("first",), "int"),
+        (":param dict[str, int] options: Description.", ("options",), "dict[str, int]"),
+        (":param tuple[str, ...] *args: Description.", ("*args",), "tuple[str, ...]"),
+        (":kwarg Mapping[str, object] **kwargs: Description.", ("**kwargs",), "Mapping[str, object]"),
+    ),
+)
+def test_typed_sphinx_parameter_fields_split_type_from_name(field: str, expected_names: tuple[str, ...], expected_type: str) -> None:
+    structure = structure_for(field)
+    entry = structure.entries[0]
+    assert (entry.kind, entry.names, entry.type_text, entry.description) == (DocstringEntryKind.PARAMETER, expected_names, expected_type, "Description.")
+
+
+@pytest.mark.parametrize(
     ("field", "expected_kind"),
     (
         ("param", DocstringEntryKind.PARAMETER),

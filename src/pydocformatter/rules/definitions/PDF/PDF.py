@@ -550,6 +550,7 @@ _NUMPY_SECTIONS = {
     "warns",
     "yields",
 }
+PARAMETER_SECTION_NAMES = {"args", "arguments", "keyword args", "keyword arguments", "other args", "other arguments", "parameters", "other parameters", "other params", "receives"}
 # Google style defines entry-section ordering, but does not define a canonical order for narrative admonition sections.
 _GOOGLE_ORDER_RANKS = {
     "args": 0,
@@ -918,7 +919,8 @@ class _DocstringParser:
         description_reflow_lines.extend(self._stripped_reflow_lines(start + 1, block_end, skip_empty=True))
         description_lines = [line.text for line in description_reflow_lines]
         kind = _sphinx_entry_kind(field)
-        entry = DocstringEntry(kind=kind, names=(argument,) if argument else (), type_text=None, description=" ".join(description_lines).strip(), start_line=start, end_line=block_end)
+        names, type_text = _sphinx_entry_names_and_type(kind, argument)
+        entry = DocstringEntry(kind=kind, names=names, type_text=type_text, description=" ".join(description_lines).strip(), start_line=start, end_line=block_end)
         self.entries.append(entry)
         prefix = self.lines[start].text[: match.start("description")]
         self._add_reflow(
@@ -1163,7 +1165,7 @@ def _value_lines(value: str, *, source_line_number: int | None, source_indent: i
 def _entry_kind(convention: settings_check.DocstringConvention, section_name: str) -> DocstringEntryKind:
     """Return the semantic entry kind for a convention section."""
     normalized = section_name.lower()
-    if normalized in {"args", "arguments", "keyword args", "keyword arguments", "other args", "other arguments", "parameters", "other parameters", "other params", "receives"}:
+    if normalized in PARAMETER_SECTION_NAMES:
         return DocstringEntryKind.PARAMETER
     if normalized in {"return", "returns"}:
         return DocstringEntryKind.RETURN
@@ -1189,6 +1191,18 @@ def _sphinx_entry_kind(field: str) -> DocstringEntryKind:
     if field in {"raise", "raises", "except", "exception"}:
         return DocstringEntryKind.EXCEPTION
     return DocstringEntryKind.FIELD
+
+
+def _sphinx_entry_names_and_type(kind: DocstringEntryKind, argument: str) -> tuple[tuple[str, ...], str | None]:
+    if not argument:
+        return (), None
+    if kind is not DocstringEntryKind.PARAMETER:
+        return (argument,), None
+    parts = argument.rsplit(None, 1)
+    if len(parts) == 1:
+        return (argument,), None
+    type_text, name = parts
+    return (name,), type_text
 
 
 def _is_adornment(text: str) -> bool:

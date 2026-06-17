@@ -35,7 +35,7 @@ def value(arg):
 
 [output=unchanged]
 [findings]
-PDF405: Line 7
+PDF405: Line 7: Docstring section 'Args' should appear before 'Returns'
 ```
 
 Once a later ordered section has appeared, every earlier-ranked ordered section after it is reported:
@@ -60,8 +60,8 @@ def value(arg):
 
 [output=unchanged]
 [findings]
-PDF405: Line 7
-PDF405: Line 10
+PDF405: Line 7: Docstring section 'Returns' should appear before 'Raises'
+PDF405: Line 10: Docstring section 'Args' should appear before 'Raises'
 ```
 
 Unordered Google sections, such as `Examples`, do not affect ordering and do not reset the highest ordered section already seen:
@@ -86,7 +86,7 @@ def value(arg):
 
 [output=unchanged]
 [findings]
-PDF405: Line 10
+PDF405: Line 10: Docstring section 'Args' should appear before 'Returns'
 ```
 
 Duplicate sections and sections with the same order rank are allowed:
@@ -138,7 +138,7 @@ def value(arg):
 
 [output=unchanged]
 [findings]
-PDF405: Line 9
+PDF405: Line 9: Docstring section 'Parameters' should appear before 'Returns'
 ```
 
 ## Options

@@ -93,7 +93,7 @@ def safe():
 def escaped():
     """return the value\ncontinued."""
 [findings]
-PDF304: Line 5
+PDF304: Line 5: Docstring summary first word 'return' should be capitalized
 ```
 
 Non-function summaries are not checked:

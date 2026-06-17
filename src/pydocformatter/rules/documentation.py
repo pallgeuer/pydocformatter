@@ -15,7 +15,7 @@ TEMPLATE_PATH = pathlib.Path(__file__).with_name("templates") / "rule_template.m
 CATEGORY_TEMPLATE_PATH = pathlib.Path(__file__).with_name("templates") / "rule_category_template.md"
 _EXAMPLE_OPENING_FENCE_RE = re.compile(r"^(?P<fence>`{3,})pydocfmt-example[^\n]*$")
 _SECTION_MARKERS = frozenset(("settings", "input", "output", "output=unchanged", "findings"))
-_FINDING_RE = re.compile(r"^(?P<code>[A-Z]+[0-9]+): (?P<label>Line|Lines) (?P<lines>[0-9][0-9, -]*)$")
+_FINDING_RE = re.compile(r"^(?P<code>[A-Z]+[0-9]+): (?P<label>Line|Lines) (?P<lines>[0-9][0-9, -]*): (?P<message>.+)$")
 
 
 class RuleMarkdownExampleParseError(ValueError):
@@ -29,7 +29,7 @@ class RuleMarkdownExample:
     settings_text: str
     input_source: str
     output_source: str
-    findings: tuple[tuple[RuleCode, tuple[int, ...]], ...]
+    findings: tuple[tuple[RuleCode, tuple[int, ...], str], ...]
 
 
 def rule_fix_text(rule: RuleMetadata) -> str:
@@ -175,9 +175,9 @@ def _parse_example_settings(settings_text: str, *, rule_code: str, example_numbe
     return settings_text
 
 
-def _parse_findings(findings_text: str, *, rule_code: str, example_number: int) -> tuple[tuple[RuleCode, tuple[int, ...]], ...]:
+def _parse_findings(findings_text: str, *, rule_code: str, example_number: int) -> tuple[tuple[RuleCode, tuple[int, ...], str], ...]:
     """Parse an optional findings section."""
-    findings: list[tuple[RuleCode, tuple[int, ...]]] = []
+    findings: list[tuple[RuleCode, tuple[int, ...], str]] = []
     for line in findings_text.splitlines():
         if not line:
             continue
@@ -186,7 +186,7 @@ def _parse_findings(findings_text: str, *, rule_code: str, example_number: int) 
             raise RuleMarkdownExampleParseError(f"{rule_code} example {example_number}: invalid finding line: {line!r}")
         line_numbers = _parse_line_numbers(match.group("lines"), rule_code=rule_code, example_number=example_number)
         _validate_finding_line_label(match.group("label"), line_numbers, rule_code=rule_code, example_number=example_number)
-        findings.append((RuleCode(match.group("code")), line_numbers))
+        findings.append((RuleCode(match.group("code")), line_numbers, match.group("message")))
     return tuple(findings)
 
 

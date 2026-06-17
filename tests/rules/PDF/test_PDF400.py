@@ -63,6 +63,7 @@ def test_reports_unsafe_section_name_capitalization_without_fixing() -> None:
     assert result.new_source == source
     assert not result.fixed_findings
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((2, 3, 4),)
+    assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring section name 'args' should be capitalized as 'Args'",)
 
 
 def test_ignored_without_google_or_numpy_convention() -> None:
