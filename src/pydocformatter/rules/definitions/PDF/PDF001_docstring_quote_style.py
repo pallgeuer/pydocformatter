@@ -20,7 +20,7 @@ class PDF001DocstringQuoteStyle(RuleBase):
         name="docstring-quote-style",
         message="Docstring should use triple double quotes",
         fix_availability=FixAvailability.SOMETIMES,
-        stable_since="0.3.0",
+        stable_since="1.0.0",
         setting_effects=(),
         incompatible_with=(),
     )

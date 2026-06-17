@@ -15,7 +15,7 @@ class PDF502MissingReturnDocumentation(RuleBase):
         name="missing-return-documentation",
         message="Function return value is missing docstring documentation",
         fix_availability=FixAvailability.NEVER,
-        stable_since="0.3.0",
+        stable_since="1.0.0",
         setting_effects=(),
         incompatible_with=(),
     )

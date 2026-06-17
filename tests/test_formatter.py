@@ -28,14 +28,14 @@ from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetadata
 
 PDF101_RULE = RuleMetadata(
-    code=RuleCode("PDF101"), name="reflow-required", message="Docstring chunk needs reflow", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0", setting_effects=(), incompatible_with=()
+    code=RuleCode("PDF101"), name="reflow-required", message="Docstring chunk needs reflow", fix_availability=FixAvailability.ALWAYS, stable_since="1.0.0", setting_effects=(), incompatible_with=()
 )
 PDF110_RULE = RuleMetadata(
     code=RuleCode("PDF110"),
     name="summary-too-long",
     message="Docstring summary does not fit on one line",
     fix_availability=FixAvailability.NEVER,
-    stable_since="0.3.0",
+    stable_since="1.0.0",
     setting_effects=(),
     incompatible_with=(),
 )
@@ -44,7 +44,7 @@ PCF100_RULE = RuleMetadata(
     name="comment-formatting-needed",
     message="Comment needs formatting",
     fix_availability=FixAvailability.ALWAYS,
-    stable_since="0.3.0",
+    stable_since="1.0.0",
     setting_effects=(),
     incompatible_with=(),
 )
@@ -94,7 +94,7 @@ class TestFormatterResults(unittest.TestCase):
                 name="summary-too-long",
                 message="Docstring summary does not fit on one line",
                 fix_availability=FixAvailability.NEVER,
-                stable_since="0.3.0",
+                stable_since="1.0.0",
                 setting_effects=(),
                 incompatible_with=(),
             ),
@@ -117,7 +117,7 @@ class TestFormatterResults(unittest.TestCase):
             name="reflow-required",
             message="Docstring chunk needs reflow",
             fix_availability=FixAvailability.ALWAYS,
-            stable_since="0.3.0",
+            stable_since="1.0.0",
             setting_effects=(),
             incompatible_with=(),
         )
@@ -136,7 +136,7 @@ class TestFormatterResults(unittest.TestCase):
         self.assertFalse(overridden_finding.fixable)
 
     def test_rule_metadata_and_finding_keys_are_sortable(self) -> None:
-        later_rule = RuleMetadata(code=RuleCode("PDF999"), name="later", message="Later", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0", setting_effects=(), incompatible_with=())
+        later_rule = RuleMetadata(code=RuleCode("PDF999"), name="later", message="Later", fix_availability=FixAvailability.ALWAYS, stable_since="1.0.0", setting_effects=(), incompatible_with=())
 
         self.assertEqual(sorted((later_rule, PDF101_RULE)), [PDF101_RULE, later_rule])
         self.assertTrue(dataclasses.is_dataclass(RuleFinding.Key))
@@ -147,7 +147,7 @@ class TestFormatterResults(unittest.TestCase):
 
     def test_rule_finding_requires_instance_fixability_for_sometimes_fixable_rules(self) -> None:
         rule = RuleMetadata(
-            code=RuleCode("PDF999"), name="sometimes-rule", message="Sometimes rule", fix_availability=FixAvailability.SOMETIMES, stable_since="0.3.0", setting_effects=(), incompatible_with=()
+            code=RuleCode("PDF999"), name="sometimes-rule", message="Sometimes rule", fix_availability=FixAvailability.SOMETIMES, stable_since="1.0.0", setting_effects=(), incompatible_with=()
         )
 
         self.assertTrue(RuleFinding(rule=rule, line_numbers=(2,), instance_fixable=True).fixable)
@@ -157,7 +157,7 @@ class TestFormatterResults(unittest.TestCase):
 
     def test_rule_finding_requires_instance_fixability_for_usually_fixable_rules(self) -> None:
         rule = RuleMetadata(
-            code=RuleCode("PDF999"), name="usually-rule", message="Usually rule", fix_availability=FixAvailability.USUALLY, stable_since="0.3.0", setting_effects=(), incompatible_with=()
+            code=RuleCode("PDF999"), name="usually-rule", message="Usually rule", fix_availability=FixAvailability.USUALLY, stable_since="1.0.0", setting_effects=(), incompatible_with=()
         )
 
         self.assertTrue(RuleFinding(rule=rule, line_numbers=(2,), instance_fixable=True).fixable)
@@ -409,7 +409,7 @@ class TestFormatterResults(unittest.TestCase):
                 name="insert-leading-line",
                 message="Insert leading line",
                 fix_availability=rule_models.FixAvailability.ALWAYS,
-                stable_since="0.3.0",
+                stable_since="1.0.0",
                 setting_effects=(),
                 incompatible_with=(),
             )
@@ -427,7 +427,7 @@ class TestFormatterResults(unittest.TestCase):
                 name="find-name",
                 message="Found name",
                 fix_availability=rule_models.FixAvailability.NEVER,
-                stable_since="0.3.0",
+                stable_since="1.0.0",
                 setting_effects=(),
                 incompatible_with=(),
             )
@@ -480,7 +480,7 @@ class TestFormatterResults(unittest.TestCase):
                 name="insert-leading-line",
                 message="Insert leading line",
                 fix_availability=rule_models.FixAvailability.ALWAYS,
-                stable_since="0.3.0",
+                stable_since="1.0.0",
                 setting_effects=(),
                 incompatible_with=(),
             )
@@ -498,7 +498,7 @@ class TestFormatterResults(unittest.TestCase):
                 name="observe-category-data",
                 message="Observe category data",
                 fix_availability=rule_models.FixAvailability.ALWAYS,
-                stable_since="0.3.0",
+                stable_since="1.0.0",
                 setting_effects=(),
                 incompatible_with=(),
             )
@@ -516,7 +516,7 @@ class TestFormatterResults(unittest.TestCase):
                 name="observe-category-data-again",
                 message="Observe category data again",
                 fix_availability=rule_models.FixAvailability.ALWAYS,
-                stable_since="0.3.0",
+                stable_since="1.0.0",
                 setting_effects=(),
                 incompatible_with=(),
             )
@@ -568,7 +568,7 @@ class TestFormatterResults(unittest.TestCase):
                 name="insert-leading-line",
                 message="Insert leading line",
                 fix_availability=rule_models.FixAvailability.ALWAYS,
-                stable_since="0.3.0",
+                stable_since="1.0.0",
                 setting_effects=(),
                 incompatible_with=(),
             )
@@ -595,7 +595,7 @@ class TestFormatterResults(unittest.TestCase):
                 name="insert-leading-line",
                 message="Insert leading line",
                 fix_availability=rule_models.FixAvailability.ALWAYS,
-                stable_since="0.3.0",
+                stable_since="1.0.0",
                 setting_effects=(),
                 incompatible_with=(),
             )
@@ -620,7 +620,7 @@ class TestFormatterResults(unittest.TestCase):
         @rule_registration.register_rule_to(TST)
         class TST001Check(rule_base.RuleBase):
             meta = rule_models.RuleMetadata(
-                code=rule_codes.RuleCode("TST001"), name="check", message="Check", fix_availability=rule_models.FixAvailability.NEVER, stable_since="0.3.0", setting_effects=(), incompatible_with=()
+                code=rule_codes.RuleCode("TST001"), name="check", message="Check", fix_availability=rule_models.FixAvailability.NEVER, stable_since="1.0.0", setting_effects=(), incompatible_with=()
             )
 
             @classmethod
@@ -647,7 +647,7 @@ class TestFormatterResults(unittest.TestCase):
         @rule_registration.register_rule_to(TST)
         class TST001Toggle(rule_base.RuleBase):
             meta = rule_models.RuleMetadata(
-                code=rule_codes.RuleCode("TST001"), name="toggle", message="Toggle", fix_availability=rule_models.FixAvailability.ALWAYS, stable_since="0.3.0", setting_effects=(), incompatible_with=()
+                code=rule_codes.RuleCode("TST001"), name="toggle", message="Toggle", fix_availability=rule_models.FixAvailability.ALWAYS, stable_since="1.0.0", setting_effects=(), incompatible_with=()
             )
 
             @classmethod
@@ -686,7 +686,7 @@ class TestFormatterResults(unittest.TestCase):
                 name="increment-to-four",
                 message="Increment to four",
                 fix_availability=rule_models.FixAvailability.ALWAYS,
-                stable_since="0.3.0",
+                stable_since="1.0.0",
                 setting_effects=(),
                 incompatible_with=(),
             )
@@ -842,7 +842,7 @@ class TestFormatterResults(unittest.TestCase):
                 name="summary-too-long",
                 message="Docstring summary does not fit on one line",
                 fix_availability=FixAvailability.NEVER,
-                stable_since="0.3.0",
+                stable_since="1.0.0",
                 setting_effects=(),
                 incompatible_with=(),
             )
@@ -897,7 +897,7 @@ class TestFormatterResults(unittest.TestCase):
                 name="summary-too-long",
                 message="Docstring summary does not fit on one line",
                 fix_availability=FixAvailability.NEVER,
-                stable_since="0.3.0",
+                stable_since="1.0.0",
                 setting_effects=(),
                 incompatible_with=(),
             )

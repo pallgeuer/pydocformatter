@@ -16,7 +16,7 @@ class PDF507ExtraneousExceptionDocumentation(RuleBase):
         name="extraneous-exception-documentation",
         message="Docstring documents an exception that is not explicitly raised",
         fix_availability=FixAvailability.NEVER,
-        stable_since="0.3.0",
+        stable_since="1.0.0",
         setting_effects=(
             RuleSettingEffects(
                 setting="docstring_convention",

@@ -16,7 +16,7 @@ class PDF404EmptySection(RuleBase):
         name="empty-section",
         message="Docstring section should not be empty",
         fix_availability=FixAvailability.NEVER,
-        stable_since="0.3.0",
+        stable_since="1.0.0",
         setting_effects=(
             RuleSettingEffects(
                 setting="docstring_convention",

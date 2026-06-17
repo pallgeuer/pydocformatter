@@ -5,7 +5,7 @@
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/release/python-3110/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**pydocformatter** is a fork (with very significant subsequent rewrites and development) of [pyformatter](https://github.com/RikGhosh487/pyformatter), which provides a Python formatter, `pydocfmt`, for formatting docstrings and comments. It is designed to be maximally compatible with [Ruff](https://docs.astral.sh/ruff/).
+**pydocformatter** provides a Ruff-style Python formatter, `pydocfmt`, for formatting docstrings and comments. It is designed to be maximally compatible with [Ruff](https://docs.astral.sh/ruff/).
 
 ---
 
@@ -369,7 +369,7 @@ Add pydocformatter to your `.pre-commit-config.yaml`:
 ```yaml
 repos:
   - repo: https://github.com/pallgeuer/pydocformatter
-    rev: v0.3.0
+    rev: v1.0.0
     hooks:
       - id: pydocfmt
         args: [--line-length=88]
@@ -423,7 +423,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## Acknowledgments
 
 Inspired by the excellent work of:
-- [pyformatter](https://github.com/RikGhosh487/pyformatter) - Forked with very significant subsequent rewrites and development
+- [pyformatter](https://github.com/RikGhosh487/pyformatter) - Project inspiration
 - [Black](https://github.com/psf/black) - The uncompromising Python code formatter
 - [isort](https://github.com/PyCQA/isort) - A Python utility to sort imports
 - [docformatter](https://github.com/PyCQA/docformatter) - Formats docstrings to follow conventions

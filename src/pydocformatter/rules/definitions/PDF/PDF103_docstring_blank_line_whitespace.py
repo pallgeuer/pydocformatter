@@ -16,7 +16,7 @@ class PDF103DocstringBlankLineWhitespace(RuleBase):
         name="docstring-blank-line-whitespace",
         message="Blank docstring line has whitespace",
         fix_availability=FixAvailability.ALWAYS,
-        stable_since="0.3.0",
+        stable_since="1.0.0",
         setting_effects=(),
         incompatible_with=(),
     )

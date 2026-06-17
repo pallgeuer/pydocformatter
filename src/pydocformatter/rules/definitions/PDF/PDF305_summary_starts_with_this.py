@@ -16,7 +16,7 @@ class PDF305SummaryStartsWithThis(RuleBase):
         name="summary-starts-with-this",
         message='Docstring summary should not start with "This"',
         fix_availability=FixAvailability.NEVER,
-        stable_since="0.3.0",
+        stable_since="1.0.0",
         setting_effects=(
             RuleSettingEffects(
                 setting="docstring_convention",

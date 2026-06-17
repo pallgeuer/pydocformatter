@@ -18,7 +18,7 @@ class PDF201MissingBlankLine(RuleBase):
         name="missing-blank-line",
         message="Docstring is missing a blank line",
         fix_availability=FixAvailability.ALWAYS,
-        stable_since="0.3.0",
+        stable_since="1.0.0",
         setting_effects=(),
         incompatible_with=(),
     )

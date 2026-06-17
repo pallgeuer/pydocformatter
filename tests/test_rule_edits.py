@@ -11,7 +11,7 @@ from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetada
 class TestSourceEdits(unittest.TestCase):
     def test_planned_source_changes_apply_edits_and_create_findings(self) -> None:
         module = cst.parse_module("value = 1\n")
-        rule = RuleMetadata(code=RuleCode("PDF999"), name="test-rule", message="Test message", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0", setting_effects=(), incompatible_with=())
+        rule = RuleMetadata(code=RuleCode("PDF999"), name="test-rule", message="Test message", fix_availability=FixAvailability.ALWAYS, stable_since="1.0.0", setting_effects=(), incompatible_with=())
         changes = (
             rule_edits.PlannedSourceChange(
                 edit=rule_edits.SourceEdit(cst_metadata.CodeRange(start=cst_metadata.CodePosition(1, 8), end=cst_metadata.CodePosition(1, 9)), "2"),
@@ -29,7 +29,7 @@ class TestSourceEdits(unittest.TestCase):
 
     def test_sometimes_fixable_findings_require_explicit_instance_fixability(self) -> None:
         rule = RuleMetadata(
-            code=RuleCode("PDF999"), name="test-rule", message="Test message", fix_availability=FixAvailability.SOMETIMES, stable_since="0.3.0", setting_effects=(), incompatible_with=()
+            code=RuleCode("PDF999"), name="test-rule", message="Test message", fix_availability=FixAvailability.SOMETIMES, stable_since="1.0.0", setting_effects=(), incompatible_with=()
         )
         changes = (
             rule_edits.PlannedSourceChange(
@@ -42,7 +42,7 @@ class TestSourceEdits(unittest.TestCase):
             rule_edits.findings_for_planned_source_changes(rule, changes)
 
     def test_usually_fixable_findings_require_explicit_instance_fixability(self) -> None:
-        rule = RuleMetadata(code=RuleCode("PDF999"), name="test-rule", message="Test message", fix_availability=FixAvailability.USUALLY, stable_since="0.3.0", setting_effects=(), incompatible_with=())
+        rule = RuleMetadata(code=RuleCode("PDF999"), name="test-rule", message="Test message", fix_availability=FixAvailability.USUALLY, stable_since="1.0.0", setting_effects=(), incompatible_with=())
         changes = (
             rule_edits.PlannedSourceChange(
                 edit=rule_edits.SourceEdit(cst_metadata.CodeRange(start=cst_metadata.CodePosition(1, 0), end=cst_metadata.CodePosition(1, 0)), ""),

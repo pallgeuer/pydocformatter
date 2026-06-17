@@ -18,7 +18,7 @@ class PCF002TrailingCommentFormatting(RuleBase):
         name="trailing-comment-formatting",
         message="Trailing comment needs formatting",
         fix_availability=FixAvailability.ALWAYS,
-        stable_since="0.3.0",
+        stable_since="1.0.0",
         setting_effects=(),
         incompatible_with=(),
     )

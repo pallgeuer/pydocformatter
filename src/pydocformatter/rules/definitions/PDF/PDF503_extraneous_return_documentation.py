@@ -15,7 +15,7 @@ class PDF503ExtraneousReturnDocumentation(RuleBase):
         name="extraneous-return-documentation",
         message="Docstring has a return section for a function that does not return",
         fix_availability=FixAvailability.NEVER,
-        stable_since="0.3.0",
+        stable_since="1.0.0",
         setting_effects=(),
         incompatible_with=(),
     )

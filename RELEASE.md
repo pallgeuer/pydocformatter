@@ -32,7 +32,7 @@
 Set the release version once and use it consistently in the commands below:
 
 ```bash
-VERSION=0.3.0
+VERSION=1.0.0
 ```
 
 ### Step 1: Final Validation
@@ -120,7 +120,7 @@ After release, verify:
    ```yaml
    repos:
      - repo: https://github.com/pallgeuer/pydocformatter
-       rev: v0.3.0
+       rev: v1.0.0
        hooks:
          - id: pydocfmt
    ```

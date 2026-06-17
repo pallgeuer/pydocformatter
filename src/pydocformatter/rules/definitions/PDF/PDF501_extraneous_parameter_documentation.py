@@ -15,7 +15,7 @@ class PDF501ExtraneousParameterDocumentation(RuleBase):
         name="extraneous-parameter-documentation",
         message="Docstring documents a parameter that is not in the function signature",
         fix_availability=FixAvailability.NEVER,
-        stable_since="0.3.0",
+        stable_since="1.0.0",
         setting_effects=(),
         incompatible_with=(),
     )

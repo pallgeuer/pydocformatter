@@ -17,7 +17,7 @@ class PDF107MultilineOpeningQuotesSepLine(RuleBase):
         name="multiline-opening-quotes-sep-line",
         message="Multi-line docstring opening quotes should be on a separate line",
         fix_availability=FixAvailability.ALWAYS,
-        stable_since="0.3.0",
+        stable_since="1.0.0",
         setting_effects=(
             RuleSettingEffects(
                 setting="docstring_convention",

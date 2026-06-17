@@ -15,7 +15,7 @@ class PDF506MissingExceptionDocumentation(RuleBase):
         name="missing-exception-documentation",
         message="Raised exception is missing docstring documentation",
         fix_availability=FixAvailability.NEVER,
-        stable_since="0.3.0",
+        stable_since="1.0.0",
         setting_effects=(),
         incompatible_with=(),
     )

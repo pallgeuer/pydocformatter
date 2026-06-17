@@ -16,7 +16,7 @@ class PDF405SectionOrder(RuleBase):
         name="section-order",
         message="Docstring sections should be in the configured order",
         fix_availability=FixAvailability.NEVER,
-        stable_since="0.3.0",
+        stable_since="1.0.0",
         setting_effects=(
             RuleSettingEffects(
                 setting="docstring_convention",

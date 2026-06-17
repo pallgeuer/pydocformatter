@@ -40,7 +40,7 @@ repos:
 
   # Example of how external users would use pydocformatter hooks:
   # - repo: https://github.com/pallgeuer/pydocformatter
-  #   rev: v0.3.0
+  #   rev: v1.0.0
   #   hooks:
   #     - id: pydocfmt
   #       args: [--line-length=88]

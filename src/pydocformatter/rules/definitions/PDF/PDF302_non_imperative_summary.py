@@ -17,7 +17,7 @@ class PDF302NonImperativeSummary(RuleBase):
         name="non-imperative-summary",
         message="Docstring summary should be in imperative mood",
         fix_availability=FixAvailability.NEVER,
-        stable_since="0.3.0",
+        stable_since="1.0.0",
         setting_effects=(
             RuleSettingEffects(
                 setting="docstring_convention",

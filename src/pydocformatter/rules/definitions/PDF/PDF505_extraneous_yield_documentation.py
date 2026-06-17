@@ -15,7 +15,7 @@ class PDF505ExtraneousYieldDocumentation(RuleBase):
         name="extraneous-yield-documentation",
         message="Docstring has a yield section for a function that does not yield a meaningful value",
         fix_availability=FixAvailability.NEVER,
-        stable_since="0.3.0",
+        stable_since="1.0.0",
         setting_effects=(),
         incompatible_with=(),
     )

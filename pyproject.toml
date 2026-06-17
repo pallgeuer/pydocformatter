@@ -4,12 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pydocformatter"
-version = "0.3.0"
+version = "1.0.0"
 description = "A Python annotation formatter for line-wrapping and formatting python comments and docstrings"
 readme = "README.md"
 license = "MIT"
 authors = [
-    {name = "Rik Ghosh", email = "rikghosh487@gmail.com"},
     {name = "Philipp Allgeuer"},
 ]
 maintainers = [

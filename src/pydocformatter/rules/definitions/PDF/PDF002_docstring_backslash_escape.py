@@ -18,7 +18,7 @@ class PDF002DocstringBackslashEscape(RuleBase):
         name="docstring-backslash-escape",
         message="Docstring with backslashes should use a raw string prefix",
         fix_availability=FixAvailability.SOMETIMES,
-        stable_since="0.3.0",
+        stable_since="1.0.0",
         setting_effects=(),
         incompatible_with=(),
     )

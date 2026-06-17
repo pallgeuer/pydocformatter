@@ -19,7 +19,7 @@ class PDF301SummaryTerminalPunctuation(RuleBase):
         name="summary-terminal-punctuation",
         message="Docstring summary should end with terminal punctuation",
         fix_availability=FixAvailability.SOMETIMES,
-        stable_since="0.3.0",
+        stable_since="1.0.0",
         setting_effects=(
             RuleSettingEffects(
                 setting="docstring_convention",

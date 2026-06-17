@@ -20,14 +20,14 @@ from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetada
 from pydocformatter.rules_selection import RuleSelection
 
 PDF101_RULE = RuleMetadata(
-    code=RuleCode("PDF101"), name="reflow-required", message="Docstring chunk needs reflow", fix_availability=FixAvailability.ALWAYS, stable_since="0.3.0", setting_effects=(), incompatible_with=()
+    code=RuleCode("PDF101"), name="reflow-required", message="Docstring chunk needs reflow", fix_availability=FixAvailability.ALWAYS, stable_since="1.0.0", setting_effects=(), incompatible_with=()
 )
 PCF001_RULE = RuleMetadata(
     code=RuleCode("PCF001"),
     name="comment-formatting-needed",
     message="Comment needs formatting",
     fix_availability=FixAvailability.ALWAYS,
-    stable_since="0.3.0",
+    stable_since="1.0.0",
     setting_effects=(),
     incompatible_with=(),
 )
@@ -1521,7 +1521,7 @@ class TestCLIShowFiles(unittest.TestCase):
                 name="summary-too-long",
                 message="Docstring summary does not fit on one line",
                 fix_availability=FixAvailability.NEVER,
-                stable_since="0.3.0",
+                stable_since="1.0.0",
                 setting_effects=(),
                 incompatible_with=(),
             )

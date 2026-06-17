@@ -16,7 +16,7 @@ class PDF303SignatureSummary(RuleBase):
         name="signature-summary",
         message="Docstring summary should not be a signature",
         fix_availability=FixAvailability.NEVER,
-        stable_since="0.3.0",
+        stable_since="1.0.0",
         setting_effects=(
             RuleSettingEffects(
                 setting="docstring_convention",

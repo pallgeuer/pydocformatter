@@ -15,7 +15,7 @@ class PDF102DocstringTrailingWhitespace(RuleBase):
         name="docstring-trailing-whitespace",
         message="Non-empty docstring line has trailing whitespace",
         fix_availability=FixAvailability.ALWAYS,
-        stable_since="0.3.0",
+        stable_since="1.0.0",
         setting_effects=(),
         incompatible_with=(),
     )

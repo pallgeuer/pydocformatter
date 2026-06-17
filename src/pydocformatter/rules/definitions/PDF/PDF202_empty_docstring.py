@@ -15,7 +15,7 @@ class PDF202EmptyDocstring(RuleBase):
         name="empty-docstring",
         message="Docstring is empty",
         fix_availability=FixAvailability.NEVER,
-        stable_since="0.3.0",
+        stable_since="1.0.0",
         setting_effects=(),
         incompatible_with=(),
     )

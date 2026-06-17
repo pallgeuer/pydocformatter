@@ -18,7 +18,7 @@ class PDF000DocstringLiteralNormalization(RuleBase):
         name="docstring-literal-normalization",
         message="Docstring literal should be normalized",
         fix_availability=FixAvailability.USUALLY,
-        stable_since="0.3.0",
+        stable_since="1.0.0",
         setting_effects=(),
         incompatible_with=(),
     )

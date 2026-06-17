@@ -19,7 +19,7 @@ class PDF105ClosingQuotesWhitespace(RuleBase):
         name="closing-quotes-whitespace",
         message="Docstring has extra whitespace before closing quotes",
         fix_availability=FixAvailability.ALWAYS,
-        stable_since="0.3.0",
+        stable_since="1.0.0",
         setting_effects=(),
         incompatible_with=(),
     )
