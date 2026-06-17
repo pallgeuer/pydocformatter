@@ -4,14 +4,11 @@ import dataclasses
 
 import libcst as cst
 
-import pydocformatter.cli.settings_check as settings_check
+import pydocformatter.rules.definition_helpers.missing_documentation as missing_documentation
+import pydocformatter.rules.definition_helpers.summary_style as summary_style
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 from pydocformatter.rules.definition import RuleContext
 from pydocformatter.rules.models import RuleFinding, RuleMetadata
-
-# Broad public-only PDF500 checks treat only constructor/callable dunders as public; other protocol dunders stay quiet
-# unless they have explicit parameter docs.
-_PUBLIC_DUNDER_FUNCTIONS = {"__init__", "__new__", "__call__"}
 
 
 @dataclasses.dataclass(frozen=True)
@@ -120,44 +117,13 @@ def documented_parameters(docstring: PDF_definition.DocstringInfo) -> tuple[Docu
 
 
 def _should_check_missing_parameters(definition: PDF_definition.DefinitionInfo, docstring: PDF_definition.DocstringInfo, *, context: RuleContext) -> bool:
-    if _has_parameter_documentation(docstring):
-        return True
-    policy = context.settings.docstring_missing_parameter_documentation
-    if policy is settings_check.DocstringMissingParameterDocumentation.HAS_PARAMETER_SECTION:
-        return False
-    if context.settings.docstring_missing_parameter_public_only and not _is_public_definition(definition):
-        return False
-    if policy is settings_check.DocstringMissingParameterDocumentation.NON_SUMMARY_DOCSTRINGS:
-        return _has_more_than_summary(docstring)
-    if policy is settings_check.DocstringMissingParameterDocumentation.ALL_DOCSTRINGS:
-        return True
-    raise AssertionError(f"Unexpected missing-parameter documentation policy: {policy}")
+    return missing_documentation.should_check_missing_documentation(definition, docstring, context=context, has_relevant_documentation=_has_parameter_documentation(docstring))
 
 
 def _has_parameter_documentation(docstring: PDF_definition.DocstringInfo) -> bool:
     return any(entry.kind is PDF_definition.DocstringEntryKind.PARAMETER for entry in docstring.structure.entries) or any(
         section.name.lower() in PDF_definition.PARAMETER_SECTION_NAMES for section in docstring.structure.sections
     )
-
-
-def _has_more_than_summary(docstring: PDF_definition.DocstringInfo) -> bool:
-    non_blank_blocks = tuple(block for block in docstring.structure.blocks if block.kind is not PDF_definition.DocstringBlockKind.BLANK)
-    return bool(non_blank_blocks) and (len(non_blank_blocks) != 1 or non_blank_blocks[0].kind is not PDF_definition.DocstringBlockKind.SUMMARY)
-
-
-def _is_public_definition(definition: PDF_definition.DefinitionInfo) -> bool:
-    current: PDF_definition.DefinitionInfo | None = definition
-    while current is not None and current.kind is not PDF_definition.DefinitionKind.MODULE:
-        if _is_private_name(current.name):
-            return False
-        current = current.parent
-    return True
-
-
-def _is_private_name(name: str) -> bool:
-    if name in _PUBLIC_DUNDER_FUNCTIONS:
-        return False
-    return name.startswith("_")
 
 
 def _implicit_receiver_name(definition: PDF_definition.DefinitionInfo) -> str | None:
@@ -173,17 +139,7 @@ def _implicit_receiver_name(definition: PDF_definition.DefinitionInfo) -> str | 
 
 
 def _is_staticmethod(decorators: tuple[cst.Decorator, ...]) -> bool:
-    return any(_decorator_name(decorator.decorator) == "staticmethod" for decorator in decorators)
-
-
-def _decorator_name(expression: cst.BaseExpression) -> str | None:
-    if isinstance(expression, cst.Name):
-        return expression.value
-    if isinstance(expression, cst.Attribute):
-        return expression.attr.value
-    if isinstance(expression, cst.Call):
-        return _decorator_name(expression.func)
-    return None
+    return any((name := summary_style.decorator_qualified_name(decorator.decorator)) is not None and name.rpartition(".")[2] == "staticmethod" for decorator in decorators)
 
 
 def _is_unpack_annotation(annotation: cst.Annotation | None) -> bool:

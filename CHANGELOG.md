@@ -96,7 +96,10 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 
 - **Docstring formatting:**
   - Added instance-specific diagnostic messages for parameter consistency, section-style, and selected summary-style rule findings where the offending parameter, section, function, word, or span length is useful context.
+  - Changed `PDF507` to be ignored by broad rule selections under every docstring convention, making the direct-raise-only exception documentation check exact-selection opt-in.
+  - Changed missing-documentation configuration from PDF500-specific `docstring-missing-parameter-*` settings to shared `docstring-missing-documentation*` settings used by missing parameter, return, yield, and exception documentation rules.
   - Renumbered section-style rules so `PDF402` is section-name trailing-colon, `PDF403` is section underline-format, `PDF404` is empty-section, and `PDF405` is section-order, and aligned built-in rule filenames and class names with rule metadata.
+  - Implemented `PDF502` through `PDF507`, replacing their previous stub behavior with return, yield, and exception documentation consistency diagnostics.
   - Implemented `PDF500` and `PDF501`, replacing their previous stub behavior with parsed docstring/signature parameter consistency diagnostics and configurable PDF500 activation.
   - Implemented `PDF400` through `PDF405`, replacing their previous stub behavior with convention-aware section capitalization fixes, Google section trailing-content fixes, NumPy underline normalization, and section content/order diagnostics.
   - Changed Google `Warning` and `Warnings` section parsing to treat them as admonition-style fields, while Google `Warns` and NumPy `Warns`/`Warnings` remain warning-exception sections.
@@ -117,6 +120,8 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 ### Fixed
 
 - **Docstring formatting:**
+  - Fixed Google return and yield section parsing to treat bare `None` and `None.` entries as `None:` entries.
+  - Fixed PDF502 and PDF503 to treat bare `yield` and `yield None` as generator behavior when classifying generator stop values, and fixed PDF506/PDF507 qualified exception diagnostics and matching.
   - Fixed PDF500 and PDF501 to recognize typed Sphinx parameter fields such as `:param int value:` as documentation for the final parameter name.
   - Fixed `PDF406` to allow Google `Warning`/`Warnings` admonition sections alongside the distinct `Warns` warning-documentation section.
   - Fixed `PDF401` to split Google section trailing content when whitespace appears before the section-name colon.

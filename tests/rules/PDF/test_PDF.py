@@ -418,6 +418,22 @@ def test_google_section_names_determine_entry_semantics(section: str, entry_text
     assert (entry.kind, entry.names, entry.type_text) == (expected_kind, expected_names, expected_type)
 
 
+@pytest.mark.parametrize(
+    ("section", "entry_text", "expected_kind"),
+    (("Returns", "None", DocstringEntryKind.RETURN), ("Returns", "None.", DocstringEntryKind.RETURN), ("Yields", "None", DocstringEntryKind.YIELD), ("Yields", "None.", DocstringEntryKind.YIELD)),
+)
+def test_google_return_and_yield_sections_parse_bare_none_as_empty_typed_entry(section: str, entry_text: str, expected_kind: DocstringEntryKind) -> None:
+    structure = structure_for(f"{section}:\n    {entry_text}", settings=CheckSettings(docstring_convention=DocstringConvention.GOOGLE))
+    assert tuple((entry.kind, entry.names, entry.type_text, entry.description, entry.start_line, entry.end_line) for entry in structure.entries) == ((expected_kind, (), "None", "", 1, 2),)
+    assert structure.reflow_regions == ()
+
+
+@pytest.mark.parametrize(("section", "entry_text"), (("Returns", "str."), ("Yields", "Iterator[int]."), ("Raises", "None.")))
+def test_google_bare_none_entry_special_case_does_not_apply_to_other_content(section: str, entry_text: str) -> None:
+    structure = structure_for(f"{section}:\n    {entry_text}", settings=CheckSettings(docstring_convention=DocstringConvention.GOOGLE))
+    assert structure.entries == ()
+
+
 def test_google_section_boundaries_and_non_entry_content_are_nested_correctly() -> None:
     value = "Args:\n    Introductory prose without a field.\n\n    value: Description.\n\nExamples:\n    >>> call(value)\n    result\n\nTrailing prose."
     structure = structure_for(value, settings=CheckSettings(docstring_convention=DocstringConvention.GOOGLE))

@@ -812,6 +812,11 @@ class _DocstringParser:
             if match is None and kind in (DocstringEntryKind.RETURN, DocstringEntryKind.YIELD, DocstringEntryKind.EXCEPTION):
                 match = _GENERIC_ENTRY_RE.match(self.lines[index].text)
             if match is None:
+                none_entry = _google_none_value_entry(kind, self.lines[index].text, start=index)
+                if none_entry is not None:
+                    entries.append(none_entry)
+                    index = none_entry.end_line
+                    continue
                 index += 1
                 continue
             entry_end = self._entry_end(index, end, _indent_width(match.group("indent")))
@@ -1203,6 +1208,13 @@ def _sphinx_entry_names_and_type(kind: DocstringEntryKind, argument: str) -> tup
         return (argument,), None
     type_text, name = parts
     return (name,), type_text
+
+
+def _google_none_value_entry(kind: DocstringEntryKind, text: str, *, start: int) -> DocstringEntry | None:
+    """Return a Google return/yield entry for bare None spellings."""
+    if kind not in (DocstringEntryKind.RETURN, DocstringEntryKind.YIELD) or not text[:1].isspace() or text.strip() not in {"None", "None."}:
+        return None
+    return DocstringEntry(kind=kind, names=(), type_text="None", description="", start_line=start, end_line=start + 1)
 
 
 def _is_adornment(text: str) -> bool:

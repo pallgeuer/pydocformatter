@@ -20,7 +20,7 @@ Documented parameters help callers understand accepted inputs without cross-chec
 This rule replaces Ruff's `D417`. Unlike Ruff, it can also use parsed Sphinx parameter fields and can be configured to require parameter documentation beyond docstrings that already contain parameter sections.
 
 ## Examples
-With the default `has-parameter-section` mode, a missing parameter is reported once parameter documentation is present:
+With the default `has-section` mode, a missing parameter is reported once parameter documentation is present:
 
 ```pydocfmt-example
 [settings]
@@ -64,13 +64,13 @@ def value(first, second, third):
 PDF500: Line 1: Function parameter 'third' is missing docstring documentation
 ````
 
-In `has-parameter-section` mode, `docstring-missing-parameter-public-only` does not suppress explicit parameter-section consistency checks. A private docstring without parameter documentation is still ignored, while a private docstring with incomplete parameter documentation is reported:
+In `has-section` mode, `docstring-missing-documentation-public-only` does not suppress explicit parameter-section consistency checks. A private docstring without parameter documentation is still ignored, while a private docstring with incomplete parameter documentation is reported:
 
 ```pydocfmt-example
 [settings]
 docstring-convention = "google"
-docstring-missing-parameter-documentation = "has-parameter-section"
-docstring-missing-parameter-public-only = false
+docstring-missing-documentation = "has-section"
+docstring-missing-documentation-public-only = false
 
 [input]
 def _private_without_section(first):
@@ -123,8 +123,8 @@ Broader activation modes can require parameter documentation even when a public 
 ```pydocfmt-example
 [settings]
 docstring-convention = "google"
-docstring-missing-parameter-documentation = "all-docstrings"
-docstring-missing-parameter-public-only = true
+docstring-missing-documentation = "all-docstrings"
+docstring-missing-documentation-public-only = true
 
 [input]
 def public(first):
@@ -148,13 +148,13 @@ PDF500: Line 1: Function parameter 'first' is missing docstring documentation
 PDF500: Line 9: Function parameter 'second' is missing docstring documentation
 ```
 
-The `non-summary-docstrings` mode reports public docstrings that contain more than only a summary. Summary-only public docstrings and private docstrings without parameter documentation are ignored when `docstring-missing-parameter-public-only` is `true`:
+The `non-summary-docstrings` mode reports public docstrings that contain more than only a summary. Summary-only public docstrings and private docstrings without parameter documentation are ignored when `docstring-missing-documentation-public-only` is `true`:
 
 ```pydocfmt-example
 [settings]
 docstring-convention = "google"
-docstring-missing-parameter-documentation = "non-summary-docstrings"
-docstring-missing-parameter-public-only = true
+docstring-missing-documentation = "non-summary-docstrings"
+docstring-missing-documentation-public-only = true
 
 [input]
 def summary_only(first):
@@ -179,13 +179,13 @@ def _private_detailed(first):
 PDF500: Line 5: Function parameter 'first' is missing docstring documentation
 ```
 
-With `non-summary-docstrings` and `docstring-missing-parameter-public-only = false`, private docstrings with body content are included in the broad check:
+With `non-summary-docstrings` and `docstring-missing-documentation-public-only = false`, private docstrings with body content are included in the broad check:
 
 ```pydocfmt-example
 [settings]
 docstring-convention = "google"
-docstring-missing-parameter-documentation = "non-summary-docstrings"
-docstring-missing-parameter-public-only = false
+docstring-missing-documentation = "non-summary-docstrings"
+docstring-missing-documentation-public-only = false
 
 [input]
 def _private_summary_only(first):
@@ -203,13 +203,13 @@ def _private_detailed(first):
 PDF500: Line 5: Function parameter 'first' is missing docstring documentation
 ```
 
-With `all-docstrings` and `docstring-missing-parameter-public-only = false`, even private summary-only and empty docstrings are included in the broad check:
+With `all-docstrings` and `docstring-missing-documentation-public-only = false`, even private summary-only and empty docstrings are included in the broad check:
 
 ```pydocfmt-example
 [settings]
 docstring-convention = "google"
-docstring-missing-parameter-documentation = "all-docstrings"
-docstring-missing-parameter-public-only = false
+docstring-missing-documentation = "all-docstrings"
+docstring-missing-documentation-public-only = false
 
 [input]
 def _private_summary_only(first):
@@ -246,5 +246,5 @@ class Builder:
 ## Options
 - `docstring-convention`: Controls whether Google or NumPy parameter sections are parsed. With `none` and `pep257`, convention sections are ordinary content.
 - `docstring-parse-sphinx-fields`: Controls whether Sphinx `:param name:` fields are parsed as parameter documentation.
-- `docstring-missing-parameter-documentation`: Controls when PDF500 is active. `has-parameter-section` reports only docstrings with recognized parameter documentation. `non-summary-docstrings` additionally reports public docstrings with more than just a summary. `all-docstrings` additionally reports all public docstrings.
-- `docstring-missing-parameter-public-only`: When `true`, the broad parts of `non-summary-docstrings` and `all-docstrings` apply only to public functions and methods. Normal public names plus `__init__`, `__new__`, and `__call__` are public for this setting; other underscore and dunder names are private. Explicit parameter documentation is always checked, including for private functions.
+- `docstring-missing-documentation`: Controls when PDF500 is active. `has-section` reports only docstrings with recognized parameter documentation. `non-summary-docstrings` additionally reports public docstrings with more than just a summary. `all-docstrings` additionally reports all public docstrings.
+- `docstring-missing-documentation-public-only`: When `true`, the broad parts of `non-summary-docstrings` and `all-docstrings` apply only to public functions and methods. Normal public names plus `__init__`, `__new__`, and `__call__` are public for this setting; other underscore and dunder names are private. Explicit parameter documentation is always checked, including for private functions.
