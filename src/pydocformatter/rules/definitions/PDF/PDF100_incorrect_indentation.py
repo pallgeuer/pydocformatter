@@ -3,7 +3,9 @@ from __future__ import annotations
 import dataclasses
 
 import pydocformatter.cli.settings_check as settings_check
+import pydocformatter.rules.definition_helpers.source_text as source_text
 import pydocformatter.rules.definition_helpers.string_literals as string_literals
+import pydocformatter.rules.definition_helpers.text_layout as text_layout
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 import pydocformatter.rules.edits as rule_edits
 import pydocformatter.rules.registration as rule_registration
@@ -43,7 +45,7 @@ class PDF100IncorrectIndentation(RuleBase):
 def _planned_changes(context: RuleContext) -> tuple[rule_edits.PlannedSourceChange, ...]:
     """Return all safe docstring indentation changes."""
     data = PDF_definition.PDF.require_data(context)
-    lines = PDF_definition.source_lines(context.module.code)
+    lines = source_text.source_lines(context.module.code)
     return tuple(change for docstring in data.docstrings if (change := _planned_change_for_docstring(docstring, context=context, source_lines=lines)) is not None)
 
 
@@ -90,7 +92,7 @@ def _target_raw_lines(docstring: PDF_definition.DocstringInfo, *, canonical_marg
     targets: list[_LineTarget | None] = [None] * len(docstring.structure.lines)
     targets[0] = _LineTarget(docstring.structure.lines[0].raw_text, 0, "")
     for line in docstring.structure.lines[1:]:
-        if not PDF_definition.has_space_tab_content(line.raw_text):
+        if not text_layout.has_space_tab_content(line.raw_text):
             target = canonical_margin if PDF_definition.is_same_line_closing_delimiter_prefix(docstring, line) else _target_blank_line(line.raw_text, canonical_margin=canonical_margin)
             targets[line.index] = _LineTarget(target, 0, "")
 
@@ -134,7 +136,7 @@ def _apply_convention_targets(
     if docstring.structure.convention not in {settings_check.DocstringConvention.GOOGLE, settings_check.DocstringConvention.NUMPY}:
         return set()
     covered: set[int] = set()
-    unit = PDF_definition.indent_unit(context.settings)
+    unit = text_layout.indent_unit(context.settings)
     for section in docstring.structure.sections:
         if section.start_line == 0:
             section_indexes = range(section.start_line, section.end_line)
@@ -173,17 +175,17 @@ def _apply_fixed_prefix_targets(targets: list[_LineTarget | None], docstring: PD
         line = docstring.structure.lines[index]
         if index == 0 or not _has_indentation_content(line.raw_text):
             continue
-        targets[index] = _LineTarget(f"{prefix}{line.raw_text[len(line.raw_indent):]}", PDF_definition.leading_width(line.raw_indent), prefix)
+        targets[index] = _LineTarget(f"{prefix}{line.raw_text[len(line.raw_indent):]}", text_layout.leading_width(line.raw_indent), prefix)
 
 
 def _apply_common_margin_targets(targets: list[_LineTarget | None], docstring: PDF_definition.DocstringInfo, indexes: tuple[int, ...], prefix: str) -> None:
     """Assign targets by stripping a shared visual margin before prefixing."""
     if not indexes:
         return
-    common_width = min(PDF_definition.leading_width(docstring.structure.lines[index].raw_text) for index in indexes)
+    common_width = min(text_layout.leading_width(docstring.structure.lines[index].raw_text) for index in indexes)
     for index in indexes:
         line = docstring.structure.lines[index]
-        targets[index] = _LineTarget(f"{prefix}{PDF_definition.strip_indent(line.raw_text, common_width)}", common_width, prefix)
+        targets[index] = _LineTarget(f"{prefix}{text_layout.strip_indent(line.raw_text, common_width)}", common_width, prefix)
 
 
 def _source_for_target_line(
@@ -194,9 +196,9 @@ def _source_for_target_line(
     fragments: tuple[string_literals.StringValueFragment, ...],
 ) -> str:
     """Return source spelling for a target line while preserving suffix spelling."""
-    if not PDF_definition.has_space_tab_content(line.raw_text):
+    if not text_layout.has_space_tab_content(line.raw_text):
         return target.raw_text
-    _, raw_index, virtual_prefix = PDF_definition.strip_indent_with_mapping(line.raw_text, max(target.strip_width, 0))
+    _, raw_index, virtual_prefix = text_layout.strip_indent_with_mapping(line.raw_text, max(target.strip_width, 0))
     suffix = f"{' ' * virtual_prefix}{string_literals.source_for_value_slice(fragments, line.start_offset + raw_index, line.end_offset)}"
     if context.settings.indent_style == settings_check.IndentStyle.SPACE:
         suffix_content = suffix.lstrip(" \t")
@@ -208,7 +210,7 @@ def _style_normalized_indent(indent: str, *, context: RuleContext) -> str:
     """Return indentation using the configured style where PDF100 owns generation."""
     if context.settings.indent_style == settings_check.IndentStyle.TAB:
         return indent
-    return " " * PDF_definition.leading_width(indent)
+    return " " * text_layout.leading_width(indent)
 
 
 def _space_normalized_target_text(target: _LineTarget, *, context: RuleContext) -> str:

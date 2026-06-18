@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import pydocformatter.rules.definition_helpers.text_layout as text_layout
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 import pydocformatter.rules.edits as rule_edits
 import pydocformatter.rules.registration as rule_registration
@@ -49,7 +50,7 @@ def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo, *, co
     targets: list[str | None] = []
     for line in docstring.structure.lines:
         target = None
-        if PDF_definition.has_space_tab_content(line.raw_text) and _has_following_evaluated_newline(docstring, line):
+        if text_layout.has_space_tab_content(line.raw_text) and _has_following_evaluated_newline(docstring, line):
             stripped = line.raw_text.rstrip(" \t")
             if stripped != line.raw_text:
                 target = stripped

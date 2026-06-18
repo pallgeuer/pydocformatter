@@ -4,11 +4,9 @@ import dataclasses
 
 import libcst as cst
 
-import pydocformatter.rules.definition_helpers.missing_documentation as missing_documentation
-import pydocformatter.rules.definition_helpers.summary_style as summary_style
+import pydocformatter.rules.definition_helpers.decorators as decorator_helpers
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 from pydocformatter.rules.definition import RuleContext
-from pydocformatter.rules.models import RuleFinding, RuleMetadata
 
 
 @dataclasses.dataclass(frozen=True)
@@ -50,95 +48,8 @@ class FunctionFacts:
 _ABSTRACT_DECORATOR_NAMES = {"abstractmethod", "abstractclassmethod", "abstractstaticmethod", "abstractproperty"}
 
 
-def missing_return_findings(context: RuleContext, *, rule: RuleMetadata) -> tuple[RuleFinding, ...]:
-    """Return PDF502 findings for undocumented meaningful return values."""
-    findings: list[RuleFinding] = []
-    for definition, docstring, facts in _documented_function_facts(context):
-        return_targets = _value_documentation_targets(docstring, PDF_definition.DocstringEntryKind.RETURN)
-        if (
-            not facts.meaningful_returns
-            or facts.any_yields
-            or any(target.has_content for target in return_targets)
-            or not missing_documentation.should_check_missing_documentation(definition, docstring, context=context, has_relevant_documentation=bool(return_targets))
-        ):
-            continue
-        findings.append(RuleFinding(rule=rule, line_numbers=facts.meaningful_returns[0].line_numbers))
-    return tuple(findings)
-
-
-def extraneous_return_findings(context: RuleContext, *, rule: RuleMetadata) -> tuple[RuleFinding, ...]:
-    """Return PDF503 findings for return docs on functions without meaningful returns."""
-    findings: list[RuleFinding] = []
-    for definition, docstring, facts in _documented_function_facts(context):
-        del definition
-        if facts.meaningful_returns and not facts.any_yields:
-            continue
-        for entry in _value_documentation_targets(docstring, PDF_definition.DocstringEntryKind.RETURN):
-            if facts.explicit_none_returns and not facts.any_yields and entry.has_content:
-                continue
-            message = "Docstring has a return section for a generator; generator return values are stop values, not ordinary returns" if facts.any_yields else None
-            findings.append(RuleFinding(rule=rule, line_numbers=entry.line_numbers, instance_message=message))
-    return tuple(findings)
-
-
-def missing_yield_findings(context: RuleContext, *, rule: RuleMetadata) -> tuple[RuleFinding, ...]:
-    """Return PDF504 findings for undocumented meaningful yielded values."""
-    findings: list[RuleFinding] = []
-    for definition, docstring, facts in _documented_function_facts(context):
-        yield_targets = _value_documentation_targets(docstring, PDF_definition.DocstringEntryKind.YIELD)
-        if (
-            not facts.meaningful_yields
-            or any(target.has_content for target in yield_targets)
-            or not missing_documentation.should_check_missing_documentation(definition, docstring, context=context, has_relevant_documentation=bool(yield_targets))
-        ):
-            continue
-        findings.append(RuleFinding(rule=rule, line_numbers=facts.meaningful_yields[0].line_numbers))
-    return tuple(findings)
-
-
-def extraneous_yield_findings(context: RuleContext, *, rule: RuleMetadata) -> tuple[RuleFinding, ...]:
-    """Return PDF505 findings for yield docs on functions without meaningful yields."""
-    findings: list[RuleFinding] = []
-    for definition, docstring, facts in _documented_function_facts(context):
-        del definition
-        if facts.meaningful_yields:
-            continue
-        for entry in _value_documentation_targets(docstring, PDF_definition.DocstringEntryKind.YIELD):
-            if facts.explicit_none_yields and entry.has_content:
-                continue
-            findings.append(RuleFinding(rule=rule, line_numbers=entry.line_numbers))
-    return tuple(findings)
-
-
-def missing_exception_findings(context: RuleContext, *, rule: RuleMetadata) -> tuple[RuleFinding, ...]:
-    """Return PDF506 findings for directly raised exceptions missing from docs."""
-    findings: list[RuleFinding] = []
-    for definition, docstring, facts in _documented_function_facts(context):
-        documented_names = tuple(entry.name for entry in _documented_entries(docstring, PDF_definition.DocstringEntryKind.EXCEPTION, require_content=False) if entry.name is not None)
-        if not missing_documentation.should_check_missing_documentation(definition, docstring, context=context, has_relevant_documentation=_has_exception_documentation(docstring)):
-            continue
-        seen: list[str] = []
-        for raised in facts.raised_exceptions:
-            if any(_exception_names_match(raised.name, seen_name) for seen_name in seen):
-                continue
-            seen.append(raised.name)
-            if not any(_exception_names_match(raised.name, documented_name) for documented_name in documented_names):
-                findings.append(RuleFinding(rule=rule, line_numbers=raised.line_numbers, instance_message=f"Raised exception '{raised.name}' is missing docstring documentation"))
-    return tuple(findings)
-
-
-def extraneous_exception_findings(context: RuleContext, *, rule: RuleMetadata) -> tuple[RuleFinding, ...]:
-    """Return PDF507 findings for exception docs absent from direct raises."""
-    findings: list[RuleFinding] = []
-    for definition, docstring, facts in _documented_function_facts(context):
-        del definition
-        for entry in _documented_entries(docstring, PDF_definition.DocstringEntryKind.EXCEPTION, require_content=False):
-            if entry.name is not None and not any(_exception_names_match(raised.name, entry.name) for raised in facts.raised_exceptions):
-                findings.append(RuleFinding(rule=rule, line_numbers=entry.line_numbers, instance_message=f"Docstring documents exception '{entry.name}' that is not explicitly raised"))
-    return tuple(findings)
-
-
-def _documented_function_facts(context: RuleContext) -> tuple[tuple[PDF_definition.DefinitionInfo, PDF_definition.DocstringInfo, FunctionFacts], ...]:
+def documented_function_facts(context: RuleContext) -> tuple[tuple[PDF_definition.DefinitionInfo, PDF_definition.DocstringInfo, FunctionFacts], ...]:
+    """Return documented non-stub function facts for value documentation rules."""
     data = PDF_definition.PDF.require_data(context)
     facts: list[tuple[PDF_definition.DefinitionInfo, PDF_definition.DocstringInfo, FunctionFacts]] = []
     for definition in data.definitions:
@@ -151,7 +62,8 @@ def _documented_function_facts(context: RuleContext) -> tuple[tuple[PDF_definiti
     return tuple(facts)
 
 
-def _documented_entries(docstring: PDF_definition.DocstringInfo, kind: PDF_definition.DocstringEntryKind, *, require_content: bool) -> tuple[DocumentedEntry, ...]:
+def documented_entries(docstring: PDF_definition.DocstringInfo, kind: PDF_definition.DocstringEntryKind, *, require_content: bool) -> tuple[DocumentedEntry, ...]:
+    """Return documented docstring entries of one semantic kind."""
     entries: list[DocumentedEntry] = []
     skipped_exception_entries = _non_exception_documentation_entries(docstring) if kind is PDF_definition.DocstringEntryKind.EXCEPTION else set()
     for entry in docstring.structure.entries:
@@ -174,11 +86,13 @@ def _non_exception_documentation_entries(docstring: PDF_definition.DocstringInfo
     return {entry for section in docstring.structure.sections if section.name.lower() != "raises" for entry in section.entries}
 
 
-def _has_exception_documentation(docstring: PDF_definition.DocstringInfo) -> bool:
-    return any(section.name.lower() == "raises" for section in docstring.structure.sections) or bool(_documented_entries(docstring, PDF_definition.DocstringEntryKind.EXCEPTION, require_content=False))
+def has_exception_documentation(docstring: PDF_definition.DocstringInfo) -> bool:
+    """Return whether a docstring contains exception documentation structures."""
+    return any(section.name.lower() == "raises" for section in docstring.structure.sections) or bool(documented_entries(docstring, PDF_definition.DocstringEntryKind.EXCEPTION, require_content=False))
 
 
-def _value_documentation_targets(docstring: PDF_definition.DocstringInfo, kind: PDF_definition.DocstringEntryKind) -> tuple[DocumentedEntry, ...]:
+def value_documentation_targets(docstring: PDF_definition.DocstringInfo, kind: PDF_definition.DocstringEntryKind) -> tuple[DocumentedEntry, ...]:
+    """Return section and entry targets for return or yield documentation."""
     entries: list[DocumentedEntry] = []
     for section in docstring.structure.sections:
         if _section_entry_kind(section) is not kind:
@@ -283,7 +197,7 @@ class _FunctionBodyVisitor(cst.CSTVisitor):
 
 
 def _is_abstract(definition: PDF_definition.DefinitionInfo) -> bool:
-    return any((name := summary_style.decorator_qualified_name(decorator.decorator)) is not None and name.rpartition(".")[2] in _ABSTRACT_DECORATOR_NAMES for decorator in definition.decorators)
+    return any((name := decorator_helpers.decorator_qualified_name(decorator.decorator)) is not None and name.rpartition(".")[2] in _ABSTRACT_DECORATOR_NAMES for decorator in definition.decorators)
 
 
 def _is_stub_function(definition: PDF_definition.DefinitionInfo, docstring: PDF_definition.DocstringInfo) -> bool:
@@ -351,7 +265,8 @@ def _exception_name_parent(expression: cst.BaseExpression) -> str | None:
     return None
 
 
-def _exception_names_match(raised_name: str, documented_name: str) -> bool:
+def exception_names_match(raised_name: str, documented_name: str) -> bool:
+    """Return whether a raised exception name matches a documented exception name."""
     if "." in raised_name and "." in documented_name:
         return raised_name == documented_name
     return raised_name.rpartition(".")[2] == documented_name.rpartition(".")[2]

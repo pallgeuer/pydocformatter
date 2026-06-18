@@ -1,11 +1,20 @@
 from __future__ import annotations
 
-import pydocformatter.rules.definition_helpers.section_style as section_style
+import re
+
+import pydocformatter.rules.definition_helpers.docstring_conventions as docstring_conventions
+import pydocformatter.rules.definition_helpers.docstring_sections as docstring_sections
+import pydocformatter.rules.definition_helpers.section_edits as section_edits
+import pydocformatter.rules.definition_helpers.text_layout as text_layout
+import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 import pydocformatter.rules.registration as rule_registration
+from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase, RuleContext, RuleFixResult
 from pydocformatter.rules.definitions.PDF.PDF import PDF
 from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
+
+_GOOGLE_TRAILING_CONTENT_RE = re.compile(r"^(?P<indent>[ \t]*)(?P<name>[A-Za-z][A-Za-z ]*?)[ \t]*:[ \t]+(?P<content>\S.*)$")
 
 
 @rule_registration.register_rule_to(PDF)
@@ -19,7 +28,7 @@ class PDF401SectionNameTrailingContent(RuleBase):
         setting_effects=(
             RuleSettingEffects(
                 setting="docstring_convention",
-                effects=(RuleSettingEffectValues(effect=RuleSettingEffect.IGNORED, values=section_style.GOOGLE_IGNORED_CONVENTIONS),),
+                effects=(RuleSettingEffectValues(effect=RuleSettingEffect.IGNORED, values=docstring_conventions.ignored_conventions_except(DocstringConvention.GOOGLE)),),
             ),
         ),
         incompatible_with=(),
@@ -28,9 +37,69 @@ class PDF401SectionNameTrailingContent(RuleBase):
     @classmethod
     def check(cls, context: RuleContext) -> tuple[RuleFinding, ...]:
         """Return findings for section names with content on the same line."""
-        return section_style.findings_for_results(section_style.trailing_content_results(context, rule=cls.meta))
+        return section_edits.findings_for_results(_results(context, rule=cls.meta))
 
     @classmethod
     def fix(cls, context: RuleContext) -> RuleFixResult:
         """Move same-line Google section content below the section name."""
-        return section_style.fix_result_for_results(context, cls.meta, section_style.trailing_content_results(context, rule=cls.meta))
+        return section_edits.fix_result_for_results(context, cls.meta, _results(context, rule=cls.meta))
+
+
+def _results(context: RuleContext, *, rule: RuleMetadata) -> tuple[section_edits.SectionEditResult, ...]:
+    """Return findings and fixes for section names followed by trailing content."""
+    data = PDF.require_data(context)
+    results: list[section_edits.SectionEditResult] = []
+    for docstring in data.docstrings:
+        if docstring.structure.convention is not DocstringConvention.GOOGLE:
+            continue
+        output_lines: list[PDF_definition.DocstringOutputLine] = []
+        line_numbers: list[int] = []
+        messages: list[str] = []
+        protected_indexes = _protected_or_parsed_line_indexes(docstring)
+        changed = False
+        for line in docstring.structure.lines:
+            target = None if line.index in protected_indexes else _google_trailing_content_target(line, context=context)
+            if target is None:
+                output_lines.append(PDF_definition.DocstringOutputLine(original=line))
+                continue
+            header, content, name = target
+            line_numbers.extend(section_edits.line_numbers(docstring, line))
+            messages.append(f"Docstring section '{name}' should be followed by a line break")
+            output_lines.append(PDF_definition.DocstringOutputLine(source=header, value=header))
+            output_lines.append(PDF_definition.DocstringOutputLine(source=content, value=content))
+            changed = True
+        if not changed:
+            continue
+        change = section_edits.planned_output_change(docstring, context=context, output_lines=tuple(output_lines), line_numbers=tuple(line_numbers))
+        results.append(section_edits.result(rule, line_numbers, change=change, instance_message=section_edits.combined_instance_message(messages)))
+    return tuple(results)
+
+
+def _google_trailing_content_target(line: PDF_definition.DocstringValueLine, *, context: RuleContext) -> tuple[str, str, str] | None:
+    match = _GOOGLE_TRAILING_CONTENT_RE.match(line.text)
+    if match is None:
+        return None
+    name = match.group("name").rstrip()
+    canonical = docstring_sections.canonical_section_name(DocstringConvention.GOOGLE, name)
+    if canonical is None:
+        return None
+    raw_indent = line.raw_text[: line.text_raw_start_column + len(match.group("indent")) - line.text_virtual_prefix_length]
+    header = f"{raw_indent}{name}:"
+    content = f"{raw_indent}{text_layout.indent_unit(context.settings)}{match.group('content').strip()}"
+    return header, content, name
+
+
+def _protected_or_parsed_line_indexes(docstring: PDF_definition.DocstringInfo) -> set[int]:
+    indexes: set[int] = set()
+    for section in docstring.structure.sections:
+        indexes.update(range(section.start_line, section.end_line))
+    _add_protected_or_parsed_block_indexes(docstring.structure.blocks, indexes)
+    return indexes
+
+
+def _add_protected_or_parsed_block_indexes(blocks: tuple[PDF_definition.DocstringBlock, ...], indexes: set[int]) -> None:
+    for block in blocks:
+        if block.kind is not PDF_definition.DocstringBlockKind.PARAGRAPH:
+            indexes.update(range(block.start_line, block.end_line))
+            continue
+        _add_protected_or_parsed_block_indexes(block.children, indexes)

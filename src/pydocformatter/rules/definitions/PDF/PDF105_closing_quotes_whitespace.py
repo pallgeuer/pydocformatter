@@ -4,6 +4,7 @@ import os.path
 
 import libcst as cst
 
+import pydocformatter.rules.definition_helpers.text_layout as text_layout
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 import pydocformatter.rules.edits as rule_edits
 import pydocformatter.rules.registration as rule_registration
@@ -51,7 +52,7 @@ def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo, *, co
     if not PDF_definition.is_safely_mapped_simple_docstring(docstring):
         return None
     line = docstring.structure.lines[-1]
-    if not PDF_definition.is_same_line_closing_delimiter_prefix(docstring, line) or not PDF_definition.has_space_tab_content(line.raw_text):
+    if not PDF_definition.is_same_line_closing_delimiter_prefix(docstring, line) or not text_layout.has_space_tab_content(line.raw_text):
         return None
     content_end = len(line.raw_text.rstrip(" \t"))
     if content_end == len(line.raw_text):

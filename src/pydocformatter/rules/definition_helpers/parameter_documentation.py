@@ -4,11 +4,11 @@ import dataclasses
 
 import libcst as cst
 
+import pydocformatter.rules.definition_helpers.decorators as decorator_helpers
+import pydocformatter.rules.definition_helpers.docstring_sections as docstring_sections
 import pydocformatter.rules.definition_helpers.missing_documentation as missing_documentation
-import pydocformatter.rules.definition_helpers.summary_style as summary_style
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 from pydocformatter.rules.definition import RuleContext
-from pydocformatter.rules.models import RuleFinding, RuleMetadata
 
 
 @dataclasses.dataclass(frozen=True)
@@ -30,51 +30,6 @@ class DocumentedParameter:
     name: str
     comparison_name: str
     line_numbers: tuple[int, ...]
-
-
-def missing_parameter_findings(context: RuleContext, *, rule: RuleMetadata) -> tuple[RuleFinding, ...]:
-    """Return PDF500 findings for undocumented signature parameters."""
-    data = PDF_definition.PDF.require_data(context)
-    findings: list[RuleFinding] = []
-    for definition in data.definitions:
-        if definition.kind is not PDF_definition.DefinitionKind.FUNCTION or definition.parameters is None:
-            continue
-        docstring = data.docstring_for(definition)
-        if docstring is None or not _should_check_missing_parameters(definition, docstring, context=context):
-            continue
-        documented_names = {parameter.comparison_name for parameter in documented_parameters(docstring)}
-        for parameter in signature_parameters(definition, context=context):
-            if parameter.implicit_receiver or parameter.unpacked or parameter.comparison_name in documented_names:
-                continue
-            findings.append(
-                RuleFinding(
-                    rule=rule,
-                    line_numbers=parameter.line_numbers,
-                    instance_message=f"Function parameter '{parameter.display_name}' is missing docstring documentation",
-                )
-            )
-    return tuple(findings)
-
-
-def extraneous_parameter_findings(context: RuleContext, *, rule: RuleMetadata) -> tuple[RuleFinding, ...]:
-    """Return PDF501 findings for documented names absent from the signature."""
-    data = PDF_definition.PDF.require_data(context)
-    findings: list[RuleFinding] = []
-    for docstring in data.docstrings:
-        definition = docstring.owner
-        if definition.kind is not PDF_definition.DefinitionKind.FUNCTION or definition.parameters is None:
-            continue
-        signature_names = {parameter.comparison_name for parameter in signature_parameters(definition, context=context)}
-        for parameter in documented_parameters(docstring):
-            if parameter.comparison_name not in signature_names:
-                findings.append(
-                    RuleFinding(
-                        rule=rule,
-                        line_numbers=parameter.line_numbers,
-                        instance_message=f"Docstring documents parameter '{parameter.name}' that is not in the function signature",
-                    )
-                )
-    return tuple(findings)
 
 
 def signature_parameters(definition: PDF_definition.DefinitionInfo, *, context: RuleContext) -> tuple[SignatureParameter, ...]:
@@ -116,13 +71,15 @@ def documented_parameters(docstring: PDF_definition.DocstringInfo) -> tuple[Docu
     return tuple(parameters)
 
 
-def _should_check_missing_parameters(definition: PDF_definition.DefinitionInfo, docstring: PDF_definition.DocstringInfo, *, context: RuleContext) -> bool:
-    return missing_documentation.should_check_missing_documentation(definition, docstring, context=context, has_relevant_documentation=_has_parameter_documentation(docstring))
+def should_check_missing_parameters(definition: PDF_definition.DefinitionInfo, docstring: PDF_definition.DocstringInfo, *, context: RuleContext) -> bool:
+    """Return whether missing parameter documentation should be checked for a docstring."""
+    return missing_documentation.should_check_missing_documentation(definition, docstring, context=context, has_relevant_documentation=has_parameter_documentation(docstring))
 
 
-def _has_parameter_documentation(docstring: PDF_definition.DocstringInfo) -> bool:
+def has_parameter_documentation(docstring: PDF_definition.DocstringInfo) -> bool:
+    """Return whether a docstring contains parameter documentation structures."""
     return any(entry.kind is PDF_definition.DocstringEntryKind.PARAMETER for entry in docstring.structure.entries) or any(
-        section.name.lower() in PDF_definition.PARAMETER_SECTION_NAMES for section in docstring.structure.sections
+        section.name.lower() in docstring_sections.PARAMETER_SECTION_NAMES for section in docstring.structure.sections
     )
 
 
@@ -139,7 +96,7 @@ def _implicit_receiver_name(definition: PDF_definition.DefinitionInfo) -> str | 
 
 
 def _is_staticmethod(decorators: tuple[cst.Decorator, ...]) -> bool:
-    return any((name := summary_style.decorator_qualified_name(decorator.decorator)) is not None and name.rpartition(".")[2] == "staticmethod" for decorator in decorators)
+    return any((name := decorator_helpers.decorator_qualified_name(decorator.decorator)) is not None and name.rpartition(".")[2] == "staticmethod" for decorator in decorators)
 
 
 def _is_unpack_annotation(annotation: cst.Annotation | None) -> bool:

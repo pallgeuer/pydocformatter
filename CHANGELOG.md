@@ -96,6 +96,10 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 
 ### Changed
 
+- **Developer workflow:**
+  - Reorganized rule helper modules so whole-rule logic lives in individual rule files while shared helper modules contain reusable source, layout, decorator, section-edit, and reStructuredText field primitives.
+  - Moved reusable docstring section and reStructuredText field metadata out of `PDF.py` into a focused helper module used by the parser, section rules, and documentation helpers.
+
 - **Project identity:**
   - Reset the planned next release to `1.0.0` and present pydocformatter as a new standalone Ruff-style formatter.
 

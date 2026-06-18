@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pydocformatter.rules.definition_helpers.parameter_documentation as parameter_documentation
+import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 import pydocformatter.rules.registration as rule_registration
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase, RuleContext
@@ -23,4 +24,23 @@ class PDF500MissingParameterDocumentation(RuleBase):
     @classmethod
     def check(cls, context: RuleContext) -> tuple[RuleFinding, ...]:
         """Return findings for signature parameters missing docstring documentation."""
-        return parameter_documentation.missing_parameter_findings(context, rule=cls.meta)
+        data = PDF.require_data(context)
+        findings: list[RuleFinding] = []
+        for definition in data.definitions:
+            if definition.kind is not PDF_definition.DefinitionKind.FUNCTION or definition.parameters is None:
+                continue
+            docstring = data.docstring_for(definition)
+            if docstring is None or not parameter_documentation.should_check_missing_parameters(definition, docstring, context=context):
+                continue
+            documented_names = {parameter.comparison_name for parameter in parameter_documentation.documented_parameters(docstring)}
+            for parameter in parameter_documentation.signature_parameters(definition, context=context):
+                if parameter.implicit_receiver or parameter.unpacked or parameter.comparison_name in documented_names:
+                    continue
+                findings.append(
+                    RuleFinding(
+                        rule=cls.meta,
+                        line_numbers=parameter.line_numbers,
+                        instance_message=f"Function parameter '{parameter.display_name}' is missing docstring documentation",
+                    )
+                )
+        return tuple(findings)

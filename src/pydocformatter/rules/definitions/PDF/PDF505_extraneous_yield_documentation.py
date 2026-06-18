@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pydocformatter.rules.definition_helpers.value_documentation as value_documentation
+import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 import pydocformatter.rules.registration as rule_registration
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase, RuleContext
@@ -23,4 +24,13 @@ class PDF505ExtraneousYieldDocumentation(RuleBase):
     @classmethod
     def check(cls, context: RuleContext) -> tuple[RuleFinding, ...]:
         """Return findings for yield docs on functions without meaningful yields."""
-        return value_documentation.extraneous_yield_findings(context, rule=cls.meta)
+        findings: list[RuleFinding] = []
+        for definition, docstring, facts in value_documentation.documented_function_facts(context):
+            del definition
+            if facts.meaningful_yields:
+                continue
+            for entry in value_documentation.value_documentation_targets(docstring, PDF_definition.DocstringEntryKind.YIELD):
+                if facts.explicit_none_yields and entry.has_content:
+                    continue
+                findings.append(RuleFinding(rule=cls.meta, line_numbers=entry.line_numbers))
+        return tuple(findings)

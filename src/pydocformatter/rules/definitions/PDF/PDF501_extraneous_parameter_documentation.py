@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pydocformatter.rules.definition_helpers.parameter_documentation as parameter_documentation
+import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 import pydocformatter.rules.registration as rule_registration
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase, RuleContext
@@ -23,4 +24,20 @@ class PDF501ExtraneousParameterDocumentation(RuleBase):
     @classmethod
     def check(cls, context: RuleContext) -> tuple[RuleFinding, ...]:
         """Return findings for documented parameters absent from the signature."""
-        return parameter_documentation.extraneous_parameter_findings(context, rule=cls.meta)
+        data = PDF.require_data(context)
+        findings: list[RuleFinding] = []
+        for docstring in data.docstrings:
+            definition = docstring.owner
+            if definition.kind is not PDF_definition.DefinitionKind.FUNCTION or definition.parameters is None:
+                continue
+            signature_names = {parameter.comparison_name for parameter in parameter_documentation.signature_parameters(definition, context=context)}
+            for parameter in parameter_documentation.documented_parameters(docstring):
+                if parameter.comparison_name not in signature_names:
+                    findings.append(
+                        RuleFinding(
+                            rule=cls.meta,
+                            line_numbers=parameter.line_numbers,
+                            instance_message=f"Docstring documents parameter '{parameter.name}' that is not in the function signature",
+                        )
+                    )
+        return tuple(findings)

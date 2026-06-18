@@ -8,6 +8,7 @@ from collections.abc import Mapping
 import libcst as cst
 import libcst.metadata as cst_metadata
 
+import pydocformatter.rules.definition_helpers.source_text as source_text
 import pydocformatter.rules.definition_helpers.text_layout as text_layout
 import pydocformatter.rules.registration as rule_registration
 from pydocformatter.rules.definition import RuleCategoryBase, RuleCategoryContext, RuleContext
@@ -97,14 +98,7 @@ class PCFCategoryData:
 
     def source_for(self, code_range: cst_metadata.CodeRange) -> str:
         """Return exact source text for a half-open LibCST code range."""
-        start_line = code_range.start.line - 1
-        end_line = code_range.end.line - 1
-        if start_line == end_line:
-            return self.source_lines[start_line][code_range.start.column : code_range.end.column]
-        parts = [self.source_lines[start_line][code_range.start.column :]]
-        parts.extend(self.source_lines[start_line + 1 : end_line])
-        parts.append(self.source_lines[end_line][: code_range.end.column])
-        return "".join(parts)
+        return source_text.source_for_range(code_range, source_lines=self.source_lines)
 
 
 class _CommentCollector(cst.CSTVisitor):
@@ -136,7 +130,7 @@ class PCF(RuleCategoryBase):
         collector = _CommentCollector()
         context.module.visit(collector)
         parents = context.metadata_wrapper.resolve(cst_metadata.ParentNodeProvider)
-        source_lines_with_endings = tuple(_source_lines_with_endings(context.module.code))
+        source_lines_with_endings = tuple(source_text.source_lines(context.module.code))
         source_lines = [line.rstrip("\r\n") for line in source_lines_with_endings]
         comments = tuple(
             sorted(
@@ -233,23 +227,3 @@ def _standalone_runs(comments: tuple[CommentInfo, ...]) -> tuple[StandaloneComme
             current.append(comment)
     flush()
     return tuple(runs)
-
-
-def _source_lines_with_endings(source: str) -> list[str]:
-    """Split source while preserving Python physical line endings."""
-    lines: list[str] = []
-    line_start = 0
-    index = 0
-    while index < len(source):
-        if source[index] == "\r":
-            index += 2 if index + 1 < len(source) and source[index + 1] == "\n" else 1
-            lines.append(source[line_start:index])
-            line_start = index
-        elif source[index] == "\n":
-            index += 1
-            lines.append(source[line_start:index])
-            line_start = index
-        else:
-            index += 1
-    lines.append(source[line_start:])
-    return lines

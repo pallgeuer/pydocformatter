@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import pydocformatter.rules.definition_helpers.missing_documentation as missing_documentation
 import pydocformatter.rules.definition_helpers.value_documentation as value_documentation
+import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 import pydocformatter.rules.registration as rule_registration
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase, RuleContext
@@ -23,4 +25,14 @@ class PDF504MissingYieldDocumentation(RuleBase):
     @classmethod
     def check(cls, context: RuleContext) -> tuple[RuleFinding, ...]:
         """Return findings for undocumented meaningful yielded values."""
-        return value_documentation.missing_yield_findings(context, rule=cls.meta)
+        findings: list[RuleFinding] = []
+        for definition, docstring, facts in value_documentation.documented_function_facts(context):
+            yield_targets = value_documentation.value_documentation_targets(docstring, PDF_definition.DocstringEntryKind.YIELD)
+            if (
+                not facts.meaningful_yields
+                or any(target.has_content for target in yield_targets)
+                or not missing_documentation.should_check_missing_documentation(definition, docstring, context=context, has_relevant_documentation=bool(yield_targets))
+            ):
+                continue
+            findings.append(RuleFinding(rule=cls.meta, line_numbers=facts.meaningful_yields[0].line_numbers))
+        return tuple(findings)

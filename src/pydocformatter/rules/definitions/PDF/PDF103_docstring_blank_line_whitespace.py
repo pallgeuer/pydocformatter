@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import pydocformatter.cli.settings_check as settings_check
+import pydocformatter.rules.definition_helpers.source_text as source_text
+import pydocformatter.rules.definition_helpers.text_layout as text_layout
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 import pydocformatter.rules.edits as rule_edits
 import pydocformatter.rules.registration as rule_registration
@@ -40,7 +42,7 @@ class PDF103DocstringBlankLineWhitespace(RuleBase):
 def _planned_changes(context: RuleContext) -> tuple[rule_edits.PlannedSourceChange, ...]:
     """Return all safe blank-line whitespace changes."""
     data = PDF_definition.PDF.require_data(context)
-    source_lines = PDF_definition.source_lines_from_context(context)
+    source_lines = source_text.source_lines_from_context(context)
     return tuple(change for docstring in data.docstrings if (change := _planned_change_for_docstring(docstring, context=context, source_lines=source_lines)) is not None)
 
 
@@ -63,7 +65,7 @@ def _line_target(
     """Return the target raw text for one blank line, if it should change."""
     if docstring.value == "":
         return None
-    if PDF_definition.has_space_tab_content(line.raw_text):
+    if text_layout.has_space_tab_content(line.raw_text):
         return None
     if PDF_definition.is_same_line_closing_delimiter_prefix(docstring, line):
         return canonical_margin

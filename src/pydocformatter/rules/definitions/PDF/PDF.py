@@ -10,7 +10,10 @@ import libcst as cst
 import libcst.metadata as cst_metadata
 
 import pydocformatter.cli.settings_check as settings_check
+import pydocformatter.rules.definition_helpers.docstring_sections as docstring_sections
+import pydocformatter.rules.definition_helpers.source_text as source_text
 import pydocformatter.rules.definition_helpers.string_literals as string_literals
+import pydocformatter.rules.definition_helpers.text_layout as text_layout
 import pydocformatter.rules.edits as rule_edits
 import pydocformatter.rules.registration as rule_registration
 from pydocformatter.rules.definition import RuleCategoryBase, RuleCategoryContext, RuleContext
@@ -261,7 +264,7 @@ class _DefinitionCollector(cst.CSTVisitor):
     def __init__(self, context: RuleCategoryContext) -> None:
         super().__init__()
         self.context = context
-        self.source_lines = source_lines(context.module.code)
+        self.source_lines = source_text.source_lines(context.module.code)
         self.definitions: list[DefinitionInfo] = []
         self.docstrings: list[DocstringInfo] = []
         self.stack: list[DefinitionInfo] = []
@@ -338,7 +341,7 @@ class _DefinitionCollector(cst.CSTVisitor):
         if not isinstance(node, (cst.SimpleString, cst.ConcatenatedString)) or not isinstance(node.evaluated_value, str):
             return
         code_range = self.context.positions[node]
-        source = _source_for_range(code_range, source_lines=self.source_lines)
+        source = source_text.source_for_range(code_range, source_lines=self.source_lines)
         physical_lines = _physical_lines(code_range, source)
         source_line_number = _simple_docstring_source_line_number(node, source=source, physical_lines=physical_lines, code_range=code_range) if isinstance(node, cst.SimpleString) else None
         self.docstrings.append(
@@ -404,49 +407,14 @@ class PDF(RuleCategoryBase):
         return context.category_data
 
 
-def convention_parses_sections(convention: settings_check.DocstringConvention) -> bool:
-    """Return whether a docstring convention recognizes named sections."""
-    return convention in (settings_check.DocstringConvention.GOOGLE, settings_check.DocstringConvention.NUMPY)
-
-
 def is_adornment(text: str) -> bool:
     """Return whether text is a heading or section adornment line."""
     return _is_adornment(text)
 
 
-def canonical_section_name(convention: settings_check.DocstringConvention, name: str) -> str | None:
-    """Return the canonical spelling for a recognized convention section."""
-    normalized = name.lower()
-    if convention == settings_check.DocstringConvention.GOOGLE and normalized in _GOOGLE_SECTIONS:
-        return normalized.title()
-    if convention == settings_check.DocstringConvention.NUMPY and normalized in _NUMPY_SECTIONS:
-        return normalized.title()
-    return None
-
-
-def section_order_rank(convention: settings_check.DocstringConvention, section_name: str) -> int | None:
-    """Return the ordering rank for a convention section, if it is ordered."""
-    normalized = section_name.lower()
-    if convention == settings_check.DocstringConvention.GOOGLE:
-        return _GOOGLE_ORDER_RANKS.get(normalized)
-    if convention == settings_check.DocstringConvention.NUMPY:
-        return _NUMPY_ORDER_RANKS.get(normalized)
-    return None
-
-
-def repeated_section_key(convention: settings_check.DocstringConvention, section_name: str) -> str:
-    """Return the repeated-section identity key for a convention section."""
-    normalized = section_name.lower()
-    if convention == settings_check.DocstringConvention.GOOGLE:
-        return _GOOGLE_REPEATED_SECTION_KEYS.get(normalized, normalized)
-    if convention == settings_check.DocstringConvention.NUMPY:
-        return _NUMPY_REPEATED_SECTION_KEYS.get(normalized, normalized)
-    return normalized
-
-
 def final_convention_section(docstring: DocstringInfo) -> DocstringBlock | None:
     """Return the final top-level convention section, if there is one."""
-    if not convention_parses_sections(docstring.structure.convention):
+    if not docstring_sections.convention_parses_sections(docstring.structure.convention):
         return None
     non_blank_blocks = tuple(block for block in docstring.structure.blocks if block.kind is not DocstringBlockKind.BLANK)
     if not non_blank_blocks or non_blank_blocks[-1].kind is not DocstringBlockKind.SECTION:
@@ -510,113 +478,6 @@ def _first_non_closing_quote_prefix_line(docstring: DocstringInfo, *, start: int
     return None
 
 
-_GOOGLE_SECTIONS = {
-    "args",
-    "arguments",
-    "attention",
-    "attributes",
-    "caution",
-    "danger",
-    "error",
-    "example",
-    "examples",
-    "hint",
-    "important",
-    "keyword args",
-    "keyword arguments",
-    "methods",
-    "note",
-    "notes",
-    "other args",
-    "other arguments",
-    "raises",
-    "references",
-    "return",
-    "returns",
-    "see also",
-    "tip",
-    "todo",
-    "warning",
-    "warnings",
-    "warns",
-    "yield",
-    "yields",
-}
-_NUMPY_SECTIONS = {
-    "attributes",
-    "examples",
-    "extended summary",
-    "methods",
-    "notes",
-    "other parameters",
-    "other params",
-    "parameters",
-    "raises",
-    "receives",
-    "references",
-    "returns",
-    "see also",
-    "short summary",
-    "warnings",
-    "warns",
-    "yields",
-}
-PARAMETER_SECTION_NAMES = {"args", "arguments", "keyword args", "keyword arguments", "other args", "other arguments", "parameters", "other parameters", "other params", "receives"}
-REST_PARAMETER_VALUE_FIELDS = frozenset({"param", "parameter", "arg", "argument", "keyword", "kwarg"})
-REST_PARAMETER_TYPE_FIELDS = frozenset({"type"})
-REST_RETURN_VALUE_FIELDS = frozenset({"return", "returns"})
-REST_RETURN_TYPE_FIELDS = frozenset({"rtype"})
-REST_YIELD_VALUE_FIELDS = frozenset({"yield", "yields"})
-REST_YIELD_TYPE_FIELDS = frozenset({"ytype"})
-REST_EXCEPTION_FIELDS = frozenset({"raise", "raises", "except", "exception"})
-# Google style defines entry-section ordering, but does not define a canonical order for narrative admonition sections.
-_GOOGLE_ORDER_RANKS = {
-    "args": 0,
-    "arguments": 0,
-    "keyword args": 0,
-    "keyword arguments": 0,
-    "other args": 0,
-    "other arguments": 0,
-    "return": 1,
-    "returns": 1,
-    "yield": 1,
-    "yields": 1,
-    "raises": 2,
-    "warns": 2,
-}
-_NUMPY_ORDER_RANKS = {
-    "short summary": 0,
-    "extended summary": 1,
-    "parameters": 2,
-    "returns": 3,
-    "yields": 4,
-    "receives": 5,
-    "other parameters": 6,
-    "other params": 6,
-    "raises": 7,
-    "warns": 8,
-    "warnings": 8,
-    "see also": 9,
-    "notes": 10,
-    "references": 11,
-    "examples": 12,
-    "attributes": 13,
-    "methods": 14,
-}
-_GOOGLE_REPEATED_SECTION_KEYS = {
-    "arguments": "args",
-    "examples": "example",
-    "keyword arguments": "keyword args",
-    "notes": "note",
-    "other arguments": "other args",
-    "returns": "return",
-    "warnings": "warning",
-    "yields": "yield",
-}
-_NUMPY_REPEATED_SECTION_KEYS = {
-    "other params": "other parameters",
-    "warnings": "warns",
-}
 _LIST_RE = re.compile(r"^(?P<indent>[ \t]*)(?P<marker>(?:[-+*]|\d+[.)]))[ \t]+(?P<text>.*)$")
 _BLOCK_QUOTE_RE = re.compile(r"^(?P<indent>[ \t]*)(?P<quote>(?:>[ \t]*)+)(?P<text>.*)$")
 _FENCE_RE = re.compile(r"^[ \t]*(?P<fence>`{3,}|~{3,})(?P<info>.*)$")
@@ -689,13 +550,13 @@ class _DocstringParser:
                 self.summary_pending = False
                 continue
             if self.settings.docstring_parse_directives and (directive := _DIRECTIVE_RE.match(text)) is not None:
-                block_end = self._indented_body_end(index, end, _indent_width(directive.group("indent")))
+                block_end = self._indented_body_end(index, end, text_layout.leading_width(directive.group("indent")))
                 blocks.append(DocstringBlock(DocstringBlockKind.DIRECTIVE, index, block_end))
                 index = block_end
                 self.summary_pending = False
                 continue
             if self.settings.docstring_parse_literal_blocks and text.rstrip().endswith("::") and self._has_indented_body(index, end):
-                block_end = self._indented_body_end(index, end, leading_width(text))
+                block_end = self._indented_body_end(index, end, text_layout.leading_width(text))
                 blocks.append(DocstringBlock(DocstringBlockKind.LITERAL_BLOCK, index, block_end))
                 index = block_end
                 self.summary_pending = False
@@ -762,14 +623,14 @@ class _DocstringParser:
 
     def _section_at(self, index: int, end: int, *, max_indent: int | None = None) -> str | None:
         convention = self.settings.docstring_convention
-        if not convention_parses_sections(convention):
+        if not docstring_sections.convention_parses_sections(convention):
             return None
         text = self.lines[index].text
-        if max_indent is not None and leading_width(text) > max_indent:
+        if max_indent is not None and text_layout.leading_width(text) > max_indent:
             return None
         stripped = text.strip()
         candidate = stripped[:-1].rstrip() if stripped.endswith(":") else stripped
-        names = _GOOGLE_SECTIONS if convention == settings_check.DocstringConvention.GOOGLE else _NUMPY_SECTIONS
+        names = docstring_sections.GOOGLE_SECTIONS if convention == settings_check.DocstringConvention.GOOGLE else docstring_sections.NUMPY_SECTIONS
         if candidate.lower() not in names:
             return None
         if convention == settings_check.DocstringConvention.NUMPY and index + 1 < end and _is_adornment(self.lines[index + 1].text):
@@ -785,7 +646,7 @@ class _DocstringParser:
         content_start = start + 1
         if content_start < end and _is_adornment(self.lines[content_start].text):
             content_start += 1
-        section_end = self._section_end(content_start, end, leading_width(self.lines[start].text))
+        section_end = self._section_end(content_start, end, text_layout.leading_width(self.lines[start].text))
         entries = self._section_entries(name, content_start, section_end)
         children: list[DocstringBlock] = [DocstringBlock(DocstringBlockKind.SECTION_HEADER, start, content_start)]
         if entries:
@@ -840,7 +701,7 @@ class _DocstringParser:
                     continue
                 index += 1
                 continue
-            entry_end = self._entry_end(index, end, _indent_width(match.group("indent")))
+            entry_end = self._entry_end(index, end, text_layout.leading_width(match.group("indent")))
             name = match.group("name").strip()
             type_text = match.groupdict().get("type")
             first_description = match.group("description").strip()
@@ -863,7 +724,7 @@ class _DocstringParser:
                 end_line=entry_end,
             )
             entries.append(entry)
-            unit = indent_unit(self.settings)
+            unit = text_layout.indent_unit(self.settings)
             prefix = f'{unit}{self.lines[index].text[len(match.group("indent")) : match.start("description")]}'
             if description_lines and not first_description and not prefix.endswith((" ", "\t")):
                 prefix = f"{prefix} "
@@ -883,7 +744,7 @@ class _DocstringParser:
             text = self.lines[index].text
             match = _NUMPY_ENTRY_RE.match(text)
             if match is not None:
-                entry_end = self._entry_end(index, end, _indent_width(match.group("indent")))
+                entry_end = self._entry_end(index, end, text_layout.leading_width(match.group("indent")))
                 description_reflow_lines = self._stripped_reflow_lines(index + 1, entry_end, skip_empty=True)
                 description_lines = [line.text for line in description_reflow_lines]
                 entry = DocstringEntry(
@@ -901,13 +762,13 @@ class _DocstringParser:
                         index + 1,
                         entry_end,
                         lines=tuple(description_reflow_lines),
-                        initial_indent=indent_unit(self.settings),
-                        subsequent_indent=indent_unit(self.settings),
+                        initial_indent=text_layout.indent_unit(self.settings),
+                        subsequent_indent=text_layout.indent_unit(self.settings),
                     )
                 index = entry_end
                 continue
             if kind in (DocstringEntryKind.RETURN, DocstringEntryKind.YIELD, DocstringEntryKind.EXCEPTION) and text.strip():
-                entry_end = self._entry_end(index, end, leading_width(text))
+                entry_end = self._entry_end(index, end, text_layout.leading_width(text))
                 description_reflow_lines = self._stripped_reflow_lines(index + 1, entry_end, skip_empty=True)
                 description_lines = [line.text for line in description_reflow_lines]
                 entries.append(
@@ -926,8 +787,8 @@ class _DocstringParser:
                         index + 1,
                         entry_end,
                         lines=tuple(description_reflow_lines),
-                        initial_indent=indent_unit(self.settings),
-                        subsequent_indent=indent_unit(self.settings),
+                        initial_indent=text_layout.indent_unit(self.settings),
+                        subsequent_indent=text_layout.indent_unit(self.settings),
                     )
                 index = entry_end
                 continue
@@ -935,7 +796,7 @@ class _DocstringParser:
         return tuple(entries)
 
     def _parse_rest_field(self, start: int, end: int, match: re.Match[str]) -> tuple[DocstringBlock, int]:
-        block_end = self._continuation_end(start, end, _indent_width(match.group("indent")))
+        block_end = self._continuation_end(start, end, text_layout.leading_width(match.group("indent")))
         field = match.group("field").lower()
         argument = (match.group("argument") or "").strip()
         first_description_line = self._reflow_line_from_text_span(start, match.start("description"), len(self.lines[start].text))
@@ -1096,15 +957,15 @@ class _DocstringParser:
                 block_end += 1
             return block_end
         if self.settings.docstring_parse_directives and (directive := _DIRECTIVE_RE.match(text)) is not None:
-            return self._indented_body_end(index, end, _indent_width(directive.group("indent")))
+            return self._indented_body_end(index, end, text_layout.leading_width(directive.group("indent")))
         if self.settings.docstring_parse_literal_blocks and text.rstrip().endswith("::") and self._has_indented_body(index, end):
-            return self._indented_body_end(index, end, leading_width(text))
+            return self._indented_body_end(index, end, text_layout.leading_width(text))
         if self.settings.docstring_parse_tables and (table_end := self._table_end(index, end)) is not None:
             return table_end
         if self.settings.docstring_parse_headings and self._is_heading(index, end):
             return index + 2 if index + 1 < end and _is_adornment(self.lines[index + 1].text) else index + 1
         if self._parses_rest_fields() and (field_match := _REST_FIELD_RE.match(text)) is not None:
-            return self._continuation_end(index, end, _indent_width(field_match.group("indent")))
+            return self._continuation_end(index, end, text_layout.leading_width(field_match.group("indent")))
         if self.settings.docstring_parse_list_items and (list_match := _LIST_RE.match(text)) is not None:
             return self._list_item_end(index, end, list_match)
         if self.settings.docstring_parse_block_quotes and (quote_match := _BLOCK_QUOTE_RE.match(text)) is not None:
@@ -1113,11 +974,11 @@ class _DocstringParser:
         return None
 
     def _list_item_end(self, start: int, end: int, match: re.Match[str]) -> int:
-        base_indent = _indent_width(match.group("indent"))
+        base_indent = text_layout.leading_width(match.group("indent"))
         block_end = start + 1
         while block_end < end:
             text = self.lines[block_end].text
-            if not text.strip() or _LIST_RE.match(text) is not None or leading_width(text) <= base_indent:
+            if not text.strip() or _LIST_RE.match(text) is not None or text_layout.leading_width(text) <= base_indent:
                 break
             block_end += 1
         return block_end
@@ -1137,15 +998,15 @@ class _DocstringParser:
             next_index += 1
         if next_index >= end:
             return False
-        base_indent = leading_width(self.lines[index].text)
-        next_indent = leading_width(self.lines[next_index].text)
+        base_indent = text_layout.leading_width(self.lines[index].text)
+        next_indent = text_layout.leading_width(self.lines[next_index].text)
         return next_indent > base_indent
 
     def _indented_body_end(self, start: int, end: int, base_indent: int) -> int:
         index = start + 1
         while index < end:
             text = self.lines[index].text
-            indent = leading_width(text)
+            indent = text_layout.leading_width(text)
             if text.strip() and indent <= base_indent:
                 break
             index += 1
@@ -1161,7 +1022,7 @@ class _DocstringParser:
         index = start + 1
         while index < end:
             text = self.lines[index].text
-            if not text.strip() or leading_width(text) <= base_indent or self._protected_block_end(index, end) is not None:
+            if not text.strip() or text_layout.leading_width(text) <= base_indent or self._protected_block_end(index, end) is not None:
                 break
             index += 1
         return index
@@ -1172,7 +1033,7 @@ class _DocstringParser:
             text = self.lines[index].text
             if not text.strip():
                 break
-            indent = leading_width(text)
+            indent = text_layout.leading_width(text)
             if indent <= base_indent:
                 break
             index += 1
@@ -1220,7 +1081,7 @@ def _value_lines(value: str, *, source_line_number: int | None, source_indent: i
             start += newline.end()
     if not raw_lines:
         raw_lines.append((0, 0, ""))
-    margin = source_indent if source_indent is not None else min((leading_width(text) for _, _, text in raw_lines[1:] if text.strip()), default=0)
+    margin = source_indent if source_indent is not None else min((text_layout.leading_width(text) for _, _, text in raw_lines[1:] if text.strip()), default=0)
     lines: list[DocstringValueLine] = []
     for index, (line_start, line_end, raw_text) in enumerate(raw_lines):
         if index == 0:
@@ -1228,7 +1089,7 @@ def _value_lines(value: str, *, source_line_number: int | None, source_indent: i
             text_virtual_prefix_length = 0
             text = raw_text[text_raw_start_column:]
         else:
-            text, text_raw_start_column, text_virtual_prefix_length = strip_indent_with_mapping(raw_text, margin)
+            text, text_raw_start_column, text_virtual_prefix_length = text_layout.strip_indent_with_mapping(raw_text, margin)
         lines.append(
             DocstringValueLine(
                 index=index,
@@ -1249,7 +1110,7 @@ def _value_lines(value: str, *, source_line_number: int | None, source_indent: i
 def _entry_kind(convention: settings_check.DocstringConvention, section_name: str) -> DocstringEntryKind:
     """Return the semantic entry kind for a convention section."""
     normalized = section_name.lower()
-    if normalized in PARAMETER_SECTION_NAMES:
+    if normalized in docstring_sections.PARAMETER_SECTION_NAMES:
         return DocstringEntryKind.PARAMETER
     if normalized in {"return", "returns"}:
         return DocstringEntryKind.RETURN
@@ -1266,13 +1127,13 @@ def _entry_kind(convention: settings_check.DocstringConvention, section_name: st
 
 def _rest_entry_kind(field: str) -> DocstringEntryKind:
     """Return the semantic entry kind for a rest field name."""
-    if field in REST_PARAMETER_VALUE_FIELDS or field in REST_PARAMETER_TYPE_FIELDS:
+    if field in docstring_sections.REST_PARAMETER_VALUE_FIELDS or field in docstring_sections.REST_PARAMETER_TYPE_FIELDS:
         return DocstringEntryKind.PARAMETER
-    if field in REST_RETURN_VALUE_FIELDS or field in REST_RETURN_TYPE_FIELDS:
+    if field in docstring_sections.REST_RETURN_VALUE_FIELDS or field in docstring_sections.REST_RETURN_TYPE_FIELDS:
         return DocstringEntryKind.RETURN
-    if field in REST_YIELD_VALUE_FIELDS or field in REST_YIELD_TYPE_FIELDS:
+    if field in docstring_sections.REST_YIELD_VALUE_FIELDS or field in docstring_sections.REST_YIELD_TYPE_FIELDS:
         return DocstringEntryKind.YIELD
-    if field in REST_EXCEPTION_FIELDS:
+    if field in docstring_sections.REST_EXCEPTION_FIELDS:
         return DocstringEntryKind.EXCEPTION
     return DocstringEntryKind.FIELD
 
@@ -1310,26 +1171,6 @@ def _is_doctest_prompt(text: str) -> bool:
     return text.lstrip().startswith(">>> ")
 
 
-def _indent_width(text: str) -> int:
-    """Return the tab-expanded width of text."""
-    return len(text.expandtabs(8))
-
-
-def leading_width(text: str) -> int:
-    """Return the tab-expanded width of leading whitespace."""
-    return _indent_width(text[: len(text) - len(text.lstrip(" \t"))])
-
-
-def indent_unit(settings: settings_check.CheckSettings) -> str:
-    """Return one generated indentation unit."""
-    return "\t" if settings.indent_style == settings_check.IndentStyle.TAB else " " * settings.indent_width
-
-
-def has_space_tab_content(text: str) -> bool:
-    """Return whether text contains content other than spaces and tabs."""
-    return bool(text.strip(" \t"))
-
-
 def is_same_line_closing_delimiter_prefix(docstring: DocstringInfo, line: DocstringValueLine) -> bool:
     """Return whether a value line prefixes same-line closing quotes."""
     return line.index == len(docstring.structure.lines) - 1 and docstring.value != "" and not docstring_value_ends_with_newline(docstring)
@@ -1354,18 +1195,13 @@ def docstring_value_fragments(docstring: DocstringInfo, *, line_ending: str) -> 
 
 def docstring_canonical_margin(docstring: DocstringInfo, *, context: RuleContext, source_lines: list[str] | None = None) -> str:
     """Return the raw indentation margin for continuation and aligned blank lines."""
-    lines = source_lines if source_lines is not None else source_lines_from_context(context)
+    lines = source_lines if source_lines is not None else source_text.source_lines_from_context(context)
     source_line = lines[docstring.range.start.line - 1]
     line_indent = source_line[: len(source_line) - len(source_line.lstrip(" \t"))]
     if isinstance(docstring.statement, cst.SimpleStatementSuite):
-        return f"{line_indent}{indent_unit(context.settings)}"
+        return f"{line_indent}{text_layout.indent_unit(context.settings)}"
     prefix = source_line[: docstring.range.start.column]
     return prefix if prefix.strip() == "" else line_indent
-
-
-def source_lines_from_context(context: RuleContext | RuleCategoryContext) -> list[str]:
-    """Return source lines for a rule or category context."""
-    return source_lines(context.module.code)
 
 
 def planned_simple_docstring_line_change(
@@ -1726,25 +1562,8 @@ def join_docstring_value_lines(docstring: DocstringInfo, lines: list[str]) -> st
 
 def _docstring_source_indent(statement: cst.SimpleStatementLine | cst.SimpleStatementSuite, *, code_range: cst_metadata.CodeRange, source_lines: list[str], indent_width: int) -> int:
     """Return the visual indentation margin for a simple docstring."""
-    source_indent = leading_width(source_lines[code_range.start.line - 1])
+    source_indent = text_layout.leading_width(source_lines[code_range.start.line - 1])
     return source_indent + indent_width if isinstance(statement, cst.SimpleStatementSuite) else source_indent
-
-
-def strip_indent(text: str, width: int) -> str:
-    """Strip up to a tab-expanded indentation width from text."""
-    stripped, _, _ = strip_indent_with_mapping(text, width)
-    return stripped
-
-
-def strip_indent_with_mapping(text: str, width: int) -> tuple[str, int, int]:
-    """Strip indentation and return the raw/virtual mapping for text column zero."""
-    index = 0
-    column = 0
-    while index < len(text) and text[index] in " \t" and column < width:
-        column = ((column // 8) + 1) * 8 if text[index] == "\t" else column + 1
-        index += 1
-    virtual_prefix = max(column - width, 0)
-    return " " * virtual_prefix + text[index:], index, virtual_prefix
 
 
 @typing.overload
@@ -1787,18 +1606,6 @@ def _first_expression(body: cst.Module | cst.BaseSuite) -> tuple[cst.Expr, cst.S
     return None
 
 
-def _source_for_range(code_range: cst_metadata.CodeRange, *, source_lines: list[str]) -> str:
-    """Return the exact source inside a LibCST code range."""
-    first_index = code_range.start.line - 1
-    last_index = code_range.end.line - 1
-    if first_index == last_index:
-        return source_lines[first_index][code_range.start.column : code_range.end.column]
-    lines = [source_lines[first_index][code_range.start.column :]]
-    lines.extend(source_lines[first_index + 1 : last_index])
-    lines.append(source_lines[last_index][: code_range.end.column])
-    return "".join(lines)
-
-
 def _simple_docstring_source_line_number(node: cst.SimpleString, *, source: str, physical_lines: tuple[DocstringLine, ...], code_range: cst_metadata.CodeRange) -> int | None:
     """Return the first source line when evaluated lines map unambiguously."""
     value = node.evaluated_value
@@ -1829,23 +1636,3 @@ def _physical_lines(code_range: cst_metadata.CodeRange, source: str) -> tuple[Do
         )
         for index, line in enumerate(lines)
     )
-
-
-def source_lines(source: str) -> list[str]:
-    """Split source into lines retaining only Python physical line endings."""
-    lines: list[str] = []
-    line_start = 0
-    index = 0
-    while index < len(source):
-        if source[index] == "\r":
-            index += 2 if index + 1 < len(source) and source[index + 1] == "\n" else 1
-            lines.append(source[line_start:index])
-            line_start = index
-        elif source[index] == "\n":
-            index += 1
-            lines.append(source[line_start:index])
-            line_start = index
-        else:
-            index += 1
-    lines.append(source[line_start:])
-    return lines
