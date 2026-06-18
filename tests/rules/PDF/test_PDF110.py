@@ -168,7 +168,6 @@ def test_disabled_structure_parsing_can_make_structural_line_collapsible() -> No
     (
         (CheckSettings(select=("PDF110",), docstring_parse_headings=False), "# Heading", 'def function():\n    """# Heading"""\n'),
         (CheckSettings(select=("PDF110",), docstring_parse_directives=False), ".. note:: Title", 'def function():\n    """.. note:: Title"""\n'),
-        (CheckSettings(select=("PDF110",), docstring_parse_sphinx_fields=False), ":param value: Description.", 'def function():\n    """:param value: Description."""\n'),
         (CheckSettings(select=("PDF110",), docstring_parse_block_quotes=False), "> quote", 'def function():\n    """> quote"""\n'),
         (CheckSettings(select=("PDF110",), docstring_parse_doctests=False, docstring_parse_block_quotes=False), ">>> call()", 'def function():\n    """>>> call()"""\n'),
     ),

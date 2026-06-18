@@ -76,7 +76,7 @@ def test_checks_only_first_summary_line() -> None:
 
 def test_applies_only_to_functions_and_respects_summary_parsing() -> None:
     source = '"""module(value)"""\n\nclass module:\n    """module(value)"""\n\n\ndef field():\n    """:return: field(value)"""\n\n\ndef function(value):\n    """function(value)"""\n'
-    result = format_source(source)
+    result = format_source(source, settings=CheckSettings(select=("PDF303",), docstring_convention=DocstringConvention.REST))
 
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((12,),)
 

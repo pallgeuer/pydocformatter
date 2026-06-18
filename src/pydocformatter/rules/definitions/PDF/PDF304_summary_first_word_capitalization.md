@@ -128,4 +128,4 @@ def value():
 ```
 
 ## Options
-- `docstring-parse-*`: Controls whether generic structures such as headings, Sphinx fields, lists, doctests, code fences, block quotes, tables, directives, and literal blocks are protected from summary-style checks.
+- `docstring-parse-*`: Controls whether generic structures such as headings, lists, doctests, code fences, block quotes, tables, directives, and literal blocks are protected from summary-style checks.

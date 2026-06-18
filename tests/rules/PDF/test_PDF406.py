@@ -240,6 +240,66 @@ def test_reports_numpy_section_alias_repeats() -> None:
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((9,),)
 
 
+def test_reports_repeated_rest_fields() -> None:
+    source = 'def function(value):\n    """Summary.\n\n    :param value: Description.\n    :type value: int\n    :parameter value: More detail.\n    :returns: Result.\n    :return: More result.\n    :rtype: str\n    :raises ValueError: Bad value.\n    :exception ValueError: More bad value.\n    """\n'
+    result = format_source(source, settings=CheckSettings(select=("PDF406",), docstring_convention=DocstringConvention.REST))
+
+    assert result.new_source == source
+    assert not result.fixed_findings
+    assert tuple(finding.rule for finding in result.unfixed_findings) == (PDF406RepeatedSection.meta, PDF406RepeatedSection.meta, PDF406RepeatedSection.meta)
+    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((6,), (8,), (11,))
+    assert tuple(finding.message for finding in result.unfixed_findings) == (
+        "Docstring field ':parameter value:' repeats earlier field ':param value:'",
+        "Docstring field ':return:' repeats earlier field ':returns:'",
+        "Docstring field ':exception ValueError:' repeats earlier field ':raises ValueError:'",
+    )
+
+
+def test_rest_type_fields_repeat_independently_from_value_fields() -> None:
+    source = 'def function(value):\n    """Summary.\n\n    :param value: Description.\n    :type value: int\n    :type value: str\n    :returns: Result.\n    :rtype: int\n    :rtype: str\n    :yields: Streamed result.\n    :ytype: int\n    :ytype: str\n    """\n'
+    result = format_source(source, settings=CheckSettings(select=("PDF406",), docstring_convention=DocstringConvention.REST))
+
+    assert result.new_source == source
+    assert not result.fixed_findings
+    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((6,), (9,), (12,))
+    assert tuple(finding.message for finding in result.unfixed_findings) == (
+        "Docstring field ':type value:' repeats earlier field ':type value:'",
+        "Docstring field ':rtype:' repeats earlier field ':rtype:'",
+        "Docstring field ':ytype:' repeats earlier field ':ytype:'",
+    )
+
+
+def test_unknown_rest_fields_repeat_only_with_same_field_name_and_argument() -> None:
+    source = 'def function():\n    """Summary.\n\n    :meta private: yes\n    :meta public: yes\n    :meta private: still yes\n    :custom: first\n    :custom: second\n    """\n'
+    result = format_source(source, settings=CheckSettings(select=("PDF406",), docstring_convention=DocstringConvention.REST))
+
+    assert result.new_source == source
+    assert not result.fixed_findings
+    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((6,), (8,))
+    assert tuple(finding.message for finding in result.unfixed_findings) == (
+        "Docstring field ':meta private:' repeats earlier field ':meta private:'",
+        "Docstring field ':custom:' repeats earlier field ':custom:'",
+    )
+
+
+def test_argumentless_rest_fields_do_not_repeat_by_empty_argument() -> None:
+    source = 'def function():\n    """Summary.\n\n    :param:\n    :param:\n    :raises:\n    :raises:\n    """\n'
+    result = format_source(source, settings=CheckSettings(select=("PDF406",), docstring_convention=DocstringConvention.REST))
+
+    assert result.new_source == source
+    assert not result.fixed_findings
+    assert not result.unfixed_findings
+
+
+def test_rest_fields_are_not_checked_without_rest_convention() -> None:
+    source = 'def function(value):\n    """Summary.\n\n    :param value: Description.\n    :parameter value: More detail.\n    """\n'
+    result = format_source(source, settings=CheckSettings(select=("PDF406",), docstring_convention=DocstringConvention.NONE))
+
+    assert result.new_source == source
+    assert not result.fixed_findings
+    assert not result.unfixed_findings
+
+
 def test_google_convention_ignores_repeated_numpy_only_sections() -> None:
     source = 'def function(value):\n    """Summary.\n\n    Parameters\n    ----------\n    value : int\n        Description.\n\n    Parameters\n    ----------\n    value : int\n        More detail.\n    """\n'
     result = format_source(source)

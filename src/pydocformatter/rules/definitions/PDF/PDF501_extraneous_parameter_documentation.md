@@ -5,7 +5,7 @@ Fix is not available.
 ## What it does
 Checks that parsed docstring parameter documentation only names parameters that exist in the function signature.
 
-The rule compares parsed Google, NumPy, and Sphinx parameter entries against positional-only, positional-or-keyword, keyword-only, `*args`, and `**kwargs` parameters. Leading `*` characters are ignored for comparison, so `args` documents `*args` and `kwargs` documents `**kwargs`. Parameter names are otherwise matched exactly and case-sensitively.
+The rule compares parsed Google, NumPy, and rest parameter entries against positional-only, positional-or-keyword, keyword-only, `*args`, and `**kwargs` parameters. Leading `*` characters are ignored for comparison, so `args` documents `*args` and `kwargs` documents `**kwargs`. Parameter names are otherwise matched exactly and case-sensitively.
 
 Unlike PDF500, this rule does not have public/private activation settings. Any parsed parameter entry is checked whenever the owning function has a signature.
 
@@ -13,7 +13,7 @@ Unlike PDF500, this rule does not have public/private activation settings. Any p
 Extraneous parameter documentation can mislead callers and usually indicates stale docs after a signature change.
 
 ## Ruff compatibility
-This rule replaces Ruff's `DOC102`. Unlike Ruff, it participates in pydocformatter's shared docstring parser, so Sphinx fields are controlled by `docstring-parse-sphinx-fields`.
+This rule replaces Ruff's `DOC102`. Unlike Ruff, it participates in pydocformatter's shared convention-aware docstring parser.
 
 ## Examples
 An entry is reported when it documents a parameter that is not present in the signature:
@@ -36,29 +36,28 @@ def value(first):
 PDF501: Line 6: Docstring documents parameter 'second' that is not in the function signature
 ```
 
-The rule uses all parsed parameter documentation for a docstring. Protected example text inside a parameter section is ignored, while parsed Sphinx parameter fields are still checked:
+The rule uses all parsed parameter documentation for a docstring. Protected example text is ignored, while parsed rest parameter fields are still checked:
 
 ````pydocfmt-example
 [settings]
-docstring-convention = "google"
+docstring-convention = "rest"
 
 [input]
 def value(first):
     """Return the value.
 
-    Args:
-        first: First value.
+    :param first: First value.
 
-        ```text
-        second: This is example text, not parameter documentation.
-        ```
+    ```text
+    :param second: This is example text, not parameter documentation.
+    ```
 
     :param third: Stale value.
     """
 
 [output=unchanged]
 [findings]
-PDF501: Line 11: Docstring documents parameter 'third' that is not in the function signature
+PDF501: Line 10: Docstring documents parameter 'third' that is not in the function signature
 ````
 
 NumPy entries can name multiple parameters on one line. Each absent documented name is reported, even when multiple findings point to the same physical line:
@@ -123,23 +122,21 @@ class Builder:
 [output=unchanged]
 ```
 
-Sphinx fields are controlled by `docstring-parse-sphinx-fields`. When Sphinx field parsing is disabled, Sphinx-looking text is ordinary docstring content and is not checked by this rule:
+Rest fields are parsed only under the rest convention. With another convention, rest-looking text is ordinary docstring content and is not checked by this rule:
 
 ```pydocfmt-example
 [settings]
 docstring-convention = "none"
-docstring-parse-sphinx-fields = false
 
 [input]
 def value(first):
     """Return the value.
 
-    :param second: Ordinary text when Sphinx field parsing is disabled.
+    :param second: Ordinary text outside the rest convention.
     """
 
 [output=unchanged]
 ```
 
 ## Options
-- `docstring-convention`: Controls whether Google or NumPy parameter sections are parsed. With `none` and `pep257`, convention sections are ordinary content.
-- `docstring-parse-sphinx-fields`: Controls whether Sphinx `:param name:` fields are parsed as parameter documentation.
+- `docstring-convention`: Controls whether Google parameter sections, NumPy parameter sections, or rest parameter fields are parsed. With `none` and `pep257`, convention syntax is ordinary content.

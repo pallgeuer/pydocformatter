@@ -9,7 +9,7 @@ A blank logical line is an evaluated docstring line with no non-whitespace conte
 
 PDF200 keeps at most one blank line between adjacent semantic chunks. It removes blank lines before the first chunk, removes blank lines after the last chunk, and collapses runs of multiple blank lines between chunks to one blank line. It only removes excess blank lines; it does not insert missing blank lines between chunks that are already adjacent.
 
-A chunk is any non-blank semantic block recognized by the docstring parser, including summaries, paragraphs, sections, section entries, lists, headings, doctests, code fences, literal blocks, directives, tables, block quotes, Sphinx fields, and verbatim blocks. Blank lines inside opaque protected blocks are preserved, while blank-line runs around those protected blocks are still collapsed. Directive and literal-block bodies keep their internal blank lines, but trailing blank runs after their indented bodies are treated as exterior spacing between chunks.
+A chunk is any non-blank semantic block recognized by the docstring parser, including summaries, paragraphs, sections, section entries, rest fields under the rest convention, lists, headings, doctests, code fences, literal blocks, directives, tables, block quotes, and verbatim blocks. Blank lines inside opaque protected blocks are preserved, while blank-line runs around those protected blocks are still collapsed. Directive and literal-block bodies keep their internal blank lines, but trailing blank runs after their indented bodies are treated as exterior spacing between chunks.
 
 With Google or NumPy conventions enabled, spacing is applied recursively inside recognized sections. Extra blank lines between a section header and its first body item are removed entirely, and extra blank lines between consecutive convention entries are removed entirely. Other blank-line runs inside sections are still collapsed to one retained blank line unless they are inside opaque protected content.
 
@@ -262,6 +262,31 @@ def area(radius: float) -> float:
     """
 ```
 
+Rest fields under the rest convention use compact spacing between adjacent fields:
+
+```pydocfmt-example
+[settings]
+docstring-convention = "rest"
+
+[input]
+def value(first: int, second: int) -> int:
+    """Return a value.
+
+    :param first: First value.
+
+
+    :param second: Second value.
+    """
+
+[output]
+def value(first: int, second: int) -> int:
+    """Return a value.
+
+    :param first: First value.
+    :param second: Second value.
+    """
+```
+
 Generic structure settings control whether special-looking blocks are protected. With code fence parsing disabled, PDF200 can collapse blank lines inside fenced-looking text:
 
 ````pydocfmt-example
@@ -309,6 +334,6 @@ def concatenated() -> None:
 When `PDF000` is also selected outside this rule-specific example context, it can literalize escaped blank lines before PDF200 collapses them in a later rule pass.
 
 ## Options
-- `docstring-convention`: Enables recursive spacing inside recognized Google or NumPy sections, including compact section header/content and consecutive entry spacing. `none` and `pep257` leave convention-specific section headers as ordinary generic chunks.
+- `docstring-convention`: Enables recursive spacing inside recognized Google or NumPy sections and compact spacing between adjacent rest fields. `none` and `pep257` leave convention-specific syntax as ordinary generic chunks.
 - `docstring-blank-line-after-last-section`: Keeps exactly one trailing blank line after the final recognized Google or NumPy section when enabled; removes final-section trailing blanks when disabled.
-- `docstring-parse-*`: Controls whether generic structures such as lists, headings, doctests, code fences, block quotes, tables, directives, literal blocks, and Sphinx fields are distinct or protected chunks for blank-line collapsing.
+- `docstring-parse-*`: Controls whether generic structures such as lists, headings, doctests, code fences, block quotes, tables, directives, and literal blocks are distinct or protected chunks for blank-line collapsing.

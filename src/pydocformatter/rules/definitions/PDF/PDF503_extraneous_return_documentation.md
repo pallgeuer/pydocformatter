@@ -7,7 +7,7 @@ Checks function and method docstrings for return documentation on functions that
 
 A meaningful return is `return <expr>` where `<expr>` is not `None`. Functions with no meaningful return, only bare `return`, or any top-level `yield` are treated as not having a normal return value to document. Non-empty return documentation is allowed for explicit `return None` only when the function is not a generator. Functions without docstrings, abstract methods, and stub functions are ignored. Nested functions, classes, and lambdas are ignored by the enclosing function and checked independently when they have their own docstrings.
 
-The rule reports each recognized Google or NumPy return section at the section header, and each parsed Sphinx return field at the field line. Empty return sections are still extraneous when the function does not return a meaningful ordinary value. In Google return sections, bare `None` and `None.` entries are treated like `None:` entries.
+The rule reports each recognized Google or NumPy return section at the section header, and each parsed rest return field at the field line. Empty return sections and empty rest return fields are still extraneous when the function does not return a meaningful ordinary value. In Google return sections, bare `None` and `None.` entries are treated like `None:` entries.
 
 ## Why is this useful?
 Extraneous return sections can imply a result where the function does not return one, or can confuse generator stop values with ordinary function returns.
@@ -120,12 +120,11 @@ def value():
 [output=unchanged]
 ```
 
-The active parser controls what counts as return documentation. With Sphinx field parsing disabled, Sphinx-looking return fields are ordinary text and are not reported:
+The active convention controls what counts as return documentation. Outside the rest convention, rest-looking return fields are ordinary text and are not reported:
 
 ```pydocfmt-example
 [settings]
 docstring-convention = "none"
-docstring-parse-sphinx-fields = false
 
 [input]
 def value():
@@ -138,5 +137,4 @@ def value():
 ```
 
 ## Options
-- `docstring-convention`: Controls whether Google or NumPy return sections are recognized.
-- `docstring-parse-sphinx-fields`: Controls whether Sphinx return fields such as `:returns:` and `:rtype:` are recognized.
+- `docstring-convention`: Controls whether Google return sections, NumPy return sections, or rest return fields such as `:returns:` and `:rtype:` are recognized.

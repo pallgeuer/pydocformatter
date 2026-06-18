@@ -7,7 +7,7 @@ Checks function and method docstrings for missing yield-value documentation when
 
 A meaningful yield is `yield <expr>` where `<expr>` is not `None`, or any `yield from <expr>`. Bare `yield`, `yield None`, functions without docstrings, abstract methods, and stub functions are ignored. Nested functions, classes, and lambdas are ignored by the enclosing function and checked independently when they have their own docstrings.
 
-Yield documentation is present when the active docstring parser finds a non-empty Google or NumPy yield section, or a parsed Sphinx yield field. In Google yield sections, bare `None` and `None.` entries are treated like `None:` entries.
+Yield documentation is present when the active docstring parser finds a non-empty Google yield section, NumPy yield section, or rest yield field. In Google yield sections, bare `None` and `None.` entries are treated like `None:` entries.
 
 By default, this rule reports missing yield documentation only when the docstring already has recognized yield documentation, such as an empty yield section. Broader shared missing-documentation modes can require yield documentation for public docstrings with body content, or for all public docstrings.
 
@@ -72,7 +72,7 @@ async def values():
 PDF504: Line 3: Function yield value is missing docstring documentation
 ```
 
-Recognized yield documentation satisfies the rule. Google sections, parsed Sphinx fields, and NumPy sections are all valid when the matching parser is active:
+Recognized yield documentation satisfies the rule. Google sections, rest fields, and NumPy sections are all valid when the matching convention is active:
 
 ```pydocfmt-example
 [settings]
@@ -96,13 +96,20 @@ def none_values():
     """
     yield 2
 
+[output=unchanged]
+```
 
-def sphinx_values():
+```pydocfmt-example
+[settings]
+docstring-convention = "rest"
+
+[input]
+def rest_values():
     """Generate values.
 
     :ytype: int
     """
-    yield 3
+    yield 1
 
 [output=unchanged]
 ```
@@ -125,12 +132,11 @@ def numpy_values():
 [output=unchanged]
 ```
 
-Parser settings control which documentation is recognized. With Sphinx field parsing disabled, a Sphinx-looking yield field is ordinary text and does not document the yielded value:
+The active convention controls which documentation is recognized. Outside the rest convention, a rest-looking yield field is ordinary text and does not document the yielded value:
 
 ```pydocfmt-example
 [settings]
 docstring-convention = "none"
-docstring-parse-sphinx-fields = false
 docstring-missing-documentation = "all-docstrings"
 
 [input]
@@ -147,7 +153,6 @@ PDF504: Line 6: Function yield value is missing docstring documentation
 ```
 
 ## Options
-- `docstring-convention`: Controls whether Google or NumPy yield sections are recognized.
-- `docstring-parse-sphinx-fields`: Controls whether Sphinx yield fields such as `:yields:` and `:ytype:` are recognized.
+- `docstring-convention`: Controls whether Google yield sections, NumPy yield sections, or rest yield fields such as `:yields:` and `:ytype:` are recognized.
 - `docstring-missing-documentation`: Controls when missing yield documentation is reported. `has-section` reports only docstrings with recognized yield documentation. `non-summary-docstrings` additionally reports public docstrings with more than just a summary. `all-docstrings` additionally reports all public docstrings.
 - `docstring-missing-documentation-public-only`: When `true`, the broad parts of `non-summary-docstrings` and `all-docstrings` apply only to public functions and methods. Explicit yield documentation is always checked, including for private functions.

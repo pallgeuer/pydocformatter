@@ -5,11 +5,11 @@ Fix is not available.
 Rule is ignored if `docstring-convention` is `none` or `pep257`.
 
 ## What it does
-PDF406 reports recognized Google and NumPy sections that repeat within one docstring under the active convention. The first occurrence is allowed, and each later matching section is reported.
+PDF406 reports recognized Google and NumPy sections, plus rest fields under the rest convention, that repeat within one docstring under the active convention. The first occurrence is allowed, and each later matching item is reported.
 
 Known spelling variants for the same section are treated as repeats, such as Google `Args` and `Arguments`, Google `Example` and `Examples`, Google `Return` and `Returns`, Google `Warning` and `Warnings`, or NumPy `Other Parameters` and `Other Params`. Matching is case-insensitive. Google `Warns` documents emitted warnings and is distinct from the `Warning`/`Warnings` admonition sections.
 
-The rule only considers section names that are recognized by the active convention. Google-style recognition is used only when `docstring-convention = "google"`, and NumPy-style recognition is used only when `docstring-convention = "numpy"`. For example, a repeated NumPy-only `Parameters` section is ignored under the Google convention, and a Google-style `Parameters:` line is ignored under the NumPy convention.
+The rule only considers syntax that is recognized by the active convention. Google-style recognition is used only when `docstring-convention = "google"`, NumPy-style recognition is used only when `docstring-convention = "numpy"`, and rest fields are recognized only when `docstring-convention = "rest"`. For example, a repeated NumPy-only `Parameters` section is ignored under the Google convention, and a Google-style `Parameters:` line is ignored under the NumPy convention.
 
 PDF406 is diagnostic only. It does not merge repeated sections or otherwise rewrite the docstring.
 
@@ -270,6 +270,25 @@ def value(arg):
 PDF406: Line 9: Docstring section 'Other Params' repeats earlier section 'Other Parameters'
 ```
 
+PDF406 also reports repeated rest fields under the rest convention:
+
+```pydocfmt-example
+[settings]
+docstring-convention = "rest"
+
+[input]
+def value(arg):
+    """Return the value.
+
+    :returns: The value.
+    :return: More detail.
+    """
+
+[output=unchanged]
+[findings]
+PDF406: Line 5: Docstring field ':return:' repeats earlier field ':returns:'
+```
+
 Convention recognition matters. A Google-style colon section is not counted as a NumPy section:
 
 ```pydocfmt-example
@@ -312,5 +331,5 @@ PDF406: Lines 2-6: Docstring section 'Args' repeats earlier section 'Args'
 ```
 
 ## Options
-- `docstring-convention`: Enables Google and NumPy section recognition. `none` and `pep257` ignore this rule.
+- `docstring-convention`: Enables Google and NumPy section recognition and rest field recognition. `none` and `pep257` ignore this rule.
 - `docstring-parse-*`: Controls whether section-like text inside protected structures, such as literal blocks or code fences, is ignored as structure content or can be parsed as ordinary section text.

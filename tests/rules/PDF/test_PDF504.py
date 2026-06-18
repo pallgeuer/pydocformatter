@@ -48,14 +48,14 @@ def test_empty_yield_section_does_not_satisfy_meaningful_yield() -> None:
     assert_pdf504_lines(source, ((6,),))
 
 
-def test_google_numpy_and_sphinx_yield_documentation_satisfy_meaningful_yield() -> None:
+def test_google_numpy_and_rest_yield_documentation_satisfy_meaningful_yield() -> None:
     google = 'def function():\n    """Generate values.\n\n    Yields:\n        int: Value.\n    """\n    yield 1\n'
     numpy = 'def function():\n    """Generate values.\n\n    Yields\n    ------\n    int\n        Value.\n    """\n    yield 1\n'
-    sphinx = 'def function():\n    """Generate values.\n\n    :yields: Value.\n    """\n    yield 1\n'
+    rest = 'def function():\n    """Generate values.\n\n    :yields: Value.\n    """\n    yield 1\n'
 
     assert_pdf504_lines(google, ())
     assert_pdf504_lines(numpy, (), settings=CheckSettings(select=("PDF504",), docstring_convention=DocstringConvention.NUMPY))
-    assert_pdf504_lines(sphinx, (), settings=CheckSettings(select=("PDF504",), docstring_convention=DocstringConvention.NONE))
+    assert_pdf504_lines(rest, (), settings=CheckSettings(select=("PDF504",), docstring_convention=DocstringConvention.REST))
 
 
 def test_google_bare_none_yield_entry_satisfies_meaningful_yield() -> None:
@@ -69,7 +69,7 @@ def test_google_bare_none_yield_entry_satisfies_meaningful_yield() -> None:
 def test_ytype_satisfies_meaningful_yield_documentation() -> None:
     source = 'def function():\n    """Generate values.\n\n    :ytype: int\n    """\n    yield 1\n'
 
-    assert_pdf504_lines(source, (), settings=CheckSettings(select=("PDF504",), docstring_convention=DocstringConvention.NONE))
+    assert_pdf504_lines(source, (), settings=CheckSettings(select=("PDF504",), docstring_convention=DocstringConvention.REST))
 
 
 def test_yield_from_requires_yield_documentation() -> None:
@@ -96,15 +96,13 @@ def test_yield_inside_lambda_does_not_count_for_enclosing_function() -> None:
     assert_pdf504_lines(source, ())
 
 
-def test_sphinx_field_parsing_setting_controls_sphinx_yield_documentation() -> None:
+def test_inactive_rest_convention_does_not_parse_rest_yield_documentation() -> None:
     source = 'def function():\n    """Generate values.\n\n    :yields: Value.\n    """\n    yield 1\n'
 
     assert_pdf504_lines(
         source,
         ((6,),),
-        settings=CheckSettings(
-            select=("PDF504",), docstring_convention=DocstringConvention.NONE, docstring_parse_sphinx_fields=False, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS
-        ),
+        settings=CheckSettings(select=("PDF504",), docstring_convention=DocstringConvention.NONE, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS),
     )
 
 

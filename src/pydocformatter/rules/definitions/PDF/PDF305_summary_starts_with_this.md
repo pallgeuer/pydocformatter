@@ -9,7 +9,7 @@ Checks module, class, function, and method docstring summaries whose first norma
 
 PDF305 removes non-alphanumeric characters from the first summary word and lowercases it before comparing. This catches forms such as `This`, `this`, `THIS`, `"This"`, `` `This` ``, and `This:`, but it does not treat `ThisReturns`, `this_module`, or `This\u00e9` as the word `this`.
 
-It skips empty docstrings, docstrings without a parsed summary, and parser-recognized structures such as sections, Sphinx fields, headings, lists, doctests, code fences, block quotes, tables, directives, literal blocks, and verbatim blocks. With heading parsing enabled, underlined title-style content is a heading and is skipped. With heading parsing disabled, the first non-adornment summary line is checked.
+It skips empty docstrings, docstrings without a parsed summary, and parser-recognized structures such as sections, rest fields under the rest convention, headings, lists, doctests, code fences, block quotes, tables, directives, literal blocks, and verbatim blocks. With heading parsing enabled, underlined title-style content is a heading and is skipped. With heading parsing disabled, the first non-adornment summary line is checked.
 
 ## Why is this useful?
 Summaries that begin with "This" are often indirect and can usually be rewritten more concisely around the action or object being documented.
@@ -102,4 +102,4 @@ PDF305: Line 2: Docstring summary should not start with "This"
 
 ## Options
 - `docstring-convention`: Ignores PDF305 for broad rule selections under the Google and PEP 257 conventions.
-- `docstring-parse-*`: Controls whether generic structures such as headings, Sphinx fields, lists, doctests, code fences, block quotes, tables, directives, and literal blocks are protected from summary-style checks.
+- `docstring-parse-*`: Controls whether generic structures such as headings, lists, doctests, code fences, block quotes, tables, directives, and literal blocks are protected from summary-style checks.

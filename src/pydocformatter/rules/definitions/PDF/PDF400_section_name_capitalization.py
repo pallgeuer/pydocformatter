@@ -19,7 +19,7 @@ class PDF400SectionNameCapitalization(RuleBase):
         setting_effects=(
             RuleSettingEffects(
                 setting="docstring_convention",
-                effects=(RuleSettingEffectValues(effect=RuleSettingEffect.IGNORED, values=section_style.SECTION_IGNORED_CONVENTIONS),),
+                effects=(RuleSettingEffectValues(effect=RuleSettingEffect.IGNORED, values=section_style.SECTION_NAME_IGNORED_CONVENTIONS),),
             ),
         ),
         incompatible_with=(),

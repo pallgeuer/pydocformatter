@@ -71,6 +71,24 @@ def test_collapses_blank_lines_between_google_section_children() -> None:
     assert not format_pdf100(result.new_source, settings=CheckSettings(select=("PDF200",), docstring_convention=DocstringConvention.GOOGLE)).modified
 
 
+def test_collapses_blank_lines_between_rest_fields() -> None:
+    source = 'def function(value):\n    """Summary.\n\n    :param value: Description.\n\n\n    :returns: Result.\n    """\n'
+    settings = CheckSettings(select=("PDF200",), docstring_convention=DocstringConvention.REST)
+    result = format_pdf100(source, settings=settings)
+
+    assert result.new_source == 'def function(value):\n    """Summary.\n\n    :param value: Description.\n    :returns: Result.\n    """\n'
+    assert result.fixed_findings[PDF200TooManyBlankLines.meta] == 1
+    assert not format_pdf100(result.new_source, settings=settings).modified
+
+
+def test_rest_like_fields_keep_normal_blank_spacing_without_rest_convention() -> None:
+    source = 'def function(value):\n    """Summary.\n\n    :param value: Description.\n\n    :returns: Result.\n    """\n'
+    result = format_pdf100(source, settings=CheckSettings(select=("PDF200",), docstring_convention=DocstringConvention.NONE))
+
+    assert result.new_source == source
+    assert not result.fixed_findings
+
+
 def test_final_google_section_blank_line_is_removed_by_default() -> None:
     source = 'def function(value):\n    """Summary.\n\n    Args:\n        value: Description.\n\n\n    """\n'
     settings = CheckSettings(select=("PDF200",), docstring_convention=DocstringConvention.GOOGLE)

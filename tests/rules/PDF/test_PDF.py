@@ -502,15 +502,16 @@ def test_nested_protected_blocks_are_not_folded_into_google_entry_descriptions()
     )
 
 
-def test_mixed_convention_and_generic_entries_and_reflow_regions_stay_in_source_order() -> None:
-    value = "Args:\n    first: First description.\n    - Interposed list item.\n    second: Second description.\n    :param third: Third description."
-    structure = structure_for(value, settings=CheckSettings(docstring_convention=DocstringConvention.GOOGLE))
-    assert tuple((entry.names, entry.start_line) for entry in structure.entries) == ((("first",), 1), (("second",), 3), (("third",), 4))
+def test_rest_fields_and_generic_reflow_regions_stay_in_source_order() -> None:
+    value = ":param first: First description.\n- Interposed list item.\n:param second: Second description.\n> Quoted text.\n:param third: Third description."
+    structure = structure_for(value, settings=CheckSettings(docstring_convention=DocstringConvention.REST))
+    assert tuple((entry.names, entry.start_line) for entry in structure.entries) == ((("first",), 0), (("second",), 2), (("third",), 4))
     assert tuple((region.kind, region.start_line) for region in structure.reflow_regions) == (
-        (DocstringBlockKind.SECTION_ENTRY, 1),
-        (DocstringBlockKind.LIST_ITEM, 2),
-        (DocstringBlockKind.SECTION_ENTRY, 3),
-        (DocstringBlockKind.SPHINX_FIELD, 4),
+        (DocstringBlockKind.REST_FIELD, 0),
+        (DocstringBlockKind.LIST_ITEM, 1),
+        (DocstringBlockKind.REST_FIELD, 2),
+        (DocstringBlockKind.BLOCK_QUOTE, 3),
+        (DocstringBlockKind.REST_FIELD, 4),
     )
 
 
@@ -663,6 +664,7 @@ def test_section_block_contains_header_entries_blanks_and_generic_children() -> 
     (
         (":param value: Description.", DocstringEntryKind.PARAMETER, ("value",)),
         (":kwarg option: Description.", DocstringEntryKind.PARAMETER, ("option",)),
+        (":type value: int", DocstringEntryKind.PARAMETER, ("value",)),
         (":returns: Description.", DocstringEntryKind.RETURN, ()),
         (":rtype: str", DocstringEntryKind.RETURN, ()),
         (":yield item: Description.", DocstringEntryKind.YIELD, ("item",)),
@@ -670,8 +672,8 @@ def test_section_block_contains_header_entries_blanks_and_generic_children() -> 
         (":meta private: Description.", DocstringEntryKind.FIELD, ("private",)),
     ),
 )
-def test_sphinx_field_aliases_map_to_semantic_entry_kinds(field: str, expected_kind: DocstringEntryKind, expected_names: tuple[str, ...]) -> None:
-    structure = structure_for(field)
+def test_rest_field_aliases_map_to_semantic_entry_kinds(field: str, expected_kind: DocstringEntryKind, expected_names: tuple[str, ...]) -> None:
+    structure = structure_for(field, settings=CheckSettings(docstring_convention=DocstringConvention.REST))
     entry = structure.entries[0]
     assert (entry.kind, entry.names, entry.description) == (expected_kind, expected_names, field.rpartition(":")[2].strip())
     assert structure.blocks[0].entry is entry
@@ -687,8 +689,8 @@ def test_sphinx_field_aliases_map_to_semantic_entry_kinds(field: str, expected_k
         (":kwarg Mapping[str, object] **kwargs: Description.", ("**kwargs",), "Mapping[str, object]"),
     ),
 )
-def test_typed_sphinx_parameter_fields_split_type_from_name(field: str, expected_names: tuple[str, ...], expected_type: str) -> None:
-    structure = structure_for(field)
+def test_typed_rest_parameter_fields_split_type_from_name(field: str, expected_names: tuple[str, ...], expected_type: str) -> None:
+    structure = structure_for(field, settings=CheckSettings(docstring_convention=DocstringConvention.REST))
     entry = structure.entries[0]
     assert (entry.kind, entry.names, entry.type_text, entry.description) == (DocstringEntryKind.PARAMETER, expected_names, expected_type, "Description.")
 
@@ -715,13 +717,13 @@ def test_typed_sphinx_parameter_fields_split_type_from_name(field: str, expected
         ("custom", DocstringEntryKind.FIELD),
     ),
 )
-def test_all_sphinx_field_aliases_are_classified(field: str, expected_kind: DocstringEntryKind) -> None:
-    entry = structure_for(f":{field}: Description.").entries[0]
+def test_all_rest_field_aliases_are_classified(field: str, expected_kind: DocstringEntryKind) -> None:
+    entry = structure_for(f":{field}: Description.", settings=CheckSettings(docstring_convention=DocstringConvention.REST)).entries[0]
     assert entry.kind == expected_kind
 
 
-def test_sphinx_field_continuation_and_tabbed_prefix_have_exact_reflow_indentation() -> None:
-    structure = structure_for("\n\t:param value: First line.\n\t\tSecond line.", settings=CheckSettings(indent_width=2))
+def test_rest_field_continuation_and_tabbed_prefix_have_exact_reflow_indentation() -> None:
+    structure = structure_for("\n\t:param value: First line.\n\t\tSecond line.", settings=CheckSettings(docstring_convention=DocstringConvention.REST, indent_width=2))
     entry = structure.entries[0]
     region = structure.reflow_regions[0]
     assert entry.description == "First line. Second line."
@@ -730,14 +732,56 @@ def test_sphinx_field_continuation_and_tabbed_prefix_have_exact_reflow_indentati
     assert region.subsequent_indent == " " * 16
 
 
-def test_sphinx_field_stops_before_a_peer_list_item_inside_a_section() -> None:
+def test_rest_field_stops_before_a_peer_list_item() -> None:
+    value = ":param value: Description.\n- Peer list item."
+    structure = structure_for(value, settings=CheckSettings(docstring_convention=DocstringConvention.REST))
+    assert tuple((entry.names, entry.start_line, entry.end_line) for entry in structure.entries) == ((("value",), 0, 1),)
+    assert tuple((block.kind, block.start_line, block.end_line) for block in structure.blocks) == (
+        (DocstringBlockKind.REST_FIELD, 0, 1),
+        (DocstringBlockKind.LIST_ITEM, 1, 2),
+    )
+
+
+def test_rest_field_includes_indented_protected_body_without_reflowing_it() -> None:
+    value = ":param value:\n    - First choice.\n      Continued choice.\n    - Second choice.\n:returns: Result."
+    structure = structure_for(value, settings=CheckSettings(docstring_convention=DocstringConvention.REST))
+
+    assert tuple((entry.names, entry.description, entry.start_line, entry.end_line) for entry in structure.entries) == (
+        (("value",), "", 0, 4),
+        ((), "Result.", 4, 5),
+    )
+    assert tuple((block.kind, block.start_line, block.end_line) for block in structure.blocks) == (
+        (DocstringBlockKind.REST_FIELD, 0, 4),
+        (DocstringBlockKind.REST_FIELD, 4, 5),
+    )
+    assert tuple((region.kind, region.start_line, region.end_line, reflow_texts(region.lines)) for region in structure.reflow_regions) == ((DocstringBlockKind.REST_FIELD, 4, 5, ("Result.",)),)
+
+
+def test_rest_field_inline_description_reflow_stops_before_protected_body() -> None:
+    value = ":param value: Intro text.\n    - First choice.\n      Continued choice.\n    - Second choice.\n:returns: Result."
+    structure = structure_for(value, settings=CheckSettings(docstring_convention=DocstringConvention.REST))
+
+    assert tuple((entry.names, entry.description, entry.start_line, entry.end_line) for entry in structure.entries) == (
+        (("value",), "Intro text.", 0, 4),
+        ((), "Result.", 4, 5),
+    )
+    assert tuple((block.kind, block.start_line, block.end_line) for block in structure.blocks) == (
+        (DocstringBlockKind.REST_FIELD, 0, 4),
+        (DocstringBlockKind.REST_FIELD, 4, 5),
+    )
+    assert tuple((region.kind, region.start_line, region.end_line, reflow_texts(region.lines)) for region in structure.reflow_regions) == (
+        (DocstringBlockKind.REST_FIELD, 0, 1, ("Intro text.",)),
+        (DocstringBlockKind.REST_FIELD, 4, 5, ("Result.",)),
+    )
+
+
+def test_rest_fields_are_not_semantic_inside_google_sections() -> None:
     value = "Examples:\n    :param value: Description.\n    - Peer list item."
     structure = structure_for(value, settings=CheckSettings(docstring_convention=DocstringConvention.GOOGLE))
-    assert tuple((entry.names, entry.start_line, entry.end_line) for entry in structure.entries) == ((("value",), 1, 2),)
+    assert structure.entries == ()
     assert tuple((child.kind, child.start_line, child.end_line) for child in structure.blocks[0].children) == (
         (DocstringBlockKind.SECTION_HEADER, 0, 1),
-        (DocstringBlockKind.SPHINX_FIELD, 1, 2),
-        (DocstringBlockKind.LIST_ITEM, 2, 3),
+        (DocstringBlockKind.VERBATIM, 1, 3),
     )
 
 
@@ -860,7 +904,7 @@ def test_markdown_and_rest_heading_variants_are_protected(value: str, expected_e
         (".. note: not a directive", DocstringBlockKind.DIRECTIVE),
         ("Example::\nnot indented", DocstringBlockKind.LITERAL_BLOCK),
         ("Example::", DocstringBlockKind.LITERAL_BLOCK),
-        (":param missing terminator", DocstringBlockKind.SPHINX_FIELD),
+        (":param missing terminator", DocstringBlockKind.REST_FIELD),
         ("-missing marker space", DocstringBlockKind.LIST_ITEM),
         ("ordinary > embedded quote", DocstringBlockKind.BLOCK_QUOTE),
     ),
@@ -876,8 +920,8 @@ def test_generic_structures_are_classified_and_protected_inside_sections() -> No
     assert DocstringBlockKind.CODE_FENCE in kinds
     assert DocstringBlockKind.LIST_ITEM in kinds
     assert DocstringBlockKind.BLOCK_QUOTE in kinds
-    assert DocstringBlockKind.SPHINX_FIELD in kinds
-    assert tuple(region.kind for region in structure.reflow_regions) == (DocstringBlockKind.SUMMARY, DocstringBlockKind.LIST_ITEM, DocstringBlockKind.BLOCK_QUOTE, DocstringBlockKind.SPHINX_FIELD)
+    assert DocstringBlockKind.REST_FIELD not in kinds
+    assert tuple(region.kind for region in structure.reflow_regions) == (DocstringBlockKind.SUMMARY, DocstringBlockKind.LIST_ITEM, DocstringBlockKind.BLOCK_QUOTE, DocstringBlockKind.PARAGRAPH)
 
 
 def test_directives_literal_blocks_and_tables_are_opaque_to_section_entry_parsing() -> None:
@@ -905,7 +949,6 @@ def test_directives_literal_blocks_and_tables_are_opaque_to_section_entry_parsin
         (CheckSettings(docstring_parse_tables=False), "| A | B |\n| --- | --- |\n| 1 | 2 |", DocstringBlockKind.TABLE),
         (CheckSettings(docstring_parse_directives=False), ".. note::\n    body", DocstringBlockKind.DIRECTIVE),
         (CheckSettings(docstring_parse_literal_blocks=False), "Example::\n\n    value = 1", DocstringBlockKind.LITERAL_BLOCK),
-        (CheckSettings(docstring_parse_sphinx_fields=False), ":param value: description", DocstringBlockKind.SPHINX_FIELD),
     ),
 )
 def test_structure_recognizers_can_be_disabled(settings: CheckSettings, source: str, kind: DocstringBlockKind) -> None:
@@ -913,6 +956,29 @@ def test_structure_recognizers_can_be_disabled(settings: CheckSettings, source: 
     disabled = PDF.prepare(category_context(f'"""{source}"""\n', settings=settings)).docstrings[0].structure
     assert kind in block_kinds(enabled.blocks)
     assert kind not in block_kinds(disabled.blocks)
+
+
+def test_rest_field_recognition_is_controlled_by_docstring_convention() -> None:
+    source = '""":param value: description"""\n'
+    rest = PDF.prepare(category_context(source, settings=CheckSettings(docstring_convention=DocstringConvention.REST))).docstrings[0].structure
+    google = PDF.prepare(category_context(source, settings=CheckSettings(docstring_convention=DocstringConvention.GOOGLE))).docstrings[0].structure
+
+    assert DocstringBlockKind.REST_FIELD in block_kinds(rest.blocks)
+    assert rest.entries[0].names == ("value",)
+    assert DocstringBlockKind.REST_FIELD not in block_kinds(google.blocks)
+    assert google.entries == ()
+
+
+def test_rest_field_metadata_preserves_field_names_and_arguments_for_rule_helpers() -> None:
+    value = ":PARAM int value: Description.\n:type value: int\n:meta private: yes\n:raises errors.ValueError: Bad value."
+    structure = structure_for(value, settings=CheckSettings(docstring_convention=DocstringConvention.REST))
+
+    assert tuple((entry.field_name, entry.field_argument, entry.names, entry.type_text, entry.description) for entry in structure.entries) == (
+        ("param", "int value", ("value",), "int", "Description."),
+        ("type", "value", ("value",), None, "int"),
+        ("meta", "private", ("private",), None, "yes"),
+        ("raises", "errors.ValueError", ("errors.ValueError",), None, "Bad value."),
+    )
 
 
 def test_disabling_directives_falls_back_to_literal_blocks_before_plain_text() -> None:
@@ -935,7 +1001,6 @@ def test_disabling_all_generic_recognizers_produces_one_plain_reflow_region() ->
         docstring_parse_tables=False,
         docstring_parse_directives=False,
         docstring_parse_literal_blocks=False,
-        docstring_parse_sphinx_fields=False,
     )
     value = "# Heading\n>>> call()\n- item\n> quote\n:param value: description"
     structure = structure_for(value, settings=settings)
@@ -955,7 +1020,6 @@ def test_convention_sections_remain_enabled_when_all_generic_recognizers_are_dis
         docstring_parse_tables=False,
         docstring_parse_directives=False,
         docstring_parse_literal_blocks=False,
-        docstring_parse_sphinx_fields=False,
     )
     structure = structure_for("Args:\n    value: Description.", settings=settings)
     assert tuple(section.name for section in structure.sections) == ("Args",)
@@ -992,4 +1056,4 @@ def test_complex_mixed_structure_partitions_lines_and_orders_semantic_regions() 
     assert all(structure.lines[region.start_line].start_offset == region.start_offset for region in structure.reflow_regions)
     assert all(structure.lines[region.end_line - 1].end_offset == region.end_offset for region in structure.reflow_regions)
     assert tuple(section.name for section in structure.sections) == ("Args", "Returns")
-    assert tuple((entry.names, entry.type_text) for entry in structure.entries) == ((("value",), None), (("other",), None), (("legacy",), None), ((), "tuple[str, int]"))
+    assert tuple((entry.names, entry.type_text) for entry in structure.entries) == ((("value",), None), (("other",), None), ((), "tuple[str, int]"))

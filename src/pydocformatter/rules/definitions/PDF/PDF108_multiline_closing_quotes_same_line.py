@@ -22,7 +22,10 @@ class PDF108MultilineClosingQuotesSameLine(RuleBase):
             RuleSettingEffects(
                 setting="docstring_convention",
                 effects=(
-                    RuleSettingEffectValues(effect=RuleSettingEffect.IGNORED, values=(DocstringConvention.NONE, DocstringConvention.GOOGLE, DocstringConvention.NUMPY, DocstringConvention.PEP257)),
+                    RuleSettingEffectValues(
+                        effect=RuleSettingEffect.IGNORED,
+                        values=(DocstringConvention.NONE, DocstringConvention.GOOGLE, DocstringConvention.NUMPY, DocstringConvention.REST, DocstringConvention.PEP257),
+                    ),
                 ),
             ),
         ),

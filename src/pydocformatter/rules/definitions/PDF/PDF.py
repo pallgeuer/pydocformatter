@@ -49,7 +49,7 @@ class DocstringBlockKind(enum.Enum):
     TABLE = "table"
     DIRECTIVE = "directive"
     LITERAL_BLOCK = "literal-block"
-    SPHINX_FIELD = "sphinx-field"
+    REST_FIELD = "rest-field"
     VERBATIM = "verbatim"
 
 
@@ -83,7 +83,7 @@ class DocstringValueLine:
 
 @dataclasses.dataclass(frozen=True)
 class DocstringEntry:
-    """One parsed convention section entry or Sphinx field."""
+    """One parsed convention section entry or rest field."""
 
     kind: DocstringEntryKind
     names: tuple[str, ...]
@@ -91,6 +91,8 @@ class DocstringEntry:
     description: str
     start_line: int
     end_line: int
+    field_name: str | None = None
+    field_argument: str | None = None
 
 
 @dataclasses.dataclass(frozen=True)
@@ -100,6 +102,15 @@ class ReflowRegionLine:
     text: str
     start_offset: int
     end_offset: int
+
+
+@dataclasses.dataclass(frozen=True)
+class ReflowRegionRun:
+    """One contiguous source run of reflowable lines."""
+
+    start_line: int
+    end_line: int
+    lines: tuple[ReflowRegionLine, ...]
 
 
 @dataclasses.dataclass(frozen=True)
@@ -551,6 +562,13 @@ _NUMPY_SECTIONS = {
     "yields",
 }
 PARAMETER_SECTION_NAMES = {"args", "arguments", "keyword args", "keyword arguments", "other args", "other arguments", "parameters", "other parameters", "other params", "receives"}
+REST_PARAMETER_VALUE_FIELDS = frozenset({"param", "parameter", "arg", "argument", "keyword", "kwarg"})
+REST_PARAMETER_TYPE_FIELDS = frozenset({"type"})
+REST_RETURN_VALUE_FIELDS = frozenset({"return", "returns"})
+REST_RETURN_TYPE_FIELDS = frozenset({"rtype"})
+REST_YIELD_VALUE_FIELDS = frozenset({"yield", "yields"})
+REST_YIELD_TYPE_FIELDS = frozenset({"ytype"})
+REST_EXCEPTION_FIELDS = frozenset({"raise", "raises", "except", "exception"})
 # Google style defines entry-section ordering, but does not define a canonical order for narrative admonition sections.
 _GOOGLE_ORDER_RANKS = {
     "args": 0,
@@ -603,7 +621,7 @@ _LIST_RE = re.compile(r"^(?P<indent>[ \t]*)(?P<marker>(?:[-+*]|\d+[.)]))[ \t]+(?
 _BLOCK_QUOTE_RE = re.compile(r"^(?P<indent>[ \t]*)(?P<quote>(?:>[ \t]*)+)(?P<text>.*)$")
 _FENCE_RE = re.compile(r"^[ \t]*(?P<fence>`{3,}|~{3,})(?P<info>.*)$")
 _DIRECTIVE_RE = re.compile(r"^(?P<indent>[ \t]*)\.\.[ \t]+(?P<name>[\w-]+)::(?P<argument>.*)$")
-_SPHINX_FIELD_RE = re.compile(r"^(?P<indent>[ \t]*):(?P<field>[\w-]+)(?:[ \t]+(?P<argument>[^:]+))?:[ \t]*(?P<description>.*)$")
+_REST_FIELD_RE = re.compile(r"^(?P<indent>[ \t]*):(?P<field>[\w-]+)(?:[ \t]+(?P<argument>[^:]+))?:[ \t]*(?P<description>.*)$")
 _GOOGLE_ENTRY_RE = re.compile(r"^(?P<indent>[ \t]+)(?P<name>\*{0,2}[A-Za-z_][\w.]*)(?:[ \t]*\((?P<type>[^)]+)\))?:[ \t]*(?P<description>.*)$")
 _GENERIC_ENTRY_RE = re.compile(r"^(?P<indent>[ \t]+)(?P<name>[^:]+):[ \t]*(?P<description>.*)$")
 _NUMPY_ENTRY_RE = re.compile(r"^(?P<indent>[ \t]*)(?P<name>\*{0,2}[A-Za-z_][\w., ]*?)[ \t]*:[ \t]*(?P<type>.+)$")
@@ -693,8 +711,8 @@ class _DocstringParser:
                 index = block_end
                 self.summary_pending = False
                 continue
-            if self.settings.docstring_parse_sphinx_fields and (field_match := _SPHINX_FIELD_RE.match(text)) is not None:
-                block, index = self._parse_sphinx_field(index, end, field_match)
+            if self._parses_rest_fields() and (field_match := _REST_FIELD_RE.match(text)) is not None:
+                block, index = self._parse_rest_field(index, end, field_match)
                 blocks.append(block)
                 self.summary_pending = False
                 continue
@@ -737,7 +755,7 @@ class _DocstringParser:
             or (self.settings.docstring_parse_literal_blocks and text.rstrip().endswith("::") and self._has_indented_body(index, end))
             or (self.settings.docstring_parse_tables and self._table_end(index, end) is not None)
             or (self.settings.docstring_parse_headings and self._is_heading(index, end))
-            or (self.settings.docstring_parse_sphinx_fields and _SPHINX_FIELD_RE.match(text) is not None)
+            or (self._parses_rest_fields() and _REST_FIELD_RE.match(text) is not None)
             or (self.settings.docstring_parse_list_items and _LIST_RE.match(text) is not None)
             or (self.settings.docstring_parse_block_quotes and _BLOCK_QUOTE_RE.match(text) is not None)
         )
@@ -759,6 +777,9 @@ class _DocstringParser:
         if convention == settings_check.DocstringConvention.GOOGLE:
             return candidate
         return candidate if not stripped.endswith(":") else None
+
+    def _parses_rest_fields(self) -> bool:
+        return self.settings.docstring_convention == settings_check.DocstringConvention.REST
 
     def _parse_section(self, start: int, end: int, name: str) -> tuple[DocstringBlock, int]:
         content_start = start + 1
@@ -913,30 +934,88 @@ class _DocstringParser:
             index += 1
         return tuple(entries)
 
-    def _parse_sphinx_field(self, start: int, end: int, match: re.Match[str]) -> tuple[DocstringBlock, int]:
-        block_end = self._entry_end(start, end, _indent_width(match.group("indent")))
+    def _parse_rest_field(self, start: int, end: int, match: re.Match[str]) -> tuple[DocstringBlock, int]:
+        block_end = self._continuation_end(start, end, _indent_width(match.group("indent")))
         field = match.group("field").lower()
         argument = (match.group("argument") or "").strip()
         first_description_line = self._reflow_line_from_text_span(start, match.start("description"), len(self.lines[start].text))
-        description_reflow_lines = []
-        if first_description_line is not None:
+        has_first_description = first_description_line is not None and bool(first_description_line.text)
+        description_reflow_lines: list[ReflowRegionLine] = []
+        reflow_runs: list[ReflowRegionRun] = []
+        if has_first_description:
+            assert first_description_line is not None
             description_reflow_lines.append(first_description_line)
-        description_reflow_lines.extend(self._stripped_reflow_lines(start + 1, block_end, skip_empty=True))
+        continuation_runs = self._rest_field_description_reflow_runs(start + 1, block_end)
+        description_reflow_lines.extend(line for run in continuation_runs for line in run.lines)
+        if has_first_description:
+            assert first_description_line is not None
+            if continuation_runs and continuation_runs[0].start_line == start + 1:
+                first_run = continuation_runs[0]
+                reflow_runs.append(ReflowRegionRun(start_line=start, end_line=first_run.end_line, lines=(first_description_line, *first_run.lines)))
+                reflow_runs.extend(continuation_runs[1:])
+            else:
+                reflow_runs.append(ReflowRegionRun(start_line=start, end_line=start + 1, lines=(first_description_line,)))
+                reflow_runs.extend(continuation_runs)
+        elif continuation_runs and continuation_runs[0].start_line == start + 1:
+            first_run = continuation_runs[0]
+            reflow_runs.append(ReflowRegionRun(start_line=start, end_line=first_run.end_line, lines=first_run.lines))
+            reflow_runs.extend(continuation_runs[1:])
+        else:
+            reflow_runs.extend(continuation_runs)
         description_lines = [line.text for line in description_reflow_lines]
-        kind = _sphinx_entry_kind(field)
-        names, type_text = _sphinx_entry_names_and_type(kind, argument)
-        entry = DocstringEntry(kind=kind, names=names, type_text=type_text, description=" ".join(description_lines).strip(), start_line=start, end_line=block_end)
+        kind, names, type_text = _rest_entry_metadata(field, argument)
+        entry = DocstringEntry(
+            kind=kind,
+            names=names,
+            type_text=type_text,
+            description=" ".join(description_lines).strip(),
+            start_line=start,
+            end_line=block_end,
+            field_name=field,
+            field_argument=argument or None,
+        )
         self.entries.append(entry)
         prefix = self.lines[start].text[: match.start("description")]
-        self._add_reflow(
-            DocstringBlockKind.SPHINX_FIELD,
-            start,
-            block_end,
-            lines=tuple(description_reflow_lines),
-            initial_indent=prefix,
-            subsequent_indent=" " * len(prefix.expandtabs(self.settings.indent_width)),
-        )
-        return DocstringBlock(DocstringBlockKind.SPHINX_FIELD, start, block_end, entry=entry), block_end
+        subsequent_indent = " " * len(prefix.expandtabs(self.settings.indent_width))
+        if reflow_runs and reflow_runs[0].start_line == start and not has_first_description and not prefix.endswith((" ", "\t")):
+            prefix = f"{prefix} "
+            subsequent_indent = " " * len(prefix.expandtabs(self.settings.indent_width))
+        for index, run in enumerate(reflow_runs):
+            run_indent = prefix if run.start_line == start else self.lines[run.start_line].text_indent
+            run_subsequent_indent = subsequent_indent if run.start_line == start else run_indent
+            self._add_reflow(
+                DocstringBlockKind.REST_FIELD,
+                run.start_line,
+                run.end_line,
+                lines=run.lines,
+                initial_indent=run_indent,
+                subsequent_indent=run_subsequent_indent,
+            )
+        return DocstringBlock(DocstringBlockKind.REST_FIELD, start, block_end, entry=entry), block_end
+
+    def _rest_field_description_reflow_runs(self, start: int, end: int) -> tuple[ReflowRegionRun, ...]:
+        runs: list[ReflowRegionRun] = []
+        run_start: int | None = None
+        run_lines: list[ReflowRegionLine] = []
+        index = start
+        while index < end:
+            protected_end = self._protected_block_end(index, end)
+            if protected_end is not None:
+                if run_start is not None and run_lines:
+                    runs.append(ReflowRegionRun(start_line=run_start, end_line=index, lines=tuple(run_lines)))
+                    run_start = None
+                    run_lines = []
+                index = protected_end
+                continue
+            line = self._reflow_line_from_text_span(index, 0, len(self.lines[index].text))
+            if line is not None and line.text:
+                if run_start is None:
+                    run_start = index
+                run_lines.append(line)
+            index += 1
+        if run_start is not None and run_lines:
+            runs.append(ReflowRegionRun(start_line=run_start, end_line=end, lines=tuple(run_lines)))
+        return tuple(runs)
 
     def _parse_list_item(self, start: int, end: int, match: re.Match[str]) -> tuple[DocstringBlock, int]:
         block_end = self._list_item_end(start, end, match)
@@ -1024,7 +1103,7 @@ class _DocstringParser:
             return table_end
         if self.settings.docstring_parse_headings and self._is_heading(index, end):
             return index + 2 if index + 1 < end and _is_adornment(self.lines[index + 1].text) else index + 1
-        if self.settings.docstring_parse_sphinx_fields and (field_match := _SPHINX_FIELD_RE.match(text)) is not None:
+        if self._parses_rest_fields() and (field_match := _REST_FIELD_RE.match(text)) is not None:
             return self._continuation_end(index, end, _indent_width(field_match.group("indent")))
         if self.settings.docstring_parse_list_items and (list_match := _LIST_RE.match(text)) is not None:
             return self._list_item_end(index, end, list_match)
@@ -1185,29 +1264,32 @@ def _entry_kind(convention: settings_check.DocstringConvention, section_name: st
     return DocstringEntryKind.FIELD
 
 
-def _sphinx_entry_kind(field: str) -> DocstringEntryKind:
-    """Return the semantic entry kind for a Sphinx field name."""
-    if field in {"param", "parameter", "arg", "argument", "keyword", "kwarg"}:
+def _rest_entry_kind(field: str) -> DocstringEntryKind:
+    """Return the semantic entry kind for a rest field name."""
+    if field in REST_PARAMETER_VALUE_FIELDS or field in REST_PARAMETER_TYPE_FIELDS:
         return DocstringEntryKind.PARAMETER
-    if field in {"return", "returns", "rtype"}:
+    if field in REST_RETURN_VALUE_FIELDS or field in REST_RETURN_TYPE_FIELDS:
         return DocstringEntryKind.RETURN
-    if field in {"yield", "yields", "ytype"}:
+    if field in REST_YIELD_VALUE_FIELDS or field in REST_YIELD_TYPE_FIELDS:
         return DocstringEntryKind.YIELD
-    if field in {"raise", "raises", "except", "exception"}:
+    if field in REST_EXCEPTION_FIELDS:
         return DocstringEntryKind.EXCEPTION
     return DocstringEntryKind.FIELD
 
 
-def _sphinx_entry_names_and_type(kind: DocstringEntryKind, argument: str) -> tuple[tuple[str, ...], str | None]:
+def _rest_entry_metadata(field: str, argument: str) -> tuple[DocstringEntryKind, tuple[str, ...], str | None]:
+    kind = _rest_entry_kind(field)
     if not argument:
-        return (), None
+        return kind, (), None
+    if field == "type":
+        return kind, (argument,), None
     if kind is not DocstringEntryKind.PARAMETER:
-        return (argument,), None
+        return kind, (argument,), None
     parts = argument.rsplit(None, 1)
     if len(parts) == 1:
-        return (argument,), None
+        return kind, (argument,), None
     type_text, name = parts
-    return (name,), type_text
+    return kind, (name,), type_text
 
 
 def _google_none_value_entry(kind: DocstringEntryKind, text: str, *, start: int) -> DocstringEntry | None:

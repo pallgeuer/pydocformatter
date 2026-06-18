@@ -23,7 +23,7 @@ class PDF507ExtraneousExceptionDocumentation(RuleBase):
                 effects=(
                     RuleSettingEffectValues(
                         effect=RuleSettingEffect.IGNORED,
-                        values=(DocstringConvention.NONE, DocstringConvention.GOOGLE, DocstringConvention.NUMPY, DocstringConvention.PEP257),
+                        values=(DocstringConvention.NONE, DocstringConvention.GOOGLE, DocstringConvention.NUMPY, DocstringConvention.REST, DocstringConvention.PEP257),
                     ),
                 ),
             ),

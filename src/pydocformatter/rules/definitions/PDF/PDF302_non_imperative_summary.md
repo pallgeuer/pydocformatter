@@ -9,7 +9,7 @@ Checks function and method docstring summaries whose first summary word is known
 
 The first summary word is normalized by removing non-alphanumeric characters and lowercasing before it is compared with the known non-imperative word list. This catches forms such as `Returns`, `returns`, `"Returns"`, and `Returns:`. Unknown words are accepted rather than guessed.
 
-PDF302 uses the parsed top-level summary block. It skips module and class docstrings, test functions named `runTest` or starting with `test`, property-like functions, empty docstrings, docstrings without a parsed summary, and parser-recognized structures such as sections, Sphinx fields, headings, lists, doctests, code fences, block quotes, tables, directives, literal blocks, and verbatim blocks. With heading parsing enabled, underlined title-style content is a heading and is skipped. With heading parsing disabled, the first non-adornment summary line is checked.
+PDF302 uses the parsed top-level summary block. It skips module and class docstrings, test functions named `runTest` or starting with `test`, property-like functions, empty docstrings, docstrings without a parsed summary, and parser-recognized structures such as sections, rest fields under the rest convention, headings, lists, doctests, code fences, block quotes, tables, directives, literal blocks, and verbatim blocks. With heading parsing enabled, underlined title-style content is a heading and is skipped. With heading parsing disabled, the first non-adornment summary line is checked.
 
 ## Why is this useful?
 Imperative summaries are the conventional style for many Python APIs because they describe what calling the function does.
@@ -102,4 +102,4 @@ PDF302: Line 2: Docstring summary first word 'Returns' is not imperative
 
 ## Options
 - `docstring-convention`: Ignores PDF302 for broad rule selections under the Google convention.
-- `docstring-parse-*`: Controls whether generic structures such as headings, Sphinx fields, lists, doctests, code fences, block quotes, tables, directives, and literal blocks are protected from summary-style checks.
+- `docstring-parse-*`: Controls whether generic structures such as headings, lists, doctests, code fences, block quotes, tables, directives, and literal blocks are protected from summary-style checks.

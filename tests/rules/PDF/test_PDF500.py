@@ -73,34 +73,46 @@ def test_reports_missing_parameters_from_numpy_parameter_section_aliases() -> No
     assert_pdf500_lines(source, ((1,),), settings=CheckSettings(select=("PDF500",), docstring_convention=DocstringConvention.NUMPY))
 
 
-def test_reports_parameter_missing_from_sphinx_fields() -> None:
+def test_reports_parameter_missing_from_rest_fields() -> None:
     source = 'def function(first, second):\n    """Summary.\n\n    :param first: First.\n    """\n'
 
-    assert_pdf500_lines(source, ((1,),), settings=CheckSettings(select=("PDF500",), docstring_convention=DocstringConvention.NONE))
+    assert_pdf500_lines(source, ((1,),), settings=CheckSettings(select=("PDF500",), docstring_convention=DocstringConvention.REST))
 
 
-def test_typed_sphinx_parameter_field_satisfies_signature_parameter() -> None:
+def test_typed_rest_parameter_field_satisfies_signature_parameter() -> None:
     source = 'def function(first):\n    """Summary.\n\n    :param int first: First.\n    """\n'
+
+    assert_pdf500_lines(source, (), settings=CheckSettings(select=("PDF500",), docstring_convention=DocstringConvention.REST))
+
+
+def test_type_only_rest_field_satisfies_signature_parameter() -> None:
+    source = 'def function(first):\n    """Summary.\n\n    :type first: int\n    """\n'
+
+    assert_pdf500_lines(source, (), settings=CheckSettings(select=("PDF500",), docstring_convention=DocstringConvention.REST))
+
+
+def test_reports_missing_parameter_from_rest_keyword_field() -> None:
+    source = 'def function(first, second):\n    """Summary.\n\n    :keyword first: First.\n    """\n'
+
+    assert_pdf500_lines(source, ((1,),), settings=CheckSettings(select=("PDF500",), docstring_convention=DocstringConvention.REST))
+
+
+def test_rest_starred_parameter_fields_satisfy_varargs_and_kwargs() -> None:
+    source = 'def function(*args, **kwargs):\n    """Summary.\n\n    :param tuple[str, ...] *args: Args.\n    :kwarg **kwargs: Kwargs.\n    """\n'
+
+    assert_pdf500_lines(source, (), settings=CheckSettings(select=("PDF500",), docstring_convention=DocstringConvention.REST))
+
+
+def test_inactive_rest_convention_does_not_parse_rest_parameter_documentation() -> None:
+    source = 'def function(first, second):\n    """Summary.\n\n    :param first: First.\n    """\n'
 
     assert_pdf500_lines(source, (), settings=CheckSettings(select=("PDF500",), docstring_convention=DocstringConvention.NONE))
 
 
-def test_reports_missing_parameter_from_sphinx_keyword_field() -> None:
-    source = 'def function(first, second):\n    """Summary.\n\n    :keyword first: First.\n    """\n'
-
-    assert_pdf500_lines(source, ((1,),), settings=CheckSettings(select=("PDF500",), docstring_convention=DocstringConvention.NONE))
-
-
-def test_sphinx_field_parsing_setting_controls_sphinx_parameter_documentation() -> None:
-    source = 'def function(first, second):\n    """Summary.\n\n    :param first: First.\n    """\n'
-
-    assert_pdf500_lines(source, (), settings=CheckSettings(select=("PDF500",), docstring_convention=DocstringConvention.NONE, docstring_parse_sphinx_fields=False))
-
-
-def test_mixed_google_and_sphinx_parameter_documentation_satisfies_signature() -> None:
+def test_rest_fields_do_not_satisfy_google_parameter_documentation() -> None:
     source = 'def function(first, second):\n    """Summary.\n\n    Args:\n        first: First.\n\n    :param second: Second.\n    """\n'
 
-    assert_pdf500_lines(source, ())
+    assert_pdf500_lines(source, ((1,),))
 
 
 def test_protected_content_inside_parameter_section_does_not_document_parameter() -> None:

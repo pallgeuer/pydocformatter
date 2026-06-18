@@ -1026,6 +1026,7 @@ class TestCLIShowFiles(unittest.TestCase):
             "none": (0, ("PDF106", "PDF109", "PDF201")),
             "google": (0, ("PDF106", "PDF109", "PDF201")),
             "numpy": (0, ("PDF109", "PDF201")),
+            "rest": (0, ("PDF106", "PDF109", "PDF201")),
             "pep257": (0, ("PDF109", "PDF201")),
         }
         for convention, (expected_exit_code, expected_rules) in broad_expectations.items():

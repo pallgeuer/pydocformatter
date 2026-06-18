@@ -316,7 +316,6 @@ class TestSettings(unittest.TestCase):
                 "docstring_parse_tables",
                 "docstring_parse_directives",
                 "docstring_parse_literal_blocks",
-                "docstring_parse_sphinx_fields",
             ),
         )
         self.assertEqual(
@@ -937,7 +936,6 @@ class TestSettings(unittest.TestCase):
                 "docstring_parse_tables": False,
                 "docstring_parse_directives": False,
                 "docstring_parse_literal_blocks": False,
-                "docstring_parse_sphinx_fields": False,
             }
         )
         self.assertFalse(config.docstring_parse_list_items)
@@ -948,10 +946,12 @@ class TestSettings(unittest.TestCase):
         self.assertFalse(config.docstring_parse_tables)
         self.assertFalse(config.docstring_parse_directives)
         self.assertFalse(config.docstring_parse_literal_blocks)
-        self.assertFalse(config.docstring_parse_sphinx_fields)
 
         with self.assertRaisesRegex(SettingsError, "docstring_convention must be one of"):
             pydocformatter_settings.SETTINGS_SCHEMA.load(field_overrides={"docstring_convention": "automatic"})
+
+        with self.assertRaisesRegex(SettingsError, "Unknown setting: docstring_parse_sphinx_fields"):
+            pydocformatter_settings.SETTINGS_SCHEMA.load(field_overrides={"docstring_parse_sphinx_fields": False})
 
     def test_output_format_setting_is_applied(self) -> None:
         with tempfile.TemporaryDirectory() as td:

@@ -870,7 +870,9 @@ def _validated_field_updates(schema: SettingsSchema[SettingsT], *, values: Mappi
     definitions_by_field = {definition.field: definition for definition in schema.definitions}
     updates: dict[str, Any] = {}
     for field, value in values.items():
-        definition = definitions_by_field[field]
+        definition = definitions_by_field.get(field)
+        if definition is None:
+            raise SettingsError(f"Unknown setting: {field}")
         updates[field] = definition.validator(value, f"{context}.{definition.key if key_based else field}")
     if schema.post_validate is not None:
         schema.post_validate(updates, context)

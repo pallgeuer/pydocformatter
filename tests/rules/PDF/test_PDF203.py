@@ -133,7 +133,6 @@ def test_disabled_code_fence_parsing_can_make_fence_text_reportable() -> None:
     (
         (CheckSettings(select=("PDF203",), docstring_parse_headings=False), "# Heading\n    Continuation.", (2, 3)),
         (CheckSettings(select=("PDF203",), docstring_parse_directives=False), ".. note:: Title\n    Continuation.", (2, 3)),
-        (CheckSettings(select=("PDF203",), docstring_parse_sphinx_fields=False), ":param value: Description.\n    Continuation.", (2, 3)),
         (CheckSettings(select=("PDF203",), docstring_parse_list_items=False), "- item\n    Continuation.", (2, 3)),
         (CheckSettings(select=("PDF203",), docstring_parse_block_quotes=False), "> quote\n    > continuation", (2, 3)),
         (CheckSettings(select=("PDF203",), docstring_parse_tables=False), "| A | B |\n    | --- | --- |\n    | 1 | 2 |", (2, 3, 4)),

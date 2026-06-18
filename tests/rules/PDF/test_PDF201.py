@@ -69,7 +69,6 @@ def test_inserts_blank_line_between_summary_and_recognized_structure() -> None:
         "    | A | B |\n    | --- | --- |\n    | 1 | 2 |",
         "    .. note:: Title\n\n        detail",
         "    Example::\n\n        code",
-        "    :param value: Description.",
         "        verbatim line",
     ),
 )
@@ -80,6 +79,19 @@ def test_inserts_blank_line_between_summary_and_each_recognized_structure_kind(s
     assert result.new_source == f'def function():\n    """Summary.\n\n{structure_source}\n    """\n'
     assert result.fixed_findings[PDF201MissingBlankLine.meta] == 1
     assert not format_source(result.new_source).modified
+
+
+def test_inserts_blank_line_between_summary_and_rest_field_only_under_rest_convention() -> None:
+    source = 'def function():\n    """Summary.\n    :param value: Description.\n    """\n'
+    rest_settings = CheckSettings(select=("PDF201",), docstring_convention=DocstringConvention.REST)
+    none_settings = CheckSettings(select=("PDF201",), docstring_convention=DocstringConvention.NONE)
+    rest = format_source(source, settings=rest_settings)
+    inactive = format_source(source, settings=none_settings)
+
+    assert rest.new_source == 'def function():\n    """Summary.\n\n    :param value: Description.\n    """\n'
+    assert rest.fixed_findings[PDF201MissingBlankLine.meta] == 1
+    assert inactive.new_source == source
+    assert not inactive.fixed_findings
 
 
 def test_disabled_structure_parsing_prevents_summary_separator_insertion() -> None:

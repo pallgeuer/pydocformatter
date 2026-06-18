@@ -5,7 +5,7 @@ Fix is usually available.
 ## What it does
 Checks for docstring text regions whose normalized wrapping does not match the configured line length and indentation settings.
 
-This rule rewrites safely mapped simple string docstrings by replacing the complete string literal with an equivalent literal that preserves the original string prefix, quote delimiter, and reusable source spellings for moved text. It can reflow summaries, paragraphs, convention section descriptions, Sphinx field descriptions, list items, and block quotes.
+This rule rewrites safely mapped simple string docstrings by replacing the complete string literal with an equivalent literal that preserves the original string prefix, quote delimiter, and reusable source spellings for moved text. It can reflow summaries, paragraphs, convention section descriptions, rest field descriptions, list items, and block quotes.
 
 PDF101 treats each reflowable semantic region independently. It joins consecutive physical lines in the same region before wrapping, so a finding can be emitted even when no individual input line is over the configured line length. Blank lines and protected structures remain region boundaries.
 
@@ -61,7 +61,7 @@ def normalize(text):
     """
 ```
 
-Google-style entries use fixed continuation indentation. If a long name or type prefix leaves too little first-line room, the description moves to the following line. Sphinx fields keep field-prefix hanging indentation:
+Google-style entries use fixed continuation indentation. If a long name or type prefix leaves too little first-line room, the description moves to the following line:
 
 ```pydocfmt-example
 [settings]
@@ -77,7 +77,6 @@ def fetch(path, payload, timeout):
         payload (Mapping[str, Sequence[tuple[str, object, bytes, float]]]): Data to send with enough explanation to require another generated line.
         timeout (float): Number of seconds to wait before failing.
 
-    :returns: The loaded bytes with enough explanation to require another generated line.
     """
 
 [output]
@@ -91,6 +90,27 @@ def fetch(path, payload, timeout):
             Data to send with enough explanation to require another generated
             line.
         timeout (float): Number of seconds to wait before failing.
+
+    """
+```
+
+Rest fields keep field-prefix hanging indentation under the rest convention:
+
+```pydocfmt-example
+[settings]
+line-length = 78
+docstring-convention = "rest"
+
+[input]
+def fetch(path):
+    """Fetch data.
+
+    :returns: The loaded bytes with enough explanation to require another generated line.
+    """
+
+[output]
+def fetch(path):
+    """Fetch data.
 
     :returns: The loaded bytes with enough explanation to require another
               generated line.
@@ -194,7 +214,7 @@ def example():
 - `line-length`: Maximum display width used when wrapping generated docstring lines.
 - `line-ending`: Line ending used inside rewritten docstring literals. Untouched source outside the replacement is preserved.
 - `indent-width`: Tab display width used for wrapping calculations and generated continuation indentation.
-- `docstring-convention`: Enables convention-aware parsing for Google or NumPy sections and entries.
+- `docstring-convention`: Enables convention-aware parsing for Google sections, NumPy sections, or rest fields.
 - `docstring-parse-list-items`: Controls whether list items are reflowed with list hanging indentation.
 - `docstring-parse-headings`: Controls whether Markdown and reStructuredText headings are protected.
 - `docstring-parse-doctests`: Controls whether doctest transcripts are protected.
@@ -203,4 +223,3 @@ def example():
 - `docstring-parse-tables`: Controls whether Markdown and reStructuredText tables are protected.
 - `docstring-parse-directives`: Controls whether reStructuredText directives and their bodies are protected.
 - `docstring-parse-literal-blocks`: Controls whether literal blocks are protected.
-- `docstring-parse-sphinx-fields`: Controls whether Sphinx fields are reflowed as field descriptions.

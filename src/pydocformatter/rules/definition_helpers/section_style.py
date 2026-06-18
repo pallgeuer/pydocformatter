@@ -9,9 +9,24 @@ import pydocformatter.rules.edits as rule_edits
 from pydocformatter.rules.definition import RuleContext, RuleFixResult
 from pydocformatter.rules.models import RuleFinding, RuleMetadata
 
-GOOGLE_IGNORED_CONVENTIONS = (settings_check.DocstringConvention.NONE, settings_check.DocstringConvention.NUMPY, settings_check.DocstringConvention.PEP257)
-NUMPY_IGNORED_CONVENTIONS = (settings_check.DocstringConvention.NONE, settings_check.DocstringConvention.GOOGLE, settings_check.DocstringConvention.PEP257)
+GOOGLE_IGNORED_CONVENTIONS = (
+    settings_check.DocstringConvention.NONE,
+    settings_check.DocstringConvention.NUMPY,
+    settings_check.DocstringConvention.REST,
+    settings_check.DocstringConvention.PEP257,
+)
+NUMPY_IGNORED_CONVENTIONS = (
+    settings_check.DocstringConvention.NONE,
+    settings_check.DocstringConvention.GOOGLE,
+    settings_check.DocstringConvention.REST,
+    settings_check.DocstringConvention.PEP257,
+)
 SECTION_IGNORED_CONVENTIONS = (settings_check.DocstringConvention.NONE, settings_check.DocstringConvention.PEP257)
+SECTION_NAME_IGNORED_CONVENTIONS = (
+    settings_check.DocstringConvention.NONE,
+    settings_check.DocstringConvention.REST,
+    settings_check.DocstringConvention.PEP257,
+)
 
 _GOOGLE_TRAILING_CONTENT_RE = re.compile(r"^(?P<indent>[ \t]*)(?P<name>[A-Za-z][A-Za-z ]*?)[ \t]*:[ \t]+(?P<content>\S.*)$")
 
@@ -154,7 +169,7 @@ def underline_results(context: RuleContext, *, rule: RuleMetadata) -> tuple[Sect
 
 
 def empty_section_findings(context: RuleContext, *, rule: RuleMetadata) -> tuple[RuleFinding, ...]:
-    """Return findings for recognized sections with no body content."""
+    """Return findings for recognized sections or rest fields with no body content."""
     data = PDF_definition.PDF.require_data(context)
     findings: list[RuleFinding] = []
     for docstring in data.docstrings:
@@ -168,54 +183,72 @@ def empty_section_findings(context: RuleContext, *, rule: RuleMetadata) -> tuple
                         instance_message=f"Docstring section '{section.name}' should not be empty",
                     )
                 )
+        if docstring.structure.convention is settings_check.DocstringConvention.REST:
+            for entry in docstring.structure.entries:
+                if entry.field_name is None or _rest_field_has_content(entry):
+                    continue
+                line = docstring.structure.lines[entry.start_line]
+                findings.append(
+                    RuleFinding(
+                        rule=rule,
+                        line_numbers=_line_numbers(docstring, line),
+                        instance_message=f"Docstring field '{_rest_field_label(entry)}' should not be empty",
+                    )
+                )
     return tuple(findings)
 
 
 def section_order_findings(context: RuleContext, *, rule: RuleMetadata) -> tuple[RuleFinding, ...]:
-    """Return findings for convention sections that appear out of order."""
+    """Return findings for convention sections or rest fields that appear out of order."""
     data = PDF_definition.PDF.require_data(context)
     findings: list[RuleFinding] = []
     for docstring in data.docstrings:
-        max_rank = -1
-        max_rank_section_name = ""
-        for section in docstring.structure.sections:
-            rank = _section_order_rank(docstring.structure.convention, section.name)
-            if rank is None:
-                continue
-            if rank < max_rank:
-                line = docstring.structure.lines[section.header_line]
-                findings.append(
-                    RuleFinding(
-                        rule=rule,
-                        line_numbers=_line_numbers(docstring, line),
-                        instance_message=f"Docstring section '{section.name}' should appear before '{max_rank_section_name}'",
+        if docstring.structure.convention is settings_check.DocstringConvention.REST:
+            findings.extend(_rest_field_order_findings(docstring, rule=rule))
+        else:
+            max_rank = -1
+            max_rank_section_name = ""
+            for section in docstring.structure.sections:
+                rank = _section_order_rank(docstring.structure.convention, section.name)
+                if rank is None:
+                    continue
+                if rank < max_rank:
+                    line = docstring.structure.lines[section.header_line]
+                    findings.append(
+                        RuleFinding(
+                            rule=rule,
+                            line_numbers=_line_numbers(docstring, line),
+                            instance_message=f"Docstring section '{section.name}' should appear before '{max_rank_section_name}'",
+                        )
                     )
-                )
-            else:
-                max_rank = rank
-                max_rank_section_name = section.name
+                else:
+                    max_rank = rank
+                    max_rank_section_name = section.name
     return tuple(findings)
 
 
 def repeated_section_findings(context: RuleContext, *, rule: RuleMetadata) -> tuple[RuleFinding, ...]:
-    """Return findings for repeated convention sections."""
+    """Return findings for repeated convention sections or rest fields."""
     data = PDF_definition.PDF.require_data(context)
     findings: list[RuleFinding] = []
     for docstring in data.docstrings:
-        seen_keys: dict[str, str] = {}
-        for section in docstring.structure.sections:
-            key = _repeated_section_key(docstring.structure.convention, section.name)
-            if key in seen_keys:
-                line = docstring.structure.lines[section.header_line]
-                findings.append(
-                    RuleFinding(
-                        rule=rule,
-                        line_numbers=_line_numbers(docstring, line),
-                        instance_message=f"Docstring section '{section.name}' repeats earlier section '{seen_keys[key]}'",
+        if docstring.structure.convention is settings_check.DocstringConvention.REST:
+            findings.extend(_repeated_rest_field_findings(docstring, rule=rule))
+        else:
+            seen_keys: dict[str, str] = {}
+            for section in docstring.structure.sections:
+                key = _repeated_section_key(docstring.structure.convention, section.name)
+                if key in seen_keys:
+                    line = docstring.structure.lines[section.header_line]
+                    findings.append(
+                        RuleFinding(
+                            rule=rule,
+                            line_numbers=_line_numbers(docstring, line),
+                            instance_message=f"Docstring section '{section.name}' repeats earlier section '{seen_keys[key]}'",
+                        )
                     )
-                )
-            else:
-                seen_keys[key] = section.name
+                else:
+                    seen_keys[key] = section.name
     return tuple(findings)
 
 
@@ -417,3 +450,101 @@ def _section_order_rank(convention: settings_check.DocstringConvention, section_
 
 def _repeated_section_key(convention: settings_check.DocstringConvention, section_name: str) -> str:
     return PDF_definition.repeated_section_key(convention, section_name)
+
+
+def _rest_field_order_findings(docstring: PDF_definition.DocstringInfo, *, rule: RuleMetadata) -> tuple[RuleFinding, ...]:
+    findings: list[RuleFinding] = []
+    max_rank = -1
+    max_rank_label = ""
+    for entry in docstring.structure.entries:
+        if entry.field_name is None:
+            continue
+        rank = _rest_field_order_rank(entry)
+        if rank is None:
+            continue
+        label = _rest_field_label(entry)
+        if rank < max_rank:
+            line = docstring.structure.lines[entry.start_line]
+            findings.append(
+                RuleFinding(
+                    rule=rule,
+                    line_numbers=_line_numbers(docstring, line),
+                    instance_message=f"Docstring field '{label}' should appear before '{max_rank_label}'",
+                )
+            )
+        else:
+            max_rank = rank
+            max_rank_label = label
+    return tuple(findings)
+
+
+def _repeated_rest_field_findings(docstring: PDF_definition.DocstringInfo, *, rule: RuleMetadata) -> tuple[RuleFinding, ...]:
+    findings: list[RuleFinding] = []
+    seen_keys: dict[tuple[str, str, str], str] = {}
+    for entry in docstring.structure.entries:
+        if entry.field_name is None:
+            continue
+        key = _repeated_rest_field_key(entry)
+        if key is None:
+            continue
+        label = _rest_field_label(entry)
+        if key in seen_keys:
+            line = docstring.structure.lines[entry.start_line]
+            findings.append(
+                RuleFinding(
+                    rule=rule,
+                    line_numbers=_line_numbers(docstring, line),
+                    instance_message=f"Docstring field '{label}' repeats earlier field '{seen_keys[key]}'",
+                )
+            )
+        else:
+            seen_keys[key] = label
+    return tuple(findings)
+
+
+def _rest_field_order_rank(entry: PDF_definition.DocstringEntry) -> int | None:
+    if entry.kind is PDF_definition.DocstringEntryKind.PARAMETER:
+        return 0
+    if entry.kind in (PDF_definition.DocstringEntryKind.RETURN, PDF_definition.DocstringEntryKind.YIELD):
+        return 1
+    if entry.kind is PDF_definition.DocstringEntryKind.EXCEPTION:
+        return 2
+    return None
+
+
+def _repeated_rest_field_key(entry: PDF_definition.DocstringEntry) -> tuple[str, str, str] | None:
+    field_name = entry.field_name or ""
+    argument = entry.field_argument or ""
+    if entry.kind is PDF_definition.DocstringEntryKind.PARAMETER and field_name in PDF_definition.REST_PARAMETER_VALUE_FIELDS:
+        if not entry.names:
+            return None
+        return ("parameter", ",".join(entry.names), "")
+    if entry.kind is PDF_definition.DocstringEntryKind.PARAMETER and field_name in PDF_definition.REST_PARAMETER_TYPE_FIELDS:
+        if not argument:
+            return None
+        return ("parameter-type", argument, "")
+    if entry.kind is PDF_definition.DocstringEntryKind.RETURN and field_name in PDF_definition.REST_RETURN_VALUE_FIELDS:
+        return ("return", "", "")
+    if entry.kind is PDF_definition.DocstringEntryKind.RETURN and field_name in PDF_definition.REST_RETURN_TYPE_FIELDS:
+        return ("return-type", "", "")
+    if entry.kind is PDF_definition.DocstringEntryKind.YIELD and field_name in PDF_definition.REST_YIELD_VALUE_FIELDS:
+        return ("yield", "", "")
+    if entry.kind is PDF_definition.DocstringEntryKind.YIELD and field_name in PDF_definition.REST_YIELD_TYPE_FIELDS:
+        return ("yield-type", "", "")
+    if entry.kind is PDF_definition.DocstringEntryKind.EXCEPTION and field_name in PDF_definition.REST_EXCEPTION_FIELDS:
+        if not entry.names:
+            return None
+        return ("exception", ",".join(entry.names), "")
+    return ("field", field_name, argument)
+
+
+def _rest_field_has_content(entry: PDF_definition.DocstringEntry) -> bool:
+    # A protected continuation body counts as content even when it has no reflowable description text.
+    return bool(entry.description or entry.end_line > entry.start_line + 1)
+
+
+def _rest_field_label(entry: PDF_definition.DocstringEntry) -> str:
+    field_name = entry.field_name or ""
+    if entry.field_argument:
+        return f":{field_name} {entry.field_argument}:"
+    return f":{field_name}:"

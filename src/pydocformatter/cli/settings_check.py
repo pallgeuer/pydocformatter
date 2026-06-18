@@ -68,6 +68,7 @@ class DocstringConvention(enum.StrEnum):
     NONE = "none"
     GOOGLE = "google"
     NUMPY = "numpy"
+    REST = "rest"
     PEP257 = "pep257"
 
 
@@ -123,7 +124,6 @@ class CheckSettings:
         docstring_parse_tables (bool): Whether Markdown and reStructuredText tables are parsed and protected.
         docstring_parse_directives (bool): Whether reStructuredText directives and their bodies are parsed.
         docstring_parse_literal_blocks (bool): Whether reStructuredText literal blocks are parsed and protected.
-        docstring_parse_sphinx_fields (bool): Whether Sphinx fields are parsed into semantic entries.
         comment_join_standalone_lines (bool): Whether consecutive standalone prose comment lines are joined before
             wrapping.
         comment_format_list_items (bool): Whether standalone comment list items are detected and reflowed.
@@ -173,7 +173,6 @@ class CheckSettings:
     docstring_parse_tables: bool = True
     docstring_parse_directives: bool = True
     docstring_parse_literal_blocks: bool = True
-    docstring_parse_sphinx_fields: bool = True
     comment_join_standalone_lines: bool = False
     comment_format_list_items: bool = True
     comment_preserve_headings: bool = True
@@ -241,7 +240,6 @@ class CheckSettingsOverrides(TypedDict, total=False):
         docstring_parse_tables (bool): Whether Markdown and reStructuredText tables are parsed and protected.
         docstring_parse_directives (bool): Whether reStructuredText directives and their bodies are parsed.
         docstring_parse_literal_blocks (bool): Whether reStructuredText literal blocks are parsed and protected.
-        docstring_parse_sphinx_fields (bool): Whether Sphinx fields are parsed into semantic entries.
         comment_join_standalone_lines (bool): Whether consecutive standalone prose comment lines are joined before
             wrapping.
         comment_format_list_items (bool): Whether standalone comment list items are detected and reflowed.
@@ -291,7 +289,6 @@ class CheckSettingsOverrides(TypedDict, total=False):
     docstring_parse_tables: bool
     docstring_parse_directives: bool
     docstring_parse_literal_blocks: bool
-    docstring_parse_sphinx_fields: bool
     comment_join_standalone_lines: bool
     comment_format_list_items: bool
     comment_preserve_headings: bool
@@ -391,7 +388,7 @@ SETTINGS_SCHEMA = SettingsSchema(
             value_type=DocstringConvention,
             group=SettingsGroup.DOCSTRING_FORMATTING,
             help="Convention used to parse semantic docstring sections.",
-            documentation='Docstring convention; one of "none", "google", "numpy", or "pep257".',
+            documentation='Docstring convention; one of "none", "google", "numpy", "rest", or "pep257".',
         ),
         SettingDefinition(
             field="docstring_blank_line_style",
@@ -468,12 +465,6 @@ SETTINGS_SCHEMA = SettingsSchema(
             value_type=bool,
             group=SettingsGroup.DOCSTRING_FORMATTING,
             help="Parse and protect reStructuredText literal blocks in docstrings.",
-        ),
-        SettingDefinition(
-            field="docstring_parse_sphinx_fields",
-            value_type=bool,
-            group=SettingsGroup.DOCSTRING_FORMATTING,
-            help="Parse Sphinx docstring fields into semantic entries.",
         ),
         SettingDefinition(
             field="comment_join_standalone_lines",

@@ -88,6 +88,50 @@ def test_allows_duplicate_and_same_rank_numpy_sections() -> None:
     assert not result.unfixed_findings
 
 
+def test_reports_rest_fields_after_later_ranked_fields() -> None:
+    source = 'def function(value):\n    """Summary.\n\n    :returns: Result.\n    :param value: Description.\n    :raises ValueError: Bad value.\n    :rtype: str\n    """\n'
+    result = format_source(source, settings=CheckSettings(select=("PDF405",), docstring_convention=DocstringConvention.REST))
+
+    assert result.new_source == source
+    assert not result.fixed_findings
+    assert tuple(finding.rule for finding in result.unfixed_findings) == (PDF405SectionOrder.meta, PDF405SectionOrder.meta)
+    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((5,), (7,))
+    assert tuple(finding.message for finding in result.unfixed_findings) == (
+        "Docstring field ':param value:' should appear before ':returns:'",
+        "Docstring field ':rtype:' should appear before ':raises ValueError:'",
+    )
+
+
+def test_reports_type_rest_field_after_return_field() -> None:
+    source = 'def function(value):\n    """Summary.\n\n    :returns: Result.\n    :type value: int\n    """\n'
+    result = format_source(source, settings=CheckSettings(select=("PDF405",), docstring_convention=DocstringConvention.REST))
+
+    assert result.new_source == source
+    assert not result.fixed_findings
+    assert tuple(finding.rule for finding in result.unfixed_findings) == (PDF405SectionOrder.meta,)
+    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((5,),)
+    assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring field ':type value:' should appear before ':returns:'",)
+
+
+def test_unordered_rest_fields_do_not_affect_order() -> None:
+    source = 'def function(value):\n    """Summary.\n\n    :meta private: yes\n    :param value: Description.\n    :returns: Result.\n    """\n'
+    result = format_source(source, settings=CheckSettings(select=("PDF405",), docstring_convention=DocstringConvention.REST))
+
+    assert result.new_source == source
+    assert not result.fixed_findings
+    assert not result.unfixed_findings
+
+
+def test_rest_unknown_fields_do_not_reset_highest_rank_and_return_yield_share_rank() -> None:
+    source = 'def function(value):\n    """Summary.\n\n    :returns: Result.\n    :yields: Streamed result.\n    :meta private: yes\n    :param value: Description.\n    """\n'
+    result = format_source(source, settings=CheckSettings(select=("PDF405",), docstring_convention=DocstringConvention.REST))
+
+    assert result.new_source == source
+    assert not result.fixed_findings
+    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((7,),)
+    assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring field ':param value:' should appear before ':yields:'",)
+
+
 def test_ignored_without_google_or_numpy_convention() -> None:
     source = 'def function(value):\n    """Summary.\n\n    Returns:\n        int: Result.\n\n    Args:\n        value: Description.\n    """\n'
     result = format_source(source, settings=CheckSettings(select=("PDF405",), docstring_convention=DocstringConvention.NONE))

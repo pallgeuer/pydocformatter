@@ -7,7 +7,7 @@ Checks function and method docstrings for directly raised exception classes miss
 
 The rule recognizes direct raises such as `raise ValueError`, `raise ValueError(...)`, `raise errors.ValueError`, and `raise errors.ValueError(...)`. Bare re-raises and dynamic raises such as `raise error` are ignored. Exception names are compared case-sensitively. Qualified names match exactly when both sides are qualified; otherwise the final class-name component is compared, so `errors.CustomError()` matches documented `CustomError` but not documented `other.CustomError`. Repeated raises of the same undocumented exception produce one finding at the first raise line.
 
-Exception documentation is read from recognized `Raises` sections and parsed Sphinx exception fields. Warning sections such as `Warns` and `Warnings` are not exception documentation for this rule. Functions without docstrings, abstract methods, and stub functions are ignored. Nested functions, classes, and lambdas are ignored by the enclosing function and checked independently when they have their own docstrings.
+Exception documentation is read from recognized `Raises` sections and parsed rest exception fields. Warning sections such as `Warns` and `Warnings` are not exception documentation for this rule. Functions without docstrings, abstract methods, and stub functions are ignored. Nested functions, classes, and lambdas are ignored by the enclosing function and checked independently when they have their own docstrings.
 
 By default, this rule reports missing exception documentation only when the docstring already has recognized exception documentation, such as a `Raises` section. Broader shared missing-documentation modes can require exception documentation for public docstrings with body content, or for all public docstrings.
 
@@ -130,11 +130,11 @@ def dynamic(error):
 PDF506: Line 7: Raised exception 'ValueError' is missing docstring documentation
 ```
 
-Sphinx exception fields satisfy the rule only when Sphinx field parsing is enabled:
+Rest exception fields satisfy the rule under the rest convention:
 
 ```pydocfmt-example
 [settings]
-docstring-convention = "none"
+docstring-convention = "rest"
 
 [input]
 def validate():
@@ -150,7 +150,6 @@ def validate():
 ```pydocfmt-example
 [settings]
 docstring-convention = "none"
-docstring-parse-sphinx-fields = false
 docstring-missing-documentation = "all-docstrings"
 
 [input]
@@ -167,7 +166,6 @@ PDF506: Line 6: Raised exception 'ValueError' is missing docstring documentation
 ```
 
 ## Options
-- `docstring-convention`: Controls whether Google or NumPy `Raises` sections are recognized.
-- `docstring-parse-sphinx-fields`: Controls whether Sphinx exception fields such as `:raises ValueError:` are recognized.
+- `docstring-convention`: Controls whether Google `Raises` sections, NumPy `Raises` sections, or rest exception fields such as `:raises ValueError:` are recognized.
 - `docstring-missing-documentation`: Controls when missing exception documentation is reported. `has-section` reports only docstrings with recognized exception documentation. `non-summary-docstrings` additionally reports public docstrings with more than just a summary. `all-docstrings` additionally reports all public docstrings.
 - `docstring-missing-documentation-public-only`: When `true`, the broad parts of `non-summary-docstrings` and `all-docstrings` apply only to public functions and methods. Explicit exception documentation is always checked, including for private functions.

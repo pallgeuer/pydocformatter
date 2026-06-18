@@ -11,7 +11,7 @@ PDF110 only rewrites summary-only docstrings. It does not collapse docstrings wi
 
 When a summary starts or ends with the quote delimiter character, PDF110 keeps valid Python source by using a value-preserving escape where possible, or a minimal separator space when escaping is not possible. That separator fallback can add a leading or trailing space to the evaluated `__doc__` value.
 
-Parsing settings affect what counts as a recognized structure. For example, a single list item, heading, doctest, directive, Sphinx field, or block quote is protected by default and is not treated as a plain summary. Disabling the matching `docstring-parse-*` setting can make that text eligible for collapse if it is then parsed as a single summary line.
+Parsing settings and the active convention affect what counts as a recognized structure. For example, a single list item, heading, doctest, directive, rest field under the rest convention, or block quote is protected and is not treated as a plain summary. Disabling the matching `docstring-parse-*` setting can make generic structures eligible for collapse if they are then parsed as a single summary line.
 
 ## Why is this useful?
 Single-line docstrings are easier to scan when their complete content fits comfortably on one source line.
@@ -171,6 +171,21 @@ def list_item() -> None:
 [output=unchanged]
 ```
 
+Rest fields are protected only under the rest convention:
+
+```pydocfmt-example
+[settings]
+docstring-convention = "rest"
+
+[input]
+def value() -> int:
+    """
+    :returns: Computed value.
+    """
+
+[output=unchanged]
+```
+
 If the relevant structure parser is disabled, the same text can become a plain one-line summary and be collapsed:
 
 ```pydocfmt-example
@@ -229,5 +244,5 @@ def escaped() -> None:
 ## Options
 - `line-length`: Maximum display width allowed for the complete collapsed source line.
 - `indent-width`: Display width used when measuring tabs.
-- `docstring-convention`: Controls whether Google and NumPy sections are recognized instead of treated as summary text.
-- `docstring-parse-*`: Controls whether generic structures such as lists, headings, doctests, directives, Sphinx fields, and block quotes are protected from one-line summary collapse.
+- `docstring-convention`: Controls whether Google sections, NumPy sections, and rest fields are recognized instead of treated as summary text.
+- `docstring-parse-*`: Controls whether generic structures such as lists, headings, doctests, directives, and block quotes are protected from one-line summary collapse.

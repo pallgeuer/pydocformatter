@@ -43,14 +43,14 @@ def test_every_convention_ignores_broad_selection_but_exact_selection_still_appl
     assert tuple(finding.line_numbers for finding in exact.unfixed_findings) == ((5,),)
 
 
-def test_allows_google_numpy_and_sphinx_documented_exceptions_matching_direct_raise() -> None:
+def test_allows_google_numpy_and_rest_documented_exceptions_matching_direct_raise() -> None:
     google = 'def function():\n    """Validate.\n\n    Raises:\n        ValueError: Bad value.\n    """\n    raise ValueError("bad")\n'
     numpy = 'def function():\n    """Validate.\n\n    Raises\n    ------\n    ValueError\n        Bad value.\n    """\n    raise ValueError("bad")\n'
-    sphinx = 'def function():\n    """Validate.\n\n    :raises ValueError: Bad value.\n    """\n    raise ValueError("bad")\n'
+    rest = 'def function():\n    """Validate.\n\n    :raises ValueError: Bad value.\n    """\n    raise ValueError("bad")\n'
 
     assert_pdf507_lines(google, ())
     assert_pdf507_lines(numpy, (), settings=CheckSettings(select=("PDF507",), docstring_convention=DocstringConvention.NUMPY))
-    assert_pdf507_lines(sphinx, (), settings=CheckSettings(select=("PDF507",), docstring_convention=DocstringConvention.NONE))
+    assert_pdf507_lines(rest, (), settings=CheckSettings(select=("PDF507",), docstring_convention=DocstringConvention.REST))
 
 
 def test_one_google_entry_can_document_multiple_directly_raised_exceptions() -> None:
@@ -118,18 +118,24 @@ def test_reports_each_duplicate_stale_documented_exception() -> None:
     )
 
 
-def test_reports_numpy_and_sphinx_stale_documented_exceptions() -> None:
+def test_reports_numpy_and_rest_stale_documented_exceptions() -> None:
     numpy = 'def function():\n    """Validate.\n\n    Raises\n    ------\n    ValueError\n        Bad value.\n    """\n'
-    sphinx = 'def function():\n    """Validate.\n\n    :raises ValueError: Bad value.\n    """\n'
+    rest = 'def function():\n    """Validate.\n\n    :raises ValueError: Bad value.\n    """\n'
 
     assert_pdf507_lines(numpy, ((6,),), settings=CheckSettings(select=("PDF507",), docstring_convention=DocstringConvention.NUMPY))
-    assert_pdf507_lines(sphinx, ((4,),), settings=CheckSettings(select=("PDF507",), docstring_convention=DocstringConvention.NONE))
+    assert_pdf507_lines(rest, ((4,),), settings=CheckSettings(select=("PDF507",), docstring_convention=DocstringConvention.REST))
+
+
+def test_reports_rest_exception_field_aliases_for_stale_documented_exceptions() -> None:
+    source = 'def function():\n    """Validate.\n\n    :except ValueError: Bad value.\n    :exception TypeError: Bad type.\n    """\n'
+
+    assert_pdf507_lines(source, ((4,), (5,)), settings=CheckSettings(select=("PDF507",), docstring_convention=DocstringConvention.REST))
 
 
 def test_concatenated_docstring_exception_field_uses_physical_line_fallback() -> None:
     source = 'def function():\n    ("Validate.\\n\\n"\n     ":raises ValueError: Bad value.")\n'
 
-    assert_pdf507_lines(source, ((2, 3),), settings=CheckSettings(select=("PDF507",), docstring_convention=DocstringConvention.NONE))
+    assert_pdf507_lines(source, ((2, 3),), settings=CheckSettings(select=("PDF507",), docstring_convention=DocstringConvention.REST))
 
 
 def test_ignores_prose_only_raises_missing_docstrings_abstracts_and_stubs() -> None:
@@ -138,13 +144,13 @@ def test_ignores_prose_only_raises_missing_docstrings_abstracts_and_stubs() -> N
     assert_pdf507_lines(source, ())
 
 
-def test_sphinx_field_parsing_setting_controls_sphinx_exception_documentation() -> None:
+def test_inactive_rest_convention_does_not_parse_rest_exception_documentation() -> None:
     source = 'def function():\n    """Validate.\n\n    :raises ValueError: Bad value.\n    """\n'
 
-    assert_pdf507_lines(source, (), settings=CheckSettings(select=("PDF507",), docstring_convention=DocstringConvention.NONE, docstring_parse_sphinx_fields=False))
+    assert_pdf507_lines(source, (), settings=CheckSettings(select=("PDF507",), docstring_convention=DocstringConvention.NONE))
 
 
-def test_nameless_sphinx_exception_field_is_not_comparable_documentation() -> None:
+def test_nameless_rest_exception_field_is_not_comparable_documentation() -> None:
     source = 'def function():\n    """Validate.\n\n    :raises: If the value is bad.\n    """\n'
 
-    assert_pdf507_lines(source, (), settings=CheckSettings(select=("PDF507",), docstring_convention=DocstringConvention.NONE))
+    assert_pdf507_lines(source, (), settings=CheckSettings(select=("PDF507",), docstring_convention=DocstringConvention.REST))

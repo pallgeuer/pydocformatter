@@ -126,4 +126,4 @@ PDF400: Lines 2-4: Docstring section name 'args' should be capitalized as 'Args'
 ```
 
 ## Options
-- `docstring-convention`: Enables Google and NumPy section recognition. `none` and `pep257` ignore this rule.
+- `docstring-convention`: Enables Google and NumPy section recognition. `none`, `rest`, and `pep257` ignore this rule.

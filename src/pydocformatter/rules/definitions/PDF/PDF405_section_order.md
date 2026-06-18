@@ -5,9 +5,9 @@ Fix is not available.
 Rule is ignored if `docstring-convention` is `none` or `pep257`.
 
 ## What it does
-PDF405 reports recognized Google and NumPy sections that appear after a later ordered section for the active convention. Duplicate sections and sections with the same order rank are allowed.
+PDF405 reports recognized Google and NumPy sections, plus rest fields under the rest convention, that appear after a later ordered item for the active convention. Duplicate sections and fields with the same order rank are allowed.
 
-For Google docstrings, PDF405 orders parameter sections before return/yield sections before raise/warn sections. Other recognized Google sections, such as examples and notes, are unordered and do not affect diagnostics. For NumPy docstrings, PDF405 follows the conventional numpydoc section order used by Ruff-style section-order checks.
+For Google docstrings, PDF405 orders parameter sections before return/yield sections before raise/warn sections. Other recognized Google sections, such as examples and notes, are unordered and do not affect diagnostics. For NumPy docstrings, PDF405 follows the conventional numpydoc section order used by Ruff-style section-order checks. For rest docstrings, PDF405 orders parameter fields before return/yield fields before exception fields.
 
 ## Why is this useful?
 Consistent section order helps readers find parameters, returns, yields, raises, and related documentation quickly.
@@ -141,5 +141,24 @@ def value(arg):
 PDF405: Line 9: Docstring section 'Parameters' should appear before 'Returns'
 ```
 
+PDF405 also applies to rest fields under the rest convention:
+
+```pydocfmt-example
+[settings]
+docstring-convention = "rest"
+
+[input]
+def value(arg):
+    """Return the value.
+
+    :returns: The value.
+    :param arg: The value.
+    """
+
+[output=unchanged]
+[findings]
+PDF405: Line 5: Docstring field ':param arg:' should appear before ':returns:'
+```
+
 ## Options
-- `docstring-convention`: Enables Google and NumPy section recognition. `none` and `pep257` ignore this rule.
+- `docstring-convention`: Enables Google and NumPy section recognition and rest field recognition. `none` and `pep257` ignore this rule.

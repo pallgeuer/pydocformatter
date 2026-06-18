@@ -38,14 +38,20 @@ def test_default_policy_ignores_docstring_without_exception_documentation() -> N
     assert_pdf506_lines(source, (), settings=CheckSettings(select=("PDF506",), docstring_convention=DocstringConvention.GOOGLE))
 
 
-def test_google_numpy_and_sphinx_exception_documentation_satisfy_direct_raise() -> None:
+def test_google_numpy_and_rest_exception_documentation_satisfy_direct_raise() -> None:
     google = 'def function():\n    """Validate.\n\n    Raises:\n        ValueError: Bad value.\n    """\n    raise ValueError("bad")\n'
     numpy = 'def function():\n    """Validate.\n\n    Raises\n    ------\n    ValueError\n        Bad value.\n    """\n    raise ValueError("bad")\n'
-    sphinx = 'def function():\n    """Validate.\n\n    :raises ValueError: Bad value.\n    """\n    raise ValueError("bad")\n'
+    rest = 'def function():\n    """Validate.\n\n    :raises ValueError: Bad value.\n    """\n    raise ValueError("bad")\n'
 
     assert_pdf506_lines(google, ())
     assert_pdf506_lines(numpy, (), settings=CheckSettings(select=("PDF506",), docstring_convention=DocstringConvention.NUMPY))
-    assert_pdf506_lines(sphinx, (), settings=CheckSettings(select=("PDF506",), docstring_convention=DocstringConvention.NONE))
+    assert_pdf506_lines(rest, (), settings=CheckSettings(select=("PDF506",), docstring_convention=DocstringConvention.REST))
+
+
+def test_rest_exception_field_aliases_satisfy_direct_raises() -> None:
+    source = 'def function(flag):\n    """Validate.\n\n    :except ValueError: Bad value.\n    :exception TypeError: Bad type.\n    """\n    if flag:\n        raise ValueError("bad")\n    raise TypeError("bad")\n'
+
+    assert_pdf506_lines(source, (), settings=CheckSettings(select=("PDF506",), docstring_convention=DocstringConvention.REST))
 
 
 def test_one_google_entry_can_document_multiple_directly_raised_exceptions() -> None:
@@ -109,15 +115,13 @@ def test_ignores_bare_raise_dynamic_raise_warning_docs_missing_docstrings_abstra
     assert_pdf506_lines(source, ((25,),))
 
 
-def test_sphinx_field_parsing_setting_controls_sphinx_exception_documentation() -> None:
+def test_inactive_rest_convention_does_not_parse_rest_exception_documentation() -> None:
     source = 'def function():\n    """Validate.\n\n    :raises ValueError: Bad value.\n    """\n    raise ValueError("bad")\n'
 
     assert_pdf506_lines(
         source,
         ((6,),),
-        settings=CheckSettings(
-            select=("PDF506",), docstring_convention=DocstringConvention.NONE, docstring_parse_sphinx_fields=False, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS
-        ),
+        settings=CheckSettings(select=("PDF506",), docstring_convention=DocstringConvention.NONE, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS),
     )
 
 

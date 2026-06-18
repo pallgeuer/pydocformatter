@@ -93,7 +93,7 @@ If no files or directories are specified, `pydocfmt check` checks the current di
 - `--indent-width WIDTH`: Generated docstring indentation width and comment tab width (default: 4)
 
 **Docstring formatting:**
-- `--docstring-convention {none,google,numpy,pep257}`: Convention used to parse semantic docstring sections (default: none)
+- `--docstring-convention {none,google,numpy,rest,pep257}`: Convention used to parse semantic docstring sections (default: none)
 - `--docstring-blank-line-style {blank,aligned}`: Whitespace style for blank docstring lines (default: blank)
 - `--docstring-blank-line-after-last-section`, `--no-docstring-blank-line-after-last-section`: Toggle keeping one blank line after the last recognized Google or NumPy docstring section (default: disabled)
 - `--docstring-missing-documentation {has-section,non-summary-docstrings,all-docstrings}`: When missing-documentation rules report missing function documentation (default: has-section)
@@ -106,7 +106,6 @@ If no files or directories are specified, `pydocfmt check` checks the current di
 - `--docstring-parse-tables`, `--no-docstring-parse-tables`: Toggle parsing and protecting tables (default: enabled)
 - `--docstring-parse-directives`, `--no-docstring-parse-directives`: Toggle parsing reStructuredText directives (default: enabled)
 - `--docstring-parse-literal-blocks`, `--no-docstring-parse-literal-blocks`: Toggle parsing reStructuredText literal blocks (default: enabled)
-- `--docstring-parse-sphinx-fields`, `--no-docstring-parse-sphinx-fields`: Toggle parsing Sphinx fields (default: enabled)
 
 **Comment formatting:**
 - `--comment-join-standalone-lines`, `--no-comment-join-standalone-lines`: Toggle joining standalone prose lines before wrapping (default: disabled)
@@ -249,7 +248,6 @@ parse-block-quotes = true
 parse-tables = true
 parse-directives = true
 parse-literal-blocks = true
-parse-sphinx-fields = true
 
 [tool.pydocfmt.comment]
 join-standalone-lines = false
@@ -274,7 +272,7 @@ For TOML configuration, `[tool.pydocfmt.docstring]` and `[tool.pydocfmt.comment]
 - `line-ending`: Line ending to use when rewriting files; one of `"auto"`, `"lf"`, `"cr-lf"`, or `"native"` (default: `"auto"`)
 - `indent-style`: Generated docstring section indentation style; one of `"space"` or `"tab"` (default: `"space"`)
 - `indent-width`: Generated docstring section indentation width and tab expansion width used when measuring comments (default: 4)
-- `docstring-convention`: Docstring convention; one of `"none"`, `"google"`, `"numpy"`, or `"pep257"` (default: `"none"`)
+- `docstring-convention`: Docstring convention; one of `"none"`, `"google"`, `"numpy"`, `"rest"`, or `"pep257"` (default: `"none"`)
 - `docstring-blank-line-style`: Blank docstring line whitespace style used by PDF103; one of `"blank"` or `"aligned"` (default: `"blank"`)
 - `docstring-blank-line-after-last-section`: Whether PDF200 and PDF201 keep one blank line after the last recognized Google or NumPy docstring section (default: `false`)
 - `docstring-missing-documentation`: When missing-documentation rules report missing function documentation; one of `"has-section"`, `"non-summary-docstrings"`, or `"all-docstrings"` (default: `"has-section"`)
@@ -287,7 +285,6 @@ For TOML configuration, `[tool.pydocfmt.docstring]` and `[tool.pydocfmt.comment]
 - `docstring-parse-tables`: Parse and protect Markdown and reStructuredText tables in docstrings (default: `true`)
 - `docstring-parse-directives`: Parse reStructuredText directives and their bodies in docstrings (default: `true`)
 - `docstring-parse-literal-blocks`: Parse and protect reStructuredText literal blocks in docstrings (default: `true`)
-- `docstring-parse-sphinx-fields`: Parse Sphinx docstring fields into semantic entries (default: `true`)
 - `comment-join-standalone-lines`: Join consecutive standalone prose comment lines before wrapping (default: `false`)
 - `comment-format-list-items`: Detect ordered and unordered standalone comment list items and reflow them with hanging indentation (default: `true`)
 - `comment-preserve-headings`: Preserve detected Markdown and reStructuredText comment headings unchanged (default: `true`)
@@ -318,7 +315,7 @@ When `respect-gitignore` is enabled, pydocfmt aborts if gitignore filtering cann
 
 The `comment-*` settings affect the rule-based formatter. PCF001 defaults to formatting each standalone physical line independently; joining and structured-markup interpretation are opt-in. See `pydocfmt rule PCF001` and `pydocfmt rule PCF002` for exact detector precedence and protected-comment behavior.
 
-The `docstring-convention` setting never auto-detects a convention. Google and NumPy sections are only parsed when their matching convention is selected; `none` and `pep257` leave those section syntaxes as ordinary content. The resolved convention can also ignore incompatible PDF rules selected through broad selectors; selecting an exact rule code restores an ignored rule. The `docstring-parse-*` settings control generic semantic structures independently, and PCF rules are not affected by docstring conventions.
+The `docstring-convention` setting never auto-detects a convention. Google sections, NumPy sections, and rest fields are only parsed when their matching convention is selected; `none` and `pep257` leave those convention syntaxes as ordinary content. The resolved convention can also ignore incompatible PDF rules selected through broad selectors; selecting an exact rule code restores an ignored rule. The `docstring-parse-*` settings control generic semantic structures independently, and PCF rules are not affected by docstring conventions.
 
 Settings are resolved per path as defaults, then the closest containing `pyproject.toml` with `[tool.pydocfmt]`, then explicit `--config` files, then inline `--config` setting overrides, then dedicated command-line options. Parent config files are not merged into child config files. The highest-precedence specified value wins for each key, including `extend-include` and `extend-exclude`.
 

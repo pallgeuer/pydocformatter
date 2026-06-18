@@ -46,25 +46,31 @@ def test_reports_return_section_for_bare_return() -> None:
     assert_pdf503_lines(source, ((4,),))
 
 
-def test_reports_empty_return_section_and_sphinx_field() -> None:
+def test_reports_empty_return_section_and_rest_field() -> None:
     source = 'def section():\n    """Do work.\n\n    Returns:\n    """\n\n\ndef field():\n    """Do work.\n\n    :returns: Value.\n    """\n'
-    result = format_source(source, settings=CheckSettings(select=("PDF503",), docstring_convention=DocstringConvention.NONE))
+    result = format_source(source, settings=CheckSettings(select=("PDF503",), docstring_convention=DocstringConvention.REST))
 
     assert_pdf503_lines('def section():\n    """Do work.\n\n    Returns:\n    """\n', ((4,),))
-    assert_pdf503_lines(source, ((11,),), settings=CheckSettings(select=("PDF503",), docstring_convention=DocstringConvention.NONE))
+    assert_pdf503_lines(source, ((11,),), settings=CheckSettings(select=("PDF503",), docstring_convention=DocstringConvention.REST))
     assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring has a return section for a function that does not return",)
+
+
+def test_reports_rest_rtype_field_but_allows_it_for_explicit_none_return() -> None:
+    source = 'def absent():\n    """Do work.\n\n    :rtype: int\n    """\n\n\ndef none():\n    """Do work.\n\n    :rtype: None\n    """\n    return None\n'
+
+    assert_pdf503_lines(source, ((4,),), settings=CheckSettings(select=("PDF503",), docstring_convention=DocstringConvention.REST))
 
 
 def test_reports_multiple_return_documentation_targets() -> None:
     source = 'def function():\n    """Do work.\n\n    Returns:\n        int: First.\n\n    Returns:\n        int: Second.\n\n    :rtype: int\n    """\n'
 
-    assert_pdf503_lines(source, ((4,), (7,), (10,)))
+    assert_pdf503_lines(source, ((4,), (7,)))
 
 
 def test_concatenated_docstring_return_field_uses_physical_line_fallback() -> None:
     source = 'def function():\n    ("Do work.\\n\\n"\n     ":returns: Value.")\n'
 
-    assert_pdf503_lines(source, ((2, 3),), settings=CheckSettings(select=("PDF503",), docstring_convention=DocstringConvention.NONE))
+    assert_pdf503_lines(source, ((2, 3),), settings=CheckSettings(select=("PDF503",), docstring_convention=DocstringConvention.REST))
 
 
 def test_reports_numpy_return_section_header() -> None:
@@ -97,10 +103,10 @@ def test_reports_return_section_for_generators_with_only_non_meaningful_yields()
         assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring has a return section for a generator; generator return values are stop values, not ordinary returns",)
 
 
-def test_sphinx_field_parsing_setting_controls_sphinx_return_documentation() -> None:
+def test_inactive_rest_convention_does_not_parse_rest_return_documentation() -> None:
     source = 'def function():\n    """Do work.\n\n    :returns: Value.\n    """\n'
 
-    assert_pdf503_lines(source, (), settings=CheckSettings(select=("PDF503",), docstring_convention=DocstringConvention.NONE, docstring_parse_sphinx_fields=False))
+    assert_pdf503_lines(source, (), settings=CheckSettings(select=("PDF503",), docstring_convention=DocstringConvention.NONE))
 
 
 def test_ignores_missing_docstrings_abstracts_and_stubs() -> None:

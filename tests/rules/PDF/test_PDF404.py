@@ -60,9 +60,50 @@ def test_protected_structure_inside_section_counts_as_content() -> None:
     assert not result.unfixed_findings
 
 
-def test_sphinx_field_inside_section_counts_as_content() -> None:
+def test_rest_like_field_inside_google_section_counts_as_plain_content() -> None:
     source = 'def function(value):\n    """Summary.\n\n    Args:\n        :param value: Description.\n    """\n'
     result = format_source(source)
+
+    assert result.new_source == source
+    assert not result.fixed_findings
+    assert not result.unfixed_findings
+
+
+def test_reports_empty_rest_fields() -> None:
+    source = 'def function(value):\n    """Summary.\n\n    :param value:\n    :rtype:\n    :raises ValueError: Bad value.\n    """\n'
+    result = format_source(source, settings=CheckSettings(select=("PDF404",), docstring_convention=DocstringConvention.REST))
+
+    assert result.new_source == source
+    assert not result.fixed_findings
+    assert tuple(finding.rule for finding in result.unfixed_findings) == (PDF404EmptySection.meta, PDF404EmptySection.meta)
+    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((4,), (5,))
+    assert tuple(finding.message for finding in result.unfixed_findings) == (
+        "Docstring field ':param value:' should not be empty",
+        "Docstring field ':rtype:' should not be empty",
+    )
+
+
+def test_accepts_rest_fields_with_only_continuation_body_content() -> None:
+    source = 'def function(value):\n    """Summary.\n\n    :param value:\n        Description on continuation.\n    :returns:\n        Result on continuation.\n    """\n'
+    result = format_source(source, settings=CheckSettings(select=("PDF404",), docstring_convention=DocstringConvention.REST))
+
+    assert result.new_source == source
+    assert not result.fixed_findings
+    assert not result.unfixed_findings
+
+
+def test_accepts_rest_fields_with_only_protected_continuation_body_content() -> None:
+    source = 'def function(value):\n    """Summary.\n\n    :param value:\n        - First choice.\n          Continued choice.\n        - Second choice.\n    :returns:\n        Result.\n    """\n'
+    result = format_source(source, settings=CheckSettings(select=("PDF404",), docstring_convention=DocstringConvention.REST))
+
+    assert result.new_source == source
+    assert not result.fixed_findings
+    assert not result.unfixed_findings
+
+
+def test_rest_fields_are_not_checked_without_rest_convention() -> None:
+    source = 'def function(value):\n    """Summary.\n\n    :param value:\n    """\n'
+    result = format_source(source, settings=CheckSettings(select=("PDF404",), docstring_convention=DocstringConvention.NONE))
 
     assert result.new_source == source
     assert not result.fixed_findings

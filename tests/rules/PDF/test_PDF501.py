@@ -61,42 +61,58 @@ def test_reports_numpy_parameter_alias_sections() -> None:
     assert_pdf501_lines(source, ((11,),), settings=CheckSettings(select=("PDF501",), docstring_convention=DocstringConvention.NUMPY))
 
 
-def test_reports_sphinx_documented_parameter_absent_from_signature() -> None:
+def test_reports_rest_documented_parameter_absent_from_signature() -> None:
     source = 'def function(first):\n    """Summary.\n\n    :param second: Second.\n    """\n'
 
-    assert_pdf501_lines(source, ((4,),), settings=CheckSettings(select=("PDF501",), docstring_convention=DocstringConvention.NONE))
+    assert_pdf501_lines(source, ((4,),), settings=CheckSettings(select=("PDF501",), docstring_convention=DocstringConvention.REST))
 
 
-def test_typed_sphinx_parameter_field_satisfies_signature_parameter() -> None:
+def test_typed_rest_parameter_field_satisfies_signature_parameter() -> None:
     source = 'def function(first):\n    """Summary.\n\n    :param int first: First.\n    """\n'
+
+    assert_pdf501_lines(source, (), settings=CheckSettings(select=("PDF501",), docstring_convention=DocstringConvention.REST))
+
+
+def test_reports_normalized_typed_rest_parameter_absent_from_signature() -> None:
+    source = 'def function(first):\n    """Summary.\n\n    :param int second: Second.\n    """\n'
+    result = format_source(source, settings=CheckSettings(select=("PDF501",), docstring_convention=DocstringConvention.REST))
+
+    assert_pdf501_lines(source, ((4,),), settings=CheckSettings(select=("PDF501",), docstring_convention=DocstringConvention.REST))
+    assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring documents parameter 'second' that is not in the function signature",)
+
+
+def test_reports_rest_keyword_documented_parameter_absent_from_signature() -> None:
+    source = 'def function(first):\n    """Summary.\n\n    :keyword second: Second.\n    """\n'
+
+    assert_pdf501_lines(source, ((4,),), settings=CheckSettings(select=("PDF501",), docstring_convention=DocstringConvention.REST))
+
+
+def test_rest_starred_parameter_fields_match_varargs_and_report_absent_kwargs() -> None:
+    source = 'def function(*args):\n    """Summary.\n\n    :param tuple[str, ...] *args: Args.\n    :kwarg **kwargs: Kwargs.\n    """\n'
+    result = format_source(source, settings=CheckSettings(select=("PDF501",), docstring_convention=DocstringConvention.REST))
+
+    assert_pdf501_lines(source, ((5,),), settings=CheckSettings(select=("PDF501",), docstring_convention=DocstringConvention.REST))
+    assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring documents parameter '**kwargs' that is not in the function signature",)
+
+
+def test_rest_type_only_field_reports_absent_parameter() -> None:
+    source = 'def function():\n    """Summary.\n\n    :type value: int\n    """\n'
+    result = format_source(source, settings=CheckSettings(select=("PDF501",), docstring_convention=DocstringConvention.REST))
+
+    assert_pdf501_lines(source, ((4,),), settings=CheckSettings(select=("PDF501",), docstring_convention=DocstringConvention.REST))
+    assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring documents parameter 'value' that is not in the function signature",)
+
+
+def test_inactive_rest_convention_does_not_parse_rest_parameter_documentation() -> None:
+    source = 'def function(first):\n    """Summary.\n\n    :param second: Second.\n    """\n'
 
     assert_pdf501_lines(source, (), settings=CheckSettings(select=("PDF501",), docstring_convention=DocstringConvention.NONE))
 
 
-def test_reports_normalized_typed_sphinx_parameter_absent_from_signature() -> None:
-    source = 'def function(first):\n    """Summary.\n\n    :param int second: Second.\n    """\n'
-    result = format_source(source, settings=CheckSettings(select=("PDF501",), docstring_convention=DocstringConvention.NONE))
-
-    assert_pdf501_lines(source, ((4,),), settings=CheckSettings(select=("PDF501",), docstring_convention=DocstringConvention.NONE))
-    assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring documents parameter 'second' that is not in the function signature",)
-
-
-def test_reports_sphinx_keyword_documented_parameter_absent_from_signature() -> None:
-    source = 'def function(first):\n    """Summary.\n\n    :keyword second: Second.\n    """\n'
-
-    assert_pdf501_lines(source, ((4,),), settings=CheckSettings(select=("PDF501",), docstring_convention=DocstringConvention.NONE))
-
-
-def test_sphinx_field_parsing_setting_controls_sphinx_parameter_documentation() -> None:
-    source = 'def function(first):\n    """Summary.\n\n    :param second: Second.\n    """\n'
-
-    assert_pdf501_lines(source, (), settings=CheckSettings(select=("PDF501",), docstring_convention=DocstringConvention.NONE, docstring_parse_sphinx_fields=False))
-
-
-def test_mixed_google_and_sphinx_parameter_documentation_reports_only_absent_names() -> None:
+def test_rest_fields_do_not_contribute_to_google_parameter_documentation() -> None:
     source = 'def function(first):\n    """Summary.\n\n    Args:\n        first: First.\n\n    :param second: Second.\n    """\n'
 
-    assert_pdf501_lines(source, ((7,),))
+    assert_pdf501_lines(source, ())
 
 
 def test_protected_content_inside_parameter_section_is_not_parameter_documentation() -> None:

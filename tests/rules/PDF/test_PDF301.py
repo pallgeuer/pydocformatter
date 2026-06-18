@@ -76,8 +76,17 @@ def test_reports_but_does_not_fix_non_terminal_punctuation(punctuation: str) -> 
 
 
 def test_skips_empty_sections_fields_and_backslash_ending_targets() -> None:
-    source = 'def empty():\n    """"""\n\n\ndef section():\n    """Args:\n        value: Description\n    """\n\n\ndef field():\n    """:param value: Description"""\n\n\ndef backslash():\n    """Path C:\\\\\\\\"""\n'
+    source = 'def empty():\n    """"""\n\n\ndef section():\n    """Args:\n        value: Description\n    """\n\n\ndef field():\n    """:param value: Description."""\n\n\ndef backslash():\n    """Path C:\\\\\\\\"""\n'
     result = format_source(source, settings=CheckSettings(select=("PDF301",), docstring_convention=DocstringConvention.GOOGLE))
+
+    assert result.new_source == source
+    assert not result.fixed_findings
+    assert not result.unfixed_findings
+
+
+def test_skips_rest_fields_under_rest_convention() -> None:
+    source = 'def field():\n    """:param value: Description"""\n'
+    result = format_source(source, settings=CheckSettings(select=("PDF301",), docstring_convention=DocstringConvention.REST))
 
     assert result.new_source == source
     assert not result.fixed_findings
@@ -153,19 +162,19 @@ def test_disabled_heading_parsing_punctuates_final_content_line_before_trailing_
     assert not result.unfixed_findings
 
 
-def test_sphinx_field_skip_requires_actual_field_marker() -> None:
+def test_rest_field_skip_requires_actual_field_marker() -> None:
     source = 'def field():\n    """:return: Description"""\n\n\ndef prose():\n    """:returning value"""\n'
-    result = format_source(source)
+    result = format_source(source, settings=CheckSettings(select=("PDF301",), docstring_convention=DocstringConvention.REST))
 
     assert result.new_source == 'def field():\n    """:return: Description"""\n\n\ndef prose():\n    """:returning value."""\n'
     assert result.fixed_findings[PDF301SummaryTerminalPunctuation.meta] == 1
 
 
-def test_sphinx_like_summary_is_punctuated_when_field_marker_is_invalid_or_disabled() -> None:
-    source = 'def malformed():\n    """:param x"""\n\n\ndef disabled():\n    """:param x: value"""\n'
-    result = format_source(source, settings=CheckSettings(select=("PDF301",), docstring_parse_sphinx_fields=False))
+def test_rest_like_summary_is_punctuated_when_field_marker_is_invalid_or_convention_is_inactive() -> None:
+    source = 'def malformed():\n    """:param x"""\n\n\ndef inactive():\n    """:param x: value"""\n'
+    result = format_source(source, settings=CheckSettings(select=("PDF301",), docstring_convention=DocstringConvention.NONE))
 
-    assert result.new_source == 'def malformed():\n    """:param x."""\n\n\ndef disabled():\n    """:param x: value."""\n'
+    assert result.new_source == 'def malformed():\n    """:param x."""\n\n\ndef inactive():\n    """:param x: value."""\n'
     assert result.fixed_findings[PDF301SummaryTerminalPunctuation.meta] == 2
 
 

@@ -11,18 +11,18 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 ### Added
 
 - **Docstring formatting:**
-  - Added convention-aware semantic docstring preparation with explicit reflow regions and configurable recognition of lists, headings, doctests, code fences, block quotes, tables, directives, literal blocks, and Sphinx fields.
-  - Added the `docstring-convention` setting with `none`, `google`, `numpy`, and `pep257` modes.
+  - Added convention-aware semantic docstring preparation with explicit reflow regions and configurable recognition of lists, headings, doctests, code fences, block quotes, tables, directives, literal blocks, and rest fields.
+  - Added the `docstring-convention` setting with `none`, `google`, `numpy`, `rest`, and `pep257` modes.
   - Added `PDF000` to rewrite implicitly concatenated docstrings as equivalent simple triple-double-quoted literals.
   - Added `PDF001` and `PDF002` to normalize simple docstring quote style and report non-raw docstrings with source backslashes, suppressing ASCII-only non-ASCII character escape spellings and using automatic fixes only when the rewrite preserves the evaluated docstring value.
-  - Added `PDF101` to reflow safely mapped docstring summaries, paragraphs, section descriptions, Sphinx fields, list items, and block quotes.
+  - Added `PDF101` to reflow safely mapped docstring summaries, paragraphs, section descriptions, rest fields, list items, and block quotes.
   - Added `PDF100` to normalize safely mapped multi-line simple docstring indentation, including convention-aware Google and NumPy section indentation.
   - Added `PDF102` and `PDF103` to normalize safely mapped docstring trailing whitespace and blank-line whitespace.
   - Added `PDF104` and `PDF105` to normalize quote-adjacent whitespace around safely mapped simple docstring content.
   - Added `PDF200` to collapse excess blank lines around docstring chunks and collapse blank-only docstrings to empty docstrings.
   - Added `PDF201` to insert safe missing blank lines before recognized docstring structures and convention sections.
   - Added `PDF202`, `PDF300` through `PDF305`, `PDF400` through `PDF405`, and `PDF500` through `PDF507` as implementation-pending stubs for the remaining Ruff docstring style and validation rules.
-  - Added `PDF406` to report repeated recognized Google and NumPy docstring sections, including known spelling variants for the same section.
+  - Added `PDF406` to report repeated recognized Google and NumPy docstring sections and rest fields, including known spelling variants for the same semantic item.
   - Added `PDF106` through `PDF109` to normalize multi-line docstring opening and closing quote placement.
   - Added `PDF110` and `PDF203` to collapse safe summary-only docstrings that fit on one line and report summaries that remain multi-line.
 
@@ -45,6 +45,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added `pydocfmt linter` to list rule-prefix linters in Ruff-style text or JSON output.
 
 - **Configuration:**
+  - Added `rest` as the convention for semantic reStructuredText/Sphinx field parsing.
   - Added generic rule-selection effects driven by resolved setting values, with exact-selector restoration for ignored rules and unconditional removal for disabled rules.
   - Added TOML-only `[tool.pydocfmt.docstring]` and `[tool.pydocfmt.comment]` tables as the preferred spelling for docstring and comment settings, with flat `docstring-*` and `comment-*` keys still supported as mutually exclusive compatibility forms.
   - Added mutually validated rule incompatibility metadata and deterministic conflict resolution that keeps the first selected rule and reports later conflicts as operational errors.
@@ -100,6 +101,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 
 - **Docstring formatting:**
   - Added instance-specific diagnostic messages for parameter consistency, section-style, and selected summary-style rule findings where the offending parameter, section, function, word, or span length is useful context.
+  - Changed legacy Sphinx-style field parsing to the explicit `docstring-convention = "rest"` mode. The removed `docstring_parse_sphinx_fields` setting now raises an unknown-setting error; set the rest convention to parse and protect `:param:`/`:rtype:` style fields.
   - Changed `PDF507` to be ignored by broad rule selections under every docstring convention, making the direct-raise-only exception documentation check exact-selection opt-in.
   - Changed missing-documentation configuration from PDF500-specific `docstring-missing-parameter-*` settings to shared `docstring-missing-documentation*` settings used by missing parameter, return, yield, and exception documentation rules.
   - Renumbered section-style rules so `PDF402` is section-name trailing-colon, `PDF403` is section underline-format, `PDF404` is empty-section, and `PDF405` is section-order, and aligned built-in rule filenames and class names with rule metadata.
@@ -109,7 +111,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Changed Google `Warning` and `Warnings` section parsing to treat them as admonition-style fields, while Google `Warns` and NumPy `Warns`/`Warnings` remain warning-exception sections.
   - Implemented `PDF302` through `PDF305`, replacing their previous stub behavior with first-summary-line diagnostics, safe first-word capitalization fixes, and Ruff-style convention-selection effects.
   - Changed summary first-word normalization to preserve Unicode alphanumeric characters when removing punctuation, avoiding false positives such as `This\u00e9`.
-  - Implemented `PDF202`, `PDF300`, and `PDF301`, replacing their previous stub behavior with empty-docstring diagnostics, safe summary-punctuation fixes, and parser-recognized section and Sphinx-field skips for the active settings.
+  - Implemented `PDF202`, `PDF300`, and `PDF301`, replacing their previous stub behavior with empty-docstring diagnostics, safe summary-punctuation fixes, and parser-recognized section and rest-field skips for the active convention.
   - Changed `PDF000` to normalize safe `\n` and `\t` whitespace escape spellings in docstrings, including non-concatenated docstrings, without changing evaluated docstring values.
   - Changed `PDF106` through `PDF109` to also normalize single-content-line docstrings when the docstring literal itself spans multiple lines.
   - Changed same-line quote placement for `PDF106` and `PDF108` to keep one separator space when needed for valid Python source.
@@ -126,7 +128,9 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 - **Docstring formatting:**
   - Fixed Google return and yield section parsing to treat bare `None` and `None.` entries as `None:` entries.
   - Fixed PDF502 and PDF503 to treat bare `yield` and `yield None` as generator behavior when classifying generator stop values, and fixed PDF506/PDF507 qualified exception diagnostics and matching.
-  - Fixed PDF500 and PDF501 to recognize typed Sphinx parameter fields such as `:param int value:` as documentation for the final parameter name.
+  - Fixed PDF500 and PDF501 to recognize typed rest parameter fields such as `:param int value:` and `:type value:` as documentation for the final parameter name.
+  - Fixed rest fields with protected continuation bodies, such as indented lists, to count as non-empty field content without reflowing the protected body.
+  - Fixed `PDF101` rest field reflow to preserve protected continuation bodies after inline field descriptions and reflow later prose in the same rest field.
   - Fixed `PDF406` to allow Google `Warning`/`Warnings` admonition sections alongside the distinct `Warns` warning-documentation section.
   - Fixed `PDF401` to split Google section trailing content when whitespace appears before the section-name colon.
   - Fixed PDF302 to skip property getter, setter, and deleter accessor docstrings.
@@ -338,6 +342,9 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Preserved untouched line endings when formatting only selected docstring or comment spans.
 
 ### Removed
+
+- **Configuration:**
+  - Removed `docstring-parse-sphinx-fields`; use `docstring-convention = "rest"` to parse reStructuredText/Sphinx fields semantically.
 
 - **Documentation:**
   - Removed the internal empirical Ruff file-selection design notes at `docs/ruff_file_selection_spec.md`.

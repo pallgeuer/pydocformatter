@@ -54,14 +54,14 @@ def test_empty_return_section_does_not_satisfy_meaningful_return() -> None:
     assert_pdf502_lines(source, ((6,),))
 
 
-def test_google_numpy_and_sphinx_return_documentation_satisfy_meaningful_return() -> None:
+def test_google_numpy_and_rest_return_documentation_satisfy_meaningful_return() -> None:
     google = 'def function():\n    """Return a value.\n\n    Returns:\n        int: Value.\n    """\n    return 1\n'
     numpy = 'def function():\n    """Return a value.\n\n    Returns\n    -------\n    int\n        Value.\n    """\n    return 1\n'
-    sphinx = 'def function():\n    """Return a value.\n\n    :returns: Value.\n    """\n    return 1\n'
+    rest = 'def function():\n    """Return a value.\n\n    :returns: Value.\n    """\n    return 1\n'
 
     assert_pdf502_lines(google, ())
     assert_pdf502_lines(numpy, (), settings=CheckSettings(select=("PDF502",), docstring_convention=DocstringConvention.NUMPY))
-    assert_pdf502_lines(sphinx, (), settings=CheckSettings(select=("PDF502",), docstring_convention=DocstringConvention.NONE))
+    assert_pdf502_lines(rest, (), settings=CheckSettings(select=("PDF502",), docstring_convention=DocstringConvention.REST))
 
 
 def test_google_bare_none_return_entry_satisfies_meaningful_return() -> None:
@@ -75,7 +75,7 @@ def test_google_bare_none_return_entry_satisfies_meaningful_return() -> None:
 def test_rtype_satisfies_meaningful_return_documentation() -> None:
     source = 'def function():\n    """Return a value.\n\n    :rtype: int\n    """\n    return 1\n'
 
-    assert_pdf502_lines(source, (), settings=CheckSettings(select=("PDF502",), docstring_convention=DocstringConvention.NONE))
+    assert_pdf502_lines(source, (), settings=CheckSettings(select=("PDF502",), docstring_convention=DocstringConvention.REST))
 
 
 def test_inactive_google_return_section_does_not_satisfy_meaningful_return() -> None:
@@ -92,15 +92,13 @@ def test_parameter_section_does_not_satisfy_meaningful_return() -> None:
     assert_pdf502_lines(source, ((7,),))
 
 
-def test_sphinx_field_parsing_setting_controls_sphinx_return_documentation() -> None:
+def test_inactive_rest_convention_does_not_parse_rest_return_documentation() -> None:
     source = 'def function():\n    """Return a value.\n\n    :returns: Value.\n    """\n    return 1\n'
 
     assert_pdf502_lines(
         source,
         ((6,),),
-        settings=CheckSettings(
-            select=("PDF502",), docstring_convention=DocstringConvention.NONE, docstring_parse_sphinx_fields=False, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS
-        ),
+        settings=CheckSettings(select=("PDF502",), docstring_convention=DocstringConvention.NONE, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS),
     )
 
 

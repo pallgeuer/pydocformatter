@@ -62,14 +62,54 @@ def test_reflows_multiline_summary_and_paragraph_without_crossing_blank_lines() 
     assert not format_pdf001(result.new_source, settings=CheckSettings(select=("PDF101",), line_length=64)).modified
 
 
-def test_reflows_google_and_sphinx_field_descriptions() -> None:
+def test_reflows_google_section_descriptions_without_rest_field_protection() -> None:
     source = 'def function(value):\n    """Do work.\n\n    Args:\n        value (int): A value with a long description that should use fixed indentation after wrapping.\n\n    :returns: The computed result with enough descriptive words to require wrapping.\n    """\n'
     result = format_pdf001(source, settings=CheckSettings(select=("PDF101",), line_length=76, docstring_convention=DocstringConvention.GOOGLE))
 
     assert (
         result.new_source
-        == 'def function(value):\n    """Do work.\n\n    Args:\n        value (int): A value with a long description that should use fixed\n            indentation after wrapping.\n\n    :returns: The computed result with enough descriptive words to require\n              wrapping.\n    """\n'
+        == 'def function(value):\n    """Do work.\n\n    Args:\n        value (int): A value with a long description that should use fixed\n            indentation after wrapping.\n\n    :returns: The computed result with enough descriptive words to require\n    wrapping.\n    """\n'
     )
+
+
+def test_reflows_rest_field_descriptions_under_rest_convention() -> None:
+    source = 'def function(value):\n    """Do work.\n\n    :returns: The computed result with enough descriptive words to require wrapping.\n    """\n'
+    result = format_pdf001(source, settings=CheckSettings(select=("PDF101",), line_length=76, docstring_convention=DocstringConvention.REST))
+
+    assert result.new_source == 'def function(value):\n    """Do work.\n\n    :returns: The computed result with enough descriptive words to require\n              wrapping.\n    """\n'
+
+
+def test_reflows_rest_field_inline_description_without_deleting_protected_body() -> None:
+    source = 'def function(value):\n    """Do work.\n\n    :param value: Intro text with enough words here to force wrapping around the configured line length.\n        - First choice.\n          Continued choice.\n        - Second choice.\n    """\n'
+    result = format_pdf001(source, settings=CheckSettings(select=("PDF101",), line_length=76, docstring_convention=DocstringConvention.REST))
+
+    assert (
+        result.new_source
+        == 'def function(value):\n    """Do work.\n\n    :param value: Intro text with enough words here to force wrapping around\n                  the configured line length.\n        - First choice.\n          Continued choice.\n        - Second choice.\n    """\n'
+    )
+    assert not format_pdf001(result.new_source, settings=CheckSettings(select=("PDF101",), line_length=76, docstring_convention=DocstringConvention.REST)).modified
+
+
+def test_reflows_rest_field_description_after_protected_body() -> None:
+    source = 'def function(value):\n    """Do work.\n\n    :param value: Intro text that should wrap with later prose when the field is formatted.\n        - First choice.\n          Continued choice.\n        More prose after the protected list that is intentionally long enough to require wrapping by PDF101.\n    """\n'
+    result = format_pdf001(source, settings=CheckSettings(select=("PDF101",), line_length=76, docstring_convention=DocstringConvention.REST))
+
+    assert (
+        result.new_source
+        == 'def function(value):\n    """Do work.\n\n    :param value: Intro text that should wrap with later prose when the\n                  field is formatted.\n        - First choice.\n          Continued choice.\n        More prose after the protected list that is intentionally long\n        enough to require wrapping by PDF101.\n    """\n'
+    )
+    assert not format_pdf001(result.new_source, settings=CheckSettings(select=("PDF101",), line_length=76, docstring_convention=DocstringConvention.REST)).modified
+
+
+def test_reflows_rest_field_continuation_description_with_separator_space() -> None:
+    source = 'def function(value):\n    """Do work.\n\n    :param value:\n        Description words long enough to require wrapping around the target line width for checking.\n    """\n'
+    result = format_pdf001(source, settings=CheckSettings(select=("PDF101",), line_length=76, docstring_convention=DocstringConvention.REST))
+
+    assert (
+        result.new_source
+        == 'def function(value):\n    """Do work.\n\n    :param value: Description words long enough to require wrapping around\n                  the target line width for checking.\n    """\n'
+    )
+    assert not format_pdf001(result.new_source, settings=CheckSettings(select=("PDF101",), line_length=76, docstring_convention=DocstringConvention.REST)).modified
 
 
 def test_reflows_malformed_google_section_entries_with_canonical_indentation() -> None:
@@ -374,7 +414,6 @@ def test_disabling_all_generic_structure_parsing_reflows_special_looking_lines_a
         docstring_parse_tables=False,
         docstring_parse_directives=False,
         docstring_parse_literal_blocks=False,
-        docstring_parse_sphinx_fields=False,
     )
     result = format_pdf001(source, settings=settings)
 
