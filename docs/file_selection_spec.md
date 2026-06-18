@@ -112,21 +112,21 @@ Accepted existing paths are deduplicated by normalized real path after gitignore
 
 `Filter result` means the combined include, exclude, and gitignore checks for files.
 
-| Input kind      | `force-exclude` | Filter result             | Outcome   |
-|-----------------|-----------------|---------------------------|-----------|
-| Explicit file   | `false`         | Any result                | Accepted  |
-| Explicit file   | `true`          | Not excluded by glob      | Accepted  |
-| Explicit file   | `true`          | Not included              | Accepted  |
-| Explicit file   | `true`          | Excluded by glob          | Rejected  |
-| Explicit file   | `true`          | Excluded by gitignore     | Accepted  |
-| Discovered file | `false`         | Included and not excluded | Accepted  |
-| Discovered file | `false`         | Not included              | Rejected  |
-| Discovered file | `false`         | Excluded by glob          | Rejected  |
-| Discovered file | `false`         | Excluded by gitignore     | Rejected  |
-| Discovered file | `true`          | Included and not excluded | Accepted  |
-| Discovered file | `true`          | Not included              | Rejected  |
-| Discovered file | `true`          | Excluded by glob          | Rejected  |
-| Discovered file | `true`          | Excluded by gitignore     | Rejected  |
+| Input kind      | `force-exclude` | Filter result             | Outcome  |
+|-----------------|-----------------|---------------------------|----------|
+| Explicit file   | `false`         | Any result                | Accepted |
+| Explicit file   | `true`          | Not excluded by glob      | Accepted |
+| Explicit file   | `true`          | Not included              | Accepted |
+| Explicit file   | `true`          | Excluded by glob          | Rejected |
+| Explicit file   | `true`          | Excluded by gitignore     | Accepted |
+| Discovered file | `false`         | Included and not excluded | Accepted |
+| Discovered file | `false`         | Not included              | Rejected |
+| Discovered file | `false`         | Excluded by glob          | Rejected |
+| Discovered file | `false`         | Excluded by gitignore     | Rejected |
+| Discovered file | `true`          | Included and not excluded | Accepted |
+| Discovered file | `true`          | Not included              | Rejected |
+| Discovered file | `true`          | Excluded by glob          | Rejected |
+| Discovered file | `true`          | Excluded by gitignore     | Rejected |
 
 Directory arguments are evaluated before this table applies to files below them. A directory argument that is excluded is rejected as an ignored directory decision. A directory argument that is not excluded is walked, and files found below it are evaluated as discovered files.
 

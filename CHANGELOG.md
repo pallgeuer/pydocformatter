@@ -79,6 +79,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added a pytest pre-commit hook that runs the test suite before commits.
   - Added pytest coverage that checks the pydocformatter rule tables in `docs/formatting_rules.md` against actual rule metadata.
   - Added pytest coverage that checks Git-tracked Markdown pipe tables for padded cell widths and separator alignment.
+  - Changed Markdown pipe table checks to enforce PyCharm-style separator rows without outer padding.
   - Added pytest coverage that executes structured examples from built-in rule Markdown documentation.
   - Added exact diagnostic message checks to structured rule Markdown examples.
   - Added validation that structured rule Markdown examples use `[output=unchanged]` when the documented output is identical to the input.
