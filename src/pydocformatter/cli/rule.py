@@ -120,7 +120,7 @@ def rule_json(rule_class: type[RuleBase]) -> RuleMetadataOutput:
     if source_location is None:
         source_location_json = None
     else:
-        source_location_json = {"file": source_location.file, "line": source_location.line}
+        source_location_json = RuleSourceLocationMetadata(file=source_location.file, line=source_location.line)
     return RuleMetadataOutput(
         name=rule.name,
         code=rule.code.tag,

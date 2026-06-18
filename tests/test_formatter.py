@@ -441,6 +441,7 @@ class TestFormatterResults(unittest.TestCase):
 
         class _NameCollector(cst.CSTVisitor):
             def __init__(self, name: str) -> None:
+                super().__init__()
                 self.name = name
                 self.nodes: list[cst.Name] = []
 
@@ -529,6 +530,7 @@ class TestFormatterResults(unittest.TestCase):
 
         class _NameCollector(cst.CSTVisitor):
             def __init__(self, name: str) -> None:
+                super().__init__()
                 self.name = name
                 self.nodes: list[cst.Name] = []
 

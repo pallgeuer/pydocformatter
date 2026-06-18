@@ -1295,21 +1295,23 @@ def planned_simple_docstring_line_change(
     """Return one whole-literal replacement for changed raw evaluated lines."""
     if len(raw_line_targets) != len(docstring.structure.lines):
         raise ValueError("Raw line targets must match the docstring line count")
-    replacements = tuple(
-        rule_edits.PlannedTextReplacement(
-            start_offset=line.start_offset,
-            end_offset=line.end_offset,
-            text=target,
-            line_numbers=(line.source_line_number,),
-        )
-        for line, target in zip(docstring.structure.lines, raw_line_targets)
-        if target is not None and line.source_line_number is not None and line.raw_text != target
-    )
+    replacements: list[rule_edits.PlannedTextReplacement] = []
+    for line, target in zip(docstring.structure.lines, raw_line_targets):
+        line_number = line.source_line_number
+        if target is not None and line_number is not None and line.raw_text != target:
+            replacements.append(
+                rule_edits.PlannedTextReplacement(
+                    start_offset=line.start_offset,
+                    end_offset=line.end_offset,
+                    text=target,
+                    line_numbers=(line_number,),
+                )
+            )
     if not replacements:
         return None
     # Safe simple docstrings map evaluated line text back to source body text modulo newline spelling.
     value_lines = [target if target is not None else line.raw_text for line, target in zip(docstring.structure.lines, raw_line_targets)]
-    return planned_simple_docstring_source_change(docstring, context=context, replacements=replacements, value_lines=value_lines)
+    return planned_simple_docstring_source_change(docstring, context=context, replacements=tuple(replacements), value_lines=value_lines)
 
 
 def planned_simple_docstring_source_change(

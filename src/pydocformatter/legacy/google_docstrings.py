@@ -370,18 +370,19 @@ def format_examples_section(
     """Format the Examples section of a Google style docstring.
 
     This function formats the Examples section, which typically contains usage examples of the function. It applies the
-    specified formatting and returns the formatted lines.
+    specified indentation style and returns the formatted lines.
 
     Args:
         buffer (list[str]): The list of lines in the Examples section.
         indent (str): Base indentation preserved from the docstring quote line.
-        line_length (int): The maximum line length for formatting.
+        line_length (int): Unused, accepted to match the section formatter interface.
         indent_style (IndentStyle): Indentation style for generated section levels.
         indent_width (int): Width of one generated indentation level.
 
     Returns:
         list[str]: The formatted section as a list of lines.
     """
+    del line_length
     result = [f"\n{indent}Examples:"]
     param_indent = indent + _indent_unit(indent_style=indent_style, indent_width=indent_width)
     block: list[str] = []

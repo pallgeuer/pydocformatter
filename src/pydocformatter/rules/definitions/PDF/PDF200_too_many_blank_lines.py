@@ -147,7 +147,7 @@ def _with_configured_final_section_blank(docstring: PDF_definition.DocstringInfo
         return retained_lines
     # Rendering follows retained line order; this blank is after final section content, and any closing-quote prefix
     # line is appended later.
-    return (*retained_lines, final_spacing.trailing_blank_line)
+    return *retained_lines, final_spacing.trailing_blank_line
 
 
 def _with_closing_quote_prefix_line(
@@ -169,7 +169,7 @@ def _with_closing_quote_prefix_line(
         return retained_lines
     if not keep_final_section_blank and _is_final_section_trailing_blank(docstring, final_line.index):
         return retained_lines
-    return (*retained_lines, final_line.index)
+    return *retained_lines, final_line.index
 
 
 def _is_final_section_trailing_blank(docstring: PDF_definition.DocstringInfo, line_index: int) -> bool:

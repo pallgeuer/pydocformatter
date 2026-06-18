@@ -56,21 +56,23 @@ def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo, *, co
         return None
     canonical_margin = PDF_definition.docstring_canonical_margin(docstring, context=context, source_lines=source_lines)
     line_targets = _target_raw_lines(docstring, canonical_margin=canonical_margin, context=context)
-    replacements = tuple(
-        rule_edits.PlannedTextReplacement(
-            start_offset=line.start_offset,
-            end_offset=line.end_offset,
-            text=_source_for_target_line(line, target, context=context, fragments=fragments),
-            line_numbers=(line.source_line_number,),
-        )
-        for line, target in zip(docstring.structure.lines, line_targets)
-        if line.index > 0 and line.source_line_number is not None and line.raw_text != target.raw_text
-    )
+    replacements: list[rule_edits.PlannedTextReplacement] = []
+    for line, target in zip(docstring.structure.lines, line_targets):
+        line_number = line.source_line_number
+        if line.index > 0 and line_number is not None and line.raw_text != target.raw_text:
+            replacements.append(
+                rule_edits.PlannedTextReplacement(
+                    start_offset=line.start_offset,
+                    end_offset=line.end_offset,
+                    text=_source_for_target_line(line, target, context=context, fragments=fragments),
+                    line_numbers=(line_number,),
+                )
+            )
     if not replacements:
         return None
 
     value_lines = [line_targets[line.index].raw_text if line.index > 0 else line.raw_text for line in docstring.structure.lines]
-    return PDF_definition.planned_simple_docstring_source_change(docstring, context=context, replacements=replacements, value_lines=value_lines)
+    return PDF_definition.planned_simple_docstring_source_change(docstring, context=context, replacements=tuple(replacements), value_lines=value_lines)
 
 
 @dataclasses.dataclass(frozen=True)
