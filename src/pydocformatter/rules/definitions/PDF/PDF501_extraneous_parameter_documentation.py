@@ -26,13 +26,23 @@ class PDF501ExtraneousParameterDocumentation(RuleBase):
         """Return findings for documented parameters absent from the signature."""
         data = PDF.require_data(context)
         findings: list[RuleFinding] = []
+        typed_dict_keys_by_name = parameter_documentation.typed_dict_keys_by_name(context.module)
         for docstring in data.docstrings:
             definition = docstring.owner
             if definition.kind is not PDF_definition.DefinitionKind.FUNCTION or definition.parameters is None:
                 continue
-            signature_names = {parameter.comparison_name for parameter in parameter_documentation.signature_parameters(definition, context=context)}
+            signature_parameters = parameter_documentation.signature_parameters(definition, context=context)
+            allowed_names = {parameter.comparison_name for parameter in signature_parameters}
+            suppress_unknown_names = False
+            for keyword_parameter in parameter_documentation.unpacked_keyword_parameters(signature_parameters):
+                if keyword_parameter.unpack_target_name is None or keyword_parameter.unpack_target_name not in typed_dict_keys_by_name:
+                    suppress_unknown_names = True
+                    break
+                allowed_names.update(typed_dict_keys_by_name[keyword_parameter.unpack_target_name])
+            if suppress_unknown_names:
+                continue
             for parameter in parameter_documentation.documented_parameters(docstring):
-                if parameter.comparison_name not in signature_names:
+                if parameter.comparison_name not in allowed_names:
                     findings.append(
                         RuleFinding(
                             rule=cls.meta,

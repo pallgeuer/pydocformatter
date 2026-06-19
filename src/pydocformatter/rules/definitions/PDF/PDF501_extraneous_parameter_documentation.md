@@ -7,6 +7,8 @@ Checks that parsed docstring parameter documentation only names parameters that 
 
 The rule compares parsed Google, NumPy, and rest parameter entries against positional-only, positional-or-keyword, keyword-only, `*args`, and `**kwargs` parameters. Leading `*` characters are ignored for comparison, so `args` documents `*args` and `kwargs` documents `**kwargs`. Parameter names are otherwise matched exactly and case-sensitively.
 
+For `**kwargs: Unpack[Options]`, `typing.Unpack[Options]`, and `typing_extensions.Unpack[Options]`, same-module class-based `TypedDict` keys from `Options` are also accepted as documented keyword names. If the unpack target cannot be resolved locally, PDF501 conservatively suppresses extraneous-parameter findings for that function to avoid false positives for valid imported `TypedDict` keys.
+
 Unlike PDF500, this rule does not have public/private activation settings. Any parsed parameter entry is checked whenever the owning function has a signature.
 
 ## Why is this useful?

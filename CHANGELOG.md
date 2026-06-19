@@ -132,6 +132,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 
 - **Docstring formatting:**
   - Fixed Google return and yield section parsing to treat bare `None` and `None.` entries as `None:` entries.
+  - Fixed `PDF501` to allow documented keys from same-module class-based `TypedDict` definitions used in `**kwargs: Unpack[...]` parameters, keep conservative suppression for unresolved unpack targets, and continue reporting unrelated documented names when the local keys are known.
   - Fixed PDF502 and PDF503 to treat bare `yield` and `yield None` as generator behavior when classifying generator stop values, and fixed PDF506/PDF507 qualified exception diagnostics and matching.
   - Fixed PDF500 and PDF501 to recognize typed rest parameter fields such as `:param int value:` and `:type value:` as documentation for the final parameter name.
   - Fixed rest fields with protected continuation bodies, such as indented lists, to count as non-empty field content without reflowing the protected body.

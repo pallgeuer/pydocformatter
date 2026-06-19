@@ -139,6 +139,48 @@ def test_stringized_unpack_parameter_counts_as_present() -> None:
     assert_pdf501_lines(source, ())
 
 
+def test_unpack_parameter_allows_documented_unpacked_keyword_names() -> None:
+    source = 'def first(**kwargs: Unpack[Options]):\n    """Summary.\n\n    Args:\n        timeout: Timeout.\n        verbose: Verbose.\n    """\n\n\ndef second(**kwargs: typing.Unpack[Options]):\n    """Summary.\n\n    Args:\n        timeout: Timeout.\n        verbose: Verbose.\n    """\n\n\ndef third(**kwargs: typing_extensions.Unpack[Options]):\n    """Summary.\n\n    Args:\n        timeout: Timeout.\n        verbose: Verbose.\n    """\n'
+
+    assert_pdf501_lines(source, ())
+
+
+def test_stringized_unpack_parameter_allows_documented_unpacked_keyword_names() -> None:
+    source = 'def first(**kwargs: "Unpack[Options]"):\n    """Summary.\n\n    Args:\n        timeout: Timeout.\n        verbose: Verbose.\n    """\n\n\ndef second(**kwargs: "typing.Unpack[Options]"):\n    """Summary.\n\n    Args:\n        timeout: Timeout.\n        verbose: Verbose.\n    """\n\n\ndef third(**kwargs: "typing_extensions.Unpack[Options]"):\n    """Summary.\n\n    Args:\n        timeout: Timeout.\n        verbose: Verbose.\n    """\n'
+
+    assert_pdf501_lines(source, ())
+
+
+def test_local_typed_dict_unpack_allows_typed_dict_keys_and_reports_other_names() -> None:
+    source = 'class Options(TypedDict):\n    timeout: int\n    verbose: bool\n\n\ndef function(first, **kwargs: Unpack[Options]):\n    """Summary.\n\n    Args:\n        frist: Typo.\n        timeout: Timeout.\n        verbose: Verbose.\n        kwargs: Kwargs.\n    """\n'
+
+    assert_pdf501_lines(source, ((10,),))
+
+
+def test_qualified_local_typed_dict_unpack_allows_typed_dict_keys_and_reports_other_names() -> None:
+    source = 'class Options(typing.TypedDict):\n    timeout: int\n\n\ndef function(**kwargs: "typing.Unpack[Options]"):\n    """Summary.\n\n    Args:\n        timeout: Timeout.\n        tmieout: Typo.\n    """\n'
+
+    assert_pdf501_lines(source, ((10,),))
+
+
+def test_unresolved_unpack_parameter_keeps_conservative_suppression() -> None:
+    source = 'def function(first, **kwargs: Unpack[Options]):\n    """Summary.\n\n    Args:\n        frist: Typo.\n        timeout: Timeout.\n    """\n'
+
+    assert_pdf501_lines(source, ())
+
+
+def test_regular_kwargs_do_not_allow_unrelated_documented_names() -> None:
+    source = 'def function(**kwargs):\n    """Summary.\n\n    Args:\n        timeout: Timeout.\n        kwargs: Kwargs.\n    """\n'
+
+    assert_pdf501_lines(source, ((5,),))
+
+
+def test_unpacked_varargs_do_not_allow_unrelated_documented_names() -> None:
+    source = 'def function(*args: Unpack[Values]):\n    """Summary.\n\n    Args:\n        timeout: Timeout.\n        args: Args.\n    """\n'
+
+    assert_pdf501_lines(source, ((5,),))
+
+
 def test_reports_each_absent_name_from_numpy_multi_name_entry_on_same_line() -> None:
     source = 'def function(first):\n    """Summary.\n\n    Parameters\n    ----------\n    first, second, third : int\n        Values.\n    """\n'
     settings = CheckSettings(select=("PDF501",), docstring_convention=DocstringConvention.NUMPY)

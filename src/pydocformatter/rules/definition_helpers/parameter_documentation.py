@@ -21,6 +21,15 @@ class SignatureParameter:
     line_numbers: tuple[int, ...]
     implicit_receiver: bool
     unpacked: bool
+    unpack_target_name: str | None
+
+
+@dataclasses.dataclass(frozen=True)
+class UnpackAnnotation:
+    """Parsed information about a parameter annotation's Unpack usage."""
+
+    unpacked: bool
+    target_name: str | None
 
 
 @dataclasses.dataclass(frozen=True)
@@ -45,15 +54,42 @@ def signature_parameters(definition: PDF_definition.DefinitionInfo, *, context: 
     implicit_receiver_name = _implicit_receiver_name(definition)
     fallback_line = context.positions[definition.node].start.line
     return tuple(
-        SignatureParameter(
-            name=parameter.name.value,
-            display_name=_display_name(parameter, definition.parameters),
-            comparison_name=_comparison_name(parameter.name.value),
-            line_numbers=_parameter_line_numbers(parameter, context=context, fallback_line=fallback_line),
-            implicit_receiver=parameter.name.value == implicit_receiver_name,
-            unpacked=_is_unpack_annotation(parameter.annotation),
-        )
-        for parameter in raw_parameters
+        _signature_parameter(parameter, parameters=definition.parameters, context=context, implicit_receiver_name=implicit_receiver_name, fallback_line=fallback_line) for parameter in raw_parameters
+    )
+
+
+def typed_dict_keys_by_name(module: cst.Module) -> dict[str, frozenset[str]]:
+    """Return same-module class-based TypedDict keys by TypedDict class name."""
+    keys_by_name: dict[str, frozenset[str]] = {}
+    for statement in module.body:
+        if not isinstance(statement, cst.ClassDef) or not _is_typed_dict_class(statement):
+            continue
+        keys_by_name[statement.name.value] = frozenset(_typed_dict_class_keys(statement))
+    return keys_by_name
+
+
+def unpacked_keyword_parameters(parameters: tuple[SignatureParameter, ...]) -> tuple[SignatureParameter, ...]:
+    """Return unpacked keyword-pack parameters from prepared signature parameters."""
+    return tuple(parameter for parameter in parameters if parameter.unpacked and parameter.display_name.startswith("**"))
+
+
+def _signature_parameter(
+    parameter: cst.Param,
+    *,
+    parameters: cst.Parameters,
+    context: RuleContext,
+    implicit_receiver_name: str | None,
+    fallback_line: int,
+) -> SignatureParameter:
+    unpack_annotation = _unpack_annotation(parameter.annotation)
+    return SignatureParameter(
+        name=parameter.name.value,
+        display_name=_display_name(parameter, parameters),
+        comparison_name=_comparison_name(parameter.name.value),
+        line_numbers=_parameter_line_numbers(parameter, context=context, fallback_line=fallback_line),
+        implicit_receiver=parameter.name.value == implicit_receiver_name,
+        unpacked=unpack_annotation.unpacked,
+        unpack_target_name=unpack_annotation.target_name,
     )
 
 
@@ -99,30 +135,70 @@ def _is_staticmethod(decorators: tuple[cst.Decorator, ...]) -> bool:
     return any((name := decorator_helpers.decorator_qualified_name(decorator.decorator)) is not None and name.rpartition(".")[2] == "staticmethod" for decorator in decorators)
 
 
-def _is_unpack_annotation(annotation: cst.Annotation | None) -> bool:
+def _unpack_annotation(annotation: cst.Annotation | None) -> UnpackAnnotation:
     if annotation is None:
-        return False
+        return UnpackAnnotation(unpacked=False, target_name=None)
     expression = annotation.annotation
     if isinstance(expression, cst.SimpleString):
         evaluated_value = expression.evaluated_value
         if not isinstance(evaluated_value, str):
-            return False
+            return UnpackAnnotation(unpacked=False, target_name=None)
         try:
             expression = cst.parse_expression(evaluated_value)
         except cst.ParserSyntaxError:
-            return False
-    return _is_unpack_expression(expression)
+            return UnpackAnnotation(unpacked=False, target_name=None)
+    return _unpack_expression(expression)
 
 
-def _is_unpack_expression(expression: cst.BaseExpression) -> bool:
+def _unpack_expression(expression: cst.BaseExpression) -> UnpackAnnotation:
     if not isinstance(expression, cst.Subscript):
-        return False
+        return UnpackAnnotation(unpacked=False, target_name=None)
     value = expression.value
-    if isinstance(value, cst.Name):
-        return value.value == "Unpack"
-    if isinstance(value, cst.Attribute):
-        return value.attr.value == "Unpack" and _expression_name(value.value) in {"typing", "typing_extensions"}
+    if not _is_unpack_value(value):
+        return UnpackAnnotation(unpacked=False, target_name=None)
+    return UnpackAnnotation(unpacked=True, target_name=_unpack_target_name(expression))
+
+
+def _is_unpack_value(expression: cst.BaseExpression) -> bool:
+    if isinstance(expression, cst.Name):
+        return expression.value == "Unpack"
+    if isinstance(expression, cst.Attribute):
+        return expression.attr.value == "Unpack" and _expression_name(expression.value) in {"typing", "typing_extensions"}
     return False
+
+
+def _unpack_target_name(expression: cst.Subscript) -> str | None:
+    if len(expression.slice) != 1:
+        return None
+    subscript_slice = expression.slice[0].slice
+    if not isinstance(subscript_slice, cst.Index):
+        return None
+    return _expression_name(subscript_slice.value)
+
+
+def _is_typed_dict_class(node: cst.ClassDef) -> bool:
+    return any(_is_typed_dict_value(base.value) for base in node.bases)
+
+
+def _is_typed_dict_value(expression: cst.BaseExpression) -> bool:
+    if isinstance(expression, cst.Name):
+        return expression.value == "TypedDict"
+    if isinstance(expression, cst.Attribute):
+        return expression.attr.value == "TypedDict" and _expression_name(expression.value) in {"typing", "typing_extensions"}
+    return False
+
+
+def _typed_dict_class_keys(node: cst.ClassDef) -> tuple[str, ...]:
+    if not isinstance(node.body, cst.IndentedBlock):
+        return ()
+    keys: list[str] = []
+    for statement in node.body.body:
+        if not isinstance(statement, cst.SimpleStatementLine):
+            continue
+        for small_statement in statement.body:
+            if isinstance(small_statement, cst.AnnAssign) and isinstance(small_statement.target, cst.Name):
+                keys.append(small_statement.target.value)
+    return tuple(keys)
 
 
 def _expression_name(expression: cst.BaseExpression) -> str | None:
