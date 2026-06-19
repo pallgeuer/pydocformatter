@@ -32,6 +32,12 @@ def test_reports_google_parameter_alias_sections() -> None:
     assert_pdf501_lines(source, ((8,),))
 
 
+def test_reports_singular_google_parameter_alias_sections() -> None:
+    source = 'def function(first):\n    """Summary.\n\n    Arg:\n        first: First.\n\n    Keyword Argument:\n        second: Stale parameter.\n    """\n'
+
+    assert_pdf501_lines(source, ((8,),))
+
+
 def test_parameter_name_matching_is_case_sensitive_and_exact() -> None:
     source = 'def function(first, options):\n    """Summary.\n\n    Args:\n        First: Wrong case.\n        options.value: Attribute, not parameter.\n    """\n'
 
@@ -59,6 +65,12 @@ def test_reports_numpy_parameter_alias_sections() -> None:
     source = 'def function(first):\n    """Summary.\n\n    Other Parameters\n    ----------------\n    first : int\n        First.\n\n    Receives\n    --------\n    second : int\n        Stale parameter.\n    """\n'
 
     assert_pdf501_lines(source, ((11,),), settings=CheckSettings(select=("PDF501",), docstring_convention=DocstringConvention.NUMPY))
+
+
+def test_reports_singular_numpy_parameter_alias_sections() -> None:
+    source = 'def function(first):\n    """Summary.\n\n    Parameter\n    ---------\n    first : int\n        First.\n\n    Other Parameter\n    ---------------\n    second : int\n        Stale parameter.\n\n    Receive\n    -------\n    third : int\n        Stale parameter.\n    """\n'
+
+    assert_pdf501_lines(source, ((11,), (16,)), settings=CheckSettings(select=("PDF501",), docstring_convention=DocstringConvention.NUMPY))
 
 
 def test_reports_rest_documented_parameter_absent_from_signature() -> None:

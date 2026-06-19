@@ -13,9 +13,9 @@ from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetada
 
 
 @rule_registration.register_rule_to(PDF)
-class PDF405SectionOrder(RuleBase):
+class PDF407SectionOrder(RuleBase):
     meta = RuleMetadata(
-        code=RuleCode("PDF405"),
+        code=RuleCode("PDF407"),
         name="section-order",
         message="Docstring sections should be in the configured order",
         fix_availability=FixAvailability.NEVER,

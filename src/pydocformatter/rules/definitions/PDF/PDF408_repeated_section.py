@@ -13,9 +13,9 @@ from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetada
 
 
 @rule_registration.register_rule_to(PDF)
-class PDF406RepeatedSection(RuleBase):
+class PDF408RepeatedSection(RuleBase):
     meta = RuleMetadata(
-        code=RuleCode("PDF406"),
+        code=RuleCode("PDF408"),
         name="repeated-section",
         message="Docstring section should not be repeated",
         fix_availability=FixAvailability.NEVER,

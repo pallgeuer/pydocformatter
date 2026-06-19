@@ -83,12 +83,14 @@ def documented_entries(docstring: PDF_definition.DocstringInfo, kind: PDF_defini
 
 
 def _non_exception_documentation_entries(docstring: PDF_definition.DocstringInfo) -> set[PDF_definition.DocstringEntry]:
-    return {entry for section in docstring.structure.sections if section.name.lower() != "raises" for entry in section.entries}
+    return {entry for section in docstring.structure.sections if section.name.lower() not in {"raise", "raises"} for entry in section.entries}
 
 
 def has_exception_documentation(docstring: PDF_definition.DocstringInfo) -> bool:
     """Return whether a docstring contains exception documentation structures."""
-    return any(section.name.lower() == "raises" for section in docstring.structure.sections) or bool(documented_entries(docstring, PDF_definition.DocstringEntryKind.EXCEPTION, require_content=False))
+    return any(section.name.lower() in {"raise", "raises"} for section in docstring.structure.sections) or bool(
+        documented_entries(docstring, PDF_definition.DocstringEntryKind.EXCEPTION, require_content=False)
+    )
 
 
 def value_documentation_targets(docstring: PDF_definition.DocstringInfo, kind: PDF_definition.DocstringEntryKind) -> tuple[DocumentedEntry, ...]:

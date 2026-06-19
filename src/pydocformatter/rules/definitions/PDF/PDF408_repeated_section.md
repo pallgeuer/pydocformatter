@@ -1,17 +1,17 @@
-# repeated-section (PDF406)
+# repeated-section (PDF408)
 
 Fix is not available.
 
 Rule is ignored if `docstring-convention` is `none` or `pep257`.
 
 ## What it does
-PDF406 reports recognized Google and NumPy sections, plus rest fields under the rest convention, that repeat within one docstring under the active convention. The first occurrence is allowed, and each later matching item is reported.
+PDF408 reports recognized Google and NumPy sections, plus rest fields under the rest convention, that repeat within one docstring under the active convention. The first occurrence is allowed, and each later matching item is reported.
 
 Known spelling variants for the same section are treated as repeats, such as Google `Args` and `Arguments`, Google `Example` and `Examples`, Google `Return` and `Returns`, Google `Warning` and `Warnings`, or NumPy `Other Parameters` and `Other Params`. Matching is case-insensitive. Google `Warns` documents emitted warnings and is distinct from the `Warning`/`Warnings` admonition sections.
 
 The rule only considers syntax that is recognized by the active convention. Google-style recognition is used only when `docstring-convention = "google"`, NumPy-style recognition is used only when `docstring-convention = "numpy"`, and rest fields are recognized only when `docstring-convention = "rest"`. For example, a repeated NumPy-only `Parameters` section is ignored under the Google convention, and a Google-style `Parameters:` line is ignored under the NumPy convention.
 
-PDF406 is diagnostic only. It does not merge repeated sections or otherwise rewrite the docstring.
+PDF408 is diagnostic only. It does not merge repeated sections or otherwise rewrite the docstring.
 
 ## Why is this useful?
 Repeated sections split related documentation across multiple places, make convention-aware parsing ambiguous, and can hide later documentation from tools that expect one section of each semantic kind.
@@ -20,7 +20,7 @@ Repeated sections split related documentation across multiple places, make conve
 None.
 
 ## Examples
-PDF406 reports repeated Google sections:
+PDF408 reports repeated Google sections:
 
 ```pydocfmt-example
 [settings]
@@ -39,7 +39,7 @@ def value(arg):
 
 [output=unchanged]
 [findings]
-PDF406: Line 7: Docstring section 'Args' repeats earlier section 'Args'
+PDF408: Line 7: Docstring section 'Args' repeats earlier section 'Args'
 ```
 
 Every repeat after the first matching section is reported:
@@ -64,8 +64,8 @@ def value(arg):
 
 [output=unchanged]
 [findings]
-PDF406: Line 7: Docstring section 'Args' repeats earlier section 'Args'
-PDF406: Line 10: Docstring section 'Args' repeats earlier section 'Args'
+PDF408: Line 7: Docstring section 'Args' repeats earlier section 'Args'
+PDF408: Line 10: Docstring section 'Args' repeats earlier section 'Args'
 ```
 
 Google spelling variants for the same semantic section are also reported:
@@ -87,7 +87,7 @@ def value(arg):
 
 [output=unchanged]
 [findings]
-PDF406: Line 7: Docstring section 'Arguments' repeats earlier section 'Args'
+PDF408: Line 7: Docstring section 'Arguments' repeats earlier section 'Args'
 ```
 
 Several alias families may be reported in one docstring:
@@ -124,9 +124,9 @@ def value(arg):
 
 [output=unchanged]
 [findings]
-PDF406: Line 7: Docstring section 'Examples' repeats earlier section 'Example'
-PDF406: Line 13: Docstring section 'Returns' repeats earlier section 'Return'
-PDF406: Line 22: Docstring section 'Warnings' repeats earlier section 'Warning'
+PDF408: Line 7: Docstring section 'Examples' repeats earlier section 'Example'
+PDF408: Line 13: Docstring section 'Returns' repeats earlier section 'Return'
+PDF408: Line 22: Docstring section 'Warnings' repeats earlier section 'Warning'
 ```
 
 Different recognized sections are allowed, even when they share a related role or the same order rank:
@@ -168,7 +168,7 @@ def value(arg):
 
 [output=unchanged]
 [findings]
-PDF406: Line 7: Docstring section 'Args' repeats earlier section 'Args'
+PDF408: Line 7: Docstring section 'Args' repeats earlier section 'Args'
 ```
 
 Section-like text inside protected structures is not counted when that structure parser is enabled:
@@ -215,10 +215,10 @@ def value(arg):
 
 [output=unchanged]
 [findings]
-PDF406: Line 9: Docstring section 'Args' repeats earlier section 'Args'
+PDF408: Line 9: Docstring section 'Args' repeats earlier section 'Args'
 ```
 
-PDF406 also reports repeated NumPy sections:
+PDF408 also reports repeated NumPy sections:
 
 ```pydocfmt-example
 [settings]
@@ -241,7 +241,7 @@ def value(arg):
 
 [output=unchanged]
 [findings]
-PDF406: Line 9: Docstring section 'Parameters' repeats earlier section 'Parameters'
+PDF408: Line 9: Docstring section 'Parameters' repeats earlier section 'Parameters'
 ```
 
 NumPy spelling variants for the same section are reported:
@@ -267,10 +267,10 @@ def value(arg):
 
 [output=unchanged]
 [findings]
-PDF406: Line 9: Docstring section 'Other Params' repeats earlier section 'Other Parameters'
+PDF408: Line 9: Docstring section 'Other Params' repeats earlier section 'Other Parameters'
 ```
 
-PDF406 also reports repeated rest fields under the rest convention:
+PDF408 also reports repeated rest fields under the rest convention:
 
 ```pydocfmt-example
 [settings]
@@ -286,7 +286,7 @@ def value(arg):
 
 [output=unchanged]
 [findings]
-PDF406: Line 5: Docstring field ':return:' repeats earlier field ':returns:'
+PDF408: Line 5: Docstring field ':return:' repeats earlier field ':returns:'
 ```
 
 Convention recognition matters. A Google-style colon section is not counted as a NumPy section:
@@ -311,7 +311,7 @@ def value(arg):
 [output=unchanged]
 ```
 
-PDF406 reports repeated sections in non-simple docstring literals, but still does not fix them:
+PDF408 reports repeated sections in non-simple docstring literals, but still does not fix them:
 
 ```pydocfmt-example
 [settings]
@@ -327,7 +327,7 @@ def value(arg):
 
 [output=unchanged]
 [findings]
-PDF406: Lines 2-6: Docstring section 'Args' repeats earlier section 'Args'
+PDF408: Lines 2-6: Docstring section 'Args' repeats earlier section 'Args'
 ```
 
 ## Options

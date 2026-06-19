@@ -1116,11 +1116,11 @@ def _entry_kind(convention: settings_check.DocstringConvention, section_name: st
         return DocstringEntryKind.RETURN
     if normalized in {"yield", "yields"}:
         return DocstringEntryKind.YIELD
-    if normalized in {"raises", "warns"} or (convention == settings_check.DocstringConvention.NUMPY and normalized == "warnings"):
+    if normalized in {"raise", "raises", "warn", "warns"} or (convention == settings_check.DocstringConvention.NUMPY and normalized in {"warning", "warnings"}):
         return DocstringEntryKind.EXCEPTION
-    if normalized == "attributes":
+    if normalized in {"attribute", "attributes"}:
         return DocstringEntryKind.ATTRIBUTE
-    if normalized == "methods":
+    if normalized in {"method", "methods"}:
         return DocstringEntryKind.METHOD
     return DocstringEntryKind.FIELD
 

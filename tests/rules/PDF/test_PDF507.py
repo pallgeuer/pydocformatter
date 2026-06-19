@@ -53,6 +53,12 @@ def test_allows_google_numpy_and_rest_documented_exceptions_matching_direct_rais
     assert_pdf507_lines(rest, (), settings=CheckSettings(select=("PDF507",), docstring_convention=DocstringConvention.REST))
 
 
+def test_allows_singular_google_raise_section_matching_direct_raise() -> None:
+    source = 'def function():\n    """Validate.\n\n    Raise:\n        ValueError: Bad value.\n    """\n    raise ValueError("bad")\n'
+
+    assert_pdf507_lines(source, ())
+
+
 def test_one_google_entry_can_document_multiple_directly_raised_exceptions() -> None:
     source = 'def function(flag):\n    """Validate.\n\n    Raises:\n        ValueError, TypeError: Bad value.\n    """\n    if flag:\n        raise ValueError("bad")\n    raise TypeError("bad")\n'
 

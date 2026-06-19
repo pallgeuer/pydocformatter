@@ -64,6 +64,12 @@ def test_google_numpy_and_rest_return_documentation_satisfy_meaningful_return() 
     assert_pdf502_lines(rest, (), settings=CheckSettings(select=("PDF502",), docstring_convention=DocstringConvention.REST))
 
 
+def test_singular_google_return_section_satisfies_meaningful_return() -> None:
+    source = 'def function():\n    """Return a value.\n\n    Return:\n        int: Value.\n    """\n    return 1\n'
+
+    assert_pdf502_lines(source, ())
+
+
 def test_google_bare_none_return_entry_satisfies_meaningful_return() -> None:
     none_plain = 'def function():\n    """Return a value.\n\n    Returns:\n        None\n    """\n    return 1\n'
     none_period = 'def function():\n    """Return a value.\n\n    Returns:\n        None.\n    """\n    return 1\n'

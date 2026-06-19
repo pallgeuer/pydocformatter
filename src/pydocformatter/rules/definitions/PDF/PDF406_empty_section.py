@@ -12,9 +12,9 @@ from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetada
 
 
 @rule_registration.register_rule_to(PDF)
-class PDF404EmptySection(RuleBase):
+class PDF406EmptySection(RuleBase):
     meta = RuleMetadata(
-        code=RuleCode("PDF404"),
+        code=RuleCode("PDF406"),
         name="empty-section",
         message="Docstring section should not be empty",
         fix_availability=FixAvailability.NEVER,

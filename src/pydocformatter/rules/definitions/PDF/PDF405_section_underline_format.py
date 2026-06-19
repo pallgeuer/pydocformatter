@@ -12,9 +12,9 @@ from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetada
 
 
 @rule_registration.register_rule_to(PDF)
-class PDF403SectionUnderlineFormat(RuleBase):
+class PDF405SectionUnderlineFormat(RuleBase):
     meta = RuleMetadata(
-        code=RuleCode("PDF403"),
+        code=RuleCode("PDF405"),
         name="section-underline-format",
         message="Docstring section underline should be normalized",
         fix_availability=FixAvailability.SOMETIMES,

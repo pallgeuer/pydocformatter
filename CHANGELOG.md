@@ -21,9 +21,10 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added `PDF104` and `PDF105` to normalize quote-adjacent whitespace around safely mapped simple docstring content.
   - Added `PDF200` to collapse excess blank lines around docstring chunks and collapse blank-only docstrings to empty docstrings.
   - Added `PDF201` to insert safe missing blank lines before recognized docstring structures and convention sections.
-  - Added `PDF202`, `PDF300` through `PDF305`, `PDF400` through `PDF405`, and `PDF500` through `PDF507` as implementation-pending stubs for the remaining Ruff docstring style and validation rules.
-  - Added `PDF406` to report repeated recognized Google and NumPy docstring sections and rest fields, including known spelling variants for the same semantic item.
-  - Added `PDF407` to normalize spacing in parsed Google, NumPy, and rest convention entries and fields.
+  - Added `PDF202`, `PDF300` through `PDF305`, `PDF400` through `PDF409`, and `PDF500` through `PDF507` as implementation-pending stubs for the remaining Ruff docstring style and validation rules.
+  - Added `PDF401` and `PDF402` to normalize Google/NumPy section-name pluralization, preferred equivalent Google/NumPy section-name terms, and reStructuredText field-name aliases.
+  - Added `PDF408` to report repeated recognized Google and NumPy docstring sections and rest fields, including known spelling variants for the same semantic item.
+  - Added `PDF409` to normalize spacing in parsed Google, NumPy, and rest convention entries and fields.
   - Added `PDF106` through `PDF109` to normalize multi-line docstring opening and closing quote placement.
   - Added `PDF110` and `PDF203` to collapse safe summary-only docstrings that fit on one line and report summaries that remain multi-line.
 
@@ -111,10 +112,10 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Changed legacy Sphinx-style field parsing to the explicit `docstring-convention = "rest"` mode. The removed `docstring_parse_sphinx_fields` setting now raises an unknown-setting error; set the rest convention to parse and protect `:param:`/`:rtype:` style fields.
   - Changed `PDF507` to be ignored by broad rule selections under every docstring convention, making the direct-raise-only exception documentation check exact-selection opt-in.
   - Changed missing-documentation configuration from PDF500-specific `docstring-missing-parameter-*` settings to shared `docstring-missing-documentation*` settings used by missing parameter, return, yield, and exception documentation rules.
-  - Renumbered section-style rules so `PDF402` is section-name trailing-colon, `PDF403` is section underline-format, `PDF404` is empty-section, and `PDF405` is section-order, and aligned built-in rule filenames and class names with rule metadata.
+  - Renumbered section-style rules so `PDF401` and `PDF402` are section-name normalization rules, `PDF403` is section-name trailing-content, `PDF404` is section-name trailing-colon, `PDF405` is section underline-format, `PDF406` is empty-section, `PDF407` is section-order, `PDF408` is repeated-section, and `PDF409` is convention-entry-spacing, and aligned built-in rule filenames and class names with rule metadata.
   - Implemented `PDF502` through `PDF507`, replacing their previous stub behavior with return, yield, and exception documentation consistency diagnostics.
   - Implemented `PDF500` and `PDF501`, replacing their previous stub behavior with parsed docstring/signature parameter consistency diagnostics and configurable PDF500 activation.
-  - Implemented `PDF400` through `PDF405`, replacing their previous stub behavior with convention-aware section capitalization fixes, Google section trailing-content fixes, NumPy underline normalization, and section content/order diagnostics.
+  - Implemented `PDF400` through `PDF409`, replacing their previous stub behavior with convention-aware section-name normalization fixes, Google section trailing-content fixes, NumPy underline normalization, convention entry spacing fixes, and section content/order diagnostics.
   - Changed Google `Warning` and `Warnings` section parsing to treat them as admonition-style fields, while Google `Warns` and NumPy `Warns`/`Warnings` remain warning-exception sections.
   - Implemented `PDF302` through `PDF305`, replacing their previous stub behavior with first-summary-line diagnostics, safe first-word capitalization fixes, and Ruff-style convention-selection effects.
   - Changed summary first-word normalization to preserve Unicode alphanumeric characters when removing punctuation, avoiding false positives such as `This\u00e9`.
@@ -139,8 +140,9 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Fixed PDF500 and PDF501 to recognize typed rest parameter fields such as `:param int value:` and `:type value:` as documentation for the final parameter name.
   - Fixed rest fields with protected continuation bodies, such as indented lists, to count as non-empty field content without reflowing the protected body.
   - Fixed `PDF101` rest field reflow to preserve protected continuation bodies after inline field descriptions and reflow later prose in the same rest field.
-  - Fixed `PDF406` to allow Google `Warning`/`Warnings` admonition sections alongside the distinct `Warns` warning-documentation section.
-  - Fixed `PDF401` to split Google section trailing content when whitespace appears before the section-name colon.
+  - Fixed `PDF408` to allow Google `Warning`/`Warnings` admonition sections alongside the distinct `Warns` warning-documentation section.
+  - Fixed `PDF408` to allow NumPy `Warning`/`Warnings` admonition sections alongside the distinct `Warn`/`Warns` warning-documentation section.
+  - Fixed `PDF403` to split Google section trailing content when whitespace appears before the section-name colon.
   - Fixed PDF302 to skip property getter, setter, and deleter accessor docstrings.
   - Fixed PDF302 third-person summary detection to avoid invalid generated forms such as `trys` and `processs`, and to recognize `has`.
   - Fixed PDF101 to account for opening and same-line closing docstring quote delimiters when wrapping generated docstring source lines.

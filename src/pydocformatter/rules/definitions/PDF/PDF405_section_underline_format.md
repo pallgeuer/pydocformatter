@@ -1,11 +1,11 @@
-# section-underline-format (PDF403)
+# section-underline-format (PDF405)
 
 Fix is sometimes available.
 
 Rule is ignored if `docstring-convention` is `none`, `google`, or `pep257`.
 
 ## What it does
-PDF403 reports recognized NumPy sections whose underline is missing, separated from the section name by blank lines, uses the wrong adornment character, or does not match the section-name length. The target underline is a line of hyphens immediately after the section name, with the same evaluated indentation as the section name.
+PDF405 reports recognized NumPy sections whose underline is missing, separated from the section name by blank lines, uses the wrong adornment character, or does not match the section-name length. The target underline is a line of hyphens immediately after the section name, with the same evaluated indentation as the section name.
 
 The fix inserts, moves, or replaces the underline in safely mapped simple docstrings. It removes only blank lines between the section name and a misplaced underline. Concatenated docstrings and unsafe source mappings are reported without a fix.
 
@@ -16,7 +16,7 @@ NumPy-style section underlines are part of the section syntax. Normalizing them 
 This rule is intended to replace Ruff's `D407`, `D408`, and `D409`.
 
 ## Examples
-PDF403 normalizes a malformed NumPy section underline:
+PDF405 normalizes a malformed NumPy section underline:
 
 ```pydocfmt-example
 [settings]
@@ -43,7 +43,7 @@ def value(arg):
     """
 ```
 
-PDF403 also inserts missing underlines and moves misplaced underlines directly below the section name:
+PDF405 also inserts missing underlines and moves misplaced underlines directly below the section name:
 
 ```pydocfmt-example
 [settings]
@@ -107,7 +107,7 @@ def value(arg):
     """
 ```
 
-PDF403 only runs for NumPy-style sections. With the Google convention, the same text is not a NumPy section for this rule:
+PDF405 only runs for NumPy-style sections. With the Google convention, the same text is not a NumPy section for this rule:
 
 ```pydocfmt-example
 [settings]
@@ -142,7 +142,7 @@ def value(arg):
 
 [output=unchanged]
 [findings]
-PDF403: Lines 2-6: Docstring section 'Parameters' underline should be normalized
+PDF405: Lines 2-6: Docstring section 'Parameters' underline should be normalized
 ```
 
 ## Options

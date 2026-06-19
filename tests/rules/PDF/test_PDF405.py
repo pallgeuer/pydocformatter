@@ -1,50 +1,91 @@
 import pydocformatter.formatter as formatter
 import pydocformatter.rules_selection as rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention
-from pydocformatter.rules.definitions.PDF.PDF405_section_order import PDF405SectionOrder
+from pydocformatter.rules.definitions.PDF.PDF405_section_underline_format import PDF405SectionUnderlineFormat
 
 
 def format_source(source: str, *, settings: CheckSettings | None = None) -> formatter.FormatterResult:
     """Format source with PDF405 selected."""
-    resolved_settings = CheckSettings(select=("PDF405",), docstring_convention=DocstringConvention.GOOGLE) if settings is None else settings
+    resolved_settings = CheckSettings(select=("PDF405",), docstring_convention=DocstringConvention.NUMPY) if settings is None else settings
     return formatter.format_source(source, "example.py", settings=resolved_settings, rule_selection=rules_selection.select_rules(resolved_settings), fix=True)
 
 
-def test_reports_google_sections_after_later_ranked_sections() -> None:
-    source = 'def function(value):\n    """Summary.\n\n    Returns:\n        int: Result.\n\n    Args:\n        value: Description.\n    """\n'
+def test_replaces_malformed_numpy_section_underline() -> None:
+    source = 'def function(value):\n    """Summary.\n\n    Parameters\n    ===\n    value : int\n        Description.\n    """\n'
     result = format_source(source)
 
-    assert result.new_source == source
-    assert not result.fixed_findings
-    assert tuple(finding.rule for finding in result.unfixed_findings) == (PDF405SectionOrder.meta,)
-    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((7,),)
-    assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring section 'Args' should appear before 'Returns'",)
+    assert result.new_source == 'def function(value):\n    """Summary.\n\n    Parameters\n    ----------\n    value : int\n        Description.\n    """\n'
+    assert result.fixed_findings[PDF405SectionUnderlineFormat.meta] == 1
+    assert PDF405SectionUnderlineFormat.meta.name == "section-underline-format"
+    assert not format_source(result.new_source).modified
 
 
-def test_allows_duplicate_and_same_rank_google_sections() -> None:
-    source = 'def function(value):\n    """Summary.\n\n    Args:\n        value: Description.\n\n    Keyword Args:\n        option: Option.\n\n    Returns:\n        int: Result.\n\n    Yields:\n        int: Streamed result.\n    """\n'
+def test_replaces_too_short_hyphen_numpy_section_underline() -> None:
+    source = 'def function(value):\n    """Summary.\n\n    Parameters\n    -----\n    value : int\n        Description.\n    """\n'
     result = format_source(source)
 
-    assert result.new_source == source
-    assert not result.fixed_findings
-    assert not result.unfixed_findings
+    assert result.new_source == 'def function(value):\n    """Summary.\n\n    Parameters\n    ----------\n    value : int\n        Description.\n    """\n'
+    assert result.fixed_findings[PDF405SectionUnderlineFormat.meta] == 1
+    assert not format_source(result.new_source).modified
 
 
-def test_reports_each_google_section_after_highest_preceding_rank() -> None:
-    source = 'def function(value):\n    """Summary.\n\n    Raises:\n        ValueError: Bad value.\n\n    Returns:\n        int: Result.\n\n    Args:\n        value: Description.\n    """\n'
+def test_inserts_missing_numpy_section_underline() -> None:
+    source = 'def function(value):\n    """Summary.\n\n    Parameters\n    value : int\n        Description.\n    """\n'
     result = format_source(source)
 
-    assert result.new_source == source
-    assert not result.fixed_findings
-    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((7,), (10,))
-    assert tuple(finding.message for finding in result.unfixed_findings) == (
-        "Docstring section 'Returns' should appear before 'Raises'",
-        "Docstring section 'Args' should appear before 'Raises'",
+    assert result.new_source == 'def function(value):\n    """Summary.\n\n    Parameters\n    ----------\n    value : int\n        Description.\n    """\n'
+    assert result.fixed_findings[PDF405SectionUnderlineFormat.meta] == 1
+
+
+def test_inserts_missing_underline_for_header_only_numpy_section() -> None:
+    source = 'def function(value):\n    """Summary.\n\n    Returns\n    """\n'
+    result = format_source(source)
+
+    assert result.new_source == 'def function(value):\n    """Summary.\n\n    Returns\n    -------\n    """\n'
+    assert result.fixed_findings[PDF405SectionUnderlineFormat.meta] == 1
+    assert not format_source(result.new_source).modified
+
+
+def test_inserts_missing_underline_before_same_line_closing_quotes() -> None:
+    source = 'def function(value):\n    """Summary.\n\n    Returns"""\n'
+    result = format_source(source)
+
+    assert result.new_source == 'def function(value):\n    """Summary.\n\n    Returns\n    -------"""\n'
+    assert result.fixed_findings[PDF405SectionUnderlineFormat.meta] == 1
+    assert not format_source(result.new_source).modified
+
+
+def test_moves_misplaced_numpy_section_underline_past_blank_lines() -> None:
+    source = 'def function(value):\n    """Summary.\n\n    Parameters\n\n    ----------\n    value : int\n        Description.\n    """\n'
+    result = format_source(source)
+
+    assert result.new_source == 'def function(value):\n    """Summary.\n\n    Parameters\n    ----------\n    value : int\n        Description.\n    """\n'
+    assert result.fixed_findings[PDF405SectionUnderlineFormat.meta] == 1
+
+
+def test_normalizes_multiple_numpy_section_underlines_in_one_docstring() -> None:
+    source = 'def function(value):\n    """Summary.\n\n    Parameters\n    ===\n    value : int\n        Description.\n\n    Returns\n    int\n        Result.\n    """\n'
+    result = format_source(source)
+
+    assert (
+        result.new_source
+        == 'def function(value):\n    """Summary.\n\n    Parameters\n    ----------\n    value : int\n        Description.\n\n    Returns\n    -------\n    int\n        Result.\n    """\n'
     )
+    assert result.fixed_findings[PDF405SectionUnderlineFormat.meta] == 1
+    assert not format_source(result.new_source).modified
 
 
-def test_unordered_google_narrative_sections_do_not_affect_order() -> None:
-    source = 'def function(value):\n    """Summary.\n\n    Examples:\n        Example text.\n\n    Args:\n        value: Description.\n\n    Returns:\n        int: Result.\n    """\n'
+def test_numpy_section_underline_uses_section_name_indentation() -> None:
+    source = 'def function(value):\n    """Summary.\n\n      Parameters\n    ----------\n      value : int\n          Description.\n    """\n'
+    result = format_source(source)
+
+    assert result.new_source == 'def function(value):\n    """Summary.\n\n      Parameters\n      ----------\n      value : int\n          Description.\n    """\n'
+    assert result.fixed_findings[PDF405SectionUnderlineFormat.meta] == 1
+    assert not format_source(result.new_source).modified
+
+
+def test_correct_numpy_section_underline_is_unchanged() -> None:
+    source = 'def function(value):\n    """Summary.\n\n    Parameters\n    ----------\n    value : int\n        Description.\n    """\n'
     result = format_source(source)
 
     assert result.new_source == source
@@ -52,89 +93,19 @@ def test_unordered_google_narrative_sections_do_not_affect_order() -> None:
     assert not result.unfixed_findings
 
 
-def test_unordered_google_sections_do_not_reset_highest_order_rank() -> None:
-    source = 'def function(value):\n    """Summary.\n\n    Returns:\n        int: Result.\n\n    Examples:\n        Example text.\n\n    Args:\n        value: Description.\n    """\n'
+def test_reports_unsafe_numpy_section_underline_without_fixing() -> None:
+    source = 'def function(value):\n    ("Summary.\\n\\n"\n     "Parameters\\n"\n     "===\\n"\n     "value : int\\n"\n     "    Description.")\n'
     result = format_source(source)
 
     assert result.new_source == source
     assert not result.fixed_findings
-    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((10,),)
+    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((2, 3, 4, 5, 6),)
+    assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring section 'Parameters' underline should be normalized",)
 
 
-def test_google_section_order_is_case_insensitive() -> None:
-    source = 'def function(value):\n    """Summary.\n\n    RETURNS:\n        int: Result.\n\n    args:\n        value: Description.\n    """\n'
-    result = format_source(source)
-
-    assert result.new_source == source
-    assert not result.fixed_findings
-    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((7,),)
-
-
-def test_reports_numpy_sections_after_later_ranked_sections() -> None:
-    source = 'def function(value):\n    """Summary.\n\n    Returns\n    -------\n    int\n        Result.\n\n    Parameters\n    ----------\n    value : int\n        Description.\n    """\n'
-    result = format_source(source, settings=CheckSettings(select=("PDF405",), docstring_convention=DocstringConvention.NUMPY))
-
-    assert result.new_source == source
-    assert not result.fixed_findings
-    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((9,),)
-
-
-def test_allows_duplicate_and_same_rank_numpy_sections() -> None:
-    source = 'def function(value):\n    """Summary.\n\n    Warns\n    -----\n    RuntimeWarning\n        Warning.\n\n    Warnings\n    --------\n    UserWarning\n        Warning.\n    """\n'
-    result = format_source(source, settings=CheckSettings(select=("PDF405",), docstring_convention=DocstringConvention.NUMPY))
-
-    assert result.new_source == source
-    assert not result.fixed_findings
-    assert not result.unfixed_findings
-
-
-def test_reports_rest_fields_after_later_ranked_fields() -> None:
-    source = 'def function(value):\n    """Summary.\n\n    :returns: Result.\n    :param value: Description.\n    :raises ValueError: Bad value.\n    :rtype: str\n    """\n'
-    result = format_source(source, settings=CheckSettings(select=("PDF405",), docstring_convention=DocstringConvention.REST))
-
-    assert result.new_source == source
-    assert not result.fixed_findings
-    assert tuple(finding.rule for finding in result.unfixed_findings) == (PDF405SectionOrder.meta, PDF405SectionOrder.meta)
-    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((5,), (7,))
-    assert tuple(finding.message for finding in result.unfixed_findings) == (
-        "Docstring field ':param value:' should appear before ':returns:'",
-        "Docstring field ':rtype:' should appear before ':raises ValueError:'",
-    )
-
-
-def test_reports_type_rest_field_after_return_field() -> None:
-    source = 'def function(value):\n    """Summary.\n\n    :returns: Result.\n    :type value: int\n    """\n'
-    result = format_source(source, settings=CheckSettings(select=("PDF405",), docstring_convention=DocstringConvention.REST))
-
-    assert result.new_source == source
-    assert not result.fixed_findings
-    assert tuple(finding.rule for finding in result.unfixed_findings) == (PDF405SectionOrder.meta,)
-    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((5,),)
-    assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring field ':type value:' should appear before ':returns:'",)
-
-
-def test_unordered_rest_fields_do_not_affect_order() -> None:
-    source = 'def function(value):\n    """Summary.\n\n    :meta private: yes\n    :param value: Description.\n    :returns: Result.\n    """\n'
-    result = format_source(source, settings=CheckSettings(select=("PDF405",), docstring_convention=DocstringConvention.REST))
-
-    assert result.new_source == source
-    assert not result.fixed_findings
-    assert not result.unfixed_findings
-
-
-def test_rest_unknown_fields_do_not_reset_highest_rank_and_return_yield_share_rank() -> None:
-    source = 'def function(value):\n    """Summary.\n\n    :returns: Result.\n    :yields: Streamed result.\n    :meta private: yes\n    :param value: Description.\n    """\n'
-    result = format_source(source, settings=CheckSettings(select=("PDF405",), docstring_convention=DocstringConvention.REST))
-
-    assert result.new_source == source
-    assert not result.fixed_findings
-    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((7,),)
-    assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring field ':param value:' should appear before ':yields:'",)
-
-
-def test_ignored_without_google_or_numpy_convention() -> None:
-    source = 'def function(value):\n    """Summary.\n\n    Returns:\n        int: Result.\n\n    Args:\n        value: Description.\n    """\n'
-    result = format_source(source, settings=CheckSettings(select=("PDF405",), docstring_convention=DocstringConvention.NONE))
+def test_ignored_outside_numpy_convention() -> None:
+    source = 'def function(value):\n    """Summary.\n\n    Parameters\n    ===\n    value : int\n        Description.\n    """\n'
+    result = format_source(source, settings=CheckSettings(select=("PDF405",), docstring_convention=DocstringConvention.GOOGLE))
 
     assert result.new_source == source
     assert not result.fixed_findings

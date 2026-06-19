@@ -48,6 +48,12 @@ def test_google_numpy_and_rest_exception_documentation_satisfy_direct_raise() ->
     assert_pdf506_lines(rest, (), settings=CheckSettings(select=("PDF506",), docstring_convention=DocstringConvention.REST))
 
 
+def test_singular_google_raise_section_satisfies_direct_raise() -> None:
+    source = 'def function():\n    """Validate.\n\n    Raise:\n        ValueError: Bad value.\n    """\n    raise ValueError("bad")\n'
+
+    assert_pdf506_lines(source, ())
+
+
 def test_rest_exception_field_aliases_satisfy_direct_raises() -> None:
     source = 'def function(flag):\n    """Validate.\n\n    :except ValueError: Bad value.\n    :exception TypeError: Bad type.\n    """\n    if flag:\n        raise ValueError("bad")\n    raise TypeError("bad")\n'
 

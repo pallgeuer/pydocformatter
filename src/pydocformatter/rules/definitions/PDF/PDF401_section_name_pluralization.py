@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pydocformatter.rules.definition_helpers.docstring_conventions as docstring_conventions
 import pydocformatter.rules.definition_helpers.docstring_sections as docstring_sections
+import pydocformatter.rules.definition_helpers.rest_fields as rest_fields
 import pydocformatter.rules.definition_helpers.section_edits as section_edits
 import pydocformatter.rules.definition_helpers.section_name_replacements as section_name_replacements
 import pydocformatter.rules.registration as rule_registration
@@ -13,11 +14,11 @@ from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetada
 
 
 @rule_registration.register_rule_to(PDF)
-class PDF400SectionNameCapitalization(RuleBase):
+class PDF401SectionNamePluralization(RuleBase):
     meta = RuleMetadata(
-        code=RuleCode("PDF400"),
-        name="section-name-capitalization",
-        message="Docstring section name should be properly capitalized",
+        code=RuleCode("PDF401"),
+        name="section-name-pluralization",
+        message="Docstring section name should use the preferred plural or canonical form",
         fix_availability=FixAvailability.SOMETIMES,
         stable_since="1.0.0",
         setting_effects=(
@@ -35,30 +36,30 @@ class PDF400SectionNameCapitalization(RuleBase):
 
     @classmethod
     def check(cls, context: RuleContext) -> tuple[RuleFinding, ...]:
-        """Return findings for non-canonical convention section capitalization."""
+        """Return findings for singular convention section names."""
         return section_edits.findings_for_results(_results(context, rule=cls.meta))
 
     @classmethod
     def fix(cls, context: RuleContext) -> RuleFixResult:
-        """Capitalize safely mapped convention section names."""
+        """Pluralize safely mapped convention section names."""
         return section_edits.fix_result_for_results(context, cls.meta, _results(context, rule=cls.meta))
 
 
 def _results(context: RuleContext, *, rule: RuleMetadata) -> tuple[section_edits.SectionEditResult, ...]:
-    """Return findings and fixes for section name capitalization."""
+    """Return findings and fixes for section name pluralization."""
     return section_name_replacements.results_for_mapped_names(
         context,
         rule=rule,
-        section_name_mapper=docstring_sections.canonical_section_name,
+        section_name_mapper=docstring_sections.plural_section_name,
         section_message_builder=_section_message,
-        field_name_mapper=str.lower,
+        field_name_mapper=rest_fields.plural_field_name,
         field_message_builder=_field_message,
     )
 
 
 def _section_message(name: str, replacement: str) -> str:
-    return f"Docstring section name '{name}' should be capitalized as '{replacement}'"
+    return f"Docstring section name '{name}' should use plural form '{replacement}'"
 
 
 def _field_message(name: str, replacement: str) -> str:
-    return f"Docstring reStructuredText field name '{name}' should be lowercase as '{replacement}'"
+    return f"Docstring reStructuredText field name '{name}' should use preferred spelling '{replacement}'"

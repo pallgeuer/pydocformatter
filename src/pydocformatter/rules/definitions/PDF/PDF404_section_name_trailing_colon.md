@@ -1,11 +1,11 @@
-# section-name-trailing-colon (PDF402)
+# section-name-trailing-colon (PDF404)
 
 Fix is sometimes available.
 
 Rule is ignored if `docstring-convention` is `none`, `numpy`, or `pep257`.
 
 ## What it does
-PDF402 reports recognized Google section names that are missing the required trailing colon. The fix adds one colon immediately after the stripped section name and removes spaces or tabs that appeared after the section name on that line.
+PDF404 reports recognized Google section names that are missing the required trailing colon. The fix adds one colon immediately after the stripped section name and removes spaces or tabs that appeared after the section name on that line.
 
 The fix is available for safely mapped simple docstrings. Concatenated docstrings and source mappings that cannot be safely rewritten are reported without a fix.
 
@@ -16,7 +16,7 @@ The colon is part of Google-style section header spelling and helps distinguish 
 This rule is intended to replace Ruff's `D416`.
 
 ## Examples
-PDF402 adds a missing Google section-name colon:
+PDF404 adds a missing Google section-name colon:
 
 ```pydocfmt-example
 [settings]
@@ -68,7 +68,7 @@ def value(arg):
     """
 ```
 
-PDF402 does not capitalize section names while adding the colon. That is handled by PDF400:
+PDF404 does not capitalize section names while adding the colon. That is handled by PDF400:
 
 ```pydocfmt-example
 [settings]
@@ -108,7 +108,7 @@ def value(arg):
 [output=unchanged]
 ```
 
-PDF402 only applies to Google sections. NumPy-style section names do not require a trailing colon:
+PDF404 only applies to Google sections. NumPy-style section names do not require a trailing colon:
 
 ```pydocfmt-example
 [settings]
@@ -141,7 +141,7 @@ def value(arg):
 
 [output=unchanged]
 [findings]
-PDF402: Lines 2-4: Docstring section 'Args' should end with a colon
+PDF404: Lines 2-4: Docstring section 'Args' should end with a colon
 ```
 
 ## Options

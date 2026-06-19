@@ -49,6 +49,12 @@ def test_reports_missing_parameters_from_google_parameter_section_aliases() -> N
     assert_pdf500_lines(source, ((1,),))
 
 
+def test_singular_google_parameter_section_aliases_document_parameters() -> None:
+    source = 'def function(first, second, third, fourth):\n    """Summary.\n\n    Arg:\n        first: First.\n\n    Keyword Argument:\n        second: Second.\n\n    Other Arg:\n        third: Third.\n    """\n'
+
+    assert_pdf500_lines(source, ((1,),))
+
+
 def test_default_policy_ignores_docstring_without_parameter_documentation() -> None:
     source = 'def function(first):\n    """Summary.\n\n    More detail.\n    """\n'
 
@@ -69,6 +75,12 @@ def test_accepts_numpy_comma_separated_documented_parameters() -> None:
 
 def test_reports_missing_parameters_from_numpy_parameter_section_aliases() -> None:
     source = 'def function(first, second, third):\n    """Summary.\n\n    Other Parameters\n    ----------------\n    first : int\n        First.\n\n    Receives\n    --------\n    second : int\n        Second.\n    """\n'
+
+    assert_pdf500_lines(source, ((1,),), settings=CheckSettings(select=("PDF500",), docstring_convention=DocstringConvention.NUMPY))
+
+
+def test_singular_numpy_parameter_section_aliases_document_parameters() -> None:
+    source = 'def function(first, second, third, fourth):\n    """Summary.\n\n    Parameter\n    ---------\n    first : int\n        First.\n\n    Other Parameter\n    ---------------\n    second : int\n        Second.\n\n    Receive\n    -------\n    third : int\n        Third.\n    """\n'
 
     assert_pdf500_lines(source, ((1,),), settings=CheckSettings(select=("PDF500",), docstring_convention=DocstringConvention.NUMPY))
 

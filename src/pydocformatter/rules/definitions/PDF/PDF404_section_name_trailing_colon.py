@@ -12,9 +12,9 @@ from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetada
 
 
 @rule_registration.register_rule_to(PDF)
-class PDF402SectionNameTrailingColon(RuleBase):
+class PDF404SectionNameTrailingColon(RuleBase):
     meta = RuleMetadata(
-        code=RuleCode("PDF402"),
+        code=RuleCode("PDF404"),
         name="section-name-trailing-colon",
         message="Docstring section name should end with a colon",
         fix_availability=FixAvailability.SOMETIMES,

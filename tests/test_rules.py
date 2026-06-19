@@ -991,29 +991,34 @@ class TestRules(unittest.TestCase):
                 "PDF302": {DocstringConvention.GOOGLE: RuleSettingEffect.IGNORED},
                 "PDF303": {DocstringConvention.NUMPY: RuleSettingEffect.IGNORED},
                 "PDF305": {DocstringConvention.GOOGLE: RuleSettingEffect.IGNORED, DocstringConvention.PEP257: RuleSettingEffect.IGNORED},
-                "PDF400": {DocstringConvention.NONE: RuleSettingEffect.IGNORED, DocstringConvention.REST: RuleSettingEffect.IGNORED, DocstringConvention.PEP257: RuleSettingEffect.IGNORED},
+                "PDF400": {DocstringConvention.NONE: RuleSettingEffect.IGNORED, DocstringConvention.PEP257: RuleSettingEffect.IGNORED},
                 "PDF401": {
                     DocstringConvention.NONE: RuleSettingEffect.IGNORED,
-                    DocstringConvention.NUMPY: RuleSettingEffect.IGNORED,
-                    DocstringConvention.REST: RuleSettingEffect.IGNORED,
                     DocstringConvention.PEP257: RuleSettingEffect.IGNORED,
                 },
-                "PDF402": {
+                "PDF402": {DocstringConvention.NONE: RuleSettingEffect.IGNORED, DocstringConvention.PEP257: RuleSettingEffect.IGNORED},
+                "PDF403": {
                     DocstringConvention.NONE: RuleSettingEffect.IGNORED,
                     DocstringConvention.NUMPY: RuleSettingEffect.IGNORED,
                     DocstringConvention.REST: RuleSettingEffect.IGNORED,
                     DocstringConvention.PEP257: RuleSettingEffect.IGNORED,
                 },
-                "PDF403": {
+                "PDF404": {
+                    DocstringConvention.NONE: RuleSettingEffect.IGNORED,
+                    DocstringConvention.NUMPY: RuleSettingEffect.IGNORED,
+                    DocstringConvention.REST: RuleSettingEffect.IGNORED,
+                    DocstringConvention.PEP257: RuleSettingEffect.IGNORED,
+                },
+                "PDF405": {
                     DocstringConvention.NONE: RuleSettingEffect.IGNORED,
                     DocstringConvention.GOOGLE: RuleSettingEffect.IGNORED,
                     DocstringConvention.REST: RuleSettingEffect.IGNORED,
                     DocstringConvention.PEP257: RuleSettingEffect.IGNORED,
                 },
-                "PDF404": {DocstringConvention.NONE: RuleSettingEffect.IGNORED, DocstringConvention.PEP257: RuleSettingEffect.IGNORED},
-                "PDF405": {DocstringConvention.NONE: RuleSettingEffect.IGNORED, DocstringConvention.PEP257: RuleSettingEffect.IGNORED},
                 "PDF406": {DocstringConvention.NONE: RuleSettingEffect.IGNORED, DocstringConvention.PEP257: RuleSettingEffect.IGNORED},
                 "PDF407": {DocstringConvention.NONE: RuleSettingEffect.IGNORED, DocstringConvention.PEP257: RuleSettingEffect.IGNORED},
+                "PDF408": {DocstringConvention.NONE: RuleSettingEffect.IGNORED, DocstringConvention.PEP257: RuleSettingEffect.IGNORED},
+                "PDF409": {DocstringConvention.NONE: RuleSettingEffect.IGNORED, DocstringConvention.PEP257: RuleSettingEffect.IGNORED},
                 "PDF507": {
                     DocstringConvention.NONE: RuleSettingEffect.IGNORED,
                     DocstringConvention.GOOGLE: RuleSettingEffect.IGNORED,

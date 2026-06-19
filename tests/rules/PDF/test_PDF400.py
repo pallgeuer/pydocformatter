@@ -19,6 +19,15 @@ def test_capitalizes_google_section_names() -> None:
     assert not format_source(result.new_source).modified
 
 
+def test_capitalizes_mixed_case_google_warns_section() -> None:
+    source = 'def function(value):\n    """Summary.\n\n    wARnS:\n        RuntimeWarning: May warn.\n    """\n'
+    result = format_source(source)
+
+    assert result.new_source == 'def function(value):\n    """Summary.\n\n    Warns:\n        RuntimeWarning: May warn.\n    """\n'
+    assert result.fixed_findings[PDF400SectionNameCapitalization.meta] == 1
+    assert not format_source(result.new_source).modified
+
+
 def test_capitalizes_numpy_section_names_and_preserves_underlines() -> None:
     source = 'def function(value):\n    """Summary.\n\n    parameters\n    ----------\n    value : int\n        Description.\n    """\n'
     settings = CheckSettings(select=("PDF400",), docstring_convention=DocstringConvention.NUMPY)
@@ -73,3 +82,34 @@ def test_ignored_without_google_or_numpy_convention() -> None:
     assert result.new_source == source
     assert not result.fixed_findings
     assert not result.unfixed_findings
+
+
+def test_lowercases_rest_field_names() -> None:
+    source = 'def function(value):\n    """Summary.\n\n    :PARAM value: Description.\n    :Meta private: yes\n    """\n'
+    settings = CheckSettings(select=("PDF400",), docstring_convention=DocstringConvention.REST)
+    result = format_source(source, settings=settings)
+
+    assert result.new_source == 'def function(value):\n    """Summary.\n\n    :param value: Description.\n    :meta private: yes\n    """\n'
+    assert result.fixed_findings[PDF400SectionNameCapitalization.meta] == 1
+    assert not format_source(result.new_source, settings=settings).modified
+
+
+def test_lowercases_hyphenated_rest_field_names_preserving_arguments_and_continuations() -> None:
+    source = 'def function():\n    """Summary.\n\n    :CUSTOM-FIELD value: Description.\n        Continued description.\n    """\n'
+    settings = CheckSettings(select=("PDF400",), docstring_convention=DocstringConvention.REST)
+    result = format_source(source, settings=settings)
+
+    assert result.new_source == 'def function():\n    """Summary.\n\n    :custom-field value: Description.\n        Continued description.\n    """\n'
+    assert result.fixed_findings[PDF400SectionNameCapitalization.meta] == 1
+    assert not format_source(result.new_source, settings=settings).modified
+
+
+def test_reports_unsafe_rest_field_capitalization_without_fixing() -> None:
+    source = 'def function(value):\n    ("Summary.\\n\\n"\n     ":PARAM value: Description.")\n'
+    settings = CheckSettings(select=("PDF400",), docstring_convention=DocstringConvention.REST)
+    result = format_source(source, settings=settings)
+
+    assert result.new_source == source
+    assert not result.fixed_findings
+    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((2, 3),)
+    assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring reStructuredText field name 'PARAM' should be lowercase as 'param'",)

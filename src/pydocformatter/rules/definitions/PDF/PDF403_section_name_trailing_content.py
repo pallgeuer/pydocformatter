@@ -18,9 +18,9 @@ _GOOGLE_TRAILING_CONTENT_RE = re.compile(r"^(?P<indent>[ \t]*)(?P<name>[A-Za-z][
 
 
 @rule_registration.register_rule_to(PDF)
-class PDF401SectionNameTrailingContent(RuleBase):
+class PDF403SectionNameTrailingContent(RuleBase):
     meta = RuleMetadata(
-        code=RuleCode("PDF401"),
+        code=RuleCode("PDF403"),
         name="section-name-trailing-content",
         message="Docstring section name should be followed by a line break",
         fix_availability=FixAvailability.SOMETIMES,

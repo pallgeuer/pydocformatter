@@ -1,11 +1,11 @@
-# empty-section (PDF404)
+# empty-section (PDF406)
 
 Fix is not available.
 
 Rule is ignored if `docstring-convention` is `none` or `pep257`.
 
 ## What it does
-PDF404 reports recognized Google and NumPy sections, plus rest fields under the rest convention, that contain no meaningful body content after their header or field marker. Header-only sections, sections containing only blank lines, and empty rest fields are findings.
+PDF406 reports recognized Google and NumPy sections, plus rest fields under the rest convention, that contain no meaningful body content after their header or field marker. Header-only sections, sections containing only blank lines, and empty rest fields are findings.
 
 Any non-blank section body content counts as content, including entries, prose, doctests, code fences, lists, block quotes, directives, literal blocks, tables, rest-looking text, and verbatim blocks. The rule is diagnostic-only and leaves source unchanged.
 
@@ -16,7 +16,7 @@ Empty sections imply documentation exists where readers will find none.
 This rule is intended to replace Ruff's `D414`.
 
 ## Examples
-PDF404 reports empty Google sections:
+PDF406 reports empty Google sections:
 
 ```pydocfmt-example
 [settings]
@@ -31,7 +31,7 @@ def value(arg):
 
 [output=unchanged]
 [findings]
-PDF404: Line 4: Docstring section 'Args' should not be empty
+PDF406: Line 4: Docstring section 'Args' should not be empty
 ```
 
 Adjacent header-only sections are separate findings:
@@ -50,8 +50,8 @@ def value(arg):
 
 [output=unchanged]
 [findings]
-PDF404: Line 4: Docstring section 'Args' should not be empty
-PDF404: Line 5: Docstring section 'Returns' should not be empty
+PDF406: Line 4: Docstring section 'Args' should not be empty
+PDF406: Line 5: Docstring section 'Returns' should not be empty
 ```
 
 NumPy sections are checked after their underline:
@@ -70,7 +70,7 @@ def value(arg):
 
 [output=unchanged]
 [findings]
-PDF404: Line 4: Docstring section 'Parameters' should not be empty
+PDF406: Line 4: Docstring section 'Parameters' should not be empty
 ```
 
 Any non-blank section body counts as content, including protected or structured content:
@@ -111,7 +111,7 @@ def value(arg):
 
 [output=unchanged]
 [findings]
-PDF404: Line 4: Docstring field ':param arg:' should not be empty
+PDF406: Line 4: Docstring field ':param arg:' should not be empty
 ```
 
 Section-like text is ignored when section parsing is disabled:

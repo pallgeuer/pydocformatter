@@ -1,11 +1,11 @@
-# convention-entry-spacing (PDF407)
+# convention-entry-spacing (PDF409)
 
 Fix is sometimes available.
 
 Rule is ignored if `docstring-convention` is `none` or `pep257`.
 
 ## What it does
-PDF407 reports recognized convention entries and rest fields whose nominal prefix spacing is not canonical for the active docstring convention.
+PDF409 reports recognized convention entries and rest fields whose nominal prefix spacing is not canonical for the active docstring convention.
 
 For Google docstrings, the fix normalizes parsed parameter, attribute, method, field, return, yield, and exception entry prefixes. Starred parameters and dotted names are preserved. For NumPy docstrings, the fix normalizes comma-separated entry names and spacing around the name/type colon. For rest docstrings, the fix normalizes spacing around field names, field arguments, colons, and same-line descriptions.
 
@@ -18,7 +18,7 @@ Consistent entry-prefix spacing makes convention-aware docstrings easier to scan
 None.
 
 ## Examples
-PDF407 normalizes the prefix of Google convention entries:
+PDF409 normalizes the prefix of Google convention entries:
 
 ```pydocfmt-example
 [settings]
@@ -41,7 +41,7 @@ def value(arg):
     """
 ```
 
-PDF407 preserves Google entry semantics while normalizing starred parameters, dotted names, return and yield types, and exceptions:
+PDF409 preserves Google entry semantics while normalizing starred parameters, dotted names, return and yield types, and exceptions:
 
 ```pydocfmt-example
 [settings]
@@ -80,7 +80,7 @@ def collect(*args, **kwargs):
     """
 ```
 
-PDF407 normalizes NumPy comma-separated parameter names and type separators, but leaves continuation descriptions alone:
+PDF409 normalizes NumPy comma-separated parameter names and type separators, but leaves continuation descriptions alone:
 
 ```pydocfmt-example
 [settings]
@@ -109,7 +109,7 @@ def value(first, second):
     """
 ```
 
-PDF407 normalizes rest parameter, type, return, yield, and exception fields:
+PDF409 normalizes rest parameter, type, return, yield, and exception fields:
 
 ```pydocfmt-example
 [settings]
@@ -142,7 +142,7 @@ def value(arg, other):
     """
 ```
 
-PDF407 does not rewrite malformed entry-like text or protected structures:
+PDF409 does not rewrite malformed entry-like text or protected structures:
 
 ````pydocfmt-example
 [settings]
@@ -191,7 +191,7 @@ def value(arg):
     """
 ```
 
-PDF407 is ignored when no supported docstring convention is active:
+PDF409 is ignored when no supported docstring convention is active:
 
 ```pydocfmt-example
 [settings]
@@ -208,7 +208,7 @@ def value(arg):
 [output=unchanged]
 ```
 
-PDF407 reports unsafe source mappings without applying a fix:
+PDF409 reports unsafe source mappings without applying a fix:
 
 ```pydocfmt-example
 [settings]
@@ -222,7 +222,7 @@ def value(arg):
 
 [output=unchanged]
 [findings]
-PDF407: Lines 2-4: Docstring convention entry spacing should be normalized
+PDF409: Lines 2-4: Docstring convention entry spacing should be normalized
 ```
 
 ## Options

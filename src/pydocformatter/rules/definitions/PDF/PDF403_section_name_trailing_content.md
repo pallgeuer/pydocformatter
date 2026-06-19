@@ -1,11 +1,11 @@
-# section-name-trailing-content (PDF401)
+# section-name-trailing-content (PDF403)
 
 Fix is sometimes available.
 
 Rule is ignored if `docstring-convention` is `none`, `numpy`, or `pep257`.
 
 ## What it does
-PDF401 reports recognized Google section names that have section content on the same logical line when that line is parsed as ordinary paragraph text. The target layout keeps the section name on its own line and moves the trailing content to the next line at the configured Google section body indentation.
+PDF403 reports recognized Google section names that have section content on the same logical line when that line is parsed as ordinary paragraph text. The target layout keeps the section name on its own line and moves the trailing content to the next line at the configured Google section body indentation.
 
 The rule skips summary lines, protected structures such as code fences, and text inside already parsed convention sections. The fix is available for safely mapped simple docstrings. Concatenated docstrings and source mappings that cannot be safely rewritten are reported without a fix.
 
@@ -16,7 +16,7 @@ Keeping section names on their own line makes section boundaries unambiguous for
 This rule is intended to replace the Google-style part of Ruff's `D406`.
 
 ## Examples
-PDF401 moves same-line Google section content below the section name:
+PDF403 moves same-line Google section content below the section name:
 
 ```pydocfmt-example
 [settings]
@@ -70,7 +70,7 @@ def value(arg):
     """
 ```
 
-PDF401 does not capitalize section names while moving content. That is handled by PDF400:
+PDF403 does not capitalize section names while moving content. That is handled by PDF400:
 
 ```pydocfmt-example
 [settings]

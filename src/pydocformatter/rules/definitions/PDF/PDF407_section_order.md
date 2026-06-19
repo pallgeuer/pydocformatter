@@ -1,13 +1,13 @@
-# section-order (PDF405)
+# section-order (PDF407)
 
 Fix is not available.
 
 Rule is ignored if `docstring-convention` is `none` or `pep257`.
 
 ## What it does
-PDF405 reports recognized Google and NumPy sections, plus rest fields under the rest convention, that appear after a later ordered item for the active convention. Duplicate sections and fields with the same order rank are allowed.
+PDF407 reports recognized Google and NumPy sections, plus rest fields under the rest convention, that appear after a later ordered item for the active convention. Duplicate sections and fields with the same order rank are allowed.
 
-For Google docstrings, PDF405 orders parameter sections before return/yield sections before raise/warn sections. Other recognized Google sections, such as examples and notes, are unordered and do not affect diagnostics. For NumPy docstrings, PDF405 follows the conventional numpydoc section order used by Ruff-style section-order checks. For rest docstrings, PDF405 orders parameter fields before return/yield fields before exception fields.
+For Google docstrings, PDF407 orders parameter sections before return/yield sections before raise/warn sections. Other recognized Google sections, such as examples and notes, are unordered and do not affect diagnostics. For NumPy docstrings, PDF407 follows the conventional numpydoc section order used by Ruff-style section-order checks. For rest docstrings, PDF407 orders parameter fields before return/yield fields before exception fields.
 
 ## Why is this useful?
 Consistent section order helps readers find parameters, returns, yields, raises, and related documentation quickly.
@@ -16,7 +16,7 @@ Consistent section order helps readers find parameters, returns, yields, raises,
 This rule is intended to replace Ruff's `D420`.
 
 ## Examples
-PDF405 reports a Google parameter section that appears after a return section:
+PDF407 reports a Google parameter section that appears after a return section:
 
 ```pydocfmt-example
 [settings]
@@ -35,7 +35,7 @@ def value(arg):
 
 [output=unchanged]
 [findings]
-PDF405: Line 7: Docstring section 'Args' should appear before 'Returns'
+PDF407: Line 7: Docstring section 'Args' should appear before 'Returns'
 ```
 
 Once a later ordered section has appeared, every earlier-ranked ordered section after it is reported:
@@ -60,8 +60,8 @@ def value(arg):
 
 [output=unchanged]
 [findings]
-PDF405: Line 7: Docstring section 'Returns' should appear before 'Raises'
-PDF405: Line 10: Docstring section 'Args' should appear before 'Raises'
+PDF407: Line 7: Docstring section 'Returns' should appear before 'Raises'
+PDF407: Line 10: Docstring section 'Args' should appear before 'Raises'
 ```
 
 Unordered Google sections, such as `Examples`, do not affect ordering and do not reset the highest ordered section already seen:
@@ -86,7 +86,7 @@ def value(arg):
 
 [output=unchanged]
 [findings]
-PDF405: Line 10: Docstring section 'Args' should appear before 'Returns'
+PDF407: Line 10: Docstring section 'Args' should appear before 'Returns'
 ```
 
 Duplicate sections and sections with the same order rank are allowed:
@@ -115,7 +115,7 @@ def value(arg, option):
 [output=unchanged]
 ```
 
-PDF405 also applies to NumPy sections using NumPy section order:
+PDF407 also applies to NumPy sections using NumPy section order:
 
 ```pydocfmt-example
 [settings]
@@ -138,10 +138,10 @@ def value(arg):
 
 [output=unchanged]
 [findings]
-PDF405: Line 9: Docstring section 'Parameters' should appear before 'Returns'
+PDF407: Line 9: Docstring section 'Parameters' should appear before 'Returns'
 ```
 
-PDF405 also applies to rest fields under the rest convention:
+PDF407 also applies to rest fields under the rest convention:
 
 ```pydocfmt-example
 [settings]
@@ -157,7 +157,7 @@ def value(arg):
 
 [output=unchanged]
 [findings]
-PDF405: Line 5: Docstring field ':param arg:' should appear before ':returns:'
+PDF407: Line 5: Docstring field ':param arg:' should appear before ':returns:'
 ```
 
 ## Options
