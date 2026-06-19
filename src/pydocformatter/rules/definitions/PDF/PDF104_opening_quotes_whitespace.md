@@ -17,7 +17,7 @@ Removing accidental leading whitespace gives docstrings a predictable shape and 
 ## Ruff compatibility
 This rule is intended to replace the opening-quotes part of Ruff's `D210` when pydocformatter is responsible for docstring whitespace.
 
-## Example
+## Examples
 The canonical PDF104 fix removes spaces immediately after the opening quotes:
 
 ```pydocfmt-example

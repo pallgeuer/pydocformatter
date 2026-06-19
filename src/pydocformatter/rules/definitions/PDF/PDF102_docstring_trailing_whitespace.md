@@ -15,7 +15,7 @@ Trailing whitespace creates noisy diffs and can make otherwise identical docstri
 ## Ruff compatibility
 This rule overlaps with Ruff's general trailing-whitespace checks, such as `W291`, but is scoped to safely rewritable docstring content handled by pydocformatter.
 
-## Example
+## Examples
 Trailing whitespace on non-empty docstring lines is removed:
 
 ```pydocfmt-example

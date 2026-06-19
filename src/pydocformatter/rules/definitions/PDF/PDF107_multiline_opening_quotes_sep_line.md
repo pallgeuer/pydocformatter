@@ -23,7 +23,7 @@ Projects that prefer expanded docstrings can keep delimiters visually separate f
 ## Ruff compatibility
 This rule is intended to replace Ruff's `D212` or `D213` when the configured pydocformatter style puts opening quotes on a separate line.
 
-## Example
+## Examples
 The canonical PDF107 fix moves first-line content below the opening quotes:
 
 ```pydocfmt-example

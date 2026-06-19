@@ -15,7 +15,7 @@ Implicitly concatenated docstrings have source-level boundaries that do not exis
 ## Ruff compatibility
 None. Ruff can flag some implicit string concatenation patterns in other contexts, but PDF000 is specific to Python docstring ownership and rewrites only recognized docstrings.
 
-## Example
+## Examples
 The canonical concatenation case is a function docstring composed of adjacent string literals:
 
 ```pydocfmt-example

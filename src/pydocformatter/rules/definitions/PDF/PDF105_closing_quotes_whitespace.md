@@ -19,7 +19,7 @@ Removing accidental trailing whitespace gives docstrings a predictable shape and
 ## Ruff compatibility
 This rule is intended to replace the closing-quotes part of Ruff's `D210` when pydocformatter is responsible for docstring whitespace.
 
-## Example
+## Examples
 The canonical PDF105 fix removes spaces immediately before same-line closing quotes:
 
 ```pydocfmt-example

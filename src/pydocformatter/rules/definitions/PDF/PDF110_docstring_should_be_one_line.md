@@ -19,7 +19,7 @@ Single-line docstrings are easier to scan when their complete content fits comfo
 ## Ruff compatibility
 This rule is intended to replace Ruff's `D200` while respecting the configured line length before collapsing a docstring. Ruff's `D200` fix is unsafe because it can create overlong source lines; PDF110 checks the final physical source line first.
 
-## Example
+## Examples
 The canonical PDF110 fix collapses a multiline docstring that contains only one summary line:
 
 ```pydocfmt-example

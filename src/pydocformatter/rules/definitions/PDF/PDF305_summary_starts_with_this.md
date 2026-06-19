@@ -19,7 +19,7 @@ This rule replaces Ruff's `D404`. Like Ruff, it applies to all definition docstr
 
 PDF305 intentionally checks pydocformatter's parsed summary target instead of Ruff's raw trimmed docstring body token. This protects parser-recognized structures that are not prose summaries. It also treats tabs, newlines, and non-breaking spaces as word separators, so a summary that visibly starts with `This` is reported even when Ruff's ASCII-space-only token split would miss it.
 
-## Example
+## Examples
 PDF305 reports summaries that start with "This" and leaves source unchanged:
 
 ```pydocfmt-example

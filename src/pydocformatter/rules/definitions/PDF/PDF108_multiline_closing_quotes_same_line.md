@@ -25,7 +25,7 @@ Projects that prefer compact docstrings can avoid a delimiter-only closing line 
 ## Ruff compatibility
 This rule is intended to provide the compact closing-quotes style not available from Ruff's `D209`.
 
-## Example
+## Examples
 The canonical PDF108 fix moves the closing quotes onto the final content line:
 
 ```pydocfmt-example

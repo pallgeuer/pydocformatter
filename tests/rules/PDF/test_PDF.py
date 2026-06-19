@@ -399,6 +399,12 @@ def test_google_parameter_entries_support_stars_dotted_names_types_and_empty_des
     )
 
 
+def test_google_parameter_entries_support_mild_spacing_around_type_and_colon() -> None:
+    value = "Args:\n    value   ( int ) : Description."
+    structure = structure_for(value, settings=CheckSettings(docstring_convention=DocstringConvention.GOOGLE))
+    assert tuple((entry.names, entry.type_text, entry.description, entry.start_line, entry.end_line) for entry in structure.entries) == ((("value",), "int", "Description.", 1, 2),)
+
+
 @pytest.mark.parametrize(
     ("section", "entry_text", "expected_kind", "expected_names", "expected_type"),
     (
@@ -709,7 +715,10 @@ def test_section_block_contains_header_entries_blanks_and_generic_children() -> 
         (":kwarg option: Description.", DocstringEntryKind.PARAMETER, ("option",)),
         (":type value: int", DocstringEntryKind.PARAMETER, ("value",)),
         (":returns: Description.", DocstringEntryKind.RETURN, ()),
+        (":returns : Description.", DocstringEntryKind.RETURN, ()),
+        (":returns  : Description.", DocstringEntryKind.RETURN, ()),
         (":rtype: str", DocstringEntryKind.RETURN, ()),
+        (":rtype : str", DocstringEntryKind.RETURN, ()),
         (":yield item: Description.", DocstringEntryKind.YIELD, ("item",)),
         (":raises ValueError: Description.", DocstringEntryKind.EXCEPTION, ("ValueError",)),
         (":meta private: Description.", DocstringEntryKind.FIELD, ("private",)),
@@ -727,6 +736,7 @@ def test_rest_field_aliases_map_to_semantic_entry_kinds(field: str, expected_kin
     (
         (":param int first: Description.", ("first",), "int"),
         (":param int\tfirst: Description.", ("first",), "int"),
+        (":param int first : Description.", ("first",), "int"),
         (":param dict[str, int] options: Description.", ("options",), "dict[str, int]"),
         (":param tuple[str, ...] *args: Description.", ("*args",), "tuple[str, ...]"),
         (":kwarg Mapping[str, object] **kwargs: Description.", ("**kwargs",), "Mapping[str, object]"),
@@ -974,6 +984,13 @@ def test_markdown_and_rest_heading_variants_are_protected(value: str, expected_e
 )
 def test_malformed_structures_are_not_overclassified(value: str, unexpected_kind: DocstringBlockKind) -> None:
     assert unexpected_kind not in block_kinds(structure_for(value).blocks)
+
+
+def test_malformed_rest_field_without_terminal_colon_is_not_parsed() -> None:
+    structure = structure_for(":param missing terminator", settings=CheckSettings(docstring_convention=DocstringConvention.REST))
+
+    assert not structure.entries
+    assert DocstringBlockKind.REST_FIELD not in block_kinds(structure.blocks)
 
 
 def test_generic_structures_are_classified_and_protected_inside_sections() -> None:

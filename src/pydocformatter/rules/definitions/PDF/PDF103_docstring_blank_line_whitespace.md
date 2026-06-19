@@ -17,7 +17,7 @@ Whitespace-only blank lines make diffs noisy and hide formatting changes that sh
 ## Ruff compatibility
 This rule overlaps with Ruff's general blank-line whitespace checks, such as `W293`, but is scoped to safely rewritable docstring content handled by pydocformatter.
 
-## Example
+## Examples
 By default, ordinary whitespace-only blank lines become truly blank:
 
 ```pydocfmt-example

@@ -19,7 +19,7 @@ The conservative ordinary-prose default corrects clear spacing and line-length i
 ## Ruff compatibility
 Ruff can report overlong comment lines and general whitespace issues, but does not provide equivalent configurable standalone-comment reflow. PCF001 complements those checks and should not be used to rewrite Ruff, type-checker, formatter, or security directives, which the PCF category protects.
 
-## Example
+## Examples
 The canonical case normalizes marker spacing and wraps an ordinary standalone comment:
 
 ```pydocfmt-example
@@ -149,7 +149,9 @@ if value:
 [output=unchanged]
 ```
 
-## Structure settings
+## Options
+Structure settings:
+
 - `comment-join-standalone-lines` defaults to `false`. When enabled, adjacent ordinary prose lines are joined with one space. Preserved structures, list items, and block quotes remain formatting boundaries.
 - `comment-format-list-items` defaults to `true`. It recognizes `-`, `+`, `*`, `1.`, and `1)` markers, including marker indentation and more-indented continuation lines. Each item is reflowed independently with hanging indentation.
 - `comment-preserve-headings` defaults to `true`. It preserves ATX headings and paired Setext/reStructuredText adornment headings unchanged.
@@ -159,25 +161,10 @@ if value:
 - `comment-preserve-tables` defaults to `true`. It requires structural delimiter rows. It recognizes Markdown pipe-table delimiter rows, reStructuredText grid borders, and reStructuredText simple-table borders rather than treating every pipe as a table.
 - `comment-preserve-directives` defaults to `true`. It recognizes `.. name::`, preserves that line, and preserves following lines whose content is more indented. Formatting resumes at the next same-level ordinary line.
 
-## Code-detection settings
+Code-detection settings:
+
 - `comment-detect-code` defaults to `false`. When enabled, a run is protected when raw content starts with at least four spaces or semantic text starts with `if`, `for`, `while`, `def`, `class`, `try`, `except`, `print`, or `return`.
 - `comment-detect-statements` defaults to `true`. It parses individual lines and a dedented multiline candidate. It protects successful parses containing assignments, imports, control-flow statements, definitions, or other non-expression statements.
 - `comment-detect-expressions` defaults to `false`. It protects calls, attribute or subscript access, operators, comparisons, comprehensions, container displays, lambdas, and similar nontrivial expressions. Bare names and scalar constants are deliberately excluded.
 
 When list or block-quote formatting is enabled, those structural prefixes are removed before keyword or AST code detection. All positive code detections protect the whole physical run.
-
-## Options
-- `line-length`
-- `line-ending`
-- `indent-width`
-- `comment-join-standalone-lines`
-- `comment-format-list-items`
-- `comment-preserve-headings`
-- `comment-preserve-doctests`
-- `comment-preserve-code-fences`
-- `comment-format-block-quotes`
-- `comment-preserve-tables`
-- `comment-preserve-directives`
-- `comment-detect-code`
-- `comment-detect-statements`
-- `comment-detect-expressions`

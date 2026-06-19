@@ -19,7 +19,7 @@ This rule replaces Ruff's `D402`. Like Ruff, it applies to functions and methods
 
 The signature-matching heuristic is Ruff-compatible: it looks for the exact function name followed immediately by `(`, with either the start of the line or a space, tab, semicolon, or comma before the name. Unlike Ruff, PDF303 applies that heuristic only after pydocformatter has selected a parsed summary line. This means parser-recognized structures such as rest fields under the rest convention, lists, doctests, headings, and code blocks are protected instead of being checked as Ruff's first trimmed docstring line.
 
-## Example
+## Examples
 PDF303 reports summaries that repeat the function signature and leaves source unchanged:
 
 ```pydocfmt-example

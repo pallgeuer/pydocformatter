@@ -17,7 +17,7 @@ Canonical spacing keeps short trailing comments predictable. Extracting long com
 ## Ruff compatibility
 Ruff can report overlong lines and spacing issues, but it does not extract and wrap trailing comments in this way. PCF002 leaves Ruff, type-checker, formatter, and security directives unchanged.
 
-## Example
+## Examples
 The canonical case normalizes fitting trailing comments in place. Additional hashes after the syntactic `#` are preserved as comment content:
 
 ```pydocfmt-example

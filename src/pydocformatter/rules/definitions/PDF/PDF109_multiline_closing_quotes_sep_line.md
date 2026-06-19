@@ -21,7 +21,7 @@ Projects that prefer expanded docstrings can keep the closing delimiter visually
 ## Ruff compatibility
 This rule is intended to replace Ruff's `D209` when pydocformatter is responsible for closing-quote placement.
 
-## Example
+## Examples
 The canonical PDF109 fix moves same-line closing quotes onto their own line:
 
 ```pydocfmt-example

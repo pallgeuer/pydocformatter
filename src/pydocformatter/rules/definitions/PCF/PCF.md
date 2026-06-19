@@ -26,7 +26,6 @@ PCF rules currently occupy one contiguous range because the category covers comm
 ## Related tooling
 Ruff can report comment line-length and whitespace issues, but does not provide equivalent configurable comment reflow and trailing-comment extraction.
 
-## Settings
 Standalone paragraph joining remains disabled by default, so ordinary prose comments are formatted one physical line at a time. List items and block quotes are formatted by default, fenced code is preserved, and Python statements are protected from prose formatting.
 
 | Setting                         | Default | Effect                                                                                                        |

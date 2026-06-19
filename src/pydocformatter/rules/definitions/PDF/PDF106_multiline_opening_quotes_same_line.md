@@ -23,7 +23,7 @@ Projects that prefer compact docstrings can keep the opening delimiter and summa
 ## Ruff compatibility
 This rule is intended to replace Ruff's `D212` or `D213` when the configured pydocformatter style keeps opening quotes on the summary line.
 
-## Example
+## Examples
 The canonical PDF106 fix moves the first content line onto the opening quote line:
 
 ```pydocfmt-example

@@ -15,7 +15,7 @@ Raw docstrings make literal backslashes in paths, regular expressions, and escap
 ## Ruff compatibility
 This rule replaces Ruff's `D301`, while keeping automatic fixes value-preserving. Ruff can suggest raw docstrings for any backslash; PDF002 reports the same broad problem but fixes only the subset where adding `r` is safe.
 
-## Example
+## Examples
 Invalid escape spellings that already evaluate to literal backslash text are rewritten by adding a raw prefix:
 
 ```pydocfmt-example

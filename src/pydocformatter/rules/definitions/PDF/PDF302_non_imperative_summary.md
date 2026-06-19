@@ -17,7 +17,7 @@ Imperative summaries are the conventional style for many Python APIs because the
 ## Ruff compatibility
 This rule replaces Ruff's `D401`. Like Ruff, it is ignored by default for the Google convention and skips test and property functions. Unlike Ruff, pydocformatter does not expose `property-decorators` or `ignore-decorators` settings.
 
-## Example
+## Examples
 PDF302 reports non-imperative function summaries and leaves source unchanged:
 
 ```pydocfmt-example

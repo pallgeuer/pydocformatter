@@ -17,7 +17,7 @@ A multi-line summary can be ambiguous: it may be a long summary that needs rewri
 ## Ruff compatibility
 This rule is intended to cover the non-fixable part of Ruff's `D205` behavior after pydocformatter has normalized fixable blank-line spacing. Ruff's `D205` cannot safely decide whether adjacent prose is a wrapped summary or a missing blank line; PDF203 reports that ambiguity without changing source.
 
-## Example
+## Examples
 PDF203 reports an ambiguous multi-line summary and does not change the source:
 
 ```pydocfmt-example

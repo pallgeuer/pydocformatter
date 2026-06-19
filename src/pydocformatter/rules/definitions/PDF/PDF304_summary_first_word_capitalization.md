@@ -17,7 +17,7 @@ Consistent summary capitalization makes docstrings scan like complete prose.
 ## Ruff compatibility
 This rule replaces Ruff's `D403`. Like Ruff, it applies to functions and methods and only fixes ASCII words that can be capitalized safely.
 
-## Example
+## Examples
 PDF304 capitalizes a safe function summary first word:
 
 ```pydocfmt-example

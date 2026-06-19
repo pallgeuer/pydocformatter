@@ -23,6 +23,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added `PDF201` to insert safe missing blank lines before recognized docstring structures and convention sections.
   - Added `PDF202`, `PDF300` through `PDF305`, `PDF400` through `PDF405`, and `PDF500` through `PDF507` as implementation-pending stubs for the remaining Ruff docstring style and validation rules.
   - Added `PDF406` to report repeated recognized Google and NumPy docstring sections and rest fields, including known spelling variants for the same semantic item.
+  - Added `PDF407` to normalize spacing in parsed Google, NumPy, and rest convention entries and fields.
   - Added `PDF106` through `PDF109` to normalize multi-line docstring opening and closing quote placement.
   - Added `PDF110` and `PDF203` to collapse safe summary-only docstrings that fit on one line and report summaries that remain multi-line.
 
@@ -67,6 +68,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added a Ruff file-selection compatibility specification at `docs/file_selection_spec.md`, including exact defaults, precedence rules, force-exclude behavior, config-relative glob bases, and explicit pydocformatter deviations.
   - Added a rule-selection specification at `docs/rule_selection_spec.md`, covering rule collection, selectors, fixability, and rule explanation output.
   - Added adjacent Markdown documentation for all built-in pydocformatter rules, including Ruff compatibility notes where relevant.
+  - Added a new-rule checklist documenting the implementation, documentation, testing, and release-note touch points for adding rules.
   - Changed non-fixable findings in rule examples to label singular and plural line references explicitly.
   - Expanded the PDF101 documentation with explicit behavior notes, setting interactions, safety limits, and verified qualitative examples.
   - Expanded the PDF104 and PDF105 documentation with explicit behavior boundaries, safety notes, and verified qualitative examples.

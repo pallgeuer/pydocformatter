@@ -15,7 +15,7 @@ Using one docstring delimiter style keeps source formatting consistent and gives
 ## Ruff compatibility
 This rule replaces Ruff's `D300`, but it applies to every non-`"""` simple docstring delimiter instead of only triple-single-quoted docstrings. Fixes are value-preserving; unsafe rewrites are reported as non-fixable findings.
 
-## Example
+## Examples
 Single-quoted, double-quoted, and triple-single-quoted docstrings are rewritten to triple double quotes:
 
 ```pydocfmt-example
