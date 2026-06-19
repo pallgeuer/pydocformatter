@@ -97,10 +97,11 @@ def _rendered_simple_docstring(node: cst.SimpleString, *, expected_value: str, l
     fragments = string_literals.value_fragments_for_simple_string(node, line_ending=line_ending)
     if fragments is None:
         return None
+    prefix = _normalized_simple_docstring_prefix(node)
     literalized = string_literals.literalized_whitespace_fragments(fragments, line_ending=line_ending)
-    if literalized == fragments:
+    if literalized == fragments and prefix == node.prefix:
         return None
-    rendered = string_literals.render_simple_string_from_fragments(node, literalized, expected_value=expected_value)
+    rendered = string_literals.render_simple_string_from_fragments(node, literalized, expected_value=expected_value, prefix=prefix)
     if rendered is not None:
         return rendered
     retargeted = string_literals.retarget_fragments(literalized, quote='"""', line_ending=line_ending)
@@ -108,6 +109,11 @@ def _rendered_simple_docstring(node: cst.SimpleString, *, expected_value: str, l
     if rendered is not None:
         return rendered
     return string_literals.render_value_as_simple_string(expected_value, line_ending=line_ending, escape_non_ascii=escape_non_ascii)
+
+
+def _normalized_simple_docstring_prefix(node: cst.SimpleString) -> str:
+    """Return the PDF000-normalized prefix for a simple docstring."""
+    return "" if node.prefix.lower() == "u" else node.prefix
 
 
 def _line_numbers(docstring: PDF_definition.DocstringInfo) -> tuple[int, ...]:

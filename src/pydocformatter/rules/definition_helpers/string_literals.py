@@ -106,10 +106,12 @@ def render_simple_string_from_fragments(
     fragments: tuple[StringValueFragment, ...],
     *,
     expected_value: str,
+    prefix: str | None = None,
 ) -> str | None:
     """Render a simple string from source fragments and validate its value."""
     body = "".join(fragment.source for fragment in fragments)
-    return render_simple_string_from_body_source(node.prefix, node.quote, body, expected_value=expected_value)
+    effective_prefix = node.prefix if prefix is None else prefix
+    return render_simple_string_from_body_source(effective_prefix, node.quote, body, expected_value=expected_value)
 
 
 def literalized_whitespace_fragments(fragments: tuple[StringValueFragment, ...], *, line_ending: str) -> tuple[StringValueFragment, ...]:

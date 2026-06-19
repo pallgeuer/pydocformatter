@@ -428,6 +428,28 @@ def test_google_return_and_yield_sections_parse_bare_none_as_empty_typed_entry(s
     assert structure.reflow_regions == ()
 
 
+@pytest.mark.parametrize(
+    ("section", "entry_text", "expected_kind", "expected_names", "expected_type"),
+    (
+        ("Returns", "Mapping[ str, Sequence[int  ]]: Result.", DocstringEntryKind.RETURN, (), "Mapping[ str, Sequence[int  ]]"),
+        ("Yields", "Iterator[tuple[str, int | None]]: Item.", DocstringEntryKind.YIELD, (), "Iterator[tuple[str, int | None]]"),
+        ("Raises", "mypkg.errors.CustomError: Bad value.", DocstringEntryKind.EXCEPTION, ("mypkg.errors.CustomError",), None),
+        ("Raises", "ValueError | TypeError: Bad value.", DocstringEntryKind.EXCEPTION, ("ValueError | TypeError",), None),
+    ),
+)
+def test_google_return_yield_and_raise_entries_preserve_generic_looking_type_text(
+    section: str,
+    entry_text: str,
+    expected_kind: DocstringEntryKind,
+    expected_names: tuple[str, ...],
+    expected_type: str | None,
+) -> None:
+    structure = structure_for(f"{section}:\n    {entry_text}", settings=CheckSettings(docstring_convention=DocstringConvention.GOOGLE))
+    entry = structure.entries[0]
+
+    assert (entry.kind, entry.names, entry.type_text, entry.description) == (expected_kind, expected_names, expected_type, entry_text.rpartition(":")[2].strip())
+
+
 @pytest.mark.parametrize(("section", "entry_text"), (("Returns", "str."), ("Yields", "Iterator[int]."), ("Raises", "None.")))
 def test_google_bare_none_entry_special_case_does_not_apply_to_other_content(section: str, entry_text: str) -> None:
     structure = structure_for(f"{section}:\n    {entry_text}", settings=CheckSettings(docstring_convention=DocstringConvention.GOOGLE))
@@ -645,6 +667,27 @@ def test_numpy_bare_return_without_description_does_not_create_reflow_region() -
     assert structure.reflow_regions == ()
 
 
+@pytest.mark.parametrize(
+    ("section", "entry_text", "expected_kind", "expected_names", "expected_type"),
+    (
+        ("Returns", "Mapping[str, Sequence[int]]", DocstringEntryKind.RETURN, (), "Mapping[str, Sequence[int]]"),
+        ("Yields", "Iterator[tuple[str, int | None]]", DocstringEntryKind.YIELD, (), "Iterator[tuple[str, int | None]]"),
+        ("Raises", "mypkg.errors.CustomError", DocstringEntryKind.EXCEPTION, ("mypkg.errors.CustomError",), None),
+    ),
+)
+def test_numpy_return_yield_and_raise_entries_preserve_generic_looking_type_text(
+    section: str,
+    entry_text: str,
+    expected_kind: DocstringEntryKind,
+    expected_names: tuple[str, ...],
+    expected_type: str | None,
+) -> None:
+    structure = structure_for(f"{section}\n{'-' * len(section)}\n{entry_text}\n    Description.", settings=CheckSettings(docstring_convention=DocstringConvention.NUMPY))
+    entry = structure.entries[0]
+
+    assert (entry.kind, entry.names, entry.type_text, entry.description) == (expected_kind, expected_names, expected_type, "Description.")
+
+
 def test_section_block_contains_header_entries_blanks_and_generic_children() -> None:
     structure = structure_for("Args:\n\n    value: Description.\n\n    - nested item\n      continuation", settings=CheckSettings(docstring_convention=DocstringConvention.GOOGLE))
     section_block = structure.blocks[0]
@@ -693,6 +736,26 @@ def test_typed_rest_parameter_fields_split_type_from_name(field: str, expected_n
     structure = structure_for(field, settings=CheckSettings(docstring_convention=DocstringConvention.REST))
     entry = structure.entries[0]
     assert (entry.kind, entry.names, entry.type_text, entry.description) == (DocstringEntryKind.PARAMETER, expected_names, expected_type, "Description.")
+
+
+@pytest.mark.parametrize(
+    ("field", "expected_kind", "expected_names", "expected_description"),
+    (
+        (":rtype: Mapping[str, Sequence[int]]", DocstringEntryKind.RETURN, (), "Mapping[str, Sequence[int]]"),
+        (":ytype: Iterator[tuple[str, int | None]]", DocstringEntryKind.YIELD, (), "Iterator[tuple[str, int | None]]"),
+        (":raises mypkg.errors.CustomError: Bad value.", DocstringEntryKind.EXCEPTION, ("mypkg.errors.CustomError",), "Bad value."),
+    ),
+)
+def test_rest_return_yield_and_raise_fields_preserve_generic_looking_type_text(
+    field: str,
+    expected_kind: DocstringEntryKind,
+    expected_names: tuple[str, ...],
+    expected_description: str,
+) -> None:
+    structure = structure_for(field, settings=CheckSettings(docstring_convention=DocstringConvention.REST))
+    entry = structure.entries[0]
+
+    assert (entry.kind, entry.names, entry.type_text, entry.description) == (expected_kind, expected_names, None, expected_description)
 
 
 @pytest.mark.parametrize(

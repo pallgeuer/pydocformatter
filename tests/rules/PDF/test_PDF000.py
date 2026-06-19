@@ -54,6 +54,30 @@ def test_fix_literalizes_normal_whitespace_escapes_in_simple_docstring() -> None
     assert PDF000DocstringLiteralNormalization.check(fixed_context) == ()
 
 
+@pytest.mark.parametrize("prefix", ("u", "U"))
+def test_fix_removes_plain_unicode_prefix_from_simple_docstring(prefix: str) -> None:
+    source = f'def function():\n    {prefix}"""simple doc"""\n'
+
+    result = format_pdf000(source)
+
+    assert result.fixed_findings[PDF000DocstringLiteralNormalization.meta] == 1
+    assert result.new_source == 'def function():\n    """simple doc"""\n'
+    assert not format_pdf000(result.new_source).modified
+    _, fixed_context = contexts(result.new_source)
+    assert PDF.require_data(fixed_context).docstrings[0].value == "simple doc"
+
+
+def test_fix_removes_unicode_prefix_while_literalizing_whitespace_escapes() -> None:
+    source = 'def function():\n    u"""first\\n\\tsecond"""\n'
+
+    result = format_pdf000(source)
+
+    assert result.fixed_findings[PDF000DocstringLiteralNormalization.meta] == 1
+    assert result.new_source == 'def function():\n    """first\n\tsecond"""\n'
+    _, fixed_context = contexts(result.new_source)
+    assert PDF.require_data(fixed_context).docstrings[0].value == "first\n\tsecond"
+
+
 def test_fix_requotes_simple_single_quoted_docstring_when_literalizing_newline() -> None:
     _, context = contexts('def function():\n    "first\\n\\tsecond"\n')
 
@@ -250,6 +274,14 @@ def test_ignores_simple_string_escapes_that_are_not_docstrings() -> None:
 
     assert PDF000DocstringLiteralNormalization.check(context) == ()
     assert PDF000DocstringLiteralNormalization.fix(context).module is context.module
+
+
+def test_ignores_unicode_prefix_on_non_docstring_simple_string() -> None:
+    source = 'def function():\n    value = u"simple"\n'
+
+    result = format_pdf000(source)
+
+    assert not result.modified
 
 
 def test_simple_docstrings_are_unchanged() -> None:

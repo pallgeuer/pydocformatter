@@ -88,6 +88,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Vastly expanded PCF rule tests across comment classification, run boundaries, structure preservation, code detection, width handling, line endings, mixed formatting, syntax-position safety, convergence, idempotence, and rule independence.
   - Vastly expanded PDF category preparation tests across docstring collection, source metadata, semantic sections and entries, protected structures, reflow regions, malformed inputs, and mixed edge cases.
   - Added PDF101 regression coverage for short-line joining, protected structures, disabled structure parsing, simple-suite docstrings, and line-ending settings.
+  - Added PDF parser regression coverage for generic-looking return, yield, and exception type spellings across Google, NumPy, and reStructuredText/rest conventions.
 
 - **Formatting:**
   - Added the LibCST-based rule execution framework with ordered category preprocessing, repeated automatic-fix passes, final read-only checks, and non-convergence diagnostics.
@@ -116,7 +117,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Implemented `PDF302` through `PDF305`, replacing their previous stub behavior with first-summary-line diagnostics, safe first-word capitalization fixes, and Ruff-style convention-selection effects.
   - Changed summary first-word normalization to preserve Unicode alphanumeric characters when removing punctuation, avoiding false positives such as `This\u00e9`.
   - Implemented `PDF202`, `PDF300`, and `PDF301`, replacing their previous stub behavior with empty-docstring diagnostics, safe summary-punctuation fixes, and parser-recognized section and rest-field skips for the active convention.
-  - Changed `PDF000` to normalize safe `\n` and `\t` whitespace escape spellings in docstrings, including non-concatenated docstrings, without changing evaluated docstring values.
+  - Changed `PDF000` to normalize safe `\n` and `\t` whitespace escape spellings in docstrings and remove plain no-op `u`/`U` docstring prefixes, including non-concatenated docstrings, without changing evaluated docstring values.
   - Changed `PDF106` through `PDF109` to also normalize single-content-line docstrings when the docstring literal itself spans multiple lines.
   - Changed same-line quote placement for `PDF106` and `PDF108` to keep one separator space when needed for valid Python source.
   - Changed `PDF200` to remove blank lines after Google/NumPy section headers and between consecutive convention entries.
