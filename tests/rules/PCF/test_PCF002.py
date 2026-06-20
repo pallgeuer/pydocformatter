@@ -138,6 +138,27 @@ def test_trailing_rule_does_not_modify_standalone_comments_when_selected_alone()
     assert result.new_source == "#bad standalone spacing\nvalue = 1  # bad trailing spacing\n"
 
 
+def test_pcf_rule_selection_keeps_standalone_trailing_and_directive_actions_separate() -> None:
+    source = "#bad standalone spacing\nregular = compute()#ordinary trailing words that need moving\nignored = compute()#noqa\n"
+
+    standalone_settings = CheckSettings(select=("PCF001",), line_length=28)
+    trailing_settings = CheckSettings(select=("PCF002",), line_length=28)
+    directive_settings = CheckSettings(select=("PCF003",), line_length=28)
+    trailing_and_directive_settings = CheckSettings(select=("PCF002", "PCF003"), line_length=28)
+
+    standalone = formatter.format_source(source, "example.py", settings=standalone_settings, rule_selection=rules_selection.select_rules(standalone_settings), fix=True)
+    trailing = formatter.format_source(source, "example.py", settings=trailing_settings, rule_selection=rules_selection.select_rules(trailing_settings), fix=True)
+    directive = formatter.format_source(source, "example.py", settings=directive_settings, rule_selection=rules_selection.select_rules(directive_settings), fix=True)
+    trailing_and_directive = formatter.format_source(
+        source, "example.py", settings=trailing_and_directive_settings, rule_selection=rules_selection.select_rules(trailing_and_directive_settings), fix=True
+    )
+
+    assert standalone.new_source == "# bad standalone spacing\nregular = compute()#ordinary trailing words that need moving\nignored = compute()#noqa\n"
+    assert trailing.new_source == "#bad standalone spacing\n\n# ordinary trailing words\n# that need moving\nregular = compute()\nignored = compute()#noqa\n"
+    assert directive.new_source == "#bad standalone spacing\nregular = compute()#ordinary trailing words that need moving\nignored = compute()  # noqa\n"
+    assert trailing_and_directive.new_source == "#bad standalone spacing\n\n# ordinary trailing words\n# that need moving\nregular = compute()\nignored = compute()  # noqa\n"
+
+
 def test_trailing_formatting_ignores_all_standalone_structure_settings() -> None:
     source = "value = compute()  # >>> This trailing doctest-like comment is too long.\n"
     result = pcf_helpers.format_pcf(

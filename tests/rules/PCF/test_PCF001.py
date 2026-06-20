@@ -69,6 +69,20 @@ def test_preserved_structure_code_does_not_prevent_adjacent_prose_formatting() -
     assert result.new_source == "# Prose before a fence with enough words\n# that it must wrap onto another line.\n# ```python\n#     value = compute()\n# ```\n"
 
 
+@pytest.mark.parametrize(
+    ("source", "expected"),
+    (
+        ("# ## Preserved heading\n# prose after heading with enough words to wrap\n", "# ## Preserved heading\n# prose after heading\n# with enough words to\n# wrap\n"),
+        (
+            "# Name | Value\n# ---- | -----\n# one  | two\n# prose after table with enough words to wrap\n",
+            "# Name | Value\n# ---- | -----\n# one  | two\n# prose after table with\n# enough words to wrap\n",
+        ),
+    ),
+)
+def test_comments_after_preserved_standalone_structures_resume_formatting(source: str, expected: str) -> None:
+    assert pcf_helpers.format_pcf(source, line_length=24, comment_detect_statements=False).new_source == expected
+
+
 def test_restructuredtext_grid_and_simple_tables_are_preserved() -> None:
     source = "# +------+-------+\n# | Name | Value |\n# +======+=======+\n# | one  | two   |\n# +------+-------+\n# =====  =====\n# Name   Value\n# =====  =====\n"
 
@@ -127,6 +141,14 @@ def test_comment_edits_preserve_untouched_mixed_endings_and_use_configured_gener
 )
 def test_standalone_spacing_long_tokens_hash_boundaries_and_eof_are_stable(source: str, line_length: int, expected: str) -> None:
     assert pcf_helpers.format_pcf(source, line_length=line_length).new_source == expected
+
+
+def test_standalone_wrapping_preserves_missing_final_newline() -> None:
+    source = "# alpha beta gamma delta"
+
+    result = pcf_helpers.format_pcf(source, line_length=16, comment_detect_statements=False)
+
+    assert result.new_source == "# alpha beta\n# gamma delta"
 
 
 def test_indented_wrapping_accounts_for_comment_prefix_width() -> None:

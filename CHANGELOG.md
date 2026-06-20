@@ -94,6 +94,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added validation that built-in rule Markdown documentation includes every template section, including empty `Options` sections.
   - Added regression coverage for Ruff-compatible file-selection and per-file-ignore pattern-base behavior.
   - Vastly expanded PCF rule tests across comment classification, run boundaries, structure preservation, code detection, width handling, line endings, mixed formatting, syntax-position safety, convergence, idempotence, and rule independence.
+  - Added targeted PCF edge-case coverage for no-final-newline standalone wrapping, formatting after preserved standalone structures, and current standalone/trailing/directive rule-selection boundaries.
   - Vastly expanded PDF category preparation tests across docstring collection, source metadata, semantic sections and entries, protected structures, reflow regions, malformed inputs, and mixed edge cases.
   - Added PDF101 regression coverage for short-line joining, protected structures, disabled structure parsing, simple-suite docstrings, and line-ending settings.
   - Added PDF parser regression coverage for generic-looking return, yield, and exception type spellings across Google, NumPy, and reStructuredText/rest conventions.
