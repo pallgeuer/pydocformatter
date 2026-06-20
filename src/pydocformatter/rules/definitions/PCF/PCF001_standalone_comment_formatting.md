@@ -11,7 +11,7 @@ PCF001 operates on physical runs of consecutive, same-indent, regular, non-empty
 
 Within a run, PCF001 first identifies enabled preserved structures, then applies enabled code detectors to the remaining semantic text, and finally formats the remaining list items, block quotes, paragraphs, or physical lines. Lines inside an explicitly preserved structure are excluded from code detection, so code in a fenced or directive region does not prevent adjacent prose from formatting. If any code detector matches another non-preserved line or multiline candidate, the entire physical standalone run remains unchanged.
 
-When indentation leaves no positive wrapping width, PCF001 still canonicalizes spacing but keeps the content on one line. It does not raise the invalid-width error possible in the legacy formatter. It also preserves the source's final-newline state and untouched mixed line endings.
+When indentation leaves no positive wrapping width, PCF001 still canonicalizes spacing but keeps the content on one line. It does not raise the invalid-width error possible in the legacy formatter. It also preserves the source's final-newline state and untouched mixed line endings. When `url-aware-wrapping` is enabled, URL tokens remain unbroken but surrounding prose may use less greedy line breaks.
 
 ## Why is this useful?
 The conservative ordinary-prose default corrects clear spacing and line-length issues without merging separately authored lines. The structure and protection settings let projects reflow common comment prose while keeping doctests, code fences, tables, directives, headings, disabled code, and tool directives stable.
@@ -150,6 +150,13 @@ if value:
 ```
 
 ## Options
+Wrapping settings:
+
+- `line-length`: Maximum display width used when wrapping generated comment lines.
+- `line-ending`: Line ending used for generated comment lines.
+- `indent-width`: Tab display width used for wrapping calculations.
+- `url-aware-wrapping` defaults to `true`. When enabled, URL tokens remain unbroken while surrounding prose may be balanced across lines.
+
 Structure settings:
 
 - `comment-join-standalone-lines` defaults to `false`. When enabled, adjacent ordinary prose lines are joined with one space. Preserved structures, list items, and block quotes remain formatting boundaries.

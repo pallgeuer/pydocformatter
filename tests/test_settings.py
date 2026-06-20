@@ -295,6 +295,7 @@ class TestSettings(unittest.TestCase):
                 "output_format",
                 "legacy",
                 "line_length",
+                "url_aware_wrapping",
                 "line_ending",
                 "indent_style",
                 "indent_width",
@@ -469,6 +470,7 @@ class TestSettings(unittest.TestCase):
                 os.chdir(previous_cwd)
 
         self.assertEqual(config.line_length, 88)
+        self.assertTrue(config.url_aware_wrapping)
         self.assertIs(config.line_ending, LineEnding.AUTO)
         self.assertIs(config.indent_style, IndentStyle.SPACE)
         self.assertEqual(config.indent_width, 4)
@@ -864,6 +866,21 @@ class TestSettings(unittest.TestCase):
                     pydocformatter_settings.SETTINGS_SCHEMA.load()
             finally:
                 os.chdir(previous_cwd)
+
+    def test_url_aware_wrapping_setting_is_loaded_from_toml_and_cli(self) -> None:
+        configured = pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(isolated=True, config_options=("url-aware-wrapping = true",)))
+        overridden = pydocformatter_settings.SETTINGS_SCHEMA.load(
+            global_values=pydocformatter_global_args.GlobalArgs(isolated=True),
+            args=argparse.Namespace(url_aware_wrapping=True),
+        )
+        disabled = pydocformatter_settings.SETTINGS_SCHEMA.load(
+            global_values=pydocformatter_global_args.GlobalArgs(isolated=True, config_options=("url-aware-wrapping = true",)),
+            args=argparse.Namespace(url_aware_wrapping=False),
+        )
+
+        self.assertTrue(configured.url_aware_wrapping)
+        self.assertTrue(overridden.url_aware_wrapping)
+        self.assertFalse(disabled.url_aware_wrapping)
 
     def test_comment_formatting_boolean_settings_are_loaded_from_toml_and_cli(self) -> None:
         configured = pydocformatter_settings.SETTINGS_SCHEMA.load(

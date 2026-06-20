@@ -105,6 +105,7 @@ class CheckSettings:
         output_format (OutputFormat): Output format used for rule findings.
         legacy (bool): Whether to use the legacy formatter implementation.
         line_length (int): Maximum line length used when wrapping docstrings or comments.
+        url_aware_wrapping (bool): Whether wrapping balances prose around unbroken URL tokens.
         line_ending (LineEnding): Line ending used when rewriting files.
         indent_style (IndentStyle): Indentation style used for generated and normalized docstring indentation.
         indent_width (int): Number of spaces per generated docstring indentation level, or the visual width of a tab.
@@ -157,6 +158,7 @@ class CheckSettings:
     output_format: OutputFormat = OutputFormat.GROUPED
     legacy: bool = False
     line_length: int = 88
+    url_aware_wrapping: bool = True
     line_ending: LineEnding = LineEnding.AUTO
     indent_style: IndentStyle = IndentStyle.SPACE
     indent_width: int = 4
@@ -225,6 +227,7 @@ class CheckSettingsOverrides(TypedDict, total=False):
         output_format (OutputFormat): Output format used for rule findings.
         legacy (bool): Whether to use the legacy formatter implementation.
         line_length (int): Maximum line length used when wrapping docstrings or comments.
+        url_aware_wrapping (bool): Whether wrapping balances prose around unbroken URL tokens.
         line_ending (LineEnding): Line ending used when rewriting files.
         indent_style (IndentStyle): Indentation style used for generated and normalized docstring indentation.
         indent_width (int): Number of spaces per generated docstring indentation level, or the visual width of a tab.
@@ -273,6 +276,7 @@ class CheckSettingsOverrides(TypedDict, total=False):
     output_format: OutputFormat
     legacy: bool
     line_length: int
+    url_aware_wrapping: bool
     line_ending: LineEnding
     indent_style: IndentStyle
     indent_width: int
@@ -359,6 +363,13 @@ SETTINGS_SCHEMA = SettingsSchema(
             help="Maximum line length for docstrings and comments.",
             validator=settings_core.validate_int(min_value=1, max_value=320),
             cli={"metavar": "LENGTH"},
+        ),
+        SettingDefinition(
+            field="url_aware_wrapping",
+            value_type=bool,
+            group=SettingsGroup.FORMATTING,
+            help="Balance wrapping around URL tokens without splitting URLs.",
+            documentation="Whether comment and docstring wrapping should balance surrounding prose around URL tokens without splitting URLs.",
         ),
         SettingDefinition(
             field="line_ending",

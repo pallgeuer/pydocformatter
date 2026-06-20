@@ -112,7 +112,7 @@ def _change_for_unit(
 def _wrap_plain(content: str, *, indent: str, settings: CheckSettings) -> tuple[str, ...]:
     """Wrap ordinary normalized comment content."""
     width = PCF_definition.available_comment_width(indent, line_length=settings.line_length, tab_width=settings.indent_width)
-    return text_layout.wrap_text(content, width=width)
+    return text_layout.wrap_text(content, width=width, tab_width=settings.indent_width, url_aware=settings.url_aware_wrapping)
 
 
 def _format_list_item(
@@ -139,7 +139,7 @@ def _format_list_item(
         end += 1
     width = settings.line_length - text_layout.display_width(f"{run.indent}# ", tab_width=settings.indent_width)
     subsequent = " " * len(prefix)
-    lines = text_layout.wrap_text(" ".join(texts), width=width, initial_indent=prefix, subsequent_indent=subsequent)
+    lines = text_layout.wrap_text(" ".join(texts), width=width, initial_indent=prefix, subsequent_indent=subsequent, tab_width=settings.indent_width, url_aware=settings.url_aware_wrapping)
     return end, lines
 
 
@@ -164,7 +164,7 @@ def _format_block_quote(
         texts.append(next_match.group("text").strip())
         end += 1
     width = settings.line_length - text_layout.display_width(f"{run.indent}# ", tab_width=settings.indent_width)
-    lines = text_layout.wrap_text(" ".join(texts), width=width, initial_indent=prefix, subsequent_indent=prefix)
+    lines = text_layout.wrap_text(" ".join(texts), width=width, initial_indent=prefix, subsequent_indent=prefix, tab_width=settings.indent_width, url_aware=settings.url_aware_wrapping)
     return end, lines
 
 

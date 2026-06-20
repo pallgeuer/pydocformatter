@@ -190,6 +190,16 @@ def test_moved_structure_like_comment_is_plain_wrapped_and_does_not_gain_standal
     assert result.new_source == "# - alpha beta gamma\n# delta epsilon\nvalue = compute()\n# > alpha beta gamma\n# delta epsilon\nother = compute()\n"
 
 
+def test_url_aware_wrapping_balances_extracted_trailing_comment_url_lines_when_enabled() -> None:
+    source = "value = compute()  # alpha beta https://example.com/path alpha\n"
+
+    disabled = pcf_helpers.format_pcf(source, line_length=31, url_aware_wrapping=False)
+    default = pcf_helpers.format_pcf(source, line_length=31)
+
+    assert disabled.new_source == "# alpha beta\n# https://example.com/path\n# alpha\nvalue = compute()\n"
+    assert default.new_source == "# alpha\n# beta https://example.com/path\n# alpha\nvalue = compute()\n"
+
+
 def test_standalone_and_trailing_edits_on_adjacent_lines_converge_without_overlap() -> None:
     source = "#standalone explanation with enough words to wrap\nvalue = compute()#trailing explanation with enough words to move\n"
     result = pcf_helpers.format_pcf(source, line_length=28)

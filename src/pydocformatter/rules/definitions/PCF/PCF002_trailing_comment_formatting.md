@@ -9,7 +9,7 @@ If the complete canonical code-plus-comment line exceeds `line-length`, PCF002 r
 
 Protected type comments and tool directives are never changed. Standalone paragraph, markup, doctest, and disabled-code settings do not apply to trailing comments.
 
-Widths use tab-expanded columns with `indent-width` as the tab size. If indentation leaves no positive wrapping width, a non-empty overlong comment is still moved above the code but its text remains on one unwrapped line. Long words are not split. Source outside the replacement retains mixed line endings and the file's final-newline state.
+Widths use tab-expanded columns with `indent-width` as the tab size. If indentation leaves no positive wrapping width, a non-empty overlong comment is still moved above the code but its text remains on one unwrapped line. Long words are not split. Source outside the replacement retains mixed line endings and the file's final-newline state. When `url-aware-wrapping` is enabled, URL tokens remain unbroken but surrounding prose may use less greedy line breaks.
 
 ## Why is this useful?
 Canonical spacing keeps short trailing comments predictable. Extracting long comments prevents explanatory text from obscuring code and avoids producing a permanently overlong combined line.
@@ -132,3 +132,4 @@ other = compute()
 - `line-length`
 - `line-ending`
 - `indent-width`
+- `url-aware-wrapping`

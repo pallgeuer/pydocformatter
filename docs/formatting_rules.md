@@ -63,6 +63,7 @@
 
 ```toml
 [tool.pydocfmt]
+url-aware-wrapping = true
 select = ["ALL"]
 extend-select = []
 ignore = []

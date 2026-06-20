@@ -394,6 +394,36 @@ def test_unicode_code_points_each_count_as_one_width_column() -> None:
     assert combining.new_source == "# e\u0301e\u0301e\u0301\n# alpha beta\n"
 
 
+def test_url_aware_wrapping_balances_standalone_comment_url_lines_when_enabled() -> None:
+    source = "# alpha beta https://example.com/path alpha\n"
+
+    disabled = pcf_helpers.format_pcf(source, line_length=31, url_aware_wrapping=False)
+    default = pcf_helpers.format_pcf(source, line_length=31)
+
+    assert disabled.new_source == "# alpha beta\n# https://example.com/path\n# alpha\n"
+    assert default.new_source == "# alpha\n# beta https://example.com/path\n# alpha\n"
+
+
+def test_url_aware_wrapping_applies_to_standalone_list_items() -> None:
+    source = "# - alpha beta https://example.com/path alpha\n"
+
+    disabled = pcf_helpers.format_pcf(source, line_length=33, url_aware_wrapping=False)
+    default = pcf_helpers.format_pcf(source, line_length=33)
+
+    assert disabled.new_source == "# - alpha beta\n#   https://example.com/path\n#   alpha\n"
+    assert default.new_source == "# - alpha\n#   beta https://example.com/path\n#   alpha\n"
+
+
+def test_url_aware_wrapping_applies_to_standalone_block_quotes() -> None:
+    source = "# > alpha beta https://example.com/path alpha\n"
+
+    disabled = pcf_helpers.format_pcf(source, line_length=33, url_aware_wrapping=False)
+    default = pcf_helpers.format_pcf(source, line_length=33)
+
+    assert disabled.new_source == "# > alpha beta\n# > https://example.com/path\n# > alpha\n"
+    assert default.new_source == "# > alpha\n# > beta https://example.com/path\n# > alpha\n"
+
+
 @pytest.mark.parametrize(
     ("source", "line_length", "join_lines", "indent_width"),
     (

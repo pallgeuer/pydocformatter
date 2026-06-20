@@ -88,6 +88,7 @@ If no files or directories are specified, `pydocfmt check` checks the current di
 - `--output-format {grouped}`: Output format for rule findings (default: grouped)
 - `--legacy`, `--no-legacy`: Toggle the legacy formatter implementation (default: disabled)
 - `--line-length LENGTH`: Maximum line length for docstrings and comments (default: 88)
+- `--url-aware-wrapping`, `--no-url-aware-wrapping`: Toggle URL-aware wrapping balance without splitting URLs (default: enabled)
 - `--line-ending {auto,lf,cr-lf,native}`: Line ending to use when rewriting files (default: auto)
 - `--indent-style {space,tab}`: Indentation style for generated docstring sections (default: space)
 - `--indent-width WIDTH`: Generated docstring indentation width and comment tab width (default: 4)
@@ -216,6 +217,7 @@ pydocformatter can be configured via `pyproject.toml` (example):
 output-format = "grouped"
 legacy = false
 line-length = 88
+url-aware-wrapping = true
 line-ending = "auto"
 indent-style = "space"
 indent-width = 4
@@ -269,6 +271,7 @@ For TOML configuration, `[tool.pydocfmt.docstring]` and `[tool.pydocfmt.comment]
 - `output-format`: Output format for rule findings; currently only `"grouped"` is supported (default: `"grouped"`)
 - `legacy`: Use the legacy formatter implementation (default: `false`)
 - `line-length`: Maximum line length for docstrings and comments (default: 88)
+- `url-aware-wrapping`: Balance comment and docstring wrapping around URL tokens without splitting URLs (default: `true`)
 - `line-ending`: Line ending to use when rewriting files; one of `"auto"`, `"lf"`, `"cr-lf"`, or `"native"` (default: `"auto"`)
 - `indent-style`: Generated docstring section indentation style; one of `"space"` or `"tab"` (default: `"space"`)
 - `indent-width`: Generated docstring section indentation width and tab expansion width used when measuring comments (default: 4)
@@ -312,6 +315,8 @@ For TOML configuration, `[tool.pydocfmt.docstring]` and `[tool.pydocfmt.comment]
 - `force-exclude`: Apply exclude rules to explicitly listed files (default: `false`)
 
 When `respect-gitignore` is enabled, pydocfmt aborts if gitignore filtering cannot be checked, because continuing without that filter could format files that should stay ignored.
+
+When `url-aware-wrapping` is enabled, pydocfmt may choose less greedy line breaks around URL tokens in comment and docstring prose, but URLs and other long words are still not split.
 
 The `comment-*` settings affect the rule-based formatter. PCF001 defaults to formatting each standalone physical line independently; joining and structured-markup interpretation are opt-in. See `pydocfmt rule PCF001` and `pydocfmt rule PCF002` for exact detector precedence and protected-comment behavior.
 

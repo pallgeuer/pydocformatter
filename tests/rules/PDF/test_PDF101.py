@@ -432,3 +432,48 @@ def test_lf_line_ending_setting_only_controls_generated_docstring_lines() -> Non
     result = format_pdf001(source, settings=CheckSettings(select=("PDF101",), line_length=48, line_ending=LineEnding.LF))
 
     assert result.new_source == 'def function():\r\n    """Summary text with enough words to wrap\n    onto another line."""\r\nvalue = 1\r\n'
+
+
+def test_url_aware_wrapping_balances_docstring_prose_around_urls_when_enabled() -> None:
+    source = 'def function():\n    """Return alpha beta gamma delta https://example.com/path alpha after validating enough extra text to require wrapping."""\n'
+
+    disabled = format_pdf001(source, settings=CheckSettings(select=("PDF101",), line_length=35, url_aware_wrapping=False))
+    default = format_pdf001(source, settings=CheckSettings(select=("PDF101",), line_length=35))
+
+    assert (
+        disabled.new_source == 'def function():\n    """Return alpha beta gamma\n    delta https://example.com/path\n    alpha after validating enough\n    extra text to require\n    wrapping."""\n'
+    )
+    assert default.new_source == 'def function():\n    """Return alpha beta gamma\n    delta https://example.com/path\n    alpha after validating\n    enough extra text to require\n    wrapping."""\n'
+    assert not format_pdf001(default.new_source, settings=CheckSettings(select=("PDF101",), line_length=35)).modified
+
+
+def test_url_aware_wrapping_balances_google_entry_descriptions_when_enabled() -> None:
+    source = 'def function(value):\n    """Do work.\n\n    Args:\n        value: alpha beta https://example.com/path alpha after validating enough extra text to require wrapping.\n    """\n'
+
+    disabled = format_pdf001(source, settings=CheckSettings(select=("PDF101",), line_length=56, docstring_convention=DocstringConvention.GOOGLE, url_aware_wrapping=False))
+    default = format_pdf001(source, settings=CheckSettings(select=("PDF101",), line_length=56, docstring_convention=DocstringConvention.GOOGLE))
+
+    assert (
+        disabled.new_source
+        == 'def function(value):\n    """Do work.\n\n    Args:\n        value: alpha beta https://example.com/path alpha\n            after validating enough extra text to\n            require wrapping.\n    """\n'
+    )
+    assert (
+        default.new_source
+        == 'def function(value):\n    """Do work.\n\n    Args:\n        value: alpha beta https://example.com/path\n            alpha after validating enough extra text to\n            require wrapping.\n    """\n'
+    )
+
+
+def test_url_aware_wrapping_balances_rest_field_descriptions_when_enabled() -> None:
+    source = 'def function(value):\n    """Do work.\n\n    :param value: alpha beta https://example.com/path alpha after validating enough extra text to require wrapping.\n    """\n'
+
+    disabled = format_pdf001(source, settings=CheckSettings(select=("PDF101",), line_length=47, docstring_convention=DocstringConvention.REST, url_aware_wrapping=False))
+    default = format_pdf001(source, settings=CheckSettings(select=("PDF101",), line_length=47, docstring_convention=DocstringConvention.REST))
+
+    assert (
+        disabled.new_source
+        == 'def function(value):\n    """Do work.\n\n    :param value: alpha beta\n                  https://example.com/path\n                  alpha after validating enough\n                  extra text to require\n                  wrapping.\n    """\n'
+    )
+    assert (
+        default.new_source
+        == 'def function(value):\n    """Do work.\n\n    :param value: alpha\n                  beta https://example.com/path\n                  alpha after validating\n                  enough extra text to require\n                  wrapping.\n    """\n'
+    )

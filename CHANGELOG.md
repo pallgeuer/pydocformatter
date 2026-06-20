@@ -58,6 +58,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added `legacy` for formatter configuration, defaulting to `false`.
   - Added Ruff-style `line-ending` configuration with `"auto"`, `"lf"`, `"cr-lf"`, and `"native"` values.
   - Added `indent-style` and `indent-width` for generated docstring section indentation, with Ruff-style defaults of `"space"` and `4`.
+  - Added `url-aware-wrapping`, enabled by default, for URL-aware comment and docstring line balancing without splitting URL tokens.
   - Added `docstring-blank-line-style` with `"blank"` and `"aligned"` modes for PDF103 blank-line whitespace normalization.
   - Added `docstring-blank-line-after-last-section` to control whether PDF200 and PDF201 keep one blank line after the final recognized Google or NumPy docstring section.
   - Added Ruff-style rule settings under `[tool.pydocfmt]`: `select`, `ignore`, `extend-select`, `per-file-ignores`, `extend-per-file-ignores`, `fixable`, `unfixable`, and `extend-fixable`.
@@ -98,6 +99,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added the LibCST-based rule execution framework with ordered category preprocessing, repeated automatic-fix passes, final read-only checks, and non-convergence diagnostics.
   - Added typed PCF comment and PDF docstring category data, together with a shared validated source-edit helper, as the foundation for individual rule implementations.
   - Implemented PCF001 standalone-comment formatting and PCF002 trailing-comment formatting with independent fixes, protected directive handling, tab-expanded widths, stable impossible-width behavior, and exact EOF preservation.
+  - Added shared URL-aware wrapping helpers used by PCF001, PCF002, and PDF101 when `url-aware-wrapping` is enabled.
 
 ### Changed
 
@@ -133,6 +135,9 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Centralized quote-collision rendering for `PDF110` so one-line docstring collapse reuses the shared PDF escape and separator fallback behavior.
 
 ### Fixed
+
+- **Formatting:**
+  - Fixed URL-aware wrapping to avoid recursive crashes on long URL-containing paragraphs and to fall back to greedy wrapping when balanced wrapping exceeds its search budget.
 
 - **Docstring formatting:**
   - Fixed `PDF409` and `PDF410` to preserve Google exception-entry parentheticals, and fixed Google and NumPy parsing to keep malformed exception-like prose continuations from being normalized as separate entries.

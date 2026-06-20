@@ -138,6 +138,7 @@ def _replacement_for_region(
             subsequent_indent=region.subsequent_indent,
             tab_width=context.settings.indent_width,
             fragments=fragments,
+            url_aware=context.settings.url_aware_wrapping,
         )
         if not wrapped:
             return None
@@ -159,6 +160,7 @@ def _replacement_for_region(
         subsequent_indent=region.subsequent_indent,
         tab_width=context.settings.indent_width,
         fragments=fragments,
+        url_aware=context.settings.url_aware_wrapping,
     )
     if not wrapped:
         return None
@@ -220,6 +222,7 @@ def _wrapped_region_lines(
     subsequent_indent: str,
     tab_width: int,
     fragments: tuple[string_literals.StringValueFragment, ...] | None,
+    url_aware: bool,
 ) -> tuple[string_literals.WrappedSourceLine, ...]:
     """Return normalized wrapped region lines."""
     if fragments is None:
@@ -240,6 +243,7 @@ def _wrapped_region_lines(
             initial_width=initial_width,
             subsequent_width=subsequent_width,
             final_suffix_width=final_suffix_width,
+            url_aware=url_aware,
         )
     return string_literals.wrap_source_words(
         _source_words_for_region(region, fragments=fragments),
@@ -250,6 +254,7 @@ def _wrapped_region_lines(
         initial_width=initial_width,
         subsequent_width=subsequent_width,
         final_suffix_width=final_suffix_width,
+        url_aware=url_aware,
     )
 
 

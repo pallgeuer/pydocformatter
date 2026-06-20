@@ -162,5 +162,44 @@ def test_wrap_source_words_reserves_final_suffix_width() -> None:
     assert tuple(line.source for line in wrapped) == ("alpha beta", "gamma")
 
 
+def test_wrap_source_words_can_balance_words_around_url_tokens() -> None:
+    words = tuple(string_literals.SourceWord(value=word, source=word) for word in ("alpha", "beta", "https://example.com/path", "alpha"))
+
+    wrapped = string_literals.wrap_source_words(words, width=29, tab_width=4, url_aware=True)
+
+    assert tuple(line.value for line in wrapped) == ("alpha", "beta https://example.com/path", "alpha")
+    assert tuple(line.source for line in wrapped) == ("alpha", "beta https://example.com/path", "alpha")
+
+
+def test_wrap_source_words_url_balancing_preserves_source_spelling() -> None:
+    words = (
+        string_literals.SourceWord(value="alpha", source="alpha"),
+        string_literals.SourceWord(value="https://example.com/path", source="https://example.com/path"),
+        string_literals.SourceWord(value="tail", source=r"t\x61il"),
+    )
+
+    wrapped = string_literals.wrap_source_words(words, width=30, tab_width=4, url_aware=True)
+
+    assert tuple(line.value for line in wrapped) == ("alpha https://example.com/path", "tail")
+    assert tuple(line.source for line in wrapped) == ("alpha https://example.com/path", r"t\x61il")
+
+
+def test_wrap_source_words_url_balancing_respects_variable_widths_and_final_suffix() -> None:
+    words = tuple(string_literals.SourceWord(value=word, source=word) for word in ("alpha", "beta", "https://example.com/path", "gamma"))
+
+    wrapped = string_literals.wrap_source_words(
+        words,
+        width=35,
+        initial_width=18,
+        subsequent_width=35,
+        final_suffix_width=6,
+        tab_width=4,
+        url_aware=True,
+    )
+
+    assert tuple(line.value for line in wrapped) == ("alpha", "beta https://example.com/path", "gamma")
+    assert tuple(line.source for line in wrapped) == ("alpha", "beta https://example.com/path", "gamma")
+
+
 def test_render_simple_string_from_body_source_returns_none_for_invalid_literal() -> None:
     assert string_literals.render_simple_string_from_body_source("", '"""', 'bad """ delimiter', expected_value='bad """ delimiter') is None

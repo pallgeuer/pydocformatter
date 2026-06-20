@@ -57,7 +57,7 @@ def _planned_changes(context: RuleContext) -> tuple[rule_edits.PlannedSourceChan
                 line_length=context.settings.line_length,
                 tab_width=context.settings.indent_width,
             )
-            wrapped = text_layout.wrap_text(content, width=width)
+            wrapped = text_layout.wrap_text(content, width=width, tab_width=context.settings.indent_width, url_aware=context.settings.url_aware_wrapping)
             comment_lines = tuple(PCF_definition.render_comment(line, indent=comment.indent) for line in wrapped)
             if _requires_standalone_boundary(data, comment):
                 comment_lines = ("", *comment_lines)

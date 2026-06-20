@@ -41,6 +41,11 @@ class WrappedSourceLine:
     source: str
 
 
+def _source_line(indent: str, words: tuple[SourceWord, ...]) -> WrappedSourceLine:
+    """Render one source-aware wrapped line."""
+    return WrappedSourceLine(value=f"{indent}{' '.join(word.value for word in words)}", source=f"{indent}{' '.join(word.source for word in words)}")
+
+
 _SIMPLE_ESCAPES = {
     "\\": "\\",
     "'": "'",
@@ -185,12 +190,24 @@ def wrap_source_words(
     initial_width: int | None = None,
     subsequent_width: int | None = None,
     final_suffix_width: int = 0,
+    url_aware: bool = False,
 ) -> tuple[WrappedSourceLine, ...]:
     """Wrap words using their final source spelling for width calculations.
 
     When variable budgets are supplied, `width` is only the fallback for unspecified initial or subsequent widths, and
     `final_suffix_width` is reserved on the final generated line.
     """
+    if url_aware and any(text_layout.is_url_token(word.value) for word in words):
+        return _wrap_source_words_with_balanced_spans(
+            words,
+            width=width,
+            initial_width=initial_width,
+            subsequent_width=subsequent_width,
+            final_suffix_width=final_suffix_width,
+            initial_indent=initial_indent,
+            subsequent_indent=subsequent_indent,
+            tab_width=tab_width,
+        )
     if initial_width is not None or subsequent_width is not None or final_suffix_width:
         return _wrap_source_words_with_variable_widths(
             words,
@@ -220,24 +237,43 @@ def wrap_source_words(
     for word in words:
         candidate = [*current_words, word]
         if current_words and text_layout.display_width(current_source(candidate), tab_width=tab_width) > width:
-            lines.append(
-                WrappedSourceLine(
-                    value=f"{current_indent}{' '.join(current_word.value for current_word in current_words)}",
-                    source=current_source(current_words),
-                )
-            )
+            lines.append(_source_line(current_indent, tuple(current_words)))
             current_indent = subsequent_indent
             current_words = [word]
         else:
             current_words = candidate
     if current_words:
-        lines.append(
-            WrappedSourceLine(
-                value=f"{current_indent}{' '.join(current_word.value for current_word in current_words)}",
-                source=current_source(current_words),
-            )
-        )
+        lines.append(_source_line(current_indent, tuple(current_words)))
     return tuple(lines)
+
+
+def _wrap_source_words_with_balanced_spans(
+    words: tuple[SourceWord, ...],
+    *,
+    width: int,
+    initial_width: int | None,
+    subsequent_width: int | None,
+    final_suffix_width: int,
+    initial_indent: str,
+    subsequent_indent: str,
+    tab_width: int,
+) -> tuple[WrappedSourceLine, ...]:
+    """Wrap source words with shared URL-aware balanced spans."""
+    if not words:
+        stripped = initial_indent.rstrip()
+        return (WrappedSourceLine(value=stripped, source=stripped),)
+    spans = text_layout.balanced_word_spans(
+        tuple(word.value for word in words),
+        width_words=tuple(word.source for word in words),
+        width=width,
+        initial_width=initial_width,
+        subsequent_width=subsequent_width,
+        final_suffix_width=final_suffix_width,
+        initial_indent=initial_indent,
+        subsequent_indent=subsequent_indent,
+        tab_width=tab_width,
+    )
+    return tuple(_source_line(initial_indent if index == 0 else subsequent_indent, words[span.start : span.end]) for index, span in enumerate(spans))
 
 
 def _wrap_source_words_with_variable_widths(
@@ -255,9 +291,6 @@ def _wrap_source_words_with_variable_widths(
         stripped = initial_indent.rstrip()
         return (WrappedSourceLine(value=stripped, source=stripped),)
 
-    def line(indent: str, line_words: tuple[SourceWord, ...]) -> WrappedSourceLine:
-        return WrappedSourceLine(value=f"{indent}{' '.join(word.value for word in line_words)}", source=f"{indent}{' '.join(word.source for word in line_words)}")
-
     def fits(candidate: WrappedSourceLine, *, first_line: bool, final_line: bool, single_word: bool) -> bool:
         limit = initial_width if first_line else subsequent_width
         if final_line:
@@ -270,7 +303,7 @@ def _wrap_source_words_with_variable_widths(
         indent = initial_indent if first_line else subsequent_indent
         for end in range(len(words), start, -1):
             candidate_words = words[start:end]
-            candidate = line(indent, candidate_words)
+            candidate = _source_line(indent, candidate_words)
             if not fits(candidate, first_line=first_line, final_line=end == len(words), single_word=end == start + 1):
                 continue
             remainder = () if end == len(words) else best(end, False)

@@ -13,6 +13,8 @@ The rule intentionally skips docstrings whose evaluated value cannot be mapped b
 
 PDF101 accounts for the docstring opening and closing delimiters when wrapping generated docstring lines. It does not account for unchanged Python source that follows the closing delimiter on the same physical line, such as `; return None` in a single-line suite.
 
+When `url-aware-wrapping` is enabled, URL tokens remain unbroken but surrounding prose may use less greedy line breaks.
+
 ## Why is this useful?
 Consistent wrapping keeps docstrings readable in editors, terminals, review diffs, and generated documentation. Reflowing semantic chunks instead of raw line ranges keeps summaries, paragraphs, parameter descriptions, fields, lists, and quoted text readable without disturbing protected examples or code-like content.
 
@@ -212,6 +214,7 @@ def example():
 
 ## Options
 - `line-length`: Maximum display width used when wrapping generated docstring lines.
+- `url-aware-wrapping`: Enables URL-aware line balancing without splitting URL tokens.
 - `line-ending`: Line ending used inside rewritten docstring literals. Untouched source outside the replacement is preserved.
 - `indent-width`: Tab display width used for wrapping calculations and generated continuation indentation.
 - `docstring-convention`: Enables convention-aware parsing for Google sections, NumPy sections, or rest fields.
