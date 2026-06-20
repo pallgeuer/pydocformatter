@@ -66,6 +66,20 @@ def test_one_google_entry_can_document_multiple_directly_raised_exceptions() -> 
     assert_pdf506_lines(source, ())
 
 
+def test_backticked_pipe_separated_google_entry_can_document_multiple_directly_raised_exceptions() -> None:
+    source = 'def function(flag):\n    """Validate.\n\n    Raises:\n        `ValueError` | errors.CustomError: Bad value.\n    """\n    if flag:\n        raise ValueError("bad")\n    raise errors.CustomError("bad")\n'
+
+    assert_pdf506_lines(source, ())
+
+
+def test_backticked_pipe_separated_numpy_and_rest_entries_can_document_multiple_directly_raised_exceptions() -> None:
+    numpy = 'def function(flag):\n    """Validate.\n\n    Raises\n    ------\n    `ValueError` | errors.CustomError\n        Bad value.\n    """\n    if flag:\n        raise ValueError("bad")\n    raise errors.CustomError("bad")\n'
+    rest = 'def function(flag):\n    """Validate.\n\n    :raises `ValueError | errors.CustomError`: Bad value.\n    """\n    if flag:\n        raise ValueError("bad")\n    raise errors.CustomError("bad")\n'
+
+    assert_pdf506_lines(numpy, (), settings=CheckSettings(select=("PDF506",), docstring_convention=DocstringConvention.NUMPY))
+    assert_pdf506_lines(rest, (), settings=CheckSettings(select=("PDF506",), docstring_convention=DocstringConvention.REST))
+
+
 def test_qualified_raise_matches_final_documented_exception_name() -> None:
     source = 'def function():\n    """Validate.\n\n    Raises:\n        ValueError: Bad value.\n    """\n    raise errors.ValueError("bad")\n'
 

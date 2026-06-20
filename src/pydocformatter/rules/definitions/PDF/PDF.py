@@ -486,6 +486,9 @@ _REST_FIELD_RE = re.compile(r"^(?P<indent>[ \t]*):(?P<field>[\w-]+)(?:[ \t]+(?P<
 _GOOGLE_ENTRY_RE = re.compile(r"^(?P<indent>[ \t]+)(?P<name>\*{0,2}[A-Za-z_][\w.]*)(?:[ \t]*\((?P<type>[^)]+)\))?[ \t]*:[ \t]*(?P<description>.*)$")
 _GENERIC_ENTRY_RE = re.compile(r"^(?P<indent>[ \t]+)(?P<name>[^:]+):[ \t]*(?P<description>.*)$")
 _NUMPY_ENTRY_RE = re.compile(r"^(?P<indent>[ \t]*)(?P<name>\*{0,2}[A-Za-z_][\w., ]*?)[ \t]*:[ \t]*(?P<type>.+)$")
+_NUMPY_EXCEPTION_ENTRY_RE = re.compile(r"^(?P<indent>[ \t]*)(?P<name>[^:]+?)[ \t]*:[ \t]*(?P<description>.*)$")
+_EXCEPTION_NAME_RE = re.compile(r"[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*")
+_EXCEPTION_NAME_SEPARATOR_RE = re.compile(r"\s*(?:,|\|)\s*")
 _ATX_HEADING_RE = re.compile(r"^[ \t]{0,3}#{1,6}[ \t]+\S")
 _MARKDOWN_TABLE_DELIMITER_RE = re.compile(r"^[ \t]*\|?[ \t]*:?-{3,}:?[ \t]*(?:\|[ \t]*:?-{3,}:?[ \t]*)+\|?[ \t]*$")
 _REST_GRID_BORDER_RE = re.compile(r"^[ \t]*\+(?:[-=]+\+)+[ \t]*$")
@@ -711,7 +714,10 @@ class _DocstringParser:
                 description_reflow_lines.append(first_description_line)
             description_reflow_lines.extend(self._stripped_reflow_lines(index + 1, entry_end, skip_empty=True))
             description_lines = [line.text for line in description_reflow_lines]
-            names = tuple(part.strip() for part in name.split(","))
+            names = _entry_names(kind, name)
+            if names is None:
+                index = entry_end
+                continue
             if kind in (DocstringEntryKind.RETURN, DocstringEntryKind.YIELD) and type_text is None:
                 names = ()
                 type_text = name
@@ -742,14 +748,50 @@ class _DocstringParser:
                 index = protected_end
                 continue
             text = self.lines[index].text
+            exception_match = _NUMPY_EXCEPTION_ENTRY_RE.match(text) if kind is DocstringEntryKind.EXCEPTION else None
+            if exception_match is not None:
+                entry_end = self._entry_end(index, end, text_layout.leading_width(exception_match.group("indent")))
+                names = _exception_names(exception_match.group("name"))
+                if names is not None:
+                    first_description_line = self._reflow_line_from_text_span(index, exception_match.start("description"), len(self.lines[index].text))
+                    description_reflow_lines = []
+                    if first_description_line is not None and first_description_line.text:
+                        description_reflow_lines.append(first_description_line)
+                    description_reflow_lines.extend(self._stripped_reflow_lines(index + 1, entry_end, skip_empty=True))
+                    description_lines = [line.text for line in description_reflow_lines]
+                    entries.append(
+                        DocstringEntry(
+                            kind=kind,
+                            names=names,
+                            type_text=None,
+                            description=" ".join(description_lines),
+                            start_line=index,
+                            end_line=entry_end,
+                        )
+                    )
+                    if description_lines:
+                        self._add_reflow(
+                            DocstringBlockKind.SECTION_ENTRY,
+                            index,
+                            entry_end,
+                            lines=tuple(description_reflow_lines),
+                            initial_indent=self.lines[index].text[: exception_match.start("description")],
+                            subsequent_indent=text_layout.indent_unit(self.settings),
+                        )
+                index = entry_end
+                continue
             match = _NUMPY_ENTRY_RE.match(text)
             if match is not None:
                 entry_end = self._entry_end(index, end, text_layout.leading_width(match.group("indent")))
-                description_reflow_lines = self._stripped_reflow_lines(index + 1, entry_end, skip_empty=True)
+                description_reflow_lines = list(self._stripped_reflow_lines(index + 1, entry_end, skip_empty=True))
                 description_lines = [line.text for line in description_reflow_lines]
+                names = _entry_names(kind, match.group("name"))
+                if names is None:
+                    index = entry_end
+                    continue
                 entry = DocstringEntry(
                     kind=kind,
-                    names=tuple(part.strip() for part in match.group("name").split(",")),
+                    names=names,
                     type_text=match.group("type").strip(),
                     description=" ".join(description_lines),
                     start_line=index,
@@ -769,12 +811,19 @@ class _DocstringParser:
                 continue
             if kind in (DocstringEntryKind.RETURN, DocstringEntryKind.YIELD, DocstringEntryKind.EXCEPTION) and text.strip():
                 entry_end = self._entry_end(index, end, text_layout.leading_width(text))
-                description_reflow_lines = self._stripped_reflow_lines(index + 1, entry_end, skip_empty=True)
+                description_reflow_lines = list(self._stripped_reflow_lines(index + 1, entry_end, skip_empty=True))
                 description_lines = [line.text for line in description_reflow_lines]
+                if kind == DocstringEntryKind.EXCEPTION:
+                    names = _exception_names(text.strip())
+                    if names is None:
+                        index = entry_end
+                        continue
+                else:
+                    names = ()
                 entries.append(
                     DocstringEntry(
                         kind=kind,
-                        names=(text.strip(),) if kind == DocstringEntryKind.EXCEPTION else (),
+                        names=names,
                         type_text=None if kind == DocstringEntryKind.EXCEPTION else text.strip(),
                         description=" ".join(description_lines),
                         start_line=index,
@@ -1142,6 +1191,8 @@ def _rest_entry_metadata(field: str, argument: str) -> tuple[DocstringEntryKind,
     kind = _rest_entry_kind(field)
     if not argument:
         return kind, (), None
+    if kind is DocstringEntryKind.EXCEPTION:
+        return kind, _exception_names(argument) or (), None
     if field == "type":
         return kind, (argument,), None
     if kind is not DocstringEntryKind.PARAMETER:
@@ -1151,6 +1202,29 @@ def _rest_entry_metadata(field: str, argument: str) -> tuple[DocstringEntryKind,
         return kind, (argument,), None
     type_text, name = parts
     return kind, (name,), type_text
+
+
+def _entry_names(kind: DocstringEntryKind, text: str) -> tuple[str, ...] | None:
+    if kind is DocstringEntryKind.EXCEPTION:
+        return _exception_names(text)
+    return tuple(part.strip() for part in text.split(","))
+
+
+def _exception_names(text: str) -> tuple[str, ...] | None:
+    stripped = _strip_exception_code_span(text.strip())
+    if not stripped:
+        return None
+    parts = _EXCEPTION_NAME_SEPARATOR_RE.split(stripped)
+    names = tuple(_strip_exception_code_span(part.strip()) for part in parts)
+    if not names or any(not _EXCEPTION_NAME_RE.fullmatch(name) for name in names):
+        return None
+    return names
+
+
+def _strip_exception_code_span(text: str) -> str:
+    if len(text) >= 2 and text.startswith("`") and text.endswith("`") and "`" not in text[1:-1]:
+        return text[1:-1].strip()
+    return text
 
 
 def _google_none_value_entry(kind: DocstringEntryKind, text: str, *, start: int) -> DocstringEntry | None:

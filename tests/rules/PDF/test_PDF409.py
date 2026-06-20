@@ -31,6 +31,40 @@ def test_normalizes_google_star_dotted_yield_and_exception_entries() -> None:
     assert not format_source(result.new_source).modified
 
 
+def test_preserves_google_exception_list_spelling_while_normalizing_spacing() -> None:
+    source = 'def function(value):\n    """Summary.\n\n    Raises:\n        `ValueError` | TypeError   : Bad value.\n    """\n'
+    result = format_source(source)
+
+    assert result.new_source == 'def function(value):\n    """Summary.\n\n    Raises:\n        `ValueError` | TypeError: Bad value.\n    """\n'
+    assert result.fixed_findings[PDF409ConventionEntrySpacing.meta] == 1
+    assert not format_source(result.new_source).modified
+
+
+def test_preserves_google_exception_parenthetical_while_normalizing_spacing() -> None:
+    source = 'def function(value):\n    """Summary.\n\n    Raises:\n        ValueError (when bad)   : Bad value.\n    """\n'
+    result = format_source(source)
+
+    assert result.new_source == 'def function(value):\n    """Summary.\n\n    Raises:\n        ValueError (when bad): Bad value.\n    """\n'
+    assert result.fixed_findings[PDF409ConventionEntrySpacing.meta] == 1
+    assert not format_source(result.new_source).modified
+
+
+def test_preserves_numpy_and_rest_exception_list_spelling_while_normalizing_spacing() -> None:
+    numpy_source = 'def function(value):\n    """Summary.\n\n    Raises\n    ------\n    `ValueError` | TypeError  :  Bad value.\n    """\n'
+    rest_source = 'def function(value):\n    """Summary.\n\n    :raises   `ValueError` | TypeError : Bad value.\n    """\n'
+    numpy_settings = CheckSettings(select=("PDF409",), docstring_convention=DocstringConvention.NUMPY)
+    rest_settings = CheckSettings(select=("PDF409",), docstring_convention=DocstringConvention.REST)
+    numpy_result = format_source(numpy_source, settings=numpy_settings)
+    rest_result = format_source(rest_source, settings=rest_settings)
+
+    assert numpy_result.new_source == 'def function(value):\n    """Summary.\n\n    Raises\n    ------\n    `ValueError` | TypeError: Bad value.\n    """\n'
+    assert rest_result.new_source == 'def function(value):\n    """Summary.\n\n    :raises `ValueError` | TypeError: Bad value.\n    """\n'
+    assert numpy_result.fixed_findings[PDF409ConventionEntrySpacing.meta] == 1
+    assert rest_result.fixed_findings[PDF409ConventionEntrySpacing.meta] == 1
+    assert not format_source(numpy_result.new_source, settings=numpy_settings).modified
+    assert not format_source(rest_result.new_source, settings=rest_settings).modified
+
+
 def test_normalizes_google_entry_prefix_without_rewriting_continuation_lines() -> None:
     source = 'def function(value):\n    """Summary.\n\n    Args:\n        value   ( int ) :\n            Keep   internal   spacing.\n            And trailing prefix behavior.\n    """\n'
     result = format_source(source)

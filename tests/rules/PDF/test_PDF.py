@@ -458,7 +458,7 @@ def test_google_return_and_yield_sections_parse_bare_none_as_empty_typed_entry(s
         ("Returns", "Mapping[ str, Sequence[int  ]]: Result.", DocstringEntryKind.RETURN, (), "Mapping[ str, Sequence[int  ]]"),
         ("Yields", "Iterator[tuple[str, int | None]]: Item.", DocstringEntryKind.YIELD, (), "Iterator[tuple[str, int | None]]"),
         ("Raises", "mypkg.errors.CustomError: Bad value.", DocstringEntryKind.EXCEPTION, ("mypkg.errors.CustomError",), None),
-        ("Raises", "ValueError | TypeError: Bad value.", DocstringEntryKind.EXCEPTION, ("ValueError | TypeError",), None),
+        ("Raises", "ValueError | TypeError: Bad value.", DocstringEntryKind.EXCEPTION, ("ValueError", "TypeError"), None),
     ),
 )
 def test_google_return_yield_and_raise_entries_preserve_generic_looking_type_text(
@@ -472,6 +472,18 @@ def test_google_return_yield_and_raise_entries_preserve_generic_looking_type_tex
     entry = structure.entries[0]
 
     assert (entry.kind, entry.names, entry.type_text, entry.description) == (expected_kind, expected_names, expected_type, entry_text.rpartition(":")[2].strip())
+
+
+def test_google_malformed_exception_entry_skips_continuation_before_later_entry() -> None:
+    value = "Raises:\n    If the value is bad: explain the condition.\n        `ValueError` | TypeError : prose continuation.\n    `RuntimeError` | LookupError: Bad runtime."
+    structure = structure_for(value, settings=CheckSettings(docstring_convention=DocstringConvention.GOOGLE))
+
+    assert tuple((entry.names, entry.description, entry.start_line, entry.end_line) for entry in structure.entries) == ((("RuntimeError", "LookupError"), "Bad runtime.", 3, 4),)
+    assert tuple((child.kind, child.start_line, child.end_line) for child in structure.blocks[0].children) == (
+        (DocstringBlockKind.SECTION_HEADER, 0, 1),
+        (DocstringBlockKind.VERBATIM, 1, 3),
+        (DocstringBlockKind.SECTION_ENTRY, 3, 4),
+    )
 
 
 @pytest.mark.parametrize(("section", "entry_text"), (("Returns", "str."), ("Yields", "Iterator[int]."), ("Raises", "None.")))
@@ -707,6 +719,26 @@ def test_numpy_section_names_determine_entry_semantics(section: str, entry_text:
 def test_numpy_colon_header_is_not_misclassified_as_a_section() -> None:
     structure = structure_for("Parameters:\nvalue : int\n    Description.", settings=CheckSettings(docstring_convention=DocstringConvention.NUMPY))
     assert structure.sections == ()
+
+
+def test_numpy_exception_colon_entry_parses_as_exception_description_not_type() -> None:
+    structure = structure_for("Raises\n------\n`ValueError` | errors.CustomError : Bad value.", settings=CheckSettings(docstring_convention=DocstringConvention.NUMPY))
+    entry = structure.entries[0]
+
+    assert (entry.kind, entry.names, entry.type_text, entry.description) == (DocstringEntryKind.EXCEPTION, ("ValueError", "errors.CustomError"), None, "Bad value.")
+
+
+def test_numpy_malformed_exception_entry_skips_continuation_before_later_entry() -> None:
+    value = "Raises\n------\nIf the value is bad: explain the condition.\n    `ValueError` | TypeError : prose continuation.\n`RuntimeError` | LookupError\n    Bad runtime."
+    structure = structure_for(value, settings=CheckSettings(docstring_convention=DocstringConvention.NUMPY))
+
+    assert tuple((entry.names, entry.description, entry.start_line, entry.end_line) for entry in structure.entries) == ((("RuntimeError", "LookupError"), "Bad runtime.", 4, 6),)
+    assert tuple((child.kind, child.start_line, child.end_line) for child in structure.blocks[0].children) == (
+        (DocstringBlockKind.SECTION_HEADER, 0, 2),
+        (DocstringBlockKind.PARAGRAPH, 2, 3),
+        (DocstringBlockKind.VERBATIM, 3, 4),
+        (DocstringBlockKind.SECTION_ENTRY, 4, 6),
+    )
 
 
 def test_numpy_bare_return_without_description_does_not_create_reflow_region() -> None:

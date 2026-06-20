@@ -9,7 +9,7 @@ PDF409 reports recognized convention entries and rest fields whose nominal prefi
 
 For Google docstrings, the fix normalizes parsed parameter, attribute, method, field, return, yield, and exception entry prefixes. Starred parameters and dotted names are preserved. For NumPy docstrings, the fix normalizes comma-separated entry names and spacing around the name/type colon. For rest docstrings, the fix normalizes spacing around field names, field arguments, colons, and same-line descriptions.
 
-The rule only targets entries and fields parsed under the active convention. It does not normalize arbitrary prose or malformed entry-like text, reflow continuation lines, or semantically rewrite type expressions beyond trimming leading and trailing whitespace around parsed type text. Concatenated docstrings and source mappings that cannot be safely rewritten are reported without a fix.
+The rule only targets entries and fields parsed under the active convention. It does not normalize arbitrary prose or malformed entry-like text, reflow continuation lines, or semantically rewrite type expressions beyond trimming leading and trailing whitespace around parsed type text. For parsed exception entries, PDF409 normalizes prefix spacing but preserves exception-list spelling such as backticks and pipe separators; PDF410 handles canonical exception-name spelling. Concatenated docstrings and source mappings that cannot be safely rewritten are reported without a fix.
 
 ## Why is this useful?
 Consistent entry-prefix spacing makes convention-aware docstrings easier to scan and avoids low-value diffs from hand-spaced parameter, type, and field syntax.
@@ -139,6 +139,27 @@ def value(arg, other):
     :rtype: list[str]
     :yield item: Next item.
     :raises ValueError: Bad value.
+    """
+```
+
+PDF409 normalizes spacing around parsed exception entries but leaves exception-list spelling to PDF410:
+
+```pydocfmt-example
+[settings]
+docstring-convention = "rest"
+
+[input]
+def value(arg):
+    """Return the value.
+
+    :raises   `ValueError` | TypeError : Bad value.
+    """
+
+[output]
+def value(arg):
+    """Return the value.
+
+    :raises `ValueError` | TypeError: Bad value.
     """
 ```
 

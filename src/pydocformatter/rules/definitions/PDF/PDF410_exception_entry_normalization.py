@@ -12,11 +12,11 @@ from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetada
 
 
 @rule_registration.register_rule_to(PDF_definition.PDF)
-class PDF409ConventionEntrySpacing(RuleBase):
+class PDF410ExceptionEntryNormalization(RuleBase):
     meta = RuleMetadata(
-        code=RuleCode("PDF409"),
-        name="convention-entry-spacing",
-        message="Docstring convention entry spacing should be normalized",
+        code=RuleCode("PDF410"),
+        name="exception-entry-normalization",
+        message="Docstring exception entry should use canonical spelling",
         fix_availability=FixAvailability.SOMETIMES,
         stable_since="1.0.0",
         setting_effects=(
@@ -34,17 +34,17 @@ class PDF409ConventionEntrySpacing(RuleBase):
 
     @classmethod
     def check(cls, context: RuleContext) -> tuple[RuleFinding, ...]:
-        """Return findings for non-canonical convention entry spacing."""
+        """Return findings for non-canonical exception entry spelling."""
         return section_edits.findings_for_results(_results(context, rule=cls.meta))
 
     @classmethod
     def fix(cls, context: RuleContext) -> RuleFixResult:
-        """Normalize safely mapped convention entry spacing."""
+        """Normalize safely mapped exception entry spellings."""
         return section_edits.fix_result_for_results(context, cls.meta, _results(context, rule=cls.meta))
 
 
 def _results(context: RuleContext, *, rule: RuleMetadata) -> tuple[section_edits.SectionEditResult, ...]:
-    """Return findings and fixes for convention entry spacing."""
+    """Return findings and fixes for exception entry normalization."""
     data = PDF_definition.PDF.require_data(context)
     results: list[section_edits.SectionEditResult] = []
     for docstring in data.docstrings:
@@ -55,19 +55,20 @@ def _results(context: RuleContext, *, rule: RuleMetadata) -> tuple[section_edits
         replacement_messages: list[str] = []
         unfixable_messages: list[str] = []
         for entry in docstring.structure.entries:
+            if entry.kind is not PDF_definition.DocstringEntryKind.EXCEPTION:
+                continue
             line = docstring.structure.lines[entry.start_line]
-            canonical = _canonical_entry_line(docstring.structure.convention, line.text, entry)
+            canonical = _canonical_exception_entry_line(docstring.structure.convention, line.text, entry)
             if canonical is None or canonical == line.text:
                 continue
-            message = rule.message
             replacement = section_edits.text_replacement(line, 0, len(line.text), canonical)
             if replacement is None:
                 unfixable_line_numbers.extend(section_edits.line_numbers(docstring, line))
-                unfixable_messages.append(message)
+                unfixable_messages.append(rule.message)
                 continue
             replacements.append(replacement)
             replacement_line_numbers.extend(section_edits.line_numbers(docstring, line))
-            replacement_messages.append(message)
+            replacement_messages.append(rule.message)
             section_edits.replace_value_line_span(value_lines, line, replacement, canonical)
         if not replacements and not unfixable_line_numbers:
             continue
@@ -85,70 +86,42 @@ def _results(context: RuleContext, *, rule: RuleMetadata) -> tuple[section_edits
     return tuple(results)
 
 
-def _canonical_entry_line(convention: DocstringConvention, text: str, entry: PDF_definition.DocstringEntry) -> str | None:
+def _canonical_exception_entry_line(convention: DocstringConvention, text: str, entry: PDF_definition.DocstringEntry) -> str | None:
+    if not entry.names:
+        return None
     if convention is DocstringConvention.GOOGLE:
-        return _canonical_google_entry_line(text, entry)
+        return _canonical_google_exception_entry_line(text, entry)
     if convention is DocstringConvention.NUMPY:
-        return _canonical_numpy_entry_line(text, entry)
+        return _canonical_numpy_exception_entry_line(text, entry)
     if convention is DocstringConvention.REST:
-        return _canonical_rest_entry_line(text, entry)
+        return _canonical_rest_exception_entry_line(text, entry)
     return None
 
 
-def _canonical_google_entry_line(text: str, entry: PDF_definition.DocstringEntry) -> str | None:
-    match = PDF_definition._GOOGLE_ENTRY_RE.match(text)
-    if match is None and entry.kind in (PDF_definition.DocstringEntryKind.RETURN, PDF_definition.DocstringEntryKind.YIELD, PDF_definition.DocstringEntryKind.EXCEPTION):
-        match = PDF_definition._GENERIC_ENTRY_RE.match(text)
-    if match is None:
+def _canonical_google_exception_entry_line(text: str, entry: PDF_definition.DocstringEntry) -> str | None:
+    if PDF_definition._GOOGLE_ENTRY_RE.match(text) is not None:
         return None
-    head = _google_entry_head(entry, original_name=match.group("name").strip(), original_type=match.groupdict().get("type"))
-    if head is None:
+    match = PDF_definition._GENERIC_ENTRY_RE.match(text)
+    if match is None:
         return None
     description = match.group("description").strip()
     if description == ":" and text.rstrip().endswith("::"):
         return None
-    return f'{match.group("indent")}{head}:{f" {description}" if description else ""}'
+    return f'{match.group("indent")}{", ".join(entry.names)}:{f" {description}" if description else ""}'
 
 
-def _google_entry_head(entry: PDF_definition.DocstringEntry, *, original_name: str, original_type: str | None) -> str | None:
-    if entry.kind in (PDF_definition.DocstringEntryKind.RETURN, PDF_definition.DocstringEntryKind.YIELD) and not entry.names:
-        return entry.type_text.strip() if entry.type_text else None
-    if entry.kind is PDF_definition.DocstringEntryKind.EXCEPTION:
-        if original_type:
-            return f"{original_name} ({original_type.strip()})"
-        return original_name
-    if not entry.names:
-        return None
-    head = ", ".join(entry.names)
-    if entry.type_text:
-        head = f"{head} ({entry.type_text.strip()})"
-    return head
-
-
-def _canonical_numpy_entry_line(text: str, entry: PDF_definition.DocstringEntry) -> str | None:
-    if entry.kind is PDF_definition.DocstringEntryKind.EXCEPTION and (exception_match := PDF_definition._NUMPY_EXCEPTION_ENTRY_RE.match(text)) is not None:
+def _canonical_numpy_exception_entry_line(text: str, entry: PDF_definition.DocstringEntry) -> str | None:
+    exception_match = PDF_definition._NUMPY_EXCEPTION_ENTRY_RE.match(text)
+    if exception_match is not None:
         description = exception_match.group("description").strip()
-        return f'{exception_match.group("indent")}{exception_match.group("name").strip()}:{f" {description}" if description else ""}'
-    match = PDF_definition._NUMPY_ENTRY_RE.match(text)
-    if match is None:
-        return None
-    return f'{match.group("indent")}{", ".join(entry.names)} : {entry.type_text.strip() if entry.type_text else match.group("type").strip()}'
+        return f'{exception_match.group("indent")}{", ".join(entry.names)}:{f" {description}" if description else ""}'
+    indent = text[: len(text) - len(text.lstrip(" \t"))]
+    return f'{indent}{", ".join(entry.names)}'
 
 
-def _canonical_rest_entry_line(text: str, entry: PDF_definition.DocstringEntry) -> str | None:
+def _canonical_rest_exception_entry_line(text: str, entry: PDF_definition.DocstringEntry) -> str | None:
     match = PDF_definition._REST_FIELD_RE.match(text)
     if match is None or entry.field_name is None:
         return None
-    argument = _canonical_rest_argument(entry)
     description = match.group("description").strip()
-    return f'{match.group("indent")}:{match.group("field")}{f" {argument}" if argument else ""}:{f" {description}" if description else ""}'
-
-
-def _canonical_rest_argument(entry: PDF_definition.DocstringEntry) -> str | None:
-    if entry.field_argument is None:
-        return None
-    if entry.kind is PDF_definition.DocstringEntryKind.PARAMETER and entry.names:
-        if entry.type_text:
-            return f"{entry.type_text.strip()} {entry.names[0]}"
-        return entry.names[0]
-    return entry.field_argument.strip()
+    return f'{match.group("indent")}:{match.group("field")} {", ".join(entry.names)}:{f" {description}" if description else ""}'
