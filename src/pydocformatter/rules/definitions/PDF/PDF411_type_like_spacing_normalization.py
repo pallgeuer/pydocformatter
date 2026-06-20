@@ -1,0 +1,217 @@
+from __future__ import annotations
+
+import ast
+import dataclasses
+
+import pydocformatter.rules.definition_helpers.docstring_conventions as docstring_conventions
+import pydocformatter.rules.definition_helpers.docstring_sections as docstring_sections
+import pydocformatter.rules.definition_helpers.section_edits as section_edits
+import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
+import pydocformatter.rules.edits as rule_edits
+import pydocformatter.rules.registration as rule_registration
+from pydocformatter.cli.settings_check import DocstringConvention
+from pydocformatter.rules.codes import RuleCode
+from pydocformatter.rules.definition import RuleBase, RuleContext, RuleFixResult
+from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
+
+
+@rule_registration.register_rule_to(PDF_definition.PDF)
+class PDF411TypeLikeSpacingNormalization(RuleBase):
+    meta = RuleMetadata(
+        code=RuleCode("PDF411"),
+        name="type-like-spacing-normalization",
+        message="Docstring type-like token spacing should be normalized",
+        fix_availability=FixAvailability.SOMETIMES,
+        stable_since="1.0.0",
+        setting_effects=(
+            RuleSettingEffects(
+                setting="docstring_convention",
+                effects=(
+                    RuleSettingEffectValues(
+                        effect=RuleSettingEffect.IGNORED, values=docstring_conventions.ignored_conventions_except(DocstringConvention.GOOGLE, DocstringConvention.NUMPY, DocstringConvention.REST)
+                    ),
+                ),
+            ),
+        ),
+        incompatible_with=(),
+    )
+
+    @classmethod
+    def check(cls, context: RuleContext) -> tuple[RuleFinding, ...]:
+        """Return findings for non-canonical type-like token spacing."""
+        return section_edits.findings_for_results(_results(context, rule=cls.meta))
+
+    @classmethod
+    def fix(cls, context: RuleContext) -> RuleFixResult:
+        """Normalize safely mapped type-like token spacing."""
+        return section_edits.fix_result_for_results(context, cls.meta, _results(context, rule=cls.meta))
+
+
+@dataclasses.dataclass(frozen=True)
+class _LineReplacement:
+    line: PDF_definition.DocstringValueLine
+    start_column: int
+    end_column: int
+    text: str
+
+
+_TYPE_TEXT_ENTRY_KINDS = frozenset(
+    {
+        PDF_definition.DocstringEntryKind.PARAMETER,
+        PDF_definition.DocstringEntryKind.RETURN,
+        PDF_definition.DocstringEntryKind.YIELD,
+        PDF_definition.DocstringEntryKind.ATTRIBUTE,
+        PDF_definition.DocstringEntryKind.METHOD,
+    }
+)
+
+
+def _results(context: RuleContext, *, rule: RuleMetadata) -> tuple[section_edits.SectionEditResult, ...]:
+    """Return findings and fixes for type-like token spacing."""
+    data = PDF_definition.PDF.require_data(context)
+    results: list[section_edits.SectionEditResult] = []
+    for docstring in data.docstrings:
+        replacements: list[rule_edits.PlannedTextReplacement] = []
+        value_lines = [line.raw_text for line in docstring.structure.lines]
+        replacement_line_numbers: list[int] = []
+        unfixable_line_numbers: list[int] = []
+        replacement_messages: list[str] = []
+        unfixable_messages: list[str] = []
+        for entry in docstring.structure.entries:
+            line_replacement = _line_replacement(docstring.structure.convention, docstring.structure.lines[entry.start_line], entry)
+            if line_replacement is None:
+                continue
+            replacement = section_edits.text_replacement(line_replacement.line, line_replacement.start_column, line_replacement.end_column, line_replacement.text)
+            if replacement is None:
+                unfixable_line_numbers.extend(section_edits.line_numbers(docstring, line_replacement.line))
+                unfixable_messages.append(rule.message)
+                continue
+            replacements.append(replacement)
+            replacement_line_numbers.extend(section_edits.line_numbers(docstring, line_replacement.line))
+            replacement_messages.append(rule.message)
+            section_edits.replace_value_line_span(value_lines, line_replacement.line, replacement, line_replacement.text)
+        if not replacements and not unfixable_line_numbers:
+            continue
+        change = section_edits.planned_replacement_change(docstring, context=context, replacements=tuple(replacements), value_lines=value_lines)
+        results.extend(
+            section_edits.replacement_results(
+                rule,
+                replacement_line_numbers=replacement_line_numbers,
+                unfixable_line_numbers=unfixable_line_numbers,
+                change=change,
+                replacement_messages=replacement_messages,
+                unfixable_messages=unfixable_messages,
+            )
+        )
+    return tuple(results)
+
+
+def _line_replacement(convention: DocstringConvention, line: PDF_definition.DocstringValueLine, entry: PDF_definition.DocstringEntry) -> _LineReplacement | None:
+    if convention is DocstringConvention.GOOGLE:
+        return _google_replacement(line, entry)
+    if convention is DocstringConvention.NUMPY:
+        return _numpy_replacement(line, entry)
+    if convention is DocstringConvention.REST:
+        return _rest_replacement(line, entry)
+    return None
+
+
+def _google_replacement(line: PDF_definition.DocstringValueLine, entry: PDF_definition.DocstringEntry) -> _LineReplacement | None:
+    if entry.kind not in _TYPE_TEXT_ENTRY_KINDS:
+        return None
+    match = PDF_definition._GOOGLE_ENTRY_RE.match(line.text)
+    if match is not None and match.group("type") is not None and entry.type_text is not None:
+        return _normalized_replacement(line, match.start("type"), match.end("type"), entry.type_text)
+    if entry.kind in (PDF_definition.DocstringEntryKind.RETURN, PDF_definition.DocstringEntryKind.YIELD):
+        generic_match = PDF_definition._GENERIC_ENTRY_RE.match(line.text)
+        if generic_match is not None and entry.type_text is not None:
+            return _normalized_replacement(line, generic_match.start("name"), generic_match.end("name"), entry.type_text)
+    return None
+
+
+def _numpy_replacement(line: PDF_definition.DocstringValueLine, entry: PDF_definition.DocstringEntry) -> _LineReplacement | None:
+    if entry.kind not in _TYPE_TEXT_ENTRY_KINDS:
+        return None
+    match = PDF_definition._NUMPY_ENTRY_RE.match(line.text)
+    if match is not None and entry.type_text is not None:
+        return _normalized_replacement(line, match.start("type"), match.end("type"), entry.type_text)
+    if entry.kind in (PDF_definition.DocstringEntryKind.RETURN, PDF_definition.DocstringEntryKind.YIELD) and entry.type_text is not None:
+        start_column = len(line.text) - len(line.text.lstrip(" \t"))
+        end_column = len(line.text.rstrip(" \t"))
+        return _normalized_replacement(line, start_column, end_column, entry.type_text)
+    return None
+
+
+def _rest_replacement(line: PDF_definition.DocstringValueLine, entry: PDF_definition.DocstringEntry) -> _LineReplacement | None:
+    match = PDF_definition._REST_FIELD_RE.match(line.text)
+    if match is None or entry.field_name is None:
+        return None
+    field = entry.field_name
+    if field in docstring_sections.REST_RETURN_TYPE_FIELDS or field in docstring_sections.REST_YIELD_TYPE_FIELDS or field in docstring_sections.REST_PARAMETER_TYPE_FIELDS:
+        return _normalized_replacement(line, match.start("description"), match.end("description"), match.group("description").strip())
+    if entry.type_text is None or entry.field_argument is None:
+        return None
+    argument = match.group("argument")
+    if argument is None:
+        return None
+    # _rest_entry_metadata derives type_text as the leading part of the stripped field argument before the final
+    # parameter name.
+    if not argument.startswith(entry.type_text):
+        return None
+    start_column = match.start("argument")
+    end_column = start_column + len(entry.type_text)
+    return _normalized_replacement(line, start_column, end_column, entry.type_text)
+
+
+def _normalized_replacement(line: PDF_definition.DocstringValueLine, start_column: int, end_column: int, text: str) -> _LineReplacement | None:
+    normalized = _normalized_type_like_text(text)
+    if normalized is None or normalized == text:
+        return None
+    return _LineReplacement(line=line, start_column=start_column, end_column=end_column, text=normalized)
+
+
+def _normalized_type_like_text(text: str) -> str | None:
+    stripped = text.strip()
+    if not stripped:
+        return None
+    parsed = _parse_type_like_expr(stripped)
+    if parsed is None or not _is_type_like_node(parsed.body, allow_sequence=False):
+        return None
+    normalized = ast.unparse(parsed)
+    if normalized == stripped:
+        return None
+    if _without_whitespace(normalized) != _without_whitespace(stripped):
+        return None
+    reparsed = _parse_type_like_expr(normalized)
+    if reparsed is None or not _is_type_like_node(reparsed.body, allow_sequence=False):
+        return None
+    if ast.dump(parsed, include_attributes=False) != ast.dump(reparsed, include_attributes=False):
+        return None
+    return normalized
+
+
+def _parse_type_like_expr(text: str) -> ast.Expression | None:
+    try:
+        return ast.parse(text, mode="eval")
+    except SyntaxError:
+        return None
+
+
+def _without_whitespace(text: str) -> str:
+    return "".join(text.split())
+
+
+def _is_type_like_node(node: ast.AST, *, allow_sequence: bool) -> bool:
+    if isinstance(node, ast.Name):
+        return True
+    if isinstance(node, ast.Attribute):
+        return _is_type_like_node(node.value, allow_sequence=False)
+    if isinstance(node, ast.Subscript):
+        return _is_type_like_node(node.value, allow_sequence=False) and _is_type_like_node(node.slice, allow_sequence=True)
+    if isinstance(node, ast.Tuple | ast.List) and allow_sequence:
+        return all(_is_type_like_node(element, allow_sequence=True) for element in node.elts)
+    if isinstance(node, ast.BinOp):
+        return isinstance(node.op, ast.BitOr) and _is_type_like_node(node.left, allow_sequence=False) and _is_type_like_node(node.right, allow_sequence=False)
+    if isinstance(node, ast.Constant):
+        return node.value is None or node.value is Ellipsis
+    return False

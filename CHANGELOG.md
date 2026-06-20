@@ -26,6 +26,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added `PDF408` to report repeated recognized Google and NumPy docstring sections and rest fields, including known spelling variants for the same semantic item.
   - Added `PDF409` to normalize spacing in parsed Google, NumPy, and rest convention entries and fields.
   - Added `PDF410` to normalize parsed Google, NumPy, and rest exception and warning entry names to no backticks and comma-separated exception lists.
+  - Added `PDF411` to normalize internal spacing in parsed convention type-like tokens using conservative AST validation.
   - Added `PDF106` through `PDF109` to normalize multi-line docstring opening and closing quote placement.
   - Added `PDF110` and `PDF203` to collapse safe summary-only docstrings that fit on one line and report summaries that remain multi-line.
 
