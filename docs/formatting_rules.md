@@ -4,10 +4,11 @@
 
 ### pydocformatter comments (PCF)
 
-|  Code  | Name                          | Message                             | Fixable | Stable Since | Comment                                                                                                    |
-|:------:|:------------------------------|:------------------------------------|:-------:|:------------:|:-----------------------------------------------------------------------------------------------------------|
-| PCF001 | standalone-comment-formatting | Standalone comment needs formatting | Always  |    1.0.0     | Formats standalone comments with conservative physical-line defaults and optional structure/code detection |
-| PCF002 | trailing-comment-formatting   | Trailing comment needs formatting   | Always  |    1.0.0     | Normalizes trailing comments or extracts overlong comments into independently formatted standalone blocks  |
+|  Code  | Name                          | Message                                        | Fixable | Stable Since | Comment                                                                                                    |
+|:------:|:------------------------------|:-----------------------------------------------|:-------:|:------------:|:-----------------------------------------------------------------------------------------------------------|
+| PCF001 | standalone-comment-formatting | Standalone comment needs formatting            | Always  |    1.0.0     | Formats standalone comments with conservative physical-line defaults and optional structure/code detection |
+| PCF002 | trailing-comment-formatting   | Trailing comment needs formatting              | Always  |    1.0.0     | Normalizes trailing comments or extracts overlong comments into independently formatted standalone blocks  |
+| PCF003 | directive-spacing             | Directive comment spacing should be normalized | Always  |    1.0.0     | Normalizes safe spacing around known trailing type and tool directive comments                             |
 
 ### pydocformatter docstrings (PDF)
 

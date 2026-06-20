@@ -62,6 +62,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added `url-aware-wrapping`, enabled by default, for URL-aware comment and docstring line balancing without splitting URL tokens.
   - Added `docstring-blank-line-style` with `"blank"` and `"aligned"` modes for PDF103 blank-line whitespace normalization.
   - Added `docstring-blank-line-after-last-section` to control whether PDF200 and PDF201 keep one blank line after the final recognized Google or NumPy docstring section.
+  - Added `comment-syntax-aware-trailing-extraction`, enabled by default, to keep overlong trailing comments inline in syntax-sensitive positions.
   - Added Ruff-style rule settings under `[tool.pydocfmt]`: `select`, `ignore`, `extend-select`, `per-file-ignores`, `extend-per-file-ignores`, `fixable`, `unfixable`, and `extend-fixable`.
   - Added `respect-gitignore` for formatter configuration, defaulting to `true`.
   - Added explicit config-file support for `--config PATH`, including pyproject-style `[tool.pydocfmt]` files and dedicated top-level pydocfmt TOML files.
@@ -90,6 +91,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added pytest coverage that executes structured examples from built-in rule Markdown documentation.
   - Added exact diagnostic message checks to structured rule Markdown examples.
   - Added validation that structured rule Markdown examples use `[output=unchanged]` when the documented output is identical to the input.
+  - Added validation that built-in rule Markdown documentation includes every template section, including empty `Options` sections.
   - Added regression coverage for Ruff-compatible file-selection and per-file-ignore pattern-base behavior.
   - Vastly expanded PCF rule tests across comment classification, run boundaries, structure preservation, code detection, width handling, line endings, mixed formatting, syntax-position safety, convergence, idempotence, and rule independence.
   - Vastly expanded PDF category preparation tests across docstring collection, source metadata, semantic sections and entries, protected structures, reflow regions, malformed inputs, and mixed edge cases.
@@ -100,6 +102,8 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added the LibCST-based rule execution framework with ordered category preprocessing, repeated automatic-fix passes, final read-only checks, and non-convergence diagnostics.
   - Added typed PCF comment and PDF docstring category data, together with a shared validated source-edit helper, as the foundation for individual rule implementations.
   - Implemented PCF001 standalone-comment formatting and PCF002 trailing-comment formatting with independent fixes, protected directive handling, tab-expanded widths, stable impossible-width behavior, and exact EOF preservation.
+  - Added PCF003 directive-spacing normalization for safe spacing around known trailing type and tool directives.
+  - Changed PCF002 to keep overlong trailing comments inline by default in decorators, compound statement headers, arguments, and parenthesized or continuation contexts.
   - Added shared URL-aware wrapping helpers used by PCF001, PCF002, and PDF101 when `url-aware-wrapping` is enabled.
 
 ### Changed
@@ -139,6 +143,10 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 
 - **Formatting:**
   - Fixed URL-aware wrapping to avoid recursive crashes on long URL-containing paragraphs and to fall back to greedy wrapping when balanced wrapping exceeds its search budget.
+
+- **Comment formatting:**
+  - Fixed syntax-aware trailing-comment extraction to keep comments inline on `except*` headers and one-line compound suites.
+  - Fixed PCF003 directive spacing to remove trailing directive whitespace.
 
 - **Docstring formatting:**
   - Fixed `PDF409` and `PDF410` to preserve Google exception-entry parentheticals, and fixed Google and NumPy parsing to keep malformed exception-like prose continuations from being normalized as separate entries.

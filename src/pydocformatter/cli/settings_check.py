@@ -135,6 +135,8 @@ class CheckSettings:
             reflowed.
         comment_preserve_tables (bool): Whether detected Markdown and reStructuredText comment tables are preserved.
         comment_preserve_directives (bool): Whether reStructuredText directives and their indented bodies are preserved.
+        comment_syntax_aware_trailing_extraction (bool): Whether trailing-comment extraction avoids syntax-sensitive
+            positions.
         comment_detect_code (bool): Whether the indentation and leading-keyword heuristic protects standalone comment
             runs.
         comment_detect_statements (bool): Whether parseable Python statements protect standalone comment runs.
@@ -183,6 +185,7 @@ class CheckSettings:
     comment_format_block_quotes: bool = True
     comment_preserve_tables: bool = True
     comment_preserve_directives: bool = True
+    comment_syntax_aware_trailing_extraction: bool = True
     comment_detect_code: bool = False
     comment_detect_statements: bool = True
     comment_detect_expressions: bool = False
@@ -253,6 +256,8 @@ class CheckSettingsOverrides(TypedDict, total=False):
             reflowed.
         comment_preserve_tables (bool): Whether detected Markdown and reStructuredText comment tables are preserved.
         comment_preserve_directives (bool): Whether reStructuredText directives and their indented bodies are preserved.
+        comment_syntax_aware_trailing_extraction (bool): Whether trailing-comment extraction avoids syntax-sensitive
+            positions.
         comment_detect_code (bool): Whether the indentation and leading-keyword heuristic protects standalone comment
             runs.
         comment_detect_statements (bool): Whether parseable Python statements protect standalone comment runs.
@@ -301,6 +306,7 @@ class CheckSettingsOverrides(TypedDict, total=False):
     comment_format_block_quotes: bool
     comment_preserve_tables: bool
     comment_preserve_directives: bool
+    comment_syntax_aware_trailing_extraction: bool
     comment_detect_code: bool
     comment_detect_statements: bool
     comment_detect_expressions: bool
@@ -524,6 +530,13 @@ SETTINGS_SCHEMA = SettingsSchema(
             value_type=bool,
             group=SettingsGroup.COMMENT_FORMATTING,
             help="Preserve reStructuredText directives and their indented bodies.",
+        ),
+        SettingDefinition(
+            field="comment_syntax_aware_trailing_extraction",
+            value_type=bool,
+            group=SettingsGroup.COMMENT_FORMATTING,
+            help="Avoid extracting trailing comments from syntax-sensitive positions.",
+            documentation="Whether overlong trailing-comment extraction avoids decorators, compound statement headers, arguments, and parenthesized or continuation contexts.",
         ),
         SettingDefinition(
             field="comment_detect_code",

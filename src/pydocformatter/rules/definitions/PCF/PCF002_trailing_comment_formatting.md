@@ -5,9 +5,13 @@ Fix is always available.
 ## What it does
 Checks each ordinary trailing comment independently. A fitting comment is normalized to exactly two spaces before `#`, one space after `#` for non-empty content, and no trailing whitespace. An empty trailing comment becomes `code  #` without a trailing space.
 
-If the complete canonical code-plus-comment line exceeds `line-length`, PCF002 removes whitespace immediately before the comment, moves the comment directly above the physical code line at the code line's indentation, and wraps it as a standalone block. When that block would directly follow an existing same-indent standalone comment, a blank line keeps the independently authored comments separate. The rule generates the complete canonical block itself and therefore works when PCF001 is disabled.
+If the complete canonical code-plus-comment line exceeds `line-length`, PCF002 usually removes whitespace immediately before the comment, moves the comment directly above the physical code line at the code line's indentation, and wraps it as a standalone block. When `comment-syntax-aware-trailing-extraction` is enabled, overlong comments in decorators, compound statement headers, arguments, and parenthesized or continuation contexts remain inline to preserve their physical association. That safety setting only suppresses extraction; PCF002 still canonicalizes trailing-comment spacing in those positions when spacing is not already canonical.
 
-Protected type comments and tool directives are never changed. Standalone paragraph, markup, doctest, and disabled-code settings do not apply to trailing comments.
+Syntax-aware extraction applies to function, class, loop, conditional, `with`, `try`/`except`/`else`/`finally`, `match`, and `case` headers, plus decorators, arguments, and parenthesized or continuation contexts. It does not protect ordinary trailing comments merely because they appear inside a compound statement body.
+
+When a moved block would directly follow an existing same-indent standalone comment, a blank line keeps the independently authored comments separate. The rule generates the complete canonical block itself and therefore works when PCF001 is disabled.
+
+Protected type comments and tool directives are never changed by PCF002. Use PCF003 to normalize safe spacing around known trailing directives. Standalone paragraph, markup, doctest, and disabled-code settings do not apply to trailing comments.
 
 Widths use tab-expanded columns with `indent-width` as the tab size. If indentation leaves no positive wrapping width, a non-empty overlong comment is still moved above the code but its text remains on one unwrapped line. Long words are not split. Source outside the replacement retains mixed line endings and the file's final-newline state. When `url-aware-wrapping` is enabled, URL tokens remain unbroken but surrounding prose may use less greedy line breaks.
 
@@ -79,6 +83,86 @@ if enabled:
     value = compute()
 ```
 
+Syntax-aware extraction keeps overlong comments inline where moving them would weaken their association with nearby syntax:
+
+```pydocfmt-example
+[settings]
+line-length = 32
+
+[input]
+if enabled:  # explanation long enough to move above the header
+    pass
+@decorator  # explanation long enough to move above the decorator
+def function(
+    value,  # explanation long enough to move above the argument
+):
+    pass
+
+[output=unchanged]
+```
+
+Spacing is still normalized in syntax-sensitive positions even when extraction is suppressed:
+
+```pydocfmt-example
+[settings]
+line-length = 32
+
+[input]
+if enabled:# explanation long enough to move above the header
+    pass
+
+[output]
+if enabled:  # explanation long enough to move above the header
+    pass
+```
+
+Ordinary body comments are not treated as syntax-sensitive just because they appear under a compound statement:
+
+```pydocfmt-example
+[settings]
+line-length = 36
+
+[input]
+match value:
+    case 1:
+        result = compute()  # explanation long enough to move above this statement
+
+[output]
+match value:
+    case 1:
+        # explanation long enough to
+        # move above this statement
+        result = compute()
+```
+
+Set `comment-syntax-aware-trailing-extraction` to `false` to restore extraction in those positions:
+
+```pydocfmt-example
+[settings]
+line-length = 32
+comment-syntax-aware-trailing-extraction = false
+
+[input]
+if enabled:  # explanation long enough to move above the header
+    pass
+match value:  # explanation long enough to move above the match header
+    case 1:  # explanation long enough to move above the case header
+        pass
+
+[output]
+# explanation long enough to
+# move above the header
+if enabled:
+    pass
+# explanation long enough to
+# move above the match header
+match value:
+    # explanation long enough to
+    # move above the case header
+    case 1:
+        pass
+```
+
 When a moved comment would touch an existing same-indent standalone comment, a blank line keeps the independently authored comments separate:
 
 ```pydocfmt-example
@@ -133,3 +217,4 @@ other = compute()
 - `line-ending`
 - `indent-width`
 - `url-aware-wrapping`
+- `comment-syntax-aware-trailing-extraction`

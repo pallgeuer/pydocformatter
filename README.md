@@ -117,6 +117,7 @@ If no files or directories are specified, `pydocfmt check` checks the current di
 - `--comment-format-block-quotes`, `--no-comment-format-block-quotes`: Toggle prefix-preserving block-quote reflow (default: enabled)
 - `--comment-preserve-tables`, `--no-comment-preserve-tables`: Toggle preserving detected Markdown and reStructuredText tables (default: enabled)
 - `--comment-preserve-directives`, `--no-comment-preserve-directives`: Toggle preserving reStructuredText directives and their indented bodies (default: enabled)
+- `--comment-syntax-aware-trailing-extraction`, `--no-comment-syntax-aware-trailing-extraction`: Toggle keeping overlong trailing comments inline in syntax-sensitive positions (default: enabled)
 - `--comment-detect-code`, `--no-comment-detect-code`: Toggle the disabled-code indentation and leading-keyword heuristic (default: disabled)
 - `--comment-detect-statements`, `--no-comment-detect-statements`: Toggle parseable Python statement detection (default: enabled)
 - `--comment-detect-expressions`, `--no-comment-detect-expressions`: Toggle nontrivial Python expression detection (default: disabled)
@@ -260,6 +261,7 @@ preserve-code-fences = true
 format-block-quotes = true
 preserve-tables = true
 preserve-directives = true
+syntax-aware-trailing-extraction = true
 detect-code = false
 detect-statements = true
 detect-expressions = false
@@ -296,6 +298,7 @@ For TOML configuration, `[tool.pydocfmt.docstring]` and `[tool.pydocfmt.comment]
 - `comment-format-block-quotes`: Detect and reflow Markdown block quotes while retaining quote prefixes (default: `true`)
 - `comment-preserve-tables`: Preserve structurally detected Markdown pipe tables and reStructuredText grid/simple tables (default: `true`)
 - `comment-preserve-directives`: Preserve reStructuredText directives and their more-indented option/content lines (default: `true`)
+- `comment-syntax-aware-trailing-extraction`: Keep overlong trailing comments inline in decorators, compound statement headers, arguments, and parenthesized or continuation contexts (default: `true`)
 - `comment-detect-code`: Protect whole standalone runs matching the disabled-code indentation or leading-keyword heuristic (default: `false`)
 - `comment-detect-statements`: Protect whole standalone runs containing parseable Python non-expression statements (default: `true`)
 - `comment-detect-expressions`: Protect whole standalone runs containing parseable nontrivial Python expressions (default: `false`)
@@ -318,7 +321,7 @@ When `respect-gitignore` is enabled, pydocfmt aborts if gitignore filtering cann
 
 When `url-aware-wrapping` is enabled, pydocfmt may choose less greedy line breaks around URL tokens in comment and docstring prose, but URLs and other long words are still not split.
 
-The `comment-*` settings affect the rule-based formatter. PCF001 defaults to formatting each standalone physical line independently; joining and structured-markup interpretation are opt-in. See `pydocfmt rule PCF001` and `pydocfmt rule PCF002` for exact detector precedence and protected-comment behavior.
+The `comment-*` settings affect the rule-based formatter. PCF001 defaults to formatting each standalone physical line independently; joining and structured-markup interpretation are opt-in. PCF002 keeps syntax-sensitive overlong trailing comments inline by default. See `pydocfmt rule PCF001`, `pydocfmt rule PCF002`, and `pydocfmt rule PCF003` for exact detector precedence, extraction, and protected-comment behavior.
 
 The `docstring-convention` setting never auto-detects a convention. Google sections, NumPy sections, and rest fields are only parsed when their matching convention is selected; `none` and `pep257` leave those convention syntaxes as ordinary content. The resolved convention can also ignore incompatible PDF rules selected through broad selectors; selecting an exact rule code restores an ignored rule. The `docstring-parse-*` settings control generic semantic structures independently, and PCF rules are not affected by docstring conventions.
 

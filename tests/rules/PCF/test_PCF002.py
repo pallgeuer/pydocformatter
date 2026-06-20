@@ -22,7 +22,8 @@ def test_long_trailing_comment_moves_above_code_and_is_independent_of_pcf001() -
 
 def test_protected_trailing_comments_are_not_modified() -> None:
     source = "value = compute() # type: ignore\nother = compute() # nosec\n"
-    result = pcf_helpers.format_pcf(source, line_length=20)
+    settings = CheckSettings(select=("PCF002",), line_length=20)
+    result = formatter.format_source(source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
     assert result.new_source == source
 
 
@@ -125,7 +126,9 @@ def test_overlong_unsplittable_trailing_word_moves_without_splitting() -> None:
 )
 def test_all_protected_trailing_directive_families_remain_byte_exact(directive: str) -> None:
     source = f"value = compute() {directive}\n"
-    assert pcf_helpers.format_pcf(source, line_length=10).new_source == source
+    settings = CheckSettings(select=("PCF002",), line_length=10)
+    result = formatter.format_source(source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
+    assert result.new_source == source
 
 
 def test_trailing_rule_does_not_modify_standalone_comments_when_selected_alone() -> None:
@@ -163,6 +166,66 @@ def test_empty_trailing_comment_remains_inline_even_when_code_is_overlong() -> N
     assert result.new_source == "very_long_variable_name = compute_expensive_value()  #\n"
 
 
+def test_canonical_overlong_trailing_comment_in_sensitive_position_is_not_reported_when_syntax_aware() -> None:
+    source = "if enabled:  # explanation long enough to move above the header\n    pass\n"
+    settings = CheckSettings(select=("PCF002",), line_length=32)
+    result = formatter.format_source(source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=False)
+    assert result.new_source == source
+    assert not result.unfixed_findings
+
+
+def test_disabled_syntax_aware_extraction_reports_sensitive_position_in_check_mode() -> None:
+    source = "if enabled:  # explanation long enough to move above the header\n    pass\n"
+    settings = CheckSettings(select=("PCF002",), line_length=32, comment_syntax_aware_trailing_extraction=False)
+    result = formatter.format_source(source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=False)
+    assert result.new_source == source
+    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((1,),)
+
+
+def test_syntax_aware_extraction_still_normalizes_spacing_without_moving_sensitive_comment() -> None:
+    source = "if enabled:# explanation long enough to move above the header\n    pass\n"
+    result = pcf_helpers.format_pcf(source, line_length=32)
+    assert result.new_source == "if enabled:  # explanation long enough to move above the header\n    pass\n"
+    assert {rule.code.tag: count for rule, count in result.fixed_findings.items()} == {"PCF002": 1}
+
+
+@pytest.mark.parametrize(
+    "source",
+    (
+        "values = [\n    item,  # explanation long enough to move above this item\n]\n",
+        "call(\n    value,  # explanation long enough to move above this argument\n)\n",
+        "if enabled:  # explanation long enough to move above the header\n    pass\n",
+        "if enabled: pass  # explanation long enough to move above one line suite\n",
+        "if enabled:\n    pass\nelse:  # explanation long enough to move above the else header\n    pass\n",
+        "@decorator  # explanation long enough to move above the decorator\ndef function():\n    pass\n",
+        "value = (\n    first +  # explanation long enough to move above this continuation\n    second\n)\n",
+    ),
+)
+def test_overlong_trailing_comments_stay_inline_in_sensitive_syntax_positions_by_default(source: str) -> None:
+    assert pcf_helpers.format_pcf(source, line_length=32).new_source == source
+
+
+@pytest.mark.parametrize(
+    "source",
+    (
+        "class Example:  # explanation long enough to move above the class header\n    pass\n",
+        "def function():  # explanation long enough to move above the function header\n    pass\n",
+        "with context:  # explanation long enough to move above the with header\n    pass\n",
+        "try:  # explanation long enough to move above the try header\n    pass\nexcept Error:  # explanation long enough to move above the except header\n    pass\nfinally:  # explanation long enough to move above the finally header\n    pass\n",
+        "try:  # explanation long enough to move above the try star header\n    pass\nexcept* Error:  # explanation long enough to move above except star\n    pass\n",
+        "match value:  # explanation long enough to move above the match header\n    case 1:  # explanation long enough to move above the case header\n        pass\n",
+    ),
+)
+def test_syntax_aware_extraction_covers_compound_statement_headers(source: str) -> None:
+    assert pcf_helpers.format_pcf(source, line_length=32).new_source == source
+
+
+def test_syntax_aware_extraction_does_not_protect_ordinary_trailing_comments_inside_match_body() -> None:
+    source = "match value:\n    case 1:\n        result = compute()  # explanation long enough to move above this statement\n"
+    result = pcf_helpers.format_pcf(source, line_length=36)
+    assert result.new_source == "match value:\n    case 1:\n        # explanation long enough to\n        # move above this statement\n        result = compute()\n"
+
+
 @pytest.mark.parametrize(
     ("source", "expected"),
     (
@@ -171,17 +234,38 @@ def test_empty_trailing_comment_remains_inline_even_when_code_is_overlong() -> N
             "values = [\n    # explanation long enough to\n    # move above this item\n    item,\n]\n",
         ),
         (
+            "call(\n    value,  # explanation long enough to move above this argument\n)\n",
+            "call(\n    # explanation long enough to\n    # move above this argument\n    value,\n)\n",
+        ),
+        (
             "if enabled:  # explanation long enough to move above the header\n    pass\n",
             "# explanation long enough to\n# move above the header\nif enabled:\n    pass\n",
+        ),
+        (
+            "if enabled: pass  # explanation long enough to move above one line suite\n",
+            "# explanation long enough to\n# move above one line suite\nif enabled: pass\n",
+        ),
+        (
+            "if enabled:\n    pass\nelse:  # explanation long enough to move above the else header\n    pass\n",
+            "if enabled:\n    pass\n# explanation long enough to\n# move above the else header\nelse:\n    pass\n",
         ),
         (
             "@decorator  # explanation long enough to move above the decorator\ndef function():\n    pass\n",
             "# explanation long enough to\n# move above the decorator\n@decorator\ndef function():\n    pass\n",
         ),
+        (
+            "match value:  # explanation long enough to move above the match header\n    case 1:  # explanation long enough to move above the case header\n        pass\n",
+            "# explanation long enough to\n# move above the match header\nmatch value:\n    # explanation long enough to\n    # move above the case header\n    case 1:\n        pass\n",
+        ),
+        (
+            "try:  # explanation long enough to move above the try star header\n    pass\nexcept* Error:  # explanation long enough to move above except star\n    pass\n",
+            "# explanation long enough to\n# move above the try star header\ntry:\n    pass\n# explanation long enough to\n# move above except star\nexcept* Error:\n    pass\n",
+        ),
     ),
 )
-def test_overlong_trailing_comments_move_safely_in_unusual_syntax_positions(source: str, expected: str) -> None:
-    assert pcf_helpers.format_pcf(source, line_length=32).new_source == expected
+def test_overlong_trailing_comments_can_move_from_sensitive_syntax_positions_when_syntax_awareness_is_disabled(source: str, expected: str) -> None:
+    result = pcf_helpers.format_pcf(source, line_length=32, comment_syntax_aware_trailing_extraction=False)
+    assert result.new_source == expected
 
 
 def test_moved_structure_like_comment_is_plain_wrapped_and_does_not_gain_standalone_semantics() -> None:

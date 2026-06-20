@@ -182,12 +182,15 @@ def test_prepare_ignores_hashes_inside_all_string_literal_forms() -> None:
 
 
 def test_prepare_classifies_comments_in_parenthesized_decorator_and_compound_statement_positions() -> None:
-    source = "@decorator  # decorator trailing\ndef function(\n    value,  # argument trailing\n):\n    if value:  # header trailing\n        # body standalone\n        return (\n            value  # expression trailing\n        )\n"
+    source = "@decorator  # decorator trailing\ndef function(\n    value,  # argument trailing\n):\n    if value:  # header trailing\n        # body standalone\n        return (\n            value  # expression trailing\n        )\ntry:  # try star trailing\n    pass\nexcept* Error:  # except star trailing\n    pass\nif enabled: pass  # one-line trailing\n"
     data = PCF.prepare(category_context(source))
-    assert tuple((comment.text, comment.placement, comment.indent) for comment in data.comments) == (
-        ("# decorator trailing", CommentPlacement.TRAILING, ""),
-        ("# argument trailing", CommentPlacement.TRAILING, "    "),
-        ("# header trailing", CommentPlacement.TRAILING, "    "),
-        ("# body standalone", CommentPlacement.STANDALONE, "        "),
-        ("# expression trailing", CommentPlacement.TRAILING, "            "),
+    assert tuple((comment.text, comment.placement, comment.indent, comment.syntax_sensitive) for comment in data.comments) == (
+        ("# decorator trailing", CommentPlacement.TRAILING, "", True),
+        ("# argument trailing", CommentPlacement.TRAILING, "    ", True),
+        ("# header trailing", CommentPlacement.TRAILING, "    ", True),
+        ("# body standalone", CommentPlacement.STANDALONE, "        ", False),
+        ("# expression trailing", CommentPlacement.TRAILING, "            ", True),
+        ("# try star trailing", CommentPlacement.TRAILING, "", True),
+        ("# except star trailing", CommentPlacement.TRAILING, "", True),
+        ("# one-line trailing", CommentPlacement.TRAILING, "", True),
     )

@@ -28,6 +28,9 @@ from pydocformatter.rules.codes import RuleCode, RuleSelector
 from pydocformatter.rules.definition import RuleBase, RuleCategoryBase
 from pydocformatter.rules.models import FixAvailability, RuleCategoryMetadata, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
 
+EXPECTED_RULE_DOCUMENTATION_SECTIONS = ("What it does", "Why is this useful?", "Ruff compatibility", "Examples", "Options")
+EXPECTED_RULE_CATEGORY_DOCUMENTATION_SECTIONS = ("What it does", "Why is this useful?", "Rules", "Code ranges", "Related tooling")
+
 
 class PDFSampleCategory(RuleCategoryBase):
     meta = RuleCategoryMetadata(prefix="PDF", name="sample PDF", url=None)
@@ -247,6 +250,11 @@ def incompatibility_collection() -> rule_collection.RuleCollection:
     return rule_collection.RuleCollection((TSTIncompatibilityCategory,))
 
 
+def markdown_level_two_headings(markdown: str) -> tuple[str, ...]:
+    """Return all level-two heading text from a Markdown document."""
+    return tuple(line.removeprefix("## ") for line in markdown.splitlines() if line.startswith("## "))
+
+
 class TestRules(unittest.TestCase):
     @staticmethod
     def _write(path: Path, text: str = "x = 1\n") -> None:
@@ -339,10 +347,12 @@ class TestRules(unittest.TestCase):
         for category_class in collection.categories:
             explanation = rule_documentation.load_rule_category_explanation(category_class)
             self.assertTrue(explanation.startswith(f"# {category_class.meta.name} ({category_class.meta.prefix})\n\n"))
+            self.assertEqual(markdown_level_two_headings(explanation), EXPECTED_RULE_CATEGORY_DOCUMENTATION_SECTIONS)
         for rule_class in collection.rules:
             explanation = rule_documentation.load_rule_explanation(rule_class)
             self.assertTrue(explanation.startswith(f"# {rule_class.meta.name} ({rule_class.meta.code})\n\n"))
             self.assertIn(f"\n\n{rule_documentation.rule_fix_text(rule_class.meta)}\n\n", explanation)
+            self.assertEqual(markdown_level_two_headings(explanation), EXPECTED_RULE_DOCUMENTATION_SECTIONS)
 
     def test_builtin_rule_file_and_class_names_match_rule_content(self) -> None:
         for rule_class in rule_collection.RULE_COLLECTION.rules:

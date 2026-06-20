@@ -10,6 +10,7 @@ import libcst.metadata as cst_metadata
 
 import pydocformatter.rules.definition_helpers.source_text as source_text
 import pydocformatter.rules.definition_helpers.text_layout as text_layout
+import pydocformatter.rules.edits as rule_edits
 import pydocformatter.rules.registration as rule_registration
 from pydocformatter.rules.definition import RuleCategoryBase, RuleCategoryContext, RuleContext
 from pydocformatter.rules.models import RuleCategoryMetadata
@@ -47,6 +48,7 @@ class CommentInfo:
     range: cst_metadata.CodeRange
     placement: CommentPlacement
     kind: CommentKind
+    syntax_sensitive: bool
     indent: str
     line_prefix: str
     text: str
@@ -164,6 +166,29 @@ def render_comment(content: str, *, indent: str = "", include_indent: bool = Tru
     return f"{prefix}# {content}" if content else f"{prefix}#"
 
 
+def render_inline_trailing_comment(code: str, content: str) -> str:
+    """Return canonical inline trailing-comment source."""
+    return f"{code}  # {content}" if content else f"{code}  #"
+
+
+def planned_trailing_line_change(
+    data: PCFCategoryData,
+    comment: CommentInfo,
+    replacement: str,
+) -> rule_edits.PlannedSourceChange | None:
+    """Return a full-line source change unless source already matches."""
+    code_range = cst_metadata.CodeRange(
+        start=cst_metadata.CodePosition(line=comment.range.start.line, column=0),
+        end=comment.range.end,
+    )
+    if data.source_for(code_range) == replacement:
+        return None
+    return rule_edits.PlannedSourceChange(
+        edit=rule_edits.SourceEdit(range=code_range, replacement=replacement),
+        line_numbers=(comment.range.start.line,),
+    )
+
+
 def _comment_info(node: cst.Comment, *, positions: Mapping[cst.CSTNode, cst_metadata.CodeRange], parents: Mapping[cst.CSTNode, cst.CSTNode], source_lines: list[str]) -> CommentInfo:
     """Build source information for one comment node."""
     code_range = positions[node]
@@ -177,6 +202,7 @@ def _comment_info(node: cst.Comment, *, positions: Mapping[cst.CSTNode, cst_meta
         range=code_range,
         placement=placement,
         kind=_comment_kind(node.value, line=code_range.start.line, source_lines=source_lines),
+        syntax_sensitive=placement == CommentPlacement.TRAILING and _is_syntax_sensitive_trailing_position(node, parents=parents),
         indent=indent,
         line_prefix=line_prefix,
         text=node.value,
@@ -195,6 +221,21 @@ def _comment_kind(text: str, *, line: int, source_lines: list[str]) -> CommentKi
     if _TOOL_DIRECTIVE_RE.match(text):
         return CommentKind.TOOL_DIRECTIVE
     return CommentKind.REGULAR
+
+
+def _is_syntax_sensitive_trailing_position(node: cst.Comment, *, parents: Mapping[cst.CSTNode, cst.CSTNode]) -> bool:
+    """Return whether extracting a trailing comment would weaken syntax association."""
+    current: cst.CSTNode = node
+    while current in parents:
+        parent = parents[current]
+        if isinstance(parent, cst.Decorator | cst.Arg | cst.ParenthesizedWhitespace):
+            return True
+        if isinstance(parent, cst.Match) and isinstance(current, cst.TrailingWhitespace):
+            return True
+        if isinstance(parent, cst.IndentedBlock | cst.SimpleStatementSuite) and isinstance(current, cst.TrailingWhitespace):
+            return parents.get(parent) is not None
+        current = parent
+    return False
 
 
 def _standalone_runs(comments: tuple[CommentInfo, ...]) -> tuple[StandaloneCommentRun, ...]:

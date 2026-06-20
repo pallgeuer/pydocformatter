@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import libcst.metadata as cst_metadata
-
 import pydocformatter.rules.definition_helpers.text_layout as text_layout
 import pydocformatter.rules.definitions.PCF.PCF as PCF_definition
 import pydocformatter.rules.edits as rule_edits
@@ -48,8 +46,9 @@ def _planned_changes(context: RuleContext) -> tuple[rule_edits.PlannedSourceChan
             continue
         code = comment.line_prefix.rstrip(" \t\f")
         content = comment.content
-        inline = f"{code}  # {content}" if content else f"{code}  #"
-        if not content or text_layout.display_width(inline, tab_width=context.settings.indent_width) <= context.settings.line_length:
+        inline = PCF_definition.render_inline_trailing_comment(code, content)
+        fits_inline = text_layout.display_width(inline, tab_width=context.settings.indent_width) <= context.settings.line_length
+        if not content or fits_inline or (context.settings.comment_syntax_aware_trailing_extraction and comment.syntax_sensitive):
             replacement = inline
         else:
             width = PCF_definition.available_comment_width(
@@ -62,18 +61,9 @@ def _planned_changes(context: RuleContext) -> tuple[rule_edits.PlannedSourceChan
             if _requires_standalone_boundary(data, comment):
                 comment_lines = ("", *comment_lines)
             replacement = context.line_ending.join((*comment_lines, code))
-        code_range = cst_metadata.CodeRange(
-            start=cst_metadata.CodePosition(line=comment.range.start.line, column=0),
-            end=comment.range.end,
-        )
-        if data.source_for(code_range) == replacement:
-            continue
-        changes.append(
-            rule_edits.PlannedSourceChange(
-                edit=rule_edits.SourceEdit(range=code_range, replacement=replacement),
-                line_numbers=(comment.range.start.line,),
-            )
-        )
+        change = PCF_definition.planned_trailing_line_change(data, comment, replacement)
+        if change is not None:
+            changes.append(change)
     return tuple(changes)
 
 
