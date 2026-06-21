@@ -136,11 +136,14 @@ def _run_fix_pass(
                 errors.append(f"{path}: {rule_class.meta.code} automatic fix returned {type(fix_result.module).__name__}, expected LibCST Module")
                 continue
             result_findings = _validated_rule_findings(rule_class, fix_result.fixed_findings, path=path, operation="automatic fix", errors=errors)
-            try:
-                result_changed = fix_result.module.code != module.code
-            except Exception as error:
-                errors.append(f"{path}: {rule_class.meta.code} automatic fix source generation failed: {error}")
-                continue
+            if fix_result.module is module:
+                result_changed = False
+            else:
+                try:
+                    result_changed = fix_result.module.code != module.code
+                except Exception as error:
+                    errors.append(f"{path}: {rule_class.meta.code} automatic fix source generation failed: {error}")
+                    continue
             if result_changed != bool(result_findings):
                 errors.append(f"{path}: {rule_class.meta.code} automatic fix must change source if and only if it reports fixed findings")
                 continue

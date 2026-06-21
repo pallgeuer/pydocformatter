@@ -4,6 +4,7 @@ import dataclasses
 import inspect
 import os
 import tempfile
+import typing
 import unittest
 import unittest.mock
 from io import StringIO
@@ -389,6 +390,108 @@ class TestFormatterResults(unittest.TestCase):
             self.assertFalse(result.modified)
             self.assertEqual(result.unfixed_findings, ())
             self.assertEqual(target.read_text(encoding="utf-8"), "x = 1\n")
+
+    def test_rule_fix_pass_same_module_noop_skips_source_comparison(self) -> None:
+        code_accesses: list[cst.Module] = []
+
+        def _raise_code_access(module: cst.Module) -> str:
+            code_accesses.append(module)
+            raise AssertionError("Module.code should not be read for same-module no-op fixes")
+
+        class TST(rule_base.RuleCategoryBase):
+            meta = rule_models.RuleCategoryMetadata(prefix="TST", name="test", url=None)
+
+        @rule_registration.register_rule_to(TST)
+        class TST001Noop(rule_base.RuleBase):
+            meta = rule_models.RuleMetadata(
+                code=rule_codes.RuleCode("TST001"),
+                name="noop",
+                message="Noop",
+                fix_availability=rule_models.FixAvailability.ALWAYS,
+                stable_since="1.0.0",
+                setting_effects=(),
+                incompatible_with=(),
+            )
+
+            @classmethod
+            def fix(cls, context: rule_base.RuleContext) -> rule_base.RuleFixResult:
+                del cls
+                patcher = unittest.mock.patch.object(cst.Module, "code", new=property(_raise_code_access))
+                patcher.start()
+                self.addCleanup(patcher.stop)
+                return rule_base.RuleFixResult(module=context.module)
+
+        module = cst.parse_module("x = 1\n")
+        settings = CheckSettings()
+        selection = isolated_rule_selection(TST)
+        selected_rule_by_code = {selected_rule.rule.code: selected_rule for selected_rule in selection.for_path("a.py")}
+        errors: list[str] = []
+
+        result_module, findings, changed = rule_runner._run_fix_pass(
+            module, path="a.py", settings=settings, line_ending="\n", rule_selection=selection, selected_rule_by_code=selected_rule_by_code, errors=errors
+        )
+
+        self.assertIs(result_module, module)
+        self.assertEqual(findings, ())
+        self.assertFalse(changed)
+        self.assertEqual(errors, [])
+        self.assertEqual(code_accesses, [])
+
+    def test_rule_fix_pass_different_module_same_source_uses_source_comparison(self) -> None:
+        original_code_property = inspect.getattr_static(cst.Module, "code")
+        if not isinstance(original_code_property, property) or original_code_property.fget is None:
+            raise AssertionError("Expected LibCST Module.code to be a property")
+        original_code_getter = typing.cast("typing.Callable[[cst.Module], str]", original_code_property.fget)
+        code_accesses: list[cst.Module] = []
+        replacement_modules: list[cst.Module] = []
+
+        def _count_code_access(module: cst.Module) -> str:
+            code_accesses.append(module)
+            return original_code_getter(module)
+
+        class TST(rule_base.RuleCategoryBase):
+            meta = rule_models.RuleCategoryMetadata(prefix="TST", name="test", url=None)
+
+        @rule_registration.register_rule_to(TST)
+        class TST001ReturnEquivalentModule(rule_base.RuleBase):
+            meta = rule_models.RuleMetadata(
+                code=rule_codes.RuleCode("TST001"),
+                name="return-equivalent-module",
+                message="Return equivalent module",
+                fix_availability=rule_models.FixAvailability.ALWAYS,
+                stable_since="1.0.0",
+                setting_effects=(),
+                incompatible_with=(),
+            )
+
+            @classmethod
+            def fix(cls, context: rule_base.RuleContext) -> rule_base.RuleFixResult:
+                del cls
+                replacement = cst.parse_module(context.source)
+                replacement_modules.append(replacement)
+                patcher = unittest.mock.patch.object(cst.Module, "code", new=property(_count_code_access))
+                patcher.start()
+                self.addCleanup(patcher.stop)
+                return rule_base.RuleFixResult(module=replacement)
+
+        module = cst.parse_module("x = 1\n")
+        settings = CheckSettings()
+        selection = isolated_rule_selection(TST)
+        selected_rule_by_code = {selected_rule.rule.code: selected_rule for selected_rule in selection.for_path("a.py")}
+        errors: list[str] = []
+
+        result_module, findings, changed = rule_runner._run_fix_pass(
+            module, path="a.py", settings=settings, line_ending="\n", rule_selection=selection, selected_rule_by_code=selected_rule_by_code, errors=errors
+        )
+
+        self.assertIs(result_module, module)
+        self.assertEqual(findings, ())
+        self.assertFalse(changed)
+        self.assertEqual(errors, [])
+        self.assertEqual(len(replacement_modules), 1)
+        self.assertIsNot(replacement_modules[0], module)
+        self.assertGreaterEqual(len(code_accesses), 1)
+        self.assertTrue(any(accessed_module is replacement_modules[0] for accessed_module in code_accesses))
 
     def test_rule_source_formatter_runs_fixes_to_convergence_and_checks_latest_positions(self) -> None:
         prepare_sources: list[str] = []

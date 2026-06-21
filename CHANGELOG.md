@@ -115,6 +115,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 
 - **Developer workflow:**
   - Cached rule-context source text and source lines per module state to reduce repeated LibCST source regeneration during no-legacy checks.
+  - Skipped fix-mode LibCST source comparison for same-module no-op fixes.
   - Renamed selected built-in rule names, rule definition files, and rule classes for clearer public metadata while keeping rule codes and selection behavior unchanged.
   - Reorganized rule helper modules so whole-rule logic lives in individual rule files while shared helper modules contain reusable source, layout, decorator, section-edit, and reStructuredText field primitives.
   - Moved reusable docstring section and reStructuredText field metadata out of `PDF.py` into a focused helper module used by the parser, section rules, and documentation helpers.
