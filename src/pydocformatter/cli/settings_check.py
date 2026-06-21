@@ -32,6 +32,8 @@ DEFAULT_EXCLUDE = (
 DEFAULT_INCLUDE = ("*.py", "*.pyi", "*.pyw")
 DEFAULT_RULE_SELECT = (ALL_RULE_SELECTOR_TAG,)
 DEFAULT_RULE_FIXABLE = (ALL_RULE_SELECTOR_TAG,)
+PARALLELISM_CONSTRAINT_MESSAGE = "must be 0, a fractional value greater than 0 and less than 1, or a whole number greater than or equal to 1"
+_validate_non_negative_float = settings_core.validate_float(min_value=0)
 
 
 class IndentStyle(enum.StrEnum):
@@ -109,6 +111,7 @@ class CheckSettings:
         line_ending (LineEnding): Line ending used when rewriting files.
         indent_style (IndentStyle): Indentation style used for generated and normalized docstring indentation.
         indent_width (int): Number of spaces per generated docstring indentation level, or the visual width of a tab.
+        parallelism (float): Number or ratio of logical CPU cores to use for internal file-level parallelism.
         docstring_convention (DocstringConvention): Convention used to parse semantic docstring sections.
         docstring_blank_line_style (DocstringBlankLineStyle): Whitespace style used by PDF103 for blank docstring lines.
         docstring_blank_line_after_last_section (bool): Whether PDF200 and PDF201 keep one blank line after the last
@@ -166,6 +169,7 @@ class CheckSettings:
     line_ending: LineEnding = LineEnding.AUTO
     indent_style: IndentStyle = IndentStyle.SPACE
     indent_width: int = 4
+    parallelism: float = 0.0
     docstring_convention: DocstringConvention = DocstringConvention.NONE
     docstring_blank_line_style: DocstringBlankLineStyle = DocstringBlankLineStyle.BLANK
     docstring_blank_line_after_last_section: bool = False
@@ -237,6 +241,7 @@ class CheckSettingsOverrides(TypedDict, total=False):
         line_ending (LineEnding): Line ending used when rewriting files.
         indent_style (IndentStyle): Indentation style used for generated and normalized docstring indentation.
         indent_width (int): Number of spaces per generated docstring indentation level, or the visual width of a tab.
+        parallelism (float): Number or ratio of logical CPU cores to use for internal file-level parallelism.
         docstring_convention (DocstringConvention): Convention used to parse semantic docstring sections.
         docstring_blank_line_style (DocstringBlankLineStyle): Whitespace style used by PDF103 for blank docstring lines.
         docstring_blank_line_after_last_section (bool): Whether PDF200 and PDF201 keep one blank line after the last
@@ -290,6 +295,7 @@ class CheckSettingsOverrides(TypedDict, total=False):
     line_ending: LineEnding
     indent_style: IndentStyle
     indent_width: int
+    parallelism: float
     docstring_convention: DocstringConvention
     docstring_blank_line_style: DocstringBlankLineStyle
     docstring_blank_line_after_last_section: bool
@@ -350,6 +356,14 @@ class SettingsGroup(enum.StrEnum):
     FILE_SELECTION = "File selection"
 
 
+def validate_parallelism(value: object, context: str) -> float:
+    """Validate a file-level parallelism setting."""
+    parallelism = _validate_non_negative_float(value, context)
+    if parallelism > 1 and not parallelism.is_integer():
+        raise settings_core.SettingsError(f"{context} {PARALLELISM_CONSTRAINT_MESSAGE}")
+    return parallelism
+
+
 SETTINGS_SCHEMA = SettingsSchema(
     settings_type=CheckSettings,
     overrides_type=CheckSettingsOverrides,
@@ -405,6 +419,16 @@ SETTINGS_SCHEMA = SettingsSchema(
             validator=settings_core.validate_int(min_value=1, max_value=255),
             cli={"metavar": "WIDTH"},
             documentation="Generated docstring indentation width and tab expansion width used when measuring docstrings and comments.",
+        ),
+        SettingDefinition(
+            field="parallelism",
+            value_type=float,
+            group=SettingsGroup.FORMATTING,
+            help="Number or ratio of logical CPU cores to use for file-level parallelism.",
+            validator=validate_parallelism,
+            cli={"metavar": "JOBS"},
+            documentation="File-level parallelism. Use 0 for all logical CPU cores subject to platform process-pool limits, a whole number greater than or equal to 1 for an exact worker count, or a fractional value greater than 0 and less than 1 for that ratio of logical CPU cores. Small file sets may be slower with parallelism due to process startup overhead.",
+            example="parallelism = 0.0",
         ),
         SettingDefinition(
             field="docstring_convention",

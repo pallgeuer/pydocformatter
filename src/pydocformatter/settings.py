@@ -4,6 +4,7 @@ import argparse
 import dataclasses
 import enum
 import json
+import math
 import os
 import tomllib
 from collections.abc import Callable, Iterable, Mapping
@@ -239,6 +240,8 @@ class SettingDefinition(Generic[SettingValueT]):
                 action = argparse.BooleanOptionalAction
             if value_type is int and cli_type is None:
                 cli_type = int
+            if value_type is float and cli_type is None:
+                cli_type = float
             if value_type == StringList:
                 if action is None:
                     action = "append"
@@ -564,6 +567,8 @@ def format_value(value: Any, value_type: type[Any] | GenericAlias) -> str:
         return str(value).lower()
     elif value_type_ is str:
         return _format_string(value)
+    elif value_type_ is float:
+        return repr(value)
     elif _is_str_enum_type(value_type_):
         return _format_string(value.value)
     elif value_type_ == StringList:
@@ -627,6 +632,33 @@ def validate_int(*, min_value: int | None = None, max_value: int | None = None) 
         if max_value is not None and value > max_value:
             raise SettingsError(f"{context} must be less than or equal to {max_value}")
         return value
+
+    return validate
+
+
+def validate_float(*, min_value: float | None = None, max_value: float | None = None) -> Callable[[Any, str], float]:
+    """Return a validator for float settings with optional inclusive bounds.
+
+    Args:
+        min_value (float | None): Optional inclusive lower bound.
+        max_value (float | None): Optional inclusive upper bound.
+
+    Returns:
+        Callable[[Any, str], float]: Validator that converts integer and float values to bounded floats.
+    """
+
+    def validate(value: Any, context: str) -> float:
+        """Validate one float setting value."""
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise SettingsError(f"{context} must be a number")
+        float_value = float(value)
+        if not math.isfinite(float_value):
+            raise SettingsError(f"{context} must be finite")
+        if min_value is not None and float_value < min_value:
+            raise SettingsError(f"{context} must be greater than or equal to {min_value:g}")
+        if max_value is not None and float_value > max_value:
+            raise SettingsError(f"{context} must be less than or equal to {max_value:g}")
+        return float_value
 
     return validate
 
@@ -727,6 +759,8 @@ def _default_validator_for_type(setting_type: type[SettingValueT] | GenericAlias
         return validate_bool
     elif setting_type is int:
         return validate_int()
+    elif setting_type is float:
+        return validate_float()
     elif _is_str_enum_type(setting_type):
         return validate_str_enum(cast(type[enum.StrEnum], setting_type))
     elif setting_type == StringList:

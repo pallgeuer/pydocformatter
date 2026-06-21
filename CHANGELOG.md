@@ -44,6 +44,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added `--respect-gitignore` / `--no-respect-gitignore`, with enabled-by-default behavior and matching `pyproject.toml` configuration.
   - Added Ruff-style `--config` and `--isolated` global options for explicit config files, inline setting overrides, and config-free runs.
   - Added `pydocfmt config` to list and describe supported configuration options in text or JSON format.
+  - Added `parallelism` / `--parallelism` to control deterministic file-level parallelism for disk-backed checks.
   - Added active-rule listing output for `pydocfmt check --show-rules`, including effective fixability markers.
   - Added `pydocfmt rule` to explain individual rules or all rules in Ruff-style text or JSON output.
   - Added `pydocfmt linter` to list rule-prefix linters in Ruff-style text or JSON output.
@@ -155,6 +156,9 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Centralized quote-collision rendering for `PDF110` so one-line docstring collapse reuses the shared PDF escape and separator fallback behavior.
 
 ### Fixed
+
+- **CLI:**
+  - Fixed `parallelism` worker resolution to cap Windows process pools at the platform-supported maximum.
 
 - **Formatting:**
   - Fixed URL-aware wrapping to avoid recursive crashes on long URL-containing paragraphs and to fall back to greedy wrapping when balanced wrapping exceeds its search budget.

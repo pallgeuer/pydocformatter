@@ -1,6 +1,7 @@
 import argparse
 import dataclasses
 import enum
+import math
 import os
 import tempfile
 import typing
@@ -183,6 +184,12 @@ class TestSettings(unittest.TestCase):
             group=SettingsGroup.FORMATTING,
             help="Line length.",
         )
+        float_definition = SettingDefinition(
+            field="parallelism",
+            value_type=float,
+            group=SettingsGroup.FORMATTING,
+            help="Parallelism.",
+        )
         string_list_definition = SettingDefinition(
             field="include",
             value_type=StringList,
@@ -204,6 +211,9 @@ class TestSettings(unittest.TestCase):
         self.assertEqual(enum_definition.cli.choices, tuple(member.value for member in LineEnding))
         self.assertIs(bool_definition.cli.action, argparse.BooleanOptionalAction)
         self.assertIs(int_definition.cli.type, int)
+        self.assertIsNotNone(float_definition.cli)
+        assert float_definition.cli is not None
+        self.assertIs(float_definition.cli.type, float)
         self.assertEqual(string_list_definition.cli.action, "append")
         self.assertEqual(string_list_definition.cli.value_kind, SettingCLIValueKind.COMMA_LIST)
         self.assertFalse(string_list_definition.cli.show_default)
@@ -213,6 +223,7 @@ class TestSettings(unittest.TestCase):
         self.assertEqual(enum_definition.validator("lf", "line-ending"), LineEnding.LF)
         self.assertTrue(bool_definition.validator(True, "legacy"))
         self.assertEqual(int_definition.validator(1, "line-length"), 1)
+        self.assertEqual(float_definition.validator(0.5, "parallelism"), 0.5)
         self.assertEqual(string_list_definition.validator(["*.py"], "include"), ("*.py",))
         self.assertEqual(string_map_definition.validator({"tests/*.py": ["PCF001"]}, "per-file-ignores"), (("tests/*.py", ("PCF001",)),))
 
@@ -299,6 +310,7 @@ class TestSettings(unittest.TestCase):
                 "line_ending",
                 "indent_style",
                 "indent_width",
+                "parallelism",
             ),
         )
         self.assertEqual(
@@ -476,6 +488,7 @@ class TestSettings(unittest.TestCase):
         self.assertIs(config.line_ending, LineEnding.AUTO)
         self.assertIs(config.indent_style, IndentStyle.SPACE)
         self.assertEqual(config.indent_width, 4)
+        self.assertEqual(config.parallelism, 0.0)
         self.assertFalse(config.comment_join_standalone_lines)
         self.assertTrue(config.comment_format_list_items)
         self.assertTrue(config.comment_preserve_headings)
@@ -829,6 +842,8 @@ class TestSettings(unittest.TestCase):
         self.assertIn("[tool.pydocfmt]\n", output)
         self.assertLess(output.index("output-format"), output.index("legacy"))
         self.assertLess(output.index("legacy"), output.index("line-length"))
+        self.assertLess(output.index("indent-width"), output.index("parallelism"))
+        self.assertIn("parallelism = 0.0\n", output)
         self.assertIn('line-ending = "lf"\n', output)
         self.assertIn('select = ["PDF", "PCF"]\n', output)
         self.assertIn('per-file-ignores = {"tests/\\"quoted\\"/*.py" = ["PCF001"]}\n', output)
@@ -870,6 +885,19 @@ class TestSettings(unittest.TestCase):
                     pydocformatter_settings.SETTINGS_SCHEMA.load()
             finally:
                 os.chdir(previous_cwd)
+
+    def test_parallelism_setting_accepts_numbers(self) -> None:
+        config = pydocformatter_settings.SETTINGS_SCHEMA.load(
+            field_overrides=CheckSettingsOverrides(parallelism=0.5),
+        )
+
+        self.assertEqual(config.parallelism, 0.5)
+
+    def test_parallelism_setting_rejects_invalid_values(self) -> None:
+        for value in (-1, True, "auto", math.inf, math.nan, 1.5):
+            with self.subTest(value=value):
+                with self.assertRaises(SettingsError):
+                    pydocformatter_settings.SETTINGS_SCHEMA.load(field_overrides={"parallelism": value})
 
     def test_url_aware_wrapping_setting_is_loaded_from_toml_and_cli(self) -> None:
         configured = pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(isolated=True, config_options=("url-aware-wrapping = true",)))

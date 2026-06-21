@@ -152,6 +152,8 @@ def value_type_name(value_type: object) -> str:
         return "bool"
     elif value_type is int:
         return "int"
+    elif value_type is float:
+        return "float"
     elif value_type is str:
         return "str"
     elif value_type == StringList:

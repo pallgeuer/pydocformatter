@@ -92,6 +92,7 @@ If no files or directories are specified, `pydocfmt check` checks the current di
 - `--line-ending {auto,lf,cr-lf,native}`: Line ending to use when rewriting files (default: auto)
 - `--indent-style {space,tab}`: Indentation style for generated docstring sections (default: space)
 - `--indent-width WIDTH`: Generated docstring indentation width and comment tab width (default: 4)
+- `--parallelism JOBS`: File-level parallelism, as a worker count, CPU ratio, or `0` for all logical CPUs subject to platform process-pool limits (default: 0.0)
 
 **Docstring formatting:**
 - `--docstring-convention {none,google,numpy,rest,pep257}`: Convention used to parse semantic docstring sections (default: none)
@@ -223,6 +224,7 @@ url-aware-wrapping = true
 line-ending = "auto"
 indent-style = "space"
 indent-width = 4
+parallelism = 0.0
 select = ["ALL"]
 ignore = []
 extend-select = []
@@ -279,6 +281,7 @@ For TOML configuration, `[tool.pydocfmt.docstring]` and `[tool.pydocfmt.comment]
 - `line-ending`: Line ending to use when rewriting files; one of `"auto"`, `"lf"`, `"cr-lf"`, or `"native"` (default: `"auto"`)
 - `indent-style`: Generated docstring section indentation style; one of `"space"` or `"tab"` (default: `"space"`)
 - `indent-width`: Generated docstring section indentation width and tab expansion width used when measuring comments (default: 4)
+- `parallelism`: File-level parallelism; use `0` for all logical CPUs subject to platform process-pool limits, a whole number greater than or equal to 1 for an exact worker count, or a fractional value greater than 0 and less than 1 for that ratio of logical CPU cores. Small file sets may be slower with parallelism due to process startup overhead (default: 0.0)
 - `docstring-convention`: Docstring convention; one of `"none"`, `"google"`, `"numpy"`, `"rest"`, or `"pep257"` (default: `"none"`)
 - `docstring-blank-line-style`: Blank docstring line whitespace style used by PDF103; one of `"blank"` or `"aligned"` (default: `"blank"`)
 - `docstring-blank-line-after-last-section`: Whether PDF200 and PDF201 keep one blank line after the last recognized Google or NumPy docstring section (default: `false`)

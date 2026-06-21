@@ -2,15 +2,17 @@ from __future__ import annotations
 
 import argparse
 import collections
+import concurrent.futures
 import contextlib
 import dataclasses
 import difflib
 import itertools
+import math
 import os
 import sys
 import tomllib
 from collections import defaultdict
-from collections.abc import Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from typing import TextIO
 
 import pydocformatter.cli.global_args as global_args
@@ -21,7 +23,7 @@ import pydocformatter.rules_selection as rules_selection
 import pydocformatter.settings as settings_core
 import pydocformatter.utils.argparser as argparser
 import pydocformatter.utils.misc as misc
-from pydocformatter.cli.settings_check import SETTINGS_SCHEMA, CheckSettings, OutputFormat
+from pydocformatter.cli.settings_check import PARALLELISM_CONSTRAINT_MESSAGE, SETTINGS_SCHEMA, CheckSettings, OutputFormat
 from pydocformatter.file_selection import STDIN_VIRTUAL_FILE, FileDecision, FileSelectionError, SelectionResult
 from pydocformatter.formatter import FormatterResult
 from pydocformatter.rules.codes import RuleCode
@@ -31,6 +33,8 @@ from pydocformatter.rules_selection import RuleSelection
 LEGACY_FORMAT_RULE_META = RuleMetadata(
     code=RuleCode("PDF000"), name="legacy-formatting-needed", message="Needs formatting", fix_availability=FixAvailability.ALWAYS, stable_since="1.0.0", setting_effects=(), incompatible_with=()
 )
+_MAX_WINDOWS_PROCESS_POOL_WORKERS = 61
+_ExecutorFactory = Callable[..., concurrent.futures.Executor]
 
 
 @dataclasses.dataclass(frozen=True)
@@ -276,7 +280,14 @@ def check_files(*, args: argparse.Namespace, settings_context: CheckRunContext) 
             print("pydocfmt check: Argument error: Cannot process input from stdin when using legacy mode", file=sys.stderr)
             return 2
 
-    results = format_selected_files(files.selected_files, rule_selections=rule_selections, use_stdin=use_stdin, fix=args.fix or args.diff, write=not args.diff)
+    results = format_selected_files(
+        files.selected_files,
+        rule_selections=rule_selections,
+        use_stdin=use_stdin,
+        fix=args.fix or args.diff,
+        write=not args.diff,
+        parallelism=settings_context.cwd_settings.parallelism,
+    )
 
     if use_stdin and args.fix and not args.diff and results:
         if len(results) != 1:
@@ -387,6 +398,47 @@ def format_legacy_files(paths: tuple[str, ...], *, settings: CheckSettings, fix:
     return results
 
 
+def resolve_parallelism(parallelism: float) -> int:
+    """Return the worker count represented by a parallelism setting."""
+    if not math.isfinite(parallelism):
+        raise settings_core.SettingsError("parallelism must be finite")
+    if parallelism == 0:
+        return max(1, os.cpu_count() or 1)
+    if 0 < parallelism < 1:
+        return max(1, math.ceil((os.cpu_count() or 1) * parallelism))
+    if parallelism >= 1 and parallelism.is_integer():
+        return int(parallelism)
+    raise settings_core.SettingsError(f"parallelism {PARALLELISM_CONSTRAINT_MESSAGE}")
+
+
+def _process_pool_worker_count(parallelism: float, selected_file_count: int) -> int:
+    """Return a worker count supported by the current process pool platform."""
+    workers = min(resolve_parallelism(parallelism), selected_file_count)
+    if sys.platform == "win32":
+        workers = min(workers, _MAX_WINDOWS_PROCESS_POOL_WORKERS)
+    return workers
+
+
+def _format_selected_file_worker(
+    selected_file: file_selection.SelectedFile,
+    *,
+    rule_selection: RuleSelection,
+    fix: bool,
+    write: bool,
+) -> FormatterResult:
+    """Format one disk-backed selected file."""
+    settings = selected_file.settings
+    if settings.legacy:
+        return format_legacy_files((selected_file.path,), settings=settings, fix=fix, write=write)[0]
+    return formatter.format_file(
+        selected_file.path,
+        settings=settings,
+        rule_selection=rule_selection,
+        fix=fix,
+        write=write,
+    )
+
+
 def format_selected_files(
     selected_files: tuple[file_selection.SelectedFile, ...],
     *,
@@ -394,26 +446,52 @@ def format_selected_files(
     use_stdin: bool,
     fix: bool,
     write: bool,
+    parallelism: float,
+    executor_factory: _ExecutorFactory = concurrent.futures.ProcessPoolExecutor,
 ) -> list[FormatterResult]:
     """Format selected files with each file's resolved settings profile."""
-    results: list[FormatterResult] = []
-    for index, selected_file in enumerate(selected_files):
-        settings = selected_file.settings
-        if settings.legacy:
-            results.extend(format_legacy_files((selected_file.path,), settings=settings, fix=fix, write=write))
-        else:
-            rule_selection = rule_selections[selected_file.profile.key()]
-            results.append(
-                formatter.format_file(
-                    selected_file.path,
-                    file=sys.stdin if use_stdin and index == 0 else None,
-                    settings=settings,
-                    rule_selection=rule_selection,
-                    fix=fix,
-                    write=write,
-                )
+    if not selected_files:
+        return []
+    if use_stdin:
+        if len(selected_files) > 1:
+            raise AssertionError(f"Expect at most one selected file when using stdin: {selected_files}")
+        selected_file = selected_files[0]
+        if selected_file.settings.legacy:
+            return format_legacy_files((selected_file.path,), settings=selected_file.settings, fix=fix, write=write)
+        rule_selection = rule_selections[selected_file.profile.key()]
+        return [
+            formatter.format_file(
+                selected_file.path,
+                file=sys.stdin,
+                settings=selected_file.settings,
+                rule_selection=rule_selection,
+                fix=fix,
+                write=write,
             )
-    return results
+        ]
+
+    workers = _process_pool_worker_count(parallelism, len(selected_files))
+    if workers == 1:
+        return [_format_selected_file_worker(selected_file, rule_selection=rule_selections[selected_file.profile.key()], fix=fix, write=write) for selected_file in selected_files]
+
+    ordered_results: list[FormatterResult | None] = [None] * len(selected_files)
+    with executor_factory(max_workers=workers) as executor:
+        futures = {
+            executor.submit(
+                _format_selected_file_worker,
+                selected_file,
+                rule_selection=rule_selections[selected_file.profile.key()],
+                fix=fix,
+                write=write,
+            ): index
+            for index, selected_file in enumerate(selected_files)
+        }
+        for future in concurrent.futures.as_completed(futures):
+            ordered_results[futures[future]] = future.result()
+
+    if any(result is None for result in ordered_results):
+        raise AssertionError("Parallel formatting completed without producing a result for every selected file")
+    return [result for result in ordered_results if result is not None]
 
 
 def load_settings(args: argparse.Namespace) -> CheckRunContext | None:

@@ -3,16 +3,21 @@ import contextlib
 import json
 import os
 import subprocess
+import sys
 import tempfile
 import unittest
 import unittest.mock
 from io import StringIO
 from pathlib import Path
-from typing import Callable, TextIO
+from typing import Callable, TextIO, cast
 
+import pydocformatter.cli.check as check_command
 import pydocformatter.cli.main as pydocfmt_cli
 import pydocformatter.cli.settings_check as settings_check
+import pydocformatter.file_selection as file_selection
 import pydocformatter.legacy.pydocfmt as pydocfmt
+import pydocformatter.rules_selection as rules_selection
+import pydocformatter.settings as settings_core
 from pydocformatter.cli.settings_check import CheckSettings
 from pydocformatter.formatter import FormatterResult
 from pydocformatter.rules.codes import RuleCode
@@ -34,6 +39,11 @@ PCF001_RULE = RuleMetadata(
 
 
 class TestCLIShowFiles(unittest.TestCase):
+    @staticmethod
+    def _profile(settings: CheckSettings) -> settings_core.SettingsProfile[CheckSettings]:
+        """Return a minimal settings profile for CLI orchestration tests."""
+        return settings_core.SettingsProfile(settings=settings, field_bases={}, field_priorities={})
+
     @staticmethod
     def _make_sample_tree() -> tempfile.TemporaryDirectory[str]:
         """Create a temporary tree with included, ignored, and non-Python files."""
@@ -129,7 +139,7 @@ class TestCLIShowFiles(unittest.TestCase):
             previous_cwd = os.getcwd()
             os.chdir(root)
             try:
-                argv = ["pydocfmt", "check", "--legacy", "--fix", "--no-respect-gitignore"]
+                argv = ["pydocfmt", "check", "--legacy", "--fix", "--no-respect-gitignore", "--parallelism", "1"]
                 with (
                     unittest.mock.patch("sys.argv", argv),
                     unittest.mock.patch(
@@ -1560,6 +1570,180 @@ class TestCLIShowFiles(unittest.TestCase):
             self.assertIn("-x = 1", output)
             self.assertIn("+x = 2", output)
             self.assertNotIn("PDF110", output)
+
+    def test_parallelism_resolution_uses_cpu_count(self) -> None:
+        with unittest.mock.patch("pydocformatter.cli.check.os.cpu_count", return_value=8):
+            self.assertEqual(check_command.resolve_parallelism(0.0), 8)
+            self.assertEqual(check_command.resolve_parallelism(0.25), 2)
+            self.assertEqual(check_command.resolve_parallelism(2.0), 2)
+
+    def test_parallelism_resolution_rejects_non_whole_values_above_one(self) -> None:
+        with self.assertRaisesRegex(settings_core.SettingsError, "whole number"):
+            check_command.resolve_parallelism(1.5)
+
+    def test_format_selected_files_caps_windows_workers_at_process_pool_limit(self) -> None:
+        profile = self._profile(CheckSettings(parallelism=0.0))
+        selected_files = tuple(file_selection.SelectedFile(path=f"{index}.py", profile=profile) for index in range(62))
+        rule_selections = {profile.key(): rules_selection.select_rules(profile.settings, profile=profile)}
+        created_max_workers: list[int | None] = []
+
+        class FakeFuture:
+            def __init__(self, result: FormatterResult) -> None:
+                self._result = result
+
+            def result(self) -> FormatterResult:
+                return self._result
+
+        class FakeExecutor:
+            def __init__(self, max_workers: int | None = None) -> None:
+                created_max_workers.append(max_workers)
+
+            def __enter__(self) -> "FakeExecutor":
+                return self
+
+            def __exit__(self, *args: object) -> None:
+                return None
+
+            def submit(self, fn: object, selected_file: file_selection.SelectedFile, **kwargs: object) -> FakeFuture:
+                del fn, kwargs
+                return FakeFuture(FormatterResult(path=selected_file.path, old_source="", new_source="", modified=False, fixed_findings=collections.Counter(), unfixed_findings=(), errors=()))
+
+        with (
+            unittest.mock.patch("pydocformatter.cli.check.os.cpu_count", return_value=128),
+            unittest.mock.patch("pydocformatter.cli.check.sys.platform", "win32"),
+            unittest.mock.patch("pydocformatter.cli.check.concurrent.futures.as_completed", side_effect=lambda futures: tuple(futures)),
+        ):
+            check_command.format_selected_files(
+                selected_files,
+                rule_selections=rule_selections,
+                use_stdin=False,
+                fix=False,
+                write=True,
+                parallelism=0.0,
+                executor_factory=cast(check_command._ExecutorFactory, FakeExecutor),
+            )
+
+        self.assertEqual(created_max_workers, [61])
+
+    def test_format_selected_files_preserves_selected_order_when_parallel_results_complete_out_of_order(self) -> None:
+        profile = self._profile(CheckSettings(parallelism=2.0))
+        selected_files = (
+            file_selection.SelectedFile(path="a.py", profile=profile),
+            file_selection.SelectedFile(path="b.py", profile=profile),
+            file_selection.SelectedFile(path="c.py", profile=profile),
+        )
+        rule_selections = {profile.key(): rules_selection.select_rules(profile.settings, profile=profile)}
+        completion_order: list[str] = []
+
+        class FakeFuture:
+            def __init__(self, result: FormatterResult) -> None:
+                self._result = result
+
+            def result(self) -> FormatterResult:
+                completion_order.append(self._result.path)
+                return self._result
+
+        class FakeExecutor:
+            def __init__(self, max_workers: int | None = None) -> None:
+                self.max_workers = max_workers
+
+            def __enter__(self) -> "FakeExecutor":
+                return self
+
+            def __exit__(self, *args: object) -> None:
+                return None
+
+            def submit(self, fn: object, selected_file: file_selection.SelectedFile, **kwargs: object) -> FakeFuture:
+                del fn, kwargs
+                return FakeFuture(FormatterResult(path=selected_file.path, old_source="", new_source="", modified=False, fixed_findings=collections.Counter(), unfixed_findings=(), errors=()))
+
+        with unittest.mock.patch("pydocformatter.cli.check.concurrent.futures.as_completed", side_effect=lambda futures: reversed(tuple(futures))):
+            results = check_command.format_selected_files(
+                selected_files,
+                rule_selections=rule_selections,
+                use_stdin=False,
+                fix=False,
+                write=True,
+                parallelism=2.0,
+                executor_factory=cast(check_command._ExecutorFactory, FakeExecutor),
+            )
+
+        self.assertEqual(completion_order, ["c.py", "b.py", "a.py"])
+        self.assertEqual([result.path for result in results], ["a.py", "b.py", "c.py"])
+
+    def test_format_selected_files_runs_real_process_pool_for_disk_files(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            first = root / "a.py"
+            second = root / "b.py"
+            first.write_text("x = 1\n", encoding="utf-8")
+            second.write_text("y = 2\n", encoding="utf-8")
+            profile = self._profile(CheckSettings(parallelism=2.0))
+            selected_files = (
+                file_selection.SelectedFile(path=str(first), profile=profile),
+                file_selection.SelectedFile(path=str(second), profile=profile),
+            )
+            rule_selections = {profile.key(): rules_selection.select_rules(profile.settings, profile=profile)}
+
+            results = check_command.format_selected_files(
+                selected_files,
+                rule_selections=rule_selections,
+                use_stdin=False,
+                fix=False,
+                write=True,
+                parallelism=2.0,
+            )
+
+        self.assertEqual([result.path for result in results], [str(first), str(second)])
+        self.assertEqual([result.errors for result in results], [(), ()])
+
+    def test_format_selected_files_keeps_single_disk_file_sequential(self) -> None:
+        profile = self._profile(CheckSettings(parallelism=2.0))
+        selected_files = (file_selection.SelectedFile(path="a.py", profile=profile),)
+        rule_selections = {profile.key(): rules_selection.select_rules(profile.settings, profile=profile)}
+
+        with (
+            unittest.mock.patch("pydocformatter.cli.check.concurrent.futures.ProcessPoolExecutor", side_effect=AssertionError("single file must not use executor")),
+            unittest.mock.patch(
+                "pydocformatter.formatter.format_file",
+                return_value=FormatterResult(path="a.py", old_source="", new_source="", modified=False, fixed_findings=collections.Counter(), unfixed_findings=(), errors=()),
+            ) as format_file,
+        ):
+            results = check_command.format_selected_files(
+                selected_files,
+                rule_selections=rule_selections,
+                use_stdin=False,
+                fix=False,
+                write=True,
+                parallelism=2.0,
+            )
+
+        self.assertEqual([result.path for result in results], ["a.py"])
+        format_file.assert_called_once()
+
+    def test_format_selected_files_keeps_stdin_sequential(self) -> None:
+        profile = self._profile(CheckSettings(parallelism=2.0))
+        selected_files = (file_selection.SelectedFile(path="-", profile=profile),)
+        rule_selections = {profile.key(): rules_selection.select_rules(profile.settings, profile=profile)}
+
+        with (
+            unittest.mock.patch("pydocformatter.cli.check.concurrent.futures.ProcessPoolExecutor", side_effect=AssertionError("stdin must not use executor")),
+            unittest.mock.patch(
+                "pydocformatter.formatter.format_file",
+                return_value=FormatterResult(path="-", old_source="", new_source="", modified=False, fixed_findings=collections.Counter(), unfixed_findings=(), errors=()),
+            ) as format_file,
+        ):
+            results = check_command.format_selected_files(
+                selected_files,
+                rule_selections=rule_selections,
+                use_stdin=True,
+                fix=False,
+                write=True,
+                parallelism=2.0,
+            )
+
+        self.assertEqual([result.path for result in results], ["-"])
+        self.assertIs(format_file.call_args.kwargs["file"], sys.stdin)
 
     def test_pydocfmt_diff_exit_zero_suppresses_diff_exit_status(self) -> None:
         with tempfile.TemporaryDirectory() as td:
