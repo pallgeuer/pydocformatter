@@ -57,6 +57,20 @@ def parent_metadata_resolves_for_format(source: str, *, settings: CheckSettings,
     return resolves, result
 
 
+def module_visit_counter(monkeypatch: pytest.MonkeyPatch) -> typing.Callable[[], int]:
+    visits = 0
+    original_visit = cst.Module.visit
+
+    def count_visit(module: cst.Module, visitor: cst.CSTVisitor) -> object:
+        nonlocal visits
+        visits += 1
+        return original_visit(module, visitor)
+
+    monkeypatch.setattr(cst.Module, "visit", count_visit)
+
+    return lambda: visits
+
+
 def test_prepare_classifies_comments_and_groups_only_eligible_standalone_blocks() -> None:
     source = "#!/usr/bin/env python\n# -*- coding: utf-8 -*-\n# first\n# second\n#\n# third\ndef f():\n    # inner first\n    # inner second\n    value = 1  # trailing\n# type: ignore\n# noqa\n"
     data = PCF.prepare(category_context(source))
@@ -94,6 +108,31 @@ def test_prepare_classifies_comments_and_groups_only_eligible_standalone_blocks(
     assert data.comments[2].raw_content == " first"
     assert data.comments[2].body == "first"
     assert data.source_for(data.standalone_runs[0].range) == "# first\n# second"
+
+
+def test_prepare_skips_module_visit_when_source_has_no_hash(monkeypatch: pytest.MonkeyPatch) -> None:
+    context = category_context("value = 1\n")
+    visits = module_visit_counter(monkeypatch)
+
+    data = PCF.prepare(context)
+
+    assert visits() == 0
+    assert data.source_lines is context.source_lines
+    assert data.comments == ()
+    assert data.standalone_runs == ()
+    assert data.trailing_comments == ()
+
+
+def test_prepare_keeps_conservative_visit_when_hash_appears_inside_string(monkeypatch: pytest.MonkeyPatch) -> None:
+    context = category_context('value = "# not a comment"\n')
+    visits = module_visit_counter(monkeypatch)
+
+    data = PCF.prepare(context)
+
+    assert visits() == 1
+    assert data.comments == ()
+    assert data.standalone_runs == ()
+    assert data.trailing_comments == ()
 
 
 def test_prepare_preserves_comment_order_with_crlf_source() -> None:

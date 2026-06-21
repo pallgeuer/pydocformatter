@@ -150,6 +150,13 @@ class PCF(RuleCategoryBase):
     def prepare(cls, context: RuleCategoryContext) -> PCFCategoryData:
         """Collect and classify comments for one module."""
         del cls
+        if "#" not in context.source:
+            return PCFCategoryData(
+                source_lines=context.source_lines,
+                comments=(),
+                standalone_runs=(),
+                trailing_comments=(),
+            )
         collector = _CommentCollector()
         context.module.visit(collector)
         syntax_sensitivity = _SyntaxSensitivity(context.metadata_wrapper)
