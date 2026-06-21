@@ -1,3 +1,4 @@
+import collections
 import tomllib
 
 import libcst as cst
@@ -76,6 +77,33 @@ def test_rule_markdown_clean_examples_have_no_hidden_fix_changes(rule_code: str,
         assert fixed_findings == (), f"{rule_code} example {index}: direct fix reported findings after a clean check"
         assert not source_changed, f"{rule_code} example {index}: direct fix changed source after a clean check"
         assert fixed_module.code == example.input_source, f"{rule_code} example {index}: direct fix returned different source after a clean check"
+
+
+@pytest.mark.parametrize(("rule_code", "rule_class"), _rule_cases())
+def test_rule_markdown_examples_account_for_initial_check_findings_after_fixing(rule_code: str, rule_class: type[object]) -> None:
+    """Documented examples must account for every initial check finding as fixed or still unfixed."""
+    markdown = rule_documentation.load_rule_explanation(rule_class)
+    examples = rule_documentation.parse_rule_markdown_examples(markdown, rule_code=rule_code)
+
+    for index, example in enumerate(examples, start=1):
+        _validate_rule_selection_settings(rule_code, index, example)
+        settings = _settings_for_example(rule_code, example)
+        selection = rules_selection.select_rules(settings)
+        assert selection.errors == (), f"{rule_code} example {index}: unexpected rule selection errors: {selection.errors}"
+
+        path = f"{rule_code}_example_{index}.py"
+        check_result = formatter.format_source(example.input_source, path, settings=settings, rule_selection=selection, fix=False)
+        assert check_result.errors == (), f"{rule_code} example {index}: unexpected check errors: {check_result.errors}"
+        initial_findings = check_result.unfixed_findings
+
+        line_ending = line_endings.resolve_line_ending(example.input_source, line_ending=settings.line_ending)
+        module = cst.parse_module(example.input_source)
+        fixed_result = rule_runner.run_rules(module, path=path, settings=settings, line_ending=line_ending, rule_selection=selection, fix=True, source=example.input_source)
+
+        assert fixed_result.errors == (), f"{rule_code} example {index}: unexpected fix errors: {fixed_result.errors}"
+        initial_finding_counts = collections.Counter(_finding_correspondence_key(initial_findings))
+        accounted_finding_counts = collections.Counter(_finding_correspondence_key(fixed_result.fixed_findings + fixed_result.unfixed_findings))
+        assert initial_finding_counts == accounted_finding_counts, f"{rule_code} example {index}: initial check findings were not accounted for as fixed or still unfixed"
 
 
 def test_parse_rule_markdown_examples_preserves_nested_shorter_fences() -> None:
@@ -288,3 +316,8 @@ def _settings_for_example(rule_code: str, example: rule_documentation.RuleMarkdo
 def _finding_key(findings: tuple[rule_models.RuleFinding, ...]) -> tuple[tuple[RuleCode, tuple[int, ...], str], ...]:
     """Return the comparable shape for formatter findings."""
     return tuple((finding.rule.code, finding.line_numbers, finding.message) for finding in findings)
+
+
+def _finding_correspondence_key(findings: tuple[rule_models.RuleFinding, ...]) -> tuple[tuple[RuleCode, tuple[int, ...], bool], ...]:
+    """Return the comparable shape for check/fix correspondence."""
+    return tuple((finding.rule.code, finding.line_numbers, finding.fixable) for finding in findings)

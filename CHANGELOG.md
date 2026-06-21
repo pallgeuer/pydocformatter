@@ -92,6 +92,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added pytest coverage that checks Git-tracked Markdown pipe tables for padded cell widths and separator alignment.
   - Changed Markdown pipe table checks to enforce PyCharm-style separator rows without outer padding.
   - Added pytest coverage that executes structured examples from built-in rule Markdown documentation.
+  - Added pytest coverage that check/fix findings for structured rule Markdown examples stay in correspondence.
   - Added exact diagnostic message checks to structured rule Markdown examples.
   - Added validation that structured rule Markdown examples use `[output=unchanged]` when the documented output is identical to the input.
   - Added validation that built-in rule Markdown documentation includes every template section, including empty `Options` sections.
