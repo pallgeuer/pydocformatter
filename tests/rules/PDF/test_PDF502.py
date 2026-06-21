@@ -70,6 +70,12 @@ def test_singular_google_return_section_satisfies_meaningful_return() -> None:
     assert_pdf502_lines(source, ())
 
 
+def test_mixed_case_singular_google_return_section_satisfies_meaningful_return() -> None:
+    source = 'def function():\n    """Return a value.\n\n    rETurn:\n        int: Value.\n    """\n    return 1\n'
+
+    assert_pdf502_lines(source, ())
+
+
 def test_google_bare_none_return_entry_satisfies_meaningful_return() -> None:
     none_plain = 'def function():\n    """Return a value.\n\n    Returns:\n        None\n    """\n    return 1\n'
     none_period = 'def function():\n    """Return a value.\n\n    Returns:\n        None.\n    """\n    return 1\n'

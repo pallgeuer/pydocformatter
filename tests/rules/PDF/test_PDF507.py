@@ -59,6 +59,12 @@ def test_allows_singular_google_raise_section_matching_direct_raise() -> None:
     assert_pdf507_lines(source, ())
 
 
+def test_reports_mixed_case_singular_google_raise_section_for_stale_exception() -> None:
+    source = 'def function():\n    """Validate.\n\n    rAIse:\n        ValueError: Bad value.\n    """\n'
+
+    assert_pdf507_lines(source, ((5,),))
+
+
 def test_one_google_entry_can_document_multiple_directly_raised_exceptions() -> None:
     source = 'def function(flag):\n    """Validate.\n\n    Raises:\n        ValueError, TypeError: Bad value.\n    """\n    if flag:\n        raise ValueError("bad")\n    raise TypeError("bad")\n'
 

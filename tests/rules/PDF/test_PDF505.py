@@ -52,6 +52,12 @@ def test_reports_yield_section_for_bare_yield() -> None:
     assert_pdf505_lines(source, ((4,),))
 
 
+def test_reports_mixed_case_singular_google_yield_section_for_function_without_yield() -> None:
+    source = 'def function():\n    """Do work.\n\n    yIELD:\n        int: Value.\n    """\n    return 1\n'
+
+    assert_pdf505_lines(source, ((4,),))
+
+
 def test_reports_yield_section_when_only_lambda_yields() -> None:
     source = 'def function():\n    """Create a generator callback.\n\n    Yields:\n        int: Value.\n    """\n    callback = lambda: (yield 1)\n    return callback\n'
 

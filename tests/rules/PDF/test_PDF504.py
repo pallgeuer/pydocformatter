@@ -58,6 +58,12 @@ def test_google_numpy_and_rest_yield_documentation_satisfy_meaningful_yield() ->
     assert_pdf504_lines(rest, (), settings=CheckSettings(select=("PDF504",), docstring_convention=DocstringConvention.REST))
 
 
+def test_mixed_case_singular_google_yield_section_satisfies_meaningful_yield() -> None:
+    source = 'def function():\n    """Generate values.\n\n    yIELD:\n        int: Value.\n    """\n    yield 1\n'
+
+    assert_pdf504_lines(source, ())
+
+
 def test_google_bare_none_yield_entry_satisfies_meaningful_yield() -> None:
     none_plain = 'def function():\n    """Generate values.\n\n    Yields:\n        None\n    """\n    yield 1\n'
     none_period = 'def function():\n    """Generate values.\n\n    Yields:\n        None.\n    """\n    yield 1\n'

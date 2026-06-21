@@ -54,6 +54,12 @@ def test_singular_google_raise_section_satisfies_direct_raise() -> None:
     assert_pdf506_lines(source, ())
 
 
+def test_mixed_case_singular_google_raise_section_satisfies_direct_raise() -> None:
+    source = 'def function():\n    """Validate.\n\n    rAIse:\n        ValueError: Bad value.\n    """\n    raise ValueError("bad")\n'
+
+    assert_pdf506_lines(source, ())
+
+
 def test_rest_exception_field_aliases_satisfy_direct_raises() -> None:
     source = 'def function(flag):\n    """Validate.\n\n    :except ValueError: Bad value.\n    :exception TypeError: Bad type.\n    """\n    if flag:\n        raise ValueError("bad")\n    raise TypeError("bad")\n'
 

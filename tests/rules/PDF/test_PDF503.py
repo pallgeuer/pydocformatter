@@ -46,6 +46,12 @@ def test_reports_return_section_for_bare_return() -> None:
     assert_pdf503_lines(source, ((4,),))
 
 
+def test_reports_mixed_case_singular_google_return_section_for_function_without_return() -> None:
+    source = 'def function():\n    """Do work.\n\n    rETurn:\n        int: Value.\n    """\n'
+
+    assert_pdf503_lines(source, ((4,),))
+
+
 def test_reports_empty_return_section_and_rest_field() -> None:
     source = 'def section():\n    """Do work.\n\n    Returns:\n    """\n\n\ndef field():\n    """Do work.\n\n    :returns: Value.\n    """\n'
     result = format_source(source, settings=CheckSettings(select=("PDF503",), docstring_convention=DocstringConvention.REST))
