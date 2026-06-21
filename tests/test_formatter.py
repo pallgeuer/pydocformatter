@@ -11,6 +11,7 @@ from io import StringIO
 from pathlib import Path
 
 import libcst as cst
+import libcst.metadata as cst_metadata
 
 import pydocformatter.cli.check as check_command
 import pydocformatter.cli.main as pydocfmt_cli
@@ -492,6 +493,307 @@ class TestFormatterResults(unittest.TestCase):
         self.assertIsNot(replacement_modules[0], module)
         self.assertGreaterEqual(len(code_accesses), 1)
         self.assertTrue(any(accessed_module is replacement_modules[0] for accessed_module in code_accesses))
+
+    def test_rule_check_pass_reuses_position_metadata_across_categories(self) -> None:
+        observed_contexts: list[tuple[cst.Module, cst_metadata.MetadataWrapper, object, str, tuple[str, ...]]] = []
+        resolved_modules: list[cst.Module] = []
+        original_resolve = cst_metadata.MetadataWrapper.resolve
+
+        def _count_position_resolve(wrapper: cst_metadata.MetadataWrapper, provider: object) -> object:
+            if provider is cst_metadata.PositionProvider:
+                resolved_modules.append(wrapper.module)
+            return typing.cast("typing.Any", original_resolve)(wrapper, provider)
+
+        class TST(rule_base.RuleCategoryBase):
+            meta = rule_models.RuleCategoryMetadata(prefix="TST", name="test", url=None)
+
+            @classmethod
+            def prepare(cls, context: rule_base.RuleCategoryContext) -> object:
+                del cls
+                observed_contexts.append((context.module, context.metadata_wrapper, context.positions, context.source, context.source_lines))
+                return None
+
+        @rule_registration.register_rule_to(TST)
+        class TST001Noop(rule_base.RuleBase):
+            meta = rule_models.RuleMetadata(
+                code=rule_codes.RuleCode("TST001"),
+                name="noop",
+                message="Noop",
+                fix_availability=rule_models.FixAvailability.NEVER,
+                stable_since="1.0.0",
+                setting_effects=(),
+                incompatible_with=(),
+            )
+
+        class TSW(rule_base.RuleCategoryBase):
+            meta = rule_models.RuleCategoryMetadata(prefix="TSW", name="test two", url=None)
+
+            @classmethod
+            def prepare(cls, context: rule_base.RuleCategoryContext) -> object:
+                del cls
+                observed_contexts.append((context.module, context.metadata_wrapper, context.positions, context.source, context.source_lines))
+                return None
+
+        @rule_registration.register_rule_to(TSW)
+        class TSW001Noop(rule_base.RuleBase):
+            meta = rule_models.RuleMetadata(
+                code=rule_codes.RuleCode("TSW001"),
+                name="noop",
+                message="Noop",
+                fix_availability=rule_models.FixAvailability.NEVER,
+                stable_since="1.0.0",
+                setting_effects=(),
+                incompatible_with=(),
+            )
+
+        module = cst.parse_module("x = 1\n")
+        settings = CheckSettings()
+        selection = isolated_rule_selection(TST, TSW)
+        selected_rule_by_code = {selected_rule.rule.code: selected_rule for selected_rule in selection.for_path("a.py")}
+        errors: list[str] = []
+
+        with unittest.mock.patch.object(cst_metadata.MetadataWrapper, "resolve", autospec=True, side_effect=_count_position_resolve):
+            findings = rule_runner._run_check_pass(module, path="a.py", settings=settings, line_ending="\n", rule_selection=selection, selected_rule_by_code=selected_rule_by_code, errors=errors)
+
+        self.assertEqual(findings, ())
+        self.assertEqual(errors, [])
+        self.assertEqual(resolved_modules, [module])
+        self.assertEqual(len(observed_contexts), 2)
+        self.assertIs(observed_contexts[0][0], module)
+        self.assertIs(observed_contexts[1][0], module)
+        self.assertIs(observed_contexts[0][1], observed_contexts[1][1])
+        self.assertIs(observed_contexts[0][2], observed_contexts[1][2])
+        self.assertEqual(observed_contexts[0][3], "x = 1\n")
+        self.assertIs(observed_contexts[0][4], observed_contexts[1][4])
+
+    def test_rule_check_pass_reports_position_metadata_errors_as_category_preparation(self) -> None:
+        def _raise_position_resolve(wrapper: cst_metadata.MetadataWrapper, provider: object) -> object:
+            del wrapper
+            if provider is cst_metadata.PositionProvider:
+                raise RuntimeError("position metadata failed")
+            return {}
+
+        class TST(rule_base.RuleCategoryBase):
+            meta = rule_models.RuleCategoryMetadata(prefix="TST", name="test", url=None)
+
+        @rule_registration.register_rule_to(TST)
+        class TST001Noop(rule_base.RuleBase):
+            meta = rule_models.RuleMetadata(
+                code=rule_codes.RuleCode("TST001"),
+                name="noop",
+                message="Noop",
+                fix_availability=rule_models.FixAvailability.NEVER,
+                stable_since="1.0.0",
+                setting_effects=(),
+                incompatible_with=(),
+            )
+
+        module = cst.parse_module("x = 1\n")
+        settings = CheckSettings()
+        selection = isolated_rule_selection(TST)
+        selected_rule_by_code = {selected_rule.rule.code: selected_rule for selected_rule in selection.for_path("a.py")}
+        errors: list[str] = []
+
+        with unittest.mock.patch.object(cst_metadata.MetadataWrapper, "resolve", autospec=True, side_effect=_raise_position_resolve):
+            findings = rule_runner._run_check_pass(module, path="a.py", settings=settings, line_ending="\n", rule_selection=selection, selected_rule_by_code=selected_rule_by_code, errors=errors)
+
+        self.assertEqual(findings, ())
+        self.assertEqual(errors, ["a.py: TST category preparation failed: position metadata failed"])
+
+    def test_rule_fix_pass_reuses_position_metadata_across_unchanged_categories(self) -> None:
+        observed_contexts: list[tuple[cst_metadata.MetadataWrapper, object]] = []
+        resolved_modules: list[cst.Module] = []
+        original_resolve = cst_metadata.MetadataWrapper.resolve
+
+        def _count_position_resolve(wrapper: cst_metadata.MetadataWrapper, provider: object) -> object:
+            if provider is cst_metadata.PositionProvider:
+                resolved_modules.append(wrapper.module)
+            return typing.cast("typing.Any", original_resolve)(wrapper, provider)
+
+        class TST(rule_base.RuleCategoryBase):
+            meta = rule_models.RuleCategoryMetadata(prefix="TST", name="test", url=None)
+
+            @classmethod
+            def prepare(cls, context: rule_base.RuleCategoryContext) -> object:
+                del cls
+                observed_contexts.append((context.metadata_wrapper, context.positions))
+                return None
+
+        @rule_registration.register_rule_to(TST)
+        class TST001Noop(rule_base.RuleBase):
+            meta = rule_models.RuleMetadata(
+                code=rule_codes.RuleCode("TST001"),
+                name="noop",
+                message="Noop",
+                fix_availability=rule_models.FixAvailability.ALWAYS,
+                stable_since="1.0.0",
+                setting_effects=(),
+                incompatible_with=(),
+            )
+
+        class TSW(rule_base.RuleCategoryBase):
+            meta = rule_models.RuleCategoryMetadata(prefix="TSW", name="test two", url=None)
+
+            @classmethod
+            def prepare(cls, context: rule_base.RuleCategoryContext) -> object:
+                del cls
+                observed_contexts.append((context.metadata_wrapper, context.positions))
+                return None
+
+        @rule_registration.register_rule_to(TSW)
+        class TSW001Noop(rule_base.RuleBase):
+            meta = rule_models.RuleMetadata(
+                code=rule_codes.RuleCode("TSW001"),
+                name="noop",
+                message="Noop",
+                fix_availability=rule_models.FixAvailability.ALWAYS,
+                stable_since="1.0.0",
+                setting_effects=(),
+                incompatible_with=(),
+            )
+
+        module = cst.parse_module("x = 1\n")
+        settings = CheckSettings()
+        selection = isolated_rule_selection(TST, TSW)
+        selected_rule_by_code = {selected_rule.rule.code: selected_rule for selected_rule in selection.for_path("a.py")}
+        errors: list[str] = []
+
+        with unittest.mock.patch.object(cst_metadata.MetadataWrapper, "resolve", autospec=True, side_effect=_count_position_resolve):
+            result_module, findings, changed = rule_runner._run_fix_pass(
+                module, path="a.py", settings=settings, line_ending="\n", rule_selection=selection, selected_rule_by_code=selected_rule_by_code, errors=errors
+            )
+
+        self.assertIs(result_module, module)
+        self.assertEqual(findings, ())
+        self.assertFalse(changed)
+        self.assertEqual(errors, [])
+        self.assertEqual(resolved_modules, [module])
+        self.assertEqual(len(observed_contexts), 2)
+        self.assertIs(observed_contexts[0][0], observed_contexts[1][0])
+        self.assertIs(observed_contexts[0][1], observed_contexts[1][1])
+
+    def test_rule_fix_pass_reports_position_metadata_errors_as_category_preparation(self) -> None:
+        def _raise_position_resolve(wrapper: cst_metadata.MetadataWrapper, provider: object) -> object:
+            del wrapper
+            if provider is cst_metadata.PositionProvider:
+                raise RuntimeError("position metadata failed")
+            return {}
+
+        class TST(rule_base.RuleCategoryBase):
+            meta = rule_models.RuleCategoryMetadata(prefix="TST", name="test", url=None)
+
+        @rule_registration.register_rule_to(TST)
+        class TST001Noop(rule_base.RuleBase):
+            meta = rule_models.RuleMetadata(
+                code=rule_codes.RuleCode("TST001"),
+                name="noop",
+                message="Noop",
+                fix_availability=rule_models.FixAvailability.ALWAYS,
+                stable_since="1.0.0",
+                setting_effects=(),
+                incompatible_with=(),
+            )
+
+        module = cst.parse_module("x = 1\n")
+        settings = CheckSettings()
+        selection = isolated_rule_selection(TST)
+        selected_rule_by_code = {selected_rule.rule.code: selected_rule for selected_rule in selection.for_path("a.py")}
+        errors: list[str] = []
+
+        with unittest.mock.patch.object(cst_metadata.MetadataWrapper, "resolve", autospec=True, side_effect=_raise_position_resolve):
+            result_module, findings, changed = rule_runner._run_fix_pass(
+                module, path="a.py", settings=settings, line_ending="\n", rule_selection=selection, selected_rule_by_code=selected_rule_by_code, errors=errors
+            )
+
+        self.assertIs(result_module, module)
+        self.assertEqual(findings, ())
+        self.assertFalse(changed)
+        self.assertEqual(errors, ["a.py: TST category preparation failed: position metadata failed"])
+
+    def test_rule_fix_pass_refreshes_position_metadata_after_changed_module(self) -> None:
+        observed_sources: list[str] = []
+        observed_line_numbers: list[tuple[int, ...]] = []
+        resolved_modules: list[cst.Module] = []
+        original_resolve = cst_metadata.MetadataWrapper.resolve
+
+        def _count_position_resolve(wrapper: cst_metadata.MetadataWrapper, provider: object) -> object:
+            if provider is cst_metadata.PositionProvider:
+                resolved_modules.append(wrapper.module)
+            return typing.cast("typing.Any", original_resolve)(wrapper, provider)
+
+        class TST(rule_base.RuleCategoryBase):
+            meta = rule_models.RuleCategoryMetadata(prefix="TST", name="test", url=None)
+
+        @rule_registration.register_rule_to(TST)
+        class TST001InsertLeadingLine(rule_base.RuleBase):
+            meta = rule_models.RuleMetadata(
+                code=rule_codes.RuleCode("TST001"),
+                name="insert-leading-line",
+                message="Insert leading line",
+                fix_availability=rule_models.FixAvailability.ALWAYS,
+                stable_since="1.0.0",
+                setting_effects=(),
+                incompatible_with=(),
+            )
+
+            @classmethod
+            def fix(cls, context: rule_base.RuleContext) -> rule_base.RuleFixResult:
+                return rule_base.RuleFixResult(module=context.module.with_changes(header=(cst.EmptyLine(),)), fixed_findings=(rule_models.RuleFinding(rule=cls.meta, line_numbers=(1,)),))
+
+        class TSW(rule_base.RuleCategoryBase):
+            meta = rule_models.RuleCategoryMetadata(prefix="TSW", name="test two", url=None)
+
+            @classmethod
+            def prepare(cls, context: rule_base.RuleCategoryContext) -> object:
+                del cls
+                collector = _NameCollector("x")
+                context.module.visit(collector)
+                observed_sources.append(context.source)
+                observed_line_numbers.append(tuple(context.positions[node].start.line for node in collector.nodes))
+                return None
+
+        @rule_registration.register_rule_to(TSW)
+        class TSW001Noop(rule_base.RuleBase):
+            meta = rule_models.RuleMetadata(
+                code=rule_codes.RuleCode("TSW001"),
+                name="noop",
+                message="Noop",
+                fix_availability=rule_models.FixAvailability.ALWAYS,
+                stable_since="1.0.0",
+                setting_effects=(),
+                incompatible_with=(),
+            )
+
+        class _NameCollector(cst.CSTVisitor):
+            def __init__(self, name: str) -> None:
+                super().__init__()
+                self.name = name
+                self.nodes: list[cst.Name] = []
+
+            def visit_Name(self, node: cst.Name) -> None:
+                if node.value == self.name:
+                    self.nodes.append(node)
+
+        module = cst.parse_module("x = 1\n")
+        settings = CheckSettings()
+        selection = isolated_rule_selection(TST, TSW)
+        selected_rule_by_code = {selected_rule.rule.code: selected_rule for selected_rule in selection.for_path("a.py")}
+        errors: list[str] = []
+
+        with unittest.mock.patch.object(cst_metadata.MetadataWrapper, "resolve", autospec=True, side_effect=_count_position_resolve):
+            result_module, findings, changed = rule_runner._run_fix_pass(
+                module, path="a.py", settings=settings, line_ending="\n", rule_selection=selection, selected_rule_by_code=selected_rule_by_code, errors=errors
+            )
+
+        self.assertEqual(result_module.code, "\nx = 1\n")
+        self.assertEqual(findings, (RuleFinding(rule=TST001InsertLeadingLine.meta, line_numbers=(1,)),))
+        self.assertTrue(changed)
+        self.assertEqual(errors, [])
+        self.assertEqual(len(resolved_modules), 2)
+        self.assertIs(resolved_modules[0], module)
+        self.assertIs(resolved_modules[1], result_module)
+        self.assertEqual(observed_sources, ["\nx = 1\n"])
+        self.assertEqual(observed_line_numbers, [(2,)])
 
     def test_rule_source_formatter_runs_fixes_to_convergence_and_checks_latest_positions(self) -> None:
         prepare_sources: list[str] = []

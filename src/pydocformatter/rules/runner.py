@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import collections
 import dataclasses
+from collections.abc import Mapping
 
 import libcst as cst
 import libcst.metadata as cst_metadata
@@ -33,6 +34,17 @@ class _PreparedCategory:
 
     context: RuleCategoryContext
     data: object | None
+
+
+@dataclasses.dataclass(frozen=True)
+class _ModulePassContext:
+    """Shared source and metadata for one module state."""
+
+    module: cst.Module
+    metadata_wrapper: cst_metadata.MetadataWrapper
+    positions: Mapping[cst.CSTNode, cst_metadata.CodeRange]
+    source: str
+    source_lines: tuple[str, ...]
 
 
 def run_rules(
@@ -107,6 +119,7 @@ def _run_fix_pass(
     """Run one ordered pass of effectively fixable rules."""
     pass_findings: list[RuleFinding] = []
     changed = False
+    pass_context: _ModulePassContext | None = None
     for category_class in rule_selection.collection.categories:
         category_rules = tuple(
             (rule_class, selected_rule_by_code[rule_class.meta.code])
@@ -115,12 +128,12 @@ def _run_fix_pass(
         )
         if not category_rules:
             continue
-        prepared_category = _prepare_category(category_class, module, path=path, settings=settings, line_ending=line_ending, errors=errors)
+        prepared_category, pass_context = _prepare_category(category_class, module, pass_context, path=path, settings=settings, line_ending=line_ending, errors=errors)
         if prepared_category is None:
             continue
         for rule_class, selected_rule in category_rules:
             if prepared_category.context.module is not module:
-                prepared_category = _prepare_category(category_class, module, path=path, settings=settings, line_ending=line_ending, errors=errors)
+                prepared_category, pass_context = _prepare_category(category_class, module, pass_context, path=path, settings=settings, line_ending=line_ending, errors=errors)
                 if prepared_category is None:
                     break
             try:
@@ -149,6 +162,7 @@ def _run_fix_pass(
                 continue
             if result_changed:
                 module = fix_result.module
+                pass_context = None
                 pass_findings.extend(result_findings)
                 changed = True
     return module, tuple(pass_findings), changed
@@ -166,11 +180,12 @@ def _run_check_pass(
 ) -> tuple[RuleFinding, ...]:
     """Run one ordered read-only pass of all selected rules."""
     findings: list[RuleFinding] = []
+    pass_context: _ModulePassContext | None = None
     for category_class in rule_selection.collection.categories:
         category_rules = tuple((rule_class, selected_rule_by_code[rule_class.meta.code]) for rule_class in category_class.ordered_rules() if rule_class.meta.code in selected_rule_by_code)
         if not category_rules:
             continue
-        prepared_category = _prepare_category(category_class, module, path=path, settings=settings, line_ending=line_ending, errors=errors)
+        prepared_category, pass_context = _prepare_category(category_class, module, pass_context, path=path, settings=settings, line_ending=line_ending, errors=errors)
         if prepared_category is None:
             continue
         for rule_class, selected_rule in category_rules:
@@ -185,30 +200,54 @@ def _run_check_pass(
     return tuple(findings)
 
 
-def _prepare_category(category_class: type[RuleCategoryBase], module: cst.Module, *, path: str, settings: CheckSettings, line_ending: str, errors: list[str]) -> _PreparedCategory | None:
+def _prepare_category(
+    category_class: type[RuleCategoryBase],
+    module: cst.Module,
+    pass_context: _ModulePassContext | None,
+    *,
+    path: str,
+    settings: CheckSettings,
+    line_ending: str,
+    errors: list[str],
+) -> tuple[_PreparedCategory | None, _ModulePassContext | None]:
     """Run one category preprocessor and return its shared data."""
+    current_pass_context: _ModulePassContext | None = None
     try:
-        context = _category_context(module, path=path, settings=settings, line_ending=line_ending)
-        return _PreparedCategory(context=context, data=category_class.prepare(context))
+        current_pass_context = _pass_context_for(module, pass_context)
+        context = _category_context(current_pass_context, path=path, settings=settings, line_ending=line_ending)
+        return _PreparedCategory(context=context, data=category_class.prepare(context)), current_pass_context
     except Exception as error:
         errors.append(f"{path}: {category_class.meta.prefix} category preparation failed: {error}")
-        return None
+        return None, current_pass_context
 
 
-def _category_context(module: cst.Module, *, path: str, settings: CheckSettings, line_ending: str) -> RuleCategoryContext:
-    """Build a category context and resolve source positions for its current module."""
+def _pass_context_for(module: cst.Module, pass_context: _ModulePassContext | None) -> _ModulePassContext:
+    """Return shared source and metadata for the current module state."""
+    if pass_context is not None and pass_context.module is module:
+        return pass_context
     source = module.code
     metadata_wrapper = cst_metadata.MetadataWrapper(module, unsafe_skip_copy=True)
     positions = metadata_wrapper.resolve(cst_metadata.PositionProvider)
-    return RuleCategoryContext(
-        path=path,
-        settings=settings,
+    return _ModulePassContext(
         module=module,
         metadata_wrapper=metadata_wrapper,
         positions=positions,
-        line_ending=line_ending,
         source=source,
         source_lines=tuple(source_text.source_lines(source)),
+    )
+
+
+def _category_context(pass_context: _ModulePassContext, *, path: str, settings: CheckSettings, line_ending: str) -> RuleCategoryContext:
+    """Build a category context from shared source and metadata."""
+    return RuleCategoryContext(
+        path=path,
+        settings=settings,
+        module=pass_context.module,
+        metadata_wrapper=pass_context.metadata_wrapper,
+        positions=pass_context.positions,
+        line_ending=line_ending,
+        source=pass_context.source,
+        source_lines=pass_context.source_lines,
     )
 
 

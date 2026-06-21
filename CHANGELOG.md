@@ -71,6 +71,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added independent comment-formatting settings for standalone paragraph joining, list items, headings, doctests, code fences, block quotes, tables, reStructuredText directives, and disabled-code detection.
 
 - **Documentation:**
+  - Added a test-performance audit plan for finding coverage-preserving speedups across the complete test set, fixtures, helpers, and testing approaches.
   - Added a Ruff file-selection compatibility specification at `docs/file_selection_spec.md`, including exact defaults, precedence rules, force-exclude behavior, config-relative glob bases, and explicit pydocformatter deviations.
   - Added a rule-selection specification at `docs/rule_selection_spec.md`, covering rule collection, selectors, fixability, and rule explanation output.
   - Added adjacent Markdown documentation for all built-in pydocformatter rules, including Ruff compatibility notes where relevant.
@@ -116,6 +117,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 - **Developer workflow:**
   - Cached rule-context source text and source lines per module state to reduce repeated LibCST source regeneration during no-legacy checks.
   - Skipped fix-mode LibCST source comparison for same-module no-op fixes.
+  - Shared LibCST position metadata across selected rule categories for each module state.
   - Renamed selected built-in rule names, rule definition files, and rule classes for clearer public metadata while keeping rule codes and selection behavior unchanged.
   - Reorganized rule helper modules so whole-rule logic lives in individual rule files while shared helper modules contain reusable source, layout, decorator, section-edit, and reStructuredText field primitives.
   - Moved reusable docstring section and reStructuredText field metadata out of `PDF.py` into a focused helper module used by the parser, section rules, and documentation helpers.
