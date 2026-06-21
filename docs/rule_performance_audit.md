@@ -1,6 +1,6 @@
 # Rule Performance Audit
 
-Date: 21/06/2026
+Rule inventory up-to-date commit: `1770d287742708de7f710f81535e37c316e8255e`
 
 This plan is a ready-to-use tracking ledger for a future audit of every rule category and rule implementation for unnecessarily or avoidably slow code. The audit must combine performance evidence with code analysis and must not introduce externally visible behavior changes. If an optimization would require treating current behavior as a bug, record it as a user-confirmation item before any implementation work.
 
@@ -9,7 +9,7 @@ This plan is a ready-to-use tracking ledger for a future audit of every rule cat
 Paste this command into Codex when you want the audit to start:
 
 ```text
-/goal Audit every pydocformatter rule category and rule implementation for unnecessarily or avoidably slow code. Measure or otherwise characterize performance, analyze the implementation code for behavior-preserving speedups, and maintain docs/rule_performance_audit.md continuously as the source of truth. Do not implement fixes during the audit unless I explicitly ask for an implementation pass. Do not recommend externally visible behavior changes unless they are confirmed bugs; if an apparent speedup depends on changing behavior, record the bug-versus-intended-behavior question in the plan and ask me to confirm before treating it as an optimization. The goal is complete only when every category and every rule row in the plan has performance evidence, code-analysis notes, potential speedup classification, and any detailed findings or no-finding rationale recorded.
+/goal Audit every pydocformatter rule category and rule implementation for unnecessarily or avoidably slow code. First update every inventory table in docs/rule_performance_audit.md from the latest Git-tracked rule category and rule implementation files, because rules may have been added, removed, renamed, or substantially changed since the rule inventory up-to-date commit recorded at the top of the file. Then measure or otherwise characterize performance, analyze the implementation code for behavior-preserving speedups, and maintain docs/rule_performance_audit.md continuously as the source of truth. Do not implement fixes during the audit unless I explicitly ask for an implementation pass. Do not recommend externally visible behavior changes unless they are confirmed bugs; if an apparent speedup depends on changing behavior, record the bug-versus-intended-behavior question in the plan and ask me to confirm before treating it as an optimization. The goal is complete only when every category and every rule row in the plan has performance evidence, code-analysis notes, potential speedup classification, and any detailed findings or no-finding rationale recorded.
 ```
 
 ## Scope
