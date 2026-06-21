@@ -2,7 +2,7 @@
 
 Fix is not available.
 
-Rule is ignored if `docstring-convention` is `numpy` or `pep257`.
+Rule is ignored if `docstring-convention` is `none`, `numpy`, or `pep257`.
 
 ## What it does
 Checks that function signature parameters are documented in parsed docstring parameter documentation.
@@ -263,6 +263,6 @@ class Builder:
 ```
 
 ## Options
-- `docstring-convention`: Controls whether Google parameter sections, NumPy parameter sections, or reST parameter fields are parsed. With `none` and `pep257`, convention syntax is ordinary content.
+- `docstring-convention`: Controls whether Google parameter sections, NumPy parameter sections, or reST parameter fields are parsed. `none`, `numpy`, and `pep257` ignore this rule by default; exact selection remains inert for `none` and `pep257`.
 - `docstring-missing-documentation`: Controls when PDF500 is active. `has-section` reports only docstrings with recognized parameter documentation. `non-summary-docstrings` additionally reports public docstrings with more than just a summary. `all-docstrings` additionally reports all public docstrings.
 - `docstring-missing-documentation-public-only`: When `true`, the broad parts of `non-summary-docstrings` and `all-docstrings` apply only to public functions and methods. Normal public names plus `__init__`, `__new__`, and `__call__` are public for this setting; other underscore and dunder names are private. Explicit parameter documentation is always checked, including for private functions.

@@ -1074,7 +1074,17 @@ class TestRules(unittest.TestCase):
                 "PDF409": {DocstringConvention.NONE: RuleSettingEffect.IGNORED, DocstringConvention.PEP257: RuleSettingEffect.IGNORED},
                 "PDF410": {DocstringConvention.NONE: RuleSettingEffect.IGNORED, DocstringConvention.PEP257: RuleSettingEffect.IGNORED},
                 "PDF411": {DocstringConvention.NONE: RuleSettingEffect.IGNORED, DocstringConvention.PEP257: RuleSettingEffect.IGNORED},
-                "PDF500": {DocstringConvention.PEP257: RuleSettingEffect.IGNORED, DocstringConvention.NUMPY: RuleSettingEffect.IGNORED},
+                "PDF500": {
+                    DocstringConvention.NONE: RuleSettingEffect.IGNORED,
+                    DocstringConvention.PEP257: RuleSettingEffect.IGNORED,
+                    DocstringConvention.NUMPY: RuleSettingEffect.IGNORED,
+                },
+                "PDF501": {DocstringConvention.NONE: RuleSettingEffect.IGNORED, DocstringConvention.PEP257: RuleSettingEffect.IGNORED},
+                "PDF502": {DocstringConvention.NONE: RuleSettingEffect.IGNORED, DocstringConvention.PEP257: RuleSettingEffect.IGNORED},
+                "PDF503": {DocstringConvention.NONE: RuleSettingEffect.IGNORED, DocstringConvention.PEP257: RuleSettingEffect.IGNORED},
+                "PDF504": {DocstringConvention.NONE: RuleSettingEffect.IGNORED, DocstringConvention.PEP257: RuleSettingEffect.IGNORED},
+                "PDF505": {DocstringConvention.NONE: RuleSettingEffect.IGNORED, DocstringConvention.PEP257: RuleSettingEffect.IGNORED},
+                "PDF506": {DocstringConvention.NONE: RuleSettingEffect.IGNORED, DocstringConvention.PEP257: RuleSettingEffect.IGNORED},
                 "PDF507": {
                     DocstringConvention.NONE: RuleSettingEffect.IGNORED,
                     DocstringConvention.PEP257: RuleSettingEffect.IGNORED,
@@ -1106,6 +1116,76 @@ class TestRules(unittest.TestCase):
                             ignored_conventions.update(typing.cast(DocstringConvention, value) for value in effect_values.values)
 
             self.assertEqual(ignored_conventions, set(DocstringConvention))
+
+    def test_builtin_none_and_pep257_broad_rule_profiles_are_distinct(self) -> None:
+        none_selection = rules_selection.select_rules(CheckSettings(docstring_convention=DocstringConvention.NONE))
+        pep257_selection = rules_selection.select_rules(CheckSettings(docstring_convention=DocstringConvention.PEP257))
+
+        self.assertEqual(none_selection.errors, ())
+        self.assertEqual(pep257_selection.errors, ())
+        self.assertEqual(
+            tuple(str(rule.rule.code) for rule in none_selection.rules),
+            (
+                "PCF001",
+                "PCF002",
+                "PCF003",
+                "PCF004",
+                "PDF000",
+                "PDF001",
+                "PDF002",
+                "PDF100",
+                "PDF101",
+                "PDF102",
+                "PDF103",
+                "PDF104",
+                "PDF105",
+                "PDF106",
+                "PDF109",
+                "PDF110",
+                "PDF200",
+                "PDF201",
+                "PDF202",
+                "PDF203",
+                "PDF300",
+                "PDF301",
+                "PDF302",
+                "PDF303",
+                "PDF304",
+                "PDF305",
+            ),
+        )
+        self.assertEqual(
+            tuple(str(rule.rule.code) for rule in pep257_selection.rules),
+            (
+                "PCF001",
+                "PCF002",
+                "PCF003",
+                "PCF004",
+                "PDF000",
+                "PDF001",
+                "PDF002",
+                "PDF100",
+                "PDF101",
+                "PDF102",
+                "PDF103",
+                "PDF104",
+                "PDF105",
+                "PDF109",
+                "PDF110",
+                "PDF200",
+                "PDF201",
+                "PDF202",
+                "PDF203",
+                "PDF300",
+                "PDF302",
+                "PDF303",
+                "PDF304",
+            ),
+        )
+        self.assertEqual(
+            tuple(sorted(set(str(rule.rule.code) for rule in none_selection.rules) - set(str(rule.rule.code) for rule in pep257_selection.rules))),
+            ("PDF106", "PDF301", "PDF305"),
+        )
 
     def test_rule_collection_does_not_expose_selector_convenience_indexes(self) -> None:
         collection = sample_collection()

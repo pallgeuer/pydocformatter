@@ -95,7 +95,7 @@ If no files or directories are specified, `pydocfmt check` checks the current di
 - `--parallelism JOBS`: File-level parallelism, as a worker count, CPU ratio, or `0` for all logical CPUs subject to platform process-pool limits (default: 0.0)
 
 **Docstring formatting:**
-- `--docstring-convention {none,pep257,google,numpy,rest}`: Convention used to parse semantic docstring sections (default: none)
+- `--docstring-convention {none,pep257,google,numpy,rest}`: Convention used to parse semantic docstring sections (default: pep257)
 - `--docstring-blank-line-style {blank,aligned}`: Whitespace style for blank docstring lines (default: blank)
 - `--docstring-blank-line-after-last-section`, `--no-docstring-blank-line-after-last-section`: Toggle keeping one blank line after the last recognized Google or NumPy docstring section (default: disabled)
 - `--docstring-missing-documentation {has-section,non-summary-docstrings,all-docstrings}`: When missing-documentation rules report missing function documentation (default: has-section)
@@ -241,7 +241,7 @@ respect-gitignore = true
 force-exclude = false
 
 [tool.pydocfmt.docstring]
-convention = "none"
+convention = "pep257"
 blank-line-style = "blank"
 blank-line-after-last-section = false
 missing-documentation = "has-section"
@@ -282,7 +282,7 @@ For TOML configuration, `[tool.pydocfmt.docstring]` and `[tool.pydocfmt.comment]
 - `indent-style`: Generated docstring section indentation style; one of `"space"` or `"tab"` (default: `"space"`)
 - `indent-width`: Generated docstring section indentation width and tab expansion width used when measuring comments (default: 4)
 - `parallelism`: File-level parallelism; use `0` for all logical CPUs subject to platform process-pool limits, a whole number greater than or equal to 1 for an exact worker count, or a fractional value greater than 0 and less than 1 for that ratio of logical CPU cores. Small file sets may be slower with parallelism due to process startup overhead (default: 0.0)
-- `docstring-convention`: Docstring convention; one of `"none"`, `"pep257"`, `"google"`, `"numpy"`, or `"rest"` (default: `"none"`)
+- `docstring-convention`: Docstring convention; one of `"none"`, `"pep257"`, `"google"`, `"numpy"`, or `"rest"` (default: `"pep257"`)
 - `docstring-blank-line-style`: Blank docstring line whitespace style used by PDF103; one of `"blank"` or `"aligned"` (default: `"blank"`)
 - `docstring-blank-line-after-last-section`: Whether PDF200 and PDF201 keep one blank line after the last recognized Google or NumPy docstring section (default: `false`)
 - `docstring-missing-documentation`: When missing-documentation rules report missing function documentation; one of `"has-section"`, `"non-summary-docstrings"`, or `"all-docstrings"` (default: `"has-section"`)
@@ -329,7 +329,7 @@ When `url-aware-wrapping` is enabled, pydocfmt may choose less greedy line break
 
 The `comment-*` settings affect the rule-based formatter. PCF001 defaults to formatting each standalone physical line independently; joining and structured-markup interpretation are opt-in. PCF004 keeps syntax-sensitive and unsafe-content overlong trailing comments inline by default. See `pydocfmt rule PCF001`, `pydocfmt rule PCF002`, `pydocfmt rule PCF003`, and `pydocfmt rule PCF004` for exact detector precedence, spacing, extraction, and protected-comment behavior.
 
-The `docstring-convention` setting never auto-detects a convention. Google sections, NumPy sections, and reST fields are only parsed when their matching convention is selected; `none` and `pep257` leave those convention syntaxes as ordinary content. The resolved convention can also ignore incompatible PDF rules selected through broad selectors; selecting an exact rule code restores an ignored rule. The `docstring-parse-*` settings control generic semantic structures independently, and PCF rules are not affected by docstring conventions.
+The `docstring-convention` setting never auto-detects a convention. Google sections, NumPy sections, and reST fields are only parsed when their matching convention is selected; `none` and `pep257` leave those convention syntaxes as ordinary content. The default `pep257` convention applies PEP 257/pydocstyle-compatible broad-rule carve-outs, while `none` is the stricter no-convention profile for generic rules that can act without convention parsing. Compared with `pep257`, `none` broadly enables PDF106, PDF301, and PDF305. The resolved convention can also ignore incompatible PDF rules selected through broad selectors; selecting an exact rule code restores an ignored rule, but disabled rules stay off even when selected exactly. The `docstring-parse-*` settings control generic semantic structures independently, and PCF rules are not affected by docstring conventions.
 
 Settings are resolved per path as defaults, then the closest containing `pyproject.toml` with `[tool.pydocfmt]`, then explicit `--config` files, then inline `--config` setting overrides, then dedicated command-line options. Parent config files are not merged into child config files. The highest-precedence specified value wins for each key, including `extend-include` and `extend-exclude`.
 

@@ -489,6 +489,7 @@ class TestSettings(unittest.TestCase):
         self.assertIs(config.indent_style, IndentStyle.SPACE)
         self.assertEqual(config.indent_width, 4)
         self.assertEqual(config.parallelism, 0.0)
+        self.assertIs(config.docstring_convention, pydocformatter_settings.DocstringConvention.PEP257)
         self.assertFalse(config.comment_join_standalone_lines)
         self.assertTrue(config.comment_format_list_items)
         self.assertTrue(config.comment_preserve_headings)

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import pydocformatter.rules.definition_helpers.docstring_conventions as docstring_conventions
 import pydocformatter.rules.definition_helpers.parameter_documentation as parameter_documentation
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 import pydocformatter.rules.registration as rule_registration
@@ -21,7 +22,7 @@ class PDF500MissingParameterDocumentation(RuleBase):
         setting_effects=(
             RuleSettingEffects(
                 setting="docstring_convention",
-                effects=(RuleSettingEffectValues(effect=RuleSettingEffect.IGNORED, values=(DocstringConvention.PEP257, DocstringConvention.NUMPY)),),
+                effects=(RuleSettingEffectValues(effect=RuleSettingEffect.IGNORED, values=docstring_conventions.ignored_conventions_except(DocstringConvention.GOOGLE, DocstringConvention.REST)),),
             ),
         ),
         incompatible_with=(),
@@ -30,6 +31,8 @@ class PDF500MissingParameterDocumentation(RuleBase):
     @classmethod
     def check(cls, context: RuleContext) -> tuple[RuleFinding, ...]:
         """Return findings for signature parameters missing docstring documentation."""
+        if docstring_conventions.missing_documentation_is_inert(context.settings.docstring_convention):
+            return ()
         data = PDF.require_data(context)
         findings: list[RuleFinding] = []
         for definition in data.definitions:

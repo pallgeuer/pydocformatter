@@ -36,25 +36,24 @@ def _split_markdown_row(line: str) -> list[str]:
     return [cell.strip() for cell in line.strip().strip("|").split("|")]
 
 
-def _ignored_conventions(rule: rule_models.RuleMetadata) -> set[DocstringConvention]:
-    """Return docstring conventions that ignore a rule."""
-    ignored: set[DocstringConvention] = set()
+def _convention_effects(rule: rule_models.RuleMetadata) -> dict[DocstringConvention, rule_models.RuleSettingEffect]:
+    """Return docstring convention effects for a rule."""
+    effects: dict[DocstringConvention, rule_models.RuleSettingEffect] = {}
     for setting_effects in rule.setting_effects:
         if setting_effects.setting != "docstring_convention":
             continue
         for effect_values in setting_effects.effects:
-            if effect_values.effect != rule_models.RuleSettingEffect.IGNORED:
-                continue
             for value in effect_values.values:
                 if not isinstance(value, DocstringConvention):
                     raise AssertionError(f"{rule.code}: Unexpected docstring convention effect value {value!r}")
-                ignored.add(value)
-    return ignored
+                effects[value] = effect_values.effect
+    return effects
 
 
 def _convention_cell(rule: rule_models.RuleMetadata, convention: DocstringConvention) -> str:
     """Return the formatting rules table cell for one convention."""
-    return "Ignored" if convention in _ignored_conventions(rule) else "-"
+    effect = _convention_effects(rule).get(convention)
+    return "-" if effect is None else effect.value
 
 
 def _conflicts_cell(rule: rule_models.RuleMetadata) -> str:

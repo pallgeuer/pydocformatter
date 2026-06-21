@@ -109,10 +109,11 @@ def test_reports_return_section_for_generators_with_only_non_meaningful_yields()
         assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring has a return section for a generator; generator return values are stop values, not ordinary returns",)
 
 
-def test_inactive_rest_convention_does_not_parse_rest_return_documentation() -> None:
+def test_none_and_pep257_conventions_do_not_parse_rest_return_documentation() -> None:
     source = 'def function():\n    """Do work.\n\n    :returns: Value.\n    """\n'
 
-    assert_pdf503_lines(source, (), settings=CheckSettings(select=("PDF503",), docstring_convention=DocstringConvention.NONE))
+    for convention in (DocstringConvention.NONE, DocstringConvention.PEP257):
+        assert_pdf503_lines(source, (), settings=CheckSettings(select=("PDF503",), docstring_convention=convention))
 
 
 def test_ignores_missing_docstrings_abstracts_and_stubs() -> None:

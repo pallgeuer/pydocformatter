@@ -170,7 +170,7 @@ class CheckSettings:
     indent_style: IndentStyle = IndentStyle.SPACE
     indent_width: int = 4
     parallelism: float = 0.0
-    docstring_convention: DocstringConvention = DocstringConvention.NONE
+    docstring_convention: DocstringConvention = DocstringConvention.PEP257
     docstring_blank_line_style: DocstringBlankLineStyle = DocstringBlankLineStyle.BLANK
     docstring_blank_line_after_last_section: bool = False
     docstring_missing_documentation: DocstringMissingDocumentation = DocstringMissingDocumentation.HAS_SECTION

@@ -874,6 +874,7 @@ class TestCLIShowFiles(unittest.TestCase):
         output = json.loads(stdout.getvalue())
         self.assertEqual(tuple(output), tuple(definition.key for definition in settings_check.SETTINGS_SCHEMA.definitions if definition.available_in_toml))
         self.assertEqual(output["line-length"]["default"], "88")
+        self.assertEqual(output["docstring-convention"]["default"], '"pep257"')
         self.assertEqual(output["select"]["value_type"], "list[str]")
         self.assertEqual(output["per-file-ignores"]["value_type"], "dict[str, list[str]]")
 
@@ -1017,6 +1018,7 @@ class TestCLIShowFiles(unittest.TestCase):
         self.assertLess(output.index("extend-fixable"), output.index("include"))
         self.assertIn("line-length = 72", output)
         self.assertIn('line-ending = "lf"', output)
+        self.assertIn('convention = "pep257"', output)
         self.assertIn("respect-gitignore = false", output)
 
     def test_pydocfmt_check_show_rules_applies_conventions_and_manual_reenablements(self) -> None:

@@ -7,3 +7,8 @@ def ignored_conventions_except(*allowed: settings_check.DocstringConvention) -> 
     """Return docstring conventions ignored by a convention-specific rule."""
     allowed_set = set(allowed)
     return tuple(convention for convention in settings_check.DocstringConvention if convention not in allowed_set)
+
+
+def missing_documentation_is_inert(convention: settings_check.DocstringConvention) -> bool:
+    """Return whether missing-documentation rules stay inert because convention-specific documentation is not parsed."""
+    return convention in (settings_check.DocstringConvention.NONE, settings_check.DocstringConvention.PEP257)

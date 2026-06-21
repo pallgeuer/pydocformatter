@@ -115,10 +115,11 @@ def test_rest_type_only_field_reports_absent_parameter() -> None:
     assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring documents parameter 'value' that is not in the function signature",)
 
 
-def test_inactive_rest_convention_does_not_parse_rest_parameter_documentation() -> None:
+def test_none_and_pep257_conventions_do_not_parse_rest_parameter_documentation() -> None:
     source = 'def function(first):\n    """Summary.\n\n    :param second: Second.\n    """\n'
 
-    assert_pdf501_lines(source, (), settings=CheckSettings(select=("PDF501",), docstring_convention=DocstringConvention.NONE))
+    for convention in (DocstringConvention.NONE, DocstringConvention.PEP257):
+        assert_pdf501_lines(source, (), settings=CheckSettings(select=("PDF501",), docstring_convention=convention))
 
 
 def test_rest_fields_do_not_contribute_to_google_parameter_documentation() -> None:

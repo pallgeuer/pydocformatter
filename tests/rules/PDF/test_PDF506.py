@@ -141,14 +141,15 @@ def test_ignores_bare_raise_dynamic_raise_warning_docs_missing_docstrings_abstra
     assert_pdf506_lines(source, ((25,),))
 
 
-def test_inactive_rest_convention_does_not_parse_rest_exception_documentation() -> None:
+def test_none_and_pep257_conventions_keep_missing_exception_documentation_inert() -> None:
     source = 'def function():\n    """Validate.\n\n    :raises ValueError: Bad value.\n    """\n    raise ValueError("bad")\n'
 
-    assert_pdf506_lines(
-        source,
-        ((6,),),
-        settings=CheckSettings(select=("PDF506",), docstring_convention=DocstringConvention.NONE, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS),
-    )
+    for convention in (DocstringConvention.NONE, DocstringConvention.PEP257):
+        assert_pdf506_lines(
+            source,
+            (),
+            settings=CheckSettings(select=("PDF506",), docstring_convention=convention, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS),
+        )
 
 
 def test_simple_suite_raise_after_docstring_is_checked() -> None:

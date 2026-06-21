@@ -102,14 +102,15 @@ def test_yield_inside_lambda_does_not_count_for_enclosing_function() -> None:
     assert_pdf504_lines(source, ())
 
 
-def test_inactive_rest_convention_does_not_parse_rest_yield_documentation() -> None:
+def test_none_and_pep257_conventions_keep_missing_yield_documentation_inert() -> None:
     source = 'def function():\n    """Generate values.\n\n    :yields: Value.\n    """\n    yield 1\n'
 
-    assert_pdf504_lines(
-        source,
-        ((6,),),
-        settings=CheckSettings(select=("PDF504",), docstring_convention=DocstringConvention.NONE, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS),
-    )
+    for convention in (DocstringConvention.NONE, DocstringConvention.PEP257):
+        assert_pdf504_lines(
+            source,
+            (),
+            settings=CheckSettings(select=("PDF504",), docstring_convention=convention, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS),
+        )
 
 
 def test_reports_first_meaningful_yield_after_non_meaningful_yields() -> None:

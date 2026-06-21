@@ -2,6 +2,8 @@
 
 Fix is not available.
 
+Rule is ignored if `docstring-convention` is `none` or `pep257`.
+
 ## What it does
 Checks function and method docstrings for missing yield-value documentation when the function body has a meaningful yielded value.
 
@@ -132,7 +134,7 @@ def numpy_values():
 [output=unchanged]
 ```
 
-The active convention controls which documentation is recognized. Outside the reST convention, a reST-looking yield field is ordinary text and does not document the yielded value:
+The active convention controls which documentation is recognized. Under `none` and `pep257`, this rule is ignored by default and remains inert when selected explicitly:
 
 ```pydocfmt-example
 [settings]
@@ -148,11 +150,9 @@ def values():
     yield 1
 
 [output=unchanged]
-[findings]
-PDF504: Line 6: Function yield value is missing docstring documentation
 ```
 
 ## Options
-- `docstring-convention`: Controls whether Google yield sections, NumPy yield sections, or reST yield fields such as `:yields:` and `:ytype:` are recognized.
+- `docstring-convention`: Controls whether Google yield sections, NumPy yield sections, or reST yield fields such as `:yields:` and `:ytype:` are recognized. `none` and `pep257` ignore this rule by default, and exact selection remains inert under those conventions.
 - `docstring-missing-documentation`: Controls when missing yield documentation is reported. `has-section` reports only docstrings with recognized yield documentation. `non-summary-docstrings` additionally reports public docstrings with more than just a summary. `all-docstrings` additionally reports all public docstrings.
 - `docstring-missing-documentation-public-only`: When `true`, the broad parts of `non-summary-docstrings` and `all-docstrings` apply only to public functions and methods. Explicit yield documentation is always checked, including for private functions.

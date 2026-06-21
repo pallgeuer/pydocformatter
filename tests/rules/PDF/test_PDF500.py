@@ -115,10 +115,15 @@ def test_rest_starred_parameter_fields_satisfy_varargs_and_kwargs() -> None:
     assert_pdf500_lines(source, (), settings=CheckSettings(select=("PDF500",), docstring_convention=DocstringConvention.REST))
 
 
-def test_inactive_rest_convention_does_not_parse_rest_parameter_documentation() -> None:
+def test_none_and_pep257_conventions_keep_missing_parameter_documentation_inert() -> None:
     source = 'def function(first, second):\n    """Summary.\n\n    :param first: First.\n    """\n'
 
-    assert_pdf500_lines(source, (), settings=CheckSettings(select=("PDF500",), docstring_convention=DocstringConvention.NONE))
+    for convention in (DocstringConvention.NONE, DocstringConvention.PEP257):
+        assert_pdf500_lines(
+            source,
+            (),
+            settings=CheckSettings(select=("PDF500",), docstring_convention=convention, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS),
+        )
 
 
 def test_rest_fields_do_not_satisfy_google_parameter_documentation() -> None:
@@ -145,14 +150,14 @@ def test_non_summary_policy_reports_public_docstrings_with_more_than_summary() -
     assert_pdf500_lines(
         source,
         ((1,),),
-        settings=CheckSettings(select=("PDF500",), docstring_missing_documentation=DocstringMissingDocumentation.NON_SUMMARY_DOCSTRINGS),
+        settings=CheckSettings(select=("PDF500",), docstring_convention=DocstringConvention.GOOGLE, docstring_missing_documentation=DocstringMissingDocumentation.NON_SUMMARY_DOCSTRINGS),
     )
 
 
 def test_non_summary_policy_does_not_report_summary_only_or_empty_docstrings_without_sections() -> None:
     summary_only = 'def summary_only(first):\n    """Summary."""\n'
     empty = 'def empty(first):\n    """"""\n'
-    settings = CheckSettings(select=("PDF500",), docstring_missing_documentation=DocstringMissingDocumentation.NON_SUMMARY_DOCSTRINGS)
+    settings = CheckSettings(select=("PDF500",), docstring_convention=DocstringConvention.GOOGLE, docstring_missing_documentation=DocstringMissingDocumentation.NON_SUMMARY_DOCSTRINGS)
 
     assert_pdf500_lines(summary_only, (), settings=settings)
     assert_pdf500_lines(empty, (), settings=settings)
@@ -164,7 +169,7 @@ def test_all_docstrings_policy_reports_summary_only_and_empty_public_docstrings(
     assert_pdf500_lines(
         source,
         ((1,), (5,)),
-        settings=CheckSettings(select=("PDF500",), docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS),
+        settings=CheckSettings(select=("PDF500",), docstring_convention=DocstringConvention.GOOGLE, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS),
     )
 
 
@@ -174,7 +179,7 @@ def test_all_docstrings_policy_public_only_ignores_private_summary_only_docstrin
     assert_pdf500_lines(
         source,
         (),
-        settings=CheckSettings(select=("PDF500",), docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS),
+        settings=CheckSettings(select=("PDF500",), docstring_convention=DocstringConvention.GOOGLE, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS),
     )
 
 
@@ -184,7 +189,7 @@ def test_public_only_broad_policy_does_not_report_private_docstrings_without_sec
     assert_pdf500_lines(
         source,
         (),
-        settings=CheckSettings(select=("PDF500",), docstring_missing_documentation=DocstringMissingDocumentation.NON_SUMMARY_DOCSTRINGS),
+        settings=CheckSettings(select=("PDF500",), docstring_convention=DocstringConvention.GOOGLE, docstring_missing_documentation=DocstringMissingDocumentation.NON_SUMMARY_DOCSTRINGS),
     )
 
 
@@ -194,7 +199,7 @@ def test_public_only_broad_policy_does_not_report_private_methods_in_public_clas
     assert_pdf500_lines(
         source,
         (),
-        settings=CheckSettings(select=("PDF500",), docstring_missing_documentation=DocstringMissingDocumentation.NON_SUMMARY_DOCSTRINGS),
+        settings=CheckSettings(select=("PDF500",), docstring_convention=DocstringConvention.GOOGLE, docstring_missing_documentation=DocstringMissingDocumentation.NON_SUMMARY_DOCSTRINGS),
     )
 
 
@@ -216,6 +221,7 @@ def test_broad_policy_can_include_private_docstrings_without_sections() -> None:
         ((1,), (8,)),
         settings=CheckSettings(
             select=("PDF500",),
+            docstring_convention=DocstringConvention.GOOGLE,
             docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS,
             docstring_missing_documentation_public_only=False,
         ),
@@ -228,7 +234,7 @@ def test_nested_inside_private_definition_is_private_for_broad_policy() -> None:
     assert_pdf500_lines(
         source,
         (),
-        settings=CheckSettings(select=("PDF500",), docstring_missing_documentation=DocstringMissingDocumentation.NON_SUMMARY_DOCSTRINGS),
+        settings=CheckSettings(select=("PDF500",), docstring_convention=DocstringConvention.GOOGLE, docstring_missing_documentation=DocstringMissingDocumentation.NON_SUMMARY_DOCSTRINGS),
     )
 
 
@@ -238,7 +244,7 @@ def test_public_dunder_exceptions_are_checked_by_broad_policy() -> None:
     assert_pdf500_lines(
         source,
         ((2,), (8,), (14,)),
-        settings=CheckSettings(select=("PDF500",), docstring_missing_documentation=DocstringMissingDocumentation.NON_SUMMARY_DOCSTRINGS),
+        settings=CheckSettings(select=("PDF500",), docstring_convention=DocstringConvention.GOOGLE, docstring_missing_documentation=DocstringMissingDocumentation.NON_SUMMARY_DOCSTRINGS),
     )
 
 
@@ -248,7 +254,7 @@ def test_protocol_dunders_are_private_for_broad_policy() -> None:
     assert_pdf500_lines(
         source,
         (),
-        settings=CheckSettings(select=("PDF500",), docstring_missing_documentation=DocstringMissingDocumentation.NON_SUMMARY_DOCSTRINGS),
+        settings=CheckSettings(select=("PDF500",), docstring_convention=DocstringConvention.GOOGLE, docstring_missing_documentation=DocstringMissingDocumentation.NON_SUMMARY_DOCSTRINGS),
     )
 
 

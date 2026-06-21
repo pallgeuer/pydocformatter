@@ -114,6 +114,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 ### Changed
 
 - **Documentation and settings:**
+  - Changed the default `docstring-convention` from `none` to `pep257`, keeping `none` as the stricter no-convention profile for generic rules that can act without Google, NumPy, or reST parsing.
   - Standardized docstring convention display order as None, PEP257, Google, NumPy, and reST, while keeping lowercase configuration values unchanged.
 
 - **Comment formatting:**
@@ -183,6 +184,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Fixed PCF003 directive normalization to avoid adding trailing whitespace for empty colon payloads.
 
 - **Docstring formatting:**
+  - Ignored PDF500 through PDF506 under the `none` and `pep257` docstring conventions for broad selections, while keeping exact-selected PDF500, PDF502, PDF504, and PDF506 inert so missing-documentation modes do not report convention-targeted findings without active convention parsing; PDF500 remains ignored under `numpy`.
   - Fixed `PDF200` to preserve one blank line between adjacent Google and NumPy sections after collapsing excess blank lines, matching `PDF201` missing-section-separator insertion.
   - Fixed `PDF409` and `PDF410` to preserve Google exception-entry parentheticals, and fixed Google and NumPy parsing to keep malformed exception-like prose continuations from being normalized as separate entries.
   - Fixed Google return and yield section parsing to treat bare `None` and `None.` entries as `None:` entries.

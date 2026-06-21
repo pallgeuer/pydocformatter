@@ -90,12 +90,15 @@ def test_rtype_satisfies_meaningful_return_documentation() -> None:
     assert_pdf502_lines(source, (), settings=CheckSettings(select=("PDF502",), docstring_convention=DocstringConvention.REST))
 
 
-def test_inactive_google_return_section_does_not_satisfy_meaningful_return() -> None:
+def test_none_and_pep257_conventions_keep_missing_return_documentation_inert_for_google_sections() -> None:
     source = 'def function():\n    """Return a value.\n\n    Returns:\n        int: Value.\n    """\n    return 1\n'
 
-    assert_pdf502_lines(
-        source, ((7,),), settings=CheckSettings(select=("PDF502",), docstring_convention=DocstringConvention.NONE, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS)
-    )
+    for convention in (DocstringConvention.NONE, DocstringConvention.PEP257):
+        assert_pdf502_lines(
+            source,
+            (),
+            settings=CheckSettings(select=("PDF502",), docstring_convention=convention, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS),
+        )
 
 
 def test_parameter_section_does_not_satisfy_meaningful_return() -> None:
@@ -104,14 +107,15 @@ def test_parameter_section_does_not_satisfy_meaningful_return() -> None:
     assert_pdf502_lines(source, ((7,),))
 
 
-def test_inactive_rest_convention_does_not_parse_rest_return_documentation() -> None:
+def test_none_and_pep257_conventions_keep_missing_return_documentation_inert_for_rest_fields() -> None:
     source = 'def function():\n    """Return a value.\n\n    :returns: Value.\n    """\n    return 1\n'
 
-    assert_pdf502_lines(
-        source,
-        ((6,),),
-        settings=CheckSettings(select=("PDF502",), docstring_convention=DocstringConvention.NONE, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS),
-    )
+    for convention in (DocstringConvention.NONE, DocstringConvention.PEP257):
+        assert_pdf502_lines(
+            source,
+            (),
+            settings=CheckSettings(select=("PDF502",), docstring_convention=convention, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS),
+        )
 
 
 def test_ignores_bare_return_return_none_generators_missing_docstrings_abstracts_and_stubs() -> None:

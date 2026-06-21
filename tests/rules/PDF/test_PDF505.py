@@ -110,10 +110,11 @@ def test_allows_meaningful_yield_and_explicit_none_yield_but_reports_bare_yield_
     assert_pdf505_lines(yield_from, ())
 
 
-def test_inactive_rest_convention_does_not_parse_rest_yield_documentation() -> None:
+def test_none_and_pep257_conventions_do_not_parse_rest_yield_documentation() -> None:
     source = 'def function():\n    """Do work.\n\n    :yields: Value.\n    """\n'
 
-    assert_pdf505_lines(source, (), settings=CheckSettings(select=("PDF505",), docstring_convention=DocstringConvention.NONE))
+    for convention in (DocstringConvention.NONE, DocstringConvention.PEP257):
+        assert_pdf505_lines(source, (), settings=CheckSettings(select=("PDF505",), docstring_convention=convention))
 
 
 def test_ignores_missing_docstrings_abstracts_and_stubs() -> None:

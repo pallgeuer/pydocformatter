@@ -172,6 +172,8 @@ After normal selection precedence and setting effects are resolved, selected rul
 
 The built-in opposing pairs (e.g. `PDF106`/`PDF107` and `PDF108`/`PDF109`) are mutually incompatible. Convention-specific setting effects keep each built-in convention profile conflict-free, but exact selection can restore ignored rules. Selecting both rules in either pair retains the lower ordered rule and reports the higher ordered rule as disabled.
 
+`docstring-convention = "pep257"` is the default named convention profile. It does not parse Google sections, NumPy sections, or reStructuredText fields, and it applies PEP 257/pydocstyle-compatible broad-rule carve-outs. `docstring-convention = "none"` also avoids convention-specific parsing, but keeps the stricter generic no-convention rule profile for rules that can act without convention parsing.
+
 ## Per-File Ignores
 
 Defaults:

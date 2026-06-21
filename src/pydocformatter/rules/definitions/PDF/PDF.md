@@ -3,7 +3,7 @@
 ## What it does
 The PDF category contains rules that detect formatting issues in Python docstrings, including wrapping, indentation, whitespace, quote placement, and blank-line layout. Category preparation builds a convention-aware semantic block tree and explicit reflow regions for summaries, paragraphs, section entries, reST fields, lists, and block quotes.
 
-`docstring-convention` is explicit and never auto-detected. Google sections, NumPy sections, and reST fields are parsed only under their matching convention. The `none` and `pep257` conventions do not interpret convention syntax. Independent `docstring-parse-*` settings control generic lists, headings, doctests, fences, quotes, tables, directives, and literal blocks.
+`docstring-convention` is explicit and never auto-detected. Google sections, NumPy sections, and reST fields are parsed only under their matching convention. The `none` and `pep257` conventions do not interpret convention syntax. The default `pep257` convention applies PEP 257/pydocstyle-compatible broad-rule carve-outs, while `none` is the stricter no-convention profile for generic rules that can act without convention parsing. Independent `docstring-parse-*` settings control generic lists, headings, doctests, fences, quotes, tables, directives, and literal blocks.
 
 ## Why is this useful?
 Consistent docstring formatting improves readability and keeps documentation stable across automated formatting runs.
@@ -31,7 +31,7 @@ Docstring options control which convention-specific structures are parsed, which
 
 | Setting                                       |       Default | Effect                                                                                  |
 |-----------------------------------------------|--------------:|-----------------------------------------------------------------------------------------|
-| `docstring-convention`                        |        `none` | Parse Google sections, NumPy sections, or reStructuredText fields only when selected.   |
+| `docstring-convention`                        |      `pep257` | Parse Google sections, NumPy sections, or reStructuredText fields only when selected.   |
 | `docstring-parse-list-items`                  |        `true` | Parse list items as distinct structures for reflow and protection.                      |
 | `docstring-parse-headings`                    |        `true` | Parse Markdown and reStructuredText headings as protected structures.                   |
 | `docstring-parse-doctests`                    |        `true` | Parse doctest regions as protected structures.                                          |
