@@ -40,6 +40,20 @@ class CommentKind(enum.Enum):
     TOOL_DIRECTIVE = "tool-directive"
 
 
+class _SyntaxSensitivity:
+    """Lazy parent metadata resolver for trailing-comment extraction safety."""
+
+    def __init__(self, metadata_wrapper: cst_metadata.MetadataWrapper) -> None:
+        self._metadata_wrapper = metadata_wrapper
+        self._parents: Mapping[cst.CSTNode, cst.CSTNode] | None = None
+
+    def is_sensitive(self, node: cst.Comment) -> bool:
+        """Return whether extracting a trailing comment would weaken syntax association."""
+        if self._parents is None:
+            self._parents = self._metadata_wrapper.resolve(cst_metadata.ParentNodeProvider)
+        return _is_syntax_sensitive_trailing_position(node, parents=self._parents)
+
+
 @dataclasses.dataclass(frozen=True)
 class CommentInfo:
     """Lossless source information for one Python comment."""
@@ -48,10 +62,17 @@ class CommentInfo:
     range: cst_metadata.CodeRange
     placement: CommentPlacement
     kind: CommentKind
-    syntax_sensitive: bool
     indent: str
     line_prefix: str
     text: str
+    _syntax_sensitivity: _SyntaxSensitivity | None = dataclasses.field(repr=False, compare=False)
+
+    @property
+    def syntax_sensitive(self) -> bool:
+        """Return whether trailing-comment extraction needs syntax-sensitive protection."""
+        if self.placement != CommentPlacement.TRAILING or self._syntax_sensitivity is None:
+            return False
+        return self._syntax_sensitivity.is_sensitive(self.node)
 
     @property
     def raw_content(self) -> str:
@@ -131,12 +152,12 @@ class PCF(RuleCategoryBase):
         del cls
         collector = _CommentCollector()
         context.module.visit(collector)
-        parents = context.metadata_wrapper.resolve(cst_metadata.ParentNodeProvider)
+        syntax_sensitivity = _SyntaxSensitivity(context.metadata_wrapper)
         source_lines_with_endings = context.source_lines
         source_lines = [line.rstrip("\r\n") for line in source_lines_with_endings]
         comments = tuple(
             sorted(
-                (_comment_info(node, positions=context.positions, parents=parents, source_lines=source_lines) for node in collector.comments),
+                (_comment_info(node, positions=context.positions, source_lines=source_lines, syntax_sensitivity=syntax_sensitivity) for node in collector.comments),
                 key=lambda comment: (comment.range.start.line, comment.range.start.column),
             )
         )
@@ -189,23 +210,22 @@ def planned_full_line_change(
     )
 
 
-def _comment_info(node: cst.Comment, *, positions: Mapping[cst.CSTNode, cst_metadata.CodeRange], parents: Mapping[cst.CSTNode, cst.CSTNode], source_lines: list[str]) -> CommentInfo:
+def _comment_info(node: cst.Comment, *, positions: Mapping[cst.CSTNode, cst_metadata.CodeRange], source_lines: list[str], syntax_sensitivity: _SyntaxSensitivity) -> CommentInfo:
     """Build source information for one comment node."""
     code_range = positions[node]
-    parent = parents[node]
-    placement = CommentPlacement.STANDALONE if isinstance(parent, cst.EmptyLine) else CommentPlacement.TRAILING
     source_line = source_lines[code_range.start.line - 1]
     line_prefix = source_line[: code_range.start.column]
+    placement = CommentPlacement.STANDALONE if not line_prefix.strip(" \t\f") else CommentPlacement.TRAILING
     indent = line_prefix if placement == CommentPlacement.STANDALONE else line_prefix[: len(line_prefix) - len(line_prefix.lstrip(" \t\f"))]
     return CommentInfo(
         node=node,
         range=code_range,
         placement=placement,
         kind=_comment_kind(node.value, line=code_range.start.line, source_lines=source_lines),
-        syntax_sensitive=placement == CommentPlacement.TRAILING and _is_syntax_sensitive_trailing_position(node, parents=parents),
         indent=indent,
         line_prefix=line_prefix,
         text=node.value,
+        _syntax_sensitivity=syntax_sensitivity,
     )
 
 

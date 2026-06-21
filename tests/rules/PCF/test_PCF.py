@@ -1,8 +1,12 @@
+import typing
+
 import libcst as cst
 import libcst.metadata as cst_metadata
 import pytest
 
+import pydocformatter.formatter as formatter
 import pydocformatter.rules.definition_helpers.source_text as source_text
+import pydocformatter.rules_selection as rules_selection
 from pydocformatter.cli.settings_check import CheckSettings
 from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
 from pydocformatter.rules.definitions.PCF.PCF import PCF, CommentKind, CommentPlacement, available_comment_width, render_comment
@@ -36,6 +40,21 @@ def rule_context(context: RuleCategoryContext, data: object | None) -> RuleConte
         category_data=data,
         effectively_fixable=True,
     )
+
+
+def parent_metadata_resolves_for_format(source: str, *, settings: CheckSettings, monkeypatch: pytest.MonkeyPatch, fix: bool = False) -> tuple[int, formatter.FormatterResult]:
+    resolves = 0
+    original_resolve = cst_metadata.MetadataWrapper.resolve
+
+    def count_parent_resolve(wrapper: cst_metadata.MetadataWrapper, provider: object) -> object:
+        nonlocal resolves
+        if provider is cst_metadata.ParentNodeProvider:
+            resolves += 1
+        return typing.cast("typing.Any", original_resolve)(wrapper, provider)
+
+    monkeypatch.setattr(cst_metadata.MetadataWrapper, "resolve", count_parent_resolve)
+    result = formatter.format_source(source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=fix)
+    return resolves, result
 
 
 def test_prepare_classifies_comments_and_groups_only_eligible_standalone_blocks() -> None:
@@ -199,3 +218,39 @@ def test_prepare_classifies_comments_in_parenthesized_decorator_and_compound_sta
         ("# except star trailing", CommentPlacement.TRAILING, "", True),
         ("# one-line trailing", CommentPlacement.TRAILING, "", True),
     )
+
+
+def test_pcf001_does_not_resolve_parent_metadata(monkeypatch: pytest.MonkeyPatch) -> None:
+    settings = CheckSettings(select=("PCF001",), line_length=24)
+
+    resolves, result = parent_metadata_resolves_for_format("#standalone words that should wrap\n", settings=settings, monkeypatch=monkeypatch)
+
+    assert resolves == 0
+    assert tuple(finding.rule.code.tag for finding in result.unfixed_findings) == ("PCF001",)
+
+
+def test_pcf004_resolves_parent_metadata_for_overlong_syntax_sensitive_comment(monkeypatch: pytest.MonkeyPatch) -> None:
+    settings = CheckSettings(select=("PCF004",), line_length=32)
+
+    resolves, result = parent_metadata_resolves_for_format("if enabled:  # explanation long enough to move above the header\n    pass\n", settings=settings, monkeypatch=monkeypatch)
+
+    assert resolves == 1
+    assert not result.unfixed_findings
+
+
+def test_pcf004_does_not_resolve_parent_metadata_when_syntax_awareness_is_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
+    settings = CheckSettings(select=("PCF004",), line_length=32, comment_trailing_extraction_syntax_aware=False)
+
+    resolves, result = parent_metadata_resolves_for_format("if enabled:  # explanation long enough to move above the header\n    pass\n", settings=settings, monkeypatch=monkeypatch)
+
+    assert resolves == 0
+    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((1,),)
+
+
+def test_pcf004_does_not_resolve_parent_metadata_for_short_trailing_comment(monkeypatch: pytest.MonkeyPatch) -> None:
+    settings = CheckSettings(select=("PCF004",), line_length=88)
+
+    resolves, result = parent_metadata_resolves_for_format("if enabled:  # short\n    pass\n", settings=settings, monkeypatch=monkeypatch)
+
+    assert resolves == 0
+    assert not result.unfixed_findings
