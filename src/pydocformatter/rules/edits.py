@@ -52,9 +52,10 @@ def apply_planned_source_changes(
 
 def apply_context_source_changes(context: RuleCategoryContext, changes: tuple[PlannedSourceChange, ...]) -> cst.Module:
     """Apply planned source changes using cached context source data when available."""
+    edits = tuple(change.edit for change in changes)
     if context.line_bounds is None:
-        return apply_planned_source_changes(context.module, changes)
-    return apply_planned_source_changes(context.module, changes, source=context.source, line_bounds=context.line_bounds)
+        return apply_source_edits(context.module, edits)
+    return apply_source_edits(context.module, edits, source=context.source, line_bounds=context.line_bounds)
 
 
 def findings_for_planned_source_changes(rule: RuleMetadata, changes: tuple[PlannedSourceChange, ...], *, instance_fixable: bool | None = None) -> tuple[RuleFinding, ...]:

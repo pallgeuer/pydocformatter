@@ -1604,9 +1604,9 @@ class TestCLIShowFiles(unittest.TestCase):
             def __exit__(self, *args: object) -> None:
                 return None
 
-            def submit(self, fn: object, selected_file: file_selection.SelectedFile, **kwargs: object) -> FakeFuture:
+            def submit(self, fn: object, request: check_command._SelectedFileFormatRequest, **kwargs: object) -> FakeFuture:
                 del fn, kwargs
-                return FakeFuture(FormatterResult(path=selected_file.path, old_source="", new_source="", modified=False, fixed_findings=collections.Counter(), unfixed_findings=(), errors=()))
+                return FakeFuture(FormatterResult(path=request.selected_file.path, old_source="", new_source="", modified=False, fixed_findings=collections.Counter(), unfixed_findings=(), errors=()))
 
         with (
             unittest.mock.patch("pydocformatter.cli.check.os.cpu_count", return_value=128),
@@ -1653,9 +1653,9 @@ class TestCLIShowFiles(unittest.TestCase):
             def __exit__(self, *args: object) -> None:
                 return None
 
-            def submit(self, fn: object, selected_file: file_selection.SelectedFile, **kwargs: object) -> FakeFuture:
+            def submit(self, fn: object, request: check_command._SelectedFileFormatRequest, **kwargs: object) -> FakeFuture:
                 del fn, kwargs
-                return FakeFuture(FormatterResult(path=selected_file.path, old_source="", new_source="", modified=False, fixed_findings=collections.Counter(), unfixed_findings=(), errors=()))
+                return FakeFuture(FormatterResult(path=request.selected_file.path, old_source="", new_source="", modified=False, fixed_findings=collections.Counter(), unfixed_findings=(), errors=()))
 
         with unittest.mock.patch("pydocformatter.cli.check.concurrent.futures.as_completed", side_effect=lambda futures: reversed(tuple(futures))):
             results = check_command.format_selected_files(

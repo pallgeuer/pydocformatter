@@ -66,18 +66,21 @@ def run_rules(
     reached_iteration_limit = False
     source_changed = False
 
+    def run_check_pass(check_module: cst.Module, check_errors: list[str]) -> tuple[RuleFinding, ...]:
+        return _run_check_pass(
+            check_module,
+            path=path,
+            settings=settings,
+            line_ending=line_ending,
+            rule_selection=rule_selection,
+            selected_rule_by_code=selected_rule_by_code,
+            errors=check_errors,
+        )
+
     if fix:
         if _fixable_rules_have_explicit_checks(rule_selection=rule_selection, selected_rule_by_code=selected_rule_by_code):
             precheck_errors: list[str] = []
-            precheck_findings = _run_check_pass(
-                module,
-                path=path,
-                settings=settings,
-                line_ending=line_ending,
-                rule_selection=rule_selection,
-                selected_rule_by_code=selected_rule_by_code,
-                errors=precheck_errors,
-            )
+            precheck_findings = run_check_pass(module, precheck_errors)
             if not precheck_errors and not any(finding.fixable for finding in precheck_findings):
                 return RuleRunResult(
                     module=module,
@@ -105,15 +108,7 @@ def run_rules(
         else:
             reached_iteration_limit = True
 
-    unfixed_findings = _run_check_pass(
-        module,
-        path=path,
-        settings=settings,
-        line_ending=line_ending,
-        rule_selection=rule_selection,
-        selected_rule_by_code=selected_rule_by_code,
-        errors=errors,
-    )
+    unfixed_findings = run_check_pass(module, errors)
 
     if reached_iteration_limit and any(finding.fixable for finding in unfixed_findings):
         errors.append(_fix_iteration_limit_error(path, last_iteration_findings=last_iteration_findings, unfixed_findings=unfixed_findings))

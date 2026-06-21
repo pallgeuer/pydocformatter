@@ -16,6 +16,7 @@ from collections.abc import Callable, Iterable, Iterator
 from typing import TextIO
 
 import pydocformatter.cli.global_args as global_args
+import pydocformatter.cli.settings_check as settings_check
 import pydocformatter.file_selection as file_selection
 import pydocformatter.formatter as formatter
 import pydocformatter.legacy.pydocfmt as legacy_formatter
@@ -23,7 +24,7 @@ import pydocformatter.rules_selection as rules_selection
 import pydocformatter.settings as settings_core
 import pydocformatter.utils.argparser as argparser
 import pydocformatter.utils.misc as misc
-from pydocformatter.cli.settings_check import PARALLELISM_CONSTRAINT_MESSAGE, SETTINGS_SCHEMA, CheckSettings, OutputFormat
+from pydocformatter.cli.settings_check import SETTINGS_SCHEMA, CheckSettings, OutputFormat
 from pydocformatter.file_selection import STDIN_VIRTUAL_FILE, FileDecision, FileSelectionError, SelectionResult
 from pydocformatter.formatter import FormatterResult
 from pydocformatter.rules.codes import RuleCode
@@ -48,6 +49,16 @@ class CheckRunContext:
     def cwd_settings(self) -> CheckSettings:
         """Return settings resolved for the current working directory."""
         return self.cwd_profile.settings
+
+
+@dataclasses.dataclass(frozen=True)
+class _SelectedFileFormatRequest:
+    """Resolved inputs for formatting one disk-backed selected file."""
+
+    selected_file: file_selection.SelectedFile
+    rule_selection: RuleSelection
+    fix: bool
+    write: bool
 
 
 class OutputError(Exception):
@@ -400,15 +411,12 @@ def format_legacy_files(paths: tuple[str, ...], *, settings: CheckSettings, fix:
 
 def resolve_parallelism(parallelism: float) -> int:
     """Return the worker count represented by a parallelism setting."""
-    if not math.isfinite(parallelism):
-        raise settings_core.SettingsError("parallelism must be finite")
+    parallelism = settings_check.validate_parallelism(parallelism, "parallelism")
     if parallelism == 0:
         return max(1, os.cpu_count() or 1)
     if 0 < parallelism < 1:
         return max(1, math.ceil((os.cpu_count() or 1) * parallelism))
-    if parallelism >= 1 and parallelism.is_integer():
-        return int(parallelism)
-    raise settings_core.SettingsError(f"parallelism {PARALLELISM_CONSTRAINT_MESSAGE}")
+    return int(parallelism)
 
 
 def _process_pool_worker_count(parallelism: float, selected_file_count: int) -> int:
@@ -419,23 +427,36 @@ def _process_pool_worker_count(parallelism: float, selected_file_count: int) -> 
     return workers
 
 
-def _format_selected_file_worker(
+def _selected_file_format_request(
     selected_file: file_selection.SelectedFile,
     *,
-    rule_selection: RuleSelection,
+    rule_selections: dict[settings_core.SettingsProfile.Key[CheckSettings], RuleSelection],
     fix: bool,
     write: bool,
+) -> _SelectedFileFormatRequest:
+    """Return the resolved formatting request for one disk-backed selected file."""
+    return _SelectedFileFormatRequest(
+        selected_file=selected_file,
+        rule_selection=rule_selections[selected_file.profile.key()],
+        fix=fix,
+        write=write,
+    )
+
+
+def _format_selected_file_worker(
+    request: _SelectedFileFormatRequest,
 ) -> FormatterResult:
     """Format one disk-backed selected file."""
+    selected_file = request.selected_file
     settings = selected_file.settings
     if settings.legacy:
-        return format_legacy_files((selected_file.path,), settings=settings, fix=fix, write=write)[0]
+        return format_legacy_files((selected_file.path,), settings=settings, fix=request.fix, write=request.write)[0]
     return formatter.format_file(
         selected_file.path,
         settings=settings,
-        rule_selection=rule_selection,
-        fix=fix,
-        write=write,
+        rule_selection=request.rule_selection,
+        fix=request.fix,
+        write=request.write,
     )
 
 
@@ -471,20 +492,18 @@ def format_selected_files(
         ]
 
     workers = _process_pool_worker_count(parallelism, len(selected_files))
+    requests = tuple(_selected_file_format_request(selected_file, rule_selections=rule_selections, fix=fix, write=write) for selected_file in selected_files)
     if workers == 1:
-        return [_format_selected_file_worker(selected_file, rule_selection=rule_selections[selected_file.profile.key()], fix=fix, write=write) for selected_file in selected_files]
+        return [_format_selected_file_worker(request) for request in requests]
 
     ordered_results: list[FormatterResult | None] = [None] * len(selected_files)
     with executor_factory(max_workers=workers) as executor:
         futures = {
             executor.submit(
                 _format_selected_file_worker,
-                selected_file,
-                rule_selection=rule_selections[selected_file.profile.key()],
-                fix=fix,
-                write=write,
+                request,
             ): index
-            for index, selected_file in enumerate(selected_files)
+            for index, request in enumerate(requests)
         }
         for future in concurrent.futures.as_completed(futures):
             ordered_results[futures[future]] = future.result()
