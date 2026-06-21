@@ -9,7 +9,10 @@ The PDF category contains rules that detect formatting issues in Python docstrin
 Consistent docstring formatting improves readability and keeps documentation stable across automated formatting runs.
 
 ## Rules
-Rules in this category cover general docstring reflow as well as specific structural and whitespace corrections.
+Rules in this category cover literal and quote normalization, source-level formatting, blank-line layout, first-line style, convention section style, and consistency between docstrings and signatures. Reflow rules operate on the semantic regions prepared for the selected convention, while structural rules normalize spacing, section syntax, and documented parameters, return values, yields, and exceptions.
+
+## Related tooling
+Individual rule documentation describes relevant Ruff compatibility and differences.
 
 ## Code ranges
 PDF rules are grouped by contiguous hundred ranges so related rules stay close together and future rules have predictable homes.
@@ -23,5 +26,21 @@ PDF rules are grouped by contiguous hundred ranges so related rules stay close t
 | `PDF4xx` | Section style                    | Section names, headers, underlines, section content, section order, and section punctuation.         |
 | `PDF5xx` | Docstring/signature validation   | Parameter, return, yield, and exception documentation consistency.                                   |
 
-## Related tooling
-Individual rule documentation describes relevant Ruff compatibility and differences.
+## Options
+Docstring options control which convention-specific structures are parsed, which generic structures are protected or reflowed, and how selected formatting and documentation checks behave.
+
+| Setting                                       |       Default | Effect                                                                                  |
+|-----------------------------------------------|--------------:|-----------------------------------------------------------------------------------------|
+| `docstring-convention`                        |        `none` | Parse Google sections, NumPy sections, or reStructuredText fields only when selected.   |
+| `docstring-parse-list-items`                  |        `true` | Parse list items as distinct structures for reflow and protection.                      |
+| `docstring-parse-headings`                    |        `true` | Parse Markdown and reStructuredText headings as protected structures.                   |
+| `docstring-parse-doctests`                    |        `true` | Parse doctest regions as protected structures.                                          |
+| `docstring-parse-code-fences`                 |        `true` | Parse fenced code blocks as protected structures.                                       |
+| `docstring-parse-block-quotes`                |        `true` | Parse Markdown block quotes for prefix-preserving reflow.                               |
+| `docstring-parse-tables`                      |        `true` | Parse Markdown and reStructuredText tables as protected structures.                     |
+| `docstring-parse-directives`                  |        `true` | Parse reStructuredText directives and their bodies as protected structures.             |
+| `docstring-parse-literal-blocks`              |        `true` | Parse reStructuredText literal blocks as protected structures.                          |
+| `docstring-blank-line-style`                  |       `blank` | Choose whether inserted blank lines are blank or aligned to the docstring indentation.  |
+| `docstring-blank-line-after-last-section`     |       `false` | Keep one blank line after the final recognized Google or NumPy section when enabled.    |
+| `docstring-missing-documentation`             | `has-section` | Select which missing parameter, return, yield, and exception documentation is reported. |
+| `docstring-missing-documentation-public-only` |        `true` | Limit missing documentation checks to public API names when enabled.                    |

@@ -171,7 +171,7 @@ def render_inline_trailing_comment(code: str, content: str) -> str:
     return f"{code}  # {content}" if content else f"{code}  #"
 
 
-def planned_trailing_line_change(
+def planned_full_line_change(
     data: PCFCategoryData,
     comment: CommentInfo,
     replacement: str,

@@ -62,7 +62,8 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added `url-aware-wrapping`, enabled by default, for URL-aware comment and docstring line balancing without splitting URL tokens.
   - Added `docstring-blank-line-style` with `"blank"` and `"aligned"` modes for PDF103 blank-line whitespace normalization.
   - Added `docstring-blank-line-after-last-section` to control whether PDF200 and PDF201 keep one blank line after the final recognized Google or NumPy docstring section.
-  - Added `comment-syntax-aware-trailing-extraction`, enabled by default, to keep overlong trailing comments inline in syntax-sensitive positions.
+  - Added `comment-trailing-extraction-syntax-aware`, enabled by default, to keep overlong trailing comments inline in syntax-sensitive positions.
+  - Added `comment-trailing-extraction-content-aware`, enabled by default, to keep overlong trailing comments inline when enabled standalone comment structure/code detectors or the operator heuristic make extraction unsafe.
   - Added Ruff-style rule settings under `[tool.pydocfmt]`: `select`, `ignore`, `extend-select`, `per-file-ignores`, `extend-per-file-ignores`, `fixable`, `unfixable`, and `extend-fixable`.
   - Added `respect-gitignore` for formatter configuration, defaulting to `true`.
   - Added explicit config-file support for `--config PATH`, including pyproject-style `[tool.pydocfmt]` files and dedicated top-level pydocfmt TOML files.
@@ -102,12 +103,15 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 - **Formatting:**
   - Added the LibCST-based rule execution framework with ordered category preprocessing, repeated automatic-fix passes, final read-only checks, and non-convergence diagnostics.
   - Added typed PCF comment and PDF docstring category data, together with a shared validated source-edit helper, as the foundation for individual rule implementations.
-  - Implemented PCF001 standalone-comment formatting and PCF002 trailing-comment formatting with independent fixes, protected directive handling, tab-expanded widths, stable impossible-width behavior, and exact EOF preservation.
-  - Added PCF003 directive-spacing normalization for safe spacing around known trailing type and tool directives.
-  - Changed PCF002 to keep overlong trailing comments inline by default in decorators, compound statement headers, arguments, and parenthesized or continuation contexts.
-  - Added shared URL-aware wrapping helpers used by PCF001, PCF002, and PDF101 when `url-aware-wrapping` is enabled.
+  - Implemented PCF001 standalone-comment formatting, PCF002 trailing-comment spacing, and PCF004 trailing-comment extraction with independent fixes, protected directive handling, tab-expanded widths, stable impossible-width behavior, and exact EOF preservation.
+  - Added PCF003 directive-normalization for safe marker spacing and syntax around known type and tool directives.
+  - Changed PCF004 to keep overlong trailing comments inline by default in decorators, compound statement headers, arguments, and parenthesized or continuation contexts.
+  - Added shared URL-aware wrapping helpers used by PCF001, PCF004, and PDF101 when `url-aware-wrapping` is enabled.
 
 ### Changed
+
+- **Comment formatting:**
+  - Renamed PCF003 from `directive-spacing` to `directive-normalization`, keeping the `PCF003` rule code while clarifying that the rule owns recognized directive marker and payload normalization from `#` onward.
 
 - **Developer workflow:**
   - Reorganized rule helper modules so whole-rule logic lives in individual rule files while shared helper modules contain reusable source, layout, decorator, section-edit, and reStructuredText field primitives.
@@ -146,8 +150,15 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Fixed URL-aware wrapping to avoid recursive crashes on long URL-containing paragraphs and to fall back to greedy wrapping when balanced wrapping exceeds its search budget.
 
 - **Comment formatting:**
+  - Fixed PCF002 to normalize the code-to-`#` delimiter for trailing type comments and tool directives while preserving directive text from `#` onward.
+  - Fixed PCF002 to strip terminal whitespace from trailing type comments and tool directives when directive normalization is not selected.
+  - Fixed PCF003 to normalize standalone recognized directives and safe directive payload syntax, including directive-head casing, colon spacing, and machine-readable comma lists.
+  - Fixed PCF003 to preserve trailing code-to-`#` delimiter spacing so PCF002 and PCF003 no longer double-report a directive whose only defect is the code-to-`#` gap.
+  - Fixed PCF004 to treat leading `and`, `or`, and `not` as ordinary prose instead of always suppressing trailing-comment extraction.
+  - Fixed PCF004 content-aware extraction to honor the disabled-code indentation heuristic for trailing comments.
   - Fixed syntax-aware trailing-comment extraction to keep comments inline on `except*` headers and one-line compound suites.
-  - Fixed PCF003 directive spacing to remove trailing directive whitespace.
+  - Fixed PCF003 directive normalization to remove trailing directive whitespace.
+  - Fixed PCF003 directive normalization to avoid adding trailing whitespace for empty colon payloads.
 
 - **Docstring formatting:**
   - Fixed `PDF409` and `PDF410` to preserve Google exception-entry parentheticals, and fixed Google and NumPy parsing to keep malformed exception-like prose continuations from being normalized as separate entries.
@@ -177,7 +188,9 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Removed dead string-literal escape handling and tightened edge-case wrapping for source-aware docstring text.
 
 - **Rule documentation:**
-  - Expanded the PCF001 and PCF002 rule examples to demonstrate common spacing, wrapping, structure, protection, boundary, and extraction behavior.
+  - Aligned category documentation checks with the updated rule category template section order, including the new `Options` section.
+  - Fixed the PDF category options table to use the repository's minimal PyCharm-style Markdown table alignment.
+  - Expanded the PCF001, PCF002, and PCF004 rule examples to demonstrate common spacing, wrapping, structure, protection, boundary, and extraction behavior.
   - Documented that PDF110 separator fallback can add a leading or trailing space to the evaluated `__doc__` value when value-preserving escaping is impossible.
   - Documented that PDF101 delimiter-aware wrapping does not reserve width for unchanged source after a same-line closing docstring delimiter.
   - Rephrased rule example results to describe the effect of applying each rule.
@@ -196,7 +209,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Moved shared modern-rule text wrapping and display-width helpers into a neutral rules helper module.
   - Moved rule codes and selectors into `pydocformatter.rules.codes` and added immutable, hashable setting-effect metadata to rule definitions.
   - Changed internal PDF and PCF classification types from string-compatible enums to ordinary enums.
-  - Renamed PCF001 to `standalone-comment-formatting` and PCF002 to `trailing-comment-formatting` to reflect their spacing and wrapping behavior.
+  - Renamed PCF001 to `standalone-comment-formatting` and PCF002 to `trailing-comment-spacing` to reflect their independent comment actions.
   - Required rule and category definitions to explicitly provide `setting_effects` and `url` metadata, including empty or absent values.
 
 - **CLI:**

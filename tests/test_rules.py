@@ -29,7 +29,7 @@ from pydocformatter.rules.definition import RuleBase, RuleCategoryBase
 from pydocformatter.rules.models import FixAvailability, RuleCategoryMetadata, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
 
 EXPECTED_RULE_DOCUMENTATION_SECTIONS = ("What it does", "Why is this useful?", "Ruff compatibility", "Examples", "Options")
-EXPECTED_RULE_CATEGORY_DOCUMENTATION_SECTIONS = ("What it does", "Why is this useful?", "Rules", "Code ranges", "Related tooling")
+EXPECTED_RULE_CATEGORY_DOCUMENTATION_SECTIONS = ("What it does", "Why is this useful?", "Rules", "Related tooling", "Code ranges", "Options")
 
 
 class PDFSampleCategory(RuleCategoryBase):

@@ -330,7 +330,8 @@ class TestSettings(unittest.TestCase):
                 "comment_format_block_quotes",
                 "comment_preserve_tables",
                 "comment_preserve_directives",
-                "comment_syntax_aware_trailing_extraction",
+                "comment_trailing_extraction_syntax_aware",
+                "comment_trailing_extraction_content_aware",
                 "comment_detect_code",
                 "comment_detect_statements",
                 "comment_detect_expressions",
@@ -483,7 +484,8 @@ class TestSettings(unittest.TestCase):
         self.assertTrue(config.comment_format_block_quotes)
         self.assertTrue(config.comment_preserve_tables)
         self.assertTrue(config.comment_preserve_directives)
-        self.assertTrue(config.comment_syntax_aware_trailing_extraction)
+        self.assertTrue(config.comment_trailing_extraction_syntax_aware)
+        self.assertTrue(config.comment_trailing_extraction_content_aware)
         self.assertFalse(config.comment_detect_code)
         self.assertTrue(config.comment_detect_statements)
         self.assertFalse(config.comment_detect_expressions)
@@ -888,7 +890,9 @@ class TestSettings(unittest.TestCase):
         configured = pydocformatter_settings.SETTINGS_SCHEMA.load(
             global_values=pydocformatter_global_args.GlobalArgs(
                 isolated=True,
-                config_options=("comment-join-standalone-lines = true\ncomment-format-list-items = true\ncomment-syntax-aware-trailing-extraction = false\ncomment-detect-code = false",),
+                config_options=(
+                    "comment-join-standalone-lines = true\ncomment-format-list-items = true\ncomment-trailing-extraction-syntax-aware = false\ncomment-trailing-extraction-content-aware = false\ncomment-detect-code = false",
+                ),
             )
         )
         overridden = pydocformatter_settings.SETTINGS_SCHEMA.load(
@@ -898,7 +902,8 @@ class TestSettings(unittest.TestCase):
 
         self.assertTrue(configured.comment_join_standalone_lines)
         self.assertTrue(configured.comment_format_list_items)
-        self.assertFalse(configured.comment_syntax_aware_trailing_extraction)
+        self.assertFalse(configured.comment_trailing_extraction_syntax_aware)
+        self.assertFalse(configured.comment_trailing_extraction_content_aware)
         self.assertFalse(configured.comment_detect_code)
         self.assertTrue(overridden.comment_preserve_tables)
         self.assertFalse(overridden.comment_detect_code)
