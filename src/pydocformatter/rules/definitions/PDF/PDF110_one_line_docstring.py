@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-import pydocformatter.rules.definition_helpers.source_text as source_text
+from collections.abc import Sequence
+
 import pydocformatter.rules.definition_helpers.text_layout as text_layout
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 import pydocformatter.rules.edits as rule_edits
@@ -42,11 +43,11 @@ class PDF110OneLineDocstring(RuleBase):
 def _planned_changes(context: RuleContext) -> tuple[rule_edits.PlannedSourceChange, ...]:
     """Return all safe one-line docstring collapses."""
     data = PDF_definition.PDF.require_data(context)
-    source_lines = source_text.source_lines_from_context(context)
+    source_lines = context.source_lines
     return tuple(change for docstring in data.docstrings if (change := _planned_change_for_docstring(docstring, context=context, source_lines=source_lines)) is not None)
 
 
-def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo, *, context: RuleContext, source_lines: list[str]) -> rule_edits.PlannedSourceChange | None:
+def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo, *, context: RuleContext, source_lines: Sequence[str]) -> rule_edits.PlannedSourceChange | None:
     """Return one whole-literal replacement for a summary-only docstring."""
     if not PDF_definition.is_safely_mapped_simple_docstring(docstring, require_multiline=True):
         return None
@@ -86,7 +87,7 @@ def _rendered_one_line_docstring(docstring: PDF_definition.DocstringInfo, summar
     return PDF_definition.render_simple_docstring_body_with_separator_fallbacks(docstring, body_source=body_source, expected_value=expected_value)
 
 
-def _rendered_line_fits(docstring: PDF_definition.DocstringInfo, rendered: str, *, context: RuleContext, source_lines: list[str]) -> bool:
+def _rendered_line_fits(docstring: PDF_definition.DocstringInfo, rendered: str, *, context: RuleContext, source_lines: Sequence[str]) -> bool:
     """Return whether the replacement keeps the resulting physical source line within line length."""
     start_line = source_lines[docstring.range.start.line - 1].rstrip("\r\n")
     end_line = source_lines[docstring.range.end.line - 1].rstrip("\r\n")

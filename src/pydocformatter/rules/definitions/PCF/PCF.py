@@ -132,7 +132,7 @@ class PCF(RuleCategoryBase):
         collector = _CommentCollector()
         context.module.visit(collector)
         parents = context.metadata_wrapper.resolve(cst_metadata.ParentNodeProvider)
-        source_lines_with_endings = tuple(source_text.source_lines(context.module.code))
+        source_lines_with_endings = context.source_lines
         source_lines = [line.rstrip("\r\n") for line in source_lines_with_endings]
         comments = tuple(
             sorted(

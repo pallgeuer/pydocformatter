@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import libcst.metadata as cst_metadata
+from collections.abc import Sequence
 
-from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
+import libcst.metadata as cst_metadata
 
 
 def source_lines(source: str) -> list[str]:
@@ -25,12 +25,7 @@ def source_lines(source: str) -> list[str]:
     return lines
 
 
-def source_lines_from_context(context: RuleContext | RuleCategoryContext) -> list[str]:
-    """Return source lines for a rule or category context."""
-    return source_lines(context.module.code)
-
-
-def source_for_range(code_range: cst_metadata.CodeRange, *, source_lines: list[str] | tuple[str, ...]) -> str:
+def source_for_range(code_range: cst_metadata.CodeRange, *, source_lines: Sequence[str]) -> str:
     """Return the exact source inside a LibCST code range."""
     first_index = code_range.start.line - 1
     last_index = code_range.end.line - 1

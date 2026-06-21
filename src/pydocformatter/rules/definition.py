@@ -25,6 +25,8 @@ class RuleCategoryContext:
     metadata_wrapper: cst_metadata.MetadataWrapper
     positions: Mapping[cst.CSTNode, cst_metadata.CodeRange]
     line_ending: str
+    source: str
+    source_lines: tuple[str, ...]
 
 
 @dataclasses.dataclass(frozen=True)

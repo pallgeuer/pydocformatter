@@ -6,6 +6,7 @@ import dataclasses
 import libcst as cst
 import libcst.metadata as cst_metadata
 
+import pydocformatter.rules.definition_helpers.source_text as source_text
 from pydocformatter.cli.settings_check import CheckSettings
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase, RuleCategoryBase, RuleCategoryContext, RuleContext, RuleFixResult
@@ -193,9 +194,19 @@ def _prepare_category(category_class: type[RuleCategoryBase], module: cst.Module
 
 def _category_context(module: cst.Module, *, path: str, settings: CheckSettings, line_ending: str) -> RuleCategoryContext:
     """Build a category context and resolve source positions for its current module."""
+    source = module.code
     metadata_wrapper = cst_metadata.MetadataWrapper(module, unsafe_skip_copy=True)
     positions = metadata_wrapper.resolve(cst_metadata.PositionProvider)
-    return RuleCategoryContext(path=path, settings=settings, module=module, metadata_wrapper=metadata_wrapper, positions=positions, line_ending=line_ending)
+    return RuleCategoryContext(
+        path=path,
+        settings=settings,
+        module=module,
+        metadata_wrapper=metadata_wrapper,
+        positions=positions,
+        line_ending=line_ending,
+        source=source,
+        source_lines=tuple(source_text.source_lines(source)),
+    )
 
 
 def _rule_context(prepared_category: _PreparedCategory, *, effectively_fixable: bool) -> RuleContext:
@@ -208,6 +219,8 @@ def _rule_context(prepared_category: _PreparedCategory, *, effectively_fixable: 
         metadata_wrapper=category_context.metadata_wrapper,
         positions=category_context.positions,
         line_ending=category_context.line_ending,
+        source=category_context.source,
+        source_lines=category_context.source_lines,
         category_data=prepared_category.data,
         effectively_fixable=effectively_fixable,
     )

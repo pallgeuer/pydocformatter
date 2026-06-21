@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 import pydocformatter.cli.settings_check as settings_check
-import pydocformatter.rules.definition_helpers.source_text as source_text
 import pydocformatter.rules.definition_helpers.text_layout as text_layout
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 import pydocformatter.rules.edits as rule_edits
@@ -42,11 +43,11 @@ class PDF103DocstringBlankLineWhitespace(RuleBase):
 def _planned_changes(context: RuleContext) -> tuple[rule_edits.PlannedSourceChange, ...]:
     """Return all safe blank-line whitespace changes."""
     data = PDF_definition.PDF.require_data(context)
-    source_lines = source_text.source_lines_from_context(context)
+    source_lines = context.source_lines
     return tuple(change for docstring in data.docstrings if (change := _planned_change_for_docstring(docstring, context=context, source_lines=source_lines)) is not None)
 
 
-def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo, *, context: RuleContext, source_lines: list[str]) -> rule_edits.PlannedSourceChange | None:
+def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo, *, context: RuleContext, source_lines: Sequence[str]) -> rule_edits.PlannedSourceChange | None:
     """Return one whole-literal replacement for a docstring."""
     if not PDF_definition.is_safely_mapped_simple_docstring(docstring):
         return None

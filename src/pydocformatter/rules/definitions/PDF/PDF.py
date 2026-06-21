@@ -4,7 +4,7 @@ import dataclasses
 import enum
 import re
 import typing
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 
 import libcst as cst
 import libcst.metadata as cst_metadata
@@ -264,7 +264,7 @@ class _DefinitionCollector(cst.CSTVisitor):
     def __init__(self, context: RuleCategoryContext) -> None:
         super().__init__()
         self.context = context
-        self.source_lines = source_text.source_lines(context.module.code)
+        self.source_lines = context.source_lines
         self.definitions: list[DefinitionInfo] = []
         self.docstrings: list[DocstringInfo] = []
         self.stack: list[DefinitionInfo] = []
@@ -1267,9 +1267,9 @@ def docstring_value_fragments(docstring: DocstringInfo, *, line_ending: str) -> 
     return string_literals.value_fragments_for_simple_string(docstring.node, line_ending=line_ending)
 
 
-def docstring_canonical_margin(docstring: DocstringInfo, *, context: RuleContext, source_lines: list[str] | None = None) -> str:
+def docstring_canonical_margin(docstring: DocstringInfo, *, context: RuleContext, source_lines: Sequence[str] | None = None) -> str:
     """Return the raw indentation margin for continuation and aligned blank lines."""
-    lines = source_lines if source_lines is not None else source_text.source_lines_from_context(context)
+    lines = source_lines if source_lines is not None else context.source_lines
     source_line = lines[docstring.range.start.line - 1]
     line_indent = source_line[: len(source_line) - len(source_line.lstrip(" \t"))]
     if isinstance(docstring.statement, cst.SimpleStatementSuite):
@@ -1634,7 +1634,7 @@ def join_docstring_value_lines(docstring: DocstringInfo, lines: list[str]) -> st
     return "".join(chunks)
 
 
-def _docstring_source_indent(statement: cst.SimpleStatementLine | cst.SimpleStatementSuite, *, code_range: cst_metadata.CodeRange, source_lines: list[str], indent_width: int) -> int:
+def _docstring_source_indent(statement: cst.SimpleStatementLine | cst.SimpleStatementSuite, *, code_range: cst_metadata.CodeRange, source_lines: Sequence[str], indent_width: int) -> int:
     """Return the visual indentation margin for a simple docstring."""
     source_indent = text_layout.leading_width(source_lines[code_range.start.line - 1])
     return source_indent + indent_width if isinstance(statement, cst.SimpleStatementSuite) else source_indent

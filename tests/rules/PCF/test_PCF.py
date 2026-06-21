@@ -2,6 +2,7 @@ import libcst as cst
 import libcst.metadata as cst_metadata
 import pytest
 
+import pydocformatter.rules.definition_helpers.source_text as source_text
 from pydocformatter.cli.settings_check import CheckSettings
 from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
 from pydocformatter.rules.definitions.PCF.PCF import PCF, CommentKind, CommentPlacement, available_comment_width, render_comment
@@ -17,6 +18,8 @@ def category_context(source: str) -> RuleCategoryContext:
         metadata_wrapper=metadata_wrapper,
         positions=metadata_wrapper.resolve(cst_metadata.PositionProvider),
         line_ending="\r\n" if "\r\n" in source else "\n",
+        source=source,
+        source_lines=tuple(source_text.source_lines(source)),
     )
 
 
@@ -28,6 +31,8 @@ def rule_context(context: RuleCategoryContext, data: object | None) -> RuleConte
         metadata_wrapper=context.metadata_wrapper,
         positions=context.positions,
         line_ending=context.line_ending,
+        source=context.source,
+        source_lines=context.source_lines,
         category_data=data,
         effectively_fixable=True,
     )

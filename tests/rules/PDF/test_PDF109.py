@@ -2,6 +2,7 @@ import libcst as cst
 import libcst.metadata as cst_metadata
 
 import pydocformatter.formatter as formatter
+import pydocformatter.rules.definition_helpers.source_text as source_text
 import pydocformatter.rules_selection as rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, IndentStyle, LineEnding
 from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
@@ -20,6 +21,8 @@ def contexts(source: str, *, settings: CheckSettings | None = None) -> tuple[Rul
         metadata_wrapper=wrapper,
         positions=wrapper.resolve(cst_metadata.PositionProvider),
         line_ending="\r\n" if "\r\n" in source else "\n",
+        source=source,
+        source_lines=tuple(source_text.source_lines(source)),
     )
     return category, RuleContext(**category.__dict__, category_data=PDF.prepare(category), effectively_fixable=True)
 

@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import dataclasses
+from collections.abc import Sequence
 
 import libcst as cst
 
-import pydocformatter.rules.definition_helpers.source_text as source_text
 import pydocformatter.rules.definition_helpers.string_literals as string_literals
 import pydocformatter.rules.definition_helpers.text_layout as text_layout
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
@@ -86,7 +86,7 @@ def _docstring_result(docstring: PDF_definition.DocstringInfo, *, context: RuleC
         return None
     fragments = string_literals.value_fragments_for_simple_string(docstring.node, line_ending=context.line_ending)
 
-    fallback_prefix = _fallback_line_prefix(context.module.code, docstring=docstring)
+    fallback_prefix = _fallback_line_prefix(context.source_lines, docstring=docstring)
     replacements: list[_RegionReplacement] = []
     for region in docstring.structure.reflow_regions:
         replacement = _replacement_for_region(docstring, region, context=context, fallback_prefix=fallback_prefix, fragments=fragments)
@@ -178,7 +178,7 @@ def _opening_delimiter_width(docstring: PDF_definition.DocstringInfo, region: PD
     """Return physical source width before first generated value text."""
     if region.start_line != 0 or not isinstance(docstring.node, cst.SimpleString):
         return 0
-    source_line = source_text.source_lines(context.module.code)[docstring.range.start.line - 1]
+    source_line = context.source_lines[docstring.range.start.line - 1]
     return text_layout.display_width(f"{source_line[: docstring.range.start.column]}{docstring.node.prefix}{docstring.node.quote}", tab_width=context.settings.indent_width)
 
 
@@ -345,8 +345,8 @@ def _raw_generated_line(docstring: PDF_definition.DocstringInfo, line_index: int
     return f"{margin_line.raw_indent}{generated_text[len(margin_line.text_indent):]}"
 
 
-def _fallback_line_prefix(source: str, *, docstring: PDF_definition.DocstringInfo) -> str:
+def _fallback_line_prefix(source_lines: Sequence[str], *, docstring: PDF_definition.DocstringInfo) -> str:
     """Return the generated body-line prefix when no prior body line exists."""
-    source_line = source_text.source_lines(source)[docstring.range.start.line - 1]
+    source_line = source_lines[docstring.range.start.line - 1]
     prefix = source_line[: docstring.range.start.column]
     return prefix if prefix.strip() == "" else " " * docstring.range.start.column

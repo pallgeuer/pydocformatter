@@ -3,6 +3,7 @@ import libcst.metadata as cst_metadata
 import pytest
 
 import pydocformatter.formatter as formatter
+import pydocformatter.rules.definition_helpers.source_text as source_text
 import pydocformatter.rules_selection as rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, LineEnding
 from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
@@ -15,7 +16,14 @@ def contexts(source: str) -> tuple[RuleCategoryContext, RuleContext]:
     module = cst.parse_module(source)
     wrapper = cst_metadata.MetadataWrapper(module, unsafe_skip_copy=True)
     category = RuleCategoryContext(
-        path="example.py", settings=CheckSettings(), module=module, metadata_wrapper=wrapper, positions=wrapper.resolve(cst_metadata.PositionProvider), line_ending="\r\n" if "\r\n" in source else "\n"
+        path="example.py",
+        settings=CheckSettings(),
+        module=module,
+        metadata_wrapper=wrapper,
+        positions=wrapper.resolve(cst_metadata.PositionProvider),
+        line_ending="\r\n" if "\r\n" in source else "\n",
+        source=source,
+        source_lines=tuple(source_text.source_lines(source)),
     )
     return category, RuleContext(**category.__dict__, category_data=PDF.prepare(category), effectively_fixable=True)
 

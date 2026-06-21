@@ -399,8 +399,8 @@ class TestFormatterResults(unittest.TestCase):
             @classmethod
             def prepare(cls, context: rule_base.RuleCategoryContext) -> object:
                 del cls
-                prepare_sources.append(context.module.code)
-                return context.module.code
+                prepare_sources.append(context.source)
+                return context.source
 
         @rule_registration.register_rule_to(TST)
         class TST001InsertLeadingLine(rule_base.RuleBase):
@@ -470,7 +470,7 @@ class TestFormatterResults(unittest.TestCase):
                 del cls
                 collector = _NameCollector("x")
                 context.module.visit(collector)
-                data = (context.module.code, tuple(context.positions[node].start.line for node in collector.nodes))
+                data = (context.source, tuple(context.positions[node].start.line for node in collector.nodes))
                 prepared_data.append(data)
                 return data
 
@@ -695,13 +695,13 @@ class TestFormatterResults(unittest.TestCase):
 
             @classmethod
             def fix(cls, context: rule_base.RuleContext) -> rule_base.RuleFixResult:
-                if context.module.code == "x = 4\n":
+                if context.source == "x = 4\n":
                     return rule_base.RuleFixResult(module=context.module)
                 return rule_base.RuleFixResult(module=context.module.visit(IncrementInteger()), fixed_findings=(rule_models.RuleFinding(rule=cls.meta, line_numbers=(1,)),))
 
             @classmethod
             def check(cls, context: rule_base.RuleContext) -> tuple[rule_models.RuleFinding, ...]:
-                if context.module.code == "x = 4\n":
+                if context.source == "x = 4\n":
                     return ()
                 return (rule_models.RuleFinding(rule=cls.meta, line_numbers=(1,)),)
 
