@@ -22,6 +22,7 @@ def _rule_cases() -> tuple[tuple[str, type[object]], ...]:
     return tuple((rule_class.meta.code.tag, rule_class) for rule_class in rule_collection.RULE_COLLECTION.rules)
 
 
+@pytest.mark.filterwarnings("ignore:invalid escape sequence.*:DeprecationWarning")
 @pytest.mark.parametrize(("rule_code", "rule_class"), _rule_cases())
 def test_rule_markdown_examples_match_rule_implementation(rule_code: str, rule_class: type[object]) -> None:
     """Execute every structured rule Markdown example against the documented rule."""
@@ -42,6 +43,7 @@ def test_rule_markdown_examples_match_rule_implementation(rule_code: str, rule_c
         assert _finding_key(result.unfixed_findings) == example.findings, f"{rule_code} example {index}: unfixed findings did not match documented findings"
 
 
+@pytest.mark.filterwarnings("ignore:invalid escape sequence.*:DeprecationWarning")
 @pytest.mark.parametrize(("rule_code", "rule_class"), _rule_cases())
 def test_rule_markdown_clean_examples_have_no_hidden_fix_changes(rule_code: str, rule_class: type[object]) -> None:
     """Check-clean documented examples must not be changed by a direct fix pass."""
@@ -79,6 +81,7 @@ def test_rule_markdown_clean_examples_have_no_hidden_fix_changes(rule_code: str,
         assert fixed_module.code == example.input_source, f"{rule_code} example {index}: direct fix returned different source after a clean check"
 
 
+@pytest.mark.filterwarnings("ignore:invalid escape sequence.*:DeprecationWarning")
 @pytest.mark.parametrize(("rule_code", "rule_class"), _rule_cases())
 def test_rule_markdown_examples_account_for_initial_check_findings_after_fixing(rule_code: str, rule_class: type[object]) -> None:
     """Documented examples must account for every initial check finding as fixed or still unfixed."""
