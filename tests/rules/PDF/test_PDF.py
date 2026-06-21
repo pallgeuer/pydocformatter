@@ -2,17 +2,22 @@ import libcst as cst
 import libcst.metadata as cst_metadata
 import pytest
 
+import pydocformatter.formatter as formatter
 import pydocformatter.rules.definition_helpers.source_text as source_text
+import pydocformatter.rules.definition_helpers.value_documentation as value_documentation
+import pydocformatter.rules_selection as rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention
 from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
 from pydocformatter.rules.definitions.PDF.PDF import (
     PDF,
+    DefinitionInfo,
     DefinitionKind,
     DocstringBlock,
     DocstringBlockKind,
     DocstringEntryKind,
     DocstringKind,
     DocstringStructure,
+    FunctionFacts,
     ReflowRegionLine,
     escaped_closing_quote_body_source,
     simple_docstring_body_source_candidates,
@@ -77,6 +82,50 @@ def test_prepare_collects_definitions_docstrings_and_owner_metadata() -> None:
     assert data.definitions[2].parent is data.definitions[1]
     assert data.docstring_for(data.definitions[1]) is data.docstrings[1]
     assert data.docstring_for(data.definitions[3]) is None
+
+
+def test_documented_function_facts_are_lazy_cached(monkeypatch: pytest.MonkeyPatch) -> None:
+    source = 'class Base:\n    @abstractmethod\n    def abstract(self):\n        """Abstract."""\n        return 1\n\n\ndef concrete():\n    """Concrete."""\n    return 2\n\n\ndef stub():\n    """Stub."""\n    pass\n\n\ndef undocumented():\n    return 3\n'
+    context = category_context(source)
+    calls: list[str] = []
+    original_function_facts = value_documentation._function_facts
+
+    def counting_function_facts(definition: DefinitionInfo, *, context: RuleCategoryContext) -> FunctionFacts:
+        calls.append(definition.qualified_name)
+        return original_function_facts(definition, context=context)
+
+    monkeypatch.setattr(value_documentation, "_function_facts", counting_function_facts)
+
+    data = PDF.prepare(context)
+    context_with_data = rule_context(context, data)
+
+    assert data._documented_function_facts is None
+    assert calls == []
+    facts = value_documentation.documented_function_facts(context_with_data)
+    assert tuple(definition.qualified_name for definition, _, _ in facts) == ("concrete",)
+    assert calls == ["concrete"]
+    assert value_documentation.documented_function_facts(context_with_data) is facts
+    assert data._documented_function_facts is facts
+    assert calls == ["concrete"]
+
+
+def test_unrelated_pdf_rule_selection_does_not_collect_documented_function_facts(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fail_function_facts(definition: DefinitionInfo, *, context: RuleCategoryContext) -> FunctionFacts:
+        del definition, context
+        pytest.fail("PDF value-documentation facts should not be collected for PDF001")
+
+    monkeypatch.setattr(value_documentation, "_function_facts", fail_function_facts)
+
+    settings = CheckSettings(select=("PDF001",))
+    result = formatter.format_source(
+        'def documented():\n    """Documented."""\n    return 1\n',
+        "example.py",
+        settings=settings,
+        rule_selection=rules_selection.select_rules(settings),
+        fix=False,
+    )
+
+    assert result.errors == ()
 
 
 def test_prepare_preserves_multiline_crlf_source_and_physical_lines() -> None:

@@ -6,22 +6,7 @@ import libcst as cst
 
 import pydocformatter.rules.definition_helpers.decorators as decorator_helpers
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
-from pydocformatter.rules.definition import RuleContext
-
-
-@dataclasses.dataclass(frozen=True)
-class StatementTarget:
-    """One detected function-body statement relevant to documentation rules."""
-
-    line_numbers: tuple[int, ...]
-
-
-@dataclasses.dataclass(frozen=True)
-class RaisedException:
-    """One directly raised exception relevant to documentation rules."""
-
-    name: str
-    line_numbers: tuple[int, ...]
+from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
 
 
 @dataclasses.dataclass(frozen=True)
@@ -33,25 +18,30 @@ class DocumentedEntry:
     has_content: bool
 
 
-@dataclasses.dataclass(frozen=True)
-class FunctionFacts:
-    """Return, yield, and raise facts collected for one function."""
-
-    meaningful_returns: tuple[StatementTarget, ...]
-    explicit_none_returns: tuple[StatementTarget, ...]
-    any_yields: tuple[StatementTarget, ...]
-    meaningful_yields: tuple[StatementTarget, ...]
-    explicit_none_yields: tuple[StatementTarget, ...]
-    raised_exceptions: tuple[RaisedException, ...]
+StatementTarget = PDF_definition.StatementTarget
+RaisedException = PDF_definition.RaisedException
+FunctionFacts = PDF_definition.FunctionFacts
+DocumentedFunctionFact = PDF_definition.DocumentedFunctionFact
 
 
 _ABSTRACT_DECORATOR_NAMES = {"abstractmethod", "abstractclassmethod", "abstractstaticmethod", "abstractproperty"}
 
 
-def documented_function_facts(context: RuleContext) -> tuple[tuple[PDF_definition.DefinitionInfo, PDF_definition.DocstringInfo, FunctionFacts], ...]:
+def documented_function_facts(context: RuleContext) -> tuple[DocumentedFunctionFact, ...]:
     """Return documented non-stub function facts for value documentation rules."""
     data = PDF_definition.PDF.require_data(context)
-    facts: list[tuple[PDF_definition.DefinitionInfo, PDF_definition.DocstringInfo, FunctionFacts]] = []
+    cached_facts = data._documented_function_facts
+    if cached_facts is not None:
+        return cached_facts
+    facts = _collect_documented_function_facts(data, context=context)
+    # Keep prepared data frozen externally while memoizing this expensive derived fact tuple.
+    object.__setattr__(data, "_documented_function_facts", facts)
+    return facts
+
+
+def _collect_documented_function_facts(data: PDF_definition.PDFCategoryData, *, context: RuleCategoryContext) -> tuple[DocumentedFunctionFact, ...]:
+    """Collect documented non-stub function facts for prepared PDF data."""
+    facts: list[DocumentedFunctionFact] = []
     for definition in data.definitions:
         if definition.kind is not PDF_definition.DefinitionKind.FUNCTION:
             continue
@@ -129,7 +119,7 @@ def _entry_has_content(entry: PDF_definition.DocstringEntry) -> bool:
     return bool(entry.names or entry.type_text or entry.description)
 
 
-def _function_facts(definition: PDF_definition.DefinitionInfo, *, context: RuleContext) -> FunctionFacts:
+def _function_facts(definition: PDF_definition.DefinitionInfo, *, context: RuleCategoryContext) -> FunctionFacts:
     visitor = _FunctionBodyVisitor(context)
     definition.body.visit(visitor)
     return FunctionFacts(
@@ -145,7 +135,7 @@ def _function_facts(definition: PDF_definition.DefinitionInfo, *, context: RuleC
 class _FunctionBodyVisitor(cst.CSTVisitor):
     """Collect top-level function behavior while skipping nested scopes."""
 
-    def __init__(self, context: RuleContext) -> None:
+    def __init__(self, context: RuleCategoryContext) -> None:
         super().__init__()
         self.context = context
         self.meaningful_returns: list[StatementTarget] = []
@@ -274,7 +264,7 @@ def exception_names_match(raised_name: str, documented_name: str) -> bool:
     return raised_name.rpartition(".")[2] == documented_name.rpartition(".")[2]
 
 
-def _node_line_numbers(node: cst.CSTNode, *, context: RuleContext) -> tuple[int, ...]:
+def _node_line_numbers(node: cst.CSTNode, *, context: RuleCategoryContext) -> tuple[int, ...]:
     position = context.positions.get(node)
     if position is None:
         return (1,)

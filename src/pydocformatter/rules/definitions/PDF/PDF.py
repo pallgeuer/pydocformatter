@@ -245,6 +245,36 @@ class SummaryLineTarget:
 
 
 @dataclasses.dataclass(frozen=True)
+class StatementTarget:
+    """One detected function-body statement relevant to documentation rules."""
+
+    line_numbers: tuple[int, ...]
+
+
+@dataclasses.dataclass(frozen=True)
+class RaisedException:
+    """One directly raised exception relevant to documentation rules."""
+
+    name: str
+    line_numbers: tuple[int, ...]
+
+
+@dataclasses.dataclass(frozen=True)
+class FunctionFacts:
+    """Return, yield, and raise facts collected for one function."""
+
+    meaningful_returns: tuple[StatementTarget, ...]
+    explicit_none_returns: tuple[StatementTarget, ...]
+    any_yields: tuple[StatementTarget, ...]
+    meaningful_yields: tuple[StatementTarget, ...]
+    explicit_none_yields: tuple[StatementTarget, ...]
+    raised_exceptions: tuple[RaisedException, ...]
+
+
+DocumentedFunctionFact = tuple[DefinitionInfo, DocstringInfo, FunctionFacts]
+
+
+@dataclasses.dataclass(frozen=True)
 class PDFCategoryData:
     """Prepared definitions and docstrings shared by PDF rules."""
 
@@ -252,6 +282,7 @@ class PDFCategoryData:
     docstrings: tuple[DocstringInfo, ...]
     summary_line_targets: tuple[SummaryLineTarget, ...]
     summary_terminal_line_targets: tuple[SummaryLineTarget, ...]
+    _documented_function_facts: tuple[DocumentedFunctionFact, ...] | None = dataclasses.field(default=None, init=False, repr=False, compare=False)
 
     def docstring_for(self, definition: DefinitionInfo) -> DocstringInfo | None:
         """Return the docstring owned by a definition, if one exists."""
