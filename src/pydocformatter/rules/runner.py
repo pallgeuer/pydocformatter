@@ -45,6 +45,7 @@ class _ModulePassContext:
     positions: Mapping[cst.CSTNode, cst_metadata.CodeRange]
     source: str
     source_lines: tuple[str, ...]
+    line_bounds: source_text.LineBounds
 
 
 def run_rules(
@@ -228,12 +229,14 @@ def _pass_context_for(module: cst.Module, pass_context: _ModulePassContext | Non
     source = module.code
     metadata_wrapper = cst_metadata.MetadataWrapper(module, unsafe_skip_copy=True)
     positions = metadata_wrapper.resolve(cst_metadata.PositionProvider)
+    source_lines = tuple(source_text.source_lines(source))
     return _ModulePassContext(
         module=module,
         metadata_wrapper=metadata_wrapper,
         positions=positions,
         source=source,
-        source_lines=tuple(source_text.source_lines(source)),
+        source_lines=source_lines,
+        line_bounds=source_text.line_bounds_from_lines(source_lines),
     )
 
 
@@ -248,6 +251,7 @@ def _category_context(pass_context: _ModulePassContext, *, path: str, settings: 
         line_ending=line_ending,
         source=pass_context.source,
         source_lines=pass_context.source_lines,
+        line_bounds=pass_context.line_bounds,
     )
 
 
@@ -263,6 +267,7 @@ def _rule_context(prepared_category: _PreparedCategory, *, effectively_fixable: 
         line_ending=category_context.line_ending,
         source=category_context.source,
         source_lines=category_context.source_lines,
+        line_bounds=category_context.line_bounds,
         category_data=prepared_category.data,
         effectively_fixable=effectively_fixable,
     )

@@ -116,6 +116,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 
 - **Developer workflow:**
   - Cached rule-context source text and source lines per module state to reduce repeated LibCST source regeneration during no-legacy checks.
+  - Reused cached source lines and line bounds for no-legacy source edits to avoid repeated line splitting.
   - Skipped fix-mode LibCST source comparison for same-module no-op fixes.
   - Shared LibCST position metadata across selected rule categories for each module state.
   - Renamed selected built-in rule names, rule definition files, and rule classes for clearer public metadata while keeping rule codes and selection behavior unchanged.

@@ -40,6 +40,6 @@ class PDF301SummaryTerminalPunctuation(RuleBase):
         changes = tuple(result.change for result in summary_punctuation.results(context, rule=cls.meta, policy=_POLICY) if result.change is not None)
         if not changes:
             return RuleFixResult(module=context.module)
-        module = rule_edits.apply_planned_source_changes(context.module, changes)
+        module = rule_edits.apply_context_source_changes(context, changes)
         findings = rule_edits.findings_for_planned_source_changes(cls.meta, changes, instance_fixable=True)
         return RuleFixResult(module=module, fixed_findings=findings)

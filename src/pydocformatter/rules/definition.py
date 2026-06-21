@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, ClassVar
 import libcst as cst
 import libcst.metadata as cst_metadata
 
+import pydocformatter.rules.definition_helpers.source_text as source_text
 import pydocformatter.utils.misc as misc
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.models import RuleCategoryMetadata, RuleFinding, RuleMetadata
@@ -27,6 +28,7 @@ class RuleCategoryContext:
     line_ending: str
     source: str
     source_lines: tuple[str, ...]
+    line_bounds: source_text.LineBounds | None = dataclasses.field(default=None, kw_only=True)
 
 
 @dataclasses.dataclass(frozen=True)

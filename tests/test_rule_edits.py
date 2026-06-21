@@ -1,10 +1,14 @@
 import unittest
+import unittest.mock
 
 import libcst as cst
 import libcst.metadata as cst_metadata
 
+import pydocformatter.rules.definition_helpers.source_text as source_text
 import pydocformatter.rules.edits as rule_edits
+from pydocformatter.cli.settings_check import CheckSettings
 from pydocformatter.rules.codes import RuleCode
+from pydocformatter.rules.definition import RuleCategoryContext
 from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetadata
 
 
@@ -70,6 +74,74 @@ class TestSourceEdits(unittest.TestCase):
         result = rule_edits.apply_source_edits(module, edits)
 
         self.assertEqual(result.code, "name = '\u03c9'\ngamma= 2\n")
+
+    def test_cached_source_and_line_bounds_apply_without_reading_module_code(self) -> None:
+        source = "alpha = 1\nbeta = 2\n"
+        module = cst.parse_module(source)
+        edits = (rule_edits.SourceEdit(cst_metadata.CodeRange(start=cst_metadata.CodePosition(2, 0), end=cst_metadata.CodePosition(2, 4)), "gamma"),)
+        lines = tuple(source_text.source_lines(source))
+
+        def _unexpected_code_access(module: cst.Module) -> str:
+            del module
+            raise AssertionError("Module.code should not be read")
+
+        with unittest.mock.patch.object(cst.Module, "code", new=property(_unexpected_code_access)):
+            result = rule_edits.apply_source_edits(module, edits, source=source, line_bounds=source_text.line_bounds_from_lines(lines))
+
+        self.assertEqual(result.code, "alpha = 1\ngamma = 2\n")
+
+    def test_cached_source_and_line_bounds_must_be_provided_together(self) -> None:
+        source = "alpha = 1\nbeta = 2\n"
+        module = cst.parse_module(source)
+        edits = (rule_edits.SourceEdit(cst_metadata.CodeRange(start=cst_metadata.CodePosition(2, 0), end=cst_metadata.CodePosition(2, 4)), "gamma"),)
+        line_bounds = source_text.line_bounds_from_lines(source_text.source_lines(source))
+
+        with self.assertRaisesRegex(ValueError, "source and line_bounds must be provided together"):
+            rule_edits.apply_source_edits(module, edits, source=source)
+        with self.assertRaisesRegex(ValueError, "source and line_bounds must be provided together"):
+            rule_edits.apply_source_edits(module, edits, line_bounds=line_bounds)
+
+    def test_context_source_changes_apply_cached_context_source_without_reading_module_code(self) -> None:
+        source = "alpha = 1\nbeta = 2\n"
+        module = cst.parse_module(source)
+        metadata_wrapper = cst_metadata.MetadataWrapper(module, unsafe_skip_copy=True)
+        lines = tuple(source_text.source_lines(source))
+        context = RuleCategoryContext(
+            path="example.py",
+            settings=CheckSettings(),
+            module=module,
+            metadata_wrapper=metadata_wrapper,
+            positions=metadata_wrapper.resolve(cst_metadata.PositionProvider),
+            line_ending="\n",
+            source=source,
+            source_lines=lines,
+            line_bounds=source_text.line_bounds_from_lines(lines),
+        )
+        changes = (
+            rule_edits.PlannedSourceChange(
+                edit=rule_edits.SourceEdit(cst_metadata.CodeRange(start=cst_metadata.CodePosition(2, 0), end=cst_metadata.CodePosition(2, 4)), "gamma"),
+                line_numbers=(2,),
+            ),
+        )
+
+        def _unexpected_code_access(module: cst.Module) -> str:
+            del module
+            raise AssertionError("Module.code should not be read")
+
+        with unittest.mock.patch.object(cst.Module, "code", new=property(_unexpected_code_access)):
+            result = rule_edits.apply_context_source_changes(context, changes)
+
+        self.assertEqual(result.code, "alpha = 1\ngamma = 2\n")
+
+    def test_cached_source_edits_support_no_final_newline(self) -> None:
+        source = "alpha = 1\nbeta = 2"
+        module = cst.parse_module(source)
+        edits = (rule_edits.SourceEdit(cst_metadata.CodeRange(start=cst_metadata.CodePosition(2, 7), end=cst_metadata.CodePosition(2, 8)), "3"),)
+        lines = tuple(source_text.source_lines(source))
+
+        result = rule_edits.apply_source_edits(module, edits, source=source, line_bounds=source_text.line_bounds_from_lines(lines))
+
+        self.assertEqual(result.code, "alpha = 1\nbeta = 3")
 
     def test_overlapping_edits_are_rejected(self) -> None:
         module = cst.parse_module("value = 1\n")

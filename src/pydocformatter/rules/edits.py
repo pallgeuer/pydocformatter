@@ -1,11 +1,16 @@
 from __future__ import annotations
 
 import dataclasses
+from typing import TYPE_CHECKING
 
 import libcst as cst
 import libcst.metadata as cst_metadata
 
+import pydocformatter.rules.definition_helpers.source_text as source_text
 from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetadata
+
+if TYPE_CHECKING:
+    from pydocformatter.rules.definition import RuleCategoryContext
 
 
 @dataclasses.dataclass(frozen=True)
@@ -34,9 +39,22 @@ class PlannedTextReplacement:
     line_numbers: tuple[int, ...]
 
 
-def apply_planned_source_changes(module: cst.Module, changes: tuple[PlannedSourceChange, ...]) -> cst.Module:
+def apply_planned_source_changes(
+    module: cst.Module,
+    changes: tuple[PlannedSourceChange, ...],
+    *,
+    source: str | None = None,
+    line_bounds: source_text.LineBounds | None = None,
+) -> cst.Module:
     """Apply the source edits from planned changes to a module."""
-    return apply_source_edits(module, tuple(change.edit for change in changes))
+    return apply_source_edits(module, tuple(change.edit for change in changes), source=source, line_bounds=line_bounds)
+
+
+def apply_context_source_changes(context: RuleCategoryContext, changes: tuple[PlannedSourceChange, ...]) -> cst.Module:
+    """Apply planned source changes using cached context source data when available."""
+    if context.line_bounds is None:
+        return apply_planned_source_changes(context.module, changes)
+    return apply_planned_source_changes(context.module, changes, source=context.source, line_bounds=context.line_bounds)
 
 
 def findings_for_planned_source_changes(rule: RuleMetadata, changes: tuple[PlannedSourceChange, ...], *, instance_fixable: bool | None = None) -> tuple[RuleFinding, ...]:
@@ -46,14 +64,22 @@ def findings_for_planned_source_changes(rule: RuleMetadata, changes: tuple[Plann
     return tuple(RuleFinding(rule=rule, line_numbers=change.line_numbers, instance_fixable=instance_fixable) for change in changes)
 
 
-def apply_source_edits(module: cst.Module, edits: tuple[SourceEdit, ...]) -> cst.Module:
+def apply_source_edits(
+    module: cst.Module,
+    edits: tuple[SourceEdit, ...],
+    *,
+    source: str | None = None,
+    line_bounds: source_text.LineBounds | None = None,
+) -> cst.Module:
     """Apply non-overlapping source edits to a module and parse the result."""
+    if (source is None) != (line_bounds is None):
+        raise ValueError("source and line_bounds must be provided together")
     if not edits:
         return module
 
-    source = module.code
-    line_bounds = _line_bounds(source)
-    indexed_edits = tuple((_range_offsets(edit.range, line_bounds=line_bounds), edit) for edit in edits)
+    edit_source = module.code if source is None else source
+    edit_line_bounds = source_text.line_bounds_from_lines(source_text.source_lines(edit_source)) if line_bounds is None else line_bounds
+    indexed_edits = tuple((_range_offsets(edit.range, line_bounds=edit_line_bounds), edit) for edit in edits)
     sorted_edits = tuple(sorted(indexed_edits, key=lambda item: item[0]))
 
     previous_start = -1
@@ -69,32 +95,11 @@ def apply_source_edits(module: cst.Module, edits: tuple[SourceEdit, ...]) -> cst
     chunks: list[str] = []
     cursor = 0
     for (start, end), edit in sorted_edits:
-        chunks.append(source[cursor:start])
+        chunks.append(edit_source[cursor:start])
         chunks.append(edit.replacement)
         cursor = end
-    chunks.append(source[cursor:])
+    chunks.append(edit_source[cursor:])
     return cst.parse_module("".join(chunks), config=module.config_for_parsing)
-
-
-def _line_bounds(source: str) -> tuple[tuple[int, int], ...]:
-    """Return source offsets bounding each line without its line ending."""
-    bounds: list[tuple[int, int]] = []
-    line_start = 0
-    index = 0
-    while index < len(source):
-        char = source[index]
-        if char == "\r":
-            bounds.append((line_start, index))
-            index += 2 if index + 1 < len(source) and source[index + 1] == "\n" else 1
-            line_start = index
-        elif char == "\n":
-            bounds.append((line_start, index))
-            index += 1
-            line_start = index
-        else:
-            index += 1
-    bounds.append((line_start, len(source)))
-    return tuple(bounds)
 
 
 def _range_offsets(code_range: cst_metadata.CodeRange, *, line_bounds: tuple[tuple[int, int], ...]) -> tuple[int, int]:
