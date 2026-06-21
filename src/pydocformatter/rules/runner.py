@@ -67,6 +67,26 @@ def run_rules(
     source_changed = False
 
     if fix:
+        if _fixable_rules_have_explicit_checks(rule_selection=rule_selection, selected_rule_by_code=selected_rule_by_code):
+            precheck_errors: list[str] = []
+            precheck_findings = _run_check_pass(
+                module,
+                path=path,
+                settings=settings,
+                line_ending=line_ending,
+                rule_selection=rule_selection,
+                selected_rule_by_code=selected_rule_by_code,
+                errors=precheck_errors,
+            )
+            if not precheck_errors and not any(finding.fixable for finding in precheck_findings):
+                return RuleRunResult(
+                    module=module,
+                    fixed_findings=(),
+                    unfixed_findings=precheck_findings,
+                    source_changed=False,
+                    errors=(),
+                )
+
         for iteration in range(1, MAX_FIX_ITERATIONS + 1):
             module, iteration_findings, changed = _run_fix_pass(
                 module,
@@ -105,6 +125,16 @@ def run_rules(
         source_changed=source_changed,
         errors=tuple(errors),
     )
+
+
+def _fixable_rules_have_explicit_checks(*, rule_selection: RuleSelection, selected_rule_by_code: dict[RuleCode, SelectedRule]) -> bool:
+    """Return whether check findings can prove no selected fix hooks need to run."""
+    for category_class in rule_selection.collection.categories:
+        for rule_class in category_class.ordered_rules():
+            selected_rule = selected_rule_by_code.get(rule_class.meta.code)
+            if selected_rule is not None and selected_rule.fixable and "check" not in rule_class.__dict__:
+                return False
+    return True
 
 
 def _run_fix_pass(

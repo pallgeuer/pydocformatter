@@ -1,11 +1,14 @@
 import tomllib
 
+import libcst as cst
 import pytest
 
 import pydocformatter.formatter as formatter
 import pydocformatter.rules.collection as rule_collection
 import pydocformatter.rules.documentation as rule_documentation
+import pydocformatter.rules.line_endings as line_endings
 import pydocformatter.rules.models as rule_models
+import pydocformatter.rules.runner as rule_runner
 import pydocformatter.rules_selection as rules_selection
 from pydocformatter.cli import global_args, settings_check
 from pydocformatter.rules.codes import RuleCode
@@ -36,6 +39,43 @@ def test_rule_markdown_examples_match_rule_implementation(rule_code: str, rule_c
         assert result.errors == (), f"{rule_code} example {index}: unexpected formatter errors: {result.errors}"
         assert result.new_source == example.output_source, f"{rule_code} example {index}: output did not match documented output"
         assert _finding_key(result.unfixed_findings) == example.findings, f"{rule_code} example {index}: unfixed findings did not match documented findings"
+
+
+@pytest.mark.parametrize(("rule_code", "rule_class"), _rule_cases())
+def test_rule_markdown_clean_examples_have_no_hidden_fix_changes(rule_code: str, rule_class: type[object]) -> None:
+    """Check-clean documented examples must not be changed by a direct fix pass."""
+    markdown = rule_documentation.load_rule_explanation(rule_class)
+    examples = rule_documentation.parse_rule_markdown_examples(markdown, rule_code=rule_code)
+
+    for index, example in enumerate(examples, start=1):
+        _validate_rule_selection_settings(rule_code, index, example)
+        settings = _settings_for_example(rule_code, example)
+        selection = rules_selection.select_rules(settings)
+        assert selection.errors == (), f"{rule_code} example {index}: unexpected rule selection errors: {selection.errors}"
+
+        path = f"{rule_code}_example_{index}.py"
+        check_result = formatter.format_source(example.input_source, path, settings=settings, rule_selection=selection, fix=False)
+        assert check_result.errors == (), f"{rule_code} example {index}: unexpected check errors: {check_result.errors}"
+        if any(finding.fixable for finding in check_result.unfixed_findings):
+            continue
+
+        module = cst.parse_module(example.input_source)
+        selected_rule_by_code = {selected_rule.rule.code: selected_rule for selected_rule in selection.for_path(path)}
+        errors: list[str] = []
+        fixed_module, fixed_findings, source_changed = rule_runner._run_fix_pass(
+            module,
+            path=path,
+            settings=settings,
+            line_ending=line_endings.resolve_line_ending(example.input_source, line_ending=settings.line_ending),
+            rule_selection=selection,
+            selected_rule_by_code=selected_rule_by_code,
+            errors=errors,
+        )
+
+        assert errors == [], f"{rule_code} example {index}: unexpected direct fix errors: {errors}"
+        assert fixed_findings == (), f"{rule_code} example {index}: direct fix reported findings after a clean check"
+        assert not source_changed, f"{rule_code} example {index}: direct fix changed source after a clean check"
+        assert fixed_module.code == example.input_source, f"{rule_code} example {index}: direct fix returned different source after a clean check"
 
 
 def test_parse_rule_markdown_examples_preserves_nested_shorter_fences() -> None:

@@ -56,10 +56,15 @@ def default_rule_selection() -> rules_selection.RuleSelection:
     return rules_selection.select_rules(CheckSettings())
 
 
-def isolated_rule_selection(*categories: type[rule_base.RuleCategoryBase], fixable: bool = True) -> rules_selection.RuleSelection:
+def isolated_rule_selection(*categories: type[rule_base.RuleCategoryBase], fixable: bool = True, fixable_by_code: dict[RuleCode, bool] | None = None) -> rules_selection.RuleSelection:
     collection = rule_collection.RuleCollection(categories)
     return rules_selection.RuleSelection(
-        rules=tuple(rules_selection.SelectedRule(rule=rule_class.meta, fixable=fixable, enabled_priority=0, enabled_specificity=0) for rule_class in collection.rules),
+        rules=tuple(
+            rules_selection.SelectedRule(
+                rule=rule_class.meta, fixable=fixable_by_code.get(rule_class.meta.code, fixable) if fixable_by_code is not None else fixable, enabled_priority=0, enabled_specificity=0
+            )
+            for rule_class in collection.rules
+        ),
         per_file_ignores=(),
         errors=(),
         collection=collection,
@@ -391,6 +396,188 @@ class TestFormatterResults(unittest.TestCase):
             self.assertFalse(result.modified)
             self.assertEqual(result.unfixed_findings, ())
             self.assertEqual(target.read_text(encoding="utf-8"), "x = 1\n")
+
+    def test_rule_runner_skips_fix_hooks_when_precheck_has_no_fixable_findings(self) -> None:
+        fix_calls: list[str] = []
+
+        class TST(rule_base.RuleCategoryBase):
+            meta = rule_models.RuleCategoryMetadata(prefix="TST", name="test", url=None)
+
+        @rule_registration.register_rule_to(TST)
+        class TST001Manual(rule_base.RuleBase):
+            meta = rule_models.RuleMetadata(
+                code=rule_codes.RuleCode("TST001"),
+                name="manual",
+                message="Manual",
+                fix_availability=rule_models.FixAvailability.NEVER,
+                stable_since="1.0.0",
+                setting_effects=(),
+                incompatible_with=(),
+            )
+
+            @classmethod
+            def check(cls, context: rule_base.RuleContext) -> tuple[rule_models.RuleFinding, ...]:
+                del context
+                return (rule_models.RuleFinding(rule=cls.meta, line_numbers=(1,)),)
+
+        @rule_registration.register_rule_to(TST)
+        class TST002UnexpectedFix(rule_base.RuleBase):
+            meta = rule_models.RuleMetadata(
+                code=rule_codes.RuleCode("TST002"),
+                name="unexpected-fix",
+                message="Unexpected fix",
+                fix_availability=rule_models.FixAvailability.ALWAYS,
+                stable_since="1.0.0",
+                setting_effects=(),
+                incompatible_with=(),
+            )
+
+            @classmethod
+            def check(cls, context: rule_base.RuleContext) -> tuple[rule_models.RuleFinding, ...]:
+                del cls, context
+                return ()
+
+            @classmethod
+            def fix(cls, context: rule_base.RuleContext) -> rule_base.RuleFixResult:
+                del cls
+                fix_calls.append(context.source)
+                return rule_base.RuleFixResult(module=context.module)
+
+        settings = CheckSettings()
+        selection = isolated_rule_selection(TST, fixable_by_code={TST001Manual.meta.code: False, TST002UnexpectedFix.meta.code: True})
+        module = cst.parse_module("x = 1\n")
+
+        check_result = rule_runner.run_rules(module, path="a.py", settings=settings, line_ending="\n", rule_selection=selection, fix=False)
+        fix_result = rule_runner.run_rules(module, path="a.py", settings=settings, line_ending="\n", rule_selection=selection, fix=True)
+
+        self.assertIs(fix_result.module, module)
+        self.assertFalse(fix_result.source_changed)
+        self.assertEqual(fix_result.fixed_findings, ())
+        self.assertEqual(fix_result.unfixed_findings, check_result.unfixed_findings)
+        self.assertEqual(fix_result.errors, ())
+        self.assertEqual(fix_calls, [])
+
+    def test_rule_source_formatter_precheck_uses_effective_fixability(self) -> None:
+        fix_calls: list[str] = []
+
+        class TST(rule_base.RuleCategoryBase):
+            meta = rule_models.RuleCategoryMetadata(prefix="TST", name="test", url=None)
+
+        @rule_registration.register_rule_to(TST)
+        class TST001ConfiguredUnfixable(rule_base.RuleBase):
+            meta = rule_models.RuleMetadata(
+                code=rule_codes.RuleCode("TST001"),
+                name="configured-unfixable",
+                message="Configured unfixable",
+                fix_availability=rule_models.FixAvailability.ALWAYS,
+                stable_since="1.0.0",
+                setting_effects=(),
+                incompatible_with=(),
+            )
+
+            @classmethod
+            def check(cls, context: rule_base.RuleContext) -> tuple[rule_models.RuleFinding, ...]:
+                del context
+                return (rule_models.RuleFinding(rule=cls.meta, line_numbers=(1,)),)
+
+            @classmethod
+            def fix(cls, context: rule_base.RuleContext) -> rule_base.RuleFixResult:
+                del cls
+                fix_calls.append(context.source)
+                return rule_base.RuleFixResult(module=context.module)
+
+        settings = CheckSettings()
+        selection = isolated_rule_selection(TST, fixable_by_code={TST001ConfiguredUnfixable.meta.code: False})
+
+        result = formatter.format_source("x = 1\n", "a.py", settings=settings, rule_selection=selection, fix=True)
+
+        self.assertEqual(result.new_source, "x = 1\n")
+        self.assertFalse(result.modified)
+        self.assertEqual(result.fixed_findings, collections.Counter())
+        self.assertEqual(result.unfixed_findings, (RuleFinding(rule=TST001ConfiguredUnfixable.meta, line_numbers=(1,), instance_fixable=False),))
+        self.assertFalse(result.unfixed_findings[0].fixable)
+        self.assertEqual(result.errors, ())
+        self.assertEqual(fix_calls, [])
+
+    def test_rule_source_formatter_runs_fix_pass_when_precheck_finds_fixable_finding(self) -> None:
+        fix_calls: list[str] = []
+
+        class TST(rule_base.RuleCategoryBase):
+            meta = rule_models.RuleCategoryMetadata(prefix="TST", name="test", url=None)
+
+        @rule_registration.register_rule_to(TST)
+        class TST001InsertLeadingLine(rule_base.RuleBase):
+            meta = rule_models.RuleMetadata(
+                code=rule_codes.RuleCode("TST001"),
+                name="insert-leading-line",
+                message="Insert leading line",
+                fix_availability=rule_models.FixAvailability.ALWAYS,
+                stable_since="1.0.0",
+                setting_effects=(),
+                incompatible_with=(),
+            )
+
+            @classmethod
+            def check(cls, context: rule_base.RuleContext) -> tuple[rule_models.RuleFinding, ...]:
+                if context.module.header:
+                    return ()
+                return (rule_models.RuleFinding(rule=cls.meta, line_numbers=(1,)),)
+
+            @classmethod
+            def fix(cls, context: rule_base.RuleContext) -> rule_base.RuleFixResult:
+                fix_calls.append(context.source)
+                if context.module.header:
+                    return rule_base.RuleFixResult(module=context.module)
+                return rule_base.RuleFixResult(module=context.module.with_changes(header=(cst.EmptyLine(),)), fixed_findings=(rule_models.RuleFinding(rule=cls.meta, line_numbers=(1,)),))
+
+        settings = CheckSettings()
+        result = formatter.format_source("x = 1\n", "a.py", settings=settings, rule_selection=isolated_rule_selection(TST), fix=True)
+
+        self.assertEqual(result.new_source, "\nx = 1\n")
+        self.assertTrue(result.modified)
+        self.assertEqual(result.fixed_findings, collections.Counter({TST001InsertLeadingLine.meta: 1}))
+        self.assertEqual(result.unfixed_findings, ())
+        self.assertEqual(result.errors, ())
+        self.assertEqual(fix_calls, ["x = 1\n", "\nx = 1\n"])
+
+    def test_rule_source_formatter_discards_precheck_errors_when_falling_back(self) -> None:
+        fix_calls: list[str] = []
+
+        class TST(rule_base.RuleCategoryBase):
+            meta = rule_models.RuleCategoryMetadata(prefix="TST", name="test", url=None)
+
+        @rule_registration.register_rule_to(TST)
+        class TST001BrokenCheck(rule_base.RuleBase):
+            meta = rule_models.RuleMetadata(
+                code=rule_codes.RuleCode("TST001"),
+                name="broken-check",
+                message="Broken check",
+                fix_availability=rule_models.FixAvailability.ALWAYS,
+                stable_since="1.0.0",
+                setting_effects=(),
+                incompatible_with=(),
+            )
+
+            @classmethod
+            def check(cls, context: rule_base.RuleContext) -> tuple[rule_models.RuleFinding, ...]:
+                del cls, context
+                raise RuntimeError("broken check")
+
+            @classmethod
+            def fix(cls, context: rule_base.RuleContext) -> rule_base.RuleFixResult:
+                del cls
+                fix_calls.append(context.source)
+                return rule_base.RuleFixResult(module=context.module)
+
+        settings = CheckSettings()
+        result = formatter.format_source("x = 1\n", "a.py", settings=settings, rule_selection=isolated_rule_selection(TST), fix=True)
+
+        self.assertEqual(result.new_source, "x = 1\n")
+        self.assertFalse(result.modified)
+        self.assertEqual(result.fixed_findings, collections.Counter())
+        self.assertEqual(result.unfixed_findings, ())
+        self.assertEqual(result.errors, ("a.py: TST001 check failed: broken check",))
+        self.assertEqual(fix_calls, ["x = 1\n"])
 
     def test_rule_fix_pass_same_module_noop_skips_source_comparison(self) -> None:
         code_accesses: list[cst.Module] = []
