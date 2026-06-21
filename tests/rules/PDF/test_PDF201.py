@@ -136,7 +136,7 @@ def test_google_section_syntax_is_not_separated_without_google_convention(conven
     assert not result.fixed_findings
 
 
-@pytest.mark.parametrize("convention", (DocstringConvention.NONE, DocstringConvention.GOOGLE, DocstringConvention.PEP257))
+@pytest.mark.parametrize("convention", (DocstringConvention.NONE, DocstringConvention.PEP257, DocstringConvention.GOOGLE))
 def test_numpy_section_syntax_is_separated_as_heading_without_numpy_convention(convention: DocstringConvention) -> None:
     source = 'def function(value):\n    """Summary.\n    Parameters\n    ----------\n    value : int\n        Description.\n    """\n'
     settings = CheckSettings(select=("PDF201",), docstring_convention=convention, docstring_blank_line_after_last_section=True)

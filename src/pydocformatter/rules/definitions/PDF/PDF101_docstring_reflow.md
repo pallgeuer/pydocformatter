@@ -5,7 +5,7 @@ Fix is usually available.
 ## What it does
 Checks for docstring text regions whose normalized wrapping does not match the configured line length and indentation settings.
 
-This rule rewrites safely mapped simple string docstrings by replacing the complete string literal with an equivalent literal that preserves the original string prefix, quote delimiter, and reusable source spellings for moved text. It can reflow summaries, paragraphs, convention section descriptions, rest field descriptions, list items, and block quotes.
+This rule rewrites safely mapped simple string docstrings by replacing the complete string literal with an equivalent literal that preserves the original string prefix, quote delimiter, and reusable source spellings for moved text. It can reflow summaries, paragraphs, convention section descriptions, reST field descriptions, list items, and block quotes.
 
 PDF101 treats each reflowable semantic region independently. It joins consecutive physical lines in the same region before wrapping, so a finding can be emitted even when no individual input line is over the configured line length. Blank lines and protected structures remain region boundaries.
 
@@ -96,7 +96,7 @@ def fetch(path, payload, timeout):
     """
 ```
 
-Rest fields keep field-prefix hanging indentation under the rest convention:
+reST fields keep field-prefix hanging indentation under the reST convention:
 
 ```pydocfmt-example
 [settings]
@@ -217,7 +217,7 @@ def example():
 - `url-aware-wrapping`: Enables URL-aware line balancing without splitting URL tokens.
 - `line-ending`: Line ending used inside rewritten docstring literals. Untouched source outside the replacement is preserved.
 - `indent-width`: Tab display width used for wrapping calculations and generated continuation indentation.
-- `docstring-convention`: Enables convention-aware parsing for Google sections, NumPy sections, or rest fields.
+- `docstring-convention`: Enables convention-aware parsing for Google sections, NumPy sections, or reST fields.
 - `docstring-parse-list-items`: Controls whether list items are reflowed with list hanging indentation.
 - `docstring-parse-headings`: Controls whether Markdown and reStructuredText headings are protected.
 - `docstring-parse-doctests`: Controls whether doctest transcripts are protected.

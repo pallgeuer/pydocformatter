@@ -7,7 +7,7 @@ Rule is ignored if `docstring-convention` is `numpy` or `pep257`.
 ## What it does
 Checks that the docstring summary punctuation target ends with terminal punctuation: a period, question mark, exclamation point, or Unicode ellipsis (`\u2026`).
 
-The target is the final non-adornment line of the first logical summary paragraph. Empty docstrings, parser-recognized section-only docstrings, rest field-only docstrings under the rest convention, and targets ending with a backslash are skipped. Underlined title-style summaries are skipped when `docstring-parse-headings` is enabled. The automatic fix only inserts a period at the end of the trimmed target line; summaries ending with `,`, `:`, or `;` are reported but not changed.
+The target is the final non-adornment line of the first logical summary paragraph. Empty docstrings, parser-recognized section-only docstrings, reST field-only docstrings under the reST convention, and targets ending with a backslash are skipped. Underlined title-style summaries are skipped when `docstring-parse-headings` is enabled. The automatic fix only inserts a period at the end of the trimmed target line; summaries ending with `,`, `:`, or `;` are reported but not changed.
 
 ## Why is this useful?
 Terminal punctuation keeps summary lines sentence-like without forcing every valid question or exclamation into a period.
@@ -118,7 +118,7 @@ def backslash():
 [output=unchanged]
 ```
 
-Rest field-only docstrings are skipped under the rest convention:
+reST field-only docstrings are skipped under the reST convention:
 
 ```pydocfmt-example
 [settings]

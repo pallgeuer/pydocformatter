@@ -5,7 +5,7 @@ Fix is always available.
 ## What it does
 Checks for safely provable missing blank logical lines inside docstrings.
 
-PDF201 inserts exactly one blank line when a blank separator is required and the surrounding structure is unambiguous. It inserts a separator between a one-line summary and a following recognized structure, including convention sections, rest fields under the rest convention, headings, lists, doctests, code fences, block quotes, tables, directives, literal blocks, and verbatim blocks.
+PDF201 inserts exactly one blank line when a blank separator is required and the surrounding structure is unambiguous. It inserts a separator between a one-line summary and a following recognized structure, including convention sections, reST fields under the reST convention, headings, lists, doctests, code fences, block quotes, tables, directives, literal blocks, and verbatim blocks.
 
 With `docstring-convention = "google"` or `docstring-convention = "numpy"`, PDF201 also inserts missing blank lines before recognized top-level sections. This covers a section that follows a paragraph and adjacent recognized sections. It does not insert blank lines between a section header and its content, and it does not insert blank lines between consecutive convention entries inside a section.
 
@@ -146,7 +146,7 @@ def choices() -> None:
     """
 ````
 
-Rest fields after a summary are separated when the rest convention is active:
+reST fields after a summary are separated when the reST convention is active:
 
 ```pydocfmt-example
 [settings]
@@ -266,7 +266,7 @@ def concatenated() -> None:
 ```
 
 ## Options
-- `docstring-convention`: Enables Google section, NumPy section, and rest field recognition. `none` and `pep257` leave convention syntax as generic docstring content, though other enabled generic structure parsers can still recognize headings, lists, and other structures.
+- `docstring-convention`: Enables Google section, NumPy section, and reST field recognition. `none` and `pep257` leave convention syntax as generic docstring content, though other enabled generic structure parsers can still recognize headings, lists, and other structures.
 - `docstring-blank-line-style`: Controls the source whitespace used on inserted blank lines.
 - `docstring-blank-line-after-last-section`: Requires one trailing blank line after the final recognized Google or NumPy section when enabled.
 - `docstring-parse-*`: Controls whether generic structures such as lists, headings, doctests, code fences, block quotes, tables, directives, and literal blocks are recognized as structures after a summary.

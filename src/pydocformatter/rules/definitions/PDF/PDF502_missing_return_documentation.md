@@ -7,7 +7,7 @@ Checks function and method docstrings for missing return-value documentation whe
 
 A meaningful return is `return <expr>` where `<expr>` is not `None`. Bare `return`, `return None`, any generator function, functions without docstrings, abstract methods, and stub functions are ignored. A function is a generator for this rule if it contains any top-level `yield`, including bare `yield` and `yield None`. Nested functions, classes, and lambdas are ignored by the enclosing function and checked independently when they have their own docstrings.
 
-Return documentation is present when the active docstring parser finds a non-empty Google return section, NumPy return section, or rest return field. In Google return sections, bare `None` and `None.` entries are treated like `None:` entries.
+Return documentation is present when the active docstring parser finds a non-empty Google return section, NumPy return section, or reST return field. In Google return sections, bare `None` and `None.` entries are treated like `None:` entries.
 
 By default, this rule reports missing return documentation only when the docstring already has recognized return documentation, such as an empty return section. Broader shared missing-documentation modes can require return documentation for public docstrings with body content, or for all public docstrings.
 
@@ -68,7 +68,7 @@ def empty_generator():
 PDF502: Line 7: Function return value is missing docstring documentation
 ```
 
-Recognized return documentation satisfies the rule. Google sections, rest fields, and NumPy sections are all valid when the matching convention is active:
+Recognized return documentation satisfies the rule. Google sections, reST fields, and NumPy sections are all valid when the matching convention is active:
 
 ```pydocfmt-example
 [settings]
@@ -128,7 +128,7 @@ def numpy_value():
 [output=unchanged]
 ```
 
-The active convention controls which documentation is recognized. Outside the rest convention, a rest-looking return field is ordinary text and does not document the return value:
+The active convention controls which documentation is recognized. Outside the reST convention, a reST-looking return field is ordinary text and does not document the return value:
 
 ```pydocfmt-example
 [settings]
@@ -149,6 +149,6 @@ PDF502: Line 6: Function return value is missing docstring documentation
 ```
 
 ## Options
-- `docstring-convention`: Controls whether Google return sections, NumPy return sections, or rest return fields such as `:returns:` and `:rtype:` are recognized.
+- `docstring-convention`: Controls whether Google return sections, NumPy return sections, or reST return fields such as `:returns:` and `:rtype:` are recognized.
 - `docstring-missing-documentation`: Controls when missing return documentation is reported. `has-section` reports only docstrings with recognized return documentation. `non-summary-docstrings` additionally reports public docstrings with more than just a summary. `all-docstrings` additionally reports all public docstrings.
 - `docstring-missing-documentation-public-only`: When `true`, the broad parts of `non-summary-docstrings` and `all-docstrings` apply only to public functions and methods. Explicit return documentation is always checked, including for private functions.

@@ -36,7 +36,7 @@ class PDF408RepeatedSection(RuleBase):
 
 
 def _findings(context: RuleContext, *, rule: RuleMetadata) -> tuple[RuleFinding, ...]:
-    """Return findings for repeated convention sections or rest fields."""
+    """Return findings for repeated convention sections or reST fields."""
     data = PDF.require_data(context)
     findings: list[RuleFinding] = []
     for docstring in data.docstrings:

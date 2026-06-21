@@ -5,7 +5,7 @@ Fix is not available.
 ## What it does
 Checks that parsed docstring parameter documentation only names parameters that exist in the function signature.
 
-The rule compares parsed Google, NumPy, and rest parameter entries against positional-only, positional-or-keyword, keyword-only, `*args`, and `**kwargs` parameters. Leading `*` characters are ignored for comparison, so `args` documents `*args` and `kwargs` documents `**kwargs`. Parameter names are otherwise matched exactly and case-sensitively.
+The rule compares parsed Google, NumPy, and reST parameter entries against positional-only, positional-or-keyword, keyword-only, `*args`, and `**kwargs` parameters. Leading `*` characters are ignored for comparison, so `args` documents `*args` and `kwargs` documents `**kwargs`. Parameter names are otherwise matched exactly and case-sensitively.
 
 For `**kwargs: Unpack[Options]`, `typing.Unpack[Options]`, and `typing_extensions.Unpack[Options]`, same-module class-based `TypedDict` keys from `Options` are also accepted as documented keyword names. If the unpack target cannot be resolved locally, PDF501 conservatively suppresses extraneous-parameter findings for that function to avoid false positives for valid imported `TypedDict` keys.
 
@@ -38,7 +38,7 @@ def value(first):
 PDF501: Line 6: Docstring documents parameter 'second' that is not in the function signature
 ```
 
-The rule uses all parsed parameter documentation for a docstring. Protected example text is ignored, while parsed rest parameter fields are still checked:
+The rule uses all parsed parameter documentation for a docstring. Protected example text is ignored, while parsed reST parameter fields are still checked:
 
 ````pydocfmt-example
 [settings]
@@ -124,7 +124,7 @@ class Builder:
 [output=unchanged]
 ```
 
-Rest fields are parsed only under the rest convention. With another convention, rest-looking text is ordinary docstring content and is not checked by this rule:
+reST fields are parsed only under the reST convention. With another convention, reST-looking text is ordinary docstring content and is not checked by this rule:
 
 ```pydocfmt-example
 [settings]
@@ -134,11 +134,11 @@ docstring-convention = "none"
 def value(first):
     """Return the value.
 
-    :param second: Ordinary text outside the rest convention.
+    :param second: Ordinary text outside the reST convention.
     """
 
 [output=unchanged]
 ```
 
 ## Options
-- `docstring-convention`: Controls whether Google parameter sections, NumPy parameter sections, or rest parameter fields are parsed. With `none` and `pep257`, convention syntax is ordinary content.
+- `docstring-convention`: Controls whether Google parameter sections, NumPy parameter sections, or reST parameter fields are parsed. With `none` and `pep257`, convention syntax is ordinary content.

@@ -937,6 +937,10 @@ class TestSettings(unittest.TestCase):
         self.assertFalse(overridden.comment_detect_code)
 
     def test_docstring_parsing_settings_are_loaded_and_validated(self) -> None:
+        definition = next(definition for definition in pydocformatter_settings.SETTINGS_SCHEMA.definitions if definition.field == "docstring_convention")
+        assert definition.cli is not None
+        self.assertEqual(definition.cli.choices, ("none", "pep257", "google", "numpy", "rest"))
+
         for convention in pydocformatter_settings.DocstringConvention:
             config = pydocformatter_settings.SETTINGS_SCHEMA.load(field_overrides={"docstring_convention": convention.value})
             self.assertEqual(config.docstring_convention, convention)

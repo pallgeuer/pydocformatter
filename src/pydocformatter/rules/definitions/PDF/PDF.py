@@ -86,7 +86,7 @@ class DocstringValueLine:
 
 @dataclasses.dataclass(frozen=True)
 class DocstringEntry:
-    """One parsed convention section entry or rest field."""
+    """One parsed convention section entry or reST field."""
 
     kind: DocstringEntryKind
     names: tuple[str, ...]
@@ -1206,7 +1206,7 @@ def _entry_kind(convention: settings_check.DocstringConvention, section_name: st
 
 
 def _rest_entry_kind(field: str) -> DocstringEntryKind:
-    """Return the semantic entry kind for a rest field name."""
+    """Return the semantic entry kind for a reST field name."""
     if field in docstring_sections.REST_PARAMETER_VALUE_FIELDS or field in docstring_sections.REST_PARAMETER_TYPE_FIELDS:
         return DocstringEntryKind.PARAMETER
     if field in docstring_sections.REST_RETURN_VALUE_FIELDS or field in docstring_sections.REST_RETURN_TYPE_FIELDS:

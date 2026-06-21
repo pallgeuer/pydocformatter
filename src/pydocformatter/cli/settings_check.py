@@ -68,10 +68,10 @@ class DocstringConvention(enum.StrEnum):
     """Conventions used to parse semantic docstring sections."""
 
     NONE = "none"
+    PEP257 = "pep257"
     GOOGLE = "google"
     NUMPY = "numpy"
     REST = "rest"
-    PEP257 = "pep257"
 
 
 class DocstringBlankLineStyle(enum.StrEnum):
@@ -435,7 +435,7 @@ SETTINGS_SCHEMA = SettingsSchema(
             value_type=DocstringConvention,
             group=SettingsGroup.DOCSTRING_FORMATTING,
             help="Convention used to parse semantic docstring sections.",
-            documentation='Docstring convention; one of "none", "google", "numpy", "rest", or "pep257".',
+            documentation='Docstring convention; one of "none", "pep257", "google", "numpy", or "rest".',
         ),
         SettingDefinition(
             field="docstring_blank_line_style",

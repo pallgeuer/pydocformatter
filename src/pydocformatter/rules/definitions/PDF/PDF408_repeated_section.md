@@ -5,11 +5,11 @@ Fix is not available.
 Rule is ignored if `docstring-convention` is `none` or `pep257`.
 
 ## What it does
-PDF408 reports recognized Google and NumPy sections, plus rest fields under the rest convention, that repeat within one docstring under the active convention. The first occurrence is allowed, and each later matching item is reported.
+PDF408 reports recognized Google and NumPy sections, plus reST fields under the reST convention, that repeat within one docstring under the active convention. The first occurrence is allowed, and each later matching item is reported.
 
 Known spelling variants for the same section are treated as repeats, such as Google `Args` and `Arguments`, Google `Example` and `Examples`, Google `Return` and `Returns`, Google `Warning` and `Warnings`, or NumPy `Other Parameters` and `Other Params`. Matching is case-insensitive. Google `Warns` documents emitted warnings and is distinct from the `Warning`/`Warnings` admonition sections.
 
-The rule only considers syntax that is recognized by the active convention. Google-style recognition is used only when `docstring-convention = "google"`, NumPy-style recognition is used only when `docstring-convention = "numpy"`, and rest fields are recognized only when `docstring-convention = "rest"`. For example, a repeated NumPy-only `Parameters` section is ignored under the Google convention, and a Google-style `Parameters:` line is ignored under the NumPy convention.
+The rule only considers syntax that is recognized by the active convention. Google-style recognition is used only when `docstring-convention = "google"`, NumPy-style recognition is used only when `docstring-convention = "numpy"`, and reST fields are recognized only when `docstring-convention = "rest"`. For example, a repeated NumPy-only `Parameters` section is ignored under the Google convention, and a Google-style `Parameters:` line is ignored under the NumPy convention.
 
 PDF408 is diagnostic only. It does not merge repeated sections or otherwise rewrite the docstring.
 
@@ -270,7 +270,7 @@ def value(arg):
 PDF408: Line 9: Docstring section 'Other Params' repeats earlier section 'Other Parameters'
 ```
 
-PDF408 also reports repeated rest fields under the rest convention:
+PDF408 also reports repeated reST fields under the reST convention:
 
 ```pydocfmt-example
 [settings]
@@ -331,5 +331,5 @@ PDF408: Lines 2-6: Docstring section 'Args' repeats earlier section 'Args'
 ```
 
 ## Options
-- `docstring-convention`: Enables Google and NumPy section recognition and rest field recognition. `none` and `pep257` ignore this rule.
+- `docstring-convention`: Enables Google and NumPy section recognition and reST field recognition. `none` and `pep257` ignore this rule.
 - `docstring-parse-*`: Controls whether section-like text inside protected structures, such as literal blocks or code fences, is ignored as structure content or can be parsed as ordinary section text.

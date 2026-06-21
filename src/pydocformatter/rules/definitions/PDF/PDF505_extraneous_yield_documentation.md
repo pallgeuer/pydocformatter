@@ -7,7 +7,7 @@ Checks function and method docstrings for yield documentation on functions that 
 
 A meaningful yield is `yield <expr>` where `<expr>` is not `None`, or any `yield from <expr>`. Functions with no meaningful yield or only bare `yield` are treated as not having a yielded value to document. Non-empty yield documentation is allowed for explicit `yield None`. Functions without docstrings, abstract methods, and stub functions are ignored. Nested functions, classes, and lambdas are ignored by the enclosing function and checked independently when they have their own docstrings.
 
-The rule reports each recognized Google or NumPy yield section at the section header, and each parsed rest yield field at the field line. Empty yield sections and empty rest yield fields are still extraneous when the function does not yield a meaningful value. In Google yield sections, bare `None` and `None.` entries are treated like `None:` entries.
+The rule reports each recognized Google or NumPy yield section at the section header, and each parsed reST yield field at the field line. Empty yield sections and empty reST yield fields are still extraneous when the function does not yield a meaningful value. In Google yield sections, bare `None` and `None.` entries are treated like `None:` entries.
 
 ## Why is this useful?
 Extraneous yield sections can make an ordinary function look like a generator.
@@ -103,7 +103,7 @@ def delegated(values):
 [output=unchanged]
 ```
 
-The active convention controls what counts as yield documentation. Outside the rest convention, rest-looking yield fields are ordinary text and are not reported:
+The active convention controls what counts as yield documentation. Outside the reST convention, reST-looking yield fields are ordinary text and are not reported:
 
 ```pydocfmt-example
 [settings]
@@ -120,4 +120,4 @@ def values():
 ```
 
 ## Options
-- `docstring-convention`: Controls whether Google yield sections, NumPy yield sections, or rest yield fields such as `:yields:` and `:ytype:` are recognized.
+- `docstring-convention`: Controls whether Google yield sections, NumPy yield sections, or reST yield fields such as `:yields:` and `:ytype:` are recognized.

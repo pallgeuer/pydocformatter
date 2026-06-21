@@ -17,7 +17,7 @@ Implicit `self` and `cls` parameters on class-owned non-static methods are not r
 Documented parameters help callers understand accepted inputs without cross-checking implementation details.
 
 ## Ruff compatibility
-This rule replaces Ruff's `D417`. Unlike Ruff, it can also use parsed rest parameter fields and can be configured to require parameter documentation beyond docstrings that already contain parameter sections.
+This rule replaces Ruff's `D417`. Unlike Ruff, it can also use parsed reST parameter fields and can be configured to require parameter documentation beyond docstrings that already contain parameter sections.
 
 ## Examples
 With the default `has-section` mode, a missing parameter is reported once parameter documentation is present:
@@ -63,7 +63,7 @@ def value(first, second, third):
 PDF500: Line 1: Function parameter 'third' is missing docstring documentation
 ````
 
-Rest parameter fields are recognized under the rest convention:
+reST parameter fields are recognized under the reST convention:
 
 ```pydocfmt-example
 [settings]
@@ -261,6 +261,6 @@ class Builder:
 ```
 
 ## Options
-- `docstring-convention`: Controls whether Google parameter sections, NumPy parameter sections, or rest parameter fields are parsed. With `none` and `pep257`, convention syntax is ordinary content.
+- `docstring-convention`: Controls whether Google parameter sections, NumPy parameter sections, or reST parameter fields are parsed. With `none` and `pep257`, convention syntax is ordinary content.
 - `docstring-missing-documentation`: Controls when PDF500 is active. `has-section` reports only docstrings with recognized parameter documentation. `non-summary-docstrings` additionally reports public docstrings with more than just a summary. `all-docstrings` additionally reports all public docstrings.
 - `docstring-missing-documentation-public-only`: When `true`, the broad parts of `non-summary-docstrings` and `all-docstrings` apply only to public functions and methods. Normal public names plus `__init__`, `__new__`, and `__call__` are public for this setting; other underscore and dunder names are private. Explicit parameter documentation is always checked, including for private functions.

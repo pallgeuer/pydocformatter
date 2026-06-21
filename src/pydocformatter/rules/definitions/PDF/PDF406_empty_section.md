@@ -5,9 +5,9 @@ Fix is not available.
 Rule is ignored if `docstring-convention` is `none` or `pep257`.
 
 ## What it does
-PDF406 reports recognized Google and NumPy sections, plus rest fields under the rest convention, that contain no meaningful body content after their header or field marker. Header-only sections, sections containing only blank lines, and empty rest fields are findings.
+PDF406 reports recognized Google and NumPy sections, plus reST fields under the reST convention, that contain no meaningful body content after their header or field marker. Header-only sections, sections containing only blank lines, and empty reST fields are findings.
 
-Any non-blank section body content counts as content, including entries, prose, doctests, code fences, lists, block quotes, directives, literal blocks, tables, rest-looking text, and verbatim blocks. The rule is diagnostic-only and leaves source unchanged.
+Any non-blank section body content counts as content, including entries, prose, doctests, code fences, lists, block quotes, directives, literal blocks, tables, reST-looking text, and verbatim blocks. The rule is diagnostic-only and leaves source unchanged.
 
 ## Why is this useful?
 Empty sections imply documentation exists where readers will find none.
@@ -95,7 +95,7 @@ def example():
 [output=unchanged]
 ````
 
-Empty rest fields are checked under the rest convention:
+Empty reST fields are checked under the reST convention:
 
 ```pydocfmt-example
 [settings]
@@ -131,4 +131,4 @@ def value(arg):
 ```
 
 ## Options
-- `docstring-convention`: Enables Google and NumPy section recognition and rest field recognition. `none` and `pep257` ignore this rule.
+- `docstring-convention`: Enables Google and NumPy section recognition and reST field recognition. `none` and `pep257` ignore this rule.

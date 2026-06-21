@@ -7,7 +7,7 @@ Rule is ignored if `docstring-convention` is `none` or `pep257`.
 ## What it does
 PDF411 reports parsed convention type-like tokens whose internal spacing can be safely normalized with Python expression parsing.
 
-The fix applies only to already parsed Google, NumPy, and rest type slots, such as parameter, attribute, method, return, and yield types, plus rest `:type:`, `:rtype:`, `:ytype:`, and typed `:param Type name:` fields. It parses the token with `ast.parse(..., mode="eval")`, accepts only conservative type-like syntax, unparses the expression, and replaces the original token only when the generated spelling reparses to the same AST and differs only by whitespace.
+The fix applies only to already parsed Google, NumPy, and reST type slots, such as parameter, attribute, method, return, and yield types, plus reST `:type:`, `:rtype:`, `:ytype:`, and typed `:param Type name:` fields. It parses the token with `ast.parse(..., mode="eval")`, accepts only conservative type-like syntax, unparses the expression, and replaces the original token only when the generated spelling reparses to the same AST and differs only by whitespace.
 
 The rule does not normalize arbitrary prose, narrative section fields, value-field descriptions, malformed entry-like text, continuation descriptions, string forward references, calls, dicts, sets, redundant parentheses, or unsupported expressions. Exception-list separators and backticks are owned by PDF410; PDF411 does not reinterpret exception lists as type unions. Concatenated docstrings and source mappings that cannot be safely rewritten are reported without a fix.
 
@@ -102,7 +102,7 @@ def value(arg):
     """
 ```
 
-PDF411 normalizes rest parameter type arguments and type fields, but leaves value-field prose alone:
+PDF411 normalizes reST parameter type arguments and type fields, but leaves value-field prose alone:
 
 ```pydocfmt-example
 [settings]
@@ -286,5 +286,5 @@ PDF411: Lines 2-6: Docstring type-like token spacing should be normalized
 ```
 
 ## Options
-- `docstring-convention`: Controls whether Google sections, NumPy sections, or rest fields are recognized. Ignores PDF411 when set to `none` or `pep257`.
+- `docstring-convention`: Controls whether Google sections, NumPy sections, or reST fields are recognized. Ignores PDF411 when set to `none` or `pep257`.
 - `docstring-parse-*`: Parser protection settings can affect whether entry-like text inside structures such as code fences and literal blocks is opaque or can be parsed as convention entries.

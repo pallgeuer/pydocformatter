@@ -9,7 +9,7 @@ PDF203 reports only summary blocks. It does not report one-line summaries, parag
 
 When selected together with `PDF101`, short wrapped summaries can be reflowed before PDF203 checks the final source. When selected together with `PDF201`, recognized structures can be separated from a one-line summary before PDF203 checks. Summaries that remain multi-line after selected fixes are reported for human rewriting or for a human decision about whether a blank line is missing between the summary and description.
 
-Parsing settings and the active convention affect what counts as a summary. Recognized structures such as list items, headings, doctests, directives, rest fields under the rest convention, block quotes, code fences, and tables are protected. Disabling the matching `docstring-parse-*` setting can make generic structure lines become part of the parsed summary and therefore reportable.
+Parsing settings and the active convention affect what counts as a summary. Recognized structures such as list items, headings, doctests, directives, reST fields under the reST convention, block quotes, code fences, and tables are protected. Disabling the matching `docstring-parse-*` setting can make generic structure lines become part of the parsed summary and therefore reportable.
 
 ## Why is this useful?
 A multi-line summary can be ambiguous: it may be a long summary that needs rewriting by a human, or a missing blank line between the summary and description.
@@ -136,7 +136,7 @@ def fenced() -> None:
 [output=unchanged]
 ````
 
-Rest fields are protected under the rest convention, so a continued rest field is not a multi-line summary:
+reST fields are protected under the reST convention, so a continued reST field is not a multi-line summary:
 
 ```pydocfmt-example
 [settings]
@@ -183,5 +183,5 @@ PDF203: Lines 2-3: Docstring summary spans 2 lines and does not fit on one line
 ```
 
 ## Options
-- `docstring-convention`: Controls whether Google sections, NumPy sections, and rest fields are recognized instead of treated as summary text.
+- `docstring-convention`: Controls whether Google sections, NumPy sections, and reST fields are recognized instead of treated as summary text.
 - `docstring-parse-*`: Controls whether generic structures such as lists, headings, doctests, directives, block quotes, code fences, and tables are protected from summary-length checks.

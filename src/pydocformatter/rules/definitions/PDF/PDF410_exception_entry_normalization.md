@@ -9,7 +9,7 @@ PDF410 reports parsed exception and warning entries whose exception-name lists a
 
 The canonical spelling uses simple or dotted exception names without backtick code spans, with multiple exception names separated by commas. The fix removes single-backtick code spans around individual exception names or around a whole parsed exception-name list, converts pipe separators to commas, and normalizes unambiguous spacing around the parsed exception entry prefix.
 
-Google `Raise`/`Raises` and `Warn`/`Warns` entries, NumPy exception and warning entries, and rest `raise`/`raises`/`except`/`exception` fields are supported under their matching conventions. Google `Warning` and `Warnings` admonition sections are not exception-entry sections for this rule. Nameless rest exception fields such as `:raises:` are left unchanged because their body is prose, not a parsed exception-name list.
+Google `Raise`/`Raises` and `Warn`/`Warns` entries, NumPy exception and warning entries, and reST `raise`/`raises`/`except`/`exception` fields are supported under their matching conventions. Google `Warning` and `Warnings` admonition sections are not exception-entry sections for this rule. Nameless reST exception fields such as `:raises:` are left unchanged because their body is prose, not a parsed exception-name list.
 
 The rule only rewrites entries that parse as simple or dotted exception names. It does not normalize arbitrary prose, malformed exception lists, double-backtick code spans, return/yield type expressions, or description text. Concatenated docstrings and source mappings that cannot be safely rewritten are reported without a fix.
 
@@ -164,7 +164,7 @@ def value(arg):
     """
 ```
 
-PDF410 normalizes rest exception field aliases, including single exception entries and a whole exception-name list wrapped in one code span:
+PDF410 normalizes reST exception field aliases, including single exception entries and a whole exception-name list wrapped in one code span:
 
 ```pydocfmt-example
 [settings]
@@ -189,7 +189,7 @@ def value(arg):
     """
 ```
 
-PDF410 leaves malformed exception-like prose, ambiguous separators, and nameless rest exception fields unchanged:
+PDF410 leaves malformed exception-like prose, ambiguous separators, and nameless reST exception fields unchanged:
 
 ```pydocfmt-example
 [settings]
@@ -224,5 +224,5 @@ PDF410: Lines 2-4: Docstring exception entry should use canonical spelling
 ```
 
 ## Options
-- `docstring-convention`: Controls whether Google sections, NumPy sections, or rest fields are recognized. Ignores PDF410 when set to `none` or `pep257`.
+- `docstring-convention`: Controls whether Google sections, NumPy sections, or reST fields are recognized. Ignores PDF410 when set to `none` or `pep257`.
 - `docstring-parse-*`: Parser protection settings can affect whether entry-like text inside structures such as code fences and literal blocks is opaque or can be parsed as convention entries.

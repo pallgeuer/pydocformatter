@@ -35,7 +35,7 @@ class PDF406EmptySection(RuleBase):
 
 
 def _findings(context: RuleContext, *, rule: RuleMetadata) -> tuple[RuleFinding, ...]:
-    """Return findings for recognized sections or rest fields with no body content."""
+    """Return findings for recognized sections or reST fields with no body content."""
     data = PDF.require_data(context)
     findings: list[RuleFinding] = []
     for docstring in data.docstrings:

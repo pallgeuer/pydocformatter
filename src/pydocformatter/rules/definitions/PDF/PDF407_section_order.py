@@ -36,7 +36,7 @@ class PDF407SectionOrder(RuleBase):
 
 
 def _findings(context: RuleContext, *, rule: RuleMetadata) -> tuple[RuleFinding, ...]:
-    """Return findings for convention sections or rest fields that appear out of order."""
+    """Return findings for convention sections or reST fields that appear out of order."""
     data = PDF.require_data(context)
     findings: list[RuleFinding] = []
     for docstring in data.docstrings:

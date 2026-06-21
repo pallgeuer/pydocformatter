@@ -26,7 +26,7 @@ class PDF107MultilineOpeningQuotesSeparateLine(RuleBase):
                 effects=(
                     RuleSettingEffectValues(
                         effect=RuleSettingEffect.IGNORED,
-                        values=(DocstringConvention.NONE, DocstringConvention.GOOGLE, DocstringConvention.NUMPY, DocstringConvention.REST, DocstringConvention.PEP257),
+                        values=(DocstringConvention.NONE, DocstringConvention.PEP257, DocstringConvention.GOOGLE, DocstringConvention.NUMPY, DocstringConvention.REST),
                     ),
                 ),
             ),

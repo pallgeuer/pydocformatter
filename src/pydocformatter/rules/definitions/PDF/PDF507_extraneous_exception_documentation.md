@@ -9,7 +9,7 @@ Checks function and method docstrings for documented exception classes that are 
 
 The rule recognizes direct raises such as `raise ValueError`, `raise ValueError(...)`, `raise errors.ValueError`, and `raise errors.ValueError(...)`. Bare re-raises and dynamic raises such as `raise error` are ignored. Exception names are compared case-sensitively. Qualified names match exactly when both sides are qualified; otherwise the final class-name component is compared, so `errors.CustomError()` matches documented `CustomError` but not documented `other.CustomError`. Duplicate stale documented exception entries produce duplicate findings.
 
-Exception documentation is read from recognized `Raises` sections and parsed rest exception fields. Prose-only `Raises` content and warning sections such as `Warns` and `Warnings` are not exception documentation for this rule. Functions without docstrings, abstract methods, and stub functions are ignored. Nested functions, classes, and lambdas are ignored by the enclosing function and checked independently when they have their own docstrings.
+Exception documentation is read from recognized `Raises` sections and parsed reST exception fields. Prose-only `Raises` content and warning sections such as `Warns` and `Warnings` are not exception documentation for this rule. Functions without docstrings, abstract methods, and stub functions are ignored. Nested functions, classes, and lambdas are ignored by the enclosing function and checked independently when they have their own docstrings.
 
 ## Why is this useful?
 Extraneous exception documentation can misstate the failure modes of an API.
@@ -166,7 +166,7 @@ def warning_doc():
 [output=unchanged]
 ```
 
-Rest exception fields are checked only under the rest convention:
+reST exception fields are checked only under the reST convention:
 
 ```pydocfmt-example
 [settings]
@@ -201,4 +201,4 @@ def parse(value):
 ```
 
 ## Options
-- `docstring-convention`: Controls whether Google `Raises` sections, NumPy `Raises` sections, or rest exception fields such as `:raises ValueError:` are recognized. Ignores PDF507 for broad rule selections under every convention.
+- `docstring-convention`: Controls whether Google `Raises` sections, NumPy `Raises` sections, or reST exception fields such as `:raises ValueError:` are recognized. Ignores PDF507 for broad rule selections under every convention.

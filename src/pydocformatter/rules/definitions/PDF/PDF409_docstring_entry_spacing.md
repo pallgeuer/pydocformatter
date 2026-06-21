@@ -5,9 +5,9 @@ Fix is sometimes available.
 Rule is ignored if `docstring-convention` is `none` or `pep257`.
 
 ## What it does
-PDF409 reports recognized convention entries and rest fields whose nominal prefix spacing is not canonical for the active docstring convention.
+PDF409 reports recognized convention entries and reST fields whose nominal prefix spacing is not canonical for the active docstring convention.
 
-For Google docstrings, the fix normalizes parsed parameter, attribute, method, field, return, yield, and exception entry prefixes. Starred parameters and dotted names are preserved. For NumPy docstrings, the fix normalizes comma-separated entry names and spacing around the name/type colon. For rest docstrings, the fix normalizes spacing around field names, field arguments, colons, and same-line descriptions.
+For Google docstrings, the fix normalizes parsed parameter, attribute, method, field, return, yield, and exception entry prefixes. Starred parameters and dotted names are preserved. For NumPy docstrings, the fix normalizes comma-separated entry names and spacing around the name/type colon. For reST docstrings, the fix normalizes spacing around field names, field arguments, colons, and same-line descriptions.
 
 The rule only targets entries and fields parsed under the active convention. It does not normalize arbitrary prose or malformed entry-like text, reflow continuation lines, or semantically rewrite type expressions beyond trimming leading and trailing whitespace around parsed type text. For parsed exception entries, PDF409 normalizes prefix spacing but preserves exception-list spelling such as backticks and pipe separators; PDF410 handles canonical exception-name spelling. Concatenated docstrings and source mappings that cannot be safely rewritten are reported without a fix.
 
@@ -109,7 +109,7 @@ def value(first, second):
     """
 ```
 
-PDF409 normalizes rest parameter, type, return, yield, and exception fields:
+PDF409 normalizes reST parameter, type, return, yield, and exception fields:
 
 ```pydocfmt-example
 [settings]
@@ -247,5 +247,5 @@ PDF409: Lines 2-4: Docstring convention entry spacing should be normalized
 ```
 
 ## Options
-- `docstring-convention`: Enables Google entry recognition, NumPy entry recognition, or rest field recognition. `none` and `pep257` ignore this rule.
+- `docstring-convention`: Enables Google entry recognition, NumPy entry recognition, or reST field recognition. `none` and `pep257` ignore this rule.
 - `docstring-parse-*`: Parser protection settings can affect whether entry-like text inside structures such as code fences and literal blocks is opaque or can be parsed as convention entries.

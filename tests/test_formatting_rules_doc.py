@@ -80,10 +80,10 @@ class TestFormattingRulesDoc(unittest.TestCase):
 
             if rule.code.prefix == "PDF":
                 self.assertEqual(row["None"], _convention_cell(rule, DocstringConvention.NONE))
+                self.assertEqual(row["PEP257"], _convention_cell(rule, DocstringConvention.PEP257))
                 self.assertEqual(row["Google"], _convention_cell(rule, DocstringConvention.GOOGLE))
                 self.assertEqual(row["NumPy"], _convention_cell(rule, DocstringConvention.NUMPY))
-                self.assertEqual(row["Rest"], _convention_cell(rule, DocstringConvention.REST))
-                self.assertEqual(row["PEP257"], _convention_cell(rule, DocstringConvention.PEP257))
+                self.assertEqual(row["reST"], _convention_cell(rule, DocstringConvention.REST))
                 self.assertEqual(row["Conflicts"], _conflicts_cell(rule))
 
 
