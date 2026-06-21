@@ -3,10 +3,11 @@ from __future__ import annotations
 import pydocformatter.rules.definition_helpers.parameter_documentation as parameter_documentation
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 import pydocformatter.rules.registration as rule_registration
+from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase, RuleContext
 from pydocformatter.rules.definitions.PDF.PDF import PDF
-from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetadata
+from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
 
 
 @rule_registration.register_rule_to(PDF)
@@ -17,7 +18,12 @@ class PDF500MissingParameterDocumentation(RuleBase):
         message="Function parameter is missing docstring documentation",
         fix_availability=FixAvailability.NEVER,
         stable_since="1.0.0",
-        setting_effects=(),
+        setting_effects=(
+            RuleSettingEffects(
+                setting="docstring_convention",
+                effects=(RuleSettingEffectValues(effect=RuleSettingEffect.IGNORED, values=(DocstringConvention.PEP257, DocstringConvention.NUMPY)),),
+            ),
+        ),
         incompatible_with=(),
     )
 

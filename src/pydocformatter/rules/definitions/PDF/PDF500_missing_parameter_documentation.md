@@ -2,6 +2,8 @@
 
 Fix is not available.
 
+Rule is ignored if `docstring-convention` is `numpy` or `pep257`.
+
 ## What it does
 Checks that function signature parameters are documented in parsed docstring parameter documentation.
 
@@ -17,7 +19,7 @@ Implicit `self` and `cls` parameters on class-owned non-static methods are not r
 Documented parameters help callers understand accepted inputs without cross-checking implementation details.
 
 ## Ruff compatibility
-This rule replaces Ruff's `D417`. Unlike Ruff, it can also use parsed reST parameter fields and can be configured to require parameter documentation beyond docstrings that already contain parameter sections.
+This rule replaces Ruff's `D417`. Like Ruff, broad convention-based selections enable it for Google-style docstrings and ignore it for NumPy and PEP 257 conventions. Unlike Ruff, it can also use parsed reST parameter fields and can be configured to require parameter documentation beyond docstrings that already contain parameter sections.
 
 ## Examples
 With the default `has-section` mode, a missing parameter is reported once parameter documentation is present:

@@ -2,7 +2,7 @@
 
 Fix is sometimes available.
 
-Rule is ignored if `docstring-convention` is `none`, `numpy`, or `pep257`.
+Rule is ignored if `docstring-convention` is `none`, `numpy`, `pep257`, or `rest`.
 
 ## What it does
 PDF403 reports recognized Google section names that have section content on the same logical line when that line is parsed as ordinary paragraph text. The target layout keeps the section name on its own line and moves the trailing content to the next line at the configured Google section body indentation.
@@ -13,7 +13,7 @@ The rule skips summary lines, protected structures such as code fences, and text
 Keeping section names on their own line makes section boundaries unambiguous for readers and convention-aware parsers.
 
 ## Ruff compatibility
-This rule is intended to replace the Google-style part of Ruff's `D406`.
+This rule covers a Google-specific section-header cleanup. Ruff's current `D406` default is NumPy-only, but pydocformatter enables PDF403 by default under the Google convention because the rule only affects recognized Google section headers.
 
 ## Examples
 PDF403 moves same-line Google section content below the section name:
@@ -124,5 +124,5 @@ def example():
 ````
 
 ## Options
-- `docstring-convention`: Enables Google section recognition. `none`, `numpy`, and `pep257` ignore this rule.
+- `docstring-convention`: Enables Google section recognition. `none`, `numpy`, `pep257`, and `rest` ignore this rule.
 - `indent-style` and `indent-width`: Control the generated indentation of content moved below the section name.

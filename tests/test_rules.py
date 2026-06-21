@@ -1074,6 +1074,7 @@ class TestRules(unittest.TestCase):
                 "PDF409": {DocstringConvention.NONE: RuleSettingEffect.IGNORED, DocstringConvention.PEP257: RuleSettingEffect.IGNORED},
                 "PDF410": {DocstringConvention.NONE: RuleSettingEffect.IGNORED, DocstringConvention.PEP257: RuleSettingEffect.IGNORED},
                 "PDF411": {DocstringConvention.NONE: RuleSettingEffect.IGNORED, DocstringConvention.PEP257: RuleSettingEffect.IGNORED},
+                "PDF500": {DocstringConvention.PEP257: RuleSettingEffect.IGNORED, DocstringConvention.NUMPY: RuleSettingEffect.IGNORED},
                 "PDF507": {
                     DocstringConvention.NONE: RuleSettingEffect.IGNORED,
                     DocstringConvention.PEP257: RuleSettingEffect.IGNORED,
