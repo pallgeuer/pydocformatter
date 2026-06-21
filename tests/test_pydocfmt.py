@@ -258,8 +258,8 @@ Raises:
             \"\"\"Raises things.
             
             Raises:
-                `ValueError`: if input is invalid.
-                `TypeError`: if the type is wrong.
+                ValueError: if input is invalid.
+                TypeError: if the type is wrong.
             \"\"\"
         """)
         self._format_and_check(doc, expected, line_length=88)
@@ -363,7 +363,7 @@ Examples:
                 bool: True if successful, False otherwise.
 
             Raises:
-                `ValueError`: if the input is invalid.
+                ValueError: if the input is invalid.
 
             Examples:
                 ```

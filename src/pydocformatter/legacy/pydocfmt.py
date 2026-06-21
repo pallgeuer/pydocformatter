@@ -154,7 +154,7 @@ def format_docstrings_in_source(
         tuple[str, tuple[int, ...]]: Formatted source and one-based changed line numbers.
 
     Raises:
-        `SyntaxError`: If the source cannot be parsed as Python.
+        SyntaxError: If the source cannot be parsed as Python.
     """
     source_lines = source.splitlines(keepends=True)
     tree = ast.parse(source)
@@ -198,7 +198,7 @@ def format_comments_in_source(
         tuple[str, tuple[int, ...]]: Formatted source and one-based changed line numbers.
 
     Raises:
-        `tokenize.TokenError`: If Python tokenization fails.
+        tokenize.TokenError: If Python tokenization fails.
     """
     tokens = list(tokenize.generate_tokens(io.StringIO(source).readline))
     lines = source.splitlines(keepends=True)
@@ -324,10 +324,10 @@ def format_file(path: str, settings: CheckSettings, fix: bool, *, output: typing
         bool: True if the file was modified or needs formatting, False otherwise.
 
     Raises:
-        `OSError`: If the file cannot be read or written.
-        `SyntaxError`: If the file cannot be parsed as Python source.
-        `tokenize.TokenError`: If Python tokenization fails.
-        `UnicodeDecodeError`: If the file cannot be decoded as UTF-8.
+        OSError: If the file cannot be read or written.
+        SyntaxError: If the file cannot be parsed as Python source.
+        tokenize.TokenError: If Python tokenization fails.
+        UnicodeDecodeError: If the file cannot be decoded as UTF-8.
     """
     result = format_file_source(path, settings=settings, fix=fix)
 
@@ -355,10 +355,10 @@ def format_file_source(
         SourceFormatResult: Source-level formatting result.
 
     Raises:
-        `OSError`: If the file cannot be read or written.
-        `SyntaxError`: If the file cannot be parsed as Python source.
-        `tokenize.TokenError`: If Python tokenization fails.
-        `UnicodeDecodeError`: If the file cannot be decoded as UTF-8.
+        OSError: If the file cannot be read or written.
+        SyntaxError: If the file cannot be parsed as Python source.
+        tokenize.TokenError: If Python tokenization fails.
+        UnicodeDecodeError: If the file cannot be decoded as UTF-8.
     """
     with open(path, encoding="utf-8", newline="") as file:
         source = file.read()
@@ -383,8 +383,8 @@ def format_source(source: str, settings: CheckSettings, fix: bool) -> SourceForm
         SourceFormatResult: Source-level formatting result.
 
     Raises:
-        `SyntaxError`: If the source cannot be parsed as Python.
-        `tokenize.TokenError`: If Python tokenization fails.
+        SyntaxError: If the source cannot be parsed as Python.
+        tokenize.TokenError: If Python tokenization fails.
     """
     line_ending = line_endings.resolve_line_ending(source, line_ending=settings.line_ending)
     docstring_source, docstring_changed_lines = format_docstrings_in_source(source, settings, line_ending=line_ending)
@@ -471,9 +471,9 @@ def format_docstrings(
         bool: True if the file was modified or needs docstring formatting.
 
     Raises:
-        `OSError`: If the file cannot be read or written.
-        `SyntaxError`: If the file cannot be parsed as Python source.
-        `UnicodeDecodeError`: If the file cannot be decoded as UTF-8.
+        OSError: If the file cannot be read or written.
+        SyntaxError: If the file cannot be parsed as Python source.
+        UnicodeDecodeError: If the file cannot be decoded as UTF-8.
     """
     with open(path, encoding="utf-8", newline="") as file:
         source = file.read()

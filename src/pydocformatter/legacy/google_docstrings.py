@@ -100,6 +100,7 @@ def _format_param_section(
     Args:
         buffer (list[str]): The list of lines in the specified section.
         indent (str): Base indentation preserved from the docstring quote line.
+        section_title (str): Section title to emit before the formatted entries.
         line_length (int): The maximum line length for formatting.
         indent_style (IndentStyle): Indentation style for generated section levels.
         indent_width (int): Width of one generated indentation level.
@@ -305,7 +306,7 @@ def format_raises_section(
             exc = current_exc
             desc = " ".join(desc_lines).strip()
             wrapped = _wrap_with_indents(
-                f"`{exc}`: {desc}",
+                f"{exc}: {desc}",
                 param_indent,
                 continuation_indent,
                 line_length=line_length,

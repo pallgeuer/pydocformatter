@@ -212,7 +212,7 @@ class SettingDefinition(Generic[SettingValueT]):
             example (str | None): Optional TOML example text.
 
         Raises:
-            `TypeError`: If no default validator exists for `value_type` and no validator is supplied.
+            TypeError: If no default validator exists for `value_type` and no validator is supplied.
         """
         resolved_key = key or field.replace("_", "-")
         resolved_validator = cast(SettingValidator[SettingValueT], _default_validator_for_type(value_type)) if validator is None else validator
@@ -310,9 +310,9 @@ class SettingsSchema(Generic[SettingsT]):
         """Validate schema group metadata.
 
         Raises:
-            `ValueError`: If the TOML table path is empty or contains empty segments.
-            `TypeError`: If a setting definition uses a group outside `group_type`.
-            `AssertionError`: If CLI availability and resolved CLI metadata disagree.
+            ValueError: If the TOML table path is empty or contains empty segments.
+            TypeError: If a setting definition uses a group outside `group_type`.
+            AssertionError: If CLI availability and resolved CLI metadata disagree.
         """
         if not self.table_path or any(not key for key in self.table_path):
             raise ValueError("Settings schema table_path must contain non-empty path segments")
@@ -342,8 +342,8 @@ class SettingsSchema(Generic[SettingsT]):
             SettingsT: Resolved settings dataclass instance.
 
         Raises:
-            `SettingsError`: If any configuration source cannot be loaded or validated.
-            `tomllib.TOMLDecodeError`: If a TOML-map CLI value is malformed.
+            SettingsError: If any configuration source cannot be loaded or validated.
+            tomllib.TOMLDecodeError: If a TOML-map CLI value is malformed.
         """
         return self.load_profile(global_values=global_values, args=args, field_overrides=field_overrides).settings
 
@@ -371,8 +371,8 @@ class SettingsSchema(Generic[SettingsT]):
             SettingsProfile[SettingsT]: Resolved settings plus field source bases and source priorities.
 
         Raises:
-            `SettingsError`: If any configuration source cannot be loaded or validated.
-            `tomllib.TOMLDecodeError`: If a TOML-map CLI value is malformed.
+            SettingsError: If any configuration source cannot be loaded or validated.
+            tomllib.TOMLDecodeError: If a TOML-map CLI value is malformed.
         """
         if global_values is None:
             global_values = GlobalArgs()
@@ -456,7 +456,7 @@ class SettingsSchema(Generic[SettingsT]):
             settings (SettingsT): Settings object supplying current defaults for help text.
 
         Raises:
-            `AssertionError`: If schema definitions cannot be mapped consistently to argparse groups.
+            AssertionError: If schema definitions cannot be mapped consistently to argparse groups.
         """
         handled_definitions: list[SettingDefinition[Any]] = []
         for group in self.group_type:
@@ -497,9 +497,9 @@ class SettingsSchema(Generic[SettingsT]):
             dict[str, Any]: Field-keyed raw override values supplied through dedicated CLI options.
 
         Raises:
-            `SettingsError`: If a TOML-map CLI value does not parse to a TOML table.
-            `tomllib.TOMLDecodeError`: If a TOML-map CLI value is malformed.
-            `AssertionError`: If a setting has an unknown CLI value kind.
+            SettingsError: If a TOML-map CLI value does not parse to a TOML table.
+            tomllib.TOMLDecodeError: If a TOML-map CLI value is malformed.
+            AssertionError: If a setting has an unknown CLI value kind.
         """
         values: dict[str, Any] = {}
         for definition in self.definitions:
@@ -600,7 +600,7 @@ def validate_bool(value: Any, context: str) -> bool:
         bool: Validated boolean value.
 
     Raises:
-        `SettingsError`: If the raw value is not a boolean.
+        SettingsError: If the raw value is not a boolean.
     """
     if not isinstance(value, bool):
         raise SettingsError(f"{context} must be a boolean")
@@ -663,7 +663,7 @@ def validate_string_list(value: Any, context: str) -> StringList:
         StringList: Validated string tuple.
 
     Raises:
-        `SettingsError`: If the raw value is not a list or tuple of strings.
+        SettingsError: If the raw value is not a list or tuple of strings.
     """
     if not isinstance(value, (list, tuple)):
         raise SettingsError(f"{context} must be a list of strings")
@@ -683,7 +683,7 @@ def validate_non_empty_string_list(value: Any, context: str) -> StringList:
         StringList: Validated string tuple.
 
     Raises:
-        `SettingsError`: If any item is not a string or is empty.
+        SettingsError: If any item is not a string or is empty.
     """
     values = validate_string_list(value, context)
     if any(not value for value in values):
@@ -702,7 +702,7 @@ def validate_multi_string_map(value: Any, context: str) -> MultiStringMap:
         MultiStringMap: Validated tuple of string keys and non-empty string-list values.
 
     Raises:
-        `SettingsError`: If the raw value is not a string-keyed mapping to non-empty string lists.
+        SettingsError: If the raw value is not a string-keyed mapping to non-empty string lists.
     """
     if isinstance(value, tuple):
         items = value

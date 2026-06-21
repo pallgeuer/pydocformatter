@@ -345,7 +345,7 @@ def validate_include_patterns(patterns: tuple[str, ...]) -> None:
         patterns (tuple[str, ...]): Include glob patterns to validate.
 
     Raises:
-        `FileSelectionError`: If any include pattern is empty.
+        FileSelectionError: If any include pattern is empty.
     """
     for pattern in patterns:
         if not pattern:
@@ -359,7 +359,7 @@ def validate_exclude_patterns(patterns: tuple[str, ...]) -> None:
         patterns (tuple[str, ...]): Exclude glob patterns to validate.
 
     Raises:
-        `FileSelectionError`: If any exclude pattern is empty.
+        FileSelectionError: If any exclude pattern is empty.
     """
     for pattern in patterns:
         if not pattern:

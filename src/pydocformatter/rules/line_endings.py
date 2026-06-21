@@ -16,7 +16,7 @@ def resolve_line_ending(source: str, *, line_ending: LineEnding) -> str:
         str: Concrete line ending string.
 
     Raises:
-        `ValueError`: If `line_ending` is not a known `LineEnding` member.
+        ValueError: If `line_ending` is not a known `LineEnding` member.
     """
     if line_ending == LineEnding.AUTO:
         return detect_line_ending(source)

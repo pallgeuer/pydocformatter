@@ -317,7 +317,7 @@ def output_stream(output_file: str | None) -> Iterator[TextIO | None]:
         TextIO | None: Open output stream, or None to let `print` use stdout.
 
     Raises:
-        `OutputError`: If the output file or its direct parent cannot be created.
+        OutputError: If the output file or its direct parent cannot be created.
     """
     if output_file is None:
         yield None
@@ -509,7 +509,7 @@ def print_results(errors: Iterable[str], results: list[FormatterResult], *, outp
         output (TextIO | None): Output stream, or stdout when None.
 
     Raises:
-        `AssertionError`: If `output_format` is unknown.
+        AssertionError: If `output_format` is unknown.
     """
     if output_format == OutputFormat.GROUPED:
         print_results_grouped(errors, results, output=output)

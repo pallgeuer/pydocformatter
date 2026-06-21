@@ -81,8 +81,8 @@ def load_pyproject() -> dict[str, Any]:
         dict[str, Any]: Parsed TOML data from `pyproject.toml`.
 
     Raises:
-        `OSError`: If `pyproject.toml` cannot be read.
-        `tomllib.TOMLDecodeError`: If `pyproject.toml` contains invalid TOML.
+        OSError: If `pyproject.toml` cannot be read.
+        tomllib.TOMLDecodeError: If `pyproject.toml` contains invalid TOML.
     """
     with PYPROJECT_PATH.open("rb") as f:
         return tomllib.load(f)
@@ -95,7 +95,7 @@ def load_precommit_repo_revs() -> dict[str, str]:
         dict[str, str]: Mapping of pre-commit repository URLs to their configured `rev` values.
 
     Raises:
-        `OSError`: If `.pre-commit-config.yaml` cannot be read.
+        OSError: If `.pre-commit-config.yaml` cannot be read.
     """
     revs: dict[str, str] = {}
     current_repo: str | None = None

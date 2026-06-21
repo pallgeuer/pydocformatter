@@ -122,6 +122,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Reset the planned next release to `1.0.0` and present pydocformatter as a new standalone Ruff-style formatter.
 
 - **Docstring formatting:**
+  - Changed the legacy Google-style `Raises` formatter to emit bare exception names instead of wrapping them in backticks.
   - Changed automatic fixing to stop after 20 fix iterations.
   - Added instance-specific diagnostic messages for parameter consistency, section-style, and selected summary-style rule findings where the offending parameter, section, function, word, or span length is useful context.
   - Changed legacy Sphinx-style field parsing to the explicit `docstring-convention = "rest"` mode. The removed `docstring_parse_sphinx_fields` setting now raises an unknown-setting error; set the rest convention to parse and protect `:param:`/`:rtype:` style fields.
