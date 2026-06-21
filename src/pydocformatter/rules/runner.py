@@ -15,6 +15,7 @@ from pydocformatter.rules.models import RuleFinding, RuleMetadata
 from pydocformatter.rules_selection import RuleSelection, SelectedRule
 
 MAX_FIX_ITERATIONS = 20
+UTF8_BOM = "\ufeff"
 
 
 @dataclasses.dataclass(frozen=True)
@@ -48,6 +49,14 @@ class _ModulePassContext:
     line_bounds: source_text.LineBounds
 
 
+@dataclasses.dataclass(frozen=True)
+class _ModuleSourceSeed:
+    """Trusted source text for one parsed module object."""
+
+    module: cst.Module
+    source: str
+
+
 def run_rules(
     module: cst.Module,
     *,
@@ -56,6 +65,7 @@ def run_rules(
     line_ending: str,
     rule_selection: RuleSelection,
     fix: bool,
+    source: str | None = None,
 ) -> RuleRunResult:
     """Run selected rule fixes and checks against one parsed module."""
     errors: list[str] = []
@@ -65,6 +75,7 @@ def run_rules(
     last_iteration_findings: tuple[RuleFinding, ...] = ()
     reached_iteration_limit = False
     source_changed = False
+    source_seed = _ModuleSourceSeed(module=module, source=_module_aligned_source(source)) if source is not None else None
 
     def run_check_pass(check_module: cst.Module, check_errors: list[str]) -> tuple[RuleFinding, ...]:
         return _run_check_pass(
@@ -75,6 +86,7 @@ def run_rules(
             rule_selection=rule_selection,
             selected_rule_by_code=selected_rule_by_code,
             errors=check_errors,
+            source_seed=source_seed,
         )
 
     if fix:
@@ -99,6 +111,7 @@ def run_rules(
                 rule_selection=rule_selection,
                 selected_rule_by_code=selected_rule_by_code,
                 errors=errors,
+                source_seed=source_seed,
             )
             fixed_findings.extend(iteration_findings)
             last_iteration_findings = iteration_findings
@@ -141,6 +154,7 @@ def _run_fix_pass(
     rule_selection: RuleSelection,
     selected_rule_by_code: dict[RuleCode, SelectedRule],
     errors: list[str],
+    source_seed: _ModuleSourceSeed | None = None,
 ) -> tuple[cst.Module, tuple[RuleFinding, ...], bool]:
     """Run one ordered pass of effectively fixable rules."""
     pass_findings: list[RuleFinding] = []
@@ -154,12 +168,12 @@ def _run_fix_pass(
         )
         if not category_rules:
             continue
-        prepared_category, pass_context = _prepare_category(category_class, module, pass_context, path=path, settings=settings, line_ending=line_ending, errors=errors)
+        prepared_category, pass_context = _prepare_category(category_class, module, pass_context, path=path, settings=settings, line_ending=line_ending, errors=errors, source_seed=source_seed)
         if prepared_category is None:
             continue
         for rule_class, selected_rule in category_rules:
             if prepared_category.context.module is not module:
-                prepared_category, pass_context = _prepare_category(category_class, module, pass_context, path=path, settings=settings, line_ending=line_ending, errors=errors)
+                prepared_category, pass_context = _prepare_category(category_class, module, pass_context, path=path, settings=settings, line_ending=line_ending, errors=errors, source_seed=source_seed)
                 if prepared_category is None:
                     break
             try:
@@ -203,6 +217,7 @@ def _run_check_pass(
     rule_selection: RuleSelection,
     selected_rule_by_code: dict[RuleCode, SelectedRule],
     errors: list[str],
+    source_seed: _ModuleSourceSeed | None = None,
 ) -> tuple[RuleFinding, ...]:
     """Run one ordered read-only pass of all selected rules."""
     findings: list[RuleFinding] = []
@@ -211,7 +226,7 @@ def _run_check_pass(
         category_rules = tuple((rule_class, selected_rule_by_code[rule_class.meta.code]) for rule_class in category_class.ordered_rules() if rule_class.meta.code in selected_rule_by_code)
         if not category_rules:
             continue
-        prepared_category, pass_context = _prepare_category(category_class, module, pass_context, path=path, settings=settings, line_ending=line_ending, errors=errors)
+        prepared_category, pass_context = _prepare_category(category_class, module, pass_context, path=path, settings=settings, line_ending=line_ending, errors=errors, source_seed=source_seed)
         if prepared_category is None:
             continue
         for rule_class, selected_rule in category_rules:
@@ -235,11 +250,12 @@ def _prepare_category(
     settings: CheckSettings,
     line_ending: str,
     errors: list[str],
+    source_seed: _ModuleSourceSeed | None = None,
 ) -> tuple[_PreparedCategory | None, _ModulePassContext | None]:
     """Run one category preprocessor and return its shared data."""
     current_pass_context: _ModulePassContext | None = None
     try:
-        current_pass_context = _pass_context_for(module, pass_context)
+        current_pass_context = _pass_context_for(module, pass_context, source_seed=source_seed)
         context = _category_context(current_pass_context, path=path, settings=settings, line_ending=line_ending)
         return _PreparedCategory(context=context, data=category_class.prepare(context)), current_pass_context
     except Exception as error:
@@ -247,11 +263,11 @@ def _prepare_category(
         return None, current_pass_context
 
 
-def _pass_context_for(module: cst.Module, pass_context: _ModulePassContext | None) -> _ModulePassContext:
+def _pass_context_for(module: cst.Module, pass_context: _ModulePassContext | None, *, source_seed: _ModuleSourceSeed | None = None) -> _ModulePassContext:
     """Return shared source and metadata for the current module state."""
     if pass_context is not None and pass_context.module is module:
         return pass_context
-    source = module.code
+    source = source_seed.source if source_seed is not None and source_seed.module is module else module.code
     metadata_wrapper = cst_metadata.MetadataWrapper(module, unsafe_skip_copy=True)
     positions = metadata_wrapper.resolve(cst_metadata.PositionProvider)
     source_lines = tuple(source_text.source_lines(source))
@@ -263,6 +279,14 @@ def _pass_context_for(module: cst.Module, pass_context: _ModulePassContext | Non
         source_lines=source_lines,
         line_bounds=source_text.line_bounds_from_lines(source_lines),
     )
+
+
+def _module_aligned_source(source: str) -> str:
+    """Return source text aligned with LibCST module source positions."""
+    aligned_source = source.removeprefix(UTF8_BOM)
+    if aligned_source.endswith("\r") and not aligned_source.endswith("\r\n"):
+        return aligned_source[:-1]
+    return aligned_source
 
 
 def _category_context(pass_context: _ModulePassContext, *, path: str, settings: CheckSettings, line_ending: str) -> RuleCategoryContext:

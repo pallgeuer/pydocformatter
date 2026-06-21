@@ -115,7 +115,7 @@ def format_source(source: str, path: str, *, settings: CheckSettings, rule_selec
         )
 
     line_ending = line_endings.resolve_line_ending(source, line_ending=settings.line_ending)
-    run_result = rule_runner.run_rules(module, path=path, settings=settings, line_ending=line_ending, rule_selection=rule_selection, fix=fix)
+    run_result = rule_runner.run_rules(module, path=path, settings=settings, line_ending=line_ending, rule_selection=rule_selection, fix=fix, source=source)
     fixed_findings = collections.Counter(finding.rule for finding in run_result.fixed_findings)
     errors = list(run_result.errors)
 

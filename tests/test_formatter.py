@@ -20,6 +20,7 @@ import pydocformatter.legacy.pydocfmt as pydocfmt
 import pydocformatter.rules.codes as rule_codes
 import pydocformatter.rules.collection as rule_collection
 import pydocformatter.rules.definition as rule_base
+import pydocformatter.rules.definition_helpers.source_text as source_text
 import pydocformatter.rules.models as rule_models
 import pydocformatter.rules.registration as rule_registration
 import pydocformatter.rules.runner as rule_runner
@@ -396,6 +397,168 @@ class TestFormatterResults(unittest.TestCase):
             self.assertFalse(result.modified)
             self.assertEqual(result.unfixed_findings, ())
             self.assertEqual(target.read_text(encoding="utf-8"), "x = 1\n")
+
+    def test_rule_source_formatter_seeds_initial_check_context_without_module_code(self) -> None:
+        observed_contexts: list[tuple[str, tuple[str, ...], source_text.LineBounds | None]] = []
+
+        def _raise_code_access(module: cst.Module) -> str:
+            del module
+            raise AssertionError("Module.code should not be read for seeded initial check contexts")
+
+        class TST(rule_base.RuleCategoryBase):
+            meta = rule_models.RuleCategoryMetadata(prefix="TST", name="test", url=None)
+
+            @classmethod
+            def prepare(cls, context: rule_base.RuleCategoryContext) -> object:
+                del cls
+                observed_contexts.append((context.source, context.source_lines, context.line_bounds))
+                return None
+
+        @rule_registration.register_rule_to(TST)
+        class TST001ObserveSource(rule_base.RuleBase):
+            meta = rule_models.RuleMetadata(
+                code=rule_codes.RuleCode("TST001"),
+                name="observe-source",
+                message="Observe source",
+                fix_availability=rule_models.FixAvailability.NEVER,
+                stable_since="1.0.0",
+                setting_effects=(),
+                incompatible_with=(),
+            )
+
+            @classmethod
+            def check(cls, context: rule_base.RuleContext) -> tuple[rule_models.RuleFinding, ...]:
+                del cls
+                self.assertEqual(context.source, expected_context_source)
+                return ()
+
+        source = "\ufeffx = 1\r\ny = 2\r\n"
+        expected_context_source = source.removeprefix("\ufeff")
+        expected_lines = tuple(source_text.source_lines(expected_context_source))
+
+        with unittest.mock.patch.object(cst.Module, "code", new=property(_raise_code_access)):
+            result = formatter.format_source(source, "a.py", settings=CheckSettings(), rule_selection=isolated_rule_selection(TST), fix=False)
+
+        self.assertEqual(result.new_source, source)
+        self.assertFalse(result.modified)
+        self.assertEqual(result.errors, ())
+        self.assertEqual(observed_contexts, [(expected_context_source, expected_lines, source_text.line_bounds_from_lines(expected_lines))])
+
+    def test_rule_source_formatter_aligns_bom_seed_with_libcst_positions(self) -> None:
+        source = "\ufeffx = 1  #bad\n"
+
+        result = formatter.format_source(source, "a.py", settings=CheckSettings(), rule_selection=default_rule_selection(), fix=True)
+
+        self.assertEqual(result.new_source, "\ufeffx = 1  # bad\n")
+        self.assertTrue(result.modified)
+        self.assertEqual(result.errors, ())
+
+    def test_rule_source_formatter_aligns_trailing_cr_seed_with_libcst_positions(self) -> None:
+        observed_contexts: list[tuple[str, tuple[str, ...], source_text.LineBounds | None]] = []
+
+        def _raise_code_access(module: cst.Module) -> str:
+            del module
+            raise AssertionError("Module.code should not be read for seeded initial check contexts")
+
+        class TST(rule_base.RuleCategoryBase):
+            meta = rule_models.RuleCategoryMetadata(prefix="TST", name="test", url=None)
+
+            @classmethod
+            def prepare(cls, context: rule_base.RuleCategoryContext) -> object:
+                del cls
+                observed_contexts.append((context.source, context.source_lines, context.line_bounds))
+                return None
+
+        @rule_registration.register_rule_to(TST)
+        class TST001ObserveSource(rule_base.RuleBase):
+            meta = rule_models.RuleMetadata(
+                code=rule_codes.RuleCode("TST001"),
+                name="observe-source",
+                message="Observe source",
+                fix_availability=rule_models.FixAvailability.NEVER,
+                stable_since="1.0.0",
+                setting_effects=(),
+                incompatible_with=(),
+            )
+
+        source = "x = 1\ry = 2\r"
+        expected_context_source = "x = 1\ry = 2"
+        expected_lines = tuple(source_text.source_lines(expected_context_source))
+
+        with unittest.mock.patch.object(cst.Module, "code", new=property(_raise_code_access)):
+            result = formatter.format_source(source, "a.py", settings=CheckSettings(), rule_selection=isolated_rule_selection(TST), fix=False)
+
+        self.assertEqual(result.new_source, source)
+        self.assertFalse(result.modified)
+        self.assertEqual(result.errors, ())
+        self.assertEqual(observed_contexts, [(expected_context_source, expected_lines, source_text.line_bounds_from_lines(expected_lines))])
+
+    def test_rule_runner_recomputes_source_after_seeded_fix_replaces_module(self) -> None:
+        original_code_property = inspect.getattr_static(cst.Module, "code")
+        if not isinstance(original_code_property, property) or original_code_property.fget is None:
+            raise AssertionError("Expected LibCST Module.code to be a property")
+        original_code_getter = typing.cast("typing.Callable[[cst.Module], str]", original_code_property.fget)
+        code_accesses: list[cst.Module] = []
+        observed_sources: list[str] = []
+
+        def _count_code_access(module: cst.Module) -> str:
+            code_accesses.append(module)
+            return original_code_getter(module)
+
+        class TST(rule_base.RuleCategoryBase):
+            meta = rule_models.RuleCategoryMetadata(prefix="TST", name="test", url=None)
+
+        @rule_registration.register_rule_to(TST)
+        class TST001InsertLeadingLine(rule_base.RuleBase):
+            meta = rule_models.RuleMetadata(
+                code=rule_codes.RuleCode("TST001"),
+                name="insert-leading-line",
+                message="Insert leading line",
+                fix_availability=rule_models.FixAvailability.ALWAYS,
+                stable_since="1.0.0",
+                setting_effects=(),
+                incompatible_with=(),
+            )
+
+            @classmethod
+            def fix(cls, context: rule_base.RuleContext) -> rule_base.RuleFixResult:
+                if context.module.header:
+                    return rule_base.RuleFixResult(module=context.module)
+                return rule_base.RuleFixResult(module=context.module.with_changes(header=(cst.EmptyLine(),)), fixed_findings=(rule_models.RuleFinding(rule=cls.meta, line_numbers=(1,)),))
+
+        class TSW(rule_base.RuleCategoryBase):
+            meta = rule_models.RuleCategoryMetadata(prefix="TSW", name="test two", url=None)
+
+            @classmethod
+            def prepare(cls, context: rule_base.RuleCategoryContext) -> object:
+                del cls
+                observed_sources.append(context.source)
+                return None
+
+        @rule_registration.register_rule_to(TSW)
+        class TSW001Noop(rule_base.RuleBase):
+            meta = rule_models.RuleMetadata(
+                code=rule_codes.RuleCode("TSW001"),
+                name="noop",
+                message="Noop",
+                fix_availability=rule_models.FixAvailability.ALWAYS,
+                stable_since="1.0.0",
+                setting_effects=(),
+                incompatible_with=(),
+            )
+
+        module = cst.parse_module("x = 1\n")
+        selection = isolated_rule_selection(TST, TSW)
+
+        with unittest.mock.patch.object(cst.Module, "code", new=property(_count_code_access)):
+            result = rule_runner.run_rules(module, path="a.py", settings=CheckSettings(), line_ending="\n", rule_selection=selection, fix=True, source="x = 1\n")
+
+        self.assertTrue(result.source_changed)
+        self.assertEqual(result.fixed_findings, (RuleFinding(rule=TST001InsertLeadingLine.meta, line_numbers=(1,)),))
+        self.assertEqual(result.errors, ())
+        self.assertTrue(observed_sources)
+        self.assertEqual(set(observed_sources), {"\nx = 1\n"})
+        self.assertTrue(any(accessed_module is result.module for accessed_module in code_accesses))
 
     def test_rule_runner_skips_fix_hooks_when_precheck_has_no_fixable_findings(self) -> None:
         fix_calls: list[str] = []
