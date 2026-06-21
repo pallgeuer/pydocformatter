@@ -11,7 +11,7 @@ PDF200 keeps at most one blank line between adjacent semantic chunks. It removes
 
 A chunk is any non-blank semantic block recognized by the docstring parser, including summaries, paragraphs, sections, section entries, rest fields under the rest convention, lists, headings, doctests, code fences, literal blocks, directives, tables, block quotes, and verbatim blocks. Blank lines inside opaque protected blocks are preserved, while blank-line runs around those protected blocks are still collapsed. Directive and literal-block bodies keep their internal blank lines, but trailing blank runs after their indented bodies are treated as exterior spacing between chunks.
 
-With Google or NumPy conventions enabled, spacing is applied recursively inside recognized sections. Extra blank lines between a section header and its first body item are removed entirely, and extra blank lines between consecutive convention entries are removed entirely. Other blank-line runs inside sections are still collapsed to one retained blank line unless they are inside opaque protected content.
+With Google or NumPy conventions enabled, spacing is applied recursively inside recognized sections. Extra blank lines between a section header and its first body item are removed entirely, and extra blank lines between consecutive convention entries are removed entirely. Extra blank lines between adjacent whole sections collapse to one retained blank line. Other blank-line runs inside sections are still collapsed to one retained blank line unless they are inside opaque protected content.
 
 The `docstring-blank-line-after-last-section` setting changes the trailing spacing rule for the final recognized Google or NumPy section. It defaults to `false`, so PDF200 removes blank lines after the final section. When enabled, PDF200 collapses trailing blank-line runs after the final recognized section to exactly one blank line instead. The setting has no effect unless the active `docstring-convention` parses the final block as a Google or NumPy section.
 
@@ -165,7 +165,7 @@ def example() -> None:
     """
 ````
 
-With Google-style section parsing enabled, section headers and consecutive convention entries use compact spacing:
+With Google-style section parsing enabled, section headers and consecutive convention entries use compact spacing, while adjacent whole sections keep one blank line between them:
 
 ```pydocfmt-example
 [settings]
@@ -191,6 +191,7 @@ def area(radius: float) -> float:
 
     Args:
         radius: Circle radius.
+
     Returns:
         float: Area.
     """
@@ -223,7 +224,7 @@ def area(radius: float) -> float:
     """
 ```
 
-NumPy-style section parsing applies the same compact spacing after section underlines:
+NumPy-style section parsing applies the same compact spacing after section underlines and keeps one blank line between adjacent whole sections:
 
 ```pydocfmt-example
 [settings]
@@ -255,6 +256,7 @@ def area(radius: float) -> float:
     ----------
     radius : float
         Circle radius.
+
     Returns
     -------
     float
@@ -334,6 +336,6 @@ def concatenated() -> None:
 When `PDF000` is also selected outside this rule-specific example context, it can literalize escaped blank lines before PDF200 collapses them in a later rule pass.
 
 ## Options
-- `docstring-convention`: Enables recursive spacing inside recognized Google or NumPy sections and compact spacing between adjacent rest fields. `none` and `pep257` leave convention-specific syntax as ordinary generic chunks.
+- `docstring-convention`: Enables recursive compact spacing inside recognized Google or NumPy sections, one retained blank line between adjacent Google or NumPy sections, and compact spacing between adjacent rest fields. `none` and `pep257` leave convention-specific syntax as ordinary generic chunks.
 - `docstring-blank-line-after-last-section`: Keeps exactly one trailing blank line after the final recognized Google or NumPy section when enabled; removes final-section trailing blanks when disabled.
 - `docstring-parse-*`: Controls whether generic structures such as lists, headings, doctests, code fences, block quotes, tables, directives, and literal blocks are distinct or protected chunks for blank-line collapsing.

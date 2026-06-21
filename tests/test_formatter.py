@@ -82,8 +82,8 @@ class TestFormatterResults(unittest.TestCase):
 
         self.assertIs(signature.parameters["rule_selection"].default, inspect.Parameter.empty)
 
-    def test_max_fix_iterations_is_one_hundred(self) -> None:
-        self.assertEqual(rule_runner.MAX_FIX_ITERATIONS, 100)
+    def test_max_fix_iterations_is_twenty(self) -> None:
+        self.assertEqual(rule_runner.MAX_FIX_ITERATIONS, 20)
 
     def test_formatter_result_tracks_modified_and_findings_explicitly(self) -> None:
         clean = FormatterResult(path="a.py", old_source="", new_source="", modified=False, fixed_findings=collections.Counter(), unfixed_findings=(), errors=())

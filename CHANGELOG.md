@@ -122,6 +122,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Reset the planned next release to `1.0.0` and present pydocformatter as a new standalone Ruff-style formatter.
 
 - **Docstring formatting:**
+  - Changed automatic fixing to stop after 20 fix iterations.
   - Added instance-specific diagnostic messages for parameter consistency, section-style, and selected summary-style rule findings where the offending parameter, section, function, word, or span length is useful context.
   - Changed legacy Sphinx-style field parsing to the explicit `docstring-convention = "rest"` mode. The removed `docstring_parse_sphinx_fields` setting now raises an unknown-setting error; set the rest convention to parse and protect `:param:`/`:rtype:` style fields.
   - Changed `PDF507` to be ignored by broad rule selections under every docstring convention, making the direct-raise-only exception documentation check exact-selection opt-in.
@@ -162,6 +163,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Fixed PCF003 directive normalization to avoid adding trailing whitespace for empty colon payloads.
 
 - **Docstring formatting:**
+  - Fixed `PDF200` to preserve one blank line between adjacent Google and NumPy sections after collapsing excess blank lines, matching `PDF201` missing-section-separator insertion.
   - Fixed `PDF409` and `PDF410` to preserve Google exception-entry parentheticals, and fixed Google and NumPy parsing to keep malformed exception-like prose continuations from being normalized as separate entries.
   - Fixed Google return and yield section parsing to treat bare `None` and `None.` entries as `None:` entries.
   - Fixed `PDF501` to allow documented keys from same-module class-based `TypedDict` definitions used in `**kwargs: Unpack[...]` parameters, keep conservative suppression for unresolved unpack targets, and continue reporting unrelated documented names when the local keys are known.

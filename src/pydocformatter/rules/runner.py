@@ -12,7 +12,7 @@ from pydocformatter.rules.definition import RuleBase, RuleCategoryBase, RuleCate
 from pydocformatter.rules.models import RuleFinding, RuleMetadata
 from pydocformatter.rules_selection import RuleSelection, SelectedRule
 
-MAX_FIX_ITERATIONS = 100
+MAX_FIX_ITERATIONS = 20
 
 
 @dataclasses.dataclass(frozen=True)

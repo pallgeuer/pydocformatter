@@ -66,9 +66,19 @@ def test_collapses_blank_lines_between_google_section_children() -> None:
     source = 'def function(value):\n    """Summary.\n\n    Args:\n\n\n        value: Description.\n\n\n        other: Other description.\n\n\n    Returns:\n        str: Result.\n    """\n'
     result = format_pdf100(source, settings=CheckSettings(select=("PDF200",), docstring_convention=DocstringConvention.GOOGLE))
 
-    assert result.new_source == 'def function(value):\n    """Summary.\n\n    Args:\n        value: Description.\n        other: Other description.\n    Returns:\n        str: Result.\n    """\n'
+    assert result.new_source == 'def function(value):\n    """Summary.\n\n    Args:\n        value: Description.\n        other: Other description.\n\n    Returns:\n        str: Result.\n    """\n'
     assert result.fixed_findings[PDF200TooManyBlankLines.meta] == 1
     assert not format_pdf100(result.new_source, settings=CheckSettings(select=("PDF200",), docstring_convention=DocstringConvention.GOOGLE)).modified
+
+
+def test_pdf200_and_pdf201_converge_on_blank_line_between_google_sections() -> None:
+    source = 'def function(value):\n    """Summary.\n\n    Args:\n        value: Description.\n    Returns:\n        str: Result.\n    """\n'
+    settings = CheckSettings(select=("PDF200", "PDF201"), docstring_convention=DocstringConvention.GOOGLE)
+    result = formatter.format_source(source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
+
+    assert result.new_source == 'def function(value):\n    """Summary.\n\n    Args:\n        value: Description.\n\n    Returns:\n        str: Result.\n    """\n'
+    assert result.fixed_findings
+    assert not formatter.format_source(result.new_source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True).modified
 
 
 def test_collapses_blank_lines_between_rest_fields() -> None:
@@ -309,10 +319,23 @@ def test_collapses_blank_lines_between_numpy_section_children() -> None:
 
     assert (
         result.new_source
-        == 'def function(value):\n    """Summary.\n\n    Parameters\n    ----------\n    value : int\n        Description.\n    other : str\n        Other description.\n    Returns\n    -------\n    bool\n        Result.\n    """\n'
+        == 'def function(value):\n    """Summary.\n\n    Parameters\n    ----------\n    value : int\n        Description.\n    other : str\n        Other description.\n\n    Returns\n    -------\n    bool\n        Result.\n    """\n'
     )
     assert result.fixed_findings[PDF200TooManyBlankLines.meta] == 1
     assert not format_pdf100(result.new_source, settings=settings).modified
+
+
+def test_pdf200_and_pdf201_converge_on_blank_line_between_numpy_sections() -> None:
+    source = 'def function(value):\n    """Summary.\n\n    Parameters\n    ----------\n    value : int\n        Description.\n    Returns\n    -------\n    bool\n        Result.\n    """\n'
+    settings = CheckSettings(select=("PDF200", "PDF201"), docstring_convention=DocstringConvention.NUMPY)
+    result = formatter.format_source(source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
+
+    assert (
+        result.new_source
+        == 'def function(value):\n    """Summary.\n\n    Parameters\n    ----------\n    value : int\n        Description.\n\n    Returns\n    -------\n    bool\n        Result.\n    """\n'
+    )
+    assert result.fixed_findings
+    assert not formatter.format_source(result.new_source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True).modified
 
 
 def test_convention_like_sections_keep_generic_spacing_when_convention_is_none() -> None:

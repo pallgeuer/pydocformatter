@@ -110,6 +110,12 @@ def _retained_line_indexes(
             retained.extend(child_lines)
         else:
             retained.extend(range(block.start_line, block.end_line))
+        if (
+            parent_kind is None
+            and _keeps_blank_separator_after_section(block, _next_non_blank_block(blocks, index + 1, last_chunk + 1), convention=convention)
+            and (trailing_blank_line := _trailing_blank_line(block)) is not None
+        ):
+            retained.append(trailing_blank_line)
     return tuple(retained)
 
 
@@ -138,6 +144,28 @@ def _should_drop_blank_separator(
     if convention is settings_check.DocstringConvention.REST:
         return previous_block.kind is PDF_definition.DocstringBlockKind.REST_FIELD and next_block.kind is PDF_definition.DocstringBlockKind.REST_FIELD
     return False
+
+
+def _keeps_blank_separator_after_section(
+    block: PDF_definition.DocstringBlock,
+    next_block: PDF_definition.DocstringBlock | None,
+    *,
+    convention: settings_check.DocstringConvention,
+) -> bool:
+    """Return whether a section trailing blank separates it from another section."""
+    return (
+        convention in (settings_check.DocstringConvention.GOOGLE, settings_check.DocstringConvention.NUMPY)
+        and block.kind is PDF_definition.DocstringBlockKind.SECTION
+        and next_block is not None
+        and next_block.kind is PDF_definition.DocstringBlockKind.SECTION
+        and _trailing_blank_line(block) is not None
+    )
+
+
+def _trailing_blank_line(block: PDF_definition.DocstringBlock) -> int | None:
+    """Return the first trailing blank line in a block."""
+    trailing_blank = block.children[-1] if block.children and block.children[-1].kind is PDF_definition.DocstringBlockKind.BLANK else None
+    return None if trailing_blank is None else trailing_blank.start_line
 
 
 def _output_lines(docstring: PDF_definition.DocstringInfo, retained_lines: tuple[int, ...]) -> tuple[PDF_definition.DocstringOutputLine, ...]:
