@@ -6,7 +6,7 @@ import pydocformatter.rules_selection as rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, LineEnding
 from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
 from pydocformatter.rules.definitions.PDF.PDF import PDF
-from pydocformatter.rules.definitions.PDF.PDF100_incorrect_indentation import PDF100IncorrectIndentation
+from pydocformatter.rules.definitions.PDF.PDF100_docstring_indentation import PDF100DocstringIndentation
 from pydocformatter.rules.definitions.PDF.PDF102_docstring_trailing_whitespace import PDF102DocstringTrailingWhitespace
 from pydocformatter.rules.definitions.PDF.PDF103_docstring_blank_line_whitespace import PDF103DocstringBlankLineWhitespace
 
@@ -122,7 +122,7 @@ def test_pdf002_pdf003_and_pdf004_can_normalize_same_docstring_in_order() -> Non
     result = formatter.format_source(source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
 
     assert result.new_source == 'def function():\n    """Summary.\n    Body.\n\n    """\n'
-    assert result.fixed_findings[PDF100IncorrectIndentation.meta] == 1
+    assert result.fixed_findings[PDF100DocstringIndentation.meta] == 1
     assert result.fixed_findings[PDF102DocstringTrailingWhitespace.meta] == 1
     assert result.fixed_findings[PDF103DocstringBlankLineWhitespace.meta] == 1
     assert not formatter.format_source(result.new_source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True).modified

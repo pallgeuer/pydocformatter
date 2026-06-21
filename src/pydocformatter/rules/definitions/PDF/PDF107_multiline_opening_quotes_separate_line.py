@@ -12,10 +12,10 @@ from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetada
 
 
 @rule_registration.register_rule_to(PDF)
-class PDF107MultilineOpeningQuotesSepLine(RuleBase):
+class PDF107MultilineOpeningQuotesSeparateLine(RuleBase):
     meta = RuleMetadata(
         code=RuleCode("PDF107"),
-        name="multiline-opening-quotes-sep-line",
+        name="multiline-opening-quotes-separate-line",
         message="Multi-line docstring opening quotes should be on a separate line",
         fix_availability=FixAvailability.ALWAYS,
         stable_since="1.0.0",

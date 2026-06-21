@@ -104,16 +104,17 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added the LibCST-based rule execution framework with ordered category preprocessing, repeated automatic-fix passes, final read-only checks, and non-convergence diagnostics.
   - Added typed PCF comment and PDF docstring category data, together with a shared validated source-edit helper, as the foundation for individual rule implementations.
   - Implemented PCF001 standalone-comment formatting, PCF002 trailing-comment spacing, and PCF004 trailing-comment extraction with independent fixes, protected directive handling, tab-expanded widths, stable impossible-width behavior, and exact EOF preservation.
-  - Added PCF003 directive-normalization for safe marker spacing and syntax around known type and tool directives.
+  - Added PCF003 comment-directive-normalization for safe marker spacing and syntax around known type and tool directives.
   - Changed PCF004 to keep overlong trailing comments inline by default in decorators, compound statement headers, arguments, and parenthesized or continuation contexts.
   - Added shared URL-aware wrapping helpers used by PCF001, PCF004, and PDF101 when `url-aware-wrapping` is enabled.
 
 ### Changed
 
 - **Comment formatting:**
-  - Renamed PCF003 from `directive-spacing` to `directive-normalization`, keeping the `PCF003` rule code while clarifying that the rule owns recognized directive marker and payload normalization from `#` onward.
+  - Renamed PCF003 from `directive-normalization` to `comment-directive-normalization`, keeping the `PCF003` rule code while clarifying that the rule owns recognized directive marker and payload normalization from `#` onward.
 
 - **Developer workflow:**
+  - Renamed selected built-in rule names, rule definition files, and rule classes for clearer public metadata while keeping rule codes and selection behavior unchanged.
   - Reorganized rule helper modules so whole-rule logic lives in individual rule files while shared helper modules contain reusable source, layout, decorator, section-edit, and reStructuredText field primitives.
   - Moved reusable docstring section and reStructuredText field metadata out of `PDF.py` into a focused helper module used by the parser, section rules, and documentation helpers.
 
@@ -125,7 +126,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Changed legacy Sphinx-style field parsing to the explicit `docstring-convention = "rest"` mode. The removed `docstring_parse_sphinx_fields` setting now raises an unknown-setting error; set the rest convention to parse and protect `:param:`/`:rtype:` style fields.
   - Changed `PDF507` to be ignored by broad rule selections under every docstring convention, making the direct-raise-only exception documentation check exact-selection opt-in.
   - Changed missing-documentation configuration from PDF500-specific `docstring-missing-parameter-*` settings to shared `docstring-missing-documentation*` settings used by missing parameter, return, yield, and exception documentation rules.
-  - Renumbered section-style rules so `PDF401` and `PDF402` are section-name normalization rules, `PDF403` is section-name trailing-content, `PDF404` is section-name trailing-colon, `PDF405` is section underline-format, `PDF406` is empty-section, `PDF407` is section-order, `PDF408` is repeated-section, and `PDF409` is convention-entry-spacing, and aligned built-in rule filenames and class names with rule metadata.
+  - Renumbered section-style rules so `PDF401` and `PDF402` are section-name normalization rules, `PDF403` is section-name trailing-content, `PDF404` is section-name trailing-colon, `PDF405` is section underline-format, `PDF406` is empty-section, `PDF407` is section-order, `PDF408` is repeated-section, and `PDF409` is docstring-entry-spacing, and aligned built-in rule filenames and class names with rule metadata.
   - Implemented `PDF502` through `PDF507`, replacing their previous stub behavior with return, yield, and exception documentation consistency diagnostics.
   - Implemented `PDF500` and `PDF501`, replacing their previous stub behavior with parsed docstring/signature parameter consistency diagnostics and configurable PDF500 activation.
   - Implemented `PDF400` through `PDF409`, replacing their previous stub behavior with convention-aware section-name normalization fixes, Google section trailing-content fixes, NumPy underline normalization, convention entry spacing fixes, and section content/order diagnostics.

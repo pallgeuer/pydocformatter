@@ -16,10 +16,10 @@ from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetada
 
 
 @rule_registration.register_rule_to(PDF_definition.PDF)
-class PDF101ReflowRequired(RuleBase):
+class PDF101DocstringReflow(RuleBase):
     meta = RuleMetadata(
         code=RuleCode("PDF101"),
-        name="reflow-required",
+        name="docstring-reflow",
         message="Docstring chunk needs reflow",
         fix_availability=FixAvailability.USUALLY,
         stable_since="1.0.0",
@@ -104,7 +104,7 @@ def _docstring_result(docstring: PDF_definition.DocstringInfo, *, context: RuleC
     line_numbers = tuple(sorted({line_number for replacement in replacements for line_number in replacement.line_numbers}))
     change = _planned_change_from_replacements(docstring, replacements, fragments=fragments, value=value) if fragments is not None else None
     return _DocstringResult(
-        finding=RuleFinding(rule=PDF101ReflowRequired.meta, line_numbers=line_numbers, instance_fixable=change is not None),
+        finding=RuleFinding(rule=PDF101DocstringReflow.meta, line_numbers=line_numbers, instance_fixable=change is not None),
         change=change,
     )
 

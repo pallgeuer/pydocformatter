@@ -7,7 +7,7 @@ import pydocformatter.rules_selection as rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention
 from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
 from pydocformatter.rules.definitions.PDF.PDF import PDF
-from pydocformatter.rules.definitions.PDF.PDF101_reflow_required import PDF101ReflowRequired
+from pydocformatter.rules.definitions.PDF.PDF101_docstring_reflow import PDF101DocstringReflow
 from pydocformatter.rules.definitions.PDF.PDF201_missing_blank_line import PDF201MissingBlankLine
 from pydocformatter.rules.definitions.PDF.PDF203_summary_too_long import PDF203SummaryTooLong
 
@@ -50,7 +50,7 @@ def test_pdf001_can_reflow_short_multiline_summary_before_pdf107_checks() -> Non
     result = format_source(source, settings=settings)
 
     assert result.new_source == 'def function():\n    """Summary line continuation line.\n    """\n'
-    assert result.fixed_findings[PDF101ReflowRequired.meta] == 1
+    assert result.fixed_findings[PDF101DocstringReflow.meta] == 1
     assert not result.unfixed_findings
 
 

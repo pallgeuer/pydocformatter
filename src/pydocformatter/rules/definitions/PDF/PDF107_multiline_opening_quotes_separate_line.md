@@ -1,4 +1,4 @@
-# multiline-opening-quotes-sep-line (PDF107)
+# multiline-opening-quotes-separate-line (PDF107)
 
 Fix is always available.
 

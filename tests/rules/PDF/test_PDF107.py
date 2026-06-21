@@ -6,8 +6,8 @@ import pydocformatter.rules_selection as rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, IndentStyle, LineEnding
 from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
 from pydocformatter.rules.definitions.PDF.PDF import PDF
-from pydocformatter.rules.definitions.PDF.PDF107_multiline_opening_quotes_sep_line import PDF107MultilineOpeningQuotesSepLine
-from pydocformatter.rules.definitions.PDF.PDF109_multiline_closing_quotes_sep_line import PDF109MultilineClosingQuotesSepLine
+from pydocformatter.rules.definitions.PDF.PDF107_multiline_opening_quotes_separate_line import PDF107MultilineOpeningQuotesSeparateLine
+from pydocformatter.rules.definitions.PDF.PDF109_multiline_closing_quotes_separate_line import PDF109MultilineClosingQuotesSeparateLine
 
 
 def contexts(source: str, *, settings: CheckSettings | None = None) -> tuple[RuleCategoryContext, RuleContext]:
@@ -36,7 +36,7 @@ def test_moves_first_content_line_below_opening_quotes() -> None:
     result = format_pdf103(source)
 
     assert result.new_source == 'def function():\n    """\n    Summary.\n\n    Body.\n    """\n'
-    assert result.fixed_findings[PDF107MultilineOpeningQuotesSepLine.meta] == 1
+    assert result.fixed_findings[PDF107MultilineOpeningQuotesSeparateLine.meta] == 1
     assert not format_pdf103(result.new_source).modified
 
 
@@ -45,7 +45,7 @@ def test_strips_quote_adjacent_space_tabs_from_moved_first_line() -> None:
     result = format_pdf103(source)
 
     assert result.new_source == 'def function():\n    """\n    Summary.\n\n    Body.\n    """\n'
-    assert result.fixed_findings[PDF107MultilineOpeningQuotesSepLine.meta] == 1
+    assert result.fixed_findings[PDF107MultilineOpeningQuotesSeparateLine.meta] == 1
     assert not format_pdf103(result.new_source).modified
 
 
@@ -54,7 +54,7 @@ def test_preserves_quote_adjacent_non_space_tab_whitespace_on_moved_first_line()
     result = format_pdf103(source)
 
     assert result.new_source == 'def function():\n    """\n    \xa0Summary.\n\n    Body.\n    """\n'
-    assert result.fixed_findings[PDF107MultilineOpeningQuotesSepLine.meta] == 1
+    assert result.fixed_findings[PDF107MultilineOpeningQuotesSeparateLine.meta] == 1
     assert not format_pdf103(result.new_source).modified
 
 
@@ -63,7 +63,7 @@ def test_moves_single_content_line_below_opening_quotes() -> None:
     result = format_pdf103(source)
 
     assert result.new_source == 'def function():\n    """\n    Summary.\n    """\n'
-    assert result.fixed_findings[PDF107MultilineOpeningQuotesSepLine.meta] == 1
+    assert result.fixed_findings[PDF107MultilineOpeningQuotesSeparateLine.meta] == 1
     assert not format_pdf103(result.new_source).modified
 
 
@@ -81,7 +81,7 @@ def test_parenthesized_and_simple_suite_docstrings_use_canonical_margin() -> Non
     result = format_pdf103(source, settings=CheckSettings(select=("PDF107",), indent_width=2))
 
     assert result.new_source == 'class Parenthesized:\n    (\n        """\n        Class.\n\n        Body.\n        """\n    )\n\ndef simple(): """\n  Summary.\nBody.\n"""; return None\n'
-    assert result.fixed_findings[PDF107MultilineOpeningQuotesSepLine.meta] == 2
+    assert result.fixed_findings[PDF107MultilineOpeningQuotesSeparateLine.meta] == 2
     assert not format_pdf103(result.new_source, settings=CheckSettings(select=("PDF107",), indent_width=2)).modified
 
 
@@ -91,7 +91,7 @@ def test_tab_simple_suite_uses_configured_tab_margin() -> None:
     result = format_pdf103(source, settings=settings)
 
     assert result.new_source == 'def function(): """\n\tSummary.\nBody.\n"""\n'
-    assert result.fixed_findings[PDF107MultilineOpeningQuotesSepLine.meta] == 1
+    assert result.fixed_findings[PDF107MultilineOpeningQuotesSeparateLine.meta] == 1
 
 
 def test_preserves_crlf_for_generated_opening_separator() -> None:
@@ -100,22 +100,22 @@ def test_preserves_crlf_for_generated_opening_separator() -> None:
     result = format_pdf103(source, settings=settings)
 
     assert result.new_source == 'def function():\r\n    """\r\n    Summary.\r\n\r\n    Body.\r\n    """\r\n'
-    assert result.fixed_findings[PDF107MultilineOpeningQuotesSepLine.meta] == 1
+    assert result.fixed_findings[PDF107MultilineOpeningQuotesSeparateLine.meta] == 1
     assert not format_pdf103(result.new_source, settings=settings).modified
 
 
 def test_check_fix_line_numbers_and_fix_false_findings_agree() -> None:
     source = 'def first():\n    """Summary.\n\n    Body.\n    """\n\ndef second():\n    """  Other.\n\n    Body.\n    """\n'
     _, context = contexts(source)
-    findings = PDF107MultilineOpeningQuotesSepLine.check(context)
-    fixed = PDF107MultilineOpeningQuotesSepLine.fix(context)
+    findings = PDF107MultilineOpeningQuotesSeparateLine.check(context)
+    fixed = PDF107MultilineOpeningQuotesSeparateLine.fix(context)
     check_only = format_pdf103(source, fix=False)
 
     assert tuple(finding.line_numbers for finding in findings) == ((2,), (8,))
     assert tuple(finding.line_numbers for finding in fixed.fixed_findings) == ((2,), (8,))
     assert tuple(finding.line_numbers for finding in check_only.unfixed_findings) == ((2,), (8,))
     _, fixed_context = contexts(fixed.module.code)
-    assert PDF107MultilineOpeningQuotesSepLine.check(fixed_context) == ()
+    assert PDF107MultilineOpeningQuotesSeparateLine.check(fixed_context) == ()
 
 
 def test_preserves_raw_prefix_quote_delimiter_and_skips_unsafe_shapes() -> None:
@@ -123,7 +123,7 @@ def test_preserves_raw_prefix_quote_delimiter_and_skips_unsafe_shapes() -> None:
     result = format_pdf103(source)
 
     assert result.new_source == "def raw():\n    r'''\n    Path C:\\\\temp.\n    Body.'''\n\ndef escaped():\n    '''Summary.\\nBody.'''\n\ndef concatenated():\n    ('Summary.\\n'\n     'Body.')\n"
-    assert result.fixed_findings[PDF107MultilineOpeningQuotesSepLine.meta] == 1
+    assert result.fixed_findings[PDF107MultilineOpeningQuotesSeparateLine.meta] == 1
 
 
 def test_pdf103_and_pdf104_normalize_compact_opt_in_pair_together() -> None:
@@ -132,7 +132,7 @@ def test_pdf103_and_pdf104_normalize_compact_opt_in_pair_together() -> None:
     result = formatter.format_source(source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
 
     assert result.new_source == 'def function():\n    """\n    Summary.\n\n    Body."""\n'
-    assert result.fixed_findings[PDF107MultilineOpeningQuotesSepLine.meta] == 1
+    assert result.fixed_findings[PDF107MultilineOpeningQuotesSeparateLine.meta] == 1
     assert not formatter.format_source(result.new_source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True).modified
 
 
@@ -142,8 +142,8 @@ def test_pdf103_and_pdf105_normalize_expanded_opt_in_pair_together() -> None:
     result = formatter.format_source(source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
 
     assert result.new_source == 'def function():\n    """\n    Summary.\n\n    Body.\n    """\n'
-    assert result.fixed_findings[PDF107MultilineOpeningQuotesSepLine.meta] == 1
-    assert result.fixed_findings[PDF109MultilineClosingQuotesSepLine.meta] == 1
+    assert result.fixed_findings[PDF107MultilineOpeningQuotesSeparateLine.meta] == 1
+    assert result.fixed_findings[PDF109MultilineClosingQuotesSeparateLine.meta] == 1
     assert not formatter.format_source(result.new_source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True).modified
 
 

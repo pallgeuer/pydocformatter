@@ -1,7 +1,7 @@
 import pydocformatter.formatter as formatter
 import pydocformatter.rules_selection as rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention
-from pydocformatter.rules.definitions.PDF.PDF409_convention_entry_spacing import PDF409ConventionEntrySpacing
+from pydocformatter.rules.definitions.PDF.PDF409_docstring_entry_spacing import PDF409DocstringEntrySpacing
 from pydocformatter.rules.definitions.PDF.PDF410_exception_entry_normalization import PDF410ExceptionEntryNormalization
 
 
@@ -47,7 +47,7 @@ def test_pdf409_and_pdf410_converge_on_overlapping_google_exception_entry() -> N
     result = format_source(source, settings=settings)
 
     assert result.new_source == 'def function(value):\n    """Summary.\n\n    Raises:\n        ValueError, TypeError:\n            Keep   continuation   spacing.\n    """\n'
-    assert result.fixed_findings[PDF409ConventionEntrySpacing.meta] == 1
+    assert result.fixed_findings[PDF409DocstringEntrySpacing.meta] == 1
     assert result.fixed_findings[PDF410ExceptionEntryNormalization.meta] == 1
     assert not format_source(result.new_source, settings=settings).modified
 

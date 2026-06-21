@@ -12,10 +12,10 @@ from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetada
 
 
 @rule_registration.register_rule_to(PDF_definition.PDF)
-class PDF409ConventionEntrySpacing(RuleBase):
+class PDF409DocstringEntrySpacing(RuleBase):
     meta = RuleMetadata(
         code=RuleCode("PDF409"),
-        name="convention-entry-spacing",
+        name="docstring-entry-spacing",
         message="Docstring convention entry spacing should be normalized",
         fix_availability=FixAvailability.SOMETIMES,
         stable_since="1.0.0",

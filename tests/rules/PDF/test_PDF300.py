@@ -7,7 +7,7 @@ import pydocformatter.rules_selection as rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention, LineEnding
 from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
 from pydocformatter.rules.definitions.PDF.PDF import PDF
-from pydocformatter.rules.definitions.PDF.PDF101_reflow_required import PDF101ReflowRequired
+from pydocformatter.rules.definitions.PDF.PDF101_docstring_reflow import PDF101DocstringReflow
 from pydocformatter.rules.definitions.PDF.PDF300_summary_trailing_period import PDF300SummaryTrailingPeriod
 
 
@@ -245,7 +245,7 @@ def test_pdf101_reflows_before_pdf300_adds_period() -> None:
     result = formatter.format_source(source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
 
     assert result.new_source == 'def function():\n    """Return value continued.\n    """\n'
-    assert result.fixed_findings[PDF101ReflowRequired.meta] == 1
+    assert result.fixed_findings[PDF101DocstringReflow.meta] == 1
     assert result.fixed_findings[PDF300SummaryTrailingPeriod.meta] == 1
     assert not result.unfixed_findings
 

@@ -1,4 +1,4 @@
-# convention-entry-spacing (PDF409)
+# docstring-entry-spacing (PDF409)
 
 Fix is sometimes available.
 

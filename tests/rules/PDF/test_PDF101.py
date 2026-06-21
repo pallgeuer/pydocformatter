@@ -7,7 +7,7 @@ import pydocformatter.rules_selection as rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention, LineEnding
 from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
 from pydocformatter.rules.definitions.PDF.PDF import PDF
-from pydocformatter.rules.definitions.PDF.PDF101_reflow_required import PDF101ReflowRequired
+from pydocformatter.rules.definitions.PDF.PDF101_docstring_reflow import PDF101DocstringReflow
 
 
 def contexts(source: str, *, settings: CheckSettings | None = None) -> tuple[RuleCategoryContext, RuleContext]:
@@ -40,14 +40,14 @@ def test_check_and_fix_single_line_summary() -> None:
     source = 'def area(radius):\n    """Return the area for a circle with the supplied radius after validating that the radius is finite and non-negative."""\n'
     _, context = contexts(source, settings=CheckSettings(select=("PDF101",), line_length=72))
 
-    findings = PDF101ReflowRequired.check(context)
-    result = PDF101ReflowRequired.fix(context)
+    findings = PDF101DocstringReflow.check(context)
+    result = PDF101DocstringReflow.fix(context)
 
     assert tuple(finding.line_numbers for finding in findings) == ((2,),)
     assert tuple(finding.line_numbers for finding in result.fixed_findings) == ((2,),)
     assert result.module.code == 'def area(radius):\n    """Return the area for a circle with the supplied radius after\n    validating that the radius is finite and non-negative."""\n'
     _, fixed_context = contexts(result.module.code, settings=CheckSettings(select=("PDF101",), line_length=72))
-    assert PDF101ReflowRequired.check(fixed_context) == ()
+    assert PDF101DocstringReflow.check(fixed_context) == ()
 
 
 def test_reflows_multiline_summary_and_paragraph_without_crossing_blank_lines() -> None:
@@ -58,7 +58,7 @@ def test_reflows_multiline_summary_and_paragraph_without_crossing_blank_lines() 
         result.new_source
         == 'def function():\n    """Summary text that should wrap together with the next\n    summary line and keep the paragraph separate.\n\n    Paragraph text that is long enough to wrap independently\n    from the summary paragraph.\n    """\n'
     )
-    assert result.fixed_findings[PDF101ReflowRequired.meta] == 1
+    assert result.fixed_findings[PDF101DocstringReflow.meta] == 1
     assert not format_pdf001(result.new_source, settings=CheckSettings(select=("PDF101",), line_length=64)).modified
 
 
@@ -279,7 +279,7 @@ def test_reflows_escaped_delimiters_and_backslashes_when_source_spelling_is_pres
         result.new_source
         == "def delimiter():\n    '''A docstring containing an escaped delimiter\n    \\'\\'\\' and enough words to need wrapping.'''\n\ndef backslash():\n    \"\"\"A docstring containing a literal backslash\n    \\\\ and enough words to need wrapping.\"\"\"\n"
     )
-    assert result.fixed_findings[PDF101ReflowRequired.meta] == 2
+    assert result.fixed_findings[PDF101DocstringReflow.meta] == 2
     assert not result.unfixed_findings
 
 
@@ -367,7 +367,7 @@ def test_check_mode_reports_all_reflowable_docstrings_without_modifying_source()
     assert check_result.new_source == source
     assert not check_result.modified
     assert tuple(finding.line_numbers for finding in check_result.unfixed_findings) == ((1,), (4,))
-    assert fix_result.fixed_findings[PDF101ReflowRequired.meta] == 2
+    assert fix_result.fixed_findings[PDF101DocstringReflow.meta] == 2
     assert fix_result.new_source == '"""Module docstring with enough words to\nrequire wrapping."""\n\ndef function():\n    """Function docstring with enough\n    words to require wrapping."""\n'
 
 
@@ -376,7 +376,7 @@ def test_reflows_module_docstring_with_trailing_newline_and_separate_closing_del
     result = format_pdf001(source, settings=CheckSettings(select=("PDF101",), line_length=42))
 
     assert result.new_source == '"""\nModule docstring with enough words to\nrequire wrapping onto a second source\nline.\n"""\n'
-    assert result.fixed_findings[PDF101ReflowRequired.meta] == 1
+    assert result.fixed_findings[PDF101DocstringReflow.meta] == 1
     assert not format_pdf001(result.new_source, settings=CheckSettings(select=("PDF101",), line_length=42)).modified
 
 
@@ -385,7 +385,7 @@ def test_reflow_joins_short_lines_without_requiring_an_overlong_input_line() -> 
     result = format_pdf001(source, settings=CheckSettings(select=("PDF101",), line_length=72))
 
     assert result.new_source == 'def function():\n    """Summary line one line two with words line three.\n    """\n'
-    assert result.fixed_findings[PDF101ReflowRequired.meta] == 1
+    assert result.fixed_findings[PDF101DocstringReflow.meta] == 1
     assert not format_pdf001(result.new_source, settings=CheckSettings(select=("PDF101",), line_length=72)).modified
 
 

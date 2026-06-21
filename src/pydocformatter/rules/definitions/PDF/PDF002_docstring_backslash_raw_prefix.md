@@ -1,4 +1,4 @@
-# docstring-backslash-escape (PDF002)
+# docstring-backslash-raw-prefix (PDF002)
 
 Fix is sometimes available.
 

@@ -19,7 +19,7 @@ class TestCLIRule(unittest.TestCase):
 
         output = stdout.getvalue()
         self.assertEqual(exit_code, 0)
-        self.assertTrue(output.startswith("# reflow-required (PDF101)\n\nFix is usually available.\n\n## What it does\n"))
+        self.assertTrue(output.startswith("# docstring-reflow (PDF101)\n\nFix is usually available.\n\n## What it does\n"))
         self.assertIn("## Ruff compatibility\n", output)
         self.assertNotIn("Derived from", output)
 
@@ -72,8 +72,8 @@ class TestCLIRule(unittest.TestCase):
         output = stdout.getvalue()
         self.assertEqual(exit_code, 0)
         self.assertIn("# standalone-comment-formatting (PCF001)\n", output)
-        self.assertIn("# docstring-should-be-one-line (PDF110)\n", output)
-        self.assertLess(output.index("# standalone-comment-formatting (PCF001)"), output.index("# reflow-required (PDF101)"))
+        self.assertIn("# one-line-docstring (PDF110)\n", output)
+        self.assertLess(output.index("# standalone-comment-formatting (PCF001)"), output.index("# docstring-reflow (PDF101)"))
 
     def test_pydocfmt_rule_prints_all_rules_json(self) -> None:
         stdout = StringIO()

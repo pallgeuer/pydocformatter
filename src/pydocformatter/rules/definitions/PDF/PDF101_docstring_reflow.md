@@ -1,4 +1,4 @@
-# reflow-required (PDF101)
+# docstring-reflow (PDF101)
 
 Fix is usually available.
 

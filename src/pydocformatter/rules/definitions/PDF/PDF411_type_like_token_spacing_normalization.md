@@ -1,4 +1,4 @@
-# type-like-spacing-normalization (PDF411)
+# type-like-token-spacing-normalization (PDF411)
 
 Fix is sometimes available.
 

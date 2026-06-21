@@ -58,7 +58,13 @@ class TSTIncompatibilityCategory(RuleCategoryBase):
 
 class PDF101SampleRule(RuleBase):
     meta = RuleMetadata(
-        code=RuleCode("PDF101"), name="reflow-required", message="Docstring chunk needs reflow", fix_availability=FixAvailability.ALWAYS, stable_since="1.0.0", setting_effects=(), incompatible_with=()
+        code=RuleCode("PDF101"),
+        name="docstring-reflow",
+        message="Docstring chunk needs reflow",
+        fix_availability=FixAvailability.ALWAYS,
+        stable_since="1.0.0",
+        setting_effects=(),
+        incompatible_with=(),
     )
 
 
@@ -381,7 +387,7 @@ class TestRules(unittest.TestCase):
                 "-c",
                 (
                     "from pydocformatter.rules.definitions.PCF.PCF import PCF\n"
-                    "from pydocformatter.rules.definitions.PDF.PDF101_reflow_required import PDF101ReflowRequired\n"
+                    "from pydocformatter.rules.definitions.PDF.PDF101_docstring_reflow import PDF101DocstringReflow\n"
                     "from pydocformatter.rules.definitions.PDF.PDF import PDF\n"
                     "import sys\n"
                     "assert 'pydocformatter.rules.collection' not in sys.modules\n"
@@ -1566,7 +1572,7 @@ class TestRules(unittest.TestCase):
         self.assertEqual(
             output.getvalue(),
             "PCF001 comment-reflow-required (Comment chunk needs reflow)\n"
-            "PDF101* reflow-required (Docstring chunk needs reflow)\n"
+            "PDF101* docstring-reflow (Docstring chunk needs reflow)\n"
             "PDF110 summary-too-long (Docstring summary does not fit on one line)\n",
         )
 
@@ -1613,7 +1619,7 @@ class TestRules(unittest.TestCase):
 
         check.print_rules(selection, output=output)
 
-        self.assertIn("PDF101* reflow-required (Docstring chunk needs reflow)\n", output.getvalue())
+        self.assertIn("PDF101* docstring-reflow (Docstring chunk needs reflow)\n", output.getvalue())
 
 
 if __name__ == "__main__":

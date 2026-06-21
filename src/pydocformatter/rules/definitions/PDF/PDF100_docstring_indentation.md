@@ -1,4 +1,4 @@
-# incorrect-indentation (PDF100)
+# docstring-indentation (PDF100)
 
 Fix is always available.
 

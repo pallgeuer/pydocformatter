@@ -12,10 +12,10 @@ from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetada
 
 
 @rule_registration.register_rule_to(PDF_definition.PDF)
-class PDF002DocstringBackslashEscape(RuleBase):
+class PDF002DocstringBackslashRawPrefix(RuleBase):
     meta = RuleMetadata(
         code=RuleCode("PDF002"),
-        name="docstring-backslash-escape",
+        name="docstring-backslash-raw-prefix",
         message="Docstring with backslashes should use a raw string prefix",
         fix_availability=FixAvailability.SOMETIMES,
         stable_since="1.0.0",
@@ -57,13 +57,13 @@ def _finding_for_docstring(docstring: PDF_definition.DocstringInfo, *, context: 
         return None
     planned_change = _planned_change_for_docstring(docstring)
     if planned_change is not None:
-        return RuleFinding(rule=PDF002DocstringBackslashEscape.meta, line_numbers=_line_numbers(docstring), instance_fixable=True)
+        return RuleFinding(rule=PDF002DocstringBackslashRawPrefix.meta, line_numbers=_line_numbers(docstring), instance_fixable=True)
     # Non-fixable findings point only to manually actionable backslash lines; fixable source changes still report the
     # whole docstring range.
     reportable_lines = _reportable_nonfixable_line_numbers(docstring)
     if not reportable_lines:
         return None
-    return RuleFinding(rule=PDF002DocstringBackslashEscape.meta, line_numbers=reportable_lines, instance_fixable=False)
+    return RuleFinding(rule=PDF002DocstringBackslashRawPrefix.meta, line_numbers=reportable_lines, instance_fixable=False)
 
 
 def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo) -> rule_edits.PlannedSourceChange | None:

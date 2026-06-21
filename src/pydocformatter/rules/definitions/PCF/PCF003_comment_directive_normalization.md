@@ -1,4 +1,4 @@
-# directive-normalization (PCF003)
+# comment-directive-normalization (PCF003)
 
 Fix is always available.
 
@@ -10,7 +10,7 @@ PCF003 handles comments already classified as type comments or known tool direct
 Unknown or ambiguous payload text is preserved after safe prefix cleanup. Ordinary comments remain outside this rule.
 
 ## Why is this useful?
-Tool directives are sensitive, so ordinary comment reflow should not rewrite them. A separate directive-normalization rule lets projects canonicalize recognized directive syntax without enabling broader trailing-comment extraction or prose formatting.
+Tool directives are sensitive, so ordinary comment reflow should not rewrite them. A separate comment-directive-normalization rule lets projects canonicalize recognized directive syntax without enabling broader trailing-comment extraction or prose formatting.
 
 ## Ruff compatibility
 Ruff may normalize some comment spacing through its formatter, but pydocformatter keeps this as an independently selectable PCF rule so directive syntax normalization can be controlled separately from ordinary comment formatting.

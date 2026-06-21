@@ -15,10 +15,10 @@ from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetada
 
 
 @rule_registration.register_rule_to(PDF_definition.PDF)
-class PDF100IncorrectIndentation(RuleBase):
+class PDF100DocstringIndentation(RuleBase):
     meta = RuleMetadata(
         code=RuleCode("PDF100"),
-        name="incorrect-indentation",
+        name="docstring-indentation",
         message="Docstring line is incorrectly indented",
         fix_availability=FixAvailability.ALWAYS,
         stable_since="1.0.0",

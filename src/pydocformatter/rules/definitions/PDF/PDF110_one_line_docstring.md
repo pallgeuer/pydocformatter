@@ -1,4 +1,4 @@
-# docstring-should-be-one-line (PDF110)
+# one-line-docstring (PDF110)
 
 Fix is always available.
 

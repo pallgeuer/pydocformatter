@@ -31,13 +31,13 @@ The class is also named after the prefix and defines `RuleCategoryMetadata` cont
 Each implemented rule should be defined as one `RuleBase` subclass, normally in a module grouped by prefix:
 
 ```text
-src/pydocformatter/rules/definitions/PDF/PDF101_reflow_required.py
+src/pydocformatter/rules/definitions/PDF/PDF101_docstring_reflow.py
 ```
 
 Rule classes register with their category through `@register_rule_to(PDF)` and define a `meta` class attribute containing `RuleMetadata`:
 
 - `code`: A `RuleCode`, such as `PDF101`.
-- `name`: A stable machine-readable name, such as `reflow-required`.
+- `name`: A stable machine-readable name, such as `docstring-reflow`.
 - `message`: The default diagnostic message. It may include format fields for per-finding customization.
 - `fix_availability`: A `FixAvailability` value describing whether automatic fixes are `Always`, `Usually`, `Sometimes`, or `Never` available at the rule level.
 - `setting_effects`: Immutable metadata mapping resolved setting fields and triggering values to `Ignored` or `Disabled` selection effects.
@@ -334,7 +334,7 @@ Only global rule selection is displayed. Per-file ignores are intentionally not 
 - `--output-format text` prints the adjacent Markdown rule document directly.
 - `--output-format json` prints Ruff-style metadata for one rule, or a list of metadata objects with `--all`; its `explanation` field omits the Markdown title and fixability paragraph.
 
-Rule documents live next to their rule definition modules with the same basename and a `.md` extension. For example, `src/pydocformatter/rules/definitions/PDF/PDF101_reflow_required.py` is documented by `src/pydocformatter/rules/definitions/PDF/PDF101_reflow_required.md`. New rule docs should follow `src/pydocformatter/rules/templates/rule_template.md`.
+Rule documents live next to their rule definition modules with the same basename and a `.md` extension. For example, `src/pydocformatter/rules/definitions/PDF/PDF101_docstring_reflow.py` is documented by `src/pydocformatter/rules/definitions/PDF/PDF101_docstring_reflow.md`. New rule docs should follow `src/pydocformatter/rules/templates/rule_template.md`.
 
 ## CLI Linter Listing
 

@@ -1,4 +1,4 @@
-# multiline-closing-quotes-sep-line (PDF109)
+# multiline-closing-quotes-separate-line (PDF109)
 
 Fix is always available.
 

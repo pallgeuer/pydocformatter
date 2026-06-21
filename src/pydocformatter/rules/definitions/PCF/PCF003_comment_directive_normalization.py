@@ -19,10 +19,10 @@ _COLON_VALUE_RE = re.compile(r"^(?P<head>pyright|mypy|ruff|flake8|fmt|isort|prag
 
 
 @rule_registration.register_rule_to(PCF_definition.PCF)
-class PCF003DirectiveNormalization(RuleBase):
+class PCF003CommentDirectiveNormalization(RuleBase):
     meta = RuleMetadata(
         code=RuleCode("PCF003"),
-        name="directive-normalization",
+        name="comment-directive-normalization",
         message="Directive comment should be normalized",
         fix_availability=FixAvailability.ALWAYS,
         stable_since="1.0.0",

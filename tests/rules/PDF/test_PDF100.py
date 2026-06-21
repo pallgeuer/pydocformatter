@@ -6,7 +6,7 @@ import pydocformatter.rules_selection as rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention, IndentStyle, LineEnding
 from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
 from pydocformatter.rules.definitions.PDF.PDF import PDF
-from pydocformatter.rules.definitions.PDF.PDF100_incorrect_indentation import PDF100IncorrectIndentation
+from pydocformatter.rules.definitions.PDF.PDF100_docstring_indentation import PDF100DocstringIndentation
 
 
 def contexts(source: str, *, settings: CheckSettings | None = None) -> tuple[RuleCategoryContext, RuleContext]:
@@ -35,7 +35,7 @@ def test_normalizes_over_indented_plain_continuation_lines() -> None:
     result = format_pdf002(source)
 
     assert result.new_source == 'def function():\n    """Summary.\n    First continuation.\n    Second continuation.\n    """\n'
-    assert result.fixed_findings[PDF100IncorrectIndentation.meta] == 1
+    assert result.fixed_findings[PDF100DocstringIndentation.meta] == 1
     assert not format_pdf002(result.new_source).modified
 
 
@@ -271,9 +271,9 @@ def test_skips_non_docstring_string_expressions() -> None:
 def test_already_canonical_multiline_docstring_has_no_fix_or_finding() -> None:
     source = 'def function():\n    """Summary.\n    Already canonical.\n        Relative indentation.\n    """\n'
     _, context = contexts(source)
-    result = PDF100IncorrectIndentation.fix(context)
+    result = PDF100DocstringIndentation.fix(context)
 
-    assert PDF100IncorrectIndentation.check(context) == ()
+    assert PDF100DocstringIndentation.check(context) == ()
     assert result.module.code == source
     assert result.fixed_findings == ()
 
@@ -281,23 +281,23 @@ def test_already_canonical_multiline_docstring_has_no_fix_or_finding() -> None:
 def test_check_fix_line_numbers_and_fix_false_findings_agree() -> None:
     source = 'def first():\n    """Summary.\n      Over.\n    """\n\ndef second():\n    """Summary.\n      Also over.\n    """\n'
     _, context = contexts(source)
-    findings = PDF100IncorrectIndentation.check(context)
-    fixed = PDF100IncorrectIndentation.fix(context)
+    findings = PDF100DocstringIndentation.check(context)
+    fixed = PDF100DocstringIndentation.fix(context)
     check_only = format_pdf002(source, fix=False)
 
     assert tuple(finding.line_numbers for finding in findings) == ((3,), (8,))
     assert tuple(finding.line_numbers for finding in fixed.fixed_findings) == ((3,), (8,))
     assert tuple(finding.line_numbers for finding in check_only.unfixed_findings) == ((3,), (8,))
     _, fixed_context = contexts(fixed.module.code)
-    assert PDF100IncorrectIndentation.check(fixed_context) == ()
+    assert PDF100DocstringIndentation.check(fixed_context) == ()
 
 
 def test_one_docstring_reports_all_changed_physical_lines_together() -> None:
     source = 'def function():\n    """Summary.\n      First.\n        Second.\n    """\n'
     _, context = contexts(source)
-    result = PDF100IncorrectIndentation.fix(context)
+    result = PDF100DocstringIndentation.fix(context)
 
-    assert tuple(finding.line_numbers for finding in PDF100IncorrectIndentation.check(context)) == ((3, 4),)
+    assert tuple(finding.line_numbers for finding in PDF100DocstringIndentation.check(context)) == ((3, 4),)
     assert tuple(finding.line_numbers for finding in result.fixed_findings) == ((3, 4),)
 
 

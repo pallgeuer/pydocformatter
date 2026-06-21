@@ -7,8 +7,8 @@ import pydocformatter.rules_selection as rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention, LineEnding
 from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
 from pydocformatter.rules.definitions.PDF.PDF import PDF
-from pydocformatter.rules.definitions.PDF.PDF101_reflow_required import PDF101ReflowRequired
-from pydocformatter.rules.definitions.PDF.PDF110_docstring_should_be_one_line import PDF110DocstringShouldBeOneLine
+from pydocformatter.rules.definitions.PDF.PDF101_docstring_reflow import PDF101DocstringReflow
+from pydocformatter.rules.definitions.PDF.PDF110_one_line_docstring import PDF110OneLineDocstring
 
 
 def contexts(source: str, *, settings: CheckSettings | None = None) -> tuple[RuleCategoryContext, RuleContext]:
@@ -37,7 +37,7 @@ def test_collapses_single_summary_line_docstring() -> None:
     result = format_pdf106(source)
 
     assert result.new_source == 'def function():\n    """Summary."""\n'
-    assert result.fixed_findings[PDF110DocstringShouldBeOneLine.meta] == 1
+    assert result.fixed_findings[PDF110OneLineDocstring.meta] == 1
     assert not format_pdf106(result.new_source).modified
 
 
@@ -46,7 +46,7 @@ def test_removes_surrounding_space_tab_only_blank_lines() -> None:
     result = format_pdf106(source)
 
     assert result.new_source == 'def function():\n    """Summary."""\n'
-    assert result.fixed_findings[PDF110DocstringShouldBeOneLine.meta] == 1
+    assert result.fixed_findings[PDF110OneLineDocstring.meta] == 1
     assert not format_pdf106(result.new_source).modified
 
 
@@ -55,7 +55,7 @@ def test_preserves_same_opening_line_content_whitespace() -> None:
     result = format_pdf106(source)
 
     assert result.new_source == 'def function():\n    """  Summary with leading spaces."""\n'
-    assert result.fixed_findings[PDF110DocstringShouldBeOneLine.meta] == 1
+    assert result.fixed_findings[PDF110OneLineDocstring.meta] == 1
 
 
 def test_collapses_module_docstring_and_preserves_closing_line_suffix() -> None:
@@ -63,7 +63,7 @@ def test_collapses_module_docstring_and_preserves_closing_line_suffix() -> None:
     result = format_pdf106(source)
 
     assert result.new_source == '"""Module summary."""\n\ndef function():\n    """Summary."""  # retained comment\n'
-    assert result.fixed_findings[PDF110DocstringShouldBeOneLine.meta] == 2
+    assert result.fixed_findings[PDF110OneLineDocstring.meta] == 2
     assert not format_pdf106(result.new_source).modified
 
 
@@ -74,7 +74,7 @@ def test_line_length_boundary_includes_complete_source_line() -> None:
     too_long = format_pdf106(source, settings=CheckSettings(select=("PDF110",), line_length=len('    """Summary."""') - 1))
 
     assert fits.new_source == 'def function():\n    """Summary."""\n'
-    assert fits.fixed_findings[PDF110DocstringShouldBeOneLine.meta] == 1
+    assert fits.fixed_findings[PDF110OneLineDocstring.meta] == 1
     assert too_long.new_source == source
     assert not too_long.fixed_findings
     assert not too_long.unfixed_findings
@@ -87,7 +87,7 @@ def test_line_length_includes_simple_suite_suffix() -> None:
     too_long = format_pdf106(source, settings=CheckSettings(select=("PDF110",), line_length=len('def function(): """Summary."""; return None') - 1))
 
     assert fits.new_source == 'def function(): """Summary."""; return None\n'
-    assert fits.fixed_findings[PDF110DocstringShouldBeOneLine.meta] == 1
+    assert fits.fixed_findings[PDF110OneLineDocstring.meta] == 1
     assert too_long.new_source == source
     assert not too_long.fixed_findings
 
@@ -103,7 +103,7 @@ def test_line_length_includes_parenthesized_prefix_and_tab_width() -> None:
     assert parenthesized_too_long.new_source == parenthesized
     assert not parenthesized_too_long.fixed_findings
     assert tab_width_four.new_source == 'def function():\n\t"""Summary."""\n'
-    assert tab_width_four.fixed_findings[PDF110DocstringShouldBeOneLine.meta] == 1
+    assert tab_width_four.fixed_findings[PDF110OneLineDocstring.meta] == 1
     assert tab_width_eight.new_source == tabs
     assert not tab_width_eight.fixed_findings
 
@@ -114,7 +114,7 @@ def test_preserves_raw_prefix_quote_delimiter_nested_async_and_crlf() -> None:
     result = format_pdf106(source, settings=settings)
 
     assert result.new_source == "class Example:\r\n    @decorator\r\n    async def method(self):\r\n        r'''Path C:\\\\temp.'''\r\n"
-    assert result.fixed_findings[PDF110DocstringShouldBeOneLine.meta] == 1
+    assert result.fixed_findings[PDF110OneLineDocstring.meta] == 1
     assert not format_pdf106(result.new_source, settings=settings).modified
 
 
@@ -123,7 +123,7 @@ def test_escapes_quote_collisions_before_using_separator_fallback() -> None:
     result = format_pdf106(source)
 
     assert result.new_source == 'def quoted():\n    """\\"quoted\\""""\n\ndef trailing():\n    """trailing \\""""\n\ndef quote_pair():\n    """\\"\\""""\n'
-    assert result.fixed_findings[PDF110DocstringShouldBeOneLine.meta] == 3
+    assert result.fixed_findings[PDF110OneLineDocstring.meta] == 3
     assert not format_pdf106(result.new_source).modified
 
 
@@ -132,7 +132,7 @@ def test_uses_separator_fallback_for_raw_backslash_collision() -> None:
     result = format_pdf106(source)
 
     assert result.new_source == 'def raw():\n    r"""Path \\ """\n'
-    assert result.fixed_findings[PDF110DocstringShouldBeOneLine.meta] == 1
+    assert result.fixed_findings[PDF110OneLineDocstring.meta] == 1
     assert not result.unfixed_findings
 
 
@@ -160,7 +160,7 @@ def test_disabled_structure_parsing_can_make_structural_line_collapsible() -> No
     assert parsed.new_source == source
     assert not parsed.fixed_findings
     assert disabled.new_source == 'def function():\n    """- item"""\n'
-    assert disabled.fixed_findings[PDF110DocstringShouldBeOneLine.meta] == 1
+    assert disabled.fixed_findings[PDF110OneLineDocstring.meta] == 1
 
 
 @pytest.mark.parametrize(
@@ -181,7 +181,7 @@ def test_disabled_single_line_structure_parsing_can_make_structure_collapsible(s
     assert parsed.new_source == source
     assert not parsed.fixed_findings
     assert disabled.new_source == expected
-    assert disabled.fixed_findings[PDF110DocstringShouldBeOneLine.meta] == 1
+    assert disabled.fixed_findings[PDF110OneLineDocstring.meta] == 1
 
 
 def test_skips_multiline_simple_docstring_when_escaped_source_mapping_is_ambiguous() -> None:
@@ -208,8 +208,8 @@ def test_pdf001_can_reflow_multiline_summary_before_pdf106_collapses_it() -> Non
     result = formatter.format_source(source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
 
     assert result.new_source == 'def function():\n    """Summary line continuation line."""\n'
-    assert result.fixed_findings[PDF101ReflowRequired.meta] == 1
-    assert result.fixed_findings[PDF110DocstringShouldBeOneLine.meta] == 1
+    assert result.fixed_findings[PDF101DocstringReflow.meta] == 1
+    assert result.fixed_findings[PDF110OneLineDocstring.meta] == 1
     assert not formatter.format_source(result.new_source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True).modified
 
 
@@ -221,7 +221,7 @@ def test_pdf_family_selection_converges_after_pdf106_collapse() -> None:
 
     assert result.new_source == 'def function():\n    """Summary."""\n'
     second_pass = formatter.format_source(result.new_source, "example.py", settings=settings, rule_selection=selection, fix=True)
-    assert result.fixed_findings[PDF110DocstringShouldBeOneLine.meta] == 1
+    assert result.fixed_findings[PDF110OneLineDocstring.meta] == 1
     assert not second_pass.modified
     assert not result.errors
     assert not second_pass.errors
@@ -230,12 +230,12 @@ def test_pdf_family_selection_converges_after_pdf106_collapse() -> None:
 def test_check_fix_line_numbers_and_fix_false_findings_agree() -> None:
     source = 'def first():\n    """\n    Summary.\n    """\n\ndef second():\n    """Other.\n    """\n'
     _, context = contexts(source)
-    findings = PDF110DocstringShouldBeOneLine.check(context)
-    fixed = PDF110DocstringShouldBeOneLine.fix(context)
+    findings = PDF110OneLineDocstring.check(context)
+    fixed = PDF110OneLineDocstring.fix(context)
     check_only = format_pdf106(source, fix=False)
 
     assert tuple(finding.line_numbers for finding in findings) == ((2, 3, 4), (7, 8))
     assert tuple(finding.line_numbers for finding in fixed.fixed_findings) == ((2, 3, 4), (7, 8))
     assert tuple(finding.line_numbers for finding in check_only.unfixed_findings) == ((2, 3, 4), (7, 8))
     _, fixed_context = contexts(fixed.module.code)
-    assert PDF110DocstringShouldBeOneLine.check(fixed_context) == ()
+    assert PDF110OneLineDocstring.check(fixed_context) == ()

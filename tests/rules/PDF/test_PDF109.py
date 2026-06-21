@@ -6,7 +6,7 @@ import pydocformatter.rules_selection as rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, IndentStyle, LineEnding
 from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
 from pydocformatter.rules.definitions.PDF.PDF import PDF
-from pydocformatter.rules.definitions.PDF.PDF109_multiline_closing_quotes_sep_line import PDF109MultilineClosingQuotesSepLine
+from pydocformatter.rules.definitions.PDF.PDF109_multiline_closing_quotes_separate_line import PDF109MultilineClosingQuotesSeparateLine
 
 
 def contexts(source: str, *, settings: CheckSettings | None = None) -> tuple[RuleCategoryContext, RuleContext]:
@@ -35,7 +35,7 @@ def test_moves_closing_quotes_below_final_content_line() -> None:
     result = format_pdf105(source)
 
     assert result.new_source == 'def function():\n    """Summary.\n\n    Body.\n    """\n'
-    assert result.fixed_findings[PDF109MultilineClosingQuotesSepLine.meta] == 1
+    assert result.fixed_findings[PDF109MultilineClosingQuotesSeparateLine.meta] == 1
     assert not format_pdf105(result.new_source).modified
 
 
@@ -44,7 +44,7 @@ def test_preserves_first_line_content_whitespace_when_moving_closing_quotes() ->
     result = format_pdf105(source)
 
     assert result.new_source == 'def function():\n    """  Summary with leading spaces.\n    More content.\n    """\n'
-    assert result.fixed_findings[PDF109MultilineClosingQuotesSepLine.meta] == 1
+    assert result.fixed_findings[PDF109MultilineClosingQuotesSeparateLine.meta] == 1
 
 
 def test_moves_closing_quotes_below_single_content_line() -> None:
@@ -52,7 +52,7 @@ def test_moves_closing_quotes_below_single_content_line() -> None:
     result = format_pdf105(source)
 
     assert result.new_source == 'def function():\n    """\n    Summary.\n    """\n'
-    assert result.fixed_findings[PDF109MultilineClosingQuotesSepLine.meta] == 1
+    assert result.fixed_findings[PDF109MultilineClosingQuotesSeparateLine.meta] == 1
     assert not format_pdf105(result.new_source).modified
 
 
@@ -70,7 +70,7 @@ def test_preserves_final_content_trailing_whitespace_for_other_rules() -> None:
     result = format_pdf105(source)
 
     assert result.new_source == 'def function():\n    """Summary.\n\n    Body.  \n    """\n'
-    assert result.fixed_findings[PDF109MultilineClosingQuotesSepLine.meta] == 1
+    assert result.fixed_findings[PDF109MultilineClosingQuotesSeparateLine.meta] == 1
 
 
 def test_skips_non_raw_backslash_escape_even_when_separating_would_be_possible() -> None:
@@ -87,7 +87,7 @@ def test_parenthesized_and_simple_suite_docstrings_use_canonical_margin() -> Non
     result = format_pdf105(source, settings=CheckSettings(select=("PDF109",), indent_width=2))
 
     assert result.new_source == 'class Parenthesized:\n    (\n        """Class.\n\n        Body.\n        """\n    )\n\ndef simple(): """Summary.\nBody.\n  """; return None\n'
-    assert result.fixed_findings[PDF109MultilineClosingQuotesSepLine.meta] == 2
+    assert result.fixed_findings[PDF109MultilineClosingQuotesSeparateLine.meta] == 2
     assert not format_pdf105(result.new_source, settings=CheckSettings(select=("PDF109",), indent_width=2)).modified
 
 
@@ -97,7 +97,7 @@ def test_tab_simple_suite_uses_configured_tab_margin() -> None:
     result = format_pdf105(source, settings=settings)
 
     assert result.new_source == 'def function(): """Summary.\nBody.\n\t"""\n'
-    assert result.fixed_findings[PDF109MultilineClosingQuotesSepLine.meta] == 1
+    assert result.fixed_findings[PDF109MultilineClosingQuotesSeparateLine.meta] == 1
 
 
 def test_module_decorated_async_method_and_nested_class_use_owner_specific_margins() -> None:
@@ -108,7 +108,7 @@ def test_module_decorated_async_method_and_nested_class_use_owner_specific_margi
         result.new_source
         == '"""Module.\n\nBody.\n"""\n\nclass Outer:\n    @decorator\n    async def method(self): """Method.\nBody.\n        """; return None\n\n    class Inner:\n        """Class.\n\n        Body.\n        """\n'
     )
-    assert result.fixed_findings[PDF109MultilineClosingQuotesSepLine.meta] == 3
+    assert result.fixed_findings[PDF109MultilineClosingQuotesSeparateLine.meta] == 3
     assert not format_pdf105(result.new_source).modified
 
 
@@ -118,22 +118,22 @@ def test_preserves_crlf_for_generated_closing_separator() -> None:
     result = format_pdf105(source, settings=settings)
 
     assert result.new_source == 'def function():\r\n    """Summary.\r\n\r\n    Body.\r\n    """\r\n'
-    assert result.fixed_findings[PDF109MultilineClosingQuotesSepLine.meta] == 1
+    assert result.fixed_findings[PDF109MultilineClosingQuotesSeparateLine.meta] == 1
     assert not format_pdf105(result.new_source, settings=settings).modified
 
 
 def test_check_fix_line_numbers_and_fix_false_findings_agree() -> None:
     source = 'def first():\n    """Summary.\n\n    Body."""\n\ndef second():\n    """Other.\n\n    Body."""\n'
     _, context = contexts(source)
-    findings = PDF109MultilineClosingQuotesSepLine.check(context)
-    fixed = PDF109MultilineClosingQuotesSepLine.fix(context)
+    findings = PDF109MultilineClosingQuotesSeparateLine.check(context)
+    fixed = PDF109MultilineClosingQuotesSeparateLine.fix(context)
     check_only = format_pdf105(source, fix=False)
 
     assert tuple(finding.line_numbers for finding in findings) == ((4,), (9,))
     assert tuple(finding.line_numbers for finding in fixed.fixed_findings) == ((4,), (9,))
     assert tuple(finding.line_numbers for finding in check_only.unfixed_findings) == ((4,), (9,))
     _, fixed_context = contexts(fixed.module.code)
-    assert PDF109MultilineClosingQuotesSepLine.check(fixed_context) == ()
+    assert PDF109MultilineClosingQuotesSeparateLine.check(fixed_context) == ()
 
 
 def test_preserves_raw_prefix_quote_delimiter_and_skips_unsafe_shapes() -> None:
@@ -141,7 +141,7 @@ def test_preserves_raw_prefix_quote_delimiter_and_skips_unsafe_shapes() -> None:
     result = format_pdf105(source)
 
     assert result.new_source == "def raw():\n    r'''Path C:\\\\temp.\n    Body.\n    '''\n\ndef escaped():\n    '''Summary.\\nBody.'''\n\ndef concatenated():\n    ('Summary.\\n'\n     'Body.')\n"
-    assert result.fixed_findings[PDF109MultilineClosingQuotesSepLine.meta] == 1
+    assert result.fixed_findings[PDF109MultilineClosingQuotesSeparateLine.meta] == 1
 
 
 def test_pdf006_trims_final_content_whitespace_before_pdf105_separates_quotes() -> None:
@@ -150,14 +150,14 @@ def test_pdf006_trims_final_content_whitespace_before_pdf105_separates_quotes() 
     result = formatter.format_source(source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
 
     assert result.new_source == 'def function():\n    """Summary.\n\n    Body.\n    """\n'
-    assert result.fixed_findings[PDF109MultilineClosingQuotesSepLine.meta] == 1
+    assert result.fixed_findings[PDF109MultilineClosingQuotesSeparateLine.meta] == 1
     assert not formatter.format_source(result.new_source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True).modified
 
 
 def test_fix_noops_for_blank_and_single_content_docstrings() -> None:
     source = 'def blank():\n    """  \n    """\n\ndef one():\n    """Summary."""\n'
     _, context = contexts(source)
-    fixed = PDF109MultilineClosingQuotesSepLine.fix(context)
+    fixed = PDF109MultilineClosingQuotesSeparateLine.fix(context)
 
     assert fixed.module.code == source
     assert fixed.fixed_findings == ()

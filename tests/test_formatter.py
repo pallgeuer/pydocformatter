@@ -28,7 +28,7 @@ from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetadata
 
 PDF101_RULE = RuleMetadata(
-    code=RuleCode("PDF101"), name="reflow-required", message="Docstring chunk needs reflow", fix_availability=FixAvailability.ALWAYS, stable_since="1.0.0", setting_effects=(), incompatible_with=()
+    code=RuleCode("PDF101"), name="docstring-reflow", message="Docstring chunk needs reflow", fix_availability=FixAvailability.ALWAYS, stable_since="1.0.0", setting_effects=(), incompatible_with=()
 )
 PDF110_RULE = RuleMetadata(
     code=RuleCode("PDF110"),
@@ -114,7 +114,7 @@ class TestFormatterResults(unittest.TestCase):
     def test_rule_finding_uses_rule_defaults_with_per_finding_overrides(self) -> None:
         rule = RuleMetadata(
             code=RuleCode("PDF101"),
-            name="reflow-required",
+            name="docstring-reflow",
             message="Docstring chunk needs reflow",
             fix_availability=FixAvailability.ALWAYS,
             stable_since="1.0.0",

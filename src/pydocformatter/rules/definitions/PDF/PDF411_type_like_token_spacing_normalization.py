@@ -16,10 +16,10 @@ from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetada
 
 
 @rule_registration.register_rule_to(PDF_definition.PDF)
-class PDF411TypeLikeSpacingNormalization(RuleBase):
+class PDF411TypeLikeTokenSpacingNormalization(RuleBase):
     meta = RuleMetadata(
         code=RuleCode("PDF411"),
-        name="type-like-spacing-normalization",
+        name="type-like-token-spacing-normalization",
         message="Docstring type-like token spacing should be normalized",
         fix_availability=FixAvailability.SOMETIMES,
         stable_since="1.0.0",

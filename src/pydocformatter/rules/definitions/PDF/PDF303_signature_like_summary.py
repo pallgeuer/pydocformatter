@@ -10,10 +10,10 @@ from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetada
 
 
 @rule_registration.register_rule_to(PDF)
-class PDF303SignatureSummary(RuleBase):
+class PDF303SignatureLikeSummary(RuleBase):
     meta = RuleMetadata(
         code=RuleCode("PDF303"),
-        name="signature-summary",
+        name="signature-like-summary",
         message="Docstring summary should not be a signature",
         fix_availability=FixAvailability.NEVER,
         stable_since="1.0.0",

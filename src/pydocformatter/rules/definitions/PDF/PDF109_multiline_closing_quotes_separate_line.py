@@ -11,10 +11,10 @@ from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetada
 
 
 @rule_registration.register_rule_to(PDF)
-class PDF109MultilineClosingQuotesSepLine(RuleBase):
+class PDF109MultilineClosingQuotesSeparateLine(RuleBase):
     meta = RuleMetadata(
         code=RuleCode("PDF109"),
-        name="multiline-closing-quotes-sep-line",
+        name="multiline-closing-quotes-separate-line",
         message="Multi-line docstring closing quotes should be on a separate line",
         fix_availability=FixAvailability.ALWAYS,
         stable_since="1.0.0",
