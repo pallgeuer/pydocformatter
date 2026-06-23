@@ -85,7 +85,7 @@ uv run pytest
 uv run mypy
 uv run black --check .
 uv run isort --check .
-uv run pydocfmt check --legacy
+uv run pydocfmt check
 ```
 
 Use narrower test commands while iterating when the changed surface is small. Run the full suite before finishing a broad rule, category parser, settings, or documentation-table change.

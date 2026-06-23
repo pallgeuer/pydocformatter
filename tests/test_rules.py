@@ -393,12 +393,13 @@ class TestRules(unittest.TestCase):
                 self.assertEqual(source_path.with_suffix(".md").stem, expected_markdown_stem)
 
     def test_fixable_rules_use_shared_check_fix_planning_pattern(self) -> None:
-        """Fixable rule implementations should keep check and fix behavior tied to one shared result source. This static
-        pattern test is intentionally opinionated and should fail future fixable rules that implement independent check
-        and fix logic; if it fails for a newly implemented rule, first check whether the rule can be expressed with an
-        existing shared planning helper, then either refactor the rule to share findings and edits through that helper
-        or add a narrowly named shared helper pattern here with focused behavioral tests proving that check findings,
-        fixed findings, and remaining findings stay in correspondence.
+        """Check that fixable rules share check and fix planning.
+
+        This static pattern test is intentionally opinionated and should fail future fixable rules that implement
+        independent check and fix logic; if it fails for a newly implemented rule, first check whether the rule can be
+        expressed with an existing shared planning helper, then either refactor the rule to share findings and edits
+        through that helper or add a narrowly named shared helper pattern here with focused behavioral tests proving
+        that check findings, fixed findings, and remaining findings stay in correspondence.
         """
         for rule_class in rule_collection.RULE_COLLECTION.rules:
             with self.subTest(code=str(rule_class.meta.code)):

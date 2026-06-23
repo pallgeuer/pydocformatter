@@ -14,7 +14,7 @@ Google `Raise`/`Raises` and `Warn`/`Warns` entries, NumPy exception and warning 
 The rule only rewrites entries that parse as simple or dotted exception names. It does not normalize arbitrary prose, malformed exception lists, double-backtick code spans, return/yield type expressions, or description text. Concatenated docstrings and source mappings that cannot be safely rewritten are reported without a fix.
 
 ## Why is this useful?
-Consistent exception-entry spelling keeps convention-aware docstrings readable without adopting the legacy behavior of wrapping exception names in backticks.
+Consistent exception-entry spelling keeps convention-aware docstrings readable without wrapping exception names in backticks.
 
 ## Ruff compatibility
 None.

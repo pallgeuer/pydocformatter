@@ -155,10 +155,10 @@ class TestSettings(unittest.TestCase):
 
     def test_setting_definition_respects_explicit_no_cli(self) -> None:
         definition = SettingDefinition(
-            field="legacy",
+            field="force_exclude",
             value_type=bool,
             group=SettingsGroup.FORMATTING,
-            help="Legacy.",
+            help="Force excludes.",
             available_in_cli=False,
         )
 
@@ -173,10 +173,10 @@ class TestSettings(unittest.TestCase):
             help="Line ending.",
         )
         bool_definition = SettingDefinition(
-            field="legacy",
+            field="force_exclude",
             value_type=bool,
             group=SettingsGroup.FORMATTING,
-            help="Legacy.",
+            help="Force excludes.",
         )
         int_definition = SettingDefinition(
             field="line_length",
@@ -221,7 +221,7 @@ class TestSettings(unittest.TestCase):
         self.assertEqual(string_map_definition.cli.value_kind, SettingCLIValueKind.TOML_MAP)
         self.assertFalse(string_map_definition.cli.show_default)
         self.assertEqual(enum_definition.validator("lf", "line-ending"), LineEnding.LF)
-        self.assertTrue(bool_definition.validator(True, "legacy"))
+        self.assertTrue(bool_definition.validator(True, "force-exclude"))
         self.assertEqual(int_definition.validator(1, "line-length"), 1)
         self.assertEqual(float_definition.validator(0.5, "parallelism"), 0.5)
         self.assertEqual(string_list_definition.validator(["*.py"], "include"), ("*.py",))
@@ -304,7 +304,6 @@ class TestSettings(unittest.TestCase):
             formatting_fields,
             (
                 "output_format",
-                "legacy",
                 "line_length",
                 "url_aware_wrapping",
                 "line_ending",
@@ -509,7 +508,6 @@ class TestSettings(unittest.TestCase):
         self.assertEqual(config.extend_exclude, ())
         self.assertTrue(config.respect_gitignore)
         self.assertFalse(config.force_exclude)
-        self.assertFalse(config.legacy)
         self.assertIs(config.output_format, OutputFormat.GROUPED)
         self.assertEqual(config.select, ("ALL",))
         self.assertEqual(config.extend_select, ())
@@ -841,51 +839,12 @@ class TestSettings(unittest.TestCase):
         output = pydocformatter_settings.SETTINGS_SCHEMA.format(settings)
 
         self.assertIn("[tool.pydocfmt]\n", output)
-        self.assertLess(output.index("output-format"), output.index("legacy"))
-        self.assertLess(output.index("legacy"), output.index("line-length"))
+        self.assertLess(output.index("output-format"), output.index("line-length"))
         self.assertLess(output.index("indent-width"), output.index("parallelism"))
         self.assertIn("parallelism = 0.0\n", output)
         self.assertIn('line-ending = "lf"\n', output)
         self.assertIn('select = ["PDF", "PCF"]\n', output)
         self.assertIn('per-file-ignores = {"tests/\\"quoted\\"/*.py" = ["PCF001"]}\n', output)
-
-    def test_legacy_setting_is_applied(self) -> None:
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
-            (root / "pyproject.toml").write_text(
-                "[tool.pydocfmt]\nlegacy = true\n",
-                encoding="utf-8",
-            )
-            previous_cwd = os.getcwd()
-            os.chdir(root)
-            try:
-                config = pydocformatter_settings.SETTINGS_SCHEMA.load()
-            finally:
-                os.chdir(previous_cwd)
-
-        self.assertTrue(config.legacy)
-
-    def test_legacy_cli_override_is_applied(self) -> None:
-        config = pydocformatter_settings.SETTINGS_SCHEMA.load(
-            field_overrides=CheckSettingsOverrides(legacy=True),
-        )
-
-        self.assertTrue(config.legacy)
-
-    def test_legacy_setting_must_be_boolean(self) -> None:
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
-            (root / "pyproject.toml").write_text(
-                '[tool.pydocfmt]\nlegacy = "yes"\n',
-                encoding="utf-8",
-            )
-            previous_cwd = os.getcwd()
-            os.chdir(root)
-            try:
-                with self.assertRaisesRegex(SettingsError, "legacy"):
-                    pydocformatter_settings.SETTINGS_SCHEMA.load()
-            finally:
-                os.chdir(previous_cwd)
 
     def test_parallelism_setting_accepts_numbers(self) -> None:
         config = pydocformatter_settings.SETTINGS_SCHEMA.load(

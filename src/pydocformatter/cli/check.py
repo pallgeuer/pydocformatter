@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import collections
 import concurrent.futures
 import contextlib
 import dataclasses
@@ -19,7 +18,6 @@ import pydocformatter.cli.global_args as global_args
 import pydocformatter.cli.settings_check as settings_check
 import pydocformatter.file_selection as file_selection
 import pydocformatter.formatter as formatter
-import pydocformatter.legacy.pydocfmt as legacy_formatter
 import pydocformatter.rules_selection as rules_selection
 import pydocformatter.settings as settings_core
 import pydocformatter.utils.argparser as argparser
@@ -27,13 +25,9 @@ import pydocformatter.utils.misc as misc
 from pydocformatter.cli.settings_check import SETTINGS_SCHEMA, CheckSettings, OutputFormat
 from pydocformatter.file_selection import STDIN_VIRTUAL_FILE, FileDecision, FileSelectionError, SelectionResult
 from pydocformatter.formatter import FormatterResult
-from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetadata
 from pydocformatter.rules_selection import RuleSelection
 
-LEGACY_FORMAT_RULE_META = RuleMetadata(
-    code=RuleCode("PDF000"), name="legacy-formatting-needed", message="Needs formatting", fix_availability=FixAvailability.ALWAYS, stable_since="1.0.0", setting_effects=(), incompatible_with=()
-)
 _MAX_WINDOWS_PROCESS_POOL_WORKERS = 61
 _ExecutorFactory = Callable[..., concurrent.futures.Executor]
 
@@ -287,9 +281,6 @@ def check_files(*, args: argparse.Namespace, settings_context: CheckRunContext) 
     if use_stdin:
         if len(files.accepted_paths) > 1:
             raise AssertionError(f"Expect at most one accepted path when using stdin: {files.accepted_paths}")
-        if files.selected_files and files.selected_files[0].settings.legacy:
-            print("pydocfmt check: Argument error: Cannot process input from stdin when using legacy mode", file=sys.stderr)
-            return 2
 
     results = format_selected_files(
         files.selected_files,
@@ -359,56 +350,6 @@ def output_stream(output_file: str | None) -> Iterator[TextIO | None]:
         yield file
 
 
-def format_legacy_files(paths: tuple[str, ...], *, settings: CheckSettings, fix: bool, write: bool) -> list[FormatterResult]:
-    """Format files with the legacy formatter path.
-
-    Args:
-        paths (tuple[str, ...]): File paths to format.
-        settings (CheckSettings): Resolved formatter settings.
-        fix (bool): Whether formatting changes should be applied.
-        write (bool): Whether fixed source should be written back to disk.
-
-    Returns:
-        list[FormatterResult]: Formatter results in input path order.
-    """
-    results: list[FormatterResult] = []
-    for path in paths:
-        try:
-            source_result = legacy_formatter.format_file_source(path, settings=settings, fix=fix, write=write)
-        except UnicodeDecodeError as error:
-            result = FormatterResult(
-                path=path, old_source=None, new_source=None, modified=False, fixed_findings=collections.Counter(), unfixed_findings=(), errors=(f"Failed to decode {path} as UTF-8: {error}",)
-            )
-        except OSError as error:
-            result = FormatterResult(
-                path=path, old_source=None, new_source=None, modified=False, fixed_findings=collections.Counter(), unfixed_findings=(), errors=(f"Failed to read or write file {path}: {error}",)
-            )
-        else:
-            if fix:
-                fixed_findings = collections.Counter({LEGACY_FORMAT_RULE_META: 1}) if source_result.modified else collections.Counter()
-                result = FormatterResult(
-                    path=path, old_source=source_result.original_source, new_source=source_result.source, modified=source_result.modified, fixed_findings=fixed_findings, unfixed_findings=(), errors=()
-                )
-            else:
-                if source_result.modified:
-                    line_numbers_set = set(source_result.docstring_changed_lines + source_result.comment_changed_lines)
-                    line_numbers = tuple(sorted(line_numbers_set)) if line_numbers_set else (0,)
-                    unfixed_findings: tuple[RuleFinding, ...] = (RuleFinding(rule=LEGACY_FORMAT_RULE_META, line_numbers=line_numbers),)
-                else:
-                    unfixed_findings = ()
-                result = FormatterResult(
-                    path=path,
-                    old_source=source_result.original_source,
-                    new_source=source_result.original_source,
-                    modified=False,
-                    fixed_findings=collections.Counter(),
-                    unfixed_findings=unfixed_findings,
-                    errors=(),
-                )
-        results.append(result)
-    return results
-
-
 def resolve_parallelism(parallelism: float) -> int:
     """Return the worker count represented by a parallelism setting."""
     parallelism = settings_check.validate_parallelism(parallelism, "parallelism")
@@ -448,12 +389,9 @@ def _format_selected_file_worker(
 ) -> FormatterResult:
     """Format one disk-backed selected file."""
     selected_file = request.selected_file
-    settings = selected_file.settings
-    if settings.legacy:
-        return format_legacy_files((selected_file.path,), settings=settings, fix=request.fix, write=request.write)[0]
     return formatter.format_file(
         selected_file.path,
-        settings=settings,
+        settings=selected_file.settings,
         rule_selection=request.rule_selection,
         fix=request.fix,
         write=request.write,
@@ -477,8 +415,6 @@ def format_selected_files(
         if len(selected_files) > 1:
             raise AssertionError(f"Expect at most one selected file when using stdin: {selected_files}")
         selected_file = selected_files[0]
-        if selected_file.settings.legacy:
-            return format_legacy_files((selected_file.path,), settings=selected_file.settings, fix=fix, write=write)
         rule_selection = rule_selections[selected_file.profile.key()]
         return [
             formatter.format_file(

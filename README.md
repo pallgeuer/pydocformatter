@@ -86,7 +86,6 @@ If no files or directories are specified, `pydocfmt check` checks the current di
 
 **Formatting:**
 - `--output-format {grouped}`: Output format for rule findings (default: grouped)
-- `--legacy`, `--no-legacy`: Toggle the legacy formatter implementation (default: disabled)
 - `--line-length LENGTH`: Maximum line length for docstrings and comments (default: 88)
 - `--url-aware-wrapping`, `--no-url-aware-wrapping`: Toggle URL-aware wrapping balance without splitting URLs (default: enabled)
 - `--line-ending {auto,lf,cr-lf,native}`: Line ending to use when rewriting files (default: auto)
@@ -218,7 +217,6 @@ pydocformatter can be configured via `pyproject.toml` (example):
 ```toml
 [tool.pydocfmt]
 output-format = "grouped"
-legacy = false
 line-length = 88
 url-aware-wrapping = true
 line-ending = "auto"
@@ -275,7 +273,6 @@ For TOML configuration, `[tool.pydocfmt.docstring]` and `[tool.pydocfmt.comment]
 
 **Configuration Options:**
 - `output-format`: Output format for rule findings; currently only `"grouped"` is supported (default: `"grouped"`)
-- `legacy`: Use the legacy formatter implementation (default: `false`)
 - `line-length`: Maximum line length for docstrings and comments (default: 88)
 - `url-aware-wrapping`: Balance comment and docstring wrapping around URL tokens without splitting URLs (default: `true`)
 - `line-ending`: Line ending to use when rewriting files; one of `"auto"`, `"lf"`, `"cr-lf"`, or `"native"` (default: `"auto"`)

@@ -16,7 +16,6 @@ import libcst.metadata as cst_metadata
 import pydocformatter.cli.check as check_command
 import pydocformatter.cli.main as pydocfmt_cli
 import pydocformatter.formatter as formatter
-import pydocformatter.legacy.pydocfmt as pydocfmt
 import pydocformatter.rules.codes as rule_codes
 import pydocformatter.rules.collection as rule_collection
 import pydocformatter.rules.definition as rule_base
@@ -1692,49 +1691,3 @@ class TestFormatterResults(unittest.TestCase):
                     exit_code = pydocfmt_cli.main()
 
                 self.assertEqual(exit_code, expected_exit_code)
-
-    def test_legacy_check_result_uses_synthetic_finding_for_needed_formatting(self) -> None:
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
-            target = root / "a.py"
-            target.write_text("x = 1\n", encoding="utf-8")
-
-            source_result = pydocfmt.SourceFormatResult(source="x = 1\n", docstring_changed_lines=(3, 1), comment_changed_lines=(5, 3))
-            with unittest.mock.patch("pydocformatter.cli.check.legacy_formatter.format_file_source", return_value=source_result):
-                results = check_command.format_legacy_files((str(target),), settings=CheckSettings(), fix=False, write=True)
-
-        self.assertEqual(len(results), 1)
-        self.assertFalse(results[0].modified)
-        self.assertEqual(len(results[0].unfixed_findings), 1)
-        self.assertEqual(results[0].unfixed_findings[0].rule.code.tag, "PDF000")
-        self.assertEqual(results[0].unfixed_findings[0].line_numbers, (1, 3, 5))
-
-    def test_legacy_check_result_uses_zero_line_fallback_for_missing_changed_lines(self) -> None:
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
-            target = root / "a.py"
-            target.write_text("x = 1\n", encoding="utf-8")
-
-            source_result = pydocfmt.SourceFormatResult(source="x = 1\n", docstring_changed_lines=(), comment_changed_lines=())
-            with unittest.mock.patch.object(type(source_result), "modified", new_callable=unittest.mock.PropertyMock, return_value=True):
-                with unittest.mock.patch("pydocformatter.cli.check.legacy_formatter.format_file_source", return_value=source_result):
-                    results = check_command.format_legacy_files((str(target),), settings=CheckSettings(), fix=False, write=True)
-
-        self.assertEqual(len(results), 1)
-        self.assertEqual(len(results[0].unfixed_findings), 1)
-        self.assertEqual(results[0].unfixed_findings[0].line_numbers, (0,))
-
-    def test_legacy_format_result_uses_modified_for_actual_writes(self) -> None:
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
-            target = root / "a.py"
-            target.write_text("x = 1\n", encoding="utf-8")
-
-            source_result = pydocfmt.SourceFormatResult(source="x = 1\n", docstring_changed_lines=(1,), comment_changed_lines=())
-            with unittest.mock.patch("pydocformatter.cli.check.legacy_formatter.format_file_source", return_value=source_result):
-                results = check_command.format_legacy_files((str(target),), settings=CheckSettings(), fix=True, write=True)
-
-        self.assertEqual(len(results), 1)
-        self.assertTrue(results[0].modified)
-        self.assertEqual(results[0].fixed_findings, collections.Counter({check_command.LEGACY_FORMAT_RULE_META: 1}))
-        self.assertEqual(results[0].unfixed_findings, ())

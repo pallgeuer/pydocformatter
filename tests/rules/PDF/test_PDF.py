@@ -1256,7 +1256,7 @@ def test_indent_width_changes_generated_tab_prefix_width_without_changing_semant
 
 
 def test_complex_mixed_structure_partitions_lines_and_orders_semantic_regions() -> None:
-    value = "Summary first line.\nsummary second line.\n\nArgs:\n    value: Description.\n        - Choice one.\n        - Choice two.\n    other: Other description.\n    :param legacy: Legacy description.\n\n    ```text\n    Returns:\n        fake: code\n    ```\n\nReturns:\n    tuple[str, int]: Result.\n\nTrailing section prose."
+    value = "Summary first line.\nsummary second line.\n\nArgs:\n    value: Description.\n        - Choice one.\n        - Choice two.\n    other: Other description.\n    :param rst_field: Field description.\n\n    ```text\n    Returns:\n        fake: code\n    ```\n\nReturns:\n    tuple[str, int]: Result.\n\nTrailing section prose."
     structure = structure_for(value, settings=CheckSettings(docstring_convention=DocstringConvention.GOOGLE))
     assert_block_partition(structure.blocks, 0, len(structure.lines))
     assert tuple(section.start_line for section in structure.sections) == tuple(sorted(section.start_line for section in structure.sections))

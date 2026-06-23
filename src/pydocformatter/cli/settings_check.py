@@ -105,7 +105,6 @@ class CheckSettings:
 
     Attributes:
         output_format (OutputFormat): Output format used for rule findings.
-        legacy (bool): Whether to use the legacy formatter implementation.
         line_length (int): Maximum line length used when wrapping docstrings or comments.
         url_aware_wrapping (bool): Whether wrapping balances prose around unbroken URL tokens.
         line_ending (LineEnding): Line ending used when rewriting files.
@@ -163,7 +162,6 @@ class CheckSettings:
     """
 
     output_format: OutputFormat = OutputFormat.GROUPED
-    legacy: bool = False
     line_length: int = 88
     url_aware_wrapping: bool = True
     line_ending: LineEnding = LineEnding.AUTO
@@ -235,7 +233,6 @@ class CheckSettingsOverrides(TypedDict, total=False):
 
     Attributes:
         output_format (OutputFormat): Output format used for rule findings.
-        legacy (bool): Whether to use the legacy formatter implementation.
         line_length (int): Maximum line length used when wrapping docstrings or comments.
         url_aware_wrapping (bool): Whether wrapping balances prose around unbroken URL tokens.
         line_ending (LineEnding): Line ending used when rewriting files.
@@ -289,7 +286,6 @@ class CheckSettingsOverrides(TypedDict, total=False):
     """
 
     output_format: OutputFormat
-    legacy: bool
     line_length: int
     url_aware_wrapping: bool
     line_ending: LineEnding
@@ -375,12 +371,6 @@ SETTINGS_SCHEMA = SettingsSchema(
             group=SettingsGroup.FORMATTING,
             help="Output format for rule findings.",
             documentation='Output format for rule findings; currently only "grouped" is supported.',
-        ),
-        SettingDefinition(
-            field="legacy",
-            value_type=bool,
-            group=SettingsGroup.FORMATTING,
-            help="Use the legacy formatter implementation.",
         ),
         SettingDefinition(
             field="line_length",
