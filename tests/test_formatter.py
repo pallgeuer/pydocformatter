@@ -12,6 +12,7 @@ from pathlib import Path
 
 import libcst as cst
 import libcst.metadata as cst_metadata
+import pytest
 
 import pydocformatter.cli.check as check_command
 import pydocformatter.cli.main as pydocfmt_cli
@@ -1569,6 +1570,7 @@ class TestFormatterResults(unittest.TestCase):
         self.assertEqual(called_paths, ["a.py", str(target)])
         self.assertEqual([result.path for result in results], ["a.py", str(target)])
 
+    @pytest.mark.isolated_cwd
     def test_check_exit_status_depends_on_remaining_findings_not_modified_results(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
@@ -1588,6 +1590,7 @@ class TestFormatterResults(unittest.TestCase):
 
         self.assertEqual(exit_code, 0)
 
+    @pytest.mark.isolated_cwd
     def test_exit_zero_suppresses_remaining_findings(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
@@ -1620,6 +1623,7 @@ class TestFormatterResults(unittest.TestCase):
 
         self.assertEqual(exit_code, 0)
 
+    @pytest.mark.isolated_cwd
     def test_errors_affect_exit_status_without_findings(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
@@ -1643,6 +1647,7 @@ class TestFormatterResults(unittest.TestCase):
                 self.assertEqual(exit_code, expected_exit_code)
                 self.assertNotIn("All checks passed!", stdout.getvalue())
 
+    @pytest.mark.isolated_cwd
     def test_fix_mode_exits_nonzero_for_remaining_findings(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
@@ -1675,6 +1680,7 @@ class TestFormatterResults(unittest.TestCase):
 
         self.assertEqual(exit_code, 1)
 
+    @pytest.mark.isolated_cwd
     def test_exit_non_zero_on_fix_reports_modified_files(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)

@@ -86,6 +86,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 
 - **Developer workflow:**
   - Added a pytest pre-commit hook that runs the test suite before commits.
+  - Added a guarded shared pytest working directory for tests that do not request filesystem isolation, with explicit `isolated_cwd` opt-in for tests that need a writable temporary CWD.
   - Added pytest coverage that checks the pydocformatter rule tables in `docs/formatting_rules.md` against actual rule metadata.
   - Added pytest coverage that checks Git-tracked Markdown pipe tables for padded cell widths and separator alignment.
   - Changed Markdown pipe table checks to enforce PyCharm-style separator rows without outer padding.

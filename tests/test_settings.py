@@ -9,6 +9,8 @@ import unittest
 import unittest.mock
 from pathlib import Path
 
+import pytest
+
 import pydocformatter.cli.global_args as pydocformatter_global_args
 import pydocformatter.cli.settings_check as pydocformatter_settings
 import pydocformatter.settings as pydocformatter_settings_core
@@ -34,6 +36,7 @@ from pydocformatter.settings import (
 )
 
 
+@pytest.mark.isolated_cwd
 class TestSettings(unittest.TestCase):
     @staticmethod
     def _write_git_marker(root: Path) -> None:

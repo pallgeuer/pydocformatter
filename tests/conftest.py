@@ -30,20 +30,56 @@ def isolated_test_root(tmp_path_factory: pytest.TempPathFactory) -> Generator[Pa
                 os.environ[name] = value
 
 
+@pytest.fixture(scope="session")
+def guarded_test_cwd(isolated_test_root: Path) -> Generator[Path, None, None]:
+    """Create a poisoned default CWD for tests that did not request isolation."""
+    cwd = isolated_test_root / "guarded-cwd"
+    cwd.mkdir()
+    config = cwd / "pyproject.toml"
+    config.write_text("[tool.pydocfmt\n", encoding="utf-8")
+    config.chmod(0o400)
+    cwd.chmod(0o500)
+    try:
+        yield cwd
+    finally:
+        cwd.chmod(0o700)
+        config.chmod(0o600)
+
+
 @pytest.fixture(autouse=True)
-def isolate_working_directory(isolated_test_root: Path) -> Generator[None, None, None]:
-    """Run every test in its own working directory below the config boundary.
+def guard_working_directory(request: pytest.FixtureRequest, isolated_test_root: Path, guarded_test_cwd: Path) -> Generator[None, None, None]:
+    """Run tests from a guarded CWD unless they explicitly request isolation.
 
     The repository ships its own ``[tool.pydocfmt]`` table in ``pyproject.toml``, which the CLI auto-discovers from the
-    current working directory. Without this fixture, tests that invoke the CLI (or otherwise resolve settings) from the
-    repository root would silently inherit that configuration instead of the documented defaults. The session root
-    provides an explicit empty configuration boundary, including for nested temporary directories and child processes,
-    while the per-test directory prevents filesystem state from leaking between tests.
+    current working directory. Unmarked tests run from a read-only directory with malformed local configuration, so
+    accidental default-CWD writes or config discovery fail loudly. The read-only guard depends on filesystem permissions
+    and is bypassed when tests run as root; the malformed config and leaked-CWD checks remain permission-independent.
+    Tests marked ``isolated_cwd`` or requesting the ``isolated_cwd`` fixture keep the previous behavior of running in a
+    fresh writable directory below the session boundary.
     """
     previous_cwd = os.getcwd()
-    with tempfile.TemporaryDirectory(dir=isolated_test_root) as isolated_cwd:
-        os.chdir(isolated_cwd)
-        try:
-            yield
-        finally:
-            os.chdir(previous_cwd)
+    use_isolated_cwd = request.node.get_closest_marker("isolated_cwd") is not None or "isolated_cwd" in request.fixturenames
+    if use_isolated_cwd:
+        with tempfile.TemporaryDirectory(dir=isolated_test_root) as test_cwd:
+            os.chdir(test_cwd)
+            try:
+                yield
+            finally:
+                os.chdir(previous_cwd)
+        return
+
+    os.chdir(guarded_test_cwd)
+    try:
+        yield
+    finally:
+        leaked_cwd = Path.cwd()
+        os.chdir(previous_cwd)
+        if leaked_cwd.resolve() != guarded_test_cwd.resolve():
+            pytest.fail(f"Test leaked working directory change: expected {guarded_test_cwd}, got {leaked_cwd}")
+
+
+@pytest.fixture
+def isolated_cwd(guard_working_directory: None) -> Path:
+    """Return the fresh writable working directory requested by this test."""
+    del guard_working_directory
+    return Path.cwd()

@@ -11,6 +11,8 @@ from io import StringIO
 from pathlib import Path
 from typing import Callable, TextIO, cast
 
+import pytest
+
 import pydocformatter.cli.check as check_command
 import pydocformatter.cli.main as pydocfmt_cli
 import pydocformatter.cli.settings_check as settings_check
@@ -37,6 +39,7 @@ PCF001_RULE = RuleMetadata(
 )
 
 
+@pytest.mark.isolated_cwd
 class TestCLIShowFiles(unittest.TestCase):
     @staticmethod
     def _profile(settings: CheckSettings) -> settings_core.SettingsProfile[CheckSettings]:
