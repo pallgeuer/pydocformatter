@@ -81,6 +81,8 @@ uv run pydocfmt check --help
 uv run pytest -q
 ```
 
+Pytest uses project-default multiprocessing through pytest-xdist. Add `-n 0` when a serial run is needed for debugging or a focused run avoids worker startup overhead.
+
 ## Making Changes
 
 ### 1. Create a Branch
@@ -141,6 +143,9 @@ uv run pytest -q --cov=pydocformatter --cov-report=html
 
 # Run specific test file
 uv run pytest -q tests/test_pydocfmt.py
+
+# Run tests serially for debugging or focused-run speed
+uv run pytest -n 0 -q
 ```
 
 ### Writing Tests

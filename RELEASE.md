@@ -3,7 +3,7 @@
 ## Pre-Release Validation
 
 ### Code Quality
-- [x] All tests pass (`uv run pytest -q`)
+- [x] All tests pass with project-default pytest-xdist multiprocessing (`uv run pytest -q`)
 - [x] Package builds successfully (`uv build`)
 - [x] No linting errors (`uv run black --check .`, `uv run isort --check .`, `uv run mypy`, `uv run pydocfmt check`)
 - [x] Pre-commit hooks pass (`uv run pre-commit run --all-files`)
@@ -37,7 +37,7 @@ VERSION=1.0.0
 
 ### Step 1: Final Validation
 ```bash
-# Run tests one more time
+# Run tests one more time with project-default pytest-xdist multiprocessing
 uv run pytest -q
 
 # Test build

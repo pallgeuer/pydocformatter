@@ -28,7 +28,7 @@ repos:
         language: system
         pass_filenames: false
       - id: pytest
-        name: pytest (test suite)
+        name: pytest (parallel test suite)
         entry: uv run pytest
         language: system
         pass_filenames: false

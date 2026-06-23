@@ -88,6 +88,8 @@ uv run isort --check .
 uv run pydocfmt check
 ```
 
+Pytest uses project-default multiprocessing through pytest-xdist. Add `-n 0` when a serial run is needed for debugging or a focused run avoids worker startup overhead.
+
 Use narrower test commands while iterating when the changed surface is small. Run the full suite before finishing a broad rule, category parser, settings, or documentation-table change.
 
 ## Loader and Packaging Invariants
