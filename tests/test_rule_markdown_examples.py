@@ -1,4 +1,5 @@
 import collections
+import dataclasses
 import tomllib
 
 import libcst as cst
@@ -17,6 +18,18 @@ from pydocformatter.rules.codes import RuleCode
 _RULE_SELECTION_SETTING_KEYS = frozenset(definition.key for definition in settings_check.SETTINGS_SCHEMA.definitions if definition.group == settings_check.SettingsGroup.RULE_SELECTION)
 
 
+@dataclasses.dataclass(frozen=True)
+class _PreparedRuleMarkdownExample:
+    """Shared prepared state for one structured rule Markdown example."""
+
+    index: int
+    example: rule_documentation.RuleMarkdownExample
+    path: str
+    settings: settings_check.CheckSettings
+    selection: rules_selection.RuleSelection
+    check_result: formatter.FormatterResult
+
+
 def _rule_cases() -> tuple[tuple[str, type[object]], ...]:
     """Return built-in rule cases for pytest parametrization."""
     return tuple((rule_class.meta.code.tag, rule_class) for rule_class in rule_collection.RULE_COLLECTION.rules)
@@ -26,87 +39,74 @@ def _rule_cases() -> tuple[tuple[str, type[object]], ...]:
 @pytest.mark.parametrize(("rule_code", "rule_class"), _rule_cases())
 def test_rule_markdown_examples_match_rule_implementation(rule_code: str, rule_class: type[object]) -> None:
     """Execute every structured rule Markdown example against the documented rule."""
+    prepared_examples = _prepared_rule_markdown_examples(rule_code, rule_class)
+
+    for prepared in prepared_examples:
+        result = formatter.format_source(prepared.example.input_source, prepared.path, settings=prepared.settings, rule_selection=prepared.selection, fix=True)
+
+        assert result.errors == (), f"{rule_code} example {prepared.index}: unexpected formatter errors: {result.errors}"
+        assert result.new_source == prepared.example.output_source, f"{rule_code} example {prepared.index}: output did not match documented output"
+        assert _finding_key(result.unfixed_findings) == prepared.example.findings, f"{rule_code} example {prepared.index}: unfixed findings did not match documented findings"
+        _assert_clean_example_has_no_hidden_fix_changes(rule_code, prepared)
+        _assert_initial_check_findings_accounted_after_fixing(rule_code, prepared)
+
+
+def _prepared_rule_markdown_examples(rule_code: str, rule_class: type[object]) -> tuple[_PreparedRuleMarkdownExample, ...]:
+    """Return shared prepared state for all structured examples for one rule."""
     markdown = rule_documentation.load_rule_explanation(rule_class)
     examples = rule_documentation.parse_rule_markdown_examples(markdown, rule_code=rule_code)
     assert examples, f"{rule_code}: expected at least one structured pydocfmt-example block"
 
+    prepared_examples: list[_PreparedRuleMarkdownExample] = []
     for index, example in enumerate(examples, start=1):
         _validate_rule_selection_settings(rule_code, index, example)
         settings = _settings_for_example(rule_code, example)
         selection = rules_selection.select_rules(settings)
         assert selection.errors == (), f"{rule_code} example {index}: unexpected rule selection errors: {selection.errors}"
 
-        result = formatter.format_source(example.input_source, f"{rule_code}_example_{index}.py", settings=settings, rule_selection=selection, fix=True)
+        path = f"{rule_code}_example_{index}.py"
+        check_result = formatter.format_source(example.input_source, path, settings=settings, rule_selection=selection, fix=False)
+        assert check_result.errors == (), f"{rule_code} example {index}: unexpected check errors: {check_result.errors}"
+        prepared_examples.append(_PreparedRuleMarkdownExample(index=index, example=example, path=path, settings=settings, selection=selection, check_result=check_result))
+    return tuple(prepared_examples)
 
-        assert result.errors == (), f"{rule_code} example {index}: unexpected formatter errors: {result.errors}"
-        assert result.new_source == example.output_source, f"{rule_code} example {index}: output did not match documented output"
-        assert _finding_key(result.unfixed_findings) == example.findings, f"{rule_code} example {index}: unfixed findings did not match documented findings"
 
-
-@pytest.mark.filterwarnings("ignore:invalid escape sequence.*:DeprecationWarning")
-@pytest.mark.parametrize(("rule_code", "rule_class"), _rule_cases())
-def test_rule_markdown_clean_examples_have_no_hidden_fix_changes(rule_code: str, rule_class: type[object]) -> None:
+def _assert_clean_example_has_no_hidden_fix_changes(rule_code: str, prepared: _PreparedRuleMarkdownExample) -> None:
     """Check-clean documented examples must not be changed by a direct fix pass."""
-    markdown = rule_documentation.load_rule_explanation(rule_class)
-    examples = rule_documentation.parse_rule_markdown_examples(markdown, rule_code=rule_code)
+    if any(finding.fixable for finding in prepared.check_result.unfixed_findings):
+        return
 
-    for index, example in enumerate(examples, start=1):
-        _validate_rule_selection_settings(rule_code, index, example)
-        settings = _settings_for_example(rule_code, example)
-        selection = rules_selection.select_rules(settings)
-        assert selection.errors == (), f"{rule_code} example {index}: unexpected rule selection errors: {selection.errors}"
+    module = cst.parse_module(prepared.example.input_source)
+    selected_rule_by_code = {selected_rule.rule.code: selected_rule for selected_rule in prepared.selection.for_path(prepared.path)}
+    errors: list[str] = []
+    fixed_module, fixed_findings, source_changed = rule_runner._run_fix_pass(
+        module,
+        path=prepared.path,
+        settings=prepared.settings,
+        line_ending=line_endings.resolve_line_ending(prepared.example.input_source, line_ending=prepared.settings.line_ending),
+        rule_selection=prepared.selection,
+        selected_rule_by_code=selected_rule_by_code,
+        errors=errors,
+    )
 
-        path = f"{rule_code}_example_{index}.py"
-        check_result = formatter.format_source(example.input_source, path, settings=settings, rule_selection=selection, fix=False)
-        assert check_result.errors == (), f"{rule_code} example {index}: unexpected check errors: {check_result.errors}"
-        if any(finding.fixable for finding in check_result.unfixed_findings):
-            continue
-
-        module = cst.parse_module(example.input_source)
-        selected_rule_by_code = {selected_rule.rule.code: selected_rule for selected_rule in selection.for_path(path)}
-        errors: list[str] = []
-        fixed_module, fixed_findings, source_changed = rule_runner._run_fix_pass(
-            module,
-            path=path,
-            settings=settings,
-            line_ending=line_endings.resolve_line_ending(example.input_source, line_ending=settings.line_ending),
-            rule_selection=selection,
-            selected_rule_by_code=selected_rule_by_code,
-            errors=errors,
-        )
-
-        assert errors == [], f"{rule_code} example {index}: unexpected direct fix errors: {errors}"
-        assert fixed_findings == (), f"{rule_code} example {index}: direct fix reported findings after a clean check"
-        assert not source_changed, f"{rule_code} example {index}: direct fix changed source after a clean check"
-        assert fixed_module.code == example.input_source, f"{rule_code} example {index}: direct fix returned different source after a clean check"
+    assert errors == [], f"{rule_code} example {prepared.index}: unexpected direct fix errors: {errors}"
+    assert fixed_findings == (), f"{rule_code} example {prepared.index}: direct fix reported findings after a clean check"
+    assert not source_changed, f"{rule_code} example {prepared.index}: direct fix changed source after a clean check"
+    assert fixed_module.code == prepared.example.input_source, f"{rule_code} example {prepared.index}: direct fix returned different source after a clean check"
 
 
-@pytest.mark.filterwarnings("ignore:invalid escape sequence.*:DeprecationWarning")
-@pytest.mark.parametrize(("rule_code", "rule_class"), _rule_cases())
-def test_rule_markdown_examples_account_for_initial_check_findings_after_fixing(rule_code: str, rule_class: type[object]) -> None:
+def _assert_initial_check_findings_accounted_after_fixing(rule_code: str, prepared: _PreparedRuleMarkdownExample) -> None:
     """Documented examples must account for every initial check finding as fixed or still unfixed."""
-    markdown = rule_documentation.load_rule_explanation(rule_class)
-    examples = rule_documentation.parse_rule_markdown_examples(markdown, rule_code=rule_code)
+    line_ending = line_endings.resolve_line_ending(prepared.example.input_source, line_ending=prepared.settings.line_ending)
+    module = cst.parse_module(prepared.example.input_source)
+    fixed_result = rule_runner.run_rules(
+        module, path=prepared.path, settings=prepared.settings, line_ending=line_ending, rule_selection=prepared.selection, fix=True, source=prepared.example.input_source
+    )
 
-    for index, example in enumerate(examples, start=1):
-        _validate_rule_selection_settings(rule_code, index, example)
-        settings = _settings_for_example(rule_code, example)
-        selection = rules_selection.select_rules(settings)
-        assert selection.errors == (), f"{rule_code} example {index}: unexpected rule selection errors: {selection.errors}"
-
-        path = f"{rule_code}_example_{index}.py"
-        check_result = formatter.format_source(example.input_source, path, settings=settings, rule_selection=selection, fix=False)
-        assert check_result.errors == (), f"{rule_code} example {index}: unexpected check errors: {check_result.errors}"
-        initial_findings = check_result.unfixed_findings
-
-        line_ending = line_endings.resolve_line_ending(example.input_source, line_ending=settings.line_ending)
-        module = cst.parse_module(example.input_source)
-        fixed_result = rule_runner.run_rules(module, path=path, settings=settings, line_ending=line_ending, rule_selection=selection, fix=True, source=example.input_source)
-
-        assert fixed_result.errors == (), f"{rule_code} example {index}: unexpected fix errors: {fixed_result.errors}"
-        initial_finding_counts = collections.Counter(_finding_correspondence_key(initial_findings))
-        accounted_finding_counts = collections.Counter(_finding_correspondence_key(fixed_result.fixed_findings + fixed_result.unfixed_findings))
-        assert initial_finding_counts == accounted_finding_counts, f"{rule_code} example {index}: initial check findings were not accounted for as fixed or still unfixed"
+    assert fixed_result.errors == (), f"{rule_code} example {prepared.index}: unexpected fix errors: {fixed_result.errors}"
+    initial_finding_counts = collections.Counter(_finding_correspondence_key(prepared.check_result.unfixed_findings))
+    accounted_finding_counts = collections.Counter(_finding_correspondence_key(fixed_result.fixed_findings + fixed_result.unfixed_findings))
+    assert initial_finding_counts == accounted_finding_counts, f"{rule_code} example {prepared.index}: initial check findings were not accounted for as fixed or still unfixed"
 
 
 def test_parse_rule_markdown_examples_preserves_nested_shorter_fences() -> None:

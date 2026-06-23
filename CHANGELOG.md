@@ -119,6 +119,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Renamed PCF003 from `directive-normalization` to `comment-directive-normalization`, keeping the `PCF003` rule code while clarifying that the rule owns recognized directive marker and payload normalization from `#` onward.
 
 - **Developer workflow:**
+  - Shared setup and initial check work across structured rule Markdown example assertions to reduce pytest runtime.
   - Cached rule-context source text and source lines per module state to reduce repeated LibCST source regeneration during checks.
   - Reused cached source lines and line bounds for rule-based source edits to avoid repeated line splitting.
   - Skipped fix-mode LibCST source comparison for same-module no-op fixes.
