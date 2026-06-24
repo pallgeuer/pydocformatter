@@ -69,6 +69,7 @@ _TYPE_TEXT_ENTRY_KINDS = frozenset(
 def _results(context: RuleContext, *, rule: RuleMetadata) -> tuple[section_edits.SectionEditResult, ...]:
     """Return findings and fixes for type-like token spacing."""
     data = PDF_definition.PDF.require_data(context)
+    normalized_type_cache: dict[str, str | None] = {}
     results: list[section_edits.SectionEditResult] = []
     for docstring in data.docstrings:
         replacements: list[rule_edits.PlannedTextReplacement] = []
@@ -78,7 +79,7 @@ def _results(context: RuleContext, *, rule: RuleMetadata) -> tuple[section_edits
         replacement_messages: list[str] = []
         unfixable_messages: list[str] = []
         for entry in docstring.structure.entries:
-            line_replacement = _line_replacement(docstring.structure.convention, docstring.structure.lines[entry.start_line], entry)
+            line_replacement = _line_replacement(docstring.structure.convention, docstring.structure.lines[entry.start_line], entry, normalized_type_cache=normalized_type_cache)
             if line_replacement is None:
                 continue
             replacement = section_edits.text_replacement(line_replacement.line, line_replacement.start_column, line_replacement.end_column, line_replacement.text)
@@ -106,49 +107,55 @@ def _results(context: RuleContext, *, rule: RuleMetadata) -> tuple[section_edits
     return tuple(results)
 
 
-def _line_replacement(convention: DocstringConvention, line: PDF_definition.DocstringValueLine, entry: PDF_definition.DocstringEntry) -> _LineReplacement | None:
+def _line_replacement(
+    convention: DocstringConvention,
+    line: PDF_definition.DocstringValueLine,
+    entry: PDF_definition.DocstringEntry,
+    *,
+    normalized_type_cache: dict[str, str | None],
+) -> _LineReplacement | None:
     if convention is DocstringConvention.GOOGLE:
-        return _google_replacement(line, entry)
+        return _google_replacement(line, entry, normalized_type_cache=normalized_type_cache)
     if convention is DocstringConvention.NUMPY:
-        return _numpy_replacement(line, entry)
+        return _numpy_replacement(line, entry, normalized_type_cache=normalized_type_cache)
     if convention is DocstringConvention.REST:
-        return _rest_replacement(line, entry)
+        return _rest_replacement(line, entry, normalized_type_cache=normalized_type_cache)
     return None
 
 
-def _google_replacement(line: PDF_definition.DocstringValueLine, entry: PDF_definition.DocstringEntry) -> _LineReplacement | None:
+def _google_replacement(line: PDF_definition.DocstringValueLine, entry: PDF_definition.DocstringEntry, *, normalized_type_cache: dict[str, str | None]) -> _LineReplacement | None:
     if entry.kind not in _TYPE_TEXT_ENTRY_KINDS:
         return None
     match = PDF_definition._GOOGLE_ENTRY_RE.match(line.text)
     if match is not None and match.group("type") is not None and entry.type_text is not None:
-        return _normalized_replacement(line, match.start("type"), match.end("type"), entry.type_text)
+        return _normalized_replacement(line, match.start("type"), match.end("type"), entry.type_text, normalized_type_cache=normalized_type_cache)
     if entry.kind in (PDF_definition.DocstringEntryKind.RETURN, PDF_definition.DocstringEntryKind.YIELD):
         generic_match = PDF_definition._GENERIC_ENTRY_RE.match(line.text)
         if generic_match is not None and entry.type_text is not None:
-            return _normalized_replacement(line, generic_match.start("name"), generic_match.end("name"), entry.type_text)
+            return _normalized_replacement(line, generic_match.start("name"), generic_match.end("name"), entry.type_text, normalized_type_cache=normalized_type_cache)
     return None
 
 
-def _numpy_replacement(line: PDF_definition.DocstringValueLine, entry: PDF_definition.DocstringEntry) -> _LineReplacement | None:
+def _numpy_replacement(line: PDF_definition.DocstringValueLine, entry: PDF_definition.DocstringEntry, *, normalized_type_cache: dict[str, str | None]) -> _LineReplacement | None:
     if entry.kind not in _TYPE_TEXT_ENTRY_KINDS:
         return None
     match = PDF_definition._NUMPY_ENTRY_RE.match(line.text)
     if match is not None and entry.type_text is not None:
-        return _normalized_replacement(line, match.start("type"), match.end("type"), entry.type_text)
+        return _normalized_replacement(line, match.start("type"), match.end("type"), entry.type_text, normalized_type_cache=normalized_type_cache)
     if entry.kind in (PDF_definition.DocstringEntryKind.RETURN, PDF_definition.DocstringEntryKind.YIELD) and entry.type_text is not None:
         start_column = len(line.text) - len(line.text.lstrip(" \t"))
         end_column = len(line.text.rstrip(" \t"))
-        return _normalized_replacement(line, start_column, end_column, entry.type_text)
+        return _normalized_replacement(line, start_column, end_column, entry.type_text, normalized_type_cache=normalized_type_cache)
     return None
 
 
-def _rest_replacement(line: PDF_definition.DocstringValueLine, entry: PDF_definition.DocstringEntry) -> _LineReplacement | None:
+def _rest_replacement(line: PDF_definition.DocstringValueLine, entry: PDF_definition.DocstringEntry, *, normalized_type_cache: dict[str, str | None]) -> _LineReplacement | None:
     match = PDF_definition._REST_FIELD_RE.match(line.text)
     if match is None or entry.field_name is None:
         return None
     field = entry.field_name
     if field in docstring_sections.REST_RETURN_TYPE_FIELDS or field in docstring_sections.REST_YIELD_TYPE_FIELDS or field in docstring_sections.REST_PARAMETER_TYPE_FIELDS:
-        return _normalized_replacement(line, match.start("description"), match.end("description"), match.group("description").strip())
+        return _normalized_replacement(line, match.start("description"), match.end("description"), match.group("description").strip(), normalized_type_cache=normalized_type_cache)
     if entry.type_text is None or entry.field_argument is None:
         return None
     argument = match.group("argument")
@@ -160,14 +167,27 @@ def _rest_replacement(line: PDF_definition.DocstringValueLine, entry: PDF_defini
         return None
     start_column = match.start("argument")
     end_column = start_column + len(entry.type_text)
-    return _normalized_replacement(line, start_column, end_column, entry.type_text)
+    return _normalized_replacement(line, start_column, end_column, entry.type_text, normalized_type_cache=normalized_type_cache)
 
 
-def _normalized_replacement(line: PDF_definition.DocstringValueLine, start_column: int, end_column: int, text: str) -> _LineReplacement | None:
-    normalized = _normalized_type_like_text(text)
+def _normalized_replacement(
+    line: PDF_definition.DocstringValueLine,
+    start_column: int,
+    end_column: int,
+    text: str,
+    *,
+    normalized_type_cache: dict[str, str | None],
+) -> _LineReplacement | None:
+    normalized = _cached_normalized_type_like_text(text, normalized_type_cache=normalized_type_cache)
     if normalized is None or normalized == text:
         return None
     return _LineReplacement(line=line, start_column=start_column, end_column=end_column, text=normalized)
+
+
+def _cached_normalized_type_like_text(text: str, *, normalized_type_cache: dict[str, str | None]) -> str | None:
+    if text not in normalized_type_cache:
+        normalized_type_cache[text] = _normalized_type_like_text(text)
+    return normalized_type_cache[text]
 
 
 def _normalized_type_like_text(text: str) -> str | None:

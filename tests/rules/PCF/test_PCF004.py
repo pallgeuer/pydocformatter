@@ -431,6 +431,20 @@ def test_standalone_and_trailing_edits_on_adjacent_lines_converge_without_overla
     assert not result.errors
 
 
+def test_extracted_trailing_comment_adds_boundary_after_adjacent_standalone_comment() -> None:
+    source = "# standalone explanation\nvalue = compute()  # trailing explanation with enough words to move\n"
+    result = pcf_helpers.format_pcf(source, line_length=28)
+    assert result.new_source == "# standalone explanation\n\n# trailing explanation with\n# enough words to move\nvalue = compute()\n"
+    assert not result.errors
+
+
+def test_extracted_trailing_comment_does_not_add_boundary_after_hash_only_comment() -> None:
+    source = "#\nvalue = compute()  # trailing explanation with enough words to move\n"
+    result = pcf_helpers.format_pcf(source, line_length=28)
+    assert result.new_source == "#\n# trailing explanation with\n# enough words to move\nvalue = compute()\n"
+    assert not result.errors
+
+
 def test_extracted_trailing_comment_stays_separate_from_joined_standalone_paragraph() -> None:
     source = "# Existing note.\nvalue = compute()  # Extracted explanation has enough words to require moving above code.\n"
     first = pcf_helpers.format_pcf(source, line_length=34, comment_join_standalone_lines=True)

@@ -169,6 +169,9 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 - **CLI:**
   - Fixed `parallelism` worker resolution to cap Windows process pools at the platform-supported maximum.
 
+- **Rule performance:**
+  - Fixed PCF004 previous-comment boundary checks, PDF411 repeated type-like normalization, and PDF501 TypedDict key lookup to avoid repeated or unnecessary rule-local work.
+
 - **Formatting:**
   - Fixed `PDF101` variable-width source wrapping to use equivalent greedy wrapping and avoid quadratic runtime on long non-URL docstring paragraphs.
   - Fixed repeated PDF docstring owner lookups to use cached identity-based lookup instead of rescanning prepared docstrings.

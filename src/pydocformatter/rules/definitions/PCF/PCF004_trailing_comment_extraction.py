@@ -41,6 +41,7 @@ class PCF004TrailingCommentExtraction(RuleBase):
 def _planned_changes(context: RuleContext) -> tuple[rule_edits.PlannedSourceChange, ...]:
     """Return all trailing comment extraction changes for the current source."""
     data = PCF_definition.PCF.require_data(context)
+    comments_by_line = {comment.range.start.line: comment for comment in data.comments}
     changes: list[rule_edits.PlannedSourceChange] = []
     for comment in data.trailing_comments:
         if comment.kind != PCF_definition.CommentKind.REGULAR or not comment.content:
@@ -53,14 +54,21 @@ def _planned_changes(context: RuleContext) -> tuple[rule_edits.PlannedSourceChan
             continue
         if context.settings.comment_trailing_extraction_content_aware and comment_helpers.trailing_content_is_unsafe(comment.body, settings=context.settings):
             continue
-        replacement = _extracted_replacement(data, comment, code=code, context=context)
+        replacement = _extracted_replacement(data, comment, code=code, context=context, comments_by_line=comments_by_line)
         change = PCF_definition.planned_full_line_change(data, comment, replacement)
         if change is not None:
             changes.append(change)
     return tuple(changes)
 
 
-def _extracted_replacement(data: PCF_definition.PCFCategoryData, comment: PCF_definition.CommentInfo, *, code: str, context: RuleContext) -> str:
+def _extracted_replacement(
+    data: PCF_definition.PCFCategoryData,
+    comment: PCF_definition.CommentInfo,
+    *,
+    code: str,
+    context: RuleContext,
+    comments_by_line: dict[int, PCF_definition.CommentInfo],
+) -> str:
     """Return the full-line replacement for one extracted trailing comment."""
     width = PCF_definition.available_comment_width(
         comment.indent,
@@ -69,23 +77,19 @@ def _extracted_replacement(data: PCF_definition.PCFCategoryData, comment: PCF_de
     )
     wrapped = text_layout.wrap_text(comment.content, width=width, tab_width=context.settings.indent_width, url_aware=context.settings.url_aware_wrapping)
     comment_lines = tuple(PCF_definition.render_comment(line, indent=comment.indent) for line in wrapped)
-    if _requires_standalone_boundary(data, comment):
+    if _requires_standalone_boundary(comment, comments_by_line=comments_by_line):
         comment_lines = ("", *comment_lines)
     return context.line_ending.join((*comment_lines, code))
 
 
-def _requires_standalone_boundary(data: PCF_definition.PCFCategoryData, comment: PCF_definition.CommentInfo) -> bool:
+def _requires_standalone_boundary(comment: PCF_definition.CommentInfo, *, comments_by_line: dict[int, PCF_definition.CommentInfo]) -> bool:
     """Return whether extraction would join a preceding standalone comment run."""
-    for previous in reversed(data.comments):
-        if previous.range.start.line >= comment.range.start.line:
-            continue
-        if previous.range.start.line < comment.range.start.line - 1:
-            return False
-        return (
-            previous.placement == PCF_definition.CommentPlacement.STANDALONE
-            and previous.kind == PCF_definition.CommentKind.REGULAR
-            and not previous.is_empty
-            and not previous.is_hash_only
-            and previous.indent == comment.indent
-        )
-    return False
+    previous = comments_by_line.get(comment.range.start.line - 1)
+    return (
+        previous is not None
+        and previous.placement == PCF_definition.CommentPlacement.STANDALONE
+        and previous.kind == PCF_definition.CommentKind.REGULAR
+        and not previous.is_empty
+        and not previous.is_hash_only
+        and previous.indent == comment.indent
+    )

@@ -1,4 +1,7 @@
+import pytest
+
 import pydocformatter.formatter as formatter
+import pydocformatter.rules.definition_helpers.parameter_documentation as parameter_documentation
 import pydocformatter.rules_selection as rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention
 from pydocformatter.rules.definitions.PDF.PDF501_extraneous_parameter_documentation import PDF501ExtraneousParameterDocumentation
@@ -21,6 +24,16 @@ def assert_pdf501_lines(source: str, expected: tuple[tuple[int, ...], ...], *, s
 
 
 def test_reports_google_documented_parameter_absent_from_signature() -> None:
+    source = 'def function(first):\n    """Summary.\n\n    Args:\n        first: First.\n        second: Second.\n    """\n'
+
+    assert_pdf501_lines(source, ((6,),))
+
+
+def test_does_not_scan_typed_dict_classes_without_unpacked_keyword_parameter(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fail_typed_dict_keys_by_name(module: object) -> dict[str, frozenset[str]]:
+        raise AssertionError("TypedDict keys should not be collected without unpacked keyword parameters")
+
+    monkeypatch.setattr(parameter_documentation, "typed_dict_keys_by_name", fail_typed_dict_keys_by_name)
     source = 'def function(first):\n    """Summary.\n\n    Args:\n        first: First.\n        second: Second.\n    """\n'
 
     assert_pdf501_lines(source, ((6,),))
@@ -168,6 +181,21 @@ def test_local_typed_dict_unpack_allows_typed_dict_keys_and_reports_other_names(
     source = 'class Options(TypedDict):\n    timeout: int\n    verbose: bool\n\n\ndef function(first, **kwargs: Unpack[Options]):\n    """Summary.\n\n    Args:\n        frist: Typo.\n        timeout: Timeout.\n        verbose: Verbose.\n        kwargs: Kwargs.\n    """\n'
 
     assert_pdf501_lines(source, ((10,),))
+
+
+def test_scans_typed_dict_classes_once_when_unpacked_keyword_parameter_needs_keys(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls = 0
+
+    def counting_typed_dict_keys_by_name(module: object) -> dict[str, frozenset[str]]:
+        nonlocal calls
+        calls += 1
+        return {"Options": frozenset({"timeout"})}
+
+    monkeypatch.setattr(parameter_documentation, "typed_dict_keys_by_name", counting_typed_dict_keys_by_name)
+    source = 'class Options(TypedDict):\n    timeout: int\n\n\ndef first(**kwargs: Unpack[Options]):\n    """Summary.\n\n    Args:\n        timeout: Timeout.\n        tmieout: Typo.\n    """\n\n\ndef second(**kwargs: Unpack[Options]):\n    """Summary.\n\n    Args:\n        timeout: Timeout.\n        tiemout: Typo.\n    """\n'
+
+    assert_pdf501_lines(source, ((10,), (19,)))
+    assert calls == 1
 
 
 def test_qualified_local_typed_dict_unpack_allows_typed_dict_keys_and_reports_other_names() -> None:

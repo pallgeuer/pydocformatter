@@ -1,4 +1,7 @@
+import pytest
+
 import pydocformatter.formatter as formatter
+import pydocformatter.rules.definitions.PDF.PDF411_type_like_token_spacing_normalization as PDF411_definition
 import pydocformatter.rules_selection as rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention
 from pydocformatter.rules.definitions.PDF.PDF409_docstring_entry_spacing import PDF409DocstringEntrySpacing
@@ -22,6 +25,24 @@ def test_normalizes_google_parameter_return_and_yield_type_spacing() -> None:
     )
     assert result.fixed_findings[PDF411TypeLikeTokenSpacingNormalization.meta] == 1
     assert not format_source(result.new_source).modified
+
+
+def test_reuses_cached_type_like_normalization_for_repeated_text(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[str] = []
+    original_normalizer = PDF411_definition._normalized_type_like_text
+
+    def counting_normalizer(text: str) -> str | None:
+        calls.append(text)
+        return original_normalizer(text)
+
+    monkeypatch.setattr(PDF411_definition, "_normalized_type_like_text", counting_normalizer)
+    source = 'def first(value):\n    """Summary.\n\n    Args:\n        value (Mapping[ str, Sequence[int  ]]): Description.\n\n    Returns:\n        dict[ str, Sequence[int | None  ]]: Result.\n    """\n\n\ndef second(value):\n    """Summary.\n\n    Args:\n        value (Mapping[ str, Sequence[int  ]]): Description.\n\n    Returns:\n        dict[ str, Sequence[int | None  ]]: Result.\n    """\n'
+    settings = CheckSettings(select=("PDF411",), docstring_convention=DocstringConvention.GOOGLE)
+    result = formatter.format_source(source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=False)
+
+    assert tuple(finding.rule for finding in result.unfixed_findings) == (PDF411TypeLikeTokenSpacingNormalization.meta, PDF411TypeLikeTokenSpacingNormalization.meta)
+    assert calls.count("Mapping[ str, Sequence[int  ]]") == 1
+    assert calls.count("dict[ str, Sequence[int | None  ]]") == 1
 
 
 def test_normalizes_numpy_parameter_return_yield_and_method_type_spacing() -> None:
