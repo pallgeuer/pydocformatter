@@ -171,6 +171,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 
 - **Formatting:**
   - Fixed `PDF101` variable-width source wrapping to use equivalent greedy wrapping and avoid quadratic runtime on long non-URL docstring paragraphs.
+  - Fixed repeated PDF docstring owner lookups to use cached identity-based lookup instead of rescanning prepared docstrings.
   - Fixed URL-aware wrapping to avoid recursive crashes on long URL-containing paragraphs and to fall back to greedy wrapping when balanced wrapping exceeds its search budget.
 
 - **Comment formatting:**

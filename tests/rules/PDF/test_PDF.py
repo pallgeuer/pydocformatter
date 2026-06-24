@@ -1,3 +1,5 @@
+import dataclasses
+
 import libcst as cst
 import libcst.metadata as cst_metadata
 import pytest
@@ -80,8 +82,13 @@ def test_prepare_collects_definitions_docstrings_and_owner_metadata() -> None:
     assert data.definitions[2].parameters is not None
     assert data.definitions[2].returns is not None
     assert data.definitions[2].parent is data.definitions[1]
+    assert data._docstrings_by_owner_id is None
     assert data.docstring_for(data.definitions[1]) is data.docstrings[1]
+    assert data._docstrings_by_owner_id is not None
     assert data.docstring_for(data.definitions[3]) is None
+    assert data.docstring_for(dataclasses.replace(data.definitions[1])) is None
+    duplicate_owner_data = dataclasses.replace(data, docstrings=(data.docstrings[1], dataclasses.replace(data.docstrings[2], owner=data.definitions[1])))
+    assert duplicate_owner_data.docstring_for(data.definitions[1]) is data.docstrings[1]
 
 
 def test_documented_function_facts_are_lazy_cached(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -282,11 +282,18 @@ class PDFCategoryData:
     docstrings: tuple[DocstringInfo, ...]
     summary_line_targets: tuple[SummaryLineTarget, ...]
     summary_terminal_line_targets: tuple[SummaryLineTarget, ...]
+    _docstrings_by_owner_id: dict[int, DocstringInfo] | None = dataclasses.field(default=None, init=False, repr=False, compare=False)
     _documented_function_facts: tuple[DocumentedFunctionFact, ...] | None = dataclasses.field(default=None, init=False, repr=False, compare=False)
 
     def docstring_for(self, definition: DefinitionInfo) -> DocstringInfo | None:
         """Return the docstring owned by a definition, if one exists."""
-        return next((docstring for docstring in self.docstrings if docstring.owner is definition), None)
+        docstrings_by_owner_id = self._docstrings_by_owner_id
+        if docstrings_by_owner_id is None:
+            docstrings_by_owner_id = {}
+            for docstring in self.docstrings:
+                docstrings_by_owner_id.setdefault(id(docstring.owner), docstring)
+            object.__setattr__(self, "_docstrings_by_owner_id", docstrings_by_owner_id)
+        return docstrings_by_owner_id.get(id(definition))
 
 
 class _DefinitionCollector(cst.CSTVisitor):
