@@ -179,7 +179,7 @@ def balanced_word_spans(
         for end in range(start + 1, len(words) + 1):
             if end > start + 1:
                 column += 1
-            column = _advance_display_column(column, width_words[end - 1], tab_width=tab_width)
+            column = advance_display_column(column, width_words[end - 1], tab_width=tab_width)
             final_line = end == len(words)
             limit = line_limit(first_line=first_line, final_line=final_line)
             single_word = end == start + 1
@@ -200,6 +200,7 @@ def balanced_word_spans(
                     )
                 )
             elif final_suffix_width >= 0:
+                # Once a prefix overflows, longer prefixes cannot fit under nonnegative suffix reservation.
                 break
         return tuple(candidates)
 
@@ -269,7 +270,7 @@ def _greedy_word_spans(
         for end in range(start + 1, len(words) + 1):
             if end > start + 1:
                 column += 1
-            column = _advance_display_column(column, width_words[end - 1], tab_width=tab_width)
+            column = advance_display_column(column, width_words[end - 1], tab_width=tab_width)
             final_line = end == len(words)
             limit = (width if initial_width is None else initial_width) if first_line else (width if subsequent_width is None else subsequent_width)
             if final_line:
@@ -278,6 +279,7 @@ def _greedy_word_spans(
             if single_word or (limit > 0 and column <= limit):
                 chosen_end = end
             elif final_suffix_width >= 0:
+                # Once a prefix overflows, longer prefixes cannot fit under nonnegative suffix reservation.
                 break
         spans.append(WordSpan(start, chosen_end))
         start = chosen_end
@@ -285,7 +287,7 @@ def _greedy_word_spans(
     return tuple(spans)
 
 
-def _advance_display_column(column: int, text: str, *, tab_width: int) -> int:
+def advance_display_column(column: int, text: str, *, tab_width: int) -> int:
     """Return the display column after rendering text from an existing column."""
     for char in text:
         if char == "\t":

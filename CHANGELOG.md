@@ -170,6 +170,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Fixed `parallelism` worker resolution to cap Windows process pools at the platform-supported maximum.
 
 - **Formatting:**
+  - Fixed `PDF101` variable-width source wrapping to use equivalent greedy wrapping and avoid quadratic runtime on long non-URL docstring paragraphs.
   - Fixed URL-aware wrapping to avoid recursive crashes on long URL-containing paragraphs and to fall back to greedy wrapping when balanced wrapping exceeds its search budget.
 
 - **Comment formatting:**

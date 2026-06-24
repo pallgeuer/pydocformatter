@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import dataclasses
-import functools
 
 import libcst as cst
 
@@ -291,29 +290,31 @@ def _wrap_source_words_with_variable_widths(
         stripped = initial_indent.rstrip()
         return (WrappedSourceLine(value=stripped, source=stripped),)
 
-    def fits(candidate: WrappedSourceLine, *, first_line: bool, final_line: bool, single_word: bool) -> bool:
-        limit = initial_width if first_line else subsequent_width
-        if final_line:
-            limit -= final_suffix_width
-        return single_word or (limit > 0 and text_layout.display_width(candidate.source, tab_width=tab_width) <= limit)
-
-    @functools.cache
-    def best(start: int, first_line: bool) -> tuple[WrappedSourceLine, ...]:
-        chosen: tuple[WrappedSourceLine, ...] | None = None
+    lines: list[WrappedSourceLine] = []
+    start = 0
+    first_line = True
+    while start < len(words):
         indent = initial_indent if first_line else subsequent_indent
-        for end in range(len(words), start, -1):
-            candidate_words = words[start:end]
-            candidate = _source_line(indent, candidate_words)
-            if not fits(candidate, first_line=first_line, final_line=end == len(words), single_word=end == start + 1):
-                continue
-            remainder = () if end == len(words) else best(end, False)
-            wrapped = (candidate, *remainder)
-            if chosen is None or len(wrapped) < len(chosen):
-                chosen = wrapped
-        assert chosen is not None
-        return chosen
-
-    return best(0, True)
+        column = text_layout.display_width(indent, tab_width=tab_width)
+        chosen_end = start + 1
+        for end in range(start + 1, len(words) + 1):
+            if end > start + 1:
+                column += 1
+            column = text_layout.advance_display_column(column, words[end - 1].source, tab_width=tab_width)
+            final_line = end == len(words)
+            limit = initial_width if first_line else subsequent_width
+            if final_line:
+                limit -= final_suffix_width
+            single_word = end == start + 1
+            if single_word or (limit > 0 and column <= limit):
+                chosen_end = end
+            elif final_suffix_width >= 0:
+                # Once a prefix overflows, longer prefixes cannot fit under nonnegative suffix reservation.
+                break
+        lines.append(_source_line(indent, words[start:chosen_end]))
+        start = chosen_end
+        first_line = False
+    return tuple(lines)
 
 
 def fragments_for_concatenated_string(node: cst.ConcatenatedString, *, target_quote: str, line_ending: str) -> tuple[StringValueFragment, ...] | None:

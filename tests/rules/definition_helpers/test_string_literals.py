@@ -162,6 +162,33 @@ def test_wrap_source_words_reserves_final_suffix_width() -> None:
     assert tuple(line.source for line in wrapped) == ("alpha beta", "gamma")
 
 
+def test_wrap_source_words_respects_variable_widths_indents_and_final_suffix() -> None:
+    words = tuple(string_literals.SourceWord(value=word, source=word) for word in ("alpha", "beta", "gamma", "delta"))
+
+    wrapped = string_literals.wrap_source_words(words, width=12, initial_width=12, subsequent_width=18, final_suffix_width=5, initial_indent="> ", subsequent_indent="  ", tab_width=4)
+
+    assert tuple(line.value for line in wrapped) == ("> alpha beta", "  gamma delta")
+    assert tuple(line.source for line in wrapped) == ("> alpha beta", "  gamma delta")
+
+
+def test_wrap_source_words_keeps_long_words_unsplit_with_variable_widths() -> None:
+    words = tuple(string_literals.SourceWord(value=word, source=word) for word in ("supercalifragilistic", "short", "words"))
+
+    wrapped = string_literals.wrap_source_words(words, width=10, initial_width=10, subsequent_width=10, final_suffix_width=3, tab_width=4)
+
+    assert tuple(line.value for line in wrapped) == ("supercalifragilistic", "short", "words")
+    assert tuple(line.source for line in wrapped) == ("supercalifragilistic", "short", "words")
+
+
+def test_wrap_source_words_uses_tab_expanded_source_widths_with_variable_widths() -> None:
+    words = tuple(string_literals.SourceWord(value=word, source=word) for word in ("tab\tword", "tail", "more"))
+
+    wrapped = string_literals.wrap_source_words(words, width=12, initial_width=12, subsequent_width=12, tab_width=4)
+
+    assert tuple(line.value for line in wrapped) == ("tab\tword", "tail more")
+    assert tuple(line.source for line in wrapped) == ("tab\tword", "tail more")
+
+
 def test_wrap_source_words_can_balance_words_around_url_tokens() -> None:
     words = tuple(string_literals.SourceWord(value=word, source=word) for word in ("alpha", "beta", "https://example.com/path", "alpha"))
 
