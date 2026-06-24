@@ -15,6 +15,10 @@ from pydocformatter.cli.settings_check import CheckSettings
         ("value = compute()\t#TYPE : ignore[assignment]\n", "value = compute()  # type: ignore[assignment]\n"),
         ("value = compute() # TY : ignore[invalid-argument-type]\n", "value = compute()  # ty: ignore[invalid-argument-type]\n"),
         ("value = compute() # ruff: noqa: F401\n", "value = compute()  # ruff: noqa: F401\n"),
+        ("value = compute()#ruff: ignore[line-too-long]\n", "value = compute()  # ruff: ignore[line-too-long]\n"),
+        ("value = compute()#noinspection PyTypeChecker\n", "value = compute()  # noinspection PyTypeChecker\n"),
+        ("value = compute()#language=SQL prefix=SELECT suffix=FROM table\n", "value = compute()  # language=SQL prefix=SELECT suffix=FROM table\n"),
+        ("value = compute()#@formatter:off\n", "value = compute()  # @formatter:off\n"),
         ("value = compute() # pragma: no cover\n", "value = compute()  # pragma: no cover\n"),
     ),
 )
@@ -37,6 +41,16 @@ def test_directive_normalization_preserves_payload_after_marker_space() -> None:
         ("    #fmt : off\n", "    # fmt: off\n"),
         ("#TYPE : ignore[assignment,arg-type]\n", "# type: ignore[assignment, arg-type]\n"),
         ("#TY : ignore[invalid-argument-type,unresolved-import]\n", "# ty: ignore[invalid-argument-type, unresolved-import]\n"),
+        ("#ruff:ignore[F401,E501]\n", "# ruff: ignore[F401, E501]\n"),
+        ("# ruff : disable [ E741, F841, ]\n", "# ruff: disable[E741, F841]\n"),
+        ("# ruff: file-ignore[unused-import,unused-function-argument]\n", "# ruff: file-ignore[unused-import, unused-function-argument]\n"),
+        ("# ruff: isort: skip_file\n", "# ruff: isort: skip_file\n"),
+        ("# ruff : isort : ON\n", "# ruff: isort: on\n"),
+        ("#NoInspection PyTypeChecker\n", "# noinspection PyTypeChecker\n"),
+        ("#noinspection PyTypeChecker,PyUnresolvedReferences\n", "# noinspection PyTypeChecker, PyUnresolvedReferences\n"),
+        ("# LANGUAGE = SQL prefix=SELECT suffix=FROM table\n", "# language=SQL prefix=SELECT suffix=FROM table\n"),
+        ("# @formatter : OFF\n", "# @formatter:off\n"),
+        ("# @formatter : ON\n", "# @formatter:on\n"),
     ),
 )
 def test_directive_normalization_normalizes_standalone_directives(source: str, expected: str) -> None:
@@ -73,6 +87,13 @@ def test_directive_normalization_does_not_add_trailing_space_for_empty_payloads(
         ("value = compute()#TY : ignore[invalid-argument-type,unresolved-import]\n", "value = compute()  # ty: ignore[invalid-argument-type, unresolved-import]\n"),
         ("value = compute()#noqa: f401,e501\n", "value = compute()  # noqa: F401, E501\n"),
         ("value = compute()#ruff : noqa : ruf100, f401\n", "value = compute()  # ruff: noqa: RUF100, F401\n"),
+        ("value = compute()#ruff:ignore[F401,E501]\n", "value = compute()  # ruff: ignore[F401, E501]\n"),
+        ("value = compute()#ruff : enable [ E741, F841, ]  # reason\n", "value = compute()  # ruff: enable[E741, F841]  # reason\n"),
+        ("value = compute()#ruff : isort : SKIP_FILE\n", "value = compute()  # ruff: isort: skip_file\n"),
+        ("value = compute()#ruff : isort : SPLIT\n", "value = compute()  # ruff: isort: split\n"),
+        ("value = compute()#NoInspection PyTypeChecker,PyUnresolvedReferences\n", "value = compute()  # noinspection PyTypeChecker, PyUnresolvedReferences\n"),
+        ("value = compute()#LANGUAGE = RegExp prefix=^ suffix=$\n", "value = compute()  # language=RegExp prefix=^ suffix=$\n"),
+        ("value = compute()#@formatter : OFF\n", "value = compute()  # @formatter:off\n"),
         ("value = compute()#pylint:disable=missing-docstring,unused-argument\n", "value = compute()  # pylint: disable=missing-docstring, unused-argument\n"),
     ),
 )
@@ -121,9 +142,12 @@ def test_directive_normalization_treats_additional_hashes_as_directive_payload()
 
 
 def test_directive_normalization_preserves_ambiguous_payloads_after_safe_prefix_cleanup() -> None:
-    source = "value = compute()#noqa: not a code list because prose\n#pylint:disable=missing-docstring because prose\n"
+    source = "value = compute()#noqa: not a code list because prose\n#pylint:disable=missing-docstring because prose\n#ruff:ignore[not safe because prose]\n#noinspection not a clear list because prose\n#@formatter:off because prose\n"
     result = pcf_helpers.format_pcf(source)
-    assert result.new_source == "value = compute()  # noqa: not a code list because prose\n# pylint: disable=missing-docstring because prose\n"
+    assert (
+        result.new_source
+        == "value = compute()  # noqa: not a code list because prose\n# pylint: disable=missing-docstring because prose\n# ruff: ignore[not safe because prose]\n# noinspection not a clear list because prose\n# @formatter:off because prose\n"
+    )
 
 
 def test_directive_normalization_preserves_trailing_code_to_hash_spacing_when_selected_alone() -> None:

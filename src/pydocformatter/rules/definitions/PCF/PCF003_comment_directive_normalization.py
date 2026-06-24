@@ -17,6 +17,11 @@ _TYPE_IGNORE_RE = re.compile(r"^type\s*:\s*ignore(?P<codes>\[[^\]]*\])?(?P<rest>
 _TY_IGNORE_RE = re.compile(r"^ty\s*:\s*ignore(?P<codes>\[[^\]]*\])?(?P<rest>.*)$", re.IGNORECASE)
 _NOQA_RE = re.compile(r"^noqa(?:\s*:\s*(?P<codes>[^#]*?))?(?P<rest>[ \t\f]+#.*|)$", re.IGNORECASE)
 _PREFIXED_NOQA_RE = re.compile(r"^(?P<head>ruff|flake8)\s*:\s*noqa(?:\s*:\s*(?P<codes>[^#]*?))?(?P<rest>[ \t\f]+#.*|)$", re.IGNORECASE)
+_RUFF_BRACKET_RE = re.compile(r"^ruff\s*:\s*(?P<action>ignore|disable|enable|file-ignore)\s*(?P<codes>\[[^\]]*\])(?P<rest>.*)$", re.IGNORECASE)
+_RUFF_ISORT_RE = re.compile(r"^ruff\s*:\s*isort\s*:\s*(?P<value>.*)$", re.IGNORECASE)
+_NOINSPECTION_RE = re.compile(r"^noinspection(?:\s+(?P<inspections>.*))?$", re.IGNORECASE)
+_LANGUAGE_INJECTION_RE = re.compile(r"^language\s*=\s*(?P<language>\S+)(?P<rest>.*)$", re.IGNORECASE)
+_FORMATTER_MARKER_RE = re.compile(r"^@formatter\s*:\s*(?P<state>on|off)(?P<rest>[ \t\f]+#.*|)$", re.IGNORECASE)
 _PYLINT_RE = re.compile(r"^pylint\s*:\s*(?P<action>disable|enable|disable-next)\s*=\s*(?P<messages>[^#]*?)(?P<rest>[ \t\f]+#.*|)$", re.IGNORECASE)
 _COLON_VALUE_RE = re.compile(r"^(?P<head>pyright|mypy|ruff|flake8|fmt|isort|pragma)\s*:\s*(?P<value>.*)$", re.IGNORECASE)
 
@@ -78,6 +83,21 @@ def _normalized_directive_content(content: str) -> str:
     if (match := _PREFIXED_NOQA_RE.match(content)) is not None:
         head = match.group("head").lower()
         return _normalized_noqa(f"{head}: noqa", match.group("codes"), match.group("rest"))
+    if (match := _RUFF_BRACKET_RE.match(content)) is not None:
+        action = match.group("action").lower()
+        codes = _normalized_bracketed_list(match.group("codes"), item_re=_LIST_ITEM_RE, allow_trailing_comma=True)
+        return f"ruff: {action}{codes}{match.group('rest')}"
+    if (match := _RUFF_ISORT_RE.match(content)) is not None:
+        return _normalized_colon_payload("ruff", _normalized_colon_value("isort", match.group("value")))
+    if (match := _NOINSPECTION_RE.match(content)) is not None:
+        inspections = match.group("inspections")
+        if inspections is None:
+            return "noinspection"
+        return f"noinspection {_normalized_comma_list(inspections, item_re=_LIST_ITEM_RE)}"
+    if (match := _LANGUAGE_INJECTION_RE.match(content)) is not None:
+        return f"language={match.group('language')}{match.group('rest')}"
+    if (match := _FORMATTER_MARKER_RE.match(content)) is not None:
+        return f"@formatter:{match.group('state').lower()}{match.group('rest')}"
     if (match := _PYLINT_RE.match(content)) is not None:
         action = match.group("action").lower()
         messages = _normalized_comma_list(match.group("messages"), item_re=_LIST_ITEM_RE)
@@ -98,18 +118,20 @@ def _normalized_noqa(head: str, codes: str | None, rest: str) -> str:
     return _normalized_colon_payload(head, f"{normalized_codes}{rest}")
 
 
-def _normalized_bracketed_list(text: str | None, *, item_re: re.Pattern[str]) -> str:
+def _normalized_bracketed_list(text: str | None, *, item_re: re.Pattern[str], allow_trailing_comma: bool = False) -> str:
     """Return a normalized bracketed directive list when it is clearly comma-separated."""
     if text is None:
         return ""
     inner = text[1:-1]
-    normalized = _normalized_comma_list(inner, item_re=item_re)
+    normalized = _normalized_comma_list(inner, item_re=item_re, allow_trailing_comma=allow_trailing_comma)
     return f"[{normalized}]"
 
 
-def _normalized_comma_list(text: str, *, item_re: re.Pattern[str], uppercase: bool = False) -> str:
+def _normalized_comma_list(text: str, *, item_re: re.Pattern[str], uppercase: bool = False, allow_trailing_comma: bool = False) -> str:
     """Normalize a comma-separated directive list when every item has a safe token shape."""
     items = tuple(item.strip() for item in text.split(","))
+    if allow_trailing_comma and items and not items[-1]:
+        items = items[:-1]
     if not items or not all(item and item_re.match(item) is not None for item in items):
         return text.strip()
     if uppercase:
@@ -122,7 +144,7 @@ def _normalized_colon_value(head: str, value: str) -> str:
     normalized_head = head.lower()
     if normalized_head == "fmt" and value.lower() in {"on", "off", "skip"}:
         value = value.lower()
-    elif normalized_head == "isort" and value.lower() in {"skip", "skip_file"}:
+    elif normalized_head == "isort" and value.lower() in {"off", "on", "skip", "skip_file", "split"}:
         value = value.lower()
     elif normalized_head == "pragma" and value.lower() in {"no cover", "no branch"}:
         value = value.lower()

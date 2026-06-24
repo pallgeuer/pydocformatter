@@ -108,6 +108,8 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Implemented PCF001 standalone-comment formatting, PCF002 trailing-comment spacing, and PCF004 trailing-comment extraction with independent fixes, protected directive handling, tab-expanded widths, stable impossible-width behavior, and exact EOF preservation.
   - Added PCF003 comment-directive-normalization for safe marker spacing and syntax around known type and tool directives.
   - Added PCF support for ty suppression directives by protecting and normalizing `ty: ignore[...]` comments and mixed `type: ignore[ty:...]` payloads.
+  - Added PCF support for Ruff suppression directives by normalizing `ruff: ignore[...]`, `ruff: disable[...]`, `ruff: enable[...]`, `ruff: file-ignore[...]`, and `ruff: isort: ...` comments.
+  - Added PCF support for single-line PyCharm directives by protecting and normalizing `noinspection`, `language=`, and `@formatter:on`/`@formatter:off` marker comments.
   - Changed PCF004 to keep overlong trailing comments inline by default in decorators, compound statement headers, arguments, and parenthesized or continuation contexts.
   - Added shared URL-aware wrapping helpers used by PCF001, PCF004, and PDF101 when `url-aware-wrapping` is enabled.
 

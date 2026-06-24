@@ -5,7 +5,7 @@ Fix is always available.
 ## What it does
 Normalizes safe marker spacing and machine-readable syntax in recognized directive comments. For trailing directives, the code before the directive is preserved exactly so PCF002 remains the owner of code-to-`#` delimiter spacing. For standalone directives, indentation is preserved. In both cases, directive content starts after one marker space.
 
-PCF003 handles comments already classified as type comments or known tool directives by the PCF category. It normalizes recognized directive heads to lowercase, removes space before directive introducer colons, adds one space after directive colons where a value follows, and normalizes safe comma-separated lists for `type: ignore[...]`, `ty: ignore[...]`, `noqa`, `ruff: noqa`, `flake8: noqa`, and `pylint` enable/disable directives.
+PCF003 handles comments already classified as type comments or known tool directives by the PCF category. It normalizes recognized directive heads to lowercase, removes space before directive introducer colons, adds one space after directive colons where a value follows, and normalizes safe comma-separated lists for `type: ignore[...]`, `ty: ignore[...]`, `noqa`, `ruff: noqa`, `flake8: noqa`, `pylint` enable/disable directives, PyCharm `noinspection` directives, and Ruff bracket directives such as `ruff: ignore[...]`, `ruff: disable[...]`, `ruff: enable[...]`, and `ruff: file-ignore[...]`. Ruff-prefixed isort action comments such as `ruff: isort: skip_file` are normalized as nested directives. PyCharm `language=` injection comments normalize only the directive head and preserve the language ID and optional `prefix=`/`suffix=` payload. PyCharm `@formatter:on` and `@formatter:off` marker comments are normalized as individual directive lines only; they do not disable pydocformatter for a range of code.
 
 Unknown or ambiguous payload text is preserved after safe prefix cleanup. Ordinary comments remain outside this rule.
 
@@ -37,12 +37,22 @@ Standalone directives are normalized without changing indentation:
 ```pydocfmt-example
 [input]
 #ruff: noqa
+#ruff:ignore[F401,E501]
+    # ruff : isort : SKIP_FILE
     #fmt : off
+#noinspection PyTypeChecker,PyUnresolvedReferences
+# LANGUAGE = SQL prefix=SELECT suffix=FROM table
+# @formatter : OFF
 #   pylint : disable-next = missing-docstring,unused-argument
 
 [output]
 # ruff: noqa
+# ruff: ignore[F401, E501]
+    # ruff: isort: skip_file
     # fmt: off
+# noinspection PyTypeChecker, PyUnresolvedReferences
+# language=SQL prefix=SELECT suffix=FROM table
+# @formatter:off
 # pylint: disable-next=missing-docstring, unused-argument
 ```
 
@@ -54,6 +64,8 @@ typed = compute()#TYPE : ignore[assignment,arg-type]
 mixed = compute()#TYPE : ignore[arg-type,ty:invalid-argument-type]
 ty_typed = compute()#TY : ignore[invalid-argument-type,unresolved-import]
 ruffed = compute() # ruff : noqa : ruf100, f401
+ruff_range = compute()#ruff : enable [ E741, F841, ]  # local reason
+pycharm = compute()#NoInspection PyTypeChecker,PyUnresolvedReferences
 linted = compute()#   PyLiNt : disable = missing-docstring,unused-argument  # local reason
 
 [output]
@@ -61,6 +73,8 @@ typed = compute()# type: ignore[assignment, arg-type]
 mixed = compute()# type: ignore[arg-type, ty:invalid-argument-type]
 ty_typed = compute()# ty: ignore[invalid-argument-type, unresolved-import]
 ruffed = compute() # ruff: noqa: RUF100, F401
+ruff_range = compute()# ruff: enable[E741, F841]  # local reason
+pycharm = compute()# noinspection PyTypeChecker, PyUnresolvedReferences
 linted = compute()# pylint: disable=missing-docstring, unused-argument  # local reason
 ```
 

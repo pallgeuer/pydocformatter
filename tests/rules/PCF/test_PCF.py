@@ -182,6 +182,16 @@ def test_prepare_classifies_shebang_and_encoding_cookie_boundaries(source: str, 
         "# PYRIGHT: ignore",
         "# mypy: ignore-errors",
         "# ruff: noqa",
+        "# ruff: ignore[F401]",
+        "# ruff: disable[E741, F841]",
+        "# ruff: enable[E741, F841]",
+        "# ruff: file-ignore[unused-import]",
+        "# ruff: isort: skip_file",
+        "# noinspection PyTypeChecker",
+        "# noinspection PyTypeChecker,PyUnresolvedReferences",
+        "# language=SQL prefix=SELECT suffix=FROM table",
+        "# @formatter:off",
+        "# @formatter:on",
         "# flake8: noqa",
         "# fmt: off",
         "# isort: skip",
@@ -193,7 +203,20 @@ def test_prepare_protects_type_and_tool_directives_case_insensitively(directive:
     assert data.comments[0].kind in (CommentKind.TYPE_DIRECTIVE, CommentKind.TOOL_DIRECTIVE)
 
 
-@pytest.mark.parametrize("comment", ("# typewriter: prose", "# noqaish prose", "# nosecurity prose", "# formatted prose", "# isotope prose", "# pragmatic prose"))
+@pytest.mark.parametrize(
+    "comment",
+    (
+        "# typewriter: prose",
+        "# noqaish prose",
+        "# nosecurity prose",
+        "# formatted prose",
+        "# isotope prose",
+        "# pragmatic prose",
+        "# noinspect prose",
+        "# language prose",
+        "# @formatting:off",
+    ),
+)
 def test_prepare_does_not_overclassify_directive_prefixes(comment: str) -> None:
     data = PCF.prepare(category_context(f"value = 1  {comment}\n"))
     assert data.comments[0].kind == CommentKind.REGULAR
