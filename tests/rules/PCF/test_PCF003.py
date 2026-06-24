@@ -13,6 +13,7 @@ from pydocformatter.cli.settings_check import CheckSettings
         ("value = compute()#noqa   \n", "value = compute()  # noqa\n"),
         ("value = compute() #   nosec reason\n", "value = compute()  # nosec reason\n"),
         ("value = compute()\t#TYPE : ignore[assignment]\n", "value = compute()  # type: ignore[assignment]\n"),
+        ("value = compute() # TY : ignore[invalid-argument-type]\n", "value = compute()  # ty: ignore[invalid-argument-type]\n"),
         ("value = compute() # ruff: noqa: F401\n", "value = compute()  # ruff: noqa: F401\n"),
         ("value = compute() # pragma: no cover\n", "value = compute()  # pragma: no cover\n"),
     ),
@@ -35,6 +36,7 @@ def test_directive_normalization_preserves_payload_after_marker_space() -> None:
         ("#   pylint : disable-next = missing-docstring,unused-argument\n", "# pylint: disable-next=missing-docstring, unused-argument\n"),
         ("    #fmt : off\n", "    # fmt: off\n"),
         ("#TYPE : ignore[assignment,arg-type]\n", "# type: ignore[assignment, arg-type]\n"),
+        ("#TY : ignore[invalid-argument-type,unresolved-import]\n", "# ty: ignore[invalid-argument-type, unresolved-import]\n"),
     ),
 )
 def test_directive_normalization_normalizes_standalone_directives(source: str, expected: str) -> None:
@@ -48,9 +50,11 @@ def test_directive_normalization_normalizes_standalone_directives(source: str, e
         ("#noqa:\n", "# noqa:\n"),
         ("#noqa:   \n", "# noqa:\n"),
         ("#ruff: noqa:\n", "# ruff: noqa:\n"),
+        ("#TY : ignore\n", "# ty: ignore\n"),
         ("#mypy:\n", "# mypy:\n"),
         ("#fmt:\n", "# fmt:\n"),
         ("value = compute()#noqa:\n", "value = compute()  # noqa:\n"),
+        ("value = compute()#TY : ignore\n", "value = compute()  # ty: ignore\n"),
         ("value = compute()#fmt:\n", "value = compute()  # fmt:\n"),
         ("#noqa:  # reason\n", "# noqa: # reason\n"),
     ),
@@ -65,6 +69,8 @@ def test_directive_normalization_does_not_add_trailing_space_for_empty_payloads(
     ("source", "expected"),
     (
         ("value = compute()#TYPE : ignore[assignment,arg-type]\n", "value = compute()  # type: ignore[assignment, arg-type]\n"),
+        ("value = compute()#TYPE : ignore[arg-type,ty:invalid-argument-type]\n", "value = compute()  # type: ignore[arg-type, ty:invalid-argument-type]\n"),
+        ("value = compute()#TY : ignore[invalid-argument-type,unresolved-import]\n", "value = compute()  # ty: ignore[invalid-argument-type, unresolved-import]\n"),
         ("value = compute()#noqa: f401,e501\n", "value = compute()  # noqa: F401, E501\n"),
         ("value = compute()#ruff : noqa : ruf100, f401\n", "value = compute()  # ruff: noqa: RUF100, F401\n"),
         ("value = compute()#pylint:disable=missing-docstring,unused-argument\n", "value = compute()  # pylint: disable=missing-docstring, unused-argument\n"),
@@ -109,9 +115,9 @@ def test_directive_normalization_and_regular_trailing_extraction_apply_together_
 
 
 def test_directive_normalization_treats_additional_hashes_as_directive_payload() -> None:
-    source = "value = compute()#noqa  # keep this tool-specific payload\n"
+    source = "value = compute()#TY : ignore[invalid-argument-type]  # fmt: skip\nother = compute()#noqa  # keep this tool-specific payload\n"
     result = pcf_helpers.format_pcf(source, line_length=20)
-    assert result.new_source == "value = compute()  # noqa  # keep this tool-specific payload\n"
+    assert result.new_source == "value = compute()  # ty: ignore[invalid-argument-type]  # fmt: skip\nother = compute()  # noqa  # keep this tool-specific payload\n"
 
 
 def test_directive_normalization_preserves_ambiguous_payloads_after_safe_prefix_cleanup() -> None:

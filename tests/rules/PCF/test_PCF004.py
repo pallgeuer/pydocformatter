@@ -90,6 +90,8 @@ def test_empty_trailing_comment_remains_inline_even_when_code_is_overlong() -> N
     "directive",
     (
         "# type: ignore[assignment]",
+        "# type: ignore[ty:invalid-argument-type]",
+        "# ty: ignore[invalid-argument-type]",
         "# noqa: F401",
         "# nosec reason",
         "# pragma: no cover",

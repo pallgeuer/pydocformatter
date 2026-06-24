@@ -18,7 +18,7 @@ from pydocformatter.rules.models import RuleCategoryMetadata
 _ENCODING_COOKIE_RE = re.compile(r"^#.*?coding[:=][ \t]*[-_.a-zA-Z0-9]+")
 _TYPE_DIRECTIVE_RE = re.compile(r"^#\s*type\s*:", re.IGNORECASE)
 _TOOL_DIRECTIVE_RE = re.compile(
-    r"^#\s*(?:noqa\b|nosec\b|nosemgrep\b|pylint\b|pyright\b|mypy\b|ruff\b|flake8\b|fmt\s*:|isort\s*:|pragma\b)",
+    r"^#\s*(?:noqa\b|nosec\b|nosemgrep\b|pylint\b|pyright\b|mypy\b|ty\s*:|ruff\b|flake8\b|fmt\s*:|isort\s*:|pragma\b)",
     re.IGNORECASE,
 )
 

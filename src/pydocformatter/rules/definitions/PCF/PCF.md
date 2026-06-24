@@ -3,7 +3,7 @@
 ## What it does
 The PCF category formats standalone and trailing Python comments. It collects comments losslessly with LibCST, classifies comments that must be protected from ordinary prose formatting, and provides physical placement and source-range information to the individual rules.
 
-PCF rules never format shebangs or valid first- or second-line encoding cookies. Type comments and recognized tool directives are protected from ordinary comment formatting; trailing-comment spacing may still normalize the delimiter before `#`, and directive normalization may normalize safe marker spacing and machine-readable syntax from `#` onward in recognized directives. Protected tool directives include `noqa`, `nosec`, `nosemgrep`, `pylint`, `pyright`, `mypy`, `ruff`, `flake8`, `fmt:`, `isort:`, and `pragma` comments.
+PCF rules never format shebangs or valid first- or second-line encoding cookies. Type comments and recognized tool directives are protected from ordinary comment formatting; trailing-comment spacing may still normalize the delimiter before `#`, and directive normalization may normalize safe marker spacing and machine-readable syntax from `#` onward in recognized directives. Protected tool directives include `noqa`, `nosec`, `nosemgrep`, `pylint`, `pyright`, `mypy`, `ty:`, `ruff`, `flake8`, `fmt:`, `isort:`, and `pragma` comments.
 
 Comment widths use tab-expanded display columns. `indent-width` supplies the tab width; other Unicode code points count as one column. Generated comment lines use the resolved `line-ending`, while source outside an edited range retains its existing line endings and final-newline state.
 

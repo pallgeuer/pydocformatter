@@ -22,7 +22,7 @@
 ### Comments
 - **Comment wrapping:** Respects line length while preserving meaning
 - **Inline and block comment handling:** Applies appropriate formatting to each comment shape
-- **Special comment preservation:** Maintains pylint, mypy, noqa, pragma, and formatter directives
+- **Special comment preservation:** Maintains pylint, mypy, ty, noqa, pragma, and formatter directives
 - **Smart spacing:** Ensures consistent spacing between code and comments
 
 ### File Selection and Configuration

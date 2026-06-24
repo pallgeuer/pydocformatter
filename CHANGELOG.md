@@ -107,6 +107,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added typed PCF comment and PDF docstring category data, together with a shared validated source-edit helper, as the foundation for individual rule implementations.
   - Implemented PCF001 standalone-comment formatting, PCF002 trailing-comment spacing, and PCF004 trailing-comment extraction with independent fixes, protected directive handling, tab-expanded widths, stable impossible-width behavior, and exact EOF preservation.
   - Added PCF003 comment-directive-normalization for safe marker spacing and syntax around known type and tool directives.
+  - Added PCF support for ty suppression directives by protecting and normalizing `ty: ignore[...]` comments and mixed `type: ignore[ty:...]` payloads.
   - Changed PCF004 to keep overlong trailing comments inline by default in decorators, compound statement headers, arguments, and parenthesized or continuation contexts.
   - Added shared URL-aware wrapping helpers used by PCF001, PCF004, and PDF101 when `url-aware-wrapping` is enabled.
 

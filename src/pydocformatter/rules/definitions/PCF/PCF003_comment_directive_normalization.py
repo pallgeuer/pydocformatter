@@ -10,8 +10,11 @@ from pydocformatter.rules.definition import RuleBase, RuleContext, RuleFixResult
 from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetadata
 
 _LIST_ITEM_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
+# ty: prefixes are accepted only in type: ignore[...] lists, where mixed type-checker payloads are used.
+_TYPE_IGNORE_ITEM_RE = re.compile(r"^(?:ty:)?[A-Za-z0-9_.-]+$")
 _NOQA_CODE_RE = re.compile(r"^[A-Za-z]+[A-Za-z0-9-]*\d+[A-Za-z0-9-]*$")
 _TYPE_IGNORE_RE = re.compile(r"^type\s*:\s*ignore(?P<codes>\[[^\]]*\])?(?P<rest>.*)$", re.IGNORECASE)
+_TY_IGNORE_RE = re.compile(r"^ty\s*:\s*ignore(?P<codes>\[[^\]]*\])?(?P<rest>.*)$", re.IGNORECASE)
 _NOQA_RE = re.compile(r"^noqa(?:\s*:\s*(?P<codes>[^#]*?))?(?P<rest>[ \t\f]+#.*|)$", re.IGNORECASE)
 _PREFIXED_NOQA_RE = re.compile(r"^(?P<head>ruff|flake8)\s*:\s*noqa(?:\s*:\s*(?P<codes>[^#]*?))?(?P<rest>[ \t\f]+#.*|)$", re.IGNORECASE)
 _PYLINT_RE = re.compile(r"^pylint\s*:\s*(?P<action>disable|enable|disable-next)\s*=\s*(?P<messages>[^#]*?)(?P<rest>[ \t\f]+#.*|)$", re.IGNORECASE)
@@ -67,7 +70,9 @@ def _planned_changes(context: RuleContext) -> tuple[rule_edits.PlannedSourceChan
 def _normalized_directive_content(content: str) -> str:
     """Return safely normalized directive content without the leading hash."""
     if (match := _TYPE_IGNORE_RE.match(content)) is not None:
-        return f"type: ignore{_normalized_bracketed_list(match.group('codes'))}{match.group('rest')}"
+        return f"type: ignore{_normalized_bracketed_list(match.group('codes'), item_re=_TYPE_IGNORE_ITEM_RE)}{match.group('rest')}"
+    if (match := _TY_IGNORE_RE.match(content)) is not None:
+        return f"ty: ignore{_normalized_bracketed_list(match.group('codes'), item_re=_LIST_ITEM_RE)}{match.group('rest')}"
     if (match := _NOQA_RE.match(content)) is not None:
         return _normalized_noqa("noqa", match.group("codes"), match.group("rest"))
     if (match := _PREFIXED_NOQA_RE.match(content)) is not None:
@@ -93,12 +98,12 @@ def _normalized_noqa(head: str, codes: str | None, rest: str) -> str:
     return _normalized_colon_payload(head, f"{normalized_codes}{rest}")
 
 
-def _normalized_bracketed_list(text: str | None) -> str:
+def _normalized_bracketed_list(text: str | None, *, item_re: re.Pattern[str]) -> str:
     """Return a normalized bracketed directive list when it is clearly comma-separated."""
     if text is None:
         return ""
     inner = text[1:-1]
-    normalized = _normalized_comma_list(inner, item_re=_LIST_ITEM_RE)
+    normalized = _normalized_comma_list(inner, item_re=item_re)
     return f"[{normalized}]"
 
 

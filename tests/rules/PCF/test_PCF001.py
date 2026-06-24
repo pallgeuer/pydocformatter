@@ -163,6 +163,12 @@ def test_joining_does_not_cross_code_blank_hash_only_protected_or_indentation_bo
     assert result.new_source == source
 
 
+def test_ty_file_level_directive_is_not_joined_with_standalone_prose() -> None:
+    source = "# first line\n# ty: ignore[invalid-argument-type]\n# second line\n"
+    result = pcf_helpers.format_pcf(source, line_length=80, comment_join_standalone_lines=True)
+    assert result.new_source == source
+
+
 @pytest.mark.parametrize(
     ("marker", "expected"),
     (
