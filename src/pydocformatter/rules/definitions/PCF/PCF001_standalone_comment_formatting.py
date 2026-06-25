@@ -57,16 +57,19 @@ def _planned_changes(context: RuleContext) -> tuple[rule_edits.PlannedSourceChan
     changes: list[rule_edits.PlannedSourceChange] = []
     for run in data.standalone_runs:
         preserved = comment_helpers.preserved_indices(run, settings=context.settings)
-        if comment_helpers.run_contains_code(run, preserved=preserved, settings=context.settings):
+        if comment_helpers.run_contains_code(run, preserved=preserved, settings=context.settings, ignore_task_markers=True):
             continue
         index = 0
         while index < len(run.comments):
             if index in preserved:
                 index += 1
                 continue
+            task_marker_match = comment_helpers.task_marker_match(run.comments[index].body.rstrip()) if context.settings.comment_format_task_markers else None
             list_match = comment_helpers.LIST_RE.match(run.comments[index].body.rstrip()) if context.settings.comment_format_list_items else None
             quote_match = comment_helpers.BLOCK_QUOTE_RE.match(run.comments[index].body.rstrip()) if context.settings.comment_format_block_quotes else None
-            if list_match is not None:
+            if task_marker_match is not None:
+                end, output_lines = _format_task_marker(run, index, match=task_marker_match, preserved=preserved, settings=context.settings)
+            elif list_match is not None:
                 end, output_lines = _format_list_item(run, index, match=list_match, preserved=preserved, settings=context.settings)
             elif quote_match is not None:
                 end, output_lines = _format_block_quote(run, index, match=quote_match, preserved=preserved, settings=context.settings)
@@ -111,6 +114,26 @@ def _wrap_plain(content: str, *, indent: str, settings: CheckSettings) -> tuple[
     return text_layout.wrap_text(content, width=width, tab_width=settings.indent_width, url_aware=settings.url_aware_wrapping)
 
 
+def _format_task_marker(
+    run: PCF_definition.StandaloneCommentRun,
+    index: int,
+    *,
+    match: comment_helpers.TaskMarkerMatch,
+    preserved: set[int],
+    settings: CheckSettings,
+) -> tuple[int, tuple[str, ...]]:
+    """Return the extent and hanging-indented output of one task marker."""
+    texts = [match.text]
+    end = index + 1
+    while end < len(run.comments) and end not in preserved:
+        continuation = comment_helpers.task_marker_continuation_text(run.comments[end].body.rstrip(), marker=match.marker)
+        if continuation is None:
+            break
+        texts.append(continuation)
+        end += 1
+    return end, comment_helpers.format_task_marker_lines(match.marker, tuple(texts), indent=run.indent, settings=settings)
+
+
 def _format_list_item(
     run: PCF_definition.StandaloneCommentRun,
     index: int,
@@ -125,6 +148,8 @@ def _format_list_item(
     end = index + 1
     while end < len(run.comments) and end not in preserved:
         body = run.comments[end].body.rstrip()
+        if settings.comment_format_task_markers and comment_helpers.task_marker_match(body) is not None:
+            break
         if comment_helpers.LIST_RE.match(body) is not None or comment_helpers.BLOCK_QUOTE_RE.match(body) is not None:
             break
         if not body[:1].isspace():
@@ -171,6 +196,8 @@ def _ordinary_paragraph_end(run: PCF_definition.StandaloneCommentRun, index: int
     end = index + 1
     while end < len(run.comments) and end not in preserved:
         body = run.comments[end].body.rstrip()
+        if settings.comment_format_task_markers and comment_helpers.task_marker_match(body) is not None:
+            break
         if settings.comment_format_list_items and comment_helpers.LIST_RE.match(body) is not None:
             break
         if settings.comment_format_block_quotes and comment_helpers.BLOCK_QUOTE_RE.match(body) is not None:

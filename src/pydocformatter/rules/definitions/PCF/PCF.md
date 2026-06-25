@@ -26,12 +26,13 @@ PCF rules currently occupy one contiguous range because the category covers comm
 | `PCF0xx` | Comment formatting | Standalone and trailing comment formatting rules. |
 
 ## Options
-Standalone paragraph joining remains disabled by default, so ordinary prose comments are formatted one physical line at a time. List items and block quotes are formatted by default, fenced code is preserved, and Python statements are protected from prose formatting.
+Standalone paragraph joining remains disabled by default, so ordinary prose comments are formatted one physical line at a time. List items, task markers, and block quotes are formatted by default, fenced code is preserved, and Python statements are protected from prose formatting.
 
 | Setting                                     | Default | Effect                                                                                                                                            |
 |---------------------------------------------|--------:|---------------------------------------------------------------------------------------------------------------------------------------------------|
 | `comment-join-standalone-lines`             | `false` | Join consecutive ordinary prose lines into paragraphs before wrapping.                                                                            |
 | `comment-format-list-items`                 |  `true` | Detect ordered and unordered list items and reflow them with hanging indentation.                                                                 |
+| `comment-format-task-markers`               |  `true` | Detect recognized task markers and reflow them with hanging indentation.                                                                          |
 | `comment-preserve-headings`                 |  `true` | Preserve detected Markdown and reStructuredText headings unchanged.                                                                               |
 | `comment-preserve-doctests`                 |  `true` | Preserve a doctest region from its first `>>>` prompt to the physical-run boundary.                                                               |
 | `comment-preserve-code-fences`              |  `true` | Preserve backtick- or tilde-fenced code regions closed by a fence without trailing text.                                                          |

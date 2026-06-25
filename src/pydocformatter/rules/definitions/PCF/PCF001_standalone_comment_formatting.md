@@ -11,6 +11,8 @@ PCF001 operates on physical runs of consecutive, same-indent, regular, non-empty
 
 Within a run, PCF001 first identifies enabled preserved structures, then applies enabled code detectors to the remaining semantic text, and finally formats the remaining list items, block quotes, paragraphs, or physical lines. Lines inside an explicitly preserved structure are excluded from code detection, so code in a fenced or directive region does not prevent adjacent prose from formatting. If any code detector matches another non-preserved line or multiline candidate, the entire physical standalone run remains unchanged.
 
+When `comment-format-task-markers` is enabled, recognized task markers such as `TODO:`, `FIXME:`, and `HACK:` are formatted as independent units with hanging continuation indentation. Existing continuation lines are reflowed with the marker line only when they have the same base indentation and exactly enough spaces after the comment marker to align with the task-marker payload. Code-like task-marker payloads are normalized but not wrapped according to the enabled code-detection settings.
+
 When indentation leaves no positive wrapping width, PCF001 still canonicalizes spacing but keeps the content on one line. It preserves the source's final-newline state and untouched mixed line endings. When `url-aware-wrapping` is enabled, URL tokens remain unbroken but surrounding prose may use less greedy line breaks.
 
 ## Why is this useful?
@@ -91,6 +93,21 @@ line-length = 34
 # > its prefix.
 ```
 
+Task-marker comments use marker-width hanging indentation so continuation lines remain visually associated with the marker:
+
+```pydocfmt-example
+[settings]
+line-length = 30
+comment-detect-statements = false
+
+[input]
+#TODO: alpha beta gamma delta epsilon zeta eta theta
+
+[output]
+# TODO: alpha beta gamma delta
+#       epsilon zeta eta theta
+```
+
 Preserved regions stay unchanged while adjacent prose still formats:
 
 ````pydocfmt-example
@@ -161,6 +178,7 @@ Structure settings:
 
 - `comment-join-standalone-lines` defaults to `false`. When enabled, adjacent ordinary prose lines are joined with one space. Preserved structures, list items, and block quotes remain formatting boundaries.
 - `comment-format-list-items` defaults to `true`. It recognizes `-`, `+`, `*`, `1.`, and `1)` markers, including marker indentation and more-indented continuation lines. Each item is reflowed independently with hanging indentation.
+- `comment-format-task-markers` defaults to `true`. It recognizes uppercase `TODO`, `FIXME`, `XXX`, `HACK`, `BUG`, `DEBUG`, `NOTE`, `OPTIMIZE`, and `REVIEW` markers followed by `:` and reflows their payloads with hanging indentation.
 - `comment-preserve-headings` defaults to `true`. It preserves ATX headings and paired Setext/reStructuredText adornment headings unchanged.
 - `comment-preserve-doctests` defaults to `true`. It preserves from the first line whose semantic text starts with `>>>` through the end of the physical run. An empty comment separator ends the run.
 - `comment-preserve-code-fences` defaults to `true`. It preserves regions opened by at least three backticks or tildes through a matching fence containing no trailing text. An unclosed fence protects the remainder of the run.

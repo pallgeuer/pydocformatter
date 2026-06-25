@@ -338,6 +338,7 @@ class TestSettings(unittest.TestCase):
             (
                 "comment_join_standalone_lines",
                 "comment_format_list_items",
+                "comment_format_task_markers",
                 "comment_preserve_headings",
                 "comment_preserve_doctests",
                 "comment_preserve_code_fences",
@@ -495,6 +496,7 @@ class TestSettings(unittest.TestCase):
         self.assertIs(config.docstring_convention, pydocformatter_settings.DocstringConvention.PEP257)
         self.assertFalse(config.comment_join_standalone_lines)
         self.assertTrue(config.comment_format_list_items)
+        self.assertTrue(config.comment_format_task_markers)
         self.assertTrue(config.comment_preserve_headings)
         self.assertTrue(config.comment_preserve_doctests)
         self.assertTrue(config.comment_preserve_code_fences)
@@ -885,21 +887,23 @@ class TestSettings(unittest.TestCase):
             global_values=pydocformatter_global_args.GlobalArgs(
                 isolated=True,
                 config_options=(
-                    "comment-join-standalone-lines = true\ncomment-format-list-items = true\ncomment-trailing-extraction-syntax-aware = false\ncomment-trailing-extraction-content-aware = false\ncomment-detect-code = false",
+                    "comment-join-standalone-lines = true\ncomment-format-list-items = true\ncomment-format-task-markers = false\ncomment-trailing-extraction-syntax-aware = false\ncomment-trailing-extraction-content-aware = false\ncomment-detect-code = false",
                 ),
             )
         )
         overridden = pydocformatter_settings.SETTINGS_SCHEMA.load(
             global_values=pydocformatter_global_args.GlobalArgs(isolated=True),
-            args=argparse.Namespace(comment_preserve_tables=True, comment_detect_code=False),
+            args=argparse.Namespace(comment_preserve_tables=True, comment_format_task_markers=False, comment_detect_code=False),
         )
 
         self.assertTrue(configured.comment_join_standalone_lines)
         self.assertTrue(configured.comment_format_list_items)
+        self.assertFalse(configured.comment_format_task_markers)
         self.assertFalse(configured.comment_trailing_extraction_syntax_aware)
         self.assertFalse(configured.comment_trailing_extraction_content_aware)
         self.assertFalse(configured.comment_detect_code)
         self.assertTrue(overridden.comment_preserve_tables)
+        self.assertFalse(overridden.comment_format_task_markers)
         self.assertFalse(overridden.comment_detect_code)
 
     def test_docstring_parsing_settings_are_loaded_and_validated(self) -> None:

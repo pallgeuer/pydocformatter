@@ -154,6 +154,35 @@ def test_content_aware_extraction_still_allows_spacing_normalization() -> None:
     assert {rule.code.tag: count for rule, count in result.fixed_findings.items()} == {"PCF002": 1}
 
 
+def test_task_marker_trailing_comment_extracts_with_hanging_indentation() -> None:
+    source = "value = compute()#TODO: alpha beta gamma delta epsilon zeta eta theta\n"
+    result = pcf_helpers.format_pcf(source, line_length=30, comment_detect_statements=False)
+    assert result.new_source == "# TODO: alpha beta gamma delta\n#       epsilon zeta eta theta\nvalue = compute()\n"
+    assert {rule.code.tag: count for rule, count in result.fixed_findings.items()} == {"PCF002": 1, "PCF004": 1}
+
+
+def test_task_marker_trailing_annotation_like_payload_is_not_misclassified_as_statement() -> None:
+    source = "value = compute_expensive_result()#TODO: fix_parser\n"
+    result = pcf_helpers.format_pcf(source, line_length=24)
+    assert result.new_source == "# TODO: fix_parser\nvalue = compute_expensive_result()\n"
+    assert {rule.code.tag: count for rule, count in result.fixed_findings.items()} == {"PCF002": 1, "PCF004": 1}
+
+
+def test_task_marker_trailing_statement_like_payload_stays_inline() -> None:
+    source = "value = compute()#TODO: value = compute()\n"
+    result = pcf_helpers.format_pcf(source, line_length=24)
+    assert result.new_source == "value = compute()  # TODO: value = compute()\n"
+    assert {rule.code.tag: count for rule, count in result.fixed_findings.items()} == {"PCF002": 1}
+
+
+def test_task_marker_trailing_expression_like_payload_follows_expression_detection_setting() -> None:
+    source = 'value = compute()#TODO: very_long(code="line", that="should_not_wrap")\n'
+    default = pcf_helpers.format_pcf(source, line_length=32, comment_detect_statements=False, comment_detect_expressions=False)
+    expression_aware = pcf_helpers.format_pcf(source, line_length=32, comment_detect_statements=False, comment_detect_expressions=True)
+    assert default.new_source == '# TODO: very_long(code="line",\n#       that="should_not_wrap")\nvalue = compute()\n'
+    assert expression_aware.new_source == 'value = compute()  # TODO: very_long(code="line", that="should_not_wrap")\n'
+
+
 def test_spacing_and_extraction_both_report_same_original_line_in_check_mode() -> None:
     source = "value = compute()#ordinary trailing words that need moving\n"
     settings = CheckSettings(select=("PCF002", "PCF004"), line_length=28)

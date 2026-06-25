@@ -3,15 +3,19 @@
 from __future__ import annotations
 
 import ast
+import dataclasses
 import re
 import textwrap
 
+import pydocformatter.rules.definition_helpers.text_layout as text_layout
 import pydocformatter.rules.definitions.PCF.PCF as PCF_definition
 from pydocformatter.cli.settings_check import CheckSettings
 
 DISABLED_CODE_RE = re.compile(r"\s*(?:if|for|while|def|class|try|except|print|return)\b")
 LIST_RE = re.compile(r"^(?P<indent>[ \t]*)(?P<marker>(?:[-+*]|\d+[.)]))[ \t]+(?P<text>\S.*)$")
 BLOCK_QUOTE_RE = re.compile(r"^(?P<prefix>(?:>[ \t]*)+)(?P<text>.*)$")
+TASK_MARKERS = ("TODO", "FIXME", "XXX", "HACK", "BUG", "DEBUG", "NOTE", "OPTIMIZE", "REVIEW")
+TASK_MARKER_RE = re.compile(rf"^(?P<marker>(?:{'|'.join(TASK_MARKERS)})):[ \t]*(?P<text>.*)$")
 ATX_HEADING_RE = re.compile(r"^#{1,6}(?:[ \t]+|$)")
 HEADING_ADORNMENT_RE = re.compile(r"^(?P<char>[=\-~`^\"'*+#:._])(?P=char){2,}[ \t]*$")
 FENCE_RE = re.compile(r"^[ \t]*(?P<fence>`{3,}|~{3,})")
@@ -20,6 +24,14 @@ MARKDOWN_TABLE_DELIMITER_RE = re.compile(r"^[ \t]*\|?(?:[ \t]*:?-{3,}:?[ \t]*\|)
 REST_GRID_BORDER_RE = re.compile(r"^[ \t]*\+(?:[-=]+\+)+[ \t]*$")
 REST_SIMPLE_BORDER_RE = re.compile(r"^[ \t]*(?:={3,}|-{3,})(?:[ \t]+(?:={3,}|-{3,}))*[ \t]*$")
 OPERATOR_LIKE_RE = re.compile(r"^(?:<=|>=|==|!=|->|=>|[-<>|&+*/%])(?:\s|$)")
+
+
+@dataclasses.dataclass(frozen=True)
+class TaskMarkerMatch:
+    """Recognized task-marker comment content."""
+
+    marker: str
+    text: str
 
 
 def preserved_indices(run: PCF_definition.StandaloneCommentRun, *, settings: CheckSettings) -> set[int]:
@@ -115,19 +127,22 @@ def is_table_border(body: str) -> bool:
     return MARKDOWN_TABLE_DELIMITER_RE.fullmatch(body) is not None or REST_GRID_BORDER_RE.fullmatch(body) is not None or REST_SIMPLE_BORDER_RE.fullmatch(body) is not None
 
 
-def run_contains_code(run: PCF_definition.StandaloneCommentRun, *, preserved: set[int], settings: CheckSettings) -> bool:
+def run_contains_code(run: PCF_definition.StandaloneCommentRun, *, preserved: set[int], settings: CheckSettings, ignore_task_markers: bool = False) -> bool:
     """Return whether enabled detectors classify any part of a run as code."""
     lines = code_detection_lines(run, settings=settings)
-    candidates = tuple(lines[index] for index in range(len(lines)) if index not in preserved and lines[index].strip())
-    if settings.comment_detect_code and any(line.startswith("    ") or DISABLED_CODE_RE.match(line) is not None for line in candidates):
+    ignored = task_marker_unit_indices(run, preserved=preserved) if ignore_task_markers and settings.comment_format_task_markers else set()
+    candidates = tuple(lines[index] for index in range(len(lines)) if index not in preserved and index not in ignored and lines[index].strip())
+    if any(_text_matches_disabled_code_heuristic(line, settings=settings) for line in candidates):
         return True
     stripped_candidates = tuple(candidate.strip() for candidate in candidates)
-    multiline_candidates = multiline_code_candidates(lines, preserved=preserved)
-    if settings.comment_detect_statements and (any(is_python_statement(candidate) for candidate in stripped_candidates) or any(is_python_statement(candidate) for candidate in multiline_candidates)):
+    multiline_candidates = multiline_code_candidates(lines, preserved=preserved | ignored)
+    if any(_text_is_code_like_statement(candidate, settings=settings) for candidate in stripped_candidates) or any(
+        _text_is_code_like_statement(candidate, settings=settings) for candidate in multiline_candidates
+    ):
         return True
-    if settings.comment_detect_expressions and any(is_nontrivial_expression(candidate) for candidate in stripped_candidates):
+    if any(_text_is_code_like_expression(candidate, settings=settings) for candidate in stripped_candidates):
         return True
-    return bool(settings.comment_detect_expressions and any(is_nontrivial_expression(candidate) for candidate in multiline_candidates))
+    return any(_text_is_code_like_expression(candidate, settings=settings) for candidate in multiline_candidates)
 
 
 def code_detection_lines(run: PCF_definition.StandaloneCommentRun, *, settings: CheckSettings) -> tuple[str, ...]:
@@ -213,12 +228,81 @@ def is_nontrivial_expression(text: str) -> bool:
     )
 
 
+def task_marker_match(body: str) -> TaskMarkerMatch | None:
+    """Return a recognized task-marker match for comment body text."""
+    match = TASK_MARKER_RE.match(body.rstrip())
+    if match is None:
+        return None
+    return TaskMarkerMatch(marker=match.group("marker"), text=match.group("text").strip())
+
+
+def task_marker_continuation_text(body: str, *, marker: str) -> str | None:
+    """Return text from an exact task-marker continuation line."""
+    prefix = " " * len(f"{marker}: ")
+    if not body.startswith(prefix):
+        return None
+    text = body[len(prefix) :]
+    if text[:1].isspace():
+        return None
+    return text.strip() if text else ""
+
+
+def task_marker_unit_indices(run: PCF_definition.StandaloneCommentRun, *, preserved: set[int]) -> set[int]:
+    """Return indices belonging to recognized task-marker units."""
+    indices: set[int] = set()
+    index = 0
+    while index < len(run.comments):
+        if index in preserved:
+            index += 1
+            continue
+        match = task_marker_match(run.comments[index].body.rstrip())
+        if match is None:
+            index += 1
+            continue
+        indices.add(index)
+        index += 1
+        while index < len(run.comments) and index not in preserved and task_marker_continuation_text(run.comments[index].body.rstrip(), marker=match.marker) is not None:
+            indices.add(index)
+            index += 1
+    return indices
+
+
+def task_marker_body_is_code_like(text: str, *, settings: CheckSettings) -> bool:
+    """Return whether task-marker payload text should be protected as code-like."""
+    body = text.strip()
+    if not body:
+        return False
+    return _text_matches_disabled_code_heuristic(body, settings=settings) or _text_is_code_like_statement(body, settings=settings) or _text_is_code_like_expression(body, settings=settings)
+
+
+def task_marker_texts_are_code_like(texts: tuple[str, ...], *, settings: CheckSettings) -> bool:
+    """Return whether any task-marker payload line should be protected as code-like."""
+    return any(task_marker_body_is_code_like(text, settings=settings) for text in texts)
+
+
+def format_task_marker_lines(marker: str, texts: tuple[str, ...], *, indent: str, settings: CheckSettings) -> tuple[str, ...]:
+    """Return task-marker comment content lines with hanging indentation."""
+    prefix = f"{marker}: "
+    body = " ".join(text for text in texts if text).strip()
+    if not body:
+        return (marker + ":",)
+    if task_marker_texts_are_code_like(texts, settings=settings):
+        lines = [prefix.rstrip() if not texts[0].strip() else prefix + texts[0].strip()]
+        lines.extend(" " * len(prefix) + text.strip() for text in texts[1:] if text.strip())
+        return tuple(lines)
+    width = PCF_definition.available_comment_width(indent, line_length=settings.line_length, tab_width=settings.indent_width)
+    return text_layout.wrap_text(body, width=width, initial_indent=prefix, subsequent_indent=" " * len(prefix), tab_width=settings.indent_width, url_aware=settings.url_aware_wrapping)
+
+
 def trailing_content_is_unsafe(content: str, *, settings: CheckSettings) -> bool:
     """Return whether content should not be reinterpreted as standalone comment text."""
     raw_body = content.rstrip()
     body = raw_body.strip()
     if not body:
         return False
+    if settings.comment_format_task_markers and (task_marker := task_marker_match(body)) is not None:
+        # Treat the marker payload as a task annotation, not as standalone list or operator-like content.
+        return task_marker_body_is_code_like(task_marker.text, settings=settings)
     if OPERATOR_LIKE_RE.match(body) is not None:
         return True
     if settings.comment_format_list_items and LIST_RE.match(body) is not None:
@@ -235,8 +319,23 @@ def trailing_content_is_unsafe(content: str, *, settings: CheckSettings) -> bool
         return True
     if settings.comment_preserve_tables and is_table_border(body):
         return True
-    if settings.comment_detect_code and (raw_body.startswith("    ") or DISABLED_CODE_RE.match(body) is not None):
+    if _text_matches_disabled_code_heuristic(raw_body, settings=settings) or _text_matches_disabled_code_heuristic(body, settings=settings):
         return True
-    if settings.comment_detect_statements and is_python_statement(body):
+    if _text_is_code_like_statement(body, settings=settings):
         return True
-    return bool(settings.comment_detect_expressions and is_nontrivial_expression(body))
+    return _text_is_code_like_expression(body, settings=settings)
+
+
+def _text_matches_disabled_code_heuristic(text: str, *, settings: CheckSettings) -> bool:
+    """Return whether text matches the enabled disabled-code heuristic."""
+    return bool(settings.comment_detect_code and (text.startswith("    ") or DISABLED_CODE_RE.match(text.strip()) is not None))
+
+
+def _text_is_code_like_statement(text: str, *, settings: CheckSettings) -> bool:
+    """Return whether text matches enabled statement detection."""
+    return bool(settings.comment_detect_statements and is_python_statement(text.strip()))
+
+
+def _text_is_code_like_expression(text: str, *, settings: CheckSettings) -> bool:
+    """Return whether text matches enabled expression detection."""
+    return bool(settings.comment_detect_expressions and is_nontrivial_expression(text.strip()))

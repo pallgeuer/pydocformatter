@@ -79,6 +79,9 @@ unfixable = []
 
 [tool.pydocfmt.per-file-ignores]
 "tests/*.py" = ["PCF001"]
+
+[tool.pydocfmt.comment]
+format-task-markers = true
 ```
 
 ## Ruff Rules

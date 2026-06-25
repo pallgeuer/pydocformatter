@@ -83,7 +83,11 @@ def _extracted_replacement(
         line_length=context.settings.line_length,
         tab_width=context.settings.indent_width,
     )
-    wrapped = text_layout.wrap_text(comment.content, width=width, tab_width=context.settings.indent_width, url_aware=context.settings.url_aware_wrapping)
+    task_marker = comment_helpers.task_marker_match(comment.body.strip()) if context.settings.comment_format_task_markers else None
+    if task_marker is not None:
+        wrapped = comment_helpers.format_task_marker_lines(task_marker.marker, (task_marker.text,), indent=comment.indent, settings=context.settings)
+    else:
+        wrapped = text_layout.wrap_text(comment.content, width=width, tab_width=context.settings.indent_width, url_aware=context.settings.url_aware_wrapping)
     comment_lines = tuple(PCF_definition.render_comment(line, indent=comment.indent) for line in wrapped)
     if _requires_standalone_boundary(comment, comments_by_line=comments_by_line):
         comment_lines = ("", *comment_lines)

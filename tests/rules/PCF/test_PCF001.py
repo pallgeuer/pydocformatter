@@ -215,6 +215,60 @@ def test_block_quote_formatting_can_be_disabled_and_then_uses_plain_wrapping() -
     assert result.new_source == "# > alpha beta\n# gamma delta\n"
 
 
+@pytest.mark.parametrize("marker", ("TODO", "FIXME", "XXX", "HACK", "BUG", "DEBUG", "NOTE", "OPTIMIZE", "REVIEW"))
+def test_task_marker_comments_use_hanging_indentation(marker: str) -> None:
+    source = f"#{marker}: alpha beta gamma delta epsilon zeta eta theta iota kappa lambda\n"
+    result = pcf_helpers.format_pcf(source, line_length=28, comment_detect_statements=False)
+    assert result.new_source is not None
+    lines = result.new_source.splitlines()
+    assert lines[0].startswith(f"# {marker}: ")
+    assert all(line.startswith("# " + " " * len(f"{marker}: ")) for line in lines[1:])
+
+
+def test_task_marker_continuations_are_reflowed_as_one_unit() -> None:
+    source = "# TODO: alpha beta gamma\n#       delta epsilon extra words\n#       zeta eta\n"
+    result = pcf_helpers.format_pcf(source, line_length=30, comment_detect_statements=False)
+    assert result.new_source == "# TODO: alpha beta gamma delta\n#       epsilon extra words\n#       zeta eta\n"
+
+
+def test_task_marker_formatting_can_be_disabled_and_then_uses_plain_wrapping() -> None:
+    source = "#TODO: alpha beta gamma delta\n"
+    result = pcf_helpers.format_pcf(source, line_length=20, comment_format_task_markers=False, comment_detect_statements=False)
+    assert result.new_source == "# TODO: alpha beta\n# gamma delta\n"
+
+
+def test_task_marker_statement_like_payload_normalizes_without_wrapping() -> None:
+    source = "#TODO: value = compute()\n"
+    result = pcf_helpers.format_pcf(source, line_length=10)
+    assert result.new_source == "# TODO: value = compute()\n"
+
+
+def test_task_marker_code_like_continuation_keeps_empty_marker_line() -> None:
+    source = "#TODO:\n#       value = compute()\n"
+    result = pcf_helpers.format_pcf(source, line_length=10)
+    assert result.new_source == "# TODO:\n#       value = compute()\n"
+
+
+def test_task_marker_statement_like_continuations_normalize_without_joining() -> None:
+    source = "#TODO: refactor these calls\n#       x = foo()\n#       y = bar()\n"
+    result = pcf_helpers.format_pcf(source)
+    assert result.new_source == "# TODO: refactor these calls\n#       x = foo()\n#       y = bar()\n"
+
+
+def test_task_marker_statement_like_continuations_wrap_when_statement_detection_is_disabled() -> None:
+    source = "#TODO: refactor these calls\n#       x = foo()\n#       y = bar()\n"
+    result = pcf_helpers.format_pcf(source, line_length=32, comment_detect_statements=False)
+    assert result.new_source == "# TODO: refactor these calls x =\n#       foo() y = bar()\n"
+
+
+def test_task_marker_expression_like_payload_follows_expression_detection_setting() -> None:
+    source = '#TODO: very_long(code="line", that="should_not_wrap")\n'
+    default = pcf_helpers.format_pcf(source, line_length=32, comment_detect_statements=False, comment_detect_expressions=False)
+    expression_aware = pcf_helpers.format_pcf(source, line_length=32, comment_detect_statements=False, comment_detect_expressions=True)
+    assert default.new_source == '# TODO: very_long(code="line",\n#       that="should_not_wrap")\n'
+    assert expression_aware.new_source == '# TODO: very_long(code="line", that="should_not_wrap")\n'
+
+
 @pytest.mark.parametrize(
     "source",
     (

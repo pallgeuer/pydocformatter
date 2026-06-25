@@ -111,6 +111,7 @@ If no files or directories are specified, `pydocfmt check` checks the current di
 **Comment formatting:**
 - `--comment-join-standalone-lines`, `--no-comment-join-standalone-lines`: Toggle joining standalone prose lines before wrapping (default: disabled)
 - `--comment-format-list-items`, `--no-comment-format-list-items`: Toggle list-item detection and hanging-indented reflow (default: enabled)
+- `--comment-format-task-markers`, `--no-comment-format-task-markers`: Toggle task-marker detection and hanging-indented reflow (default: enabled)
 - `--comment-preserve-headings`, `--no-comment-preserve-headings`: Toggle preserving Markdown and reStructuredText headings (default: enabled)
 - `--comment-preserve-doctests`, `--no-comment-preserve-doctests`: Toggle preserving standalone doctest regions (default: enabled)
 - `--comment-preserve-code-fences`, `--no-comment-preserve-code-fences`: Toggle preserving fenced code regions (default: enabled)
@@ -258,6 +259,7 @@ parse-literal-blocks = true
 [tool.pydocfmt.comment]
 join-standalone-lines = false
 format-list-items = true
+format-task-markers = true
 preserve-headings = true
 preserve-doctests = true
 preserve-code-fences = true
@@ -296,6 +298,7 @@ For TOML configuration, `[tool.pydocfmt.docstring]` and `[tool.pydocfmt.comment]
 - `docstring-parse-literal-blocks`: Parse and protect reStructuredText literal blocks in docstrings (default: `true`)
 - `comment-join-standalone-lines`: Join consecutive standalone prose comment lines before wrapping (default: `false`)
 - `comment-format-list-items`: Detect ordered and unordered standalone comment list items and reflow them with hanging indentation (default: `true`)
+- `comment-format-task-markers`: Detect task markers such as `TODO:` and `FIXME:` and reflow them with hanging indentation (default: `true`)
 - `comment-preserve-headings`: Preserve detected Markdown and reStructuredText comment headings unchanged (default: `true`)
 - `comment-preserve-doctests`: Preserve standalone doctest comment regions from the first `>>>` prompt to the physical-run boundary (default: `true`)
 - `comment-preserve-code-fences`: Preserve backtick- and tilde-fenced standalone comment regions (default: `true`)

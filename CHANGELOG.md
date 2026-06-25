@@ -66,6 +66,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added `docstring-blank-line-after-last-section` to control whether PDF200 and PDF201 keep one blank line after the final recognized Google or NumPy docstring section.
   - Added `comment-trailing-extraction-syntax-aware`, enabled by default, to keep overlong trailing comments inline in syntax-sensitive positions.
   - Added `comment-trailing-extraction-content-aware`, enabled by default, to keep overlong trailing comments inline when enabled standalone comment structure/code detectors or the operator heuristic make extraction unsafe.
+  - Added `comment-format-task-markers`, enabled by default, to reflow recognized task-marker comments such as `TODO:`, `FIXME:`, and `HACK:` with hanging indentation.
   - Added Ruff-style rule settings under `[tool.pydocfmt]`: `select`, `ignore`, `extend-select`, `per-file-ignores`, `extend-per-file-ignores`, `fixable`, `unfixable`, and `extend-fixable`.
   - Added `respect-gitignore` for formatter configuration, defaulting to `true`.
   - Added explicit config-file support for `--config PATH`, including pyproject-style `[tool.pydocfmt]` files and dedicated top-level pydocfmt TOML files.

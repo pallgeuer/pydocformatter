@@ -152,6 +152,8 @@ class CheckSettings:
         comment_join_standalone_lines (bool): Whether consecutive standalone prose comment lines are joined before
             wrapping.
         comment_format_list_items (bool): Whether standalone comment list items are detected and reflowed.
+        comment_format_task_markers (bool): Whether task-marker comments are detected and reflowed with hanging
+            indentation.
         comment_preserve_headings (bool): Whether detected Markdown and reStructuredText comment headings are preserved.
         comment_preserve_doctests (bool): Whether standalone doctest comment regions are preserved.
         comment_preserve_code_fences (bool): Whether fenced code regions in standalone comments are preserved.
@@ -206,6 +208,7 @@ class CheckSettings:
     docstring_parse_literal_blocks: bool = True
     comment_join_standalone_lines: bool = False
     comment_format_list_items: bool = True
+    comment_format_task_markers: bool = True
     comment_preserve_headings: bool = True
     comment_preserve_doctests: bool = True
     comment_preserve_code_fences: bool = True
@@ -278,6 +281,8 @@ class CheckSettingsOverrides(TypedDict, total=False):
         comment_join_standalone_lines (bool): Whether consecutive standalone prose comment lines are joined before
             wrapping.
         comment_format_list_items (bool): Whether standalone comment list items are detected and reflowed.
+        comment_format_task_markers (bool): Whether task-marker comments are detected and reflowed with hanging
+            indentation.
         comment_preserve_headings (bool): Whether detected Markdown and reStructuredText comment headings are preserved.
         comment_preserve_doctests (bool): Whether standalone doctest comment regions are preserved.
         comment_preserve_code_fences (bool): Whether fenced code regions in standalone comments are preserved.
@@ -332,6 +337,7 @@ class CheckSettingsOverrides(TypedDict, total=False):
     docstring_parse_literal_blocks: bool
     comment_join_standalone_lines: bool
     comment_format_list_items: bool
+    comment_format_task_markers: bool
     comment_preserve_headings: bool
     comment_preserve_doctests: bool
     comment_preserve_code_fences: bool
@@ -540,6 +546,12 @@ SETTINGS_SCHEMA = SettingsSchema(
             value_type=bool,
             group=SettingsGroup.COMMENT_FORMATTING,
             help="Detect and reflow standalone comment list items with hanging indentation.",
+        ),
+        SettingDefinition(
+            field="comment_format_task_markers",
+            value_type=bool,
+            group=SettingsGroup.COMMENT_FORMATTING,
+            help="Detect and reflow task-marker comments with hanging indentation.",
         ),
         SettingDefinition(
             field="comment_preserve_headings",
