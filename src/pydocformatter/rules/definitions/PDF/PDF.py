@@ -1,3 +1,5 @@
+"""PDF docstring-formatting rule category."""
+
 from __future__ import annotations
 
 import dataclasses
@@ -21,7 +23,14 @@ from pydocformatter.rules.models import RuleCategoryMetadata
 
 
 class DefinitionKind(enum.Enum):
-    """Kinds of Python owners that may have docstrings."""
+    """Kinds of Python owners that may have docstrings.
+
+    Attributes:
+        MODULE: A Python module-level docstring owner.
+        CLASS: A class docstring owner.
+        FUNCTION: A function, method, or nested function docstring owner.
+        ATTRIBUTE: An assignment documented by an adjacent attribute docstring.
+    """
 
     MODULE = "module"
     CLASS = "class"
@@ -30,14 +39,38 @@ class DefinitionKind(enum.Enum):
 
 
 class DocstringKind(enum.Enum):
-    """LibCST string-expression shapes accepted as Python docstrings."""
+    """LibCST string-expression shapes accepted as Python docstrings.
+
+    Attributes:
+        SIMPLE: A single `cst.SimpleString` docstring literal.
+        CONCATENATED: An implicitly concatenated docstring expression.
+    """
 
     SIMPLE = "simple"
     CONCATENATED = "concatenated"
 
 
 class DocstringBlockKind(enum.Enum):
-    """Semantic block kinds recognized inside docstrings."""
+    """Semantic block kinds recognized inside docstrings.
+
+    Attributes:
+        BLANK: A blank logical docstring line.
+        SUMMARY: The first prose line or compact summary block.
+        PARAGRAPH: A wrap-eligible prose paragraph.
+        SECTION: A recognized convention section including its header and body.
+        SECTION_HEADER: The heading line or underline that names a section.
+        SECTION_ENTRY: One parsed Google or NumPy section entry.
+        LIST_ITEM: A Markdown or reStructuredText list item.
+        HEADING: A Markdown or reStructuredText heading protected from prose reflow.
+        DOCTEST: A doctest prompt block protected from prose reflow.
+        CODE_FENCE: A fenced code block protected from prose reflow.
+        BLOCK_QUOTE: A Markdown block quote.
+        TABLE: A Markdown or reStructuredText table protected from prose reflow.
+        DIRECTIVE: A reStructuredText directive and its indented body.
+        LITERAL_BLOCK: A reStructuredText literal block.
+        REST_FIELD: A parsed reStructuredText field list entry.
+        VERBATIM: Any protected block whose source should be preserved as-is.
+    """
 
     BLANK = "blank"
     SUMMARY = "summary"
@@ -58,7 +91,17 @@ class DocstringBlockKind(enum.Enum):
 
 
 class DocstringEntryKind(enum.Enum):
-    """Semantic entry kinds exposed to convention-aware rules."""
+    """Semantic entry kinds exposed to convention-aware rules.
+
+    Attributes:
+        PARAMETER: Documentation for one function parameter.
+        RETURN: Documentation for a returned value.
+        YIELD: Documentation for a yielded value.
+        EXCEPTION: Documentation for raised exceptions or warnings.
+        ATTRIBUTE: Documentation for an instance or class attribute.
+        METHOD: Documentation for a method entry in a class docstring.
+        FIELD: A generic or unclassified reStructuredText field.
+    """
 
     PARAMETER = "parameter"
     RETURN = "return"
@@ -71,7 +114,21 @@ class DocstringEntryKind(enum.Enum):
 
 @dataclasses.dataclass(frozen=True)
 class DocstringValueLine:
-    """One logical line in an evaluated docstring value."""
+    """One logical line in an evaluated docstring value.
+
+    Attributes:
+        index (int): Zero-based logical line index in the evaluated docstring value.
+        start_offset (int): Start offset of the logical line in the evaluated docstring value.
+        end_offset (int): End offset of the logical line in the evaluated docstring value.
+        raw_text (str): Evaluated line text, including indentation that belongs to the docstring value.
+        text (str): Content after removing the docstring margin used for semantic parsing and reflow.
+        raw_indent (str): Leading whitespace present in `raw_text`.
+        text_indent (str): Leading whitespace present in `text`.
+        text_raw_start_column (int): Raw-text column where `text` starts.
+        text_virtual_prefix_length (int): Virtual indentation added for parser alignment but absent from raw source.
+        source_line_number (int | None): One-based physical source line number, if the value line maps cleanly to
+            source.
+    """
 
     index: int
     start_offset: int
@@ -87,7 +144,18 @@ class DocstringValueLine:
 
 @dataclasses.dataclass(frozen=True)
 class DocstringEntry:
-    """One parsed convention section entry or reST field."""
+    """One parsed convention section entry or reST field.
+
+    Attributes:
+        kind (DocstringEntryKind): Semantic documentation role inferred from the section or field name.
+        names (tuple[str, ...]): Parameter, exception, attribute, or field argument names documented by this entry.
+        type_text (str | None): Parsed type annotation text supplied by the docstring convention, if present.
+        description (str): Entry description text after the entry head.
+        start_line (int): First logical docstring line occupied by the entry.
+        end_line (int): Last logical docstring line occupied by the entry.
+        field_name (str | None): Original reStructuredText field name, without the surrounding colons.
+        field_argument (str | None): Original reStructuredText field argument, if the field syntax supplied one.
+    """
 
     kind: DocstringEntryKind
     names: tuple[str, ...]
@@ -101,7 +169,13 @@ class DocstringEntry:
 
 @dataclasses.dataclass(frozen=True)
 class ReflowRegionLine:
-    """One reflowable text line with its evaluated-value span."""
+    """One reflowable text line with its evaluated-value span.
+
+    Attributes:
+        text (str): Text fragment that can participate in paragraph reflow.
+        start_offset (int): Start offset of the fragment in the evaluated docstring value.
+        end_offset (int): End offset of the fragment in the evaluated docstring value.
+    """
 
     text: str
     start_offset: int
@@ -110,7 +184,13 @@ class ReflowRegionLine:
 
 @dataclasses.dataclass(frozen=True)
 class ReflowRegionRun:
-    """One contiguous source run of reflowable lines."""
+    """One contiguous source run of reflowable lines.
+
+    Attributes:
+        start_line (int): First logical docstring line in the contiguous run.
+        end_line (int): Last logical docstring line in the contiguous run.
+        lines (tuple[ReflowRegionLine, ...]): Reflowable fragments from the run in source order.
+    """
 
     start_line: int
     end_line: int
@@ -119,7 +199,18 @@ class ReflowRegionRun:
 
 @dataclasses.dataclass(frozen=True)
 class ReflowRegion:
-    """A contiguous semantic region whose lines may be merged before wrapping."""
+    """A contiguous semantic region whose lines may be merged before wrapping.
+
+    Attributes:
+        kind (DocstringBlockKind): Semantic block kind that controls wrapping policy.
+        start_line (int): First logical docstring line covered by the region.
+        end_line (int): Last logical docstring line covered by the region.
+        start_offset (int): Start offset of the region in the evaluated docstring value.
+        end_offset (int): End offset of the region in the evaluated docstring value.
+        lines (tuple[ReflowRegionLine, ...]): Reflowable fragments grouped under this region.
+        initial_indent (str): Indentation to use for the first rendered output line.
+        subsequent_indent (str): Indentation to use for continuation output lines.
+    """
 
     kind: DocstringBlockKind
     start_line: int
@@ -133,7 +224,15 @@ class ReflowRegion:
 
 @dataclasses.dataclass(frozen=True)
 class DocstringBlock:
-    """One nested semantic block in a docstring."""
+    """One nested semantic block in a docstring.
+
+    Attributes:
+        kind (DocstringBlockKind): Semantic role of this parsed block.
+        start_line (int): First logical docstring line included in the block.
+        end_line (int): Last logical docstring line included in the block.
+        children (tuple[DocstringBlock, ...]): Nested blocks parsed inside this block.
+        entry (DocstringEntry | None): Parsed convention entry represented by this block, when applicable.
+    """
 
     kind: DocstringBlockKind
     start_line: int
@@ -144,7 +243,16 @@ class DocstringBlock:
 
 @dataclasses.dataclass(frozen=True)
 class DocstringSection:
-    """One convention-specific docstring section."""
+    """One convention-specific docstring section.
+
+    Attributes:
+        name (str): Section heading text as it appears in the docstring.
+        start_line (int): First logical docstring line included in the section.
+        end_line (int): Last logical docstring line included in the section.
+        header_line (int): Logical line containing the section heading.
+        content_start_line (int): First logical line after the heading and any underline.
+        entries (tuple[DocstringEntry, ...]): Parsed entries contained directly in the section.
+    """
 
     name: str
     start_line: int
@@ -156,7 +264,13 @@ class DocstringSection:
 
 @dataclasses.dataclass(frozen=True)
 class FinalConventionSectionSpacing:
-    """Spacing facts for the final recognized convention section."""
+    """Spacing facts for the final recognized convention section.
+
+    Attributes:
+        section (DocstringBlock): Final convention section block in a docstring.
+        final_content_line (int | None): Last nonblank logical line in that section, if one exists.
+        trailing_blank_line (int | None): Blank logical line immediately after the section content, if present.
+    """
 
     section: DocstringBlock
     final_content_line: int | None
@@ -165,7 +279,14 @@ class FinalConventionSectionSpacing:
 
 @dataclasses.dataclass(frozen=True)
 class DocstringOutputLine:
-    """One output logical docstring line for whole-literal rendering."""
+    """One output logical docstring line for whole-literal rendering.
+
+    Attributes:
+        original (DocstringValueLine | None): Existing value line to preserve when no replacement text is supplied.
+        source (str | None): Replacement source text for this logical line, when it differs from evaluated text.
+        value (str | None): Replacement evaluated value text for this logical line.
+        strip_docstring_margin (bool): Whether to render `original` after removing the docstring margin.
+    """
 
     original: DocstringValueLine | None = None
     source: str | None = None
@@ -174,7 +295,13 @@ class DocstringOutputLine:
 
 
 class DocstringOutputSeparatorFallback(enum.Enum):
-    """Separator fallback direction for whole-literal rendering."""
+    """Separator fallback direction for whole-literal rendering.
+
+    Attributes:
+        OPENING: Prefer inserting separator whitespace after the opening quotes.
+        CLOSING: Prefer inserting separator whitespace before the closing quotes.
+        BOTH: Allow fallback whitespace on both quote boundaries.
+    """
 
     OPENING = "opening"
     CLOSING = "closing"
@@ -183,7 +310,16 @@ class DocstringOutputSeparatorFallback(enum.Enum):
 
 @dataclasses.dataclass(frozen=True)
 class DocstringStructure:
-    """Convention-aware semantic structure prepared for one docstring."""
+    """Convention-aware semantic structure prepared for one docstring.
+
+    Attributes:
+        convention (settings_check.DocstringConvention): Convention used to parse sections and entries.
+        lines (tuple[DocstringValueLine, ...]): Logical evaluated-value lines in source order.
+        blocks (tuple[DocstringBlock, ...]): Top-level semantic blocks parsed from the docstring.
+        sections (tuple[DocstringSection, ...]): Recognized convention sections in source order.
+        entries (tuple[DocstringEntry, ...]): Parsed documentation entries from sections and fields.
+        reflow_regions (tuple[ReflowRegion, ...]): Text regions that rules may safely reflow.
+    """
 
     convention: settings_check.DocstringConvention
     lines: tuple[DocstringValueLine, ...]
@@ -195,7 +331,20 @@ class DocstringStructure:
 
 @dataclasses.dataclass(frozen=True)
 class DefinitionInfo:
-    """Convention-neutral information about one documentable definition."""
+    """Convention-neutral information about one documentable definition.
+
+    Attributes:
+        node (cst.Module | cst.ClassDef | cst.FunctionDef): LibCST node that owns the docstring slot.
+        kind (DefinitionKind): Kind of Python definition represented by the node.
+        name (str): Local definition name, or an empty string for the module.
+        qualified_name (str): Dotted name relative to the module root.
+        parent (DefinitionInfo | None): Containing definition, or None for the module.
+        body (cst.Module | cst.BaseSuite): Body searched for the definition's docstring and nested definitions.
+        asynchronous (bool): Whether a function definition uses `async def`.
+        decorators (tuple[cst.Decorator, ...]): Decorators attached to a function or class definition.
+        parameters (cst.Parameters | None): Function parameters for callable definitions.
+        returns (cst.Annotation | None): Function return annotation, if one is present.
+    """
 
     node: cst.Module | cst.ClassDef | cst.FunctionDef
     kind: DefinitionKind
@@ -211,7 +360,16 @@ class DefinitionInfo:
 
 @dataclasses.dataclass(frozen=True)
 class AttributeInfo:
-    """Convention-neutral information about one documented attribute."""
+    """Convention-neutral information about one documented attribute.
+
+    Attributes:
+        node (cst.Assign | cst.AnnAssign): Assignment node that may be documented by the adjacent string literal.
+        kind (DefinitionKind): Always `DefinitionKind.ATTRIBUTE` for attribute documentation targets.
+        name (str): Primary attribute name used for diagnostics and lookup.
+        qualified_name (str): Dotted attribute name relative to the module root.
+        parent (DefinitionInfo): Definition whose body contains the assignment.
+        targets (tuple[str, ...]): All simple assignment target names documented by the same docstring.
+    """
 
     node: cst.Assign | cst.AnnAssign
     kind: DefinitionKind
@@ -226,7 +384,14 @@ DocstringOwner = DefinitionInfo | AttributeInfo
 
 @dataclasses.dataclass(frozen=True)
 class DocstringLine:
-    """One physical source line occupied by a docstring expression."""
+    """One physical source line occupied by a docstring expression.
+
+    Attributes:
+        line_number (int): One-based physical source line number.
+        start_column (int): Zero-based source column where the docstring occupies this physical line.
+        end_column (int): Zero-based source column immediately after the occupied span.
+        source (str): Exact source text occupied by the docstring on this physical line.
+    """
 
     line_number: int
     start_column: int
@@ -236,7 +401,22 @@ class DocstringLine:
 
 @dataclasses.dataclass(frozen=True)
 class DocstringInfo:
-    """Lossless source and owner information for one existing docstring."""
+    """Lossless source and owner information for one existing docstring.
+
+    Attributes:
+        node (cst.SimpleString | cst.ConcatenatedString): String expression node that forms the docstring.
+        expression (cst.Expr): Expression statement wrapping the string expression.
+        statement (cst.SimpleStatementLine | cst.SimpleStatementSuite): Full simple statement that contains the
+            docstring expression.
+        owner (DocstringOwner): Definition or attribute assignment documented by this string.
+        kind (DocstringKind): Source string shape used for safe rewrite decisions.
+        range (cst_metadata.CodeRange): Source range occupied by the string expression.
+        source (str): Exact source text of the string expression.
+        value (str): Evaluated Python string value of the docstring.
+        physical_lines (tuple[DocstringLine, ...]): Physical source lines occupied by the docstring expression.
+        value_lines (tuple[str, ...]): Evaluated docstring value split into logical lines.
+        structure (DocstringStructure): Convention-aware parsed structure for the evaluated value.
+    """
 
     node: cst.SimpleString | cst.ConcatenatedString
     expression: cst.Expr
@@ -253,7 +433,13 @@ class DocstringInfo:
 
 @dataclasses.dataclass(frozen=True)
 class SummaryLineTarget:
-    """One parsed summary line targeted by first-line style rules."""
+    """One parsed summary line targeted by first-line style rules.
+
+    Attributes:
+        docstring (DocstringInfo): Docstring that owns the target summary line.
+        block (DocstringBlock): Summary block containing the target line.
+        line (DocstringValueLine): Logical value line inspected or rewritten by summary rules.
+    """
 
     docstring: DocstringInfo
     block: DocstringBlock
@@ -262,14 +448,23 @@ class SummaryLineTarget:
 
 @dataclasses.dataclass(frozen=True)
 class StatementTarget:
-    """One detected function-body statement relevant to documentation rules."""
+    """One detected function-body statement relevant to documentation rules.
+
+    Attributes:
+        line_numbers (tuple[int, ...]): One-based source lines associated with the statement.
+    """
 
     line_numbers: tuple[int, ...]
 
 
 @dataclasses.dataclass(frozen=True)
 class RaisedException:
-    """One directly raised exception relevant to documentation rules."""
+    """One directly raised exception relevant to documentation rules.
+
+    Attributes:
+        name (str): Best-effort exception class name used for documentation comparison.
+        line_numbers (tuple[int, ...]): One-based source lines associated with the `raise` statement.
+    """
 
     name: str
     line_numbers: tuple[int, ...]
@@ -277,7 +472,16 @@ class RaisedException:
 
 @dataclasses.dataclass(frozen=True)
 class FunctionFacts:
-    """Return, yield, and raise facts collected for one function."""
+    """Return, yield, and raise facts collected for one function.
+
+    Attributes:
+        meaningful_returns (tuple[StatementTarget, ...]): Return statements that produce a non-None value.
+        explicit_none_returns (tuple[StatementTarget, ...]): Return statements whose expression is explicitly `None`.
+        any_yields (tuple[StatementTarget, ...]): Yield or yield-from statements regardless of yielded value.
+        meaningful_yields (tuple[StatementTarget, ...]): Yield statements that may produce a non-None value.
+        explicit_none_yields (tuple[StatementTarget, ...]): Yield statements whose expression is explicitly `None`.
+        raised_exceptions (tuple[RaisedException, ...]): Directly raised exceptions detected in the function body.
+    """
 
     meaningful_returns: tuple[StatementTarget, ...]
     explicit_none_returns: tuple[StatementTarget, ...]
@@ -301,7 +505,15 @@ class _AttributeAssignment:
 
 @dataclasses.dataclass(frozen=True)
 class PDFCategoryData:
-    """Prepared definitions and docstrings shared by PDF rules."""
+    """Prepared definitions and docstrings shared by PDF rules.
+
+    Attributes:
+        definitions (tuple[DefinitionInfo, ...]): Documentable module, class, function, and attribute owners.
+        docstrings (tuple[DocstringInfo, ...]): Existing docstrings paired with their parsed structure and owner.
+        summary_line_targets (tuple[SummaryLineTarget, ...]): Summary lines eligible for first-line style checks.
+        summary_terminal_line_targets (tuple[SummaryLineTarget, ...]): Summary lines eligible for terminal-punctuation
+            checks.
+    """
 
     definitions: tuple[DefinitionInfo, ...]
     docstrings: tuple[DocstringInfo, ...]
@@ -326,6 +538,7 @@ class _DefinitionCollector(cst.CSTVisitor):
     """Collect documentable definitions and their existing docstrings."""
 
     def __init__(self, context: RuleCategoryContext) -> None:
+        """Initialize definition and docstring collection for one module."""
         super().__init__()
         self.context = context
         self.source_lines = context.source_lines
@@ -410,6 +623,7 @@ class _AttributeDocstringCollector:
     """Collect attribute docstrings recognized by common documentation tools."""
 
     def __init__(self, context: RuleCategoryContext, definitions: Sequence[DefinitionInfo]) -> None:
+        """Index collected definitions before scanning for adjacent attribute docstrings."""
         self.context = context
         self.definitions_by_node_id = {id(definition.node): definition for definition in definitions}
         self.docstrings: list[DocstringInfo] = []
@@ -421,12 +635,14 @@ class _AttributeDocstringCollector:
         return tuple(self.docstrings)
 
     def _scan_suite(self, suite: cst.BaseSuite, owner: DefinitionInfo) -> None:
+        """Scan a simple or indented suite for attribute docstring patterns."""
         if isinstance(suite, cst.SimpleStatementSuite):
             self._scan_small_statements(suite.body, owner, suite, previous_assignment=None)
         else:
             self._scan_statements(typing.cast(Sequence[cst.BaseStatement], suite.body), owner)
 
     def _scan_statements(self, statements: Sequence[cst.BaseStatement], owner: DefinitionInfo) -> None:
+        """Scan a sequence of compound or simple statements under an owner."""
         previous_assignment: _AttributeAssignment | None = None
         for statement in statements:
             if isinstance(statement, cst.SimpleStatementLine):
@@ -444,6 +660,7 @@ class _AttributeDocstringCollector:
         *,
         previous_assignment: _AttributeAssignment | None,
     ) -> _AttributeAssignment | None:
+        """Scan semicolon-separated small statements and return a pending assignment."""
         pending_assignment = previous_assignment
         for small_statement in statements:
             if isinstance(small_statement, cst.Expr):
@@ -459,6 +676,7 @@ class _AttributeDocstringCollector:
         statement: cst.SimpleStatementLine | cst.SimpleStatementSuite,
         assignment: _AttributeAssignment | None,
     ) -> None:
+        """Collect a string expression immediately following an attribute assignment."""
         if assignment is None:
             return
         owner = _attribute_owner(assignment)
@@ -467,6 +685,7 @@ class _AttributeDocstringCollector:
             self.docstrings.append(docstring)
 
     def _scan_compound_statement(self, statement: cst.BaseStatement, owner: DefinitionInfo) -> None:
+        """Recurse into compound statements that can contain attribute docstrings."""
         if isinstance(statement, cst.ClassDef):
             self._scan_suite(statement.body, self.definitions_by_node_id[id(statement)])
             return
@@ -499,6 +718,7 @@ class _AttributeDocstringCollector:
                 self._scan_suite(case.body, owner)
 
     def _scan_if_orelse(self, orelse: cst.Else | cst.If | None, owner: DefinitionInfo) -> None:
+        """Scan an if/elif/else continuation for attribute docstrings."""
         if orelse is None:
             return
         if isinstance(orelse, cst.If):
@@ -509,7 +729,11 @@ class _AttributeDocstringCollector:
 
 @rule_registration.register_rule_category
 class PDF(RuleCategoryBase):
-    """Docstring formatting rule category."""
+    """Docstring formatting rule category.
+
+    Attributes:
+        meta (RuleMetadata): Static metadata used for registration, diagnostics, and rule selection.
+    """
 
     meta = RuleCategoryMetadata(
         prefix="PDF",
@@ -632,6 +856,7 @@ class _DocstringParser:
     """Parse one evaluated docstring value into conservative semantic blocks."""
 
     def __init__(self, value: str, *, settings: settings_check.CheckSettings, source_line_number: int | None, source_indent: int | None) -> None:
+        """Prepare parser state for one evaluated docstring value."""
         self.value = value
         self.settings = settings
         self.lines = _value_lines(value, source_line_number=source_line_number, source_indent=source_indent)
@@ -654,6 +879,7 @@ class _DocstringParser:
         )
 
     def _parse_range(self, start: int, end: int) -> list[DocstringBlock]:
+        """Parse a half-open logical line range into semantic docstring blocks."""
         blocks: list[DocstringBlock] = []
         index = start
         while index < end:
@@ -743,6 +969,7 @@ class _DocstringParser:
         return blocks
 
     def _starts_special(self, index: int, end: int) -> bool:
+        """Return whether a line begins a structure that should stop paragraph collection."""
         text = self.lines[index].text
         return (
             self._section_at(index, end) is not None
@@ -758,6 +985,7 @@ class _DocstringParser:
         )
 
     def _section_at(self, index: int, end: int, *, max_indent: int | None = None) -> str | None:
+        """Return a recognized convention section name at a line index."""
         convention = self.settings.docstring_convention
         if not docstring_sections.convention_parses_sections(convention):
             return None
@@ -776,9 +1004,11 @@ class _DocstringParser:
         return candidate if not stripped.endswith(":") else None
 
     def _parses_rest_fields(self) -> bool:
+        """Return whether the active convention parses reStructuredText fields."""
         return self.settings.docstring_convention == settings_check.DocstringConvention.REST
 
     def _parse_section(self, start: int, end: int, name: str) -> tuple[DocstringBlock, int]:
+        """Parse a recognized Google or NumPy section and its child blocks."""
         content_start = start + 1
         if content_start < end and _is_adornment(self.lines[content_start].text):
             content_start += 1
@@ -811,6 +1041,7 @@ class _DocstringParser:
         return DocstringBlock(DocstringBlockKind.SECTION, start, section_end, children=tuple(children)), section_end
 
     def _section_entries(self, name: str, start: int, end: int) -> tuple[DocstringEntry, ...]:
+        """Return entries parsed from a convention section body."""
         if self.settings.docstring_convention == settings_check.DocstringConvention.GOOGLE:
             return self._google_entries(name, start, end)
         if self.settings.docstring_convention == settings_check.DocstringConvention.NUMPY:
@@ -818,6 +1049,7 @@ class _DocstringParser:
         return ()
 
     def _google_entries(self, section_name: str, start: int, end: int) -> tuple[DocstringEntry, ...]:
+        """Return Google-style entries parsed from a section body."""
         entries: list[DocstringEntry] = []
         index = start
         kind = _entry_kind(self.settings.docstring_convention, section_name)
@@ -872,6 +1104,7 @@ class _DocstringParser:
         return tuple(entries)
 
     def _numpy_entries(self, section_name: str, start: int, end: int) -> tuple[DocstringEntry, ...]:
+        """Return NumPy-style entries parsed from a section body."""
         entries: list[DocstringEntry] = []
         index = start
         kind = _entry_kind(self.settings.docstring_convention, section_name)
@@ -978,6 +1211,7 @@ class _DocstringParser:
         return tuple(entries)
 
     def _parse_rest_field(self, start: int, end: int, match: re.Match[str]) -> tuple[DocstringBlock, int]:
+        """Parse one reStructuredText field and any indented continuation lines."""
         block_end = self._continuation_end(start, end, text_layout.leading_width(match.group("indent")))
         field = match.group("field").lower()
         argument = (match.group("argument") or "").strip()
@@ -1037,6 +1271,7 @@ class _DocstringParser:
         return DocstringBlock(DocstringBlockKind.REST_FIELD, start, block_end, entry=entry), block_end
 
     def _rest_field_description_reflow_runs(self, start: int, end: int) -> tuple[ReflowRegionRun, ...]:
+        """Return reflowable runs from a reStructuredText field description body."""
         runs: list[ReflowRegionRun] = []
         run_start: int | None = None
         run_lines: list[ReflowRegionLine] = []
@@ -1061,6 +1296,7 @@ class _DocstringParser:
         return tuple(runs)
 
     def _parse_list_item(self, start: int, end: int, match: re.Match[str]) -> tuple[DocstringBlock, int]:
+        """Parse a Markdown-style list item and register its reflow region."""
         block_end = self._list_item_end(start, end, match)
         prefix = f'{match.group("indent")}{match.group("marker")} '
         first_line = self._reflow_line_from_text_span(start, match.start("text"), len(self.lines[start].text))
@@ -1069,6 +1305,7 @@ class _DocstringParser:
         return DocstringBlock(DocstringBlockKind.LIST_ITEM, start, block_end), block_end
 
     def _parse_block_quote(self, start: int, end: int, match: re.Match[str]) -> tuple[DocstringBlock, int]:
+        """Parse a block quote run and register its reflow region."""
         prefix = f'{match.group("indent")}{match.group("quote")}'
         block_end = self._block_quote_end(start, end, prefix)
         texts = tuple(line for line in (self._reflow_line_from_text_span(line, len(prefix), len(self.lines[line].text)) for line in range(start, block_end)) if line is not None)
@@ -1076,6 +1313,7 @@ class _DocstringParser:
         return DocstringBlock(DocstringBlockKind.BLOCK_QUOTE, start, block_end), block_end
 
     def _add_reflow(self, kind: DocstringBlockKind, start: int, end: int, *, lines: tuple[ReflowRegionLine, ...], initial_indent: str, subsequent_indent: str) -> None:
+        """Register a non-empty safely reflowable region."""
         if not lines or not any(line.text for line in lines):
             return
         self.reflow_regions.append(
@@ -1092,6 +1330,7 @@ class _DocstringParser:
         )
 
     def _stripped_reflow_lines(self, start: int, end: int, *, skip_empty: bool = False) -> tuple[ReflowRegionLine, ...]:
+        """Return stripped reflow lines for a logical line range."""
         lines: list[ReflowRegionLine] = []
         for index in range(start, end):
             line = self._reflow_line_from_text_span(index, 0, len(self.lines[index].text))
@@ -1100,6 +1339,7 @@ class _DocstringParser:
         return tuple(lines)
 
     def _reflow_line_from_text_span(self, line_index: int, start_column: int, end_column: int) -> ReflowRegionLine | None:
+        """Return a reflow line from a trimmed column span in evaluated text."""
         line = self.lines[line_index]
         while start_column < end_column and line.text[start_column].isspace():
             start_column += 1
@@ -1112,6 +1352,7 @@ class _DocstringParser:
         return ReflowRegionLine(text=line.text[start_column:end_column], start_offset=start_offset, end_offset=end_offset)
 
     def _fence_end(self, start: int, end: int, opening: str) -> int:
+        """Return the end index for a fenced code block."""
         index = start + 1
         while index < end:
             match = _FENCE_RE.match(self.lines[index].text)
@@ -1121,6 +1362,7 @@ class _DocstringParser:
         return end
 
     def _section_end(self, start: int, end: int, section_indent: int) -> int:
+        """Return the first line after a convention section body."""
         index = start
         while index < end:
             if self._section_at(index, end, max_indent=section_indent) is not None:
@@ -1130,6 +1372,7 @@ class _DocstringParser:
         return end
 
     def _protected_block_end(self, index: int, end: int) -> int | None:
+        """Return the end of a protected structure starting at a line index."""
         text = self.lines[index].text
         if self.settings.docstring_parse_code_fences and (fence := _FENCE_RE.match(text)) is not None:
             return self._fence_end(index, end, fence.group("fence"))
@@ -1156,6 +1399,7 @@ class _DocstringParser:
         return None
 
     def _list_item_end(self, start: int, end: int, match: re.Match[str]) -> int:
+        """Return the end index for a list item continuation block."""
         base_indent = text_layout.leading_width(match.group("indent"))
         block_end = start + 1
         while block_end < end:
@@ -1166,6 +1410,7 @@ class _DocstringParser:
         return block_end
 
     def _block_quote_end(self, start: int, end: int, prefix: str) -> int:
+        """Return the end index for consecutive block quote lines with a shared prefix."""
         block_end = start + 1
         while block_end < end:
             next_match = _BLOCK_QUOTE_RE.match(self.lines[block_end].text)
@@ -1175,6 +1420,7 @@ class _DocstringParser:
         return block_end
 
     def _has_indented_body(self, index: int, end: int) -> bool:
+        """Return whether the next non-blank line is more indented than the current line."""
         next_index = index + 1
         while next_index < end and not self.lines[next_index].text.strip():
             next_index += 1
@@ -1185,6 +1431,7 @@ class _DocstringParser:
         return next_indent > base_indent
 
     def _indented_body_end(self, start: int, end: int, base_indent: int) -> int:
+        """Return the end index for an indented directive or literal-block body."""
         index = start + 1
         while index < end:
             text = self.lines[index].text
@@ -1195,12 +1442,14 @@ class _DocstringParser:
         return self._trim_trailing_blank_lines(start, index)
 
     def _trim_trailing_blank_lines(self, start: int, end: int) -> int:
+        """Return an end index with trailing blank body lines excluded."""
         index = end
         while index > start + 1 and not self.lines[index - 1].text.strip():
             index -= 1
         return index
 
     def _entry_end(self, start: int, end: int, base_indent: int) -> int:
+        """Return the end index for a convention entry body."""
         index = start + 1
         while index < end:
             text = self.lines[index].text
@@ -1210,6 +1459,7 @@ class _DocstringParser:
         return index
 
     def _continuation_end(self, start: int, end: int, base_indent: int) -> int:
+        """Return the end index for an indented continuation block."""
         index = start + 1
         while index < end:
             text = self.lines[index].text
@@ -1222,6 +1472,7 @@ class _DocstringParser:
         return index
 
     def _table_end(self, index: int, end: int) -> int | None:
+        """Return the end index for a recognized Markdown or reST table."""
         text = self.lines[index].text
         if "|" in text and index + 1 < end and _MARKDOWN_TABLE_DELIMITER_RE.fullmatch(self.lines[index + 1].text) is not None:
             table_end = index + 2
@@ -1241,6 +1492,7 @@ class _DocstringParser:
         return None
 
     def _is_heading(self, index: int, end: int) -> bool:
+        """Return whether a line starts an ATX or adornment-style heading."""
         return _ATX_HEADING_RE.match(self.lines[index].text) is not None or (index + 1 < end and bool(self.lines[index].text.strip()) and _is_adornment(self.lines[index + 1].text))
 
 
@@ -1321,6 +1573,7 @@ def _rest_entry_kind(field: str) -> DocstringEntryKind:
 
 
 def _rest_entry_metadata(field: str, argument: str) -> tuple[DocstringEntryKind, tuple[str, ...], str | None]:
+    """Return semantic entry kind, names, and type text for a reST field."""
     kind = _rest_entry_kind(field)
     if not argument:
         return kind, (), None
@@ -1338,12 +1591,14 @@ def _rest_entry_metadata(field: str, argument: str) -> tuple[DocstringEntryKind,
 
 
 def _entry_names(kind: DocstringEntryKind, text: str) -> tuple[str, ...] | None:
+    """Return parsed entry names for a convention entry."""
     if kind is DocstringEntryKind.EXCEPTION:
         return _exception_names(text)
     return tuple(part.strip() for part in text.split(","))
 
 
 def _exception_names(text: str) -> tuple[str, ...] | None:
+    """Return validated exception names from a comma- or pipe-separated entry."""
     stripped = _strip_exception_code_span(text.strip())
     if not stripped:
         return None
@@ -1355,6 +1610,7 @@ def _exception_names(text: str) -> tuple[str, ...] | None:
 
 
 def _strip_exception_code_span(text: str) -> str:
+    """Return exception text without one surrounding inline-code span."""
     if len(text) >= 2 and text.startswith("`") and text.endswith("`") and "`" not in text[1:-1]:
         return text[1:-1].strip()
     return text

@@ -1,3 +1,5 @@
+"""File discovery and filtering for checkable Python sources."""
+
 from __future__ import annotations
 
 import dataclasses
@@ -51,7 +53,12 @@ _REASON_MESSAGES = {
 
 @dataclasses.dataclass(frozen=True)
 class SelectedFile:
-    """An accepted path with the settings profile that applies to it."""
+    """An accepted path with the settings profile that applies to it.
+
+    Attributes:
+        path (str): Display path accepted for formatting.
+        profile (settings_core.SettingsProfile[CheckSettings]): Resolved settings profile to use for this path.
+    """
 
     path: str
     profile: settings_core.SettingsProfile[CheckSettings]

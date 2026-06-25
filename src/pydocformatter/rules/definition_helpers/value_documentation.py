@@ -1,3 +1,5 @@
+"""Return, yield, and exception documentation helpers."""
+
 from __future__ import annotations
 
 import dataclasses
@@ -11,7 +13,13 @@ from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
 
 @dataclasses.dataclass(frozen=True)
 class DocumentedEntry:
-    """One parsed docstring entry relevant to documentation rules."""
+    """One parsed docstring entry relevant to documentation rules.
+
+    Attributes:
+        name (str | None): Documented return, yield, or exception name, when the convention supplies one.
+        line_numbers (tuple[int, ...]): One-based source lines occupied by the documented entry.
+        has_content (bool): Whether the entry or section contains a documented name, type, or description payload.
+    """
 
     name: str | None
     line_numbers: tuple[int, ...]
@@ -73,6 +81,7 @@ def documented_entries(docstring: PDF_definition.DocstringInfo, kind: PDF_defini
 
 
 def _non_exception_documentation_entries(docstring: PDF_definition.DocstringInfo) -> set[PDF_definition.DocstringEntry]:
+    """Return entries nested under sections that are not exception documentation sections."""
     return {entry for section in docstring.structure.sections if section.name.lower() not in {"raise", "raises"} for entry in section.entries}
 
 
@@ -103,6 +112,7 @@ def value_documentation_targets(docstring: PDF_definition.DocstringInfo, kind: P
 
 
 def _section_entry_kind(section: PDF_definition.DocstringSection) -> PDF_definition.DocstringEntryKind | None:
+    """Return the value-documentation entry kind implied by a section name."""
     normalized = section.name.lower()
     if normalized in {"return", "returns"}:
         return PDF_definition.DocstringEntryKind.RETURN
@@ -112,14 +122,17 @@ def _section_entry_kind(section: PDF_definition.DocstringSection) -> PDF_definit
 
 
 def _section_has_content(docstring: PDF_definition.DocstringInfo, section: PDF_definition.DocstringSection) -> bool:
+    """Return whether a value documentation section has non-blank content lines."""
     return any(docstring.structure.lines[index].text.strip() for index in range(section.content_start_line, section.end_line))
 
 
 def _entry_has_content(entry: PDF_definition.DocstringEntry) -> bool:
+    """Return whether a parsed entry carries any documented payload."""
     return bool(entry.names or entry.type_text or entry.description)
 
 
 def _function_facts(definition: PDF_definition.DefinitionInfo, *, context: RuleCategoryContext) -> FunctionFacts:
+    """Return return, yield, and raise facts collected from a function body."""
     visitor = _FunctionBodyVisitor(context)
     definition.body.visit(visitor)
     return FunctionFacts(
@@ -136,6 +149,7 @@ class _FunctionBodyVisitor(cst.CSTVisitor):
     """Collect top-level function behavior while skipping nested scopes."""
 
     def __init__(self, context: RuleCategoryContext) -> None:
+        """Initialize empty behavior collections for one function body."""
         super().__init__()
         self.context = context
         self.meaningful_returns: list[StatementTarget] = []
@@ -189,15 +203,18 @@ class _FunctionBodyVisitor(cst.CSTVisitor):
 
 
 def _is_abstract(definition: PDF_definition.DefinitionInfo) -> bool:
+    """Return whether a function definition is decorated as abstract."""
     return any((name := decorator_helpers.decorator_qualified_name(decorator.decorator)) is not None and name.rpartition(".")[2] in _ABSTRACT_DECORATOR_NAMES for decorator in definition.decorators)
 
 
 def _is_stub_function(definition: PDF_definition.DefinitionInfo, docstring: PDF_definition.DocstringInfo) -> bool:
+    """Return whether the documented function body is a one-statement stub."""
     statements = _top_level_body_statements(definition, docstring)
     return len(statements) == 1 and _is_stub_statement(statements[0])
 
 
 def _top_level_body_statements(definition: PDF_definition.DefinitionInfo, docstring: PDF_definition.DocstringInfo) -> tuple[cst.BaseStatement | cst.BaseSmallStatement, ...]:
+    """Return top-level body statements excluding the owning docstring expression."""
     if isinstance(definition.body, cst.SimpleStatementSuite):
         return tuple(statement for statement in definition.body.body if statement is not docstring.expression)
     statements: list[cst.BaseStatement | cst.BaseSmallStatement] = []
@@ -211,6 +228,7 @@ def _top_level_body_statements(definition: PDF_definition.DefinitionInfo, docstr
 
 
 def _is_stub_statement(statement: cst.BaseStatement | cst.BaseSmallStatement) -> bool:
+    """Return whether a statement is a pass, ellipsis, or NotImplementedError stub."""
     if isinstance(statement, cst.SimpleStatementLine):
         return len(statement.body) == 1 and _is_stub_statement(statement.body[0])
     if isinstance(statement, cst.Pass):
@@ -222,10 +240,12 @@ def _is_stub_statement(statement: cst.BaseStatement | cst.BaseSmallStatement) ->
 
 
 def _is_none_expression(expression: cst.BaseExpression) -> bool:
+    """Return whether an expression is the literal `None` name."""
     return isinstance(expression, cst.Name) and expression.value == "None"
 
 
 def _exception_name(expression: cst.BaseExpression | None) -> str | None:
+    """Return a statically comparable raised exception name, if one is present."""
     if expression is None:
         return None
     if isinstance(expression, cst.Call):
@@ -241,12 +261,14 @@ def _exception_name(expression: cst.BaseExpression | None) -> str | None:
 
 
 def _looks_like_exception_name(name: str) -> bool:
+    """Return whether a name follows the direct exception-name heuristic."""
     # Static-only heuristic: direct capitalized names are comparable, while dynamic/lowercase aliases are intentionally
     # ignored.
     return bool(name) and name[0].isupper()
 
 
 def _exception_name_parent(expression: cst.BaseExpression) -> str | None:
+    """Return the dotted parent prefix for a raised exception attribute expression."""
     if isinstance(expression, cst.Name):
         return expression.value
     if isinstance(expression, cst.Attribute):
@@ -265,6 +287,7 @@ def exception_names_match(raised_name: str, documented_name: str) -> bool:
 
 
 def _node_line_numbers(node: cst.CSTNode, *, context: RuleCategoryContext) -> tuple[int, ...]:
+    """Return the one-based start line for a CST node with a safe fallback."""
     position = context.positions.get(node)
     if position is None:
         return (1,)

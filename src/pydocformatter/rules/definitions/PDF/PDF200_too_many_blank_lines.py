@@ -1,3 +1,5 @@
+"""PDF200 too-many-blank-lines rule."""
+
 from __future__ import annotations
 
 from collections.abc import Sequence
@@ -15,6 +17,12 @@ from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetada
 
 @rule_registration.register_rule_to(PDF_definition.PDF)
 class PDF200TooManyBlankLines(RuleBase):
+    """Rule implementation for PDF200.
+
+    Attributes:
+        meta (RuleMetadata): Static metadata used for registration, diagnostics, and rule selection.
+    """
+
     meta = RuleMetadata(
         code=RuleCode("PDF200"),
         name="too-many-blank-lines",

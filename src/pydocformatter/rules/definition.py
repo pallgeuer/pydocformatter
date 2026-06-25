@@ -1,3 +1,5 @@
+"""Base classes and execution contexts for rules."""
+
 from __future__ import annotations
 
 import dataclasses
@@ -18,7 +20,19 @@ if TYPE_CHECKING:
 
 @dataclasses.dataclass(frozen=True)
 class RuleCategoryContext:
-    """Read-only source context supplied to a rule category preprocessor."""
+    """Read-only source context supplied to a rule category preprocessor.
+
+    Attributes:
+        path (str): Display path for diagnostics and path-sensitive settings.
+        settings (CheckSettings): Resolved check settings for `path`.
+        module (cst.Module): Parsed LibCST module currently being checked or fixed.
+        metadata_wrapper (cst_metadata.MetadataWrapper): Metadata wrapper for resolving LibCST providers.
+        positions (Mapping[cst.CSTNode, cst_metadata.CodeRange]): Position metadata for nodes in `module`.
+        line_ending (str): Line ending to use for generated source text.
+        source (str): Current module source aligned with `module`.
+        source_lines (tuple[str, ...]): Current source split into physical lines.
+        line_bounds (source_text.LineBounds | None): Cached source offset lookup table, if available.
+    """
 
     path: str
     settings: CheckSettings
@@ -33,7 +47,12 @@ class RuleCategoryContext:
 
 @dataclasses.dataclass(frozen=True)
 class RuleContext(RuleCategoryContext):
-    """Read-only source and category context supplied to one rule."""
+    """Read-only source and category context supplied to one rule.
+
+    Attributes:
+        category_data (object | None): Shared data prepared by the rule category for this module.
+        effectively_fixable (bool): Whether this rule may apply fixes in the current run.
+    """
 
     category_data: object | None
     effectively_fixable: bool
@@ -41,14 +60,33 @@ class RuleContext(RuleCategoryContext):
 
 @dataclasses.dataclass(frozen=True)
 class RuleFixResult:
-    """Result returned by one rule automatic-fix attempt."""
+    """Result returned by one rule automatic-fix attempt.
+
+    Attributes:
+        module (cst.Module): Module after applying the rule's fixes.
+        fixed_findings (tuple[RuleFinding, ...]): Findings fixed by the returned module.
+    """
 
     module: cst.Module
     fixed_findings: tuple[RuleFinding, ...] = ()
 
 
 class RuleBase:
-    """Base class for implemented pydocformatter rules."""
+    """Base class for implemented pydocformatter rules.
+
+    Attributes:
+        meta (ClassVar[RuleMetadata]): Rule metadata supplied by concrete rule classes.
+        code: Alias for the full rule code tag.
+        prefix: Alias for the rule-code prefix.
+        number_str: Alias for the zero-padded rule number string.
+        number: Alias for the integer rule number.
+        name: Alias for the rule name.
+        message: Alias for the default diagnostic message.
+        fix_availability: Alias for the rule-level automatic fix availability.
+        stable_since: Alias for the pydocformatter version in which the rule became stable.
+        setting_effects: Alias for selection effects driven by resolved settings.
+        incompatible_with: Alias for rule codes that cannot be selected with this rule.
+    """
 
     meta: ClassVar[RuleMetadata]
 
@@ -84,7 +122,15 @@ class RuleBase:
 
 
 class RuleCategoryBase:
-    """Base class for pydocformatter rule categories."""
+    """Base class for pydocformatter rule categories.
+
+    Attributes:
+        meta (ClassVar[RuleCategoryMetadata]): Category metadata supplied by concrete category classes.
+        code_class_map (ClassVar[dict[RuleCode, type[RuleBase]]]): Registered rules indexed by rule code.
+        prefix: Alias for the category rule-code prefix.
+        name: Alias for the category name.
+        url: Alias for the optional category documentation URL.
+    """
 
     meta: ClassVar[RuleCategoryMetadata]
     code_class_map: ClassVar[dict[RuleCode, type[RuleBase]]]

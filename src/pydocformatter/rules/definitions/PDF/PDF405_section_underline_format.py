@@ -1,3 +1,5 @@
+"""PDF405 section-underline-format rule."""
+
 from __future__ import annotations
 
 import pydocformatter.rules.definition_helpers.docstring_conventions as docstring_conventions
@@ -13,6 +15,12 @@ from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetada
 
 @rule_registration.register_rule_to(PDF)
 class PDF405SectionUnderlineFormat(RuleBase):
+    """Rule implementation for PDF405.
+
+    Attributes:
+        meta (RuleMetadata): Static metadata used for registration, diagnostics, and rule selection.
+    """
+
     meta = RuleMetadata(
         code=RuleCode("PDF405"),
         name="section-underline-format",
@@ -77,6 +85,7 @@ def _results(context: RuleContext, *, rule: RuleMetadata) -> tuple[section_edits
 
 
 def _target_underline(docstring: PDF_definition.DocstringInfo, section: PDF_definition.DocstringSection) -> tuple[str | None, tuple[int, ...]]:
+    """Return the canonical NumPy underline and existing underline lines to replace."""
     header = docstring.structure.lines[section.header_line]
     underline = f"{header.raw_text[: header.text_raw_start_column + section_edits.section_name_start_column(header)]}{'-' * len(section.name)}"
     next_index = section.header_line + 1

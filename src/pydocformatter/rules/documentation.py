@@ -1,3 +1,5 @@
+"""Rule Markdown documentation parsing."""
+
 from __future__ import annotations
 
 import dataclasses
@@ -24,7 +26,15 @@ class RuleMarkdownExampleParseError(ValueError):
 
 @dataclasses.dataclass(frozen=True)
 class RuleMarkdownExample:
-    """Structured rule Markdown example parsed from a ``pydocfmt-example`` block."""
+    """Structured rule Markdown example parsed from a ``pydocfmt-example`` block.
+
+    Attributes:
+        settings_text (str): TOML settings snippet declared for the example.
+        input_source (str): Python source passed to pydocformatter.
+        output_source (str): Expected fixed source, or the input source for unchanged examples.
+        findings (tuple[tuple[RuleCode, tuple[int, ...], str], ...]): Expected diagnostics as rule code, line numbers,
+            and message.
+    """
 
     settings_text: str
     input_source: str
@@ -48,7 +58,12 @@ def rule_fix_text(rule: RuleMetadata) -> str:
 
 @dataclasses.dataclass(frozen=True)
 class RuleSourceLocation:
-    """Source location for a rule definition class."""
+    """Source location for a rule definition class.
+
+    Attributes:
+        file (str): Source file that defines the rule class.
+        line (int): One-based line number where the rule class is defined.
+    """
 
     file: str
     line: int

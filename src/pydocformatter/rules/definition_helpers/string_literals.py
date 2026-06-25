@@ -1,3 +1,5 @@
+"""Source-preserving Python string literal helpers."""
+
 from __future__ import annotations
 
 import dataclasses
@@ -9,7 +11,12 @@ import pydocformatter.rules.definition_helpers.text_layout as text_layout
 
 @dataclasses.dataclass(frozen=True)
 class StringValueFragment:
-    """Source spelling for one evaluated string character."""
+    """Source spelling for one evaluated string character.
+
+    Attributes:
+        value (str): Evaluated string fragment represented by the source spelling.
+        source (str): Source characters that produce `value`.
+    """
 
     value: str
     source: str
@@ -17,7 +24,13 @@ class StringValueFragment:
 
 @dataclasses.dataclass(frozen=True)
 class StringEscape:
-    """One parsed escape sequence in a simple string body."""
+    """One parsed escape sequence in a simple string body.
+
+    Attributes:
+        value (str): Evaluated value produced by the escape sequence.
+        source (str): Source spelling that should be preserved or rewritten as a unit.
+        end (int): Body offset immediately after the parsed escape sequence.
+    """
 
     value: str
     source: str
@@ -26,7 +39,12 @@ class StringEscape:
 
 @dataclasses.dataclass(frozen=True)
 class SourceWord:
-    """One whitespace-delimited evaluated word with source spelling."""
+    """One whitespace-delimited evaluated word with source spelling.
+
+    Attributes:
+        value (str): Evaluated word text used for wrapping decisions.
+        source (str): Source spelling of the same word used for literal-preserving output.
+    """
 
     value: str
     source: str
@@ -34,7 +52,12 @@ class SourceWord:
 
 @dataclasses.dataclass(frozen=True)
 class WrappedSourceLine:
-    """One wrapped line in evaluated and source-literal forms."""
+    """One wrapped line in evaluated and source-literal forms.
+
+    Attributes:
+        value (str): Evaluated line text after wrapping.
+        source (str): Source-literal line text that produces `value`.
+    """
 
     value: str
     source: str
@@ -332,6 +355,7 @@ def fragments_for_concatenated_string(node: cst.ConcatenatedString, *, target_qu
 
 
 def _iter_simple_string_parts(node: cst.ConcatenatedString) -> tuple[cst.SimpleString, ...] | None:
+    """Return all simple-string leaves in a concatenation tree."""
     parts: list[cst.SimpleString] = []
 
     def visit(part: cst.BaseExpression) -> bool:
@@ -392,10 +416,12 @@ def parse_simple_string_escape(body: str, start: int) -> StringEscape | None:
 
 
 def _has_hex_digits(text: str, start: int, length: int) -> bool:
+    """Return whether a text span contains exactly the requested number of hex digits."""
     return start + length <= len(text) and all(char in "0123456789abcdefABCDEF" for char in text[start : start + length])
 
 
 def _retarget_fragment(fragment: StringValueFragment, *, quote: str, line_ending: str) -> StringValueFragment:
+    """Return a value fragment whose source is safe for a target quote delimiter."""
     quote_char = "'" if "'" in quote else '"'
     if fragment.source == fragment.value and len(fragment.value) == 1 and fragment.value not in {"\\", "\r", "\n", quote_char}:
         return fragment
@@ -406,6 +432,7 @@ def _retarget_fragment(fragment: StringValueFragment, *, quote: str, line_ending
 
 
 def _literalized_whitespace_fragment(fragment: StringValueFragment, *, previous: StringValueFragment | None, line_ending: str) -> StringValueFragment:
+    """Return literal newline and tab fragments when escape spellings can be preserved as whitespace."""
     if fragment.value == "\n" and fragment.source == r"\n" and (previous is None or previous.value != "\r"):
         return StringValueFragment(value=fragment.value, source=line_ending)
     if fragment.value == "\t" and fragment.source == r"\t":
@@ -414,6 +441,7 @@ def _literalized_whitespace_fragment(fragment: StringValueFragment, *, previous:
 
 
 def _escape_char(char: str, *, quote: str, line_ending: str = "\n", escape_non_ascii: bool) -> str:
+    """Return source text for one character inside a simple string body."""
     quote_char = "'" if "'" in quote else '"'
     codepoint = ord(char)
     if char == quote_char:

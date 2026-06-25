@@ -1,3 +1,5 @@
+"""PDF407 section-order rule."""
+
 from __future__ import annotations
 
 import pydocformatter.rules.definition_helpers.docstring_sections as docstring_sections
@@ -14,6 +16,12 @@ from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetada
 
 @rule_registration.register_rule_to(PDF)
 class PDF407SectionOrder(RuleBase):
+    """Rule implementation for PDF407.
+
+    Attributes:
+        meta (RuleMetadata): Static metadata used for registration, diagnostics, and rule selection.
+    """
+
     meta = RuleMetadata(
         code=RuleCode("PDF407"),
         name="section-order",
@@ -65,6 +73,7 @@ def _findings(context: RuleContext, *, rule: RuleMetadata) -> tuple[RuleFinding,
 
 
 def _rest_field_findings(docstring: PDF_definition.DocstringInfo, *, rule: RuleMetadata) -> tuple[RuleFinding, ...]:
+    """Return findings for out-of-order reStructuredText fields."""
     findings: list[RuleFinding] = []
     max_rank = -1
     max_rank_label = ""

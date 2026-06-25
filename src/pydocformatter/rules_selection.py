@@ -1,3 +1,5 @@
+"""Rule selection, fixability, and per-file ignores."""
+
 from __future__ import annotations
 
 import dataclasses
@@ -16,7 +18,14 @@ from pydocformatter.utils.globs import GlobPatternSet
 
 @dataclasses.dataclass(frozen=True)
 class SelectedRule:
-    """A rule selected for processing with its effective fixability."""
+    """A rule selected for processing with its effective fixability.
+
+    Attributes:
+        rule (RuleMetadata): Rule metadata selected for processing.
+        fixable (bool): Whether fixes are enabled for this rule after fixability settings.
+        enabled_priority (int): Source-priority level of the selector that enabled the rule.
+        enabled_specificity (int): Specificity of the selector that enabled the rule.
+    """
 
     rule: RuleMetadata
     fixable: bool
@@ -43,7 +52,17 @@ class _SelectorGroup:
 
 @dataclasses.dataclass(frozen=True)
 class PerFileRuleIgnore:
-    """Rule ignore selectors resolved for one path pattern."""
+    """Rule ignore selectors resolved for one path pattern.
+
+    Attributes:
+        pattern (str): Configured glob pattern, optionally prefixed with `!` for negation.
+        base_path (str): Absolute directory relative to which `pattern` is evaluated.
+        rule_codes (frozenset[RuleCode]): Rules ignored when this pattern matches.
+        rule_specificities (tuple[tuple[RuleCode, int], ...]): Ignored rules paired with the selector specificity that
+            selected them.
+        negated (bool): Whether the pattern is a negated per-file-ignore entry.
+        matcher (GlobPatternSet): Compiled matcher reused for per-path checks.
+    """
 
     pattern: str
     base_path: str
@@ -67,7 +86,14 @@ class PerFileRuleIgnore:
 
 @dataclasses.dataclass(frozen=True)
 class RuleSelection:
-    """Effective rule selection for a resolved settings object."""
+    """Effective rule selection for a resolved settings object.
+
+    Attributes:
+        rules (tuple[SelectedRule, ...]): Globally selected rules before per-file ignores are applied.
+        per_file_ignores (tuple[PerFileRuleIgnore, ...]): Path-specific ignore entries resolved from settings.
+        errors (tuple[str, ...]): Non-fatal rule-selection errors to report to the caller.
+        collection (RuleCollection): Rule collection that supplied the selectable rule metadata.
+    """
 
     rules: tuple[SelectedRule, ...]
     per_file_ignores: tuple[PerFileRuleIgnore, ...]

@@ -1,3 +1,5 @@
+"""Source edit planning and application for rules."""
+
 from __future__ import annotations
 
 import dataclasses
@@ -15,7 +17,12 @@ if TYPE_CHECKING:
 
 @dataclasses.dataclass(frozen=True)
 class SourceEdit:
-    """Replacement of one half-open source range."""
+    """Replacement of one half-open source range.
+
+    Attributes:
+        range (cst_metadata.CodeRange): Half-open source range to replace.
+        replacement (str): Source text inserted in place of `range`.
+    """
 
     range: cst_metadata.CodeRange
     replacement: str
@@ -23,7 +30,12 @@ class SourceEdit:
 
 @dataclasses.dataclass(frozen=True)
 class PlannedSourceChange:
-    """One source edit and the lines reported for it."""
+    """One source edit and the lines reported for it.
+
+    Attributes:
+        edit (SourceEdit): Concrete source edit to apply.
+        line_numbers (tuple[int, ...]): One-based source lines reported for the associated finding.
+    """
 
     edit: SourceEdit
     line_numbers: tuple[int, ...]
@@ -31,7 +43,14 @@ class PlannedSourceChange:
 
 @dataclasses.dataclass(frozen=True)
 class PlannedTextReplacement:
-    """Replacement text and the source lines reported for it."""
+    """Replacement text and the source lines reported for it.
+
+    Attributes:
+        start_offset (int): Start offset in the original source text.
+        end_offset (int): End offset in the original source text.
+        text (str): Replacement source text.
+        line_numbers (tuple[int, ...]): One-based source lines reported for the associated finding.
+    """
 
     start_offset: int
     end_offset: int

@@ -1,3 +1,5 @@
+"""PDF110 one-line-docstring rule."""
+
 from __future__ import annotations
 
 from collections.abc import Sequence
@@ -14,6 +16,12 @@ from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetada
 
 @rule_registration.register_rule_to(PDF)
 class PDF110OneLineDocstring(RuleBase):
+    """Rule implementation for PDF110.
+
+    Attributes:
+        meta (RuleMetadata): Static metadata used for registration, diagnostics, and rule selection.
+    """
+
     meta = RuleMetadata(
         code=RuleCode("PDF110"),
         name="one-line-docstring",

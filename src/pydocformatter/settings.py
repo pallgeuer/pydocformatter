@@ -1,3 +1,5 @@
+"""Layered pydocformatter settings resolution."""
+
 from __future__ import annotations
 
 import argparse
@@ -44,7 +46,13 @@ class SettingsError(ValueError):
 
 @dataclasses.dataclass(frozen=True)
 class SettingsProfile(Generic[SettingsT]):
-    """Resolved settings plus source-base and source-priority metadata."""
+    """Resolved settings plus source-base and source-priority metadata.
+
+    Attributes:
+        settings (SettingsT): Fully resolved settings object for a path or config layer.
+        field_bases (Mapping[str, str]): Absolute base directories used to interpret path-like fields.
+        field_priorities (Mapping[str, int]): Configuration-source priorities that supplied each field.
+    """
 
     @dataclasses.dataclass(frozen=True)
     class Key(Generic[SettingsKeyT]):
@@ -73,7 +81,14 @@ class SettingsProfile(Generic[SettingsT]):
 
 @dataclasses.dataclass(frozen=True)
 class SettingsResolver(Generic[SettingsT]):
-    """Resolve settings for paths using Ruff-style closest-config semantics."""
+    """Resolve settings for paths using Ruff-style closest-config semantics.
+
+    Attributes:
+        schema (SettingsSchema[SettingsT]): Settings schema used to load and validate profiles.
+        global_values (GlobalArgs): Global CLI options that affect config discovery and inline overrides.
+        args (argparse.Namespace | None): Command-specific argparse namespace whose options override config files.
+        field_overrides (Mapping[str, Any] | None): Programmatic overrides applied with highest precedence.
+    """
 
     schema: SettingsSchema[SettingsT]
     global_values: GlobalArgs

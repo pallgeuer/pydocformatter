@@ -1,3 +1,5 @@
+"""PDF301 summary-terminal-punctuation rule."""
+
 from __future__ import annotations
 
 import pydocformatter.rules.definition_helpers.summary_punctuation as summary_punctuation
@@ -14,6 +16,12 @@ _POLICY = summary_punctuation.SummaryPunctuationPolicy(valid_endings=".?!\u2026"
 
 @rule_registration.register_rule_to(PDF)
 class PDF301SummaryTerminalPunctuation(RuleBase):
+    """Rule implementation for PDF301.
+
+    Attributes:
+        meta (RuleMetadata): Static metadata used for registration, diagnostics, and rule selection.
+    """
+
     meta = RuleMetadata(
         code=RuleCode("PDF301"),
         name="summary-terminal-punctuation",

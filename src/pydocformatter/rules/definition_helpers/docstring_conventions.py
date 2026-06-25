@@ -1,3 +1,5 @@
+"""Docstring convention policy helpers."""
+
 from __future__ import annotations
 
 import pydocformatter.cli.settings_check as settings_check

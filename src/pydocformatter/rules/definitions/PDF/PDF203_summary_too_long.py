@@ -1,3 +1,5 @@
+"""PDF203 summary-too-long rule."""
+
 from __future__ import annotations
 
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
@@ -10,6 +12,12 @@ from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetada
 
 @rule_registration.register_rule_to(PDF)
 class PDF203SummaryTooLong(RuleBase):
+    """Rule implementation for PDF203.
+
+    Attributes:
+        meta (RuleMetadata): Static metadata used for registration, diagnostics, and rule selection.
+    """
+
     meta = RuleMetadata(
         code=RuleCode("PDF203"),
         name="summary-too-long",

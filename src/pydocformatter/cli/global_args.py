@@ -1,3 +1,5 @@
+"""Global pydocfmt command-line options."""
+
 import argparse
 import dataclasses
 

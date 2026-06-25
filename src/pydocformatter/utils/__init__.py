@@ -1,0 +1,1 @@
+"""Shared pydocformatter utility package."""

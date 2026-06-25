@@ -1,3 +1,5 @@
+"""PCF001 standalone-comment-formatting rule."""
+
 from __future__ import annotations
 
 import re
@@ -17,6 +19,12 @@ from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetada
 
 @rule_registration.register_rule_to(PCF_definition.PCF)
 class PCF001StandaloneCommentFormatting(RuleBase):
+    """Rule implementation for PCF001.
+
+    Attributes:
+        meta (RuleMetadata): Static metadata used for registration, diagnostics, and rule selection.
+    """
+
     meta = RuleMetadata(
         code=RuleCode("PCF001"),
         name="standalone-comment-formatting",

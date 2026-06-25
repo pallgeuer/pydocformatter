@@ -1,3 +1,5 @@
+"""PCF003 comment-directive-normalization rule."""
+
 from __future__ import annotations
 
 import re
@@ -28,6 +30,12 @@ _COLON_VALUE_RE = re.compile(r"^(?P<head>pyright|mypy|ruff|flake8|fmt|isort|prag
 
 @rule_registration.register_rule_to(PCF_definition.PCF)
 class PCF003CommentDirectiveNormalization(RuleBase):
+    """Rule implementation for PCF003.
+
+    Attributes:
+        meta (RuleMetadata): Static metadata used for registration, diagnostics, and rule selection.
+    """
+
     meta = RuleMetadata(
         code=RuleCode("PCF003"),
         name="comment-directive-normalization",

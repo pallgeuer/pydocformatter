@@ -1,3 +1,5 @@
+"""PDF101 docstring-reflow rule."""
+
 from __future__ import annotations
 
 import dataclasses
@@ -17,6 +19,12 @@ from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetada
 
 @rule_registration.register_rule_to(PDF_definition.PDF)
 class PDF101DocstringReflow(RuleBase):
+    """Rule implementation for PDF101.
+
+    Attributes:
+        meta (RuleMetadata): Static metadata used for registration, diagnostics, and rule selection.
+    """
+
     meta = RuleMetadata(
         code=RuleCode("PDF101"),
         name="docstring-reflow",

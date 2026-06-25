@@ -1,3 +1,5 @@
+"""Rule category registration."""
+
 from __future__ import annotations
 
 import dataclasses
@@ -12,7 +14,12 @@ class RuleError(ValueError):
 
 @dataclasses.dataclass(frozen=True)
 class RuleRegistry:
-    """Registry of rule category classes."""
+    """Registry of rule category classes.
+
+    Attributes:
+        category_classes (set[type[RuleCategoryBase]]): Mutable set of category classes discovered by decorators before
+            rule collection.
+    """
 
     category_classes: set[type[RuleCategoryBase]] = dataclasses.field(default_factory=set)
 

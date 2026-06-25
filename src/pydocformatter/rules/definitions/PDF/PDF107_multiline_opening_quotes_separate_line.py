@@ -1,3 +1,5 @@
+"""PDF107 multiline-opening-quotes-separate-line rule."""
+
 from __future__ import annotations
 
 from collections.abc import Sequence
@@ -14,6 +16,12 @@ from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetada
 
 @rule_registration.register_rule_to(PDF)
 class PDF107MultilineOpeningQuotesSeparateLine(RuleBase):
+    """Rule implementation for PDF107.
+
+    Attributes:
+        meta (RuleMetadata): Static metadata used for registration, diagnostics, and rule selection.
+    """
+
     meta = RuleMetadata(
         code=RuleCode("PDF107"),
         name="multiline-opening-quotes-separate-line",

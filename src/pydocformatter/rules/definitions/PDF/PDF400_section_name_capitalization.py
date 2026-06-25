@@ -1,3 +1,5 @@
+"""PDF400 section-name-capitalization rule."""
+
 from __future__ import annotations
 
 import pydocformatter.rules.definition_helpers.docstring_conventions as docstring_conventions
@@ -14,6 +16,12 @@ from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetada
 
 @rule_registration.register_rule_to(PDF)
 class PDF400SectionNameCapitalization(RuleBase):
+    """Rule implementation for PDF400.
+
+    Attributes:
+        meta (RuleMetadata): Static metadata used for registration, diagnostics, and rule selection.
+    """
+
     meta = RuleMetadata(
         code=RuleCode("PDF400"),
         name="section-name-capitalization",
@@ -57,8 +65,10 @@ def _results(context: RuleContext, *, rule: RuleMetadata) -> tuple[section_edits
 
 
 def _section_message(name: str, replacement: str) -> str:
+    """Return the diagnostic message for a section capitalization replacement."""
     return f"Docstring section name '{name}' should be capitalized as '{replacement}'"
 
 
 def _field_message(name: str, replacement: str) -> str:
+    """Return the diagnostic message for a reST field capitalization replacement."""
     return f"Docstring reStructuredText field name '{name}' should be lowercase as '{replacement}'"

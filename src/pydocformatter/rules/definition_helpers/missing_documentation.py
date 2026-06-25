@@ -1,3 +1,5 @@
+"""Missing-documentation activation helpers."""
+
 from __future__ import annotations
 
 import pydocformatter.cli.settings_check as settings_check
@@ -42,6 +44,7 @@ def is_public_definition(definition: PDF_definition.DefinitionInfo) -> bool:
 
 
 def _is_private_name(name: str) -> bool:
+    """Return whether a definition name is private for broad documentation checks."""
     if name in _PUBLIC_DUNDER_FUNCTIONS:
         return False
     return name.startswith("_")

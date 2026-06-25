@@ -1,3 +1,5 @@
+"""PDF002 docstring-backslash-raw-prefix rule."""
+
 from __future__ import annotations
 
 import libcst as cst
@@ -13,6 +15,12 @@ from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetada
 
 @rule_registration.register_rule_to(PDF_definition.PDF)
 class PDF002DocstringBackslashRawPrefix(RuleBase):
+    """Rule implementation for PDF002.
+
+    Attributes:
+        meta (RuleMetadata): Static metadata used for registration, diagnostics, and rule selection.
+    """
+
     meta = RuleMetadata(
         code=RuleCode("PDF002"),
         name="docstring-backslash-raw-prefix",

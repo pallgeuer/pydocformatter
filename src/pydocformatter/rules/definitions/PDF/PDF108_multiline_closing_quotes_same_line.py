@@ -1,3 +1,5 @@
+"""PDF108 multiline-closing-quotes-same-line rule."""
+
 from __future__ import annotations
 
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
@@ -12,6 +14,12 @@ from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetada
 
 @rule_registration.register_rule_to(PDF)
 class PDF108MultilineClosingQuotesSameLine(RuleBase):
+    """Rule implementation for PDF108.
+
+    Attributes:
+        meta (RuleMetadata): Static metadata used for registration, diagnostics, and rule selection.
+    """
+
     meta = RuleMetadata(
         code=RuleCode("PDF108"),
         name="multiline-closing-quotes-same-line",

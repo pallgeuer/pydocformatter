@@ -1,3 +1,5 @@
+"""Gitignore-style glob matching helpers."""
+
 from __future__ import annotations
 
 import dataclasses

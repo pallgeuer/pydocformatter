@@ -1,3 +1,5 @@
+"""Small descriptors and reflection helpers."""
+
 from __future__ import annotations
 
 import functools
@@ -14,12 +16,16 @@ class classproperty(Generic[_R_co]):
 
     Instance assignment/deletion is blocked. Class-level assignment/deletion can still replace/remove the descriptor
     unless the metaclass prevents it.
+
+    Attributes:
+        fget (Callable[[type[Any]], _R_co]): Function called with the owning class to compute the descriptor value.
     """
 
     fget: Callable[[type[Any]], _R_co]
     __isabstractmethod__: bool
 
     def __init__(self, fget: Callable[[type[Any]], _R_co]) -> None:
+        """Bind the class-level getter used by this descriptor."""
         self.fget = fget
         functools.update_wrapper(cast(Callable[..., Any], self), fget)
         self.__isabstractmethod__ = getattr(fget, "__isabstractmethod__", False)
@@ -31,6 +37,7 @@ class classproperty(Generic[_R_co]):
     def __get__(self, obj: object, owner: type[Any] | None = None) -> _R_co: ...
 
     def __get__(self, obj: object | None, owner: type[Any] | None = None) -> _R_co:
+        """Return the computed value for an instance or owner class."""
         if owner is None:
             if obj is None:
                 raise TypeError("classproperty.__get__(None, None) is invalid")
@@ -38,14 +45,17 @@ class classproperty(Generic[_R_co]):
         return self.fget(owner)
 
     def __set__(self, obj: Any, value: Any) -> None:
+        """Reject attempts to assign through the descriptor."""
         name = getattr(self, "__name__", type(self).__name__)
         raise AttributeError(f"Cannot set read-only classproperty {name!r}")
 
     def __delete__(self, obj: Any) -> None:
+        """Reject attempts to delete through the descriptor."""
         name = getattr(self, "__name__", type(self).__name__)
         raise AttributeError(f"Cannot delete read-only classproperty {name!r}")
 
     def __repr__(self) -> str:
+        """Return a debugging representation showing the wrapped getter."""
         return f"<classproperty {self.fget!r}>"
 
 

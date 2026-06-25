@@ -1,3 +1,5 @@
+"""PDF409 docstring-entry-spacing rule."""
+
 from __future__ import annotations
 
 import pydocformatter.rules.definition_helpers.docstring_conventions as docstring_conventions
@@ -13,6 +15,12 @@ from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetada
 
 @rule_registration.register_rule_to(PDF_definition.PDF)
 class PDF409DocstringEntrySpacing(RuleBase):
+    """Rule implementation for PDF409.
+
+    Attributes:
+        meta (RuleMetadata): Static metadata used for registration, diagnostics, and rule selection.
+    """
+
     meta = RuleMetadata(
         code=RuleCode("PDF409"),
         name="docstring-entry-spacing",
@@ -86,6 +94,7 @@ def _results(context: RuleContext, *, rule: RuleMetadata) -> tuple[section_edits
 
 
 def _canonical_entry_line(convention: DocstringConvention, text: str, entry: PDF_definition.DocstringEntry) -> str | None:
+    """Return the canonical spelling for one convention entry line."""
     if convention is DocstringConvention.GOOGLE:
         return _canonical_google_entry_line(text, entry)
     if convention is DocstringConvention.NUMPY:
@@ -96,6 +105,7 @@ def _canonical_entry_line(convention: DocstringConvention, text: str, entry: PDF
 
 
 def _canonical_google_entry_line(text: str, entry: PDF_definition.DocstringEntry) -> str | None:
+    """Return the canonical Google entry line for spacing normalization."""
     match = PDF_definition._GOOGLE_ENTRY_RE.match(text)
     if match is None and entry.kind in (PDF_definition.DocstringEntryKind.RETURN, PDF_definition.DocstringEntryKind.YIELD, PDF_definition.DocstringEntryKind.EXCEPTION):
         match = PDF_definition._GENERIC_ENTRY_RE.match(text)
@@ -111,6 +121,7 @@ def _canonical_google_entry_line(text: str, entry: PDF_definition.DocstringEntry
 
 
 def _google_entry_head(entry: PDF_definition.DocstringEntry, *, original_name: str, original_type: str | None) -> str | None:
+    """Return the canonical Google entry head before the description colon."""
     if entry.kind in (PDF_definition.DocstringEntryKind.RETURN, PDF_definition.DocstringEntryKind.YIELD) and not entry.names:
         return entry.type_text.strip() if entry.type_text else None
     if entry.kind is PDF_definition.DocstringEntryKind.EXCEPTION:
@@ -126,6 +137,7 @@ def _google_entry_head(entry: PDF_definition.DocstringEntry, *, original_name: s
 
 
 def _canonical_numpy_entry_line(text: str, entry: PDF_definition.DocstringEntry) -> str | None:
+    """Return the canonical NumPy entry line for spacing normalization."""
     if entry.kind is PDF_definition.DocstringEntryKind.EXCEPTION and (exception_match := PDF_definition._NUMPY_EXCEPTION_ENTRY_RE.match(text)) is not None:
         description = exception_match.group("description").strip()
         return f'{exception_match.group("indent")}{exception_match.group("name").strip()}:{f" {description}" if description else ""}'
@@ -136,6 +148,7 @@ def _canonical_numpy_entry_line(text: str, entry: PDF_definition.DocstringEntry)
 
 
 def _canonical_rest_entry_line(text: str, entry: PDF_definition.DocstringEntry) -> str | None:
+    """Return the canonical reStructuredText field line for spacing normalization."""
     match = PDF_definition._REST_FIELD_RE.match(text)
     if match is None or entry.field_name is None:
         return None
@@ -145,6 +158,7 @@ def _canonical_rest_entry_line(text: str, entry: PDF_definition.DocstringEntry) 
 
 
 def _canonical_rest_argument(entry: PDF_definition.DocstringEntry) -> str | None:
+    """Return the canonical reStructuredText field argument."""
     if entry.field_argument is None:
         return None
     if entry.kind is PDF_definition.DocstringEntryKind.PARAMETER and entry.names:

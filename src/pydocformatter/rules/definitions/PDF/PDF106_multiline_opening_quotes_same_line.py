@@ -1,3 +1,5 @@
+"""PDF106 multiline-opening-quotes-same-line rule."""
+
 from __future__ import annotations
 
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
@@ -12,6 +14,12 @@ from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetada
 
 @rule_registration.register_rule_to(PDF)
 class PDF106MultilineOpeningQuotesSameLine(RuleBase):
+    """Rule implementation for PDF106.
+
+    Attributes:
+        meta (RuleMetadata): Static metadata used for registration, diagnostics, and rule selection.
+    """
+
     meta = RuleMetadata(
         code=RuleCode("PDF106"),
         name="multiline-opening-quotes-same-line",

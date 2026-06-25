@@ -1,3 +1,5 @@
+"""PDF102 docstring-trailing-whitespace rule."""
+
 from __future__ import annotations
 
 import pydocformatter.rules.definition_helpers.text_layout as text_layout
@@ -11,6 +13,12 @@ from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetada
 
 @rule_registration.register_rule_to(PDF_definition.PDF)
 class PDF102DocstringTrailingWhitespace(RuleBase):
+    """Rule implementation for PDF102.
+
+    Attributes:
+        meta (RuleMetadata): Static metadata used for registration, diagnostics, and rule selection.
+    """
+
     meta = RuleMetadata(
         code=RuleCode("PDF102"),
         name="docstring-trailing-whitespace",

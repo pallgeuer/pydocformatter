@@ -1,3 +1,5 @@
+"""PDF001 docstring-quote-style rule."""
+
 from __future__ import annotations
 
 import libcst as cst
@@ -15,6 +17,12 @@ _TARGET_QUOTE = '"""'
 
 @rule_registration.register_rule_to(PDF_definition.PDF)
 class PDF001DocstringQuoteStyle(RuleBase):
+    """Rule implementation for PDF001.
+
+    Attributes:
+        meta (RuleMetadata): Static metadata used for registration, diagnostics, and rule selection.
+    """
+
     meta = RuleMetadata(
         code=RuleCode("PDF001"),
         name="docstring-quote-style",

@@ -1,3 +1,5 @@
+"""`pydocfmt linter` command."""
+
 from __future__ import annotations
 
 import argparse
@@ -11,7 +13,13 @@ from pydocformatter.rules.definition import RuleCategoryBase
 
 
 class CategoryMetadataOutput(TypedDict, total=False):
-    """JSON metadata for one rule category in Ruff linter format."""
+    """JSON metadata for one rule category in Ruff linter format.
+
+    Attributes:
+        prefix (str): Rule-code prefix for the category.
+        name (str): User-facing category name.
+        url (str): Documentation or project URL associated with the category.
+    """
 
     prefix: str
     name: str

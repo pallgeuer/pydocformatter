@@ -1,3 +1,5 @@
+"""PDF401 section-name-pluralization rule."""
+
 from __future__ import annotations
 
 import pydocformatter.rules.definition_helpers.docstring_conventions as docstring_conventions
@@ -15,6 +17,12 @@ from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetada
 
 @rule_registration.register_rule_to(PDF)
 class PDF401SectionNamePluralization(RuleBase):
+    """Rule implementation for PDF401.
+
+    Attributes:
+        meta (RuleMetadata): Static metadata used for registration, diagnostics, and rule selection.
+    """
+
     meta = RuleMetadata(
         code=RuleCode("PDF401"),
         name="section-name-pluralization",
@@ -58,8 +66,10 @@ def _results(context: RuleContext, *, rule: RuleMetadata) -> tuple[section_edits
 
 
 def _section_message(name: str, replacement: str) -> str:
+    """Return the diagnostic message for a section pluralization replacement."""
     return f"Docstring section name '{name}' should use plural form '{replacement}'"
 
 
 def _field_message(name: str, replacement: str) -> str:
+    """Return the diagnostic message for a reST field spelling replacement."""
     return f"Docstring reStructuredText field name '{name}' should use preferred spelling '{replacement}'"

@@ -1,3 +1,5 @@
+"""PDF402 section-name-term-normalization rule."""
+
 from __future__ import annotations
 
 import pydocformatter.rules.definition_helpers.docstring_conventions as docstring_conventions
@@ -15,6 +17,12 @@ from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetada
 
 @rule_registration.register_rule_to(PDF)
 class PDF402SectionNameTermNormalization(RuleBase):
+    """Rule implementation for PDF402.
+
+    Attributes:
+        meta (RuleMetadata): Static metadata used for registration, diagnostics, and rule selection.
+    """
+
     meta = RuleMetadata(
         code=RuleCode("PDF402"),
         name="section-name-term-normalization",
@@ -58,8 +66,10 @@ def _results(context: RuleContext, *, rule: RuleMetadata) -> tuple[section_edits
 
 
 def _section_message(name: str, replacement: str) -> str:
+    """Return the diagnostic message for a section term replacement."""
     return f"Docstring section name '{name}' should use equivalent term '{replacement}'"
 
 
 def _field_message(name: str, replacement: str) -> str:
+    """Return the diagnostic message for a reST field term replacement."""
     return f"Docstring reStructuredText field name '{name}' should use equivalent term '{replacement}'"

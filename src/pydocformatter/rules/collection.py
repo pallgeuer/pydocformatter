@@ -1,3 +1,5 @@
+"""Built-in rule collection loading."""
+
 from __future__ import annotations
 
 import dataclasses
@@ -19,7 +21,14 @@ _BaseT = TypeVar("_BaseT")
 
 @dataclasses.dataclass(frozen=True, init=False)
 class RuleCollection:
-    """Collected pydocformatter rule category and rule classes."""
+    """Collected pydocformatter rule category and rule classes.
+
+    Attributes:
+        categories (tuple[type[RuleCategoryBase], ...]): Registered rule categories in deterministic order.
+        category_class (dict[str, type[RuleCategoryBase]]): Category classes indexed by rule-code prefix.
+        rules (tuple[type[RuleBase], ...]): Registered rule classes in deterministic rule-code order.
+        rule_class (dict[RuleCode, type[RuleBase]]): Rule classes indexed by full rule code.
+    """
 
     categories: tuple[type[RuleCategoryBase], ...]
     category_class: dict[str, type[RuleCategoryBase]]

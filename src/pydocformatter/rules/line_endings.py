@@ -1,3 +1,5 @@
+"""Line-ending detection and rendering."""
+
 from __future__ import annotations
 
 import os

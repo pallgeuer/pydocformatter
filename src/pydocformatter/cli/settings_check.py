@@ -1,3 +1,5 @@
+"""Settings schema for `pydocfmt check`."""
+
 import dataclasses
 import enum
 from typing import TypedDict
@@ -66,7 +68,15 @@ class LineEnding(enum.StrEnum):
 
 
 class DocstringConvention(enum.StrEnum):
-    """Conventions used to parse semantic docstring sections."""
+    """Conventions used to parse semantic docstring sections.
+
+    Attributes:
+        NONE: Disable convention-specific section parsing.
+        PEP257: Apply generic PEP 257 style checks without semantic sections.
+        GOOGLE: Parse Google-style section headers and entries.
+        NUMPY: Parse NumPy-style section headers, underlines, and entries.
+        REST: Parse reStructuredText field lists.
+    """
 
     NONE = "none"
     PEP257 = "pep257"
@@ -76,14 +86,25 @@ class DocstringConvention(enum.StrEnum):
 
 
 class DocstringBlankLineStyle(enum.StrEnum):
-    """Whitespace styles for blank docstring lines."""
+    """Whitespace styles for blank docstring lines.
+
+    Attributes:
+        BLANK: Normalize blank docstring lines to empty lines.
+        ALIGNED: Preserve indentation on blank lines so they align with surrounding content.
+    """
 
     BLANK = "blank"
     ALIGNED = "aligned"
 
 
 class DocstringMissingDocumentation(enum.StrEnum):
-    """Activation policies for missing documentation diagnostics."""
+    """Activation policies for missing documentation diagnostics.
+
+    Attributes:
+        HAS_SECTION: Check only docstrings that already contain a relevant documentation section.
+        NON_SUMMARY_DOCSTRINGS: Check docstrings with content beyond a single summary line.
+        ALL_DOCSTRINGS: Check every eligible function docstring.
+    """
 
     HAS_SECTION = "has-section"
     NON_SUMMARY_DOCSTRINGS = "non-summary-docstrings"

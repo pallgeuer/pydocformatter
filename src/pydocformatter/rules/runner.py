@@ -1,3 +1,5 @@
+"""Rule check and fix pass execution."""
+
 from __future__ import annotations
 
 import collections
@@ -20,7 +22,15 @@ UTF8_BOM = "\ufeff"
 
 @dataclasses.dataclass(frozen=True)
 class RuleRunResult:
-    """Result of running selected rules against one parsed module."""
+    """Result of running selected rules against one parsed module.
+
+    Attributes:
+        module (cst.Module): Final module after all selected fix passes.
+        fixed_findings (tuple[RuleFinding, ...]): Findings fixed during the run.
+        unfixed_findings (tuple[RuleFinding, ...]): Findings still present after checking the final module.
+        source_changed (bool): Whether any fix pass changed the source.
+        errors (tuple[str, ...]): Operational errors raised by rule preparation, checking, or fixing.
+    """
 
     module: cst.Module
     fixed_findings: tuple[RuleFinding, ...]

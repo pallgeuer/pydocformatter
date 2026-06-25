@@ -1,3 +1,5 @@
+"""PDF406 empty-section rule."""
+
 from __future__ import annotations
 
 import pydocformatter.rules.definition_helpers.rest_fields as rest_fields
@@ -13,6 +15,12 @@ from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetada
 
 @rule_registration.register_rule_to(PDF)
 class PDF406EmptySection(RuleBase):
+    """Rule implementation for PDF406.
+
+    Attributes:
+        meta (RuleMetadata): Static metadata used for registration, diagnostics, and rule selection.
+    """
+
     meta = RuleMetadata(
         code=RuleCode("PDF406"),
         name="empty-section",
@@ -65,4 +73,5 @@ def _findings(context: RuleContext, *, rule: RuleMetadata) -> tuple[RuleFinding,
 
 
 def _section_has_content(docstring: PDF_definition.DocstringInfo, section: PDF_definition.DocstringSection) -> bool:
+    """Return whether a section body contains non-whitespace text."""
     return any(line.text.strip(" \t") for line in docstring.structure.lines[section.content_start_line : section.end_line])

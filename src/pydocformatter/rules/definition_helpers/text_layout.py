@@ -1,3 +1,5 @@
+"""Display-width and balanced wrapping helpers."""
+
 from __future__ import annotations
 
 import dataclasses
@@ -15,7 +17,12 @@ _URL_TOKEN_TRAILING_PUNCTUATION = ".,;:!?)]}>\"'"
 
 @dataclasses.dataclass(frozen=True)
 class WordSpan:
-    """Half-open word span in wrapped output."""
+    """Half-open word span in wrapped output.
+
+    Attributes:
+        start (int): Inclusive index of the first word in the span.
+        end (int): Exclusive index immediately after the last word in the span.
+    """
 
     start: int
     end: int

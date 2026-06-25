@@ -1,3 +1,5 @@
+"""PDF404 section-name-trailing-colon rule."""
+
 from __future__ import annotations
 
 import pydocformatter.rules.definition_helpers.docstring_conventions as docstring_conventions
@@ -13,6 +15,12 @@ from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetada
 
 @rule_registration.register_rule_to(PDF)
 class PDF404SectionNameTrailingColon(RuleBase):
+    """Rule implementation for PDF404.
+
+    Attributes:
+        meta (RuleMetadata): Static metadata used for registration, diagnostics, and rule selection.
+    """
+
     meta = RuleMetadata(
         code=RuleCode("PDF404"),
         name="section-name-trailing-colon",

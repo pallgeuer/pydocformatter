@@ -1,3 +1,5 @@
+"""reStructuredText field parsing helpers."""
+
 from __future__ import annotations
 
 import pydocformatter.rules.definition_helpers.docstring_sections as docstring_sections

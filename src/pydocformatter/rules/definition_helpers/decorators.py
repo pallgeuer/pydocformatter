@@ -1,3 +1,5 @@
+"""Decorator name extraction helpers."""
+
 from __future__ import annotations
 
 import libcst as cst

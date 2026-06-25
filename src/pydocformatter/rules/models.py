@@ -1,3 +1,5 @@
+"""Shared rule metadata and diagnostic models."""
+
 from __future__ import annotations
 
 import dataclasses
@@ -10,7 +12,14 @@ _RULE_PREFIX_RE = re.compile(r"^[A-Z]+$")
 
 
 class FixAvailability(enum.StrEnum):
-    """Rule-level automatic fix availability."""
+    """Rule-level automatic fix availability.
+
+    Attributes:
+        ALWAYS: Every reported finding has an automatic fix.
+        USUALLY: Most findings have fixes, but individual cases may opt out.
+        SOMETIMES: Only a subset of findings can be fixed automatically.
+        NEVER: The rule is diagnostic-only.
+    """
 
     ALWAYS = "Always"
     USUALLY = "Usually"
@@ -19,7 +28,12 @@ class FixAvailability(enum.StrEnum):
 
 
 class RuleSettingEffect(enum.StrEnum):
-    """Effect of a resolved setting value on rule selection."""
+    """Effect of a resolved setting value on rule selection.
+
+    Attributes:
+        IGNORED: Matching values remove the rule unless it was selected exactly.
+        DISABLED: Matching values always remove the rule from the active selection.
+    """
 
     IGNORED = "Ignored"
     DISABLED = "Disabled"
@@ -27,7 +41,12 @@ class RuleSettingEffect(enum.StrEnum):
 
 @dataclasses.dataclass(frozen=True, order=True)
 class RuleSettingEffectValues:
-    """Triggering values for one setting effect."""
+    """Triggering values for one setting effect.
+
+    Attributes:
+        effect (RuleSettingEffect): Selection effect to apply when the resolved setting matches.
+        values (tuple[object, ...]): Hashable setting values that trigger the effect.
+    """
 
     effect: RuleSettingEffect
     values: tuple[object, ...]
@@ -48,7 +67,12 @@ class RuleSettingEffectValues:
 
 @dataclasses.dataclass(frozen=True, order=True)
 class RuleSettingEffects:
-    """Selection effects associated with one resolved setting field."""
+    """Selection effects associated with one resolved setting field.
+
+    Attributes:
+        setting (str): Name of the resolved settings field that controls the effects.
+        effects (tuple[RuleSettingEffectValues, ...]): Effects available for specific values of that field.
+    """
 
     setting: str
     effects: tuple[RuleSettingEffectValues, ...]

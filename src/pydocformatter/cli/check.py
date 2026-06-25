@@ -1,3 +1,5 @@
+"""`pydocfmt check` command."""
+
 from __future__ import annotations
 
 import argparse
@@ -34,7 +36,14 @@ _ExecutorFactory = Callable[..., concurrent.futures.Executor]
 
 @dataclasses.dataclass(frozen=True)
 class CheckRunContext:
-    """Path-aware settings context for one check invocation."""
+    """Path-aware settings context for one check invocation.
+
+    Attributes:
+        resolver (settings_core.SettingsResolver[CheckSettings]): Settings resolver shared by all paths in the command
+            run.
+        cwd_profile (settings_core.SettingsProfile[CheckSettings]): Settings profile resolved for the current working
+            directory.
+    """
 
     resolver: settings_core.SettingsResolver[CheckSettings]
     cwd_profile: settings_core.SettingsProfile[CheckSettings]

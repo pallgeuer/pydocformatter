@@ -1,3 +1,5 @@
+"""PDF502 missing-return-documentation rule."""
+
 from __future__ import annotations
 
 import pydocformatter.rules.definition_helpers.docstring_conventions as docstring_conventions
@@ -14,6 +16,12 @@ from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetada
 
 @rule_registration.register_rule_to(PDF)
 class PDF502MissingReturnDocumentation(RuleBase):
+    """Rule implementation for PDF502.
+
+    Attributes:
+        meta (RuleMetadata): Static metadata used for registration, diagnostics, and rule selection.
+    """
+
     meta = RuleMetadata(
         code=RuleCode("PDF502"),
         name="missing-return-documentation",

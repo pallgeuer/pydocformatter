@@ -1,3 +1,5 @@
+"""PDF305 summary-starts-with-this rule."""
+
 from __future__ import annotations
 
 import pydocformatter.rules.definition_helpers.summary_style as summary_style
@@ -11,6 +13,12 @@ from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetada
 
 @rule_registration.register_rule_to(PDF)
 class PDF305SummaryStartsWithThis(RuleBase):
+    """Rule implementation for PDF305.
+
+    Attributes:
+        meta (RuleMetadata): Static metadata used for registration, diagnostics, and rule selection.
+    """
+
     meta = RuleMetadata(
         code=RuleCode("PDF305"),
         name="summary-starts-with-this",

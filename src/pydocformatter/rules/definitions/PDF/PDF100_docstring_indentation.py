@@ -1,3 +1,5 @@
+"""PDF100 docstring-indentation rule."""
+
 from __future__ import annotations
 
 import dataclasses
@@ -16,6 +18,12 @@ from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetada
 
 @rule_registration.register_rule_to(PDF_definition.PDF)
 class PDF100DocstringIndentation(RuleBase):
+    """Rule implementation for PDF100.
+
+    Attributes:
+        meta (RuleMetadata): Static metadata used for registration, diagnostics, and rule selection.
+    """
+
     meta = RuleMetadata(
         code=RuleCode("PDF100"),
         name="docstring-indentation",

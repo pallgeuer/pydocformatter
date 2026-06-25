@@ -1,3 +1,5 @@
+"""Signature and documented parameter comparison helpers."""
+
 from __future__ import annotations
 
 import dataclasses
@@ -13,7 +15,17 @@ from pydocformatter.rules.definition import RuleContext
 
 @dataclasses.dataclass(frozen=True)
 class SignatureParameter:
-    """One signature parameter relevant to parameter documentation rules."""
+    """One signature parameter relevant to parameter documentation rules.
+
+    Attributes:
+        name (str): Raw parameter name from the function signature.
+        display_name (str): Name shown in user-facing diagnostics.
+        comparison_name (str): Normalized name used to compare signature and docstring entries.
+        line_numbers (tuple[int, ...]): One-based source lines occupied by the parameter.
+        implicit_receiver (bool): Whether this is an implicit `self` or `cls` receiver skipped by docs checks.
+        unpacked (bool): Whether the parameter uses `Unpack[...]` documentation semantics.
+        unpack_target_name (str | None): TypedDict or unpack target name used in diagnostics, if known.
+    """
 
     name: str
     display_name: str
@@ -26,7 +38,12 @@ class SignatureParameter:
 
 @dataclasses.dataclass(frozen=True)
 class UnpackAnnotation:
-    """Parsed information about a parameter annotation's Unpack usage."""
+    """Parsed information about a parameter annotation's Unpack usage.
+
+    Attributes:
+        unpacked (bool): Whether the annotation denotes an unpacked parameter.
+        target_name (str | None): Extracted unpack target name, when the annotation exposes one.
+    """
 
     unpacked: bool
     target_name: str | None
@@ -34,7 +51,13 @@ class UnpackAnnotation:
 
 @dataclasses.dataclass(frozen=True)
 class DocumentedParameter:
-    """One parameter name parsed from a docstring entry."""
+    """One parameter name parsed from a docstring entry.
+
+    Attributes:
+        name (str): Parameter name as written in the docstring.
+        comparison_name (str): Normalized name used to match a signature parameter.
+        line_numbers (tuple[int, ...]): One-based source lines occupied by the docstring entry.
+    """
 
     name: str
     comparison_name: str
@@ -81,6 +104,7 @@ def _signature_parameter(
     implicit_receiver_name: str | None,
     fallback_line: int,
 ) -> SignatureParameter:
+    """Return normalized documentation metadata for one CST signature parameter."""
     unpack_annotation = _unpack_annotation(parameter.annotation)
     return SignatureParameter(
         name=parameter.name.value,
@@ -120,6 +144,7 @@ def has_parameter_documentation(docstring: PDF_definition.DocstringInfo) -> bool
 
 
 def _implicit_receiver_name(definition: PDF_definition.DefinitionInfo) -> str | None:
+    """Return an implicit `self` or `cls` receiver name for instance or class methods."""
     if definition.parent is None or definition.parent.kind is not PDF_definition.DefinitionKind.CLASS or _is_staticmethod(definition.decorators):
         return None
     if definition.parameters is None:
@@ -132,10 +157,12 @@ def _implicit_receiver_name(definition: PDF_definition.DefinitionInfo) -> str | 
 
 
 def _is_staticmethod(decorators: tuple[cst.Decorator, ...]) -> bool:
+    """Return whether decorators include a staticmethod marker."""
     return any((name := decorator_helpers.decorator_qualified_name(decorator.decorator)) is not None and name.rpartition(".")[2] == "staticmethod" for decorator in decorators)
 
 
 def _unpack_annotation(annotation: cst.Annotation | None) -> UnpackAnnotation:
+    """Return unpack metadata parsed from a real or stringized annotation."""
     if annotation is None:
         return UnpackAnnotation(unpacked=False, target_name=None)
     expression = annotation.annotation
@@ -151,6 +178,7 @@ def _unpack_annotation(annotation: cst.Annotation | None) -> UnpackAnnotation:
 
 
 def _unpack_expression(expression: cst.BaseExpression) -> UnpackAnnotation:
+    """Return unpack metadata for a parsed annotation expression."""
     if not isinstance(expression, cst.Subscript):
         return UnpackAnnotation(unpacked=False, target_name=None)
     value = expression.value
@@ -160,6 +188,7 @@ def _unpack_expression(expression: cst.BaseExpression) -> UnpackAnnotation:
 
 
 def _is_unpack_value(expression: cst.BaseExpression) -> bool:
+    """Return whether an expression names `Unpack` from typing or typing_extensions."""
     if isinstance(expression, cst.Name):
         return expression.value == "Unpack"
     if isinstance(expression, cst.Attribute):
@@ -168,6 +197,7 @@ def _is_unpack_value(expression: cst.BaseExpression) -> bool:
 
 
 def _unpack_target_name(expression: cst.Subscript) -> str | None:
+    """Return the single subscript target name inside an `Unpack[...]` annotation."""
     if len(expression.slice) != 1:
         return None
     subscript_slice = expression.slice[0].slice
@@ -177,10 +207,12 @@ def _unpack_target_name(expression: cst.Subscript) -> str | None:
 
 
 def _is_typed_dict_class(node: cst.ClassDef) -> bool:
+    """Return whether a class directly bases itself on `TypedDict`."""
     return any(_is_typed_dict_value(base.value) for base in node.bases)
 
 
 def _is_typed_dict_value(expression: cst.BaseExpression) -> bool:
+    """Return whether an expression names `TypedDict` from typing or typing_extensions."""
     if isinstance(expression, cst.Name):
         return expression.value == "TypedDict"
     if isinstance(expression, cst.Attribute):
@@ -189,6 +221,7 @@ def _is_typed_dict_value(expression: cst.BaseExpression) -> bool:
 
 
 def _typed_dict_class_keys(node: cst.ClassDef) -> tuple[str, ...]:
+    """Return annotated key names declared directly in a class-based TypedDict body."""
     if not isinstance(node.body, cst.IndentedBlock):
         return ()
     keys: list[str] = []
@@ -202,16 +235,19 @@ def _typed_dict_class_keys(node: cst.ClassDef) -> tuple[str, ...]:
 
 
 def _expression_name(expression: cst.BaseExpression) -> str | None:
+    """Return a bare name expression value."""
     if isinstance(expression, cst.Name):
         return expression.value
     return None
 
 
 def _comparison_name(name: str) -> str:
+    """Return a docstring-comparison name without vararg marker stars."""
     return name.lstrip("*")
 
 
 def _display_name(parameter: cst.Param, parameters: cst.Parameters) -> str:
+    """Return the parameter spelling used in diagnostics, including vararg markers."""
     name = parameter.name.value
     if isinstance(parameters.star_arg, cst.Param) and parameter is parameters.star_arg:
         return f"*{name}"
@@ -221,5 +257,6 @@ def _display_name(parameter: cst.Param, parameters: cst.Parameters) -> str:
 
 
 def _parameter_line_numbers(parameter: cst.Param, *, context: RuleContext, fallback_line: int) -> tuple[int, ...]:
+    """Return the source line for a parameter name or the definition fallback line."""
     position = context.positions.get(parameter.name)
     return (fallback_line,) if position is None else (position.start.line,)

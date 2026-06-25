@@ -1,3 +1,5 @@
+"""PDF507 extraneous-exception-documentation rule."""
+
 from __future__ import annotations
 
 import pydocformatter.rules.definition_helpers.value_documentation as value_documentation
@@ -12,6 +14,12 @@ from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetada
 
 @rule_registration.register_rule_to(PDF)
 class PDF507ExtraneousExceptionDocumentation(RuleBase):
+    """Rule implementation for PDF507.
+
+    Attributes:
+        meta (RuleMetadata): Static metadata used for registration, diagnostics, and rule selection.
+    """
+
     meta = RuleMetadata(
         code=RuleCode("PDF507"),
         name="extraneous-exception-documentation",

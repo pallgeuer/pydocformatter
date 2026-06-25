@@ -1,3 +1,5 @@
+"""PDF403 section-name-trailing-content rule."""
+
 from __future__ import annotations
 
 import re
@@ -19,6 +21,12 @@ _GOOGLE_TRAILING_CONTENT_RE = re.compile(r"^(?P<indent>[ \t]*)(?P<name>[A-Za-z][
 
 @rule_registration.register_rule_to(PDF)
 class PDF403SectionNameTrailingContent(RuleBase):
+    """Rule implementation for PDF403.
+
+    Attributes:
+        meta (RuleMetadata): Static metadata used for registration, diagnostics, and rule selection.
+    """
+
     meta = RuleMetadata(
         code=RuleCode("PDF403"),
         name="section-name-trailing-content",
@@ -76,6 +84,7 @@ def _results(context: RuleContext, *, rule: RuleMetadata) -> tuple[section_edits
 
 
 def _google_trailing_content_target(line: PDF_definition.DocstringValueLine, *, context: RuleContext) -> tuple[str, str, str] | None:
+    """Return split header/content lines for a Google section with trailing text."""
     match = _GOOGLE_TRAILING_CONTENT_RE.match(line.text)
     if match is None:
         return None
@@ -90,6 +99,7 @@ def _google_trailing_content_target(line: PDF_definition.DocstringValueLine, *, 
 
 
 def _protected_or_parsed_line_indexes(docstring: PDF_definition.DocstringInfo) -> set[int]:
+    """Return logical line indexes that are already parsed or protected from splitting."""
     indexes: set[int] = set()
     for section in docstring.structure.sections:
         indexes.update(range(section.start_line, section.end_line))
@@ -98,6 +108,7 @@ def _protected_or_parsed_line_indexes(docstring: PDF_definition.DocstringInfo) -
 
 
 def _add_protected_or_parsed_block_indexes(blocks: tuple[PDF_definition.DocstringBlock, ...], indexes: set[int]) -> None:
+    """Add line indexes occupied by non-paragraph blocks to a mutable set."""
     for block in blocks:
         if block.kind is not PDF_definition.DocstringBlockKind.PARAGRAPH:
             indexes.update(range(block.start_line, block.end_line))

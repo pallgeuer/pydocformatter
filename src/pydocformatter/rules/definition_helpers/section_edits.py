@@ -1,3 +1,5 @@
+"""Docstring section edit result helpers."""
+
 from __future__ import annotations
 
 import dataclasses
@@ -10,7 +12,12 @@ from pydocformatter.rules.models import RuleFinding, RuleMetadata
 
 @dataclasses.dataclass(frozen=True)
 class SectionEditResult:
-    """A section-style finding and its optional whole-docstring change."""
+    """A section-style finding and its optional whole-docstring change.
+
+    Attributes:
+        finding (RuleFinding): Diagnostic reported for the section-style issue.
+        change (rule_edits.PlannedSourceChange | None): Whole-docstring edit that fixes the issue, if available.
+    """
 
     finding: RuleFinding
     change: rule_edits.PlannedSourceChange | None

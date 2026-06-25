@@ -1,3 +1,5 @@
+"""Summary word targeting helpers."""
+
 from __future__ import annotations
 
 import dataclasses
@@ -10,7 +12,14 @@ SummaryLineTarget = PDF_definition.SummaryLineTarget
 
 @dataclasses.dataclass(frozen=True)
 class SummaryWordTarget:
-    """The first word in a targeted summary line."""
+    """The first word in a targeted summary line.
+
+    Attributes:
+        summary (SummaryLineTarget): Summary line that contains the target word.
+        word (str): First summary word selected for style checks.
+        text_start_column (int): Zero-based column where `word` starts in the evaluated docstring line.
+        text_end_column (int): Zero-based column just after `word` in the evaluated docstring line.
+    """
 
     summary: SummaryLineTarget
     word: str

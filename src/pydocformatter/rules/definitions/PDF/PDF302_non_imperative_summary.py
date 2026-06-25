@@ -1,3 +1,5 @@
+"""PDF302 non-imperative-summary rule."""
+
 from __future__ import annotations
 
 import pydocformatter.rules.definition_helpers.decorators as decorator_helpers
@@ -13,6 +15,12 @@ from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetada
 
 @rule_registration.register_rule_to(PDF)
 class PDF302NonImperativeSummary(RuleBase):
+    """Rule implementation for PDF302.
+
+    Attributes:
+        meta (RuleMetadata): Static metadata used for registration, diagnostics, and rule selection.
+    """
+
     meta = RuleMetadata(
         code=RuleCode("PDF302"),
         name="non-imperative-summary",

@@ -1,3 +1,5 @@
+"""PDF304 summary-first-word-capitalization rule."""
+
 from __future__ import annotations
 
 import dataclasses
@@ -14,6 +16,12 @@ from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetada
 
 @rule_registration.register_rule_to(PDF)
 class PDF304SummaryFirstWordCapitalization(RuleBase):
+    """Rule implementation for PDF304.
+
+    Attributes:
+        meta (RuleMetadata): Static metadata used for registration, diagnostics, and rule selection.
+    """
+
     meta = RuleMetadata(
         code=RuleCode("PDF304"),
         name="summary-first-word-capitalization",
@@ -42,6 +50,14 @@ class PDF304SummaryFirstWordCapitalization(RuleBase):
 
 @dataclasses.dataclass(frozen=True)
 class _CapitalizationResult:
+    """Finding plus optional source change for one capitalization target.
+
+    Attributes:
+        finding (RuleFinding): Diagnostic reported for the summary word.
+        change (rule_edits.PlannedSourceChange | None): Safe source rewrite for the word, when the docstring can be
+            mapped back to source.
+    """
+
     finding: RuleFinding
     change: rule_edits.PlannedSourceChange | None
 

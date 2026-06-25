@@ -1,3 +1,5 @@
+"""PDF411 type-like-token-spacing-normalization rule."""
+
 from __future__ import annotations
 
 import ast
@@ -17,6 +19,12 @@ from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetada
 
 @rule_registration.register_rule_to(PDF_definition.PDF)
 class PDF411TypeLikeTokenSpacingNormalization(RuleBase):
+    """Rule implementation for PDF411.
+
+    Attributes:
+        meta (RuleMetadata): Static metadata used for registration, diagnostics, and rule selection.
+    """
+
     meta = RuleMetadata(
         code=RuleCode("PDF411"),
         name="type-like-token-spacing-normalization",
@@ -49,6 +57,15 @@ class PDF411TypeLikeTokenSpacingNormalization(RuleBase):
 
 @dataclasses.dataclass(frozen=True)
 class _LineReplacement:
+    """Replacement span for one normalized type-like token.
+
+    Attributes:
+        line (PDF_definition.DocstringValueLine): Logical docstring line containing the token.
+        start_column (int): Zero-based evaluated-text column where the token starts.
+        end_column (int): Zero-based evaluated-text column just after the token.
+        text (str): Normalized replacement text.
+    """
+
     line: PDF_definition.DocstringValueLine
     start_column: int
     end_column: int
@@ -114,6 +131,7 @@ def _line_replacement(
     *,
     normalized_type_cache: dict[str, str | None],
 ) -> _LineReplacement | None:
+    """Return a convention-specific replacement for an entry's type-like token."""
     if convention is DocstringConvention.GOOGLE:
         return _google_replacement(line, entry, normalized_type_cache=normalized_type_cache)
     if convention is DocstringConvention.NUMPY:
@@ -124,6 +142,7 @@ def _line_replacement(
 
 
 def _google_replacement(line: PDF_definition.DocstringValueLine, entry: PDF_definition.DocstringEntry, *, normalized_type_cache: dict[str, str | None]) -> _LineReplacement | None:
+    """Return a replacement for a Google entry type token."""
     if entry.kind not in _TYPE_TEXT_ENTRY_KINDS:
         return None
     match = PDF_definition._GOOGLE_ENTRY_RE.match(line.text)
@@ -137,6 +156,7 @@ def _google_replacement(line: PDF_definition.DocstringValueLine, entry: PDF_defi
 
 
 def _numpy_replacement(line: PDF_definition.DocstringValueLine, entry: PDF_definition.DocstringEntry, *, normalized_type_cache: dict[str, str | None]) -> _LineReplacement | None:
+    """Return a replacement for a NumPy entry type token."""
     if entry.kind not in _TYPE_TEXT_ENTRY_KINDS:
         return None
     match = PDF_definition._NUMPY_ENTRY_RE.match(line.text)
@@ -150,6 +170,7 @@ def _numpy_replacement(line: PDF_definition.DocstringValueLine, entry: PDF_defin
 
 
 def _rest_replacement(line: PDF_definition.DocstringValueLine, entry: PDF_definition.DocstringEntry, *, normalized_type_cache: dict[str, str | None]) -> _LineReplacement | None:
+    """Return a replacement for a reStructuredText field type token."""
     match = PDF_definition._REST_FIELD_RE.match(line.text)
     if match is None or entry.field_name is None:
         return None
@@ -178,6 +199,7 @@ def _normalized_replacement(
     *,
     normalized_type_cache: dict[str, str | None],
 ) -> _LineReplacement | None:
+    """Return a replacement object when normalized text differs from source text."""
     normalized = _cached_normalized_type_like_text(text, normalized_type_cache=normalized_type_cache)
     if normalized is None or normalized == text:
         return None
@@ -185,12 +207,14 @@ def _normalized_replacement(
 
 
 def _cached_normalized_type_like_text(text: str, *, normalized_type_cache: dict[str, str | None]) -> str | None:
+    """Return cached normalized type-like text for an entry fragment."""
     if text not in normalized_type_cache:
         normalized_type_cache[text] = _normalized_type_like_text(text)
     return normalized_type_cache[text]
 
 
 def _normalized_type_like_text(text: str) -> str | None:
+    """Return AST-stable normalized spacing for a type-like expression."""
     stripped = text.strip()
     if not stripped:
         return None
@@ -211,6 +235,7 @@ def _normalized_type_like_text(text: str) -> str | None:
 
 
 def _parse_type_like_expr(text: str) -> ast.Expression | None:
+    """Parse text as a Python expression, returning None for syntax errors."""
     try:
         return ast.parse(text, mode="eval")
     except SyntaxError:
@@ -218,10 +243,12 @@ def _parse_type_like_expr(text: str) -> ast.Expression | None:
 
 
 def _without_whitespace(text: str) -> str:
+    """Return text with all whitespace removed for token-preservation checks."""
     return "".join(text.split())
 
 
 def _is_type_like_node(node: ast.AST, *, allow_sequence: bool) -> bool:
+    """Return whether an AST node is accepted as a conservative type-like expression."""
     if isinstance(node, ast.Name):
         return True
     if isinstance(node, ast.Attribute):

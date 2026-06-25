@@ -1,3 +1,5 @@
+"""PDF410 exception-entry-normalization rule."""
+
 from __future__ import annotations
 
 import pydocformatter.rules.definition_helpers.docstring_conventions as docstring_conventions
@@ -13,6 +15,12 @@ from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetada
 
 @rule_registration.register_rule_to(PDF_definition.PDF)
 class PDF410ExceptionEntryNormalization(RuleBase):
+    """Rule implementation for PDF410.
+
+    Attributes:
+        meta (RuleMetadata): Static metadata used for registration, diagnostics, and rule selection.
+    """
+
     meta = RuleMetadata(
         code=RuleCode("PDF410"),
         name="exception-entry-normalization",
@@ -87,6 +95,7 @@ def _results(context: RuleContext, *, rule: RuleMetadata) -> tuple[section_edits
 
 
 def _canonical_exception_entry_line(convention: DocstringConvention, text: str, entry: PDF_definition.DocstringEntry) -> str | None:
+    """Return the canonical exception entry line for a docstring convention."""
     if not entry.names:
         return None
     if convention is DocstringConvention.GOOGLE:
@@ -99,6 +108,7 @@ def _canonical_exception_entry_line(convention: DocstringConvention, text: str, 
 
 
 def _canonical_google_exception_entry_line(text: str, entry: PDF_definition.DocstringEntry) -> str | None:
+    """Return the canonical Google exception entry spelling."""
     if PDF_definition._GOOGLE_ENTRY_RE.match(text) is not None:
         return None
     match = PDF_definition._GENERIC_ENTRY_RE.match(text)
@@ -111,6 +121,7 @@ def _canonical_google_exception_entry_line(text: str, entry: PDF_definition.Docs
 
 
 def _canonical_numpy_exception_entry_line(text: str, entry: PDF_definition.DocstringEntry) -> str | None:
+    """Return the canonical NumPy exception entry spelling."""
     exception_match = PDF_definition._NUMPY_EXCEPTION_ENTRY_RE.match(text)
     if exception_match is not None:
         description = exception_match.group("description").strip()
@@ -120,6 +131,7 @@ def _canonical_numpy_exception_entry_line(text: str, entry: PDF_definition.Docst
 
 
 def _canonical_rest_exception_entry_line(text: str, entry: PDF_definition.DocstringEntry) -> str | None:
+    """Return the canonical reStructuredText exception field spelling."""
     match = PDF_definition._REST_FIELD_RE.match(text)
     if match is None or entry.field_name is None:
         return None

@@ -1,3 +1,5 @@
+"""Rule code and selector parsing."""
+
 from __future__ import annotations
 
 import dataclasses
@@ -10,7 +12,14 @@ ALL_RULE_SELECTOR_TAG = "ALL"
 
 @dataclasses.dataclass(frozen=True, order=True)
 class RuleCode:
-    """Parsed pydocformatter rule code."""
+    """Parsed pydocformatter rule code.
+
+    Attributes:
+        tag (str): Full rule code such as `PDF101`.
+        prefix (str): Alphabetic rule category prefix parsed from `tag`.
+        number_str (str): Numeric rule suffix preserved with any leading zeros.
+        number (int): Integer value of the numeric rule suffix.
+    """
 
     tag: str
     prefix: str = dataclasses.field(init=False)
@@ -43,7 +52,13 @@ class RuleCode:
 
 @dataclasses.dataclass(frozen=True, order=True)
 class RuleSelector:
-    """Parsed pydocformatter rule selector."""
+    """Parsed pydocformatter rule selector.
+
+    Attributes:
+        tag (str): Selector text such as `PDF`, `PDF10`, `PDF101`, or `ALL`.
+        prefix (str): Alphabetic selector prefix, or `ALL`.
+        number_str (str): Optional numeric selector prefix matched against rule-code numbers.
+    """
 
     tag: str
     prefix: str = dataclasses.field(init=False)

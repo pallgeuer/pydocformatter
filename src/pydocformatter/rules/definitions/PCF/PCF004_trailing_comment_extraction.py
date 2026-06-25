@@ -1,3 +1,5 @@
+"""PCF004 trailing-comment-extraction rule."""
+
 from __future__ import annotations
 
 import pydocformatter.rules.definition_helpers.comments as comment_helpers
@@ -12,6 +14,12 @@ from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetada
 
 @rule_registration.register_rule_to(PCF_definition.PCF)
 class PCF004TrailingCommentExtraction(RuleBase):
+    """Rule implementation for PCF004.
+
+    Attributes:
+        meta (RuleMetadata): Static metadata used for registration, diagnostics, and rule selection.
+    """
+
     meta = RuleMetadata(
         code=RuleCode("PCF004"),
         name="trailing-comment-extraction",

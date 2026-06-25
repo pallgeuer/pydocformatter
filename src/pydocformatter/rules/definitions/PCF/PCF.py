@@ -1,3 +1,5 @@
+"""PCF comment-formatting rule category."""
+
 from __future__ import annotations
 
 import dataclasses
@@ -24,14 +26,27 @@ _TOOL_DIRECTIVE_RE = re.compile(
 
 
 class CommentPlacement(enum.Enum):
-    """Physical placement of a Python comment."""
+    """Physical placement of a Python comment.
+
+    Attributes:
+        STANDALONE: A comment that occupies its own logical source line.
+        TRAILING: A comment that follows code on the same logical source line.
+    """
 
     STANDALONE = "standalone"
     TRAILING = "trailing"
 
 
 class CommentKind(enum.Enum):
-    """Semantic kind used to protect special comments from formatting."""
+    """Semantic kind used to protect special comments from formatting.
+
+    Attributes:
+        REGULAR: Ordinary prose or code-like comments eligible for normal formatting policy.
+        SHEBANG: Interpreter directive comments that must remain byte-for-byte stable.
+        ENCODING_COOKIE: Python encoding declaration comments.
+        TYPE_DIRECTIVE: Inline or standalone type-checker directive comments.
+        TOOL_DIRECTIVE: Linter, formatter, coverage, or IDE directive comments.
+    """
 
     REGULAR = "regular"
     SHEBANG = "shebang"
@@ -44,6 +59,7 @@ class _SyntaxSensitivity:
     """Lazy parent metadata resolver for trailing-comment extraction safety."""
 
     def __init__(self, metadata_wrapper: cst_metadata.MetadataWrapper) -> None:
+        """Store a metadata wrapper and defer parent-map resolution until needed."""
         self._metadata_wrapper = metadata_wrapper
         self._parents: Mapping[cst.CSTNode, cst.CSTNode] | None = None
 
@@ -56,7 +72,17 @@ class _SyntaxSensitivity:
 
 @dataclasses.dataclass(frozen=True)
 class CommentInfo:
-    """Lossless source information for one Python comment."""
+    """Lossless source information for one Python comment.
+
+    Attributes:
+        node (cst.Comment): LibCST comment node.
+        range (cst_metadata.CodeRange): Source range occupied by the comment text.
+        placement (CommentPlacement): Whether the comment is standalone or trailing.
+        kind (CommentKind): Directive classification used to protect special comments.
+        indent (str): Leading whitespace before a standalone comment marker.
+        line_prefix (str): Source text before the comment on its physical line.
+        text (str): Exact comment token text, including the leading hash.
+    """
 
     node: cst.Comment
     range: cst_metadata.CodeRange
@@ -103,7 +129,13 @@ class CommentInfo:
 
 @dataclasses.dataclass(frozen=True)
 class StandaloneCommentRun:
-    """Consecutive regular non-empty standalone comments at one indentation."""
+    """Consecutive regular non-empty standalone comments at one indentation.
+
+    Attributes:
+        comments (tuple[CommentInfo, ...]): Consecutive standalone comments in physical source order.
+        range (cst_metadata.CodeRange): Source range spanning the entire run.
+        indent (str): Shared indentation used when rewriting the run.
+    """
 
     comments: tuple[CommentInfo, ...]
     range: cst_metadata.CodeRange
@@ -112,7 +144,15 @@ class StandaloneCommentRun:
 
 @dataclasses.dataclass(frozen=True)
 class PCFCategoryData:
-    """Prepared source and comment information shared by PCF rules."""
+    """Prepared source and comment information shared by PCF rules.
+
+    Attributes:
+        source_lines (tuple[str, ...]): Original source split into physical lines.
+        comments (tuple[CommentInfo, ...]): All collected comments in source order.
+        standalone_runs (tuple[StandaloneCommentRun, ...]): Consecutive standalone comments eligible for block-level
+            formatting.
+        trailing_comments (tuple[CommentInfo, ...]): Trailing comments eligible for spacing or extraction rules.
+    """
 
     source_lines: tuple[str, ...]
     comments: tuple[CommentInfo, ...]
@@ -128,6 +168,7 @@ class _CommentCollector(cst.CSTVisitor):
     """Collect comments from a LibCST module."""
 
     def __init__(self) -> None:
+        """Initialize an empty comment collection."""
         super().__init__()
         self.comments: list[cst.Comment] = []
 
@@ -138,7 +179,11 @@ class _CommentCollector(cst.CSTVisitor):
 
 @rule_registration.register_rule_category
 class PCF(RuleCategoryBase):
-    """Comment formatting rule category."""
+    """Comment formatting rule category.
+
+    Attributes:
+        meta (RuleMetadata): Static metadata used for registration, diagnostics, and rule selection.
+    """
 
     meta = RuleCategoryMetadata(
         prefix="PCF",

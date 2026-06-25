@@ -1,3 +1,5 @@
+"""PDF300 summary-trailing-period rule."""
+
 from __future__ import annotations
 
 import pydocformatter.rules.definition_helpers.summary_punctuation as summary_punctuation
@@ -14,6 +16,12 @@ _POLICY = summary_punctuation.SummaryPunctuationPolicy(valid_endings=".", nonfix
 
 @rule_registration.register_rule_to(PDF)
 class PDF300SummaryTrailingPeriod(RuleBase):
+    """Rule implementation for PDF300.
+
+    Attributes:
+        meta (RuleMetadata): Static metadata used for registration, diagnostics, and rule selection.
+    """
+
     meta = RuleMetadata(
         code=RuleCode("PDF300"),
         name="summary-trailing-period",

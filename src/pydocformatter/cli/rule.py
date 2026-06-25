@@ -1,3 +1,5 @@
+"""`pydocfmt rule` command."""
+
 from __future__ import annotations
 
 import argparse
@@ -15,20 +17,43 @@ from pydocformatter.rules.models import FixAvailability
 
 
 class RuleSourceLocationMetadata(TypedDict):
-    """JSON metadata for a rule source location."""
+    """JSON metadata for a rule source location.
+
+    Attributes:
+        file (str): Source file that defines the rule class.
+        line (int): One-based line number where the rule class is defined.
+    """
 
     file: str
     line: int
 
 
 class RuleStatusMetadata(TypedDict):
-    """JSON metadata for a rule status entry."""
+    """JSON metadata for a rule status entry.
+
+    Attributes:
+        since (str): pydocformatter version in which the status became true.
+    """
 
     since: str
 
 
 class RuleMetadataOutput(TypedDict):
-    """JSON metadata for one rule explanation."""
+    """JSON metadata for one rule explanation.
+
+    Attributes:
+        name (str): Stable rule name used in documentation and JSON output.
+        code (str): Full rule code such as `PDF101`.
+        linter (str): Rule category prefix that owns the rule.
+        summary (str): Short rule summary from the adjacent Markdown documentation.
+        message_formats (list[str]): Diagnostic message templates this rule can emit.
+        fix (str): Human-readable automatic-fix availability.
+        fix_availability (FixAvailability): Machine-readable automatic-fix availability.
+        explanation (str): Long-form rule explanation from the adjacent Markdown documentation.
+        preview (bool): Whether the rule is preview-only in Ruff-compatible output.
+        status (dict[str, RuleStatusMetadata]): Stable status metadata keyed by status name.
+        source_location (RuleSourceLocationMetadata | None): Optional source location of the rule class.
+    """
 
     name: str
     code: str

@@ -1,3 +1,5 @@
+"""Summary punctuation finding and fix helpers."""
+
 from __future__ import annotations
 
 import dataclasses
@@ -10,7 +12,12 @@ from pydocformatter.rules.models import RuleFinding, RuleMetadata
 
 @dataclasses.dataclass(frozen=True)
 class SummaryPunctuationResult:
-    """Finding and optional fix for one summary-punctuation issue."""
+    """Finding and optional fix for one summary-punctuation issue.
+
+    Attributes:
+        finding (RuleFinding): Diagnostic reported for one summary-punctuation issue.
+        change (rule_edits.PlannedSourceChange | None): Planned edit that fixes the summary, if safe.
+    """
 
     finding: RuleFinding
     change: rule_edits.PlannedSourceChange | None
@@ -18,7 +25,12 @@ class SummaryPunctuationResult:
 
 @dataclasses.dataclass(frozen=True)
 class SummaryPunctuationPolicy:
-    """Policy for one summary-punctuation rule."""
+    """Policy for one summary-punctuation rule.
+
+    Attributes:
+        valid_endings (str): Terminal characters accepted by the rule.
+        nonfixable_endings (str): Terminal characters that should report but not be rewritten automatically.
+    """
 
     valid_endings: str
     nonfixable_endings: str

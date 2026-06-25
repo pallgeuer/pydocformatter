@@ -1,3 +1,5 @@
+"""PDF109 multiline-closing-quotes-separate-line rule."""
+
 from __future__ import annotations
 
 from collections.abc import Sequence
@@ -13,6 +15,12 @@ from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetada
 
 @rule_registration.register_rule_to(PDF)
 class PDF109MultilineClosingQuotesSeparateLine(RuleBase):
+    """Rule implementation for PDF109.
+
+    Attributes:
+        meta (RuleMetadata): Static metadata used for registration, diagnostics, and rule selection.
+    """
+
     meta = RuleMetadata(
         code=RuleCode("PDF109"),
         name="multiline-closing-quotes-separate-line",

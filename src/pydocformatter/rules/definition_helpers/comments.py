@@ -1,3 +1,5 @@
+"""Comment structure detection helpers."""
+
 from __future__ import annotations
 
 import ast

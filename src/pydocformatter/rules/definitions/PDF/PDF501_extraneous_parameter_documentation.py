@@ -1,3 +1,5 @@
+"""PDF501 extraneous-parameter-documentation rule."""
+
 from __future__ import annotations
 
 import pydocformatter.rules.definition_helpers.docstring_conventions as docstring_conventions
@@ -13,6 +15,12 @@ from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetada
 
 @rule_registration.register_rule_to(PDF)
 class PDF501ExtraneousParameterDocumentation(RuleBase):
+    """Rule implementation for PDF501.
+
+    Attributes:
+        meta (RuleMetadata): Static metadata used for registration, diagnostics, and rule selection.
+    """
+
     meta = RuleMetadata(
         code=RuleCode("PDF501"),
         name="extraneous-parameter-documentation",
