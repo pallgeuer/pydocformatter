@@ -4,6 +4,8 @@ Fix is always available. (Use `Fix is usually available.`, `Fix is sometimes ava
 
 (Only if rule has `setting_effects` like ignored or disabled:) Rule is ignored if `docstring-convention` is `google` or `numpy`.
 
+(Only if rule is listed in the default `require-explicit` setting:) Rule must by default be explicitly selected, unless it is removed from `require-explicit`.
+
 (Only if rule has `incompatible_with`:) Rule is incompatible with `CODE`.
 
 ## What it does

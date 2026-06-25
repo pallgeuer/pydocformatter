@@ -147,6 +147,7 @@ Defaults:
 - `select = ["ALL"]`
 - `ignore = []`
 - `extend-select = []`
+- `require-explicit = ["PCF005", "PDF003"]`
 
 Global enabled rules are resolved per rule:
 
@@ -156,12 +157,15 @@ Global enabled rules are resolved per rule:
 - For each rule, track the strongest matching enabling selector by source priority and specificity.
 - For each rule, track the strongest matching disabling selector by source priority and specificity.
 - Select the rule only when the enabling selector strength is greater than the disabling selector strength.
+- Resolve `require-explicit` as rule selectors. Any selected rule matched by `require-explicit` is removed unless an exact rule-code selector also participated in enabling it.
 
 The output `rules` tuple preserves deterministic rule-code order after filtering.
 
+`require-explicit` is intended for opt-in rules that should remain available through exact selection without being enabled by broad selectors such as `ALL`, `PDF`, or `PCF`. For example, with the defaults, `select = ["ALL"]` does not enable `PCF005` or `PDF003`, while `extend-select = ["PCF005", "PDF003"]` enables them. Setting `require-explicit = []` lets broad selectors enable all selected rules.
+
 ## Rule Incompatibilities
 
-After normal selection precedence and setting effects are resolved, selected rule incompatibilities are resolved once for the complete settings profile:
+After normal selection precedence, setting effects, and explicit-selection requirements are resolved, selected rule incompatibilities are resolved once for the complete settings profile:
 
 - Rules are considered in deterministic `RuleCollection.rules` order.
 - A rule is retained unless it is incompatible with an earlier retained rule.

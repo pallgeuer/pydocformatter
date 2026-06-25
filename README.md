@@ -127,6 +127,7 @@ If no files or directories are specified, `pydocfmt check` checks the current di
 - `--select RULE`: Comma-separated rule selector(s) to enable
 - `--ignore RULE`: Comma-separated rule selector(s) to ignore
 - `--extend-select RULE`: Comma-separated additional rule selector(s) to enable
+- `--require-explicit RULE`: Comma-separated rule selector(s) that require exact rule-code selection
 - `--per-file-ignores RULE_TOML`: TOML inline table mapping file patterns to ignored rule selectors
 - `--extend-per-file-ignores RULE_TOML`: TOML inline table mapping file patterns to additional ignored rule selectors
 - `--fixable RULE`: Comma-separated rule selector(s) eligible for automatic fixes
@@ -226,6 +227,7 @@ parallelism = 0.0
 select = ["ALL"]
 ignore = []
 extend-select = []
+require-explicit = ["PCF005", "PDF003"]
 per-file-ignores = {"tests/*.py" = ["PCF001"]}
 extend-per-file-ignores = {}
 fixable = ["ALL"]
@@ -308,6 +310,7 @@ For TOML configuration, `[tool.pydocfmt.docstring]` and `[tool.pydocfmt.comment]
 - `select`: Rule selectors to enable (default: `["ALL"]`)
 - `ignore`: Rule selectors to ignore
 - `extend-select`: Additional rule selectors to enable
+- `require-explicit`: Rule selectors that broad selectors do not enable unless an exact rule-code selector also participates (default: `["PCF005", "PDF003"]`)
 - `per-file-ignores`: File-pattern-specific ignored rule selectors
 - `extend-per-file-ignores`: Additional file-pattern-specific ignored rule selectors
 - `fixable`: Rule selectors eligible for automatic fixes (default: `["ALL"]`)

@@ -1209,6 +1209,34 @@ class TestRules(unittest.TestCase):
         self.assertEqual(tuple(rule.rule.code.tag for rule in selection.rules), ("PDF101",))
         self.assertEqual(tuple(rule.fixable for rule in selection.rules), (True,))
 
+    def test_select_rules_requires_exact_selection_for_require_explicit_rules(self) -> None:
+        defaults = rules_selection.select_rules(CheckSettings(select=("ALL",)))
+        prefixed = rules_selection.select_rules(CheckSettings(select=("PDF",)))
+        mixed_broad = rules_selection.select_rules(CheckSettings(select=("ALL", "PCF001")))
+        exact = rules_selection.select_rules(CheckSettings(select=("PDF", "PDF003")))
+        extended_exact = rules_selection.select_rules(CheckSettings(extend_select=("PCF005", "PDF003")))
+        disabled_requirement = rules_selection.select_rules(CheckSettings(require_explicit=()))
+
+        self.assertEqual(defaults.errors, ())
+        self.assertEqual(prefixed.errors, ())
+        self.assertEqual(mixed_broad.errors, ())
+        self.assertNotIn("PCF005", tuple(rule.rule.code.tag for rule in defaults.rules))
+        self.assertNotIn("PDF003", tuple(rule.rule.code.tag for rule in defaults.rules))
+        self.assertNotIn("PDF003", tuple(rule.rule.code.tag for rule in prefixed.rules))
+        self.assertNotIn("PCF005", tuple(rule.rule.code.tag for rule in mixed_broad.rules))
+        self.assertNotIn("PDF003", tuple(rule.rule.code.tag for rule in mixed_broad.rules))
+        self.assertIn("PDF003", tuple(rule.rule.code.tag for rule in exact.rules))
+        self.assertIn("PCF005", tuple(rule.rule.code.tag for rule in extended_exact.rules))
+        self.assertIn("PDF003", tuple(rule.rule.code.tag for rule in extended_exact.rules))
+        self.assertIn("PCF005", tuple(rule.rule.code.tag for rule in disabled_requirement.rules))
+        self.assertIn("PDF003", tuple(rule.rule.code.tag for rule in disabled_requirement.rules))
+
+    def test_select_rules_reports_require_explicit_selector_errors(self) -> None:
+        selection = rules_selection.select_rules(CheckSettings(require_explicit=("bad", "PDF999")))
+
+        self.assertIn("require-explicit rules contains invalid selector: bad", selection.errors)
+        self.assertIn("require-explicit rules contains unknown selector: PDF999", selection.errors)
+
     def test_select_rules_applies_ignored_setting_effect_after_normal_precedence(self) -> None:
         broad = rules_selection.select_rules(CheckSettings(select=("TST",), docstring_convention=DocstringConvention.GOOGLE), collection=setting_effect_collection())
         exact = rules_selection.select_rules(CheckSettings(select=("TST001",), docstring_convention=DocstringConvention.GOOGLE), collection=setting_effect_collection())

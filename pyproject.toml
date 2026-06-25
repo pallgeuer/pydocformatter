@@ -94,6 +94,7 @@ skip = [".github", ".eggs", ".git", ".hg", ".mypy_cache", ".tox", ".venv", "html
 line-length = 120
 indent-style = "space"
 docstring-convention = "google"
+extend-select = ["PCF005", "PDF003"]
 
 [tool.mypy]
 files = ["src/pydocformatter", "tests"]

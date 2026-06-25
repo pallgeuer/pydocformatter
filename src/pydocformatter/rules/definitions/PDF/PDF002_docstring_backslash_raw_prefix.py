@@ -60,7 +60,7 @@ def _finding_for_docstring(docstring: PDF_definition.DocstringInfo, *, context: 
         return RuleFinding(rule=PDF002DocstringBackslashRawPrefix.meta, line_numbers=_line_numbers(docstring), instance_fixable=True)
     # Non-fixable findings point only to manually actionable backslash lines; fixable source changes still report the
     # whole docstring range.
-    reportable_lines = _reportable_nonfixable_line_numbers(docstring)
+    reportable_lines = reportable_backslash_line_numbers(docstring)
     if not reportable_lines:
         return None
     return RuleFinding(rule=PDF002DocstringBackslashRawPrefix.meta, line_numbers=reportable_lines, instance_fixable=False)
@@ -97,7 +97,7 @@ def _rendered_docstring(docstring: PDF_definition.DocstringInfo) -> str | None:
     return string_literals.render_simple_string_from_body_source("r", docstring.node.quote, body_source, expected_value=docstring.value)
 
 
-def _reportable_nonfixable_line_numbers(docstring: PDF_definition.DocstringInfo) -> tuple[int, ...]:
+def reportable_backslash_line_numbers(docstring: PDF_definition.DocstringInfo) -> tuple[int, ...]:
     """Return lines with non-fixable backslashes other than non-ASCII character escapes."""
     if not isinstance(docstring.node, cst.SimpleString):
         return _line_numbers(docstring)

@@ -3,7 +3,8 @@ import unittest
 
 import pydocformatter.rules.collection as rule_collection
 import pydocformatter.rules.models as rule_models
-from pydocformatter.cli.settings_check import DocstringConvention
+from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention
+from pydocformatter.rules.codes import RuleSelector
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 FORMAT_RULES_PATH = ROOT / "docs" / "formatting_rules.md"
@@ -61,6 +62,12 @@ def _conflicts_cell(rule: rule_models.RuleMetadata) -> str:
     return ", ".join(str(code) for code in rule.incompatible_with)
 
 
+def _explicit_cell(rule: rule_models.RuleMetadata) -> str:
+    """Return the formatting rules table cell for explicit-selection requirements."""
+    selectors = tuple(RuleSelector(selector) for selector in CheckSettings().require_explicit)
+    return "Required" if any(selector.selects_code(rule.code) for selector in selectors) else "-"
+
+
 class TestFormattingRulesDoc(unittest.TestCase):
     def test_pydocformatter_rule_tables_match_rule_metadata(self) -> None:
         text = FORMAT_RULES_PATH.read_text(encoding="utf-8")
@@ -75,6 +82,7 @@ class TestFormattingRulesDoc(unittest.TestCase):
             self.assertEqual(row["Name"], rule.name)
             self.assertEqual(row["Message"], rule.message)
             self.assertEqual(row["Fixable"], rule.fix_availability.value)
+            self.assertEqual(row["Explicit"], _explicit_cell(rule))
             self.assertEqual(row["Stable Since"], rule.stable_since)
 
             if rule.code.prefix == "PDF":

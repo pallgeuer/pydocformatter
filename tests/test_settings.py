@@ -357,6 +357,7 @@ class TestSettings(unittest.TestCase):
                 "select",
                 "ignore",
                 "extend_select",
+                "require_explicit",
                 "per_file_ignores",
                 "extend_per_file_ignores",
                 "fixable",
@@ -514,6 +515,7 @@ class TestSettings(unittest.TestCase):
         self.assertIs(config.output_format, OutputFormat.GROUPED)
         self.assertEqual(config.select, ("ALL",))
         self.assertEqual(config.extend_select, ())
+        self.assertEqual(config.require_explicit, ("PCF005", "PDF003"))
         self.assertEqual(config.ignore, ())
         self.assertEqual(config.fixable, ("ALL",))
         self.assertEqual(config.extend_fixable, ())
@@ -847,6 +849,7 @@ class TestSettings(unittest.TestCase):
         self.assertIn("parallelism = 0.0\n", output)
         self.assertIn('line-ending = "lf"\n', output)
         self.assertIn('select = ["PDF", "PCF"]\n', output)
+        self.assertIn('require-explicit = ["PCF005", "PDF003"]\n', output)
         self.assertIn('per-file-ignores = {"tests/\\"quoted\\"/*.py" = ["PCF001"]}\n', output)
 
     def test_parallelism_setting_accepts_numbers(self) -> None:
@@ -1373,7 +1376,7 @@ class TestSettings(unittest.TestCase):
         self.assertEqual(config.line_length, 103)
 
     def test_load_accepts_argparse_namespace_overrides(self) -> None:
-        args = argparse.Namespace(line_length=103, select=["PDF,PCF"], per_file_ignores=['{"tests/*.py" = ["PCF001"]}'])
+        args = argparse.Namespace(line_length=103, select=["PDF,PCF"], require_explicit=["PCF005, PDF003"], per_file_ignores=['{"tests/*.py" = ["PCF001"]}'])
 
         config = pydocformatter_settings.SETTINGS_SCHEMA.load(
             global_values=pydocformatter_global_args.GlobalArgs(config_options=("line-length = 102",)),
@@ -1382,6 +1385,7 @@ class TestSettings(unittest.TestCase):
 
         self.assertEqual(config.line_length, 103)
         self.assertEqual(config.select, ("PDF", "PCF"))
+        self.assertEqual(config.require_explicit, ("PCF005", "PDF003"))
         self.assertEqual(config.per_file_ignores, (("tests/*.py", ("PCF001",)),))
 
     def test_toml_map_cli_repeated_patterns_append_values(self) -> None:

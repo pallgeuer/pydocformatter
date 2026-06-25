@@ -15,6 +15,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added the `docstring-convention` setting with `none`, `pep257`, `google`, `numpy`, and `rest` modes.
   - Added `PDF000` to rewrite implicitly concatenated docstrings as equivalent simple triple-double-quoted literals.
   - Added `PDF001` and `PDF002` to normalize simple docstring quote style and report non-raw docstrings with source backslashes, suppressing ASCII-only non-ASCII character escape spellings and using automatic fixes only when the rewrite preserves the evaluated docstring value.
+  - Added opt-in `PDF003` to report docstrings with literal non-ASCII source characters and escape them when doing so preserves the evaluated docstring value.
   - Added `PDF101` to reflow safely mapped docstring summaries, paragraphs, section descriptions, reST fields, list items, and block quotes.
   - Added `PDF100` to normalize safely mapped multi-line simple docstring indentation, including convention-aware Google and NumPy section indentation.
   - Added `PDF102` and `PDF103` to normalize safely mapped docstring trailing whitespace and blank-line whitespace.
@@ -55,6 +56,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added mutually validated rule incompatibility metadata and deterministic conflict resolution that keeps the first selected rule and reports later conflicts as operational errors.
   - Added docstring-convention effects for `PDF106` through `PDF109` while keeping PCF rules convention-independent.
   - Enabled comment list-item and block-quote formatting, structural preservation, and Python statement detection by default, while leaving heuristic disabled-code and expression detection disabled.
+  - Added `require-explicit` to keep configured opt-in rules selectable by exact rule code without enabling them through broad selectors like `ALL`, `PDF`, or `PCF`.
   - Added `output-format` for formatter configuration, currently supporting only `"grouped"`.
   - Added Ruff-style `line-ending` configuration with `"auto"`, `"lf"`, `"cr-lf"`, and `"native"` values.
   - Added `indent-style` and `indent-width` for generated docstring section indentation, with Ruff-style defaults of `"space"` and `4`.
@@ -107,6 +109,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added typed PCF comment and PDF docstring category data, together with a shared validated source-edit helper, as the foundation for individual rule implementations.
   - Implemented PCF001 standalone-comment formatting, PCF002 trailing-comment spacing, and PCF004 trailing-comment extraction with independent fixes, protected directive handling, tab-expanded widths, stable impossible-width behavior, and exact EOF preservation.
   - Added PCF003 comment-directive-normalization for safe marker spacing and syntax around known type and tool directives.
+  - Added opt-in diagnostic `PCF005` to report comments with literal non-ASCII source characters.
   - Added PCF support for ty suppression directives by protecting and normalizing `ty: ignore[...]` comments and mixed `type: ignore[ty:...]` payloads.
   - Added PCF support for Ruff suppression directives by normalizing `ruff: ignore[...]`, `ruff: disable[...]`, `ruff: enable[...]`, `ruff: file-ignore[...]`, and `ruff: isort: ...` comments.
   - Added PCF support for single-line PyCharm directives by protecting and normalizing `noinspection`, `language=`, and `@formatter:on`/`@formatter:off` marker comments.

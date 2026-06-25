@@ -7,7 +7,7 @@ from collections.abc import Mapping
 import pydocformatter.rules.collection as rule_collection
 import pydocformatter.settings as settings_core
 import pydocformatter.utils.misc as misc
-from pydocformatter.cli.settings_check import CheckSettings
+from pydocformatter.cli.settings_check import DEFAULT_REQUIRE_EXPLICIT, CheckSettings
 from pydocformatter.rules.codes import ALL_RULE_SELECTOR_TAG, RuleCode, RuleSelector
 from pydocformatter.rules.collection import RuleCollection
 from pydocformatter.rules.models import FixAvailability, RuleMetadata, RuleSettingEffect
@@ -149,6 +149,8 @@ def select_rules(
     )
     enabled_strengths = _resolve_enabled_strengths(selected_strengths, ignored_strengths)
     enabled_strengths = _apply_setting_effects(settings, enabled_strengths=enabled_strengths, collection=collection)
+    require_explicit_codes = _resolve_require_explicit_codes(settings, collection=collection, errors=errors, field_priorities=field_priorities)
+    enabled_strengths = _apply_require_explicit(enabled_strengths, require_explicit_codes=require_explicit_codes)
     enabled_strengths = _resolve_rule_incompatibilities(enabled_strengths, collection=collection, errors=errors)
 
     fixable_strengths = _resolve_rule_strengths(
@@ -236,6 +238,31 @@ def _apply_setting_effects(settings: CheckSettings, *, enabled_strengths: dict[R
     return effective_strengths
 
 
+def _resolve_require_explicit_codes(
+    settings: CheckSettings,
+    *,
+    collection: RuleCollection,
+    errors: list[str],
+    field_priorities: Mapping[str, int] | None,
+) -> frozenset[RuleCode]:
+    """Return rules that broad selectors cannot enable without exact rule-code selection."""
+    report_unknown = settings.require_explicit != DEFAULT_REQUIRE_EXPLICIT or _field_priority("require_explicit", field_priorities) > settings_core.DEFAULT_SOURCE_PRIORITY
+    return frozenset(
+        _resolve_rule_specificities(
+            settings.require_explicit,
+            collection=collection,
+            context="require-explicit rules",
+            errors=errors,
+            report_unknown=report_unknown,
+        )
+    )
+
+
+def _apply_require_explicit(enabled_strengths: dict[RuleCode, _SelectorStrength], *, require_explicit_codes: frozenset[RuleCode]) -> dict[RuleCode, _SelectorStrength]:
+    """Remove require-explicit rules that were only selected through broad selectors."""
+    return {rule_code: strength for rule_code, strength in enabled_strengths.items() if rule_code not in require_explicit_codes or strength.exact_match}
+
+
 def _resolve_rule_incompatibilities(enabled_strengths: dict[RuleCode, _SelectorStrength], *, collection: RuleCollection, errors: list[str]) -> dict[RuleCode, _SelectorStrength]:
     """Keep the first selected rule from each incompatible set and report discarded rules."""
     effective_strengths: dict[RuleCode, _SelectorStrength] = {}
@@ -300,7 +327,15 @@ def _resolve_per_file_ignores(settings: CheckSettings, *, collection: RuleCollec
     return tuple(ignores)
 
 
-def _resolve_rule_specificities(selectors: tuple[str, ...], *, collection: RuleCollection, context: str, errors: list[str], require_available_fix: bool = False) -> dict[RuleCode, int]:
+def _resolve_rule_specificities(
+    selectors: tuple[str, ...],
+    *,
+    collection: RuleCollection,
+    context: str,
+    errors: list[str],
+    require_available_fix: bool = False,
+    report_unknown: bool = True,
+) -> dict[RuleCode, int]:
     """Resolve selectors to rule-code specificities and append nonfatal errors for unusable selectors."""
     strengths = _resolve_rule_strengths(
         (_SelectorGroup(selectors=selectors, priority=settings_core.DEFAULT_SOURCE_PRIORITY),),
@@ -308,12 +343,19 @@ def _resolve_rule_specificities(selectors: tuple[str, ...], *, collection: RuleC
         context=context,
         errors=errors,
         require_available_fix=require_available_fix,
+        report_unknown=report_unknown,
     )
     return {rule_code: strength.specificity for rule_code, strength in strengths.items()}
 
 
 def _resolve_rule_strengths(
-    selector_groups: tuple[_SelectorGroup, ...], *, collection: RuleCollection, context: str, errors: list[str], require_available_fix: bool = False
+    selector_groups: tuple[_SelectorGroup, ...],
+    *,
+    collection: RuleCollection,
+    context: str,
+    errors: list[str],
+    require_available_fix: bool = False,
+    report_unknown: bool = True,
 ) -> dict[RuleCode, _SelectorStrength]:
     """Resolve selectors to rule-code source strengths and append nonfatal errors for unusable selectors."""
     rule_strengths: dict[RuleCode, _SelectorStrength] = {}
@@ -325,7 +367,7 @@ def _resolve_rule_strengths(
 
             matching_rules = collection.matching_rules(selector)
             if not matching_rules:
-                if selector_tag != ALL_RULE_SELECTOR_TAG:
+                if report_unknown and selector_tag != ALL_RULE_SELECTOR_TAG:
                     errors.append(f"{context} contains unknown selector: {selector_tag}")
                 continue
 

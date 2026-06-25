@@ -3,7 +3,7 @@
 ## Code Style
 
 - NEVER manually wrap code/comments/docstrings during code writing and edits; allow the formatters to later enforce line length.
-- Use ASCII-only project source; represent required non-ASCII values with escapes.
+- Use ASCII-only project source; represent required non-ASCII values with escapes. Markdown files may use literal non-ASCII when required.
 - Avoid unqualified function imports like `from X.Y import func`; use `import X.Y` or `import X.Y as Y` and call via the module. Classes, exceptions, types, and constants may be imported directly.
 
 ## Commands
@@ -16,6 +16,7 @@
 
 ## Workflows
 
+- Interview me for relevant details when making plans, unless the details are quite clear already from the provided information.
 - When implementing a new rule, refer to `docs/new_rule_checklist.md`.
 - Rule documentation Markdown files follow the templates `rule_template.md` and `rule_category_template.md` in `src/pydocformatter/rules/`.
 - When changing function signatures or class attributes, update all affected docstrings in the same change.

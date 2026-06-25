@@ -32,6 +32,7 @@ DEFAULT_EXCLUDE = (
 DEFAULT_INCLUDE = ("*.py", "*.pyi", "*.pyw")
 DEFAULT_RULE_SELECT = (ALL_RULE_SELECTOR_TAG,)
 DEFAULT_RULE_FIXABLE = (ALL_RULE_SELECTOR_TAG,)
+DEFAULT_REQUIRE_EXPLICIT = ("PCF005", "PDF003")
 PARALLELISM_CONSTRAINT_MESSAGE = "must be 0, a fractional value greater than 0 and less than 1, or a whole number greater than or equal to 1"
 _validate_non_negative_float = settings_core.validate_float(min_value=0)
 
@@ -148,6 +149,7 @@ class CheckSettings:
         select (StringList): Base selected pydocformatter rule selectors.
         ignore (StringList): Rule selectors to ignore.
         extend_select (StringList): Additional selected rule selectors.
+        require_explicit (StringList): Rule selectors that require exact rule-code selection.
         per_file_ignores (MultiStringMap): File-pattern-specific ignored selectors.
         extend_per_file_ignores (MultiStringMap): Additional file-specific ignores.
         fixable (StringList): Rule selectors eligible for automatic fixes.
@@ -197,6 +199,7 @@ class CheckSettings:
     select: StringList = DEFAULT_RULE_SELECT
     ignore: StringList = ()
     extend_select: StringList = ()
+    require_explicit: StringList = DEFAULT_REQUIRE_EXPLICIT
     per_file_ignores: MultiStringMap = ()
     extend_per_file_ignores: MultiStringMap = ()
     fixable: StringList = DEFAULT_RULE_FIXABLE
@@ -272,6 +275,7 @@ class CheckSettingsOverrides(TypedDict, total=False):
         select (StringList): Base selected pydocformatter rule selectors.
         ignore (StringList): Rule selectors to ignore.
         extend_select (StringList): Additional selected rule selectors.
+        require_explicit (StringList): Rule selectors that require exact rule-code selection.
         per_file_ignores (MultiStringMap): File-pattern-specific ignored selectors.
         extend_per_file_ignores (MultiStringMap): Additional file-specific ignores.
         fixable (StringList): Rule selectors eligible for automatic fixes.
@@ -321,6 +325,7 @@ class CheckSettingsOverrides(TypedDict, total=False):
     select: StringList
     ignore: StringList
     extend_select: StringList
+    require_explicit: StringList
     per_file_ignores: MultiStringMap
     extend_per_file_ignores: MultiStringMap
     fixable: StringList
@@ -609,6 +614,15 @@ SETTINGS_SCHEMA = SettingsSchema(
             validator=settings_core.validate_non_empty_string_list,
             cli={"metavar": "RULE"},
             documentation="Additional rule selectors to enable.",
+        ),
+        SettingDefinition(
+            field="require_explicit",
+            value_type=StringList,
+            group=SettingsGroup.RULE_SELECTION,
+            help="Comma-separated rule selector(s) that require exact rule-code selection.",
+            validator=settings_core.validate_non_empty_string_list,
+            cli={"metavar": "RULE"},
+            documentation='Rule selectors that broad rule selectors do not enable unless an exact rule-code selector also participates; defaults to ["PCF005", "PDF003"].',
         ),
         SettingDefinition(
             field="per_file_ignores",
