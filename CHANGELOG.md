@@ -30,6 +30,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added `PDF411` to normalize internal spacing in parsed convention type-like tokens using conservative AST validation.
   - Added `PDF106` through `PDF109` to normalize multi-line docstring opening and closing quote placement.
   - Added `PDF110` and `PDF203` to collapse safe summary-only docstrings that fit on one line and report summaries that remain multi-line.
+  - Added PDF processing for module, class, and `__init__` instance attribute docstrings recognized by common documentation tools.
 
 - **CLI:**
   - Added Ruff-style subcommands with `pydocfmt check` for read-only checks and `pydocfmt check --fix` for formatting.
@@ -126,6 +127,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Renamed PCF003 from `directive-normalization` to `comment-directive-normalization`, keeping the `PCF003` rule code while clarifying that the rule owns recognized directive marker and payload normalization from `#` onward.
 
 - **Developer workflow:**
+  - Expanded the Loupe review skill with deeper per-lane analysis prompts, explicit manual repro expectations, and clearer read-only scratch-space rules.
   - Changed pytest to use pytest-xdist multiprocessing by default for local, pre-commit, and CI test runs.
   - Shared setup and initial check work across structured rule Markdown example assertions to reduce pytest runtime.
   - Cached rule-context source text and source lines per module state to reduce repeated LibCST source regeneration during checks.
@@ -196,6 +198,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 
 - **Docstring formatting:**
   - Ignored PDF500 through PDF506 under the `none` and `pep257` docstring conventions for broad selections, while keeping exact-selected PDF500, PDF502, PDF504, and PDF506 inert so missing-documentation modes do not report convention-targeted findings without active convention parsing; PDF500 remains ignored under `numpy`.
+  - Fixed same-line docstring reflow to keep wrapped summaries as one summary instead of letting later blank-line and punctuation fixes split and punctuate the sentence mid-summary.
   - Fixed `PDF200` to preserve one blank line between adjacent Google and NumPy sections after collapsing excess blank lines, matching `PDF201` missing-section-separator insertion.
   - Fixed `PDF409` and `PDF410` to preserve Google exception-entry parentheticals, and fixed Google and NumPy parsing to keep malformed exception-like prose continuations from being normalized as separate entries.
   - Fixed Google return and yield section parsing to treat bare `None` and `None.` entries as `None:` entries.

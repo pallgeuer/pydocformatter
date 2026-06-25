@@ -86,7 +86,7 @@ def _docstring_result(docstring: PDF_definition.DocstringInfo, *, context: RuleC
         return None
     fragments = string_literals.value_fragments_for_simple_string(docstring.node, line_ending=context.line_ending)
 
-    fallback_prefix = _fallback_line_prefix(context.source_lines, docstring=docstring)
+    fallback_prefix = _fallback_line_prefix(context.source_lines, docstring=docstring, context=context)
     replacements: list[_RegionReplacement] = []
     for region in docstring.structure.reflow_regions:
         replacement = _replacement_for_region(docstring, region, context=context, fallback_prefix=fallback_prefix, fragments=fragments)
@@ -345,8 +345,11 @@ def _raw_generated_line(docstring: PDF_definition.DocstringInfo, line_index: int
     return f"{margin_line.raw_indent}{generated_text[len(margin_line.text_indent):]}"
 
 
-def _fallback_line_prefix(source_lines: Sequence[str], *, docstring: PDF_definition.DocstringInfo) -> str:
+def _fallback_line_prefix(source_lines: Sequence[str], *, docstring: PDF_definition.DocstringInfo, context: RuleContext) -> str:
     """Return the generated body-line prefix when no prior body line exists."""
     source_line = source_lines[docstring.range.start.line - 1]
+    if isinstance(docstring.statement, cst.SimpleStatementSuite):
+        source_indent = source_line[: len(source_line) - len(source_line.lstrip(" \t"))]
+        return f"{source_indent}{text_layout.indent_unit(context.settings)}"
     prefix = source_line[: docstring.range.start.column]
     return prefix if prefix.strip() == "" else " " * docstring.range.start.column

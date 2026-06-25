@@ -61,6 +61,12 @@ def test_default_policy_ignores_docstring_without_parameter_documentation() -> N
     assert_pdf500_lines(source, ())
 
 
+def test_ignores_attribute_docstrings_with_parameter_sections() -> None:
+    source = 'module_value = 1\n"""Summary.\n\nArgs:\n    missing: Missing.\n"""\n\nclass Example:\n    class_value = 1\n    """Summary.\n\n    Args:\n        missing: Missing.\n    """\n\n    def __init__(self):\n        self.instance_value = 1\n        """Summary.\n\n        Args:\n            missing: Missing.\n        """\n'
+
+    assert_pdf500_lines(source, ())
+
+
 def test_reports_numpy_parameter_missing_from_existing_parameter_section() -> None:
     source = 'def function(first, second):\n    """Summary.\n\n    Parameters\n    ----------\n    first : int\n        First.\n    """\n'
 

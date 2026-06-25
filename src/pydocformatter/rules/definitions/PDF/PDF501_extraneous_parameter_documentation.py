@@ -40,7 +40,7 @@ class PDF501ExtraneousParameterDocumentation(RuleBase):
         typed_dict_keys_by_name: dict[str, frozenset[str]] | None = None
         for docstring in data.docstrings:
             definition = docstring.owner
-            if definition.kind is not PDF_definition.DefinitionKind.FUNCTION or definition.parameters is None:
+            if not isinstance(definition, PDF_definition.DefinitionInfo) or definition.kind is not PDF_definition.DefinitionKind.FUNCTION or definition.parameters is None:
                 continue
             signature_parameters = parameter_documentation.signature_parameters(definition, context=context)
             allowed_names = {parameter.comparison_name for parameter in signature_parameters}

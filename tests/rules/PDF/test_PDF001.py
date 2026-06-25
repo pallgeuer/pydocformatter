@@ -43,6 +43,29 @@ def test_rewrites_simple_docstring_quote_styles() -> None:
     assert not format_pdf001(result.new_source).modified
 
 
+def test_rewrites_attribute_docstring_quote_styles() -> None:
+    source = "module_value = 1\n'module attr'\n\nclass Client:\n    class_value = 1\n    'class attr'\n\n    def __init__(self): self.instance_value = 1; 'instance attr'\n"
+    result = format_pdf001(source)
+
+    assert (
+        result.new_source == 'module_value = 1\n"""module attr"""\n\nclass Client:\n    class_value = 1\n    """class attr"""\n\n    def __init__(self): self.instance_value = 1; """instance attr"""\n'
+    )
+    assert result.fixed_findings[PDF001DocstringQuoteStyle.meta] == 3
+    assert not format_pdf001(result.new_source).modified
+
+
+def test_ignores_attribute_like_strings_after_blank_or_comment_lines() -> None:
+    source = (
+        "module_blank = 1\n\n'separated module string without period and enough words to reflow'\nmodule_comment = 1\n# comment\n'separated comment string without period and enough words to reflow'\n"
+    )
+    settings = CheckSettings(select=("PDF001", "PDF101", "PDF300"), line_length=32)
+    result = format_pdf001(source, settings=settings)
+
+    assert result.new_source == source
+    assert not result.fixed_findings
+    assert not result.unfixed_findings
+
+
 def test_preserves_raw_prefix_when_requoting_is_value_preserving() -> None:
     source = "def path():\n    r'''Return C:\\\\temp.'''\n"
     result = format_pdf001(source)

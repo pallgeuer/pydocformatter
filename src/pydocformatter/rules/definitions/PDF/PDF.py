@@ -21,11 +21,12 @@ from pydocformatter.rules.models import RuleCategoryMetadata
 
 
 class DefinitionKind(enum.Enum):
-    """Kinds of Python definitions that may own docstrings."""
+    """Kinds of Python owners that may have docstrings."""
 
     MODULE = "module"
     CLASS = "class"
     FUNCTION = "function"
+    ATTRIBUTE = "attribute"
 
 
 class DocstringKind(enum.Enum):
@@ -209,6 +210,21 @@ class DefinitionInfo:
 
 
 @dataclasses.dataclass(frozen=True)
+class AttributeInfo:
+    """Convention-neutral information about one documented attribute."""
+
+    node: cst.Assign | cst.AnnAssign
+    kind: DefinitionKind
+    name: str
+    qualified_name: str
+    parent: DefinitionInfo
+    targets: tuple[str, ...]
+
+
+DocstringOwner = DefinitionInfo | AttributeInfo
+
+
+@dataclasses.dataclass(frozen=True)
 class DocstringLine:
     """One physical source line occupied by a docstring expression."""
 
@@ -225,7 +241,7 @@ class DocstringInfo:
     node: cst.SimpleString | cst.ConcatenatedString
     expression: cst.Expr
     statement: cst.SimpleStatementLine | cst.SimpleStatementSuite
-    owner: DefinitionInfo
+    owner: DocstringOwner
     kind: DocstringKind
     range: cst_metadata.CodeRange
     source: str
@@ -275,6 +291,15 @@ DocumentedFunctionFact = tuple[DefinitionInfo, DocstringInfo, FunctionFacts]
 
 
 @dataclasses.dataclass(frozen=True)
+class _AttributeAssignment:
+    """One assignment that may be followed by an attribute docstring."""
+
+    node: cst.Assign | cst.AnnAssign
+    parent: DefinitionInfo
+    targets: tuple[str, ...]
+
+
+@dataclasses.dataclass(frozen=True)
 class PDFCategoryData:
     """Prepared definitions and docstrings shared by PDF rules."""
 
@@ -291,7 +316,8 @@ class PDFCategoryData:
         if docstrings_by_owner_id is None:
             docstrings_by_owner_id = {}
             for docstring in self.docstrings:
-                docstrings_by_owner_id.setdefault(id(docstring.owner), docstring)
+                if isinstance(docstring.owner, DefinitionInfo):
+                    docstrings_by_owner_id.setdefault(id(docstring.owner), docstring)
             object.__setattr__(self, "_docstrings_by_owner_id", docstrings_by_owner_id)
         return docstrings_by_owner_id.get(id(definition))
 
@@ -375,42 +401,110 @@ class _DefinitionCollector(cst.CSTVisitor):
         if first_expression is None:
             return
         expression, statement = first_expression
-        node = expression.value
-        if not isinstance(node, (cst.SimpleString, cst.ConcatenatedString)) or not isinstance(node.evaluated_value, str):
+        docstring = _docstring_info(expression, statement, owner=owner, context=self.context)
+        if docstring is not None:
+            self.docstrings.append(docstring)
+
+
+class _AttributeDocstringCollector:
+    """Collect attribute docstrings recognized by common documentation tools."""
+
+    def __init__(self, context: RuleCategoryContext, definitions: Sequence[DefinitionInfo]) -> None:
+        self.context = context
+        self.definitions_by_node_id = {id(definition.node): definition for definition in definitions}
+        self.docstrings: list[DocstringInfo] = []
+
+    def collect(self) -> tuple[DocstringInfo, ...]:
+        """Return attribute docstrings in source order."""
+        module_definition = self.definitions_by_node_id[id(self.context.module)]
+        self._scan_statements(self.context.module.body, module_definition)
+        return tuple(self.docstrings)
+
+    def _scan_suite(self, suite: cst.BaseSuite, owner: DefinitionInfo) -> None:
+        if isinstance(suite, cst.SimpleStatementSuite):
+            self._scan_small_statements(suite.body, owner, suite, previous_assignment=None)
+        else:
+            self._scan_statements(typing.cast(Sequence[cst.BaseStatement], suite.body), owner)
+
+    def _scan_statements(self, statements: Sequence[cst.BaseStatement], owner: DefinitionInfo) -> None:
+        previous_assignment: _AttributeAssignment | None = None
+        for statement in statements:
+            if isinstance(statement, cst.SimpleStatementLine):
+                pending_assignment = None if statement.leading_lines else previous_assignment
+                previous_assignment = self._scan_small_statements(statement.body, owner, statement, previous_assignment=pending_assignment)
+            else:
+                previous_assignment = None
+                self._scan_compound_statement(statement, owner)
+
+    def _scan_small_statements(
+        self,
+        statements: Sequence[cst.BaseSmallStatement],
+        owner: DefinitionInfo,
+        statement: cst.SimpleStatementLine | cst.SimpleStatementSuite,
+        *,
+        previous_assignment: _AttributeAssignment | None,
+    ) -> _AttributeAssignment | None:
+        pending_assignment = previous_assignment
+        for small_statement in statements:
+            if isinstance(small_statement, cst.Expr):
+                self._collect_after_assignment(small_statement, statement, pending_assignment)
+                pending_assignment = None
+                continue
+            pending_assignment = _attribute_assignment(small_statement, owner)
+        return pending_assignment
+
+    def _collect_after_assignment(
+        self,
+        expression: cst.Expr,
+        statement: cst.SimpleStatementLine | cst.SimpleStatementSuite,
+        assignment: _AttributeAssignment | None,
+    ) -> None:
+        if assignment is None:
             return
-        code_range = self.context.positions[node]
-        source = source_text.source_for_range(code_range, source_lines=self.source_lines)
-        physical_lines = _physical_lines(code_range, source)
-        source_line_number = _simple_docstring_source_line_number(node, source=source, physical_lines=physical_lines, code_range=code_range) if isinstance(node, cst.SimpleString) else None
-        self.docstrings.append(
-            DocstringInfo(
-                node=node,
-                expression=expression,
-                statement=statement,
-                owner=owner,
-                kind=DocstringKind.SIMPLE if isinstance(node, cst.SimpleString) else DocstringKind.CONCATENATED,
-                range=code_range,
-                source=source,
-                value=node.evaluated_value,
-                physical_lines=physical_lines,
-                value_lines=tuple(node.evaluated_value.splitlines()),
-                structure=_parse_docstring(
-                    node.evaluated_value,
-                    settings=self.context.settings,
-                    source_line_number=source_line_number,
-                    source_indent=(
-                        _docstring_source_indent(
-                            statement,
-                            code_range=code_range,
-                            source_lines=self.source_lines,
-                            indent_width=self.context.settings.indent_width,
-                        )
-                        if isinstance(node, cst.SimpleString)
-                        else None
-                    ),
-                ),
-            )
-        )
+        owner = _attribute_owner(assignment)
+        docstring = _docstring_info(expression, statement, owner=owner, context=self.context)
+        if docstring is not None:
+            self.docstrings.append(docstring)
+
+    def _scan_compound_statement(self, statement: cst.BaseStatement, owner: DefinitionInfo) -> None:
+        if isinstance(statement, cst.ClassDef):
+            self._scan_suite(statement.body, self.definitions_by_node_id[id(statement)])
+            return
+        if isinstance(statement, cst.FunctionDef):
+            self._scan_suite(statement.body, self.definitions_by_node_id[id(statement)])
+            return
+        if isinstance(statement, cst.If):
+            self._scan_suite(statement.body, owner)
+            self._scan_if_orelse(statement.orelse, owner)
+            return
+        if isinstance(statement, (cst.For, cst.While)):
+            self._scan_suite(statement.body, owner)
+            if statement.orelse is not None:
+                self._scan_suite(statement.orelse.body, owner)
+            return
+        if isinstance(statement, cst.With):
+            self._scan_suite(statement.body, owner)
+            return
+        if isinstance(statement, (cst.Try, cst.TryStar)):
+            self._scan_suite(statement.body, owner)
+            for handler in statement.handlers:
+                self._scan_suite(handler.body, owner)
+            if statement.orelse is not None:
+                self._scan_suite(statement.orelse.body, owner)
+            if statement.finalbody is not None:
+                self._scan_suite(statement.finalbody.body, owner)
+            return
+        if isinstance(statement, cst.Match):
+            for case in statement.cases:
+                self._scan_suite(case.body, owner)
+
+    def _scan_if_orelse(self, orelse: cst.Else | cst.If | None, owner: DefinitionInfo) -> None:
+        if orelse is None:
+            return
+        if isinstance(orelse, cst.If):
+            self._scan_compound_statement(orelse, owner)
+        else:
+            self._scan_suite(orelse.body, owner)
 
 
 @rule_registration.register_rule_category
@@ -429,7 +523,8 @@ class PDF(RuleCategoryBase):
         del cls
         collector = _DefinitionCollector(context)
         context.module.visit(collector)
-        docstrings = tuple(collector.docstrings)
+        attribute_collector = _AttributeDocstringCollector(context, collector.definitions)
+        docstrings = tuple(sorted((*collector.docstrings, *attribute_collector.collect()), key=_docstring_sort_key))
         return PDFCategoryData(
             definitions=tuple(collector.definitions),
             docstrings=docstrings,
@@ -1672,9 +1767,12 @@ def join_docstring_value_lines(docstring: DocstringInfo, lines: list[str]) -> st
     return "".join(chunks)
 
 
-def _docstring_source_indent(statement: cst.SimpleStatementLine | cst.SimpleStatementSuite, *, code_range: cst_metadata.CodeRange, source_lines: Sequence[str], indent_width: int) -> int:
+def _docstring_source_indent(statement: cst.SimpleStatementLine | cst.SimpleStatementSuite, *, code_range: cst_metadata.CodeRange, source_lines: Sequence[str], indent_width: int) -> int | None:
     """Return the visual indentation margin for a simple docstring."""
-    source_indent = text_layout.leading_width(source_lines[code_range.start.line - 1])
+    source_line = source_lines[code_range.start.line - 1]
+    if isinstance(statement, cst.SimpleStatementLine) and source_line[: code_range.start.column].strip():
+        return None
+    source_indent = text_layout.leading_width(source_line)
     return source_indent + indent_width if isinstance(statement, cst.SimpleStatementSuite) else source_indent
 
 
@@ -1700,6 +1798,107 @@ def _qualified_name(parent: DefinitionInfo, name: str) -> str:
     if parent.kind == DefinitionKind.MODULE:
         return name
     return f"{parent.qualified_name}.{name}"
+
+
+def _docstring_sort_key(docstring: DocstringInfo) -> tuple[int, int]:
+    """Return a source-order sort key for collected docstrings."""
+    return docstring.range.start.line, docstring.range.start.column
+
+
+def _docstring_info(
+    expression: cst.Expr,
+    statement: cst.SimpleStatementLine | cst.SimpleStatementSuite,
+    *,
+    owner: DocstringOwner,
+    context: RuleCategoryContext,
+) -> DocstringInfo | None:
+    """Return docstring metadata for a string expression."""
+    node = expression.value
+    if not isinstance(node, (cst.SimpleString, cst.ConcatenatedString)) or not isinstance(node.evaluated_value, str):
+        return None
+    code_range = context.positions[node]
+    source = source_text.source_for_range(code_range, source_lines=context.source_lines)
+    physical_lines = _physical_lines(code_range, source)
+    source_line_number = _simple_docstring_source_line_number(node, source=source, physical_lines=physical_lines, code_range=code_range) if isinstance(node, cst.SimpleString) else None
+    return DocstringInfo(
+        node=node,
+        expression=expression,
+        statement=statement,
+        owner=owner,
+        kind=DocstringKind.SIMPLE if isinstance(node, cst.SimpleString) else DocstringKind.CONCATENATED,
+        range=code_range,
+        source=source,
+        value=node.evaluated_value,
+        physical_lines=physical_lines,
+        value_lines=tuple(node.evaluated_value.splitlines()),
+        structure=_parse_docstring(
+            node.evaluated_value,
+            settings=context.settings,
+            source_line_number=source_line_number,
+            source_indent=(
+                _docstring_source_indent(
+                    statement,
+                    code_range=code_range,
+                    source_lines=context.source_lines,
+                    indent_width=context.settings.indent_width,
+                )
+                if isinstance(node, cst.SimpleString)
+                else None
+            ),
+        ),
+    )
+
+
+def _attribute_assignment(statement: cst.BaseSmallStatement, owner: DefinitionInfo) -> _AttributeAssignment | None:
+    """Return attribute assignment metadata for supported assignment statements."""
+    if not isinstance(statement, (cst.Assign, cst.AnnAssign)):
+        return None
+    parent = _attribute_parent(owner)
+    if parent is None:
+        return None
+    targets = _assignment_target_names(statement, owner)
+    if not targets:
+        return None
+    return _AttributeAssignment(node=statement, parent=parent, targets=targets)
+
+
+def _attribute_parent(owner: DefinitionInfo) -> DefinitionInfo | None:
+    """Return the API parent for attributes documented in an owner body."""
+    if owner.kind in {DefinitionKind.MODULE, DefinitionKind.CLASS}:
+        return owner
+    if owner.kind is DefinitionKind.FUNCTION and owner.name == "__init__" and owner.parent is not None and owner.parent.kind is DefinitionKind.CLASS:
+        return owner.parent
+    return None
+
+
+def _assignment_target_names(statement: cst.Assign | cst.AnnAssign, owner: DefinitionInfo) -> tuple[str, ...]:
+    """Return supported attribute target names for an assignment."""
+    if isinstance(statement, cst.Assign):
+        return tuple(name for target in statement.targets if (name := _target_name(target.target, owner)) is not None)
+    name = _target_name(statement.target, owner)
+    return (name,) if name is not None else ()
+
+
+def _target_name(target: cst.BaseAssignTargetExpression, owner: DefinitionInfo) -> str | None:
+    """Return a documented attribute name for one supported assignment target."""
+    if owner.kind in {DefinitionKind.MODULE, DefinitionKind.CLASS} and isinstance(target, cst.Name):
+        return target.value
+    if owner.kind is DefinitionKind.FUNCTION and isinstance(target, cst.Attribute) and isinstance(target.value, cst.Name) and target.value.value == "self" and isinstance(target.attr, cst.Name):
+        return target.attr.value
+    return None
+
+
+def _attribute_owner(assignment: _AttributeAssignment) -> AttributeInfo:
+    """Return the docstring owner for one documented attribute assignment."""
+    qualified_names = tuple(_qualified_name(assignment.parent, target) for target in assignment.targets)
+    return AttributeInfo(
+        node=assignment.node,
+        kind=DefinitionKind.ATTRIBUTE,
+        name=", ".join(assignment.targets),
+        qualified_name=", ".join(qualified_names),
+        parent=assignment.parent,
+        targets=assignment.targets,
+    )
 
 
 def _first_expression(body: cst.Module | cst.BaseSuite) -> tuple[cst.Expr, cst.SimpleStatementLine | cst.SimpleStatementSuite] | None:

@@ -12,6 +12,7 @@ from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention
 from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
 from pydocformatter.rules.definitions.PDF.PDF import (
     PDF,
+    AttributeInfo,
     DefinitionInfo,
     DefinitionKind,
     DocstringBlock,
@@ -91,6 +92,51 @@ def test_prepare_collects_definitions_docstrings_and_owner_metadata() -> None:
     assert duplicate_owner_data.docstring_for(data.definitions[1]) is data.docstrings[1]
 
 
+def test_prepare_collects_attribute_docstrings_and_owner_metadata() -> None:
+    source = '"""module doc"""\n"""module additional ignored"""\nmodule_plain = 1\n"""module attr doc"""\nmodule_annotated: int\n"""module annotated doc"""\nmodule_a = module_b = 2; "module multi doc"\n\nclass Client:\n    """class doc"""\n    """class additional ignored"""\n    class_plain = 1\n    """class attr doc"""\n    class_annotated: int = 2; "class annotated doc"\n    class_a = class_b = 3\n    "class multi doc"\n\n    def __init__(self, flag):\n        self.instance_plain = 1\n        "instance attr doc"\n        if flag:\n            self.conditional: int = 2; "conditional attr doc"\n        def nested():\n            self.not_instance = 1\n            "not collected"\n\n    def method(self):\n        local = 1; "not collected"\n'
+    data = PDF.prepare(category_context(source))
+    attribute_docstrings = tuple(docstring for docstring in data.docstrings if isinstance(docstring.owner, AttributeInfo))
+    attribute_details = []
+    for docstring in attribute_docstrings:
+        owner = docstring.owner
+        if isinstance(owner, AttributeInfo):
+            attribute_details.append((owner.qualified_name, owner.targets, docstring.value))
+
+    assert tuple(docstring.owner.qualified_name for docstring in data.docstrings) == (
+        "<module>",
+        "module_plain",
+        "module_annotated",
+        "module_a, module_b",
+        "Client",
+        "Client.class_plain",
+        "Client.class_annotated",
+        "Client.class_a, Client.class_b",
+        "Client.instance_plain",
+        "Client.conditional",
+    )
+    assert tuple(attribute_details) == (
+        ("module_plain", ("module_plain",), "module attr doc"),
+        ("module_annotated", ("module_annotated",), "module annotated doc"),
+        ("module_a, module_b", ("module_a", "module_b"), "module multi doc"),
+        ("Client.class_plain", ("class_plain",), "class attr doc"),
+        ("Client.class_annotated", ("class_annotated",), "class annotated doc"),
+        ("Client.class_a, Client.class_b", ("class_a", "class_b"), "class multi doc"),
+        ("Client.instance_plain", ("instance_plain",), "instance attr doc"),
+        ("Client.conditional", ("conditional",), "conditional attr doc"),
+    )
+    assert all(docstring.owner.kind is DefinitionKind.ATTRIBUTE for docstring in attribute_docstrings)
+    assert data.docstring_for(data.definitions[1]) is data.docstrings[4]
+
+
+def test_prepare_ignores_attribute_like_strings_after_blank_or_comment_lines() -> None:
+    source = 'module_valid = 1\n"""module valid doc"""\nmodule_blank = 1\n\n"""module blank ignored"""\nmodule_comment = 1\n# comment\n"""module comment ignored"""\n\nclass Client:\n    class_valid = 1\n    """class valid doc"""\n    class_blank = 1\n\n    """class blank ignored"""\n    class_comment = 1\n    # comment\n    """class comment ignored"""\n\n    def __init__(self):\n        self.valid = 1\n        """instance valid doc"""\n        self.blank = 1\n\n        """instance blank ignored"""\n        self.comment = 1\n        # comment\n        """instance comment ignored"""\n'
+    data = PDF.prepare(category_context(source))
+    attribute_docstrings = tuple(docstring for docstring in data.docstrings if isinstance(docstring.owner, AttributeInfo))
+
+    assert tuple(docstring.owner.qualified_name for docstring in attribute_docstrings) == ("module_valid", "Client.class_valid", "Client.valid")
+    assert tuple(docstring.value for docstring in attribute_docstrings) == ("module valid doc", "class valid doc", "instance valid doc")
+
+
 def test_documented_function_facts_are_lazy_cached(monkeypatch: pytest.MonkeyPatch) -> None:
     source = 'class Base:\n    @abstractmethod\n    def abstract(self):\n        """Abstract."""\n        return 1\n\n\ndef concrete():\n    """Concrete."""\n    return 2\n\n\ndef stub():\n    """Stub."""\n    pass\n\n\ndef undocumented():\n    return 3\n'
     context = category_context(source)
@@ -145,7 +191,7 @@ def test_prepare_preserves_multiline_crlf_source_and_physical_lines() -> None:
 
 
 def test_prepare_accepts_only_string_valued_first_expressions_as_docstrings() -> None:
-    source = 'def parenthesized():\n    (u"doc")\n\ndef later_string():\n    value = 1\n    "not a docstring"\n'
+    source = 'def parenthesized():\n    (u"doc")\n    "not an additional docstring"\n\ndef later_string():\n    value = 1\n    "not a docstring"\n'
     data = PDF.prepare(category_context(source))
     assert tuple(docstring.owner.qualified_name for docstring in data.docstrings) == ("parenthesized",)
     assert data.docstrings[0].source == 'u"doc"'
@@ -227,8 +273,18 @@ def test_prepare_collects_deeply_nested_definitions_in_lexical_order() -> None:
 def test_prepare_handles_simple_statement_suites_and_non_expression_first_statements() -> None:
     source = 'class Documented: "class doc"; value = 1\nclass Undocumented: value = 1; "late"\ndef documented(): "function doc"; return 1\ndef assigned_first(): value = 1; "late"\n'
     data = PDF.prepare(category_context(source))
-    assert tuple(docstring.owner.qualified_name for docstring in data.docstrings) == ("Documented", "documented")
-    assert all(docstring.statement is docstring.owner.body for docstring in data.docstrings)
+    definition_docstrings = tuple(docstring for docstring in data.docstrings if isinstance(docstring.owner, DefinitionInfo))
+    attribute_docstrings = tuple(docstring for docstring in data.docstrings if isinstance(docstring.owner, AttributeInfo))
+    definition_statement_matches = []
+    for docstring in definition_docstrings:
+        owner = docstring.owner
+        if isinstance(owner, DefinitionInfo):
+            definition_statement_matches.append(docstring.statement is owner.body)
+
+    assert tuple(docstring.owner.qualified_name for docstring in data.docstrings) == ("Documented", "Undocumented.value", "documented")
+    assert tuple(docstring.owner.qualified_name for docstring in definition_docstrings) == ("Documented", "documented")
+    assert tuple(docstring.owner.qualified_name for docstring in attribute_docstrings) == ("Undocumented.value",)
+    assert all(definition_statement_matches)
 
 
 def test_comments_before_first_statements_do_not_prevent_docstring_collection() -> None:
@@ -299,6 +355,13 @@ def test_simple_suite_docstring_uses_suite_indentation_instead_of_literal_column
     structure = PDF.prepare(category_context(source)).docstrings[0].structure
     assert tuple(line.text for line in structure.lines) == ("Summary::", "    Indented literal.", "")
     assert tuple((block.kind, block.start_line, block.end_line) for block in structure.blocks) == ((DocstringBlockKind.LITERAL_BLOCK, 0, 2), (DocstringBlockKind.BLANK, 2, 3))
+
+
+def test_same_line_attribute_docstring_uses_continuation_indentation() -> None:
+    source = 'class Client:\n    def __init__(self):\n        self.value = 1; """Return the instance value after validating\n                        that the configured value is finite."""\n'
+    structure = PDF.prepare(category_context(source)).docstrings[0].structure
+    assert tuple(line.text for line in structure.lines) == ("Return the instance value after validating", "that the configured value is finite.")
+    assert tuple((block.kind, block.start_line, block.end_line) for block in structure.blocks) == ((DocstringBlockKind.SUMMARY, 0, 2),)
 
 
 def test_nested_simple_suite_docstring_includes_enclosing_indentation() -> None:

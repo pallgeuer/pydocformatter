@@ -34,7 +34,8 @@ class PDF302NonImperativeSummary(RuleBase):
         data = PDF.require_data(context)
         findings: list[RuleFinding] = []
         for target in data.summary_line_targets:
-            if not summary_style.is_function_docstring(target.docstring) or _is_test_function(target.docstring) or _is_property_function(target.docstring):
+            owner = target.docstring.owner
+            if not isinstance(owner, PDF_definition.DefinitionInfo) or owner.kind is not PDF_definition.DefinitionKind.FUNCTION or _is_test_function(owner) or _is_property_function(owner):
                 continue
             word = summary_style.first_word_target(target)
             if word is None:
@@ -62,17 +63,15 @@ def _third_person_forms(word: str) -> tuple[str, ...]:
     return (f"{word}s",)
 
 
-def _is_test_function(docstring: PDF_definition.DocstringInfo) -> bool:
+def _is_test_function(definition: PDF_definition.DefinitionInfo) -> bool:
     """Return whether a function docstring belongs to a test-style function."""
-    name = docstring.owner.name
+    name = definition.name
     return name == "runTest" or name.startswith("test")
 
 
-def _is_property_function(docstring: PDF_definition.DocstringInfo) -> bool:
+def _is_property_function(definition: PDF_definition.DefinitionInfo) -> bool:
     """Return whether a function docstring belongs to a property-like function."""
-    return any(
-        (decorator_name := decorator_helpers.decorator_qualified_name(decorator.decorator)) is not None and _is_property_decorator_name(decorator_name) for decorator in docstring.owner.decorators
-    )
+    return any((decorator_name := decorator_helpers.decorator_qualified_name(decorator.decorator)) is not None and _is_property_decorator_name(decorator_name) for decorator in definition.decorators)
 
 
 def _is_property_decorator_name(decorator_name: str) -> bool:

@@ -80,6 +80,14 @@ def test_applies_only_to_functions_and_skips_tests_and_properties() -> None:
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((21,),)
 
 
+def test_ignores_attribute_docstrings() -> None:
+    source = 'module_value = 1\n"""Returns module value."""\n\nclass Example:\n    class_value = 1\n    """Returns class value."""\n\n    def __init__(self):\n        self.instance_value = 1\n        """Returns instance value."""\n'
+    result = format_source(source)
+
+    assert result.new_source == source
+    assert not result.unfixed_findings
+
+
 @pytest.mark.parametrize(
     "decorator",
     (

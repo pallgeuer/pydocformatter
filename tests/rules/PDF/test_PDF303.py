@@ -84,6 +84,14 @@ def test_applies_only_to_functions_and_respects_summary_parsing() -> None:
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((12,),)
 
 
+def test_ignores_attribute_docstrings() -> None:
+    source = 'module_value = 1\n"""module_value(value)"""\n\nclass Example:\n    class_value = 1\n    """class_value(value)"""\n\n    def __init__(self):\n        self.instance_value = 1\n        """instance_value(value)"""\n'
+    result = format_source(source)
+
+    assert result.new_source == source
+    assert not result.unfixed_findings
+
+
 def test_leading_blank_lines_do_not_hide_signature_like_summary() -> None:
     source = 'def function(value):\n    """\n    function(value)\n    """\n'
     result = format_source(source)

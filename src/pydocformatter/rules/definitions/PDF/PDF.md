@@ -5,6 +5,60 @@ The PDF category contains rules that detect formatting issues in Python docstrin
 
 `docstring-convention` is explicit and never auto-detected. Google sections, NumPy sections, and reST fields are parsed only under their matching convention. The `none` and `pep257` conventions do not interpret convention syntax. The default `pep257` convention applies PEP 257/pydocstyle-compatible broad-rule carve-outs, while `none` is the stricter no-convention profile for generic rules that can act without convention parsing. Independent `docstring-parse-*` settings control generic lists, headings, doctests, fences, quotes, tables, directives, and literal blocks.
 
+### Considered docstrings
+PDF rules consider primary module, class, function, method, and nested-definition docstrings:
+
+```python
+"""Module docstring."""
+
+
+class Client:
+    """Class docstring."""
+
+    def close(self):
+        """Method docstring."""
+```
+
+PDF rules also consider attribute docstrings collected by common documentation tools. Supported forms are module attributes, class attributes, and `self.<name>` instance attributes assigned inside `__init__`, including same-line docstrings, next-line docstrings, annotations without values, and multi-target assignments:
+
+```python
+module_value = 1
+"""Module attribute docstring."""
+
+module_name: str
+"""Annotated module attribute docstring."""
+
+first = second = 1
+"""Shared docstring for both module attributes."""
+
+
+class Client:
+    class_value = 1
+    """Class attribute docstring."""
+
+    def __init__(self, enabled):
+        self.instance_value = 1; """Same-line instance attribute docstring."""
+        if enabled:
+            self.conditional_value = 1
+            """Nested instance attribute docstring."""
+```
+
+PDF rules do not consider additional string literals after a primary docstring, local variable strings outside supported attribute locations, bytes literals, f-strings, unpacking targets, subscript targets, `cls.<name>` targets, or arbitrary object attributes:
+
+```python
+def function():
+    """Primary docstring."""
+    """Ignored additional string."""
+
+    local_value = 1
+    """Ignored local string."""
+
+
+class Client:
+    items[0] = 1
+    """Ignored subscript target."""
+```
+
 ## Why is this useful?
 Consistent docstring formatting improves readability and keeps documentation stable across automated formatting runs.
 

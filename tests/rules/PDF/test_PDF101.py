@@ -9,6 +9,8 @@ from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention
 from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
 from pydocformatter.rules.definitions.PDF.PDF import PDF
 from pydocformatter.rules.definitions.PDF.PDF101_docstring_reflow import PDF101DocstringReflow
+from pydocformatter.rules.definitions.PDF.PDF201_missing_blank_line import PDF201MissingBlankLine
+from pydocformatter.rules.definitions.PDF.PDF300_summary_trailing_period import PDF300SummaryTrailingPeriod
 
 
 def contexts(source: str, *, settings: CheckSettings | None = None) -> tuple[RuleCategoryContext, RuleContext]:
@@ -51,6 +53,33 @@ def test_check_and_fix_single_line_summary() -> None:
     assert result.module.code == 'def area(radius):\n    """Return the area for a circle with the supplied radius after\n    validating that the radius is finite and non-negative."""\n'
     _, fixed_context = contexts(result.module.code, settings=CheckSettings(select=("PDF101",), line_length=72))
     assert PDF101DocstringReflow.check(fixed_context) == ()
+
+
+def test_reflows_attribute_docstring_summaries() -> None:
+    source = 'module_value = 1\n"""Return the module value after validating that the configured value is finite and non-negative."""\n\nclass Client:\n    def __init__(self):\n        self.value = 1\n        """Return the instance value after validating that the configured value is finite and non-negative."""\n'
+    result = format_pdf001(source, settings=CheckSettings(select=("PDF101",), line_length=72))
+
+    assert (
+        result.new_source
+        == 'module_value = 1\n"""Return the module value after validating that the configured value is\nfinite and non-negative."""\n\nclass Client:\n    def __init__(self):\n        self.value = 1\n        """Return the instance value after validating that the\n        configured value is finite and non-negative."""\n'
+    )
+    assert result.fixed_findings[PDF101DocstringReflow.meta] == 2
+    assert not format_pdf001(result.new_source, settings=CheckSettings(select=("PDF101",), line_length=72)).modified
+
+
+def test_reflows_same_line_docstrings_without_splitting_summary() -> None:
+    source = 'class Client:\n    def __init__(self):\n        self.value = 1; """Return the instance value after validating that the configured value is finite and non negative and quite long okay."""\n\nclass SameLineClass: """Return the class value after validating that the configured value is finite and non negative and quite long okay."""\n\ndef same_line_function(): """Return the function value after validating that the configured value is finite and non negative and quite long okay."""\n'
+    settings = CheckSettings(select=("PDF101", "PDF201", "PDF300"), line_length=72)
+    result = format_pdf001(source, settings=settings)
+
+    assert (
+        result.new_source
+        == 'class Client:\n    def __init__(self):\n        self.value = 1; """Return the instance value after validating\n                        that the configured value is finite and non\n                        negative and quite long okay."""\n\nclass SameLineClass: """Return the class value after validating that the\n    configured value is finite and non negative and quite long okay."""\n\ndef same_line_function(): """Return the function value after validating\n    that the configured value is finite and non negative and quite long\n    okay."""\n'
+    )
+    assert result.fixed_findings[PDF101DocstringReflow.meta] == 3
+    assert result.fixed_findings[PDF201MissingBlankLine.meta] == 0
+    assert result.fixed_findings[PDF300SummaryTrailingPeriod.meta] == 0
+    assert not format_pdf001(result.new_source, settings=settings).modified
 
 
 def test_reflows_multiline_summary_and_paragraph_without_crossing_blank_lines() -> None:
@@ -423,11 +452,11 @@ def test_disabling_all_generic_structure_parsing_reflows_special_looking_lines_a
     assert result.new_source == 'def function():\n    """# Heading >>> call() - item > quote\n    :param value: description\n    """\n'
 
 
-def test_single_line_suite_docstring_reflow_uses_literal_column_for_generated_lines() -> None:
+def test_single_line_suite_docstring_reflow_uses_suite_indentation_for_generated_lines() -> None:
     source = 'def function(): """Summary text with enough words to wrap onto a second source line."""; return None\n'
     result = format_pdf001(source, settings=CheckSettings(select=("PDF101",), line_length=48))
 
-    assert result.new_source == 'def function(): """Summary text with enough\n                words to wrap onto a second\n                source line."""; return None\n'
+    assert result.new_source == 'def function(): """Summary text with enough\n    words to wrap onto a second source line."""; return None\n'
 
 
 def test_lf_line_ending_setting_only_controls_generated_docstring_lines() -> None:

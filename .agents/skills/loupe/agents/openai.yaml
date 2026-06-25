@@ -3,4 +3,4 @@ interface:
   short_description: "Deep diff review with focused lanes"
   default_prompt: "Use $loupe to review my current uncommitted changes."
 policy:
-  allow_implicit_invocation: true
+  allow_implicit_invocation: false
