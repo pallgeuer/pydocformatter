@@ -14,7 +14,7 @@ import pydocformatter.rules.registration as rule_registration
 from pydocformatter.cli.settings_check import CheckSettings
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase, RuleContext, RuleFixResult
-from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetadata
+from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleFinding, RuleMetadata
 
 
 @rule_registration.register_rule_to(PCF_definition.PCF)
@@ -33,6 +33,7 @@ class PCF001StandaloneCommentFormatting(RuleBase):
         stable_since="1.0.0",
         setting_effects=(),
         incompatible_with=(),
+        check_kind=RuleCheckKind.STANDARD,
     )
 
     @classmethod
@@ -46,9 +47,7 @@ class PCF001StandaloneCommentFormatting(RuleBase):
         changes = _planned_changes(context)
         if not changes:
             return RuleFixResult(module=context.module)
-        module = rule_edits.apply_context_source_changes(context, changes)
-        findings = rule_edits.findings_for_planned_source_changes(cls.meta, changes)
-        return RuleFixResult(module=module, fixed_findings=findings)
+        return rule_edits.fix_result_for_planned_source_changes(context, cls.meta, changes)
 
 
 def _planned_changes(context: RuleContext) -> tuple[rule_edits.PlannedSourceChange, ...]:
@@ -105,6 +104,7 @@ def _change_for_unit(
     return rule_edits.PlannedSourceChange(
         edit=rule_edits.SourceEdit(range=code_range, replacement=replacement),
         line_numbers=tuple(comment.range.start.line for comment in comments),
+        suppression_line_numbers=(),
     )
 
 

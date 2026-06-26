@@ -85,8 +85,8 @@ class FileDecision:
     accepted: bool
     reason: DecisionReason
     explicit: bool
-    profile: settings_core.SettingsProfile[CheckSettings] | None = dataclasses.field(default=None, compare=False, repr=False)
-    respect_gitignore: bool = dataclasses.field(default=True, compare=False, repr=False)
+    profile: settings_core.SettingsProfile[CheckSettings] | None = dataclasses.field(compare=False, repr=False)
+    respect_gitignore: bool = dataclasses.field(compare=False, repr=False)
 
     @property
     def message(self) -> str:
@@ -110,7 +110,7 @@ class SelectionResult:
 
     accepted_paths: tuple[str, ...]
     decisions: tuple[FileDecision, ...]
-    selected_files: tuple[SelectedFile, ...] = ()
+    selected_files: tuple[SelectedFile, ...]
 
     def profile_for_path(self, path: str) -> settings_core.SettingsProfile[CheckSettings]:
         """Return the selected settings profile for an accepted display path."""
@@ -393,6 +393,7 @@ def _excluded_directory_decision(path: str, *, explicit: bool, profile: settings
         reason=DecisionReason.EXCLUDED,
         explicit=explicit,
         profile=profile,
+        respect_gitignore=True,
     )
 
 

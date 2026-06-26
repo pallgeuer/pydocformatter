@@ -10,10 +10,12 @@ import libcst as cst
 import libcst.metadata as cst_metadata
 
 import pydocformatter.rules.definition_helpers.source_text as source_text
+import pydocformatter.rules.suppressions as suppressions
 from pydocformatter.cli.settings_check import CheckSettings
 from pydocformatter.rules.codes import RuleCode
+from pydocformatter.rules.collection import RuleCollection
 from pydocformatter.rules.definition import RuleBase, RuleCategoryBase, RuleCategoryContext, RuleContext, RuleFixResult
-from pydocformatter.rules.models import RuleFinding, RuleMetadata
+from pydocformatter.rules.models import RuleCheckKind, RuleFinding, RuleMetadata
 from pydocformatter.rules_selection import RuleSelection, SelectedRule
 
 MAX_FIX_ITERATIONS = 20
@@ -57,6 +59,7 @@ class _ModulePassContext:
     source: str
     source_lines: tuple[str, ...]
     line_bounds: source_text.LineBounds
+    suppression_index: suppressions.SuppressionIndex
 
 
 @dataclasses.dataclass(frozen=True)
@@ -178,12 +181,16 @@ def _run_fix_pass(
         )
         if not category_rules:
             continue
-        prepared_category, pass_context = _prepare_category(category_class, module, pass_context, path=path, settings=settings, line_ending=line_ending, errors=errors, source_seed=source_seed)
+        prepared_category, pass_context = _prepare_category(
+            category_class, module, pass_context, path=path, settings=settings, line_ending=line_ending, rule_collection=rule_selection.collection, errors=errors, source_seed=source_seed
+        )
         if prepared_category is None:
             continue
         for rule_class, selected_rule in category_rules:
             if prepared_category.context.module is not module:
-                prepared_category, pass_context = _prepare_category(category_class, module, pass_context, path=path, settings=settings, line_ending=line_ending, errors=errors, source_seed=source_seed)
+                prepared_category, pass_context = _prepare_category(
+                    category_class, module, pass_context, path=path, settings=settings, line_ending=line_ending, rule_collection=rule_selection.collection, errors=errors, source_seed=source_seed
+                )
                 if prepared_category is None:
                     break
             try:
@@ -231,15 +238,22 @@ def _run_check_pass(
 ) -> tuple[RuleFinding, ...]:
     """Run one ordered read-only pass of all selected rules."""
     findings: list[RuleFinding] = []
+    used_selector_keys: set[suppressions.SuppressionSelectorKey] = set()
     pass_context: _ModulePassContext | None = None
+    selected_standard_rule_codes = frozenset(selected_rule.rule.code for selected_rule in selected_rule_by_code.values() if selected_rule.rule.check_kind == RuleCheckKind.STANDARD)
+    suppression_audit_rules = tuple(selected_rule for selected_rule in selected_rule_by_code.values() if selected_rule.rule.check_kind == RuleCheckKind.SUPPRESSION_AUDIT)
     for category_class in rule_selection.collection.categories:
         category_rules = tuple((rule_class, selected_rule_by_code[rule_class.meta.code]) for rule_class in category_class.ordered_rules() if rule_class.meta.code in selected_rule_by_code)
         if not category_rules:
             continue
-        prepared_category, pass_context = _prepare_category(category_class, module, pass_context, path=path, settings=settings, line_ending=line_ending, errors=errors, source_seed=source_seed)
+        prepared_category, pass_context = _prepare_category(
+            category_class, module, pass_context, path=path, settings=settings, line_ending=line_ending, rule_collection=rule_selection.collection, errors=errors, source_seed=source_seed
+        )
         if prepared_category is None:
             continue
         for rule_class, selected_rule in category_rules:
+            if rule_class.meta.check_kind != RuleCheckKind.STANDARD:
+                continue
             try:
                 context = _rule_context(prepared_category, effectively_fixable=selected_rule.fixable)
                 rule_findings = rule_class.check(context)
@@ -247,7 +261,18 @@ def _run_check_pass(
                 errors.append(f"{path}: {rule_class.meta.code} check failed: {error}")
                 continue
             validated_findings = _validated_rule_findings(rule_class, rule_findings, path=path, operation="check", errors=errors)
-            findings.extend(_apply_effective_fixability(finding, selected_rule=selected_rule) for finding in validated_findings)
+            if prepared_category.context.suppression_index is None:
+                unsuppressed_findings = validated_findings
+            else:
+                suppression_result = prepared_category.context.suppression_index.filter_findings(validated_findings)
+                used_selector_keys.update(suppression_result.used_selector_keys)
+                unsuppressed_findings = suppression_result.findings
+            findings.extend(_apply_effective_fixability(finding, selected_rule=selected_rule) for finding in unsuppressed_findings)
+    if suppression_audit_rules and pass_context is not None:
+        for selected_rule in suppression_audit_rules:
+            audit_findings = pass_context.suppression_index.unused_findings(frozenset(used_selector_keys), selected_rule_codes=selected_standard_rule_codes, rule=selected_rule.rule)
+            audit_filter_result = pass_context.suppression_index.filter_findings(audit_findings)
+            findings.extend(_apply_effective_fixability(finding, selected_rule=selected_rule) for finding in audit_filter_result.findings)
     return tuple(findings)
 
 
@@ -259,13 +284,14 @@ def _prepare_category(
     path: str,
     settings: CheckSettings,
     line_ending: str,
+    rule_collection: RuleCollection,
     errors: list[str],
     source_seed: _ModuleSourceSeed | None = None,
 ) -> tuple[_PreparedCategory | None, _ModulePassContext | None]:
     """Run one category preprocessor and return its shared data."""
     current_pass_context: _ModulePassContext | None = None
     try:
-        current_pass_context = _pass_context_for(module, pass_context, source_seed=source_seed)
+        current_pass_context = _pass_context_for(module, pass_context, source_seed=source_seed, collection=rule_collection)
         context = _category_context(current_pass_context, path=path, settings=settings, line_ending=line_ending)
         return _PreparedCategory(context=context, data=category_class.prepare(context)), current_pass_context
     except Exception as error:
@@ -273,7 +299,7 @@ def _prepare_category(
         return None, current_pass_context
 
 
-def _pass_context_for(module: cst.Module, pass_context: _ModulePassContext | None, *, source_seed: _ModuleSourceSeed | None = None) -> _ModulePassContext:
+def _pass_context_for(module: cst.Module, pass_context: _ModulePassContext | None, *, collection: RuleCollection, source_seed: _ModuleSourceSeed | None = None) -> _ModulePassContext:
     """Return shared source and metadata for the current module state."""
     if pass_context is not None and pass_context.module is module:
         return pass_context
@@ -281,6 +307,7 @@ def _pass_context_for(module: cst.Module, pass_context: _ModulePassContext | Non
     metadata_wrapper = cst_metadata.MetadataWrapper(module, unsafe_skip_copy=True)
     positions = metadata_wrapper.resolve(cst_metadata.PositionProvider)
     source_lines = tuple(source_text.source_lines(source))
+    suppression_index = suppressions.suppression_index(module, positions=positions, source_lines=source_lines, collection=collection)
     return _ModulePassContext(
         module=module,
         metadata_wrapper=metadata_wrapper,
@@ -288,6 +315,7 @@ def _pass_context_for(module: cst.Module, pass_context: _ModulePassContext | Non
         source=source,
         source_lines=source_lines,
         line_bounds=source_text.line_bounds_from_lines(source_lines),
+        suppression_index=suppression_index,
     )
 
 
@@ -311,6 +339,7 @@ def _category_context(pass_context: _ModulePassContext, *, path: str, settings: 
         source=pass_context.source,
         source_lines=pass_context.source_lines,
         line_bounds=pass_context.line_bounds,
+        suppression_index=pass_context.suppression_index,
     )
 
 
@@ -327,6 +356,7 @@ def _rule_context(prepared_category: _PreparedCategory, *, effectively_fixable: 
         source=category_context.source,
         source_lines=category_context.source_lines,
         line_bounds=category_context.line_bounds,
+        suppression_index=category_context.suppression_index,
         category_data=prepared_category.data,
         effectively_fixable=effectively_fixable,
     )

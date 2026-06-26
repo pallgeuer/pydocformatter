@@ -10,7 +10,7 @@ import pydocformatter.rules.registration as rule_registration
 from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase, RuleContext, RuleFixResult
-from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
+from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleFinding, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
 
 
 @rule_registration.register_rule_to(PDF_definition.PDF)
@@ -38,6 +38,7 @@ class PDF410ExceptionEntryNormalization(RuleBase):
             ),
         ),
         incompatible_with=(),
+        check_kind=RuleCheckKind.STANDARD,
     )
 
     @classmethod

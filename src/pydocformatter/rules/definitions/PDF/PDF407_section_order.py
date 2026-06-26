@@ -11,7 +11,7 @@ from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase, RuleContext
 from pydocformatter.rules.definitions.PDF.PDF import PDF
-from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
+from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleFinding, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
 
 
 @rule_registration.register_rule_to(PDF)
@@ -35,6 +35,7 @@ class PDF407SectionOrder(RuleBase):
             ),
         ),
         incompatible_with=(),
+        check_kind=RuleCheckKind.STANDARD,
     )
 
     @classmethod
@@ -64,6 +65,7 @@ def _findings(context: RuleContext, *, rule: RuleMetadata) -> tuple[RuleFinding,
                             rule=rule,
                             line_numbers=section_edits.line_numbers(docstring, line),
                             instance_message=f"Docstring section '{section.name}' should appear before '{max_rank_section_name}'",
+                            instance_fixable=None,
                         )
                     )
                 else:
@@ -88,9 +90,7 @@ def _rest_field_findings(docstring: PDF_definition.DocstringInfo, *, rule: RuleM
             line = docstring.structure.lines[entry.start_line]
             findings.append(
                 RuleFinding(
-                    rule=rule,
-                    line_numbers=section_edits.line_numbers(docstring, line),
-                    instance_message=f"Docstring field '{label}' should appear before '{max_rank_label}'",
+                    rule=rule, line_numbers=section_edits.line_numbers(docstring, line), instance_message=f"Docstring field '{label}' should appear before '{max_rank_label}'", instance_fixable=None
                 )
             )
         else:

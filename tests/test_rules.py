@@ -26,7 +26,7 @@ from pydocformatter.cli.global_args import GlobalArgs
 from pydocformatter.cli.settings_check import SETTINGS_SCHEMA, CheckSettings, DocstringConvention
 from pydocformatter.rules.codes import RuleCode, RuleSelector
 from pydocformatter.rules.definition import RuleBase, RuleCategoryBase
-from pydocformatter.rules.models import FixAvailability, RuleCategoryMetadata, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
+from pydocformatter.rules.models import FixAvailability, RuleCategoryMetadata, RuleCheckKind, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
 
 EXPECTED_RULE_DOCUMENTATION_SECTIONS = ("What it does", "Why is this useful?", "Ruff compatibility", "Examples", "Options")
 EXPECTED_RULE_CATEGORY_DOCUMENTATION_SECTIONS = ("What it does", "Why is this useful?", "Rules", "Related tooling", "Code ranges", "Options")
@@ -65,6 +65,7 @@ class PDF101SampleRule(RuleBase):
         stable_since="1.0.0",
         setting_effects=(),
         incompatible_with=(),
+        check_kind=RuleCheckKind.STANDARD,
     )
 
 
@@ -77,15 +78,34 @@ class PDF110SampleRule(RuleBase):
         stable_since="1.0.0",
         setting_effects=(),
         incompatible_with=(),
+        check_kind=RuleCheckKind.STANDARD,
     )
 
 
 class PDF142SampleRule(RuleBase):
-    meta = RuleMetadata(code=RuleCode("PDF142"), name="specific-rule", message="Specific rule", fix_availability=FixAvailability.ALWAYS, stable_since="1.0.0", setting_effects=(), incompatible_with=())
+    meta = RuleMetadata(
+        code=RuleCode("PDF142"),
+        name="specific-rule",
+        message="Specific rule",
+        fix_availability=FixAvailability.ALWAYS,
+        stable_since="1.0.0",
+        setting_effects=(),
+        incompatible_with=(),
+        check_kind=RuleCheckKind.STANDARD,
+    )
 
 
 class PDF150SampleRule(RuleBase):
-    meta = RuleMetadata(code=RuleCode("PDF150"), name="sibling-rule", message="Sibling rule", fix_availability=FixAvailability.ALWAYS, stable_since="1.0.0", setting_effects=(), incompatible_with=())
+    meta = RuleMetadata(
+        code=RuleCode("PDF150"),
+        name="sibling-rule",
+        message="Sibling rule",
+        fix_availability=FixAvailability.ALWAYS,
+        stable_since="1.0.0",
+        setting_effects=(),
+        incompatible_with=(),
+        check_kind=RuleCheckKind.STANDARD,
+    )
 
 
 class PDF160SometimesFixableSampleRule(RuleBase):
@@ -97,6 +117,7 @@ class PDF160SometimesFixableSampleRule(RuleBase):
         stable_since="1.0.0",
         setting_effects=(),
         incompatible_with=(),
+        check_kind=RuleCheckKind.STANDARD,
     )
 
 
@@ -109,6 +130,7 @@ class PDF170UsuallyFixableSampleRule(RuleBase):
         stable_since="1.0.0",
         setting_effects=(),
         incompatible_with=(),
+        check_kind=RuleCheckKind.STANDARD,
     )
 
 
@@ -121,6 +143,7 @@ class PCF001SampleRule(RuleBase):
         stable_since="1.0.0",
         setting_effects=(),
         incompatible_with=(),
+        check_kind=RuleCheckKind.STANDARD,
     )
 
 
@@ -138,6 +161,7 @@ class TST001IgnoredSampleRule(RuleBase):
             ),
         ),
         incompatible_with=(),
+        check_kind=RuleCheckKind.STANDARD,
     )
 
 
@@ -159,6 +183,7 @@ class TST002DisabledSampleRule(RuleBase):
             ),
         ),
         incompatible_with=(),
+        check_kind=RuleCheckKind.STANDARD,
     )
 
 
@@ -176,6 +201,7 @@ class TST001FirstIncompatibleSampleRule(RuleBase):
             ),
         ),
         incompatible_with=(RuleCode("TST002"), RuleCode("TST004")),
+        check_kind=RuleCheckKind.STANDARD,
     )
 
 
@@ -188,6 +214,7 @@ class TST002SecondIncompatibleSampleRule(RuleBase):
         stable_since="1.0.0",
         setting_effects=(),
         incompatible_with=(RuleCode("TST001"), RuleCode("TST003")),
+        check_kind=RuleCheckKind.STANDARD,
     )
 
 
@@ -200,6 +227,7 @@ class TST003ThirdIncompatibleSampleRule(RuleBase):
         stable_since="1.0.0",
         setting_effects=(),
         incompatible_with=(RuleCode("TST002"), RuleCode("TST004")),
+        check_kind=RuleCheckKind.STANDARD,
     )
 
 
@@ -212,6 +240,7 @@ class TST004FourthIncompatibleSampleRule(RuleBase):
         stable_since="1.0.0",
         setting_effects=(),
         incompatible_with=(RuleCode("TST001"), RuleCode("TST003")),
+        check_kind=RuleCheckKind.STANDARD,
     )
 
 
@@ -307,11 +336,11 @@ class TestRules(unittest.TestCase):
                 "import pydocformatter.rules.registration as rule_registration\n"
                 "from pydocformatter.rules.definition import RuleBase\n"
                 "from pydocformatter.rules.codes import RuleCode\n"
-                "from pydocformatter.rules.models import FixAvailability, RuleMetadata\n"
+                "from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata\n"
                 f"from {package_name}.PDF.PDF import PDF\n\n"
                 "@rule_registration.register_rule_to(PDF)\n"
                 "class PDF101Test(RuleBase):\n"
-                "    meta = RuleMetadata(code=RuleCode('PDF101'), name='test', message='Test', fix_availability=FixAvailability.ALWAYS, stable_since='1.0.0', setting_effects=(), incompatible_with=())\n"
+                "    meta = RuleMetadata(code=RuleCode('PDF101'), name='test', message='Test', fix_availability=FixAvailability.ALWAYS, stable_since='1.0.0', setting_effects=(), incompatible_with=(), check_kind=RuleCheckKind.STANDARD)\n"
             ),
             "PDF/PDF101_test.md": "# test (PDF101)\n",
         }
@@ -452,7 +481,16 @@ class TestRules(unittest.TestCase):
 
         @rule_registration.register_rule_to(PDFTestCategory)
         class PDF999TestRule(RuleBase):
-            meta = RuleMetadata(code=RuleCode("PDF999"), name="test-rule", message="Test rule", fix_availability=FixAvailability.ALWAYS, stable_since="1.0.0", setting_effects=(), incompatible_with=())
+            meta = RuleMetadata(
+                code=RuleCode("PDF999"),
+                name="test-rule",
+                message="Test rule",
+                fix_availability=FixAvailability.ALWAYS,
+                stable_since="1.0.0",
+                setting_effects=(),
+                incompatible_with=(),
+                check_kind=RuleCheckKind.STANDARD,
+            )
 
         registry.register(PDFTestCategory)
 
@@ -536,7 +574,7 @@ class TestRules(unittest.TestCase):
                 {
                     **valid_files,
                     "PDF/PDF101_test.py": valid_files["PDF/PDF101_test.py"]
-                    + "\nclass PDF100Test(RuleBase):\n    meta = RuleMetadata(code=RuleCode('PDF100'), name='test-two', message='Test two', fix_availability=FixAvailability.ALWAYS, stable_since='1.0.0', setting_effects=(), incompatible_with=())\n",
+                    + "\nclass PDF100Test(RuleBase):\n    meta = RuleMetadata(code=RuleCode('PDF100'), name='test-two', message='Test two', fix_availability=FixAvailability.ALWAYS, stable_since='1.0.0', setting_effects=(), incompatible_with=(), check_kind=RuleCheckKind.STANDARD)\n",
                 },
                 "must define exactly one RuleBase subclass",
             ),
@@ -576,9 +614,9 @@ class TestRules(unittest.TestCase):
         files["../synthetic_rule_support.py"] = (
             "from pydocformatter.rules.definition import RuleBase\n"
             "from pydocformatter.rules.codes import RuleCode\n"
-            "from pydocformatter.rules.models import FixAvailability, RuleMetadata\n\n"
+            "from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata\n\n"
             "class PDF100External(RuleBase):\n"
-            "    meta = RuleMetadata(code=RuleCode('PDF100'), name='external', message='External', fix_availability=FixAvailability.ALWAYS, stable_since='1.0.0', setting_effects=(), incompatible_with=())\n"
+            "    meta = RuleMetadata(code=RuleCode('PDF100'), name='external', message='External', fix_availability=FixAvailability.ALWAYS, stable_since='1.0.0', setting_effects=(), incompatible_with=(), check_kind=RuleCheckKind.STANDARD)\n"
         )
         files["PDF/PDF.py"] += "\nfrom synthetic_rule_support import PDF100External\nrule_registration.register_rule_to(PDF)(PDF100External)\n"
 
@@ -591,9 +629,9 @@ class TestRules(unittest.TestCase):
         files["PDF/__init__.py"] = (
             "from pydocformatter.rules.definition import RuleBase\n"
             "from pydocformatter.rules.codes import RuleCode\n"
-            "from pydocformatter.rules.models import FixAvailability, RuleMetadata\n\n"
+            "from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata\n\n"
             "class PDF100PackageRule(RuleBase):\n"
-            "    meta = RuleMetadata(code=RuleCode('PDF100'), name='package-rule', message='Package rule', fix_availability=FixAvailability.ALWAYS, stable_since='1.0.0', setting_effects=(), incompatible_with=())\n"
+            "    meta = RuleMetadata(code=RuleCode('PDF100'), name='package-rule', message='Package rule', fix_availability=FixAvailability.ALWAYS, stable_since='1.0.0', setting_effects=(), incompatible_with=(), check_kind=RuleCheckKind.STANDARD)\n"
         )
         files["PDF/PDF.py"] += f"\nfrom {package_name}.PDF import PDF100PackageRule\nrule_registration.register_rule_to(PDF)(PDF100PackageRule)\n"
 
@@ -616,7 +654,14 @@ class TestRules(unittest.TestCase):
         @rule_registration.register_rule_to(PDFTestCategory)
         class PDF999FirstRule(RuleBase):
             meta = RuleMetadata(
-                code=RuleCode("PDF999"), name="first-rule", message="First rule", fix_availability=FixAvailability.ALWAYS, stable_since="1.0.0", setting_effects=(), incompatible_with=()
+                code=RuleCode("PDF999"),
+                name="first-rule",
+                message="First rule",
+                fix_availability=FixAvailability.ALWAYS,
+                stable_since="1.0.0",
+                setting_effects=(),
+                incompatible_with=(),
+                check_kind=RuleCheckKind.STANDARD,
             )
 
         with self.assertRaisesRegex(rule_registration.RuleError, "Duplicate rule code in category PDF: PDF999"):
@@ -624,7 +669,14 @@ class TestRules(unittest.TestCase):
             @rule_registration.register_rule_to(PDFTestCategory)
             class PDF999SecondRule(RuleBase):
                 meta = RuleMetadata(
-                    code=RuleCode("PDF999"), name="second-rule", message="Second rule", fix_availability=FixAvailability.ALWAYS, stable_since="1.0.0", setting_effects=(), incompatible_with=()
+                    code=RuleCode("PDF999"),
+                    name="second-rule",
+                    message="Second rule",
+                    fix_availability=FixAvailability.ALWAYS,
+                    stable_since="1.0.0",
+                    setting_effects=(),
+                    incompatible_with=(),
+                    check_kind=RuleCheckKind.STANDARD,
                 )
 
     def test_rule_category_allows_registering_the_same_rule_class_twice(self) -> None:
@@ -632,7 +684,16 @@ class TestRules(unittest.TestCase):
             meta = RuleCategoryMetadata(prefix="PDF", name="test PDF", url=None)
 
         class PDF999TestRule(RuleBase):
-            meta = RuleMetadata(code=RuleCode("PDF999"), name="test-rule", message="Test rule", fix_availability=FixAvailability.ALWAYS, stable_since="1.0.0", setting_effects=(), incompatible_with=())
+            meta = RuleMetadata(
+                code=RuleCode("PDF999"),
+                name="test-rule",
+                message="Test rule",
+                fix_availability=FixAvailability.ALWAYS,
+                stable_since="1.0.0",
+                setting_effects=(),
+                incompatible_with=(),
+                check_kind=RuleCheckKind.STANDARD,
+            )
 
         rule_registration.register_rule_to(PDFTestCategory)(PDF999TestRule)
         rule_registration.register_rule_to(PDFTestCategory)(PDF999TestRule)
@@ -691,6 +752,7 @@ class TestRules(unittest.TestCase):
             stable_since="1.0.0",
             setting_effects=(),
             incompatible_with=(),
+            check_kind=RuleCheckKind.STANDARD,
         )
 
         self.assertEqual(tuple(field.name for field in dataclasses.fields(RuleCode)), ("tag", "prefix", "number_str", "number"))
@@ -705,8 +767,12 @@ class TestRules(unittest.TestCase):
         self.assertFalse(hasattr(rule_models, "valid_rule_code_tag"))
         self.assertFalse(hasattr(rule_models, "split_rule_code"))
         self.assertEqual(rule.stable_since, "1.0.0")
-        self.assertEqual(tuple(field.name for field in dataclasses.fields(RuleMetadata)), ("code", "name", "message", "fix_availability", "stable_since", "setting_effects", "incompatible_with"))
+        self.assertEqual(
+            tuple(field.name for field in dataclasses.fields(RuleMetadata)), ("code", "name", "message", "fix_availability", "stable_since", "setting_effects", "incompatible_with", "check_kind")
+        )
         self.assertTrue(all(field.default is dataclasses.MISSING for field in dataclasses.fields(RuleMetadata)))
+        self.assertTrue(all(field.default_factory is dataclasses.MISSING for field in dataclasses.fields(RuleMetadata)))
+        self.assertEqual(rule.check_kind, RuleCheckKind.STANDARD)
         self.assertEqual(rule.setting_effects, ())
         self.assertEqual(rule.incompatible_with, ())
         self.assertIsInstance(hash(TST001IgnoredSampleRule.meta), int)
@@ -716,7 +782,14 @@ class TestRules(unittest.TestCase):
         self.assertEqual(
             rule_documentation.rule_fix_text(
                 RuleMetadata(
-                    code=RuleCode("PDF999"), name="usually-rule", message="Usually rule", fix_availability=FixAvailability.USUALLY, stable_since="1.0.0", setting_effects=(), incompatible_with=()
+                    code=RuleCode("PDF999"),
+                    name="usually-rule",
+                    message="Usually rule",
+                    fix_availability=FixAvailability.USUALLY,
+                    stable_since="1.0.0",
+                    setting_effects=(),
+                    incompatible_with=(),
+                    check_kind=RuleCheckKind.STANDARD,
                 )
             ),
             "Fix is usually available.",
@@ -724,7 +797,14 @@ class TestRules(unittest.TestCase):
         self.assertEqual(
             rule_documentation.rule_fix_text(
                 RuleMetadata(
-                    code=RuleCode("PDF999"), name="sometimes-rule", message="Sometimes rule", fix_availability=FixAvailability.SOMETIMES, stable_since="1.0.0", setting_effects=(), incompatible_with=()
+                    code=RuleCode("PDF999"),
+                    name="sometimes-rule",
+                    message="Sometimes rule",
+                    fix_availability=FixAvailability.SOMETIMES,
+                    stable_since="1.0.0",
+                    setting_effects=(),
+                    incompatible_with=(),
+                    check_kind=RuleCheckKind.STANDARD,
                 )
             ),
             "Fix is sometimes available.",
@@ -764,20 +844,54 @@ class TestRules(unittest.TestCase):
             RuleCode("ALL001")
         with self.assertRaisesRegex(TypeError, "Expected RuleCode, got str"):
             RuleMetadata(
-                code=typing.cast(typing.Any, "bad"), name="bad-rule", message="Bad rule", fix_availability=FixAvailability.ALWAYS, stable_since="1.0.0", setting_effects=(), incompatible_with=()
+                code=typing.cast(typing.Any, "bad"),
+                name="bad-rule",
+                message="Bad rule",
+                fix_availability=FixAvailability.ALWAYS,
+                stable_since="1.0.0",
+                setting_effects=(),
+                incompatible_with=(),
+                check_kind=RuleCheckKind.STANDARD,
             )
         with self.assertRaisesRegex(TypeError, "Expected FixAvailability, got str"):
             RuleMetadata(
-                code=RuleCode("PDF101"), name="bad-rule", message="Bad rule", fix_availability=typing.cast(typing.Any, "Always"), stable_since="1.0.0", setting_effects=(), incompatible_with=()
+                code=RuleCode("PDF101"),
+                name="bad-rule",
+                message="Bad rule",
+                fix_availability=typing.cast(typing.Any, "Always"),
+                stable_since="1.0.0",
+                setting_effects=(),
+                incompatible_with=(),
+                check_kind=RuleCheckKind.STANDARD,
+            )
+        with self.assertRaisesRegex(TypeError, "Expected RuleCheckKind, got str"):
+            RuleMetadata(
+                code=RuleCode("PDF101"),
+                name="bad-rule",
+                message="Bad rule",
+                fix_availability=FixAvailability.ALWAYS,
+                stable_since="1.0.0",
+                setting_effects=(),
+                incompatible_with=(),
+                check_kind=typing.cast(typing.Any, "standard"),
             )
         with self.assertRaisesRegex(TypeError, "missing 1 required positional argument: 'stable_since'"):
-            RuleMetadata(code=RuleCode("PDF101"), name="bad-rule", message="Bad rule", fix_availability=FixAvailability.ALWAYS, setting_effects=(), incompatible_with=())  # type: ignore[call-arg]
+            RuleMetadata(code=RuleCode("PDF101"), name="bad-rule", message="Bad rule", fix_availability=FixAvailability.ALWAYS, setting_effects=(), incompatible_with=(), check_kind=RuleCheckKind.STANDARD)  # type: ignore[call-arg]
         with self.assertRaisesRegex(TypeError, "missing 1 required positional argument: 'setting_effects'"):
-            RuleMetadata(code=RuleCode("PDF101"), name="bad-rule", message="Bad rule", fix_availability=FixAvailability.ALWAYS, stable_since="1.0.0", incompatible_with=())  # type: ignore[call-arg]
+            RuleMetadata(code=RuleCode("PDF101"), name="bad-rule", message="Bad rule", fix_availability=FixAvailability.ALWAYS, stable_since="1.0.0", incompatible_with=(), check_kind=RuleCheckKind.STANDARD)  # type: ignore[call-arg]
         with self.assertRaisesRegex(TypeError, "missing 1 required positional argument: 'incompatible_with'"):
-            RuleMetadata(code=RuleCode("PDF101"), name="bad-rule", message="Bad rule", fix_availability=FixAvailability.ALWAYS, stable_since="1.0.0", setting_effects=())  # type: ignore[call-arg]
+            RuleMetadata(code=RuleCode("PDF101"), name="bad-rule", message="Bad rule", fix_availability=FixAvailability.ALWAYS, stable_since="1.0.0", setting_effects=(), check_kind=RuleCheckKind.STANDARD)  # type: ignore[call-arg]
         with self.assertRaisesRegex(ValueError, "PDF101: Stable version must not be empty"):
-            RuleMetadata(code=RuleCode("PDF101"), name="bad-rule", message="Bad rule", fix_availability=FixAvailability.ALWAYS, stable_since="", setting_effects=(), incompatible_with=())
+            RuleMetadata(
+                code=RuleCode("PDF101"),
+                name="bad-rule",
+                message="Bad rule",
+                fix_availability=FixAvailability.ALWAYS,
+                stable_since="",
+                setting_effects=(),
+                incompatible_with=(),
+                check_kind=RuleCheckKind.STANDARD,
+            )
         with self.assertRaisesRegex(ValueError, "Rule setting name must not be empty"):
             RuleSettingEffects(setting="", effects=())
         with self.assertRaisesRegex(TypeError, "Expected RuleSettingEffect, got str"):
@@ -799,6 +913,7 @@ class TestRules(unittest.TestCase):
                 stable_since="1.0.0",
                 setting_effects=typing.cast(typing.Any, ("bad",)),
                 incompatible_with=(),
+                check_kind=RuleCheckKind.STANDARD,
             )
         with self.assertRaisesRegex(TypeError, "Incompatible rule codes must be a tuple"):
             RuleMetadata(
@@ -809,6 +924,7 @@ class TestRules(unittest.TestCase):
                 stable_since="1.0.0",
                 setting_effects=(),
                 incompatible_with=typing.cast(typing.Any, [RuleCode("PDF100")]),
+                check_kind=RuleCheckKind.STANDARD,
             )
         with self.assertRaisesRegex(TypeError, "Incompatible rule codes must contain RuleCode instances"):
             RuleMetadata(
@@ -819,6 +935,7 @@ class TestRules(unittest.TestCase):
                 stable_since="1.0.0",
                 setting_effects=(),
                 incompatible_with=typing.cast(typing.Any, ("PDF100",)),
+                check_kind=RuleCheckKind.STANDARD,
             )
         with self.assertRaisesRegex(ValueError, "Incompatible rule codes must not contain duplicates"):
             RuleMetadata(
@@ -829,6 +946,7 @@ class TestRules(unittest.TestCase):
                 stable_since="1.0.0",
                 setting_effects=(),
                 incompatible_with=(RuleCode("PDF100"), RuleCode("PDF100")),
+                check_kind=RuleCheckKind.STANDARD,
             )
 
     def test_rule_selector_validates_tag(self) -> None:
@@ -911,6 +1029,7 @@ class TestRules(unittest.TestCase):
                 stable_since="1.0.0",
                 setting_effects=(),
                 incompatible_with=(RuleCode("TST001"),),
+                check_kind=RuleCheckKind.STANDARD,
             )
 
         with self.assertRaisesRegex(rule_registration.RuleError, "Rule TST001 cannot be incompatible with itself"):
@@ -943,6 +1062,7 @@ class TestRules(unittest.TestCase):
                 stable_since="1.0.0",
                 setting_effects=(),
                 incompatible_with=(),
+                check_kind=RuleCheckKind.STANDARD,
             )
 
         with self.assertRaisesRegex(rule_registration.RuleError, "Rule incompatibility between TST001 and TST002 must be declared by both rules"):
@@ -950,7 +1070,16 @@ class TestRules(unittest.TestCase):
 
     def test_rule_base_class_properties_redirect_to_metadata(self) -> None:
         class PDF999TestRule(RuleBase):
-            meta = RuleMetadata(code=RuleCode("PDF999"), name="test-rule", message="Test rule", fix_availability=FixAvailability.ALWAYS, stable_since="1.0.0", setting_effects=(), incompatible_with=())
+            meta = RuleMetadata(
+                code=RuleCode("PDF999"),
+                name="test-rule",
+                message="Test rule",
+                fix_availability=FixAvailability.ALWAYS,
+                stable_since="1.0.0",
+                setting_effects=(),
+                incompatible_with=(),
+                check_kind=RuleCheckKind.STANDARD,
+            )
 
         rule = PDF999TestRule()
 
@@ -1131,6 +1260,7 @@ class TestRules(unittest.TestCase):
                 "PCF002",
                 "PCF003",
                 "PCF004",
+                "PCF006",
                 "PDF000",
                 "PDF001",
                 "PDF002",
@@ -1162,6 +1292,7 @@ class TestRules(unittest.TestCase):
                 "PCF002",
                 "PCF003",
                 "PCF004",
+                "PCF006",
                 "PDF000",
                 "PDF001",
                 "PDF002",
@@ -1392,6 +1523,7 @@ class TestRules(unittest.TestCase):
                     ),
                 ),
                 incompatible_with=(),
+                check_kind=RuleCheckKind.STANDARD,
             )
 
         rule_registration.register_rule_to(TSTUnknownSettingEffectCategory)(TST999UnknownSettingEffectRule)

@@ -40,10 +40,12 @@ Rule classes register with their category through `@register_rule_to(PDF)` and d
 - `name`: A stable machine-readable name, such as `docstring-reflow`.
 - `message`: The default diagnostic message. It may include format fields for per-finding customization.
 - `fix_availability`: A `FixAvailability` value describing whether automatic fixes are `Always`, `Usually`, `Sometimes`, or `Never` available at the rule level.
+- `stable_since`: The pydocformatter version in which the rule became stable.
 - `setting_effects`: Immutable metadata mapping resolved setting fields and triggering values to `Ignored` or `Disabled` selection effects.
 - `incompatible_with`: An immutable tuple of `RuleCode` values for rules that cannot be selected together with this rule.
+- `check_kind`: A `RuleCheckKind` value describing whether the rule runs as a standard source check or an aggregate suppression-audit check.
 
-`RuleBase` rejects subclasses without `meta`, or with non-`RuleMetadata` metadata, at class definition time. `RuleMetadata` rejects non-`RuleCode` codes, non-`FixAvailability` fix availability values, empty names, messages, or stable versions, malformed setting-effect records, malformed incompatibility tuples, and duplicate incompatible codes. Category registration rejects rules whose code prefix differs from the category prefix and rejects duplicate rule codes from different classes.
+`RuleBase` rejects subclasses without `meta`, or with non-`RuleMetadata` metadata, at class definition time. `RuleMetadata` rejects non-`RuleCode` codes, non-`FixAvailability` fix availability values, non-`RuleCheckKind` check kinds, empty names, messages, or stable versions, malformed setting-effect records, malformed incompatibility tuples, and duplicate incompatible codes. Category registration rejects rules whose code prefix differs from the category prefix and rejects duplicate rule codes from different classes.
 
 No rule application or fix method interface is specified yet. That interface will be added when rule execution is implemented.
 

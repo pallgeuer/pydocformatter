@@ -10,7 +10,7 @@ from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase, RuleContext
 from pydocformatter.rules.definitions.PDF.PDF import PDF
-from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
+from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleFinding, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
 
 
 @rule_registration.register_rule_to(PDF)
@@ -38,6 +38,7 @@ class PDF503ExtraneousReturnDocumentation(RuleBase):
             ),
         ),
         incompatible_with=(),
+        check_kind=RuleCheckKind.STANDARD,
     )
 
     @classmethod
@@ -52,5 +53,5 @@ class PDF503ExtraneousReturnDocumentation(RuleBase):
                 if facts.explicit_none_returns and not facts.any_yields and entry.has_content:
                     continue
                 message = "Docstring has a return section for a generator; generator return values are stop values, not ordinary returns" if facts.any_yields else None
-                findings.append(RuleFinding(rule=cls.meta, line_numbers=entry.line_numbers, instance_message=message))
+                findings.append(RuleFinding(rule=cls.meta, line_numbers=entry.line_numbers, instance_message=message, instance_fixable=None))
         return tuple(findings)

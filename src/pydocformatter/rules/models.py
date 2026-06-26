@@ -27,6 +27,18 @@ class FixAvailability(enum.StrEnum):
     NEVER = "Never"
 
 
+class RuleCheckKind(enum.StrEnum):
+    """How a rule participates in check passes.
+
+    Attributes:
+        STANDARD: Rule checks source directly and returns findings for its own code.
+        SUPPRESSION_AUDIT: Rule reports unused or invalid source suppressions after standard checks run.
+    """
+
+    STANDARD = "standard"
+    SUPPRESSION_AUDIT = "suppression-audit"
+
+
 class RuleSettingEffect(enum.StrEnum):
     """Effect of a resolved setting value on rule selection.
 
@@ -99,6 +111,7 @@ class RuleMetadata:
         stable_since (str): pydocformatter version in which the rule became stable.
         setting_effects (tuple[RuleSettingEffects, ...]): Selection effects driven by resolved setting values.
         incompatible_with (tuple[RuleCode, ...]): Rule codes that cannot be selected together with this rule.
+        check_kind (RuleCheckKind): Check-pass phase used to run the rule.
     """
 
     code: RuleCode
@@ -108,6 +121,7 @@ class RuleMetadata:
     stable_since: str
     setting_effects: tuple[RuleSettingEffects, ...]
     incompatible_with: tuple[RuleCode, ...]
+    check_kind: RuleCheckKind = dataclasses.field(kw_only=True)
 
     def __post_init__(self) -> None:
         """Validate rule metadata fields."""
@@ -115,6 +129,8 @@ class RuleMetadata:
             raise TypeError(f"Expected RuleCode, got {type(self.code).__name__}")
         if not isinstance(self.fix_availability, FixAvailability):
             raise TypeError(f"Expected FixAvailability, got {type(self.fix_availability).__name__}")
+        if not isinstance(self.check_kind, RuleCheckKind):
+            raise TypeError(f"Expected RuleCheckKind, got {type(self.check_kind).__name__}")
         if not self.name:
             raise ValueError(f"{self.code}: Rule name must not be empty")
         if not self.message:
@@ -162,6 +178,8 @@ class RuleFinding:
     Attributes:
         rule (RuleMetadata): Rule metadata for the finding.
         line_numbers (tuple[int, ...]): One-based source line numbers associated with the finding.
+        suppression_line_numbers (tuple[tuple[int, ...], ...]): Additional line-number targets used only for source
+            suppression matching.
         instance_message (str | None): Optional message overriding the rule default for this instance.
         instance_fixable (bool | None): Optional fixability overriding the rule default for this instance.
     """
@@ -176,8 +194,9 @@ class RuleFinding:
 
     rule: RuleMetadata
     line_numbers: tuple[int, ...]
+    suppression_line_numbers: tuple[tuple[int, ...], ...] = ()
     instance_message: str | None = None
-    instance_fixable: bool | None = None
+    instance_fixable: bool | None = dataclasses.field(kw_only=True)
 
     @property
     def message(self) -> str:
@@ -202,6 +221,11 @@ class RuleFinding:
     def grouping_key(self) -> RuleFinding.Key:
         """Return the key used to merge findings that differ only by line numbers."""
         return RuleFinding.Key(rule=self.rule, message=self.message, fixable=self.fixable)
+
+    @property
+    def suppression_targets(self) -> tuple[tuple[int, ...], ...]:
+        """Return line-number targets that can suppress this finding."""
+        return (self.line_numbers, *self.suppression_line_numbers)
 
     def with_line_numbers(self, line_numbers: tuple[int, ...]) -> RuleFinding:
         """Return this finding with updated line numbers."""

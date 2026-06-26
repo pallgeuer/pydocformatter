@@ -10,7 +10,7 @@ from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase, RuleContext, RuleFixResult
 from pydocformatter.rules.definitions.PDF.PDF import PDF
-from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
+from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleFinding, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
 
 
 @rule_registration.register_rule_to(PDF)
@@ -34,6 +34,7 @@ class PDF405SectionUnderlineFormat(RuleBase):
             ),
         ),
         incompatible_with=(),
+        check_kind=RuleCheckKind.STANDARD,
     )
 
     @classmethod
@@ -66,9 +67,9 @@ def _results(context: RuleContext, *, rule: RuleMetadata) -> tuple[section_edits
                 continue
             section = section_by_header.get(line.index)
             if section is None:
-                output_lines.append(PDF_definition.DocstringOutputLine(original=line))
+                output_lines.append(PDF_definition.DocstringOutputLine(original=line, source=None, value=None))
                 continue
-            output_lines.append(PDF_definition.DocstringOutputLine(original=line))
+            output_lines.append(PDF_definition.DocstringOutputLine(original=line, source=None, value=None))
             underline, skipped = _target_underline(docstring, section)
             if underline is None:
                 continue

@@ -11,7 +11,7 @@ from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase, RuleContext, RuleFixResult
 from pydocformatter.rules.definitions.PDF.PDF import PDF
-from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
+from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleFinding, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
 
 
 @rule_registration.register_rule_to(PDF)
@@ -40,6 +40,7 @@ class PDF107MultilineOpeningQuotesSeparateLine(RuleBase):
             ),
         ),
         incompatible_with=(RuleCode("PDF106"),),
+        check_kind=RuleCheckKind.STANDARD,
     )
 
     @classmethod
@@ -53,9 +54,7 @@ class PDF107MultilineOpeningQuotesSeparateLine(RuleBase):
         changes = _planned_changes(context)
         if not changes:
             return RuleFixResult(module=context.module)
-        module = rule_edits.apply_context_source_changes(context, changes)
-        findings = rule_edits.findings_for_planned_source_changes(cls.meta, changes)
-        return RuleFixResult(module=module, fixed_findings=findings)
+        return rule_edits.fix_result_for_planned_source_changes(context, cls.meta, changes)
 
 
 def _planned_changes(context: RuleContext) -> tuple[rule_edits.PlannedSourceChange, ...]:
@@ -78,7 +77,7 @@ def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo, *, co
     output_lines = (
         PDF_definition.DocstringOutputLine(source="", value=""),
         PDF_definition.DocstringOutputLine(source=f"{canonical_margin}{moved_text}", value=f"{canonical_margin}{moved_text}"),
-        *(PDF_definition.DocstringOutputLine(original=line) for line in docstring.structure.lines[1:]),
+        *(PDF_definition.DocstringOutputLine(original=line, source=None, value=None) for line in docstring.structure.lines[1:]),
     )
     line_numbers = PDF_definition.docstring_value_line_numbers((first_line,))
     return PDF_definition.planned_simple_docstring_output_change(docstring, context=context, output_lines=output_lines, line_numbers=line_numbers)

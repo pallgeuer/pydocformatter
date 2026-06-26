@@ -5,7 +5,9 @@ Fix is always available.
 ## What it does
 Normalizes safe marker spacing and machine-readable syntax in recognized directive comments. For trailing directives, the code before the directive is preserved exactly so PCF002 remains the owner of code-to-`#` delimiter spacing. For standalone directives, indentation is preserved. In both cases, directive content starts after one marker space.
 
-PCF003 handles comments already classified as type comments or known tool directives by the PCF category. It normalizes recognized directive heads to lowercase, removes space before directive introducer colons, adds one space after directive colons where a value follows, and normalizes safe comma-separated lists for `type: ignore[...]`, `ty: ignore[...]`, `noqa`, `ruff: noqa`, `flake8: noqa`, `pylint` enable/disable directives, PyCharm `noinspection` directives, and Ruff bracket directives such as `ruff: ignore[...]`, `ruff: disable[...]`, `ruff: enable[...]`, and `ruff: file-ignore[...]`. Ruff-prefixed isort action comments such as `ruff: isort: skip_file` are normalized as nested directives. PyCharm `language=` injection comments normalize only the directive head and preserve the language ID and optional `prefix=`/`suffix=` payload. PyCharm `@formatter:on` and `@formatter:off` marker comments are normalized as individual directive lines only; they do not disable pydocformatter for a range of code.
+PCF003 handles comments already classified as type comments or known tool directives by the PCF category. It normalizes recognized directive heads to lowercase, removes space before directive introducer colons, adds one space after directive colons where a value follows, and normalizes safe comma-separated lists for `type: ignore[...]`, `ty: ignore[...]`, `noqa`, `pydocfmt: noqa`, `pydocfmt: ignore[...]`, `pydocfmt: file-ignore[...]`, `ruff: noqa`, `flake8: noqa`, `pylint` enable/disable directives, PyCharm `noinspection` directives, and Ruff bracket directives such as `ruff: ignore[...]`, `ruff: disable[...]`, `ruff: enable[...]`, and `ruff: file-ignore[...]`. Ruff-prefixed isort action comments such as `ruff: isort: skip_file` are normalized as nested directives. PyCharm `language=` injection comments normalize only the directive head and preserve the language ID and optional `prefix=`/`suffix=` payload. PyCharm `@formatter:on` and `@formatter:off` marker comments are normalized as individual directive lines only; they do not disable pydocformatter for a range of code.
+
+For pydocfmt directives, this rule normalizes only the supported suppression forms: `pydocfmt: noqa`, `pydocfmt: ignore[...]`, and `pydocfmt: file-ignore[...]`. It does not add support for range-style `pydocfmt: disable[...]` or `pydocfmt: enable[...]` comments.
 
 Unknown or ambiguous payload text is preserved after safe prefix cleanup. Ordinary comments remain outside this rule.
 
@@ -37,6 +39,7 @@ Standalone directives are normalized without changing indentation:
 ```pydocfmt-example
 [input]
 #ruff: noqa
+#PYDOCFMT : ignore [ pdf101, pcf001, ]
 #ruff:ignore[F401,E501]
     # ruff : isort : SKIP_FILE
     #fmt : off
@@ -47,6 +50,7 @@ Standalone directives are normalized without changing indentation:
 
 [output]
 # ruff: noqa
+# pydocfmt: ignore[PDF101, PCF001]
 # ruff: ignore[F401, E501]
     # ruff: isort: skip_file
     # fmt: off
@@ -54,6 +58,22 @@ Standalone directives are normalized without changing indentation:
 # language=SQL prefix=SELECT suffix=FROM table
 # @formatter:off
 # pylint: disable-next=missing-docstring, unused-argument
+```
+
+Pydocfmt suppression directives use pydocfmt selector casing and safe list normalization:
+
+```pydocfmt-example
+[input]
+#PYDOCFMT : noqa : pdf101,pcf001
+#PYDOCFMT : ignore [ pdf101, pcf001, ]  # reason
+#PYDOCFMT : file-ignore [ pdf, pcf006, ]
+#PYDOCFMT : disable [ pdf101 ]
+
+[output]
+# pydocfmt: noqa: PDF101, PCF001
+# pydocfmt: ignore[PDF101, PCF001]  # reason
+# pydocfmt: file-ignore[PDF, PCF006]
+# PYDOCFMT : disable [ pdf101 ]
 ```
 
 Safe machine-readable payloads are normalized, while additional `#` payload text is preserved:

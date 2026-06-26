@@ -11,7 +11,7 @@ import pydocformatter.rules.registration as rule_registration
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase, RuleContext, RuleFixResult
 from pydocformatter.rules.definitions.PDF.PDF import PDF
-from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetadata
+from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleFinding, RuleMetadata
 
 
 @rule_registration.register_rule_to(PDF)
@@ -30,6 +30,7 @@ class PDF110OneLineDocstring(RuleBase):
         stable_since="1.0.0",
         setting_effects=(),
         incompatible_with=(),
+        check_kind=RuleCheckKind.STANDARD,
     )
 
     @classmethod
@@ -43,9 +44,7 @@ class PDF110OneLineDocstring(RuleBase):
         changes = _planned_changes(context)
         if not changes:
             return RuleFixResult(module=context.module)
-        module = rule_edits.apply_context_source_changes(context, changes)
-        findings = rule_edits.findings_for_planned_source_changes(cls.meta, changes)
-        return RuleFixResult(module=module, fixed_findings=findings)
+        return rule_edits.fix_result_for_planned_source_changes(context, cls.meta, changes)
 
 
 def _planned_changes(context: RuleContext) -> tuple[rule_edits.PlannedSourceChange, ...]:
@@ -70,6 +69,7 @@ def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo, *, co
     return rule_edits.PlannedSourceChange(
         edit=rule_edits.SourceEdit(range=docstring.range, replacement=rendered),
         line_numbers=tuple(line.line_number for line in docstring.physical_lines),
+        suppression_line_numbers=(),
     )
 
 

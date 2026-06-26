@@ -7,7 +7,7 @@ import pydocformatter.rules.registration as rule_registration
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase, RuleContext
 from pydocformatter.rules.definitions.PDF.PDF import PDF
-from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetadata
+from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleFinding, RuleMetadata
 
 
 @rule_registration.register_rule_to(PDF)
@@ -26,6 +26,7 @@ class PDF203SummaryTooLong(RuleBase):
         stable_since="1.0.0",
         setting_effects=(),
         incompatible_with=(),
+        check_kind=RuleCheckKind.STANDARD,
     )
 
     @classmethod
@@ -45,6 +46,7 @@ def _finding_for_docstring(docstring: PDF_definition.DocstringInfo) -> RuleFindi
         rule=PDF203SummaryTooLong.meta,
         line_numbers=_summary_line_numbers(docstring, summary),
         instance_message=f"Docstring summary spans {line_count} lines and does not fit on one line",
+        instance_fixable=None,
     )
 
 

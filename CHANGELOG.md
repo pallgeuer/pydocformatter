@@ -87,6 +87,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Expanded the PDF110 and PDF203 documentation with explicit behavior boundaries, setting interactions, safety notes, and verified qualitative examples.
   - Added a reusable rule documentation Markdown template at `src/pydocformatter/rules/templates/rule_template.md`.
   - Added adjacent documentation for each rule category and a reusable rule category documentation template.
+  - Added a source-suppression guide at `docs/suppressions.md` with structured examples executed by pytest.
   - Added docstrings for public glob matching methods, the dependency-pin check tool, and important configuration, CLI, and file-selection helpers.
   - Completed Google-style docstrings for public source APIs and added concise docstrings for private helpers that previously lacked them.
 
@@ -113,6 +114,8 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added typed PCF comment and PDF docstring category data, together with a shared validated source-edit helper, as the foundation for individual rule implementations.
   - Implemented PCF001 standalone-comment formatting, PCF002 trailing-comment spacing, and PCF004 trailing-comment extraction with independent fixes, protected directive handling, tab-expanded widths, stable impossible-width behavior, and exact EOF preservation.
   - Added PCF003 comment-directive-normalization for safe marker spacing and syntax around known type and tool directives.
+  - Added pydocfmt suppression directives for rule findings, including `PCF006` unused-suppression reporting.
+  - Added suppression support for docstring-owned missing-documentation diagnostics that report on signature and body lines.
   - Added opt-in diagnostic `PCF005` to report comments with literal non-ASCII source characters.
   - Added PCF support for ty suppression directives by protecting and normalizing `ty: ignore[...]` comments and mixed `type: ignore[ty:...]` payloads.
   - Added PCF support for Ruff suppression directives by normalizing `ruff: ignore[...]`, `ruff: disable[...]`, `ruff: enable[...]`, `ruff: file-ignore[...]`, and `ruff: isort: ...` comments.
@@ -130,7 +133,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Renamed PCF003 from `directive-normalization` to `comment-directive-normalization`, keeping the `PCF003` rule code while clarifying that the rule owns recognized directive marker and payload normalization from `#` onward.
 
 - **Developer workflow:**
-  - Expanded the Loupe review skill with deeper per-lane analysis prompts, explicit manual repro expectations, and clearer read-only scratch-space rules.
+  - Changed the Loupe review skill to orchestrate parallel Claude Code and Codex CLI review passes with a timeout-bounded helper script and verified final review synthesis.
   - Changed pytest to use pytest-xdist multiprocessing by default for local, pre-commit, and CI test runs.
   - Shared setup and initial check work across structured rule Markdown example assertions to reduce pytest runtime.
   - Cached rule-context source text and source lines per module state to reduce repeated LibCST source regeneration during checks.
@@ -142,6 +145,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Skipped fix passes when an initial clean check proves there are no effectively fixable findings.
   - Skipped PCF category CST traversal for source files that cannot contain Python comments because they have no `#` character.
   - Seeded the initial rule context from already-read LibCST-aligned source text to avoid redundant LibCST source regeneration for unchanged modules.
+  - Required explicit constructor values for important internal dataclass fields that previously supplied implicit defaults.
   - Renamed selected built-in rule names, rule definition files, and rule classes for clearer public metadata while keeping rule codes and selection behavior unchanged.
   - Reorganized rule helper modules so whole-rule logic lives in individual rule files while shared helper modules contain reusable source, layout, decorator, section-edit, and reStructuredText field primitives.
   - Moved reusable docstring section and reStructuredText field metadata out of `PDF.py` into a focused helper module used by the parser, section rules, and documentation helpers.
@@ -189,6 +193,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Fixed URL-aware wrapping to avoid recursive crashes on long URL-containing paragraphs and to fall back to greedy wrapping when balanced wrapping exceeds its search budget.
 
 - **Comment formatting:**
+  - Fixed source suppression handling for PCF findings, PCF006 self-suppression, disabled-rule selectors, and pydocfmt directives with trailing reasons.
   - Fixed PCF002 to normalize the code-to-`#` delimiter for trailing type comments and tool directives while preserving directive text from `#` onward.
   - Fixed PCF002 to strip terminal whitespace from trailing type comments and tool directives when directive normalization is not selected.
   - Fixed PCF003 to normalize standalone recognized directives and safe directive payload syntax, including directive-head casing, colon spacing, and machine-readable comma lists.

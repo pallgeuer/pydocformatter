@@ -4,20 +4,21 @@ from __future__ import annotations
 
 import re
 
+import pydocformatter.rules.definition_helpers.directives as directive_helpers
 import pydocformatter.rules.definitions.PCF.PCF as PCF_definition
 import pydocformatter.rules.edits as rule_edits
 import pydocformatter.rules.registration as rule_registration
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase, RuleContext, RuleFixResult
-from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetadata
+from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleFinding, RuleMetadata
 
 _LIST_ITEM_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
 # ty: prefixes are accepted only in type: ignore[...] lists, where mixed type-checker payloads are used.
 _TYPE_IGNORE_ITEM_RE = re.compile(r"^(?:ty:)?[A-Za-z0-9_.-]+$")
 _NOQA_CODE_RE = re.compile(r"^[A-Za-z]+[A-Za-z0-9-]*\d+[A-Za-z0-9-]*$")
+_PYDOCFMT_SELECTOR_RE = re.compile(r"^(?:ALL|[A-Za-z]+[0-9]*)$")
 _TYPE_IGNORE_RE = re.compile(r"^type\s*:\s*ignore(?P<codes>\[[^\]]*\])?(?P<rest>.*)$", re.IGNORECASE)
 _TY_IGNORE_RE = re.compile(r"^ty\s*:\s*ignore(?P<codes>\[[^\]]*\])?(?P<rest>.*)$", re.IGNORECASE)
-_NOQA_RE = re.compile(r"^noqa(?:\s*:\s*(?P<codes>[^#]*?))?(?P<rest>[ \t\f]+#.*|)$", re.IGNORECASE)
 _PREFIXED_NOQA_RE = re.compile(r"^(?P<head>ruff|flake8)\s*:\s*noqa(?:\s*:\s*(?P<codes>[^#]*?))?(?P<rest>[ \t\f]+#.*|)$", re.IGNORECASE)
 _RUFF_BRACKET_RE = re.compile(r"^ruff\s*:\s*(?P<action>ignore|disable|enable|file-ignore)\s*(?P<codes>\[[^\]]*\])(?P<rest>.*)$", re.IGNORECASE)
 _RUFF_ISORT_RE = re.compile(r"^ruff\s*:\s*isort\s*:\s*(?P<value>.*)$", re.IGNORECASE)
@@ -44,6 +45,7 @@ class PCF003CommentDirectiveNormalization(RuleBase):
         stable_since="1.0.0",
         setting_effects=(),
         incompatible_with=(),
+        check_kind=RuleCheckKind.STANDARD,
     )
 
     @classmethod
@@ -57,9 +59,7 @@ class PCF003CommentDirectiveNormalization(RuleBase):
         changes = _planned_changes(context)
         if not changes:
             return RuleFixResult(module=context.module)
-        module = rule_edits.apply_context_source_changes(context, changes)
-        findings = rule_edits.findings_for_planned_source_changes(cls.meta, changes)
-        return RuleFixResult(module=module, fixed_findings=findings)
+        return rule_edits.fix_result_for_planned_source_changes(context, cls.meta, changes)
 
 
 def _planned_changes(context: RuleContext) -> tuple[rule_edits.PlannedSourceChange, ...]:
@@ -86,8 +86,14 @@ def _normalized_directive_content(content: str) -> str:
         return f"type: ignore{_normalized_bracketed_list(match.group('codes'), item_re=_TYPE_IGNORE_ITEM_RE)}{match.group('rest')}"
     if (match := _TY_IGNORE_RE.match(content)) is not None:
         return f"ty: ignore{_normalized_bracketed_list(match.group('codes'), item_re=_LIST_ITEM_RE)}{match.group('rest')}"
-    if (match := _NOQA_RE.match(content)) is not None:
-        return _normalized_noqa("noqa", match.group("codes"), match.group("rest"))
+    if (match := directive_helpers.NOQA_RE.match(content)) is not None:
+        return _normalized_noqa("noqa", match.group("selectors"), match.group("rest"))
+    if (match := directive_helpers.PYDOCFMT_NOQA_RE.match(content)) is not None:
+        return _normalized_pydocfmt_noqa(match.group("selectors"), match.group("rest"))
+    if (match := directive_helpers.PYDOCFMT_BRACKET_RE.match(content)) is not None and match.group("action").lower() in {"ignore", "file-ignore"}:
+        action = match.group("action").lower()
+        codes = _normalized_bracketed_list(match.group("codes"), item_re=_PYDOCFMT_SELECTOR_RE, allow_trailing_comma=True, uppercase=True)
+        return f"pydocfmt: {action}{codes}{match.group('rest')}"
     if (match := _PREFIXED_NOQA_RE.match(content)) is not None:
         head = match.group("head").lower()
         return _normalized_noqa(f"{head}: noqa", match.group("codes"), match.group("rest"))
@@ -126,12 +132,20 @@ def _normalized_noqa(head: str, codes: str | None, rest: str) -> str:
     return _normalized_colon_payload(head, f"{normalized_codes}{rest}")
 
 
-def _normalized_bracketed_list(text: str | None, *, item_re: re.Pattern[str], allow_trailing_comma: bool = False) -> str:
+def _normalized_pydocfmt_noqa(codes: str | None, rest: str) -> str:
+    """Return a normalized pydocfmt noqa directive."""
+    if codes is None:
+        return f"pydocfmt: noqa{rest}"
+    normalized_codes = _normalized_comma_list(codes, item_re=_PYDOCFMT_SELECTOR_RE, uppercase=True)
+    return _normalized_colon_payload("pydocfmt: noqa", f"{normalized_codes}{rest}")
+
+
+def _normalized_bracketed_list(text: str | None, *, item_re: re.Pattern[str], allow_trailing_comma: bool = False, uppercase: bool = False) -> str:
     """Return a normalized bracketed directive list when it is clearly comma-separated."""
     if text is None:
         return ""
     inner = text[1:-1]
-    normalized = _normalized_comma_list(inner, item_re=item_re, allow_trailing_comma=allow_trailing_comma)
+    normalized = _normalized_comma_list(inner, item_re=item_re, allow_trailing_comma=allow_trailing_comma, uppercase=uppercase)
     return f"[{normalized}]"
 
 

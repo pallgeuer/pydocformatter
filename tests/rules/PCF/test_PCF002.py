@@ -54,28 +54,28 @@ def test_protected_trailing_comments_strip_terminal_whitespace() -> None:
 
 
 @pytest.mark.parametrize(
-    "directive",
+    ("directive", "expected_gap"),
     (
-        "# type: ignore",
-        "# TYPE : ignore",
-        "# noqa",
-        "# nosec",
-        "# nosemgrep",
-        "# pylint: disable=x",
-        "# pyright: ignore",
-        "# mypy: ignore-errors",
-        "# ruff: noqa",
-        "# flake8: noqa",
-        "# fmt: off",
-        "# isort: skip",
-        "# pragma: no cover",
+        ("# type: ignore", "  "),
+        ("# TYPE : ignore", "  "),
+        ("# noqa", " "),
+        ("# nosec", "  "),
+        ("# nosemgrep", "  "),
+        ("# pylint: disable=x", "  "),
+        ("# pyright: ignore", "  "),
+        ("# mypy: ignore-errors", "  "),
+        ("# ruff: noqa", "  "),
+        ("# flake8: noqa", "  "),
+        ("# fmt: off", "  "),
+        ("# isort: skip", "  "),
+        ("# pragma: no cover", "  "),
     ),
 )
-def test_all_protected_trailing_directive_families_preserve_payload_after_hash(directive: str) -> None:
+def test_all_protected_trailing_directive_families_preserve_payload_after_hash(directive: str, expected_gap: str) -> None:
     source = f"value = compute() {directive}\n"
     settings = CheckSettings(select=("PCF002",), line_length=10)
     result = formatter.format_source(source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
-    assert result.new_source == f"value = compute()  {directive}\n"
+    assert result.new_source == f"value = compute(){expected_gap}{directive}\n"
 
 
 @pytest.mark.parametrize(

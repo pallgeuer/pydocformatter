@@ -8,7 +8,7 @@ from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase, RuleContext
 from pydocformatter.rules.definitions.PDF.PDF import PDF
-from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
+from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleFinding, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
 
 
 @rule_registration.register_rule_to(PDF)
@@ -32,6 +32,7 @@ class PDF303SignatureLikeSummary(RuleBase):
             ),
         ),
         incompatible_with=(),
+        check_kind=RuleCheckKind.STANDARD,
     )
 
     @classmethod
@@ -48,6 +49,7 @@ class PDF303SignatureLikeSummary(RuleBase):
                         rule=cls.meta,
                         line_numbers=summary_style.line_numbers(target),
                         instance_message=f"Docstring summary should not include signature for function '{target.docstring.owner.name}'",
+                        instance_fixable=None,
                     )
                 )
         return tuple(findings)

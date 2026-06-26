@@ -6,7 +6,7 @@ import pydocformatter.rules.definitions.PCF.PCF as PCF_definition
 import pydocformatter.rules.registration as rule_registration
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase, RuleContext
-from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetadata
+from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleFinding, RuleMetadata
 
 
 @rule_registration.register_rule_to(PCF_definition.PCF)
@@ -25,10 +25,11 @@ class PCF005CommentAsciiOnly(RuleBase):
         stable_since="1.0.0",
         setting_effects=(),
         incompatible_with=(),
+        check_kind=RuleCheckKind.STANDARD,
     )
 
     @classmethod
     def check(cls, context: RuleContext) -> tuple[RuleFinding, ...]:
         """Return findings for comments containing non-ASCII source characters."""
         data = PCF_definition.PCF.require_data(context)
-        return tuple(RuleFinding(rule=cls.meta, line_numbers=(comment.range.start.line,)) for comment in data.comments if not comment.text.isascii())
+        return tuple(RuleFinding(rule=cls.meta, line_numbers=(comment.range.start.line,), instance_fixable=None) for comment in data.comments if not comment.text.isascii())

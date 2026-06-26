@@ -10,7 +10,7 @@ from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase, RuleContext
 from pydocformatter.rules.definitions.PDF.PDF import PDF
-from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
+from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleFinding, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
 
 
 @rule_registration.register_rule_to(PDF)
@@ -38,6 +38,7 @@ class PDF505ExtraneousYieldDocumentation(RuleBase):
             ),
         ),
         incompatible_with=(),
+        check_kind=RuleCheckKind.STANDARD,
     )
 
     @classmethod
@@ -51,5 +52,5 @@ class PDF505ExtraneousYieldDocumentation(RuleBase):
             for entry in value_documentation.value_documentation_targets(docstring, PDF_definition.DocstringEntryKind.YIELD):
                 if facts.explicit_none_yields and entry.has_content:
                     continue
-                findings.append(RuleFinding(rule=cls.meta, line_numbers=entry.line_numbers))
+                findings.append(RuleFinding(rule=cls.meta, line_numbers=entry.line_numbers, instance_fixable=None))
         return tuple(findings)

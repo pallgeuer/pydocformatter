@@ -3,7 +3,7 @@
 ## What it does
 The PCF category formats standalone and trailing Python comments. It collects comments losslessly with LibCST, classifies comments that must be protected from ordinary prose formatting, and provides physical placement and source-range information to the individual rules.
 
-PCF rules never format shebangs or valid first- or second-line encoding cookies. Type comments and recognized tool directives are protected from ordinary comment formatting; trailing-comment spacing may still normalize the delimiter before `#`, and directive normalization may normalize safe marker spacing and machine-readable syntax from `#` onward in recognized directives. Protected tool directives include `noqa`, `nosec`, `nosemgrep`, `pylint`, `pyright`, `mypy`, `ty:`, `ruff`, `flake8`, `fmt:`, `isort:`, `pragma`, PyCharm `noinspection`, PyCharm `language=`, and PyCharm `@formatter:` marker comments.
+PCF rules never format shebangs or valid first- or second-line encoding cookies. Type comments and recognized tool directives are protected from ordinary comment formatting; trailing-comment spacing may still normalize the delimiter before `#`, and directive normalization may normalize safe marker spacing and machine-readable syntax from `#` onward in recognized directives. Protected tool directives include `noqa`, `nosec`, `nosemgrep`, `pydocfmt`, `pylint`, `pyright`, `mypy`, `ty:`, `ruff`, `flake8`, `fmt:`, `isort:`, `pragma`, PyCharm `noinspection`, PyCharm `language=`, and PyCharm `@formatter:` marker comments.
 
 Comment widths use tab-expanded display columns. `indent-width` supplies the tab width; other Unicode code points count as one column. Generated comment lines use the resolved `line-ending`, while source outside an edited range retains its existing line endings and final-newline state.
 
@@ -11,7 +11,7 @@ Comment widths use tab-expanded display columns. `indent-width` supplies the tab
 Comments remain readable and consistently spaced without rewriting directives or requiring Ruff to perform transformations outside its formatter scope. Separate standalone and trailing rules allow either behavior to be selected or disabled independently.
 
 ## Rules
-Rules in this category cover regular standalone comment formatting, regular trailing-comment spacing, safe directive normalization, and syntax-aware extraction of overlong trailing comments. Standalone formatting is conservative by default, while optional settings enable paragraph joining, structured-markup handling, and broader disabled-code detection. Trailing-comment extraction only moves comments when the surrounding syntax and comment content are safe to rewrite.
+Rules in this category cover regular standalone comment formatting, regular trailing-comment spacing, safe directive normalization, syntax-aware extraction of overlong trailing comments, and unused pydocfmt suppression directives. Standalone formatting is conservative by default, while optional settings enable paragraph joining, structured-markup handling, and broader disabled-code detection. Trailing-comment extraction only moves comments when the surrounding syntax and comment content are safe to rewrite.
 
 Physical standalone runs contain consecutive, same-indent, regular, non-empty comments. Empty comments, hash-only separators, protected comments, indentation changes, and nonconsecutive source lines end a run. Standalone formatting may subdivide a run further according to its enabled structure settings.
 

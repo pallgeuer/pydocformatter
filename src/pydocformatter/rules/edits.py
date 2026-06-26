@@ -12,7 +12,7 @@ import pydocformatter.rules.definition_helpers.source_text as source_text
 from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetadata
 
 if TYPE_CHECKING:
-    from pydocformatter.rules.definition import RuleCategoryContext
+    from pydocformatter.rules.definition import RuleCategoryContext, RuleFixResult
 
 
 @dataclasses.dataclass(frozen=True)
@@ -35,10 +35,13 @@ class PlannedSourceChange:
     Attributes:
         edit (SourceEdit): Concrete source edit to apply.
         line_numbers (tuple[int, ...]): One-based source lines reported for the associated finding.
+        suppression_line_numbers (tuple[tuple[int, ...], ...]): Additional line-number targets used only for source
+            suppression matching.
     """
 
     edit: SourceEdit
     line_numbers: tuple[int, ...]
+    suppression_line_numbers: tuple[tuple[int, ...], ...]
 
 
 @dataclasses.dataclass(frozen=True)
@@ -77,11 +80,34 @@ def apply_context_source_changes(context: RuleCategoryContext, changes: tuple[Pl
     return apply_source_edits(context.module, edits, source=context.source, line_bounds=context.line_bounds)
 
 
+def unsuppressed_planned_source_changes(context: RuleCategoryContext, rule: RuleMetadata, changes: tuple[PlannedSourceChange, ...]) -> tuple[PlannedSourceChange, ...]:
+    """Return planned changes whose associated finding is not suppressed."""
+    if context.suppression_index is None:
+        return changes
+    return tuple(
+        change
+        for change in changes
+        if not context.suppression_index.suppresses(RuleFinding(rule=rule, line_numbers=change.line_numbers, suppression_line_numbers=change.suppression_line_numbers, instance_fixable=None))
+    )
+
+
+def fix_result_for_planned_source_changes(context: RuleCategoryContext, rule: RuleMetadata, changes: tuple[PlannedSourceChange, ...], *, instance_fixable: bool | None = None) -> RuleFixResult:
+    """Return a fix result after dropping suppressed planned changes."""
+    from pydocformatter.rules.definition import RuleFixResult
+
+    changes = unsuppressed_planned_source_changes(context, rule, changes)
+    if not changes:
+        return RuleFixResult(module=context.module)
+    module = apply_context_source_changes(context, changes)
+    findings = findings_for_planned_source_changes(rule, changes, instance_fixable=instance_fixable)
+    return RuleFixResult(module=module, fixed_findings=findings)
+
+
 def findings_for_planned_source_changes(rule: RuleMetadata, changes: tuple[PlannedSourceChange, ...], *, instance_fixable: bool | None = None) -> tuple[RuleFinding, ...]:
     """Return rule findings for planned source changes."""
     if rule.fix_availability in {FixAvailability.USUALLY, FixAvailability.SOMETIMES} and instance_fixable is None:
         raise ValueError(f"{rule.code}: Findings for {rule.fix_availability.lower()}-fixable rules must specify instance_fixable")
-    return tuple(RuleFinding(rule=rule, line_numbers=change.line_numbers, instance_fixable=instance_fixable) for change in changes)
+    return tuple(RuleFinding(rule=rule, line_numbers=change.line_numbers, suppression_line_numbers=change.suppression_line_numbers, instance_fixable=instance_fixable) for change in changes)
 
 
 def apply_source_edits(

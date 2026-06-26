@@ -16,6 +16,7 @@ from pydocformatter.rules.models import RuleCategoryMetadata, RuleFinding, RuleM
 
 if TYPE_CHECKING:
     from pydocformatter.cli.settings_check import CheckSettings
+    from pydocformatter.rules.suppressions import SuppressionIndex
 
 
 @dataclasses.dataclass(frozen=True)
@@ -32,6 +33,7 @@ class RuleCategoryContext:
         source (str): Current module source aligned with `module`.
         source_lines (tuple[str, ...]): Current source split into physical lines.
         line_bounds (source_text.LineBounds | None): Cached source offset lookup table, if available.
+        suppression_index (SuppressionIndex | None): Parsed pydocformatter suppression directives for this source state.
     """
 
     path: str
@@ -42,7 +44,8 @@ class RuleCategoryContext:
     line_ending: str
     source: str
     source_lines: tuple[str, ...]
-    line_bounds: source_text.LineBounds | None = dataclasses.field(default=None, kw_only=True)
+    line_bounds: source_text.LineBounds | None = dataclasses.field(kw_only=True)
+    suppression_index: SuppressionIndex | None = dataclasses.field(kw_only=True)
 
 
 @dataclasses.dataclass(frozen=True)

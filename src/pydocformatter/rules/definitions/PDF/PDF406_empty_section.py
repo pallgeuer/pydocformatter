@@ -10,7 +10,7 @@ from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase, RuleContext
 from pydocformatter.rules.definitions.PDF.PDF import PDF
-from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
+from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleFinding, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
 
 
 @rule_registration.register_rule_to(PDF)
@@ -34,6 +34,7 @@ class PDF406EmptySection(RuleBase):
             ),
         ),
         incompatible_with=(),
+        check_kind=RuleCheckKind.STANDARD,
     )
 
     @classmethod
@@ -51,11 +52,7 @@ def _findings(context: RuleContext, *, rule: RuleMetadata) -> tuple[RuleFinding,
             if not _section_has_content(docstring, section):
                 line = docstring.structure.lines[section.header_line]
                 findings.append(
-                    RuleFinding(
-                        rule=rule,
-                        line_numbers=section_edits.line_numbers(docstring, line),
-                        instance_message=f"Docstring section '{section.name}' should not be empty",
-                    )
+                    RuleFinding(rule=rule, line_numbers=section_edits.line_numbers(docstring, line), instance_message=f"Docstring section '{section.name}' should not be empty", instance_fixable=None)
                 )
         if docstring.structure.convention is DocstringConvention.REST:
             for entry in docstring.structure.entries:
@@ -64,9 +61,7 @@ def _findings(context: RuleContext, *, rule: RuleMetadata) -> tuple[RuleFinding,
                 line = docstring.structure.lines[entry.start_line]
                 findings.append(
                     RuleFinding(
-                        rule=rule,
-                        line_numbers=section_edits.line_numbers(docstring, line),
-                        instance_message=f"Docstring field '{rest_fields.label(entry)}' should not be empty",
+                        rule=rule, line_numbers=section_edits.line_numbers(docstring, line), instance_message=f"Docstring field '{rest_fields.label(entry)}' should not be empty", instance_fixable=None
                     )
                 )
     return tuple(findings)

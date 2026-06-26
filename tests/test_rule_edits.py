@@ -6,20 +6,31 @@ import libcst.metadata as cst_metadata
 
 import pydocformatter.rules.definition_helpers.source_text as source_text
 import pydocformatter.rules.edits as rule_edits
+import pydocformatter.rules.suppressions as suppressions
 from pydocformatter.cli.settings_check import CheckSettings
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleCategoryContext
-from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetadata
+from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleFinding, RuleMetadata
 
 
 class TestSourceEdits(unittest.TestCase):
     def test_planned_source_changes_apply_edits_and_create_findings(self) -> None:
         module = cst.parse_module("value = 1\n")
-        rule = RuleMetadata(code=RuleCode("PDF999"), name="test-rule", message="Test message", fix_availability=FixAvailability.ALWAYS, stable_since="1.0.0", setting_effects=(), incompatible_with=())
+        rule = RuleMetadata(
+            code=RuleCode("PDF999"),
+            name="test-rule",
+            message="Test message",
+            fix_availability=FixAvailability.ALWAYS,
+            stable_since="1.0.0",
+            setting_effects=(),
+            incompatible_with=(),
+            check_kind=RuleCheckKind.STANDARD,
+        )
         changes = (
             rule_edits.PlannedSourceChange(
                 edit=rule_edits.SourceEdit(cst_metadata.CodeRange(start=cst_metadata.CodePosition(1, 8), end=cst_metadata.CodePosition(1, 9)), "2"),
                 line_numbers=(1,),
+                suppression_line_numbers=((2,),),
             ),
         )
 
@@ -28,17 +39,73 @@ class TestSourceEdits(unittest.TestCase):
         explicitly_fixable_findings = rule_edits.findings_for_planned_source_changes(rule, changes, instance_fixable=True)
 
         self.assertEqual(result.code, "value = 2\n")
-        self.assertEqual(findings, (RuleFinding(rule=rule, line_numbers=(1,)),))
-        self.assertEqual(explicitly_fixable_findings, (RuleFinding(rule=rule, line_numbers=(1,), instance_fixable=True),))
+        self.assertEqual(findings, (RuleFinding(rule=rule, line_numbers=(1,), suppression_line_numbers=((2,),), instance_fixable=None),))
+        self.assertEqual(explicitly_fixable_findings, (RuleFinding(rule=rule, line_numbers=(1,), suppression_line_numbers=((2,),), instance_fixable=True),))
+
+    def test_planned_source_change_suppression_uses_additional_targets(self) -> None:
+        source = "first = 1\nsecond = 2\nthird = 3\n"
+        module = cst.parse_module(source)
+        metadata_wrapper = cst_metadata.MetadataWrapper(module, unsafe_skip_copy=True)
+        rule = RuleMetadata(
+            code=RuleCode("PDF999"),
+            name="test-rule",
+            message="Test message",
+            fix_availability=FixAvailability.ALWAYS,
+            stable_since="1.0.0",
+            setting_effects=(),
+            incompatible_with=(),
+            check_kind=RuleCheckKind.STANDARD,
+        )
+        context = RuleCategoryContext(
+            path="example.py",
+            settings=CheckSettings(),
+            module=module,
+            metadata_wrapper=metadata_wrapper,
+            positions=metadata_wrapper.resolve(cst_metadata.PositionProvider),
+            line_ending="\n",
+            source=source,
+            source_lines=tuple(source_text.source_lines(source)),
+            suppression_index=suppressions.SuppressionIndex(
+                directives=(
+                    suppressions.SuppressionDirective(
+                        line=1,
+                        selectors=(suppressions.SuppressionSelector(text="PDF999", matched_codes=frozenset((rule.code,)), coverage_lines=frozenset((2,)), audit=True),),
+                    ),
+                )
+            ),
+            line_bounds=None,
+        )
+        suppressed = rule_edits.PlannedSourceChange(
+            edit=rule_edits.SourceEdit(cst_metadata.CodeRange(start=cst_metadata.CodePosition(3, 8), end=cst_metadata.CodePosition(3, 9)), "4"),
+            line_numbers=(3,),
+            suppression_line_numbers=((2,),),
+        )
+        unsuppressed = rule_edits.PlannedSourceChange(
+            edit=rule_edits.SourceEdit(cst_metadata.CodeRange(start=cst_metadata.CodePosition(3, 8), end=cst_metadata.CodePosition(3, 9)), "5"),
+            line_numbers=(3,),
+            suppression_line_numbers=(),
+        )
+
+        result = rule_edits.unsuppressed_planned_source_changes(context, rule, (suppressed, unsuppressed))
+
+        self.assertEqual(result, (unsuppressed,))
 
     def test_sometimes_fixable_findings_require_explicit_instance_fixability(self) -> None:
         rule = RuleMetadata(
-            code=RuleCode("PDF999"), name="test-rule", message="Test message", fix_availability=FixAvailability.SOMETIMES, stable_since="1.0.0", setting_effects=(), incompatible_with=()
+            code=RuleCode("PDF999"),
+            name="test-rule",
+            message="Test message",
+            fix_availability=FixAvailability.SOMETIMES,
+            stable_since="1.0.0",
+            setting_effects=(),
+            incompatible_with=(),
+            check_kind=RuleCheckKind.STANDARD,
         )
         changes = (
             rule_edits.PlannedSourceChange(
                 edit=rule_edits.SourceEdit(cst_metadata.CodeRange(start=cst_metadata.CodePosition(1, 0), end=cst_metadata.CodePosition(1, 0)), ""),
                 line_numbers=(1,),
+                suppression_line_numbers=(),
             ),
         )
 
@@ -46,11 +113,21 @@ class TestSourceEdits(unittest.TestCase):
             rule_edits.findings_for_planned_source_changes(rule, changes)
 
     def test_usually_fixable_findings_require_explicit_instance_fixability(self) -> None:
-        rule = RuleMetadata(code=RuleCode("PDF999"), name="test-rule", message="Test message", fix_availability=FixAvailability.USUALLY, stable_since="1.0.0", setting_effects=(), incompatible_with=())
+        rule = RuleMetadata(
+            code=RuleCode("PDF999"),
+            name="test-rule",
+            message="Test message",
+            fix_availability=FixAvailability.USUALLY,
+            stable_since="1.0.0",
+            setting_effects=(),
+            incompatible_with=(),
+            check_kind=RuleCheckKind.STANDARD,
+        )
         changes = (
             rule_edits.PlannedSourceChange(
                 edit=rule_edits.SourceEdit(cst_metadata.CodeRange(start=cst_metadata.CodePosition(1, 0), end=cst_metadata.CodePosition(1, 0)), ""),
                 line_numbers=(1,),
+                suppression_line_numbers=(),
             ),
         )
 
@@ -116,11 +193,13 @@ class TestSourceEdits(unittest.TestCase):
             source=source,
             source_lines=lines,
             line_bounds=source_text.line_bounds_from_lines(lines),
+            suppression_index=None,
         )
         changes = (
             rule_edits.PlannedSourceChange(
                 edit=rule_edits.SourceEdit(cst_metadata.CodeRange(start=cst_metadata.CodePosition(2, 0), end=cst_metadata.CodePosition(2, 4)), "gamma"),
                 line_numbers=(2,),
+                suppression_line_numbers=(),
             ),
         )
 

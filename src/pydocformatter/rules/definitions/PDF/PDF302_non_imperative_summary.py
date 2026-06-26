@@ -10,7 +10,7 @@ from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase, RuleContext
 from pydocformatter.rules.definitions.PDF.PDF import PDF
-from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
+from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleFinding, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
 
 
 @rule_registration.register_rule_to(PDF)
@@ -34,6 +34,7 @@ class PDF302NonImperativeSummary(RuleBase):
             ),
         ),
         incompatible_with=(),
+        check_kind=RuleCheckKind.STANDARD,
     )
 
     @classmethod
@@ -50,7 +51,9 @@ class PDF302NonImperativeSummary(RuleBase):
                 continue
             normalized = summary_style.normalize_word(word.word)
             if normalized and _is_non_imperative(normalized):
-                findings.append(RuleFinding(rule=cls.meta, line_numbers=summary_style.line_numbers(word), instance_message=f"Docstring summary first word '{word.word}' is not imperative"))
+                findings.append(
+                    RuleFinding(rule=cls.meta, line_numbers=summary_style.line_numbers(word), instance_message=f"Docstring summary first word '{word.word}' is not imperative", instance_fixable=None)
+                )
         return tuple(findings)
 
 

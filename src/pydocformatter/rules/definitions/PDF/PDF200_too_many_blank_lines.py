@@ -12,7 +12,7 @@ import pydocformatter.rules.edits as rule_edits
 import pydocformatter.rules.registration as rule_registration
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase, RuleContext, RuleFixResult
-from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetadata
+from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleFinding, RuleMetadata
 
 
 @rule_registration.register_rule_to(PDF_definition.PDF)
@@ -31,6 +31,7 @@ class PDF200TooManyBlankLines(RuleBase):
         stable_since="1.0.0",
         setting_effects=(),
         incompatible_with=(),
+        check_kind=RuleCheckKind.STANDARD,
     )
 
     @classmethod
@@ -44,9 +45,7 @@ class PDF200TooManyBlankLines(RuleBase):
         changes = _planned_changes(context)
         if not changes:
             return RuleFixResult(module=context.module)
-        module = rule_edits.apply_context_source_changes(context, changes)
-        findings = rule_edits.findings_for_planned_source_changes(cls.meta, changes)
-        return RuleFixResult(module=module, fixed_findings=findings)
+        return rule_edits.fix_result_for_planned_source_changes(context, cls.meta, changes)
 
 
 def _planned_changes(context: RuleContext) -> tuple[rule_edits.PlannedSourceChange, ...]:
@@ -180,7 +179,7 @@ def _trailing_blank_line(block: PDF_definition.DocstringBlock) -> int | None:
 def _output_lines(docstring: PDF_definition.DocstringInfo, retained_lines: tuple[int, ...]) -> tuple[PDF_definition.DocstringOutputLine, ...]:
     """Return replacement logical lines for retained docstring indexes."""
     return tuple(
-        PDF_definition.DocstringOutputLine(original=line, strip_docstring_margin=output_index == 0 and line.index != 0)
+        PDF_definition.DocstringOutputLine(original=line, strip_docstring_margin=output_index == 0 and line.index != 0, source=None, value=None)
         for output_index, line_index in enumerate(retained_lines)
         for line in (docstring.structure.lines[line_index],)
     )

@@ -11,6 +11,7 @@
 | PCF003 | comment-directive-normalization | Directive comment should be normalized        | Always  |    -     |    1.0.0     | Normalizes safe marker spacing and syntax for known type and tool directive comments                       |
 | PCF004 | trailing-comment-extraction     | Trailing comment should be extracted          | Always  |    -     |    1.0.0     | Extracts overlong ordinary trailing comments when syntax and content safety settings allow it              |
 | PCF005 | comment-ascii-only              | Comment should contain only ASCII characters  |  Never  | Required |    1.0.0     | Flags literal non-ASCII characters in Python comments                                                      |
+| PCF006 | unused-suppression              | Suppression directive is unused               |  Never  |    -     |    1.0.0     | Reports unused or invalid pydocfmt suppression selectors                                                   |
 
 ### pydocformatter docstrings (PDF)
 
@@ -83,6 +84,8 @@ unfixable = []
 [tool.pydocfmt.comment]
 format-task-markers = true
 ```
+
+pydocfmt source comments can suppress findings and fixes. Bare `# noqa` uses conventional same-line suppression, while pydocfmt-owned `# pydocfmt: noqa`, `# pydocfmt: file-ignore[...]`, and `# pydocfmt: ignore[...]` directives support file-level and local pydocformatter selectors. For the full source-suppression contract and executed examples, see [Source Suppressions](suppressions.md).
 
 ## Ruff Rules
 

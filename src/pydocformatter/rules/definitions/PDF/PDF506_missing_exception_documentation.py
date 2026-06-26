@@ -11,7 +11,7 @@ from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase, RuleContext
 from pydocformatter.rules.definitions.PDF.PDF import PDF
-from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
+from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleFinding, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
 
 
 @rule_registration.register_rule_to(PDF)
@@ -35,6 +35,7 @@ class PDF506MissingExceptionDocumentation(RuleBase):
             ),
         ),
         incompatible_with=(),
+        check_kind=RuleCheckKind.STANDARD,
     )
 
     @classmethod
@@ -57,5 +58,13 @@ class PDF506MissingExceptionDocumentation(RuleBase):
                     continue
                 seen.append(raised.name)
                 if not any(value_documentation.exception_names_match(raised.name, documented_name) for documented_name in documented_names):
-                    findings.append(RuleFinding(rule=cls.meta, line_numbers=raised.line_numbers, instance_message=f"Raised exception '{raised.name}' is missing docstring documentation"))
+                    findings.append(
+                        RuleFinding(
+                            rule=cls.meta,
+                            line_numbers=raised.line_numbers,
+                            suppression_line_numbers=(PDF_definition.docstring_physical_line_numbers(docstring),),
+                            instance_message=f"Raised exception '{raised.name}' is missing docstring documentation",
+                            instance_fixable=None,
+                        )
+                    )
         return tuple(findings)

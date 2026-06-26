@@ -9,7 +9,7 @@ from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase, RuleContext, RuleFixResult
 from pydocformatter.rules.definitions.PDF.PDF import PDF
-from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
+from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleFinding, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
 
 _POLICY = summary_punctuation.SummaryPunctuationPolicy(valid_endings=".?!\u2026", nonfixable_endings=",:;")
 
@@ -35,6 +35,7 @@ class PDF301SummaryTerminalPunctuation(RuleBase):
             ),
         ),
         incompatible_with=(),
+        check_kind=RuleCheckKind.STANDARD,
     )
 
     @classmethod
@@ -48,6 +49,4 @@ class PDF301SummaryTerminalPunctuation(RuleBase):
         changes = tuple(result.change for result in summary_punctuation.results(context, rule=cls.meta, policy=_POLICY) if result.change is not None)
         if not changes:
             return RuleFixResult(module=context.module)
-        module = rule_edits.apply_context_source_changes(context, changes)
-        findings = rule_edits.findings_for_planned_source_changes(cls.meta, changes, instance_fixable=True)
-        return RuleFixResult(module=module, fixed_findings=findings)
+        return rule_edits.fix_result_for_planned_source_changes(context, cls.meta, changes, instance_fixable=True)

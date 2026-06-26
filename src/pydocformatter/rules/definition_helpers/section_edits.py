@@ -33,9 +33,7 @@ def fix_result_for_results(context: RuleContext, rule: RuleMetadata, results: tu
     changes = tuple(result.change for result in results if result.change is not None)
     if not changes:
         return RuleFixResult(module=context.module)
-    module = rule_edits.apply_context_source_changes(context, changes)
-    findings = rule_edits.findings_for_planned_source_changes(rule, changes, instance_fixable=True)
-    return RuleFixResult(module=module, fixed_findings=findings)
+    return rule_edits.fix_result_for_planned_source_changes(context, rule, changes, instance_fixable=True)
 
 
 def result(rule: RuleMetadata, line_numbers: tuple[int, ...] | list[int], *, change: rule_edits.PlannedSourceChange | None, instance_message: str | None = None) -> SectionEditResult:

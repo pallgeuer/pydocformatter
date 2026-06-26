@@ -10,7 +10,7 @@ import pydocformatter.rules.registration as rule_registration
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase, RuleContext, RuleFixResult
 from pydocformatter.rules.definitions.PDF.PDF import PDF
-from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetadata
+from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleFinding, RuleMetadata
 
 
 @rule_registration.register_rule_to(PDF)
@@ -29,6 +29,7 @@ class PDF109MultilineClosingQuotesSeparateLine(RuleBase):
         stable_since="1.0.0",
         setting_effects=(),
         incompatible_with=(RuleCode("PDF108"),),
+        check_kind=RuleCheckKind.STANDARD,
     )
 
     @classmethod
@@ -42,9 +43,7 @@ class PDF109MultilineClosingQuotesSeparateLine(RuleBase):
         changes = _planned_changes(context)
         if not changes:
             return RuleFixResult(module=context.module)
-        module = rule_edits.apply_context_source_changes(context, changes)
-        findings = rule_edits.findings_for_planned_source_changes(cls.meta, changes)
-        return RuleFixResult(module=module, fixed_findings=findings)
+        return rule_edits.fix_result_for_planned_source_changes(context, cls.meta, changes)
 
 
 def _planned_changes(context: RuleContext) -> tuple[rule_edits.PlannedSourceChange, ...]:
@@ -67,7 +66,7 @@ def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo, *, co
     canonical_margin = PDF_definition.docstring_canonical_margin(docstring, context=context, source_lines=source_lines)
     final_line = docstring.structure.lines[last_content]
     output_lines = (
-        *(PDF_definition.DocstringOutputLine(original=line) for line in docstring.structure.lines),
+        *(PDF_definition.DocstringOutputLine(original=line, source=None, value=None) for line in docstring.structure.lines),
         PDF_definition.DocstringOutputLine(source=canonical_margin, value=canonical_margin),
     )
     line_numbers = PDF_definition.docstring_value_line_numbers((final_line,))

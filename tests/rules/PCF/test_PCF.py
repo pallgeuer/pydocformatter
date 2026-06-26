@@ -24,6 +24,8 @@ def category_context(source: str) -> RuleCategoryContext:
         line_ending="\r\n" if "\r\n" in source else "\n",
         source=source,
         source_lines=tuple(source_text.source_lines(source)),
+        line_bounds=None,
+        suppression_index=None,
     )
 
 
@@ -37,6 +39,8 @@ def rule_context(context: RuleCategoryContext, data: object | None) -> RuleConte
         line_ending=context.line_ending,
         source=context.source,
         source_lines=context.source_lines,
+        line_bounds=context.line_bounds,
+        suppression_index=context.suppression_index,
         category_data=data,
         effectively_fixable=True,
     )
@@ -181,6 +185,9 @@ def test_prepare_classifies_shebang_and_encoding_cookie_boundaries(source: str, 
         "# pylint: disable=x",
         "# PYRIGHT: ignore",
         "# mypy: ignore-errors",
+        "# pydocfmt: noqa",
+        "# pydocfmt: ignore[PDF101]",
+        "# pydocfmt: file-ignore[PCF001]",
         "# ruff: noqa",
         "# ruff: ignore[F401]",
         "# ruff: disable[E741, F841]",

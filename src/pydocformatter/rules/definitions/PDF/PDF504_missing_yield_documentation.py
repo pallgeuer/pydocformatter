@@ -11,7 +11,7 @@ from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase, RuleContext
 from pydocformatter.rules.definitions.PDF.PDF import PDF
-from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
+from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleFinding, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
 
 
 @rule_registration.register_rule_to(PDF)
@@ -35,6 +35,7 @@ class PDF504MissingYieldDocumentation(RuleBase):
             ),
         ),
         incompatible_with=(),
+        check_kind=RuleCheckKind.STANDARD,
     )
 
     @classmethod
@@ -51,5 +52,9 @@ class PDF504MissingYieldDocumentation(RuleBase):
                 or not missing_documentation.should_check_missing_documentation(definition, docstring, context=context, has_relevant_documentation=bool(yield_targets))
             ):
                 continue
-            findings.append(RuleFinding(rule=cls.meta, line_numbers=facts.meaningful_yields[0].line_numbers))
+            findings.append(
+                RuleFinding(
+                    rule=cls.meta, line_numbers=facts.meaningful_yields[0].line_numbers, suppression_line_numbers=(PDF_definition.docstring_physical_line_numbers(docstring),), instance_fixable=None
+                )
+            )
         return tuple(findings)

@@ -9,7 +9,7 @@ from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase, RuleContext
 from pydocformatter.rules.definitions.PDF.PDF import PDF
-from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
+from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleFinding, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
 
 
 @rule_registration.register_rule_to(PDF)
@@ -38,6 +38,7 @@ class PDF507ExtraneousExceptionDocumentation(RuleBase):
             ),
         ),
         incompatible_with=(),
+        check_kind=RuleCheckKind.STANDARD,
     )
 
     @classmethod
@@ -48,5 +49,9 @@ class PDF507ExtraneousExceptionDocumentation(RuleBase):
             del definition
             for entry in value_documentation.documented_entries(docstring, PDF_definition.DocstringEntryKind.EXCEPTION, require_content=False):
                 if entry.name is not None and not any(value_documentation.exception_names_match(raised.name, entry.name) for raised in facts.raised_exceptions):
-                    findings.append(RuleFinding(rule=cls.meta, line_numbers=entry.line_numbers, instance_message=f"Docstring documents exception '{entry.name}' that is not explicitly raised"))
+                    findings.append(
+                        RuleFinding(
+                            rule=cls.meta, line_numbers=entry.line_numbers, instance_message=f"Docstring documents exception '{entry.name}' that is not explicitly raised", instance_fixable=None
+                        )
+                    )
         return tuple(findings)

@@ -10,7 +10,7 @@ from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase, RuleContext
 from pydocformatter.rules.definitions.PDF.PDF import PDF
-from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
+from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleFinding, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
 
 
 @rule_registration.register_rule_to(PDF)
@@ -38,6 +38,7 @@ class PDF501ExtraneousParameterDocumentation(RuleBase):
             ),
         ),
         incompatible_with=(),
+        check_kind=RuleCheckKind.STANDARD,
     )
 
     @classmethod
@@ -72,6 +73,7 @@ class PDF501ExtraneousParameterDocumentation(RuleBase):
                             rule=cls.meta,
                             line_numbers=parameter.line_numbers,
                             instance_message=f"Docstring documents parameter '{parameter.name}' that is not in the function signature",
+                            instance_fixable=None,
                         )
                     )
         return tuple(findings)

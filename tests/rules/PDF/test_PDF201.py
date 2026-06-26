@@ -24,8 +24,23 @@ def contexts(source: str, *, settings: CheckSettings | None = None) -> tuple[Rul
         line_ending="\r\n" if "\r\n" in source else "\n",
         source=source,
         source_lines=tuple(source_text.source_lines(source)),
+        line_bounds=None,
+        suppression_index=None,
     )
-    return category, RuleContext(**category.__dict__, category_data=PDF.prepare(category), effectively_fixable=True)
+    return category, RuleContext(
+        path=category.path,
+        settings=category.settings,
+        module=category.module,
+        metadata_wrapper=category.metadata_wrapper,
+        positions=category.positions,
+        line_ending=category.line_ending,
+        source=category.source,
+        source_lines=category.source_lines,
+        line_bounds=category.line_bounds,
+        suppression_index=category.suppression_index,
+        category_data=PDF.prepare(category),
+        effectively_fixable=True,
+    )
 
 
 def format_source(source: str, *, settings: CheckSettings | None = None, fix: bool = True) -> formatter.FormatterResult:

@@ -10,7 +10,7 @@ from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase, RuleContext
 from pydocformatter.rules.definitions.PDF.PDF import PDF
-from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
+from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleFinding, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
 
 
 @rule_registration.register_rule_to(PDF)
@@ -34,6 +34,7 @@ class PDF500MissingParameterDocumentation(RuleBase):
             ),
         ),
         incompatible_with=(),
+        check_kind=RuleCheckKind.STANDARD,
     )
 
     @classmethod
@@ -50,6 +51,7 @@ class PDF500MissingParameterDocumentation(RuleBase):
             if docstring is None or not parameter_documentation.should_check_missing_parameters(definition, docstring, context=context):
                 continue
             documented_names = {parameter.comparison_name for parameter in parameter_documentation.documented_parameters(docstring)}
+            docstring_suppression_target = (PDF_definition.docstring_physical_line_numbers(docstring),)
             for parameter in parameter_documentation.signature_parameters(definition, context=context):
                 if parameter.implicit_receiver or parameter.unpacked or parameter.comparison_name in documented_names:
                     continue
@@ -57,7 +59,9 @@ class PDF500MissingParameterDocumentation(RuleBase):
                     RuleFinding(
                         rule=cls.meta,
                         line_numbers=parameter.line_numbers,
+                        suppression_line_numbers=docstring_suppression_target,
                         instance_message=f"Function parameter '{parameter.display_name}' is missing docstring documentation",
+                        instance_fixable=None,
                     )
                 )
         return tuple(findings)

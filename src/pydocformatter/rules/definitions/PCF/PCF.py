@@ -20,7 +20,7 @@ from pydocformatter.rules.models import RuleCategoryMetadata
 _ENCODING_COOKIE_RE = re.compile(r"^#.*?coding[:=][ \t]*[-_.a-zA-Z0-9]+")
 _TYPE_DIRECTIVE_RE = re.compile(r"^#\s*type\s*:", re.IGNORECASE)
 _TOOL_DIRECTIVE_RE = re.compile(
-    r"^#\s*(?:noqa\b|nosec\b|nosemgrep\b|pylint\b|pyright\b|mypy\b|ty\s*:|ruff\b|flake8\b|fmt\s*:|isort\s*:|pragma\b|noinspection\b|language\s*=|@formatter\s*:)",
+    r"^#\s*(?:noqa\b|nosec\b|nosemgrep\b|pydocfmt\b|pylint\b|pyright\b|mypy\b|ty\s*:|ruff\b|flake8\b|fmt\s*:|isort\s*:|pragma\b|noinspection\b|language\s*=|@formatter\s*:)",
     re.IGNORECASE,
 )
 
@@ -259,6 +259,7 @@ def planned_full_line_change(
     return rule_edits.PlannedSourceChange(
         edit=rule_edits.SourceEdit(range=code_range, replacement=replacement),
         line_numbers=(comment.range.start.line,),
+        suppression_line_numbers=(),
     )
 
 

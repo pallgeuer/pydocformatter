@@ -22,11 +22,18 @@ import pydocformatter.settings as settings_core
 from pydocformatter.cli.settings_check import CheckSettings
 from pydocformatter.formatter import FormatterResult
 from pydocformatter.rules.codes import RuleCode
-from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetadata
+from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleFinding, RuleMetadata
 from pydocformatter.rules_selection import RuleSelection
 
 PDF101_RULE = RuleMetadata(
-    code=RuleCode("PDF101"), name="docstring-reflow", message="Docstring chunk needs reflow", fix_availability=FixAvailability.ALWAYS, stable_since="1.0.0", setting_effects=(), incompatible_with=()
+    code=RuleCode("PDF101"),
+    name="docstring-reflow",
+    message="Docstring chunk needs reflow",
+    fix_availability=FixAvailability.ALWAYS,
+    stable_since="1.0.0",
+    setting_effects=(),
+    incompatible_with=(),
+    check_kind=RuleCheckKind.STANDARD,
 )
 PCF001_RULE = RuleMetadata(
     code=RuleCode("PCF001"),
@@ -36,6 +43,7 @@ PCF001_RULE = RuleMetadata(
     stable_since="1.0.0",
     setting_effects=(),
     incompatible_with=(),
+    check_kind=RuleCheckKind.STANDARD,
 )
 
 
@@ -1453,6 +1461,7 @@ class TestCLIShowFiles(unittest.TestCase):
                 stable_since="1.0.0",
                 setting_effects=(),
                 incompatible_with=(),
+                check_kind=RuleCheckKind.STANDARD,
             )
             called_args: list[tuple[bool, bool]] = []
 
@@ -1465,7 +1474,7 @@ class TestCLIShowFiles(unittest.TestCase):
                     new_source=formatted_source,
                     modified=True,
                     fixed_findings=collections.Counter({PDF101_RULE: 1}),
-                    unfixed_findings=(RuleFinding(rule=rule, line_numbers=(1,)),),
+                    unfixed_findings=(RuleFinding(rule=rule, line_numbers=(1,), instance_fixable=None),),
                     errors=(),
                 )
 

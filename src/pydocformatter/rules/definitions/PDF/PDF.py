@@ -289,8 +289,8 @@ class DocstringOutputLine:
     """
 
     original: DocstringValueLine | None = None
-    source: str | None = None
-    value: str | None = None
+    source: str | None = dataclasses.field(kw_only=True)
+    value: str | None = dataclasses.field(kw_only=True)
     strip_docstring_margin: bool = False
 
 
@@ -1722,6 +1722,7 @@ def planned_simple_docstring_source_change(
     return rule_edits.PlannedSourceChange(
         edit=rule_edits.SourceEdit(range=docstring.range, replacement=rendered),
         line_numbers=tuple(line_number for replacement in replacements for line_number in replacement.line_numbers),
+        suppression_line_numbers=(),
     )
 
 
@@ -1749,6 +1750,7 @@ def planned_simple_docstring_output_change(
     return rule_edits.PlannedSourceChange(
         edit=rule_edits.SourceEdit(range=docstring.range, replacement=rendered),
         line_numbers=line_numbers,
+        suppression_line_numbers=(),
     )
 
 
@@ -1760,6 +1762,11 @@ def docstring_content_indexes(docstring: DocstringInfo) -> tuple[int, ...]:
 def docstring_value_line_numbers(lines: tuple[DocstringValueLine, ...]) -> tuple[int, ...]:
     """Return deduplicated source line numbers for changed logical lines."""
     return tuple(dict.fromkeys(line.source_line_number for line in lines if line.source_line_number is not None))
+
+
+def docstring_physical_line_numbers(docstring: DocstringInfo) -> tuple[int, ...]:
+    """Return physical source lines occupied by a docstring expression."""
+    return tuple(source_line.line_number for source_line in docstring.physical_lines)
 
 
 def summary_first_line_targets(docstrings: tuple[DocstringInfo, ...]) -> tuple[SummaryLineTarget, ...]:
@@ -1818,7 +1825,7 @@ def docstring_line_numbers(docstring: DocstringInfo, line: DocstringValueLine) -
     """Return concrete source lines for a docstring value line."""
     if line.source_line_number is not None:
         return docstring_value_line_numbers((line,))
-    return tuple(source_line.line_number for source_line in docstring.physical_lines)
+    return docstring_physical_line_numbers(docstring)
 
 
 def docstring_value_ends_with_newline(docstring: DocstringInfo) -> bool:
