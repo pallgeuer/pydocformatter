@@ -89,7 +89,9 @@ Use this structure for the final review in chat:
 
 1. [<Severity>] <Concise summary sentence>. · `<path:line or symbol>` · Description: <Evidence and impact>. · Recommendation: <Concrete fix direction>.
 
-**<Reviewer name>:**
+**<Reviewer name>:** <status> in <elapsed_seconds>
+
+2. [<Severity>] <Concise summary sentence>. · `<path:line or symbol>` · Description: <Evidence and impact>. · Recommendation: <Concrete fix direction>.
 
 ...
 ```
@@ -100,6 +102,7 @@ Rules for final output:
 - `<status>` should be the reviewer status exactly as per the script JSON output, only with the first letter capitalized and spaces instead of underscores, e.g. `Succeeded`, `Timed out`.
 - `<elapsed_seconds>` should be the elapsed time of that specific reviewer exactly as per the script JSON output, only rounded to the nearest second, e.g. `174s`.
 - Show all findings of all reviewers, whether they were rejected or not. Sort findings per reviewer by descending severity, then by likely fix order.
+- Number findings with one continuous global counter across every reviewer section. The first structured finding in the final review is `1.`, and each later structured finding uses the next integer even when it appears under a different reviewer, so every finding can be uniquely referenced by number. Failed-reviewer descriptions and `No findings.` sections do not consume a finding number.
 - Every finding must be self-contained and contain all information required for the user to understand the problem.
 - If a reviewer failed then provide a detailed description of what went wrong in place of the structured findings list.
 - If a reviewer succeeded but produced no findings then just say `No findings.` in place of the structured findings list.

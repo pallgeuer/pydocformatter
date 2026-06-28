@@ -19,6 +19,7 @@ from typing import Any, BinaryIO, Dict, List, Optional, Sequence
 DEFAULT_TIMEOUT_SECONDS = 30 * 60
 PROCESS_TERMINATION_SECONDS = 5
 NO_LAUNCHABLE_REVIEWERS_MESSAGE = "No launchable reviewers are available."
+MISSING_ADDITIONAL_EXECUTABLE_MESSAGE_TEMPLATE = "Missing additional executable '{}' for {}. Please install {} and rerun Loupe."
 
 CODEX_COMMAND_TEMPLATE = """( set -o pipefail; codex exec --cd "$(git rev-parse --show-toplevel)" --ephemeral --sandbox workspace-write -c model_reasoning_effort='"high"' --json {prompt} | jq -ser 'map(select(.type == "item.completed" and .item.type == "agent_message") | .item.text) | last // empty' )"""
 CLAUDE_COMMAND_TEMPLATE = """( set -o pipefail; cd "$(git rev-parse --show-toplevel)" && claude -p --no-session-persistence --permission-mode auto --effort high --output-format json {prompt} | jq -er ".result" )"""  # fmt: skip
@@ -40,12 +41,13 @@ Note: {review_note}"""
 class Reviewer:
     """Command and prompt template for one external reviewer."""
 
-    def __init__(self, reviewer_name: str, command_template: str, prompt_template: str, required_executable: Optional[str] = None) -> None:
-        """Store the display name, shell command template, prompt template, and required executable."""
+    def __init__(self, reviewer_name: str, command_template: str, prompt_template: str, required_executable: Optional[str] = None, additional_required_executables: Sequence[str] = ()) -> None:
+        """Store the display name, command template, prompt template, fundamental executable, and helper executables."""
         self.reviewer_name = reviewer_name
         self.command_template = command_template
         self.prompt_template = prompt_template
         self.required_executable = required_executable
+        self.additional_required_executables = tuple(additional_required_executables)
 
     def build_prompt(self, review_scope: str) -> str:
         """Return the complete prompt passed to this reviewer for a scope."""
@@ -59,16 +61,16 @@ class Reviewer:
 class ReviewerRun:
     """Mutable execution state for one launched reviewer process."""
 
-    def __init__(self, reviewer: Reviewer, launched_command: str) -> None:
+    def __init__(self, reviewer: Reviewer, launched_command: str, launch_error: Optional[str] = None) -> None:
         """Initialize process, timing, and captured output fields."""
         self.reviewer = reviewer
         self.launched_command = launched_command
-        self.process: Optional[subprocess.Popen] = None
+        self.process = None  # type: Optional[subprocess.Popen[Any]]
         self.started_at: Optional[float] = None
         self.finished_at: Optional[float] = None
         self.stdout = ""
         self.stderr = ""
-        self.launch_error: Optional[str] = None
+        self.launch_error = launch_error
         self.collection_error: Optional[str] = None
         self.thread: Optional[threading.Thread] = None
         self.stdout_file: Optional[BinaryIO] = None
@@ -193,21 +195,28 @@ REVIEWERS = (
         command_template=CLAUDE_COMMAND_TEMPLATE,
         prompt_template=CODE_REVIEW_COMMAND_PROMPT_TEMPLATE,
         required_executable="claude",
+        additional_required_executables=("jq",),
     ),
     Reviewer(
         reviewer_name="Codex Review",
         command_template=CODEX_COMMAND_TEMPLATE,
         prompt_template=REVIEW_COMMAND_PROMPT_TEMPLATE,
+        required_executable="codex",
+        additional_required_executables=("jq",),
     ),
     Reviewer(
         reviewer_name="Codex Correctness",
         command_template=CODEX_COMMAND_TEMPLATE,
         prompt_template=CORRECTNESS_REVIEW_PROMPT_TEMPLATE,
+        required_executable="codex",
+        additional_required_executables=("jq",),
     ),
     Reviewer(
         reviewer_name="Codex Design",
         command_template=CODEX_COMMAND_TEMPLATE,
         prompt_template=DESIGN_REVIEW_PROMPT_TEMPLATE,
+        required_executable="codex",
+        additional_required_executables=("jq",),
     ),
 )
 
@@ -226,20 +235,25 @@ def executable_is_available(executable: str) -> bool:
     return completed.returncode == 0
 
 
-def available_reviewers(reviewers: Sequence[Reviewer]) -> List[Reviewer]:
-    """Return configured reviewers that are launchable in this environment."""
+def reviewer_launch_plan(reviewers: Sequence[Reviewer], review_scope: str) -> List[ReviewerRun]:
+    """Return reviewer runs that can launch or fail with a planned launch error."""
     availability_cache: Dict[str, bool] = {}
-    launchable_reviewers = []
+    runs: List[ReviewerRun] = []
     for reviewer in reviewers:
         required_executable = reviewer.required_executable
-        if required_executable is None:
-            launchable_reviewers.append(reviewer)
-            continue
-        if required_executable not in availability_cache:
+        if required_executable is not None and required_executable not in availability_cache:
             availability_cache[required_executable] = executable_is_available(required_executable)
-        if availability_cache[required_executable]:
-            launchable_reviewers.append(reviewer)
-    return launchable_reviewers
+        if required_executable is not None and not availability_cache[required_executable]:
+            continue
+        launch_errors = []
+        for executable in reviewer.additional_required_executables:
+            if executable not in availability_cache:
+                availability_cache[executable] = executable_is_available(executable)
+            if not availability_cache[executable]:
+                launch_errors.append(MISSING_ADDITIONAL_EXECUTABLE_MESSAGE_TEMPLATE.format(executable, reviewer.reviewer_name, executable))
+        launch_error = "\n".join(launch_errors) if launch_errors else None
+        runs.append(ReviewerRun(reviewer=reviewer, launched_command=reviewer.build_command(review_scope), launch_error=launch_error))
+    return runs
 
 
 def parse_args(argv: Optional[Sequence[str]]) -> argparse.Namespace:
@@ -254,11 +268,6 @@ def parse_args(argv: Optional[Sequence[str]]) -> argparse.Namespace:
     if not args.review_scope:
         parser.error("review scope must not be empty")
     return args
-
-
-def build_reviewer_runs(reviewers: Sequence[Reviewer], review_scope: str) -> List[ReviewerRun]:
-    """Create reviewer run states for all configured reviewers."""
-    return [ReviewerRun(reviewer=reviewer, launched_command=reviewer.build_command(review_scope)) for reviewer in reviewers]
 
 
 def get_repo_root() -> Optional[str]:
@@ -276,7 +285,7 @@ def get_repo_root() -> Optional[str]:
     return completed.stdout.strip() or None
 
 
-def send_process_group_signal(process: subprocess.Popen, signal_number: signal.Signals) -> None:
+def send_process_group_signal(process, signal_number):  # type: (subprocess.Popen[Any], signal.Signals) -> None
     """Send a signal to a launched reviewer process group."""
     try:
         os.killpg(process.pid, signal_number)
@@ -287,6 +296,8 @@ def send_process_group_signal(process: subprocess.Popen, signal_number: signal.S
 def launch_reviewer_runs(runs: Sequence[ReviewerRun]) -> None:
     """Launch every reviewer run."""
     for run in runs:
+        if run.launch_error is not None:
+            continue
         run.launch()
 
 
@@ -360,15 +371,25 @@ def emit_no_launchable_reviewers_message() -> None:
     sys.stderr.write("{}\n".format(NO_LAUNCHABLE_REVIEWERS_MESSAGE))
 
 
+def emit_launch_error_messages(runs: Sequence[ReviewerRun]) -> None:
+    """Report missing helper executables for launchable reviewers."""
+    for run in runs:
+        if run.launch_error is not None:
+            sys.stderr.write("{}\n".format(run.launch_error))
+
+
 def main(argv: Optional[Sequence[str]] = None, reviewers: Sequence[Reviewer] = REVIEWERS) -> int:
     """Run configured external reviewers and emit combined JSON."""
     args = parse_args(argv)
-    runs = build_reviewer_runs(available_reviewers(reviewers), args.review_scope)
+    runs = reviewer_launch_plan(reviewers, args.review_scope)
     git_root = get_repo_root()
     if args.dry_run:
         emit_json_output(dry_run_output(args.review_scope, git_root, args.timeout_seconds, runs), args.output)
         if not runs:
             emit_no_launchable_reviewers_message()
+            return 1
+        if any(run.launch_error is not None for run in runs):
+            emit_launch_error_messages(runs)
             return 1
         return 0
     if not runs:

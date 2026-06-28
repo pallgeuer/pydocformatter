@@ -2,7 +2,7 @@ import importlib.util
 import json
 from pathlib import Path
 from types import ModuleType
-from typing import Any, List, Sequence
+from typing import Any, Callable, List, Sequence
 
 import pytest
 
@@ -17,6 +17,11 @@ def load_loupe_runner() -> ModuleType:
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def executable_availability(*available_executables: str) -> Callable[[str], bool]:
+    """Return an availability probe for selected executable names."""
+    return lambda executable: executable in available_executables
 
 
 def test_parse_args_requires_review_scope() -> None:
@@ -53,7 +58,7 @@ def test_parse_args_rejects_multiple_review_scope_arguments() -> None:
 def test_dry_run_uses_expected_json_shape_and_reviewer_commands(capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch) -> None:
     """Emit dry-run reviewer names and commands using the public JSON keys."""
     runner = load_loupe_runner()
-    monkeypatch.setattr(runner, "executable_is_available", lambda executable: executable == "claude")
+    monkeypatch.setattr(runner, "executable_is_available", executable_availability("claude", "codex", "jq"))
 
     exit_code = runner.main(["--dry-run", "uncommitted changes"])
 
@@ -119,7 +124,7 @@ def test_dry_run_uses_expected_json_shape_and_reviewer_commands(capsys: pytest.C
 def test_dry_run_skips_claude_reviewers_when_claude_is_missing(capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch) -> None:
     """Omit Claude reviewers from dry-run output when the Claude CLI is unavailable."""
     runner = load_loupe_runner()
-    monkeypatch.setattr(runner, "executable_is_available", lambda executable: False)
+    monkeypatch.setattr(runner, "executable_is_available", executable_availability("codex", "jq"))
 
     exit_code = runner.main(["--dry-run", "uncommitted changes"])
 
@@ -131,9 +136,24 @@ def test_dry_run_skips_claude_reviewers_when_claude_is_missing(capsys: pytest.Ca
     assert all(not reviewer_name.startswith("Claude ") for reviewer_name in reviewer_names)
 
 
-def test_dry_run_output_file_matches_stdout(capsys: pytest.CaptureFixture[str], tmp_path: Path) -> None:
+def test_dry_run_skips_codex_reviewers_when_codex_is_missing(capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch) -> None:
+    """Omit Codex reviewers from dry-run output when the Codex CLI is unavailable."""
+    runner = load_loupe_runner()
+    monkeypatch.setattr(runner, "executable_is_available", executable_availability("claude", "jq"))
+
+    exit_code = runner.main(["--dry-run", "uncommitted changes"])
+
+    assert exit_code == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert list(payload) == ["review_scope", "git_root", "timeout_seconds", "reviewers"]
+    reviewer_names = [reviewer["reviewer_name"] for reviewer in payload["reviewers"]]
+    assert reviewer_names == ["Claude Code Review"]
+
+
+def test_dry_run_output_file_matches_stdout(capsys: pytest.CaptureFixture[str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Write the exact emitted dry-run JSON to the requested output file."""
     runner = load_loupe_runner()
+    monkeypatch.setattr(runner, "executable_is_available", executable_availability("claude", "codex", "jq"))
     output_path = tmp_path / "reviewers.json"
 
     exit_code = runner.main(["--dry-run", "--output", str(output_path), "uncommitted changes"])
@@ -144,8 +164,8 @@ def test_dry_run_output_file_matches_stdout(capsys: pytest.CaptureFixture[str], 
     assert json.loads(stdout)["review_scope"] == "uncommitted changes"
 
 
-def test_available_reviewers_uses_required_executable_metadata(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Filter reviewers by executable metadata instead of display name."""
+def test_reviewer_launch_plan_uses_required_executable_metadata(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Filter reviewer runs by executable metadata instead of display name."""
     runner = load_loupe_runner()
     monkeypatch.setattr(runner, "executable_is_available", lambda executable: False)
     reviewers = (
@@ -153,9 +173,44 @@ def test_available_reviewers_uses_required_executable_metadata(monkeypatch: pyte
         runner.Reviewer("Anthropic Review", "printf skip", "{review_scope}", required_executable="claude"),
     )
 
-    available = runner.available_reviewers(reviewers)
+    runs = runner.reviewer_launch_plan(reviewers, "metadata scope")
 
-    assert [reviewer.reviewer_name for reviewer in available] == ["Claude Local"]
+    assert [run.reviewer.reviewer_name for run in runs] == ["Claude Local"]
+    assert [run.launch_error for run in runs] == [None]
+
+
+def test_reviewer_launch_plan_shares_executable_availability_cache(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Probe each executable only once across primary and helper dependencies."""
+    runner = load_loupe_runner()
+    checked_executables: List[str] = []
+
+    def executable_is_available(executable: str) -> bool:
+        checked_executables.append(executable)
+        return True
+
+    monkeypatch.setattr(runner, "executable_is_available", executable_is_available)
+    reviewers = (
+        runner.Reviewer("Primary Shared", "printf primary", "{review_scope}", required_executable="shared-tool"),
+        runner.Reviewer("Helper Shared", "printf helper", "{review_scope}", additional_required_executables=("shared-tool",)),
+    )
+
+    runs = runner.reviewer_launch_plan(reviewers, "shared cache scope")
+
+    assert [run.reviewer.reviewer_name for run in runs] == ["Primary Shared", "Helper Shared"]
+    assert [run.launch_error for run in runs] == [None, None]
+    assert checked_executables == ["shared-tool"]
+
+
+def test_reviewer_launch_plan_attaches_missing_helper_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Store helper dependency failures on the planned reviewer run."""
+    runner = load_loupe_runner()
+    monkeypatch.setattr(runner, "executable_is_available", executable_availability("codex"))
+    reviewers = (runner.Reviewer("Codex Local", "printf should-not-run", "{review_scope}", required_executable="codex", additional_required_executables=("jq",)),)
+
+    runs = runner.reviewer_launch_plan(reviewers, "helper-missing scope")
+
+    assert len(runs) == 1
+    assert runs[0].launch_error == "Missing additional executable 'jq' for Codex Local. Please install jq and rerun Loupe."
 
 
 def test_executable_availability_uses_reviewer_launch_shell(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -179,10 +234,10 @@ def test_executable_availability_uses_reviewer_launch_shell(monkeypatch: pytest.
 def test_missing_claude_skips_claude_reviewers_before_launch(capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch) -> None:
     """Do not launch Claude reviewers when the Claude CLI is unavailable."""
     runner = load_loupe_runner()
-    monkeypatch.setattr(runner, "executable_is_available", lambda executable: False)
+    monkeypatch.setattr(runner, "executable_is_available", executable_availability("codex", "jq"))
     reviewers = (
         runner.Reviewer("Claude Missing", "printf should-not-run; exit 9", "{review_scope}", required_executable="claude"),
-        runner.Reviewer("Codex Local", "printf ok", "{review_scope}"),
+        runner.Reviewer("Codex Local", "printf ok", "{review_scope}", required_executable="codex", additional_required_executables=("jq",)),
     )
 
     exit_code = runner.main(["filtered scope"], reviewers=reviewers)
@@ -223,6 +278,41 @@ def test_dry_run_all_filtered_reviewers_return_nonzero_and_empty_payload(capsys:
     payload = json.loads(captured.out)
     assert list(payload) == ["review_scope", "git_root", "timeout_seconds", "reviewers"]
     assert payload["reviewers"] == []
+
+
+def test_missing_additional_executable_produces_launch_failed_without_launch(capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch) -> None:
+    """Fail a launchable reviewer clearly when a helper executable is unavailable."""
+    runner = load_loupe_runner()
+    monkeypatch.setattr(runner, "executable_is_available", executable_availability("codex"))
+    reviewers = (runner.Reviewer("Codex Local", "printf should-not-run", "{review_scope}", required_executable="codex", additional_required_executables=("jq",)),)
+
+    exit_code = runner.main(["helper-missing scope"], reviewers=reviewers)
+
+    captured = capsys.readouterr()
+    assert exit_code == 1
+    payload = json.loads(captured.out)
+    result = payload["reviewers"][0]
+    assert result["reviewer_name"] == "Codex Local"
+    assert result["status"] == "launch_failed"
+    assert result["return_code"] is None
+    assert result["stdout"] == ""
+    assert result["stderr"] == "Missing additional executable 'jq' for Codex Local. Please install jq and rerun Loupe."
+
+
+def test_dry_run_reports_missing_additional_executable(capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch) -> None:
+    """Return dry-run commands while warning about missing helper executables."""
+    runner = load_loupe_runner()
+    monkeypatch.setattr(runner, "executable_is_available", executable_availability("codex"))
+    reviewers = (runner.Reviewer("Codex Local", "printf would-run", "{review_scope}", required_executable="codex", additional_required_executables=("jq",)),)
+
+    exit_code = runner.main(["--dry-run", "helper-missing scope"], reviewers=reviewers)
+
+    captured = capsys.readouterr()
+    assert exit_code == 1
+    assert "Missing additional executable 'jq' for Codex Local. Please install jq and rerun Loupe." in captured.err
+    payload = json.loads(captured.out)
+    assert [reviewer["reviewer_name"] for reviewer in payload["reviewers"]] == ["Codex Local"]
+    assert payload["reviewers"][0]["launched_command"] == "printf would-run"
 
 
 def test_failed_reviewer_produces_failed_status_and_nonzero_exit(capsys: pytest.CaptureFixture[str]) -> None:

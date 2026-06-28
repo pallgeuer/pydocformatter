@@ -139,7 +139,9 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Changed the Loupe review workflow to snapshot temporary diff and reviewer-output artifacts, use a 30000-token capture budget, and recover truncated reviewer output from the runner's `--output` artifact instead of rerunning reviewers.
   - Changed the Loupe review workflow to require full small-diff artifact contents in chat instead of guessed preview ranges.
   - Changed the Loupe review workflow to clean successful temporary artifact directories by deleting only known artifact files before removing the empty directory.
+  - Changed the Loupe final review format to keep one continuous finding number sequence across all reviewer sections.
   - Changed Loupe reviewer definitions to declare optional required executables instead of deriving launch requirements from reviewer display names.
+  - Changed Loupe reviewer launch planning to attach helper dependency failures directly to planned reviewer runs in one cached availability pass.
   - Changed pytest to treat warnings as errors by default.
   - Changed pytest to use pytest-xdist multiprocessing by default for local, pre-commit, and CI test runs.
   - Shared setup and initial check work across structured rule Markdown example assertions to reduce pytest runtime.
@@ -200,6 +202,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Fixed Loupe reviewer timeout cleanup to let collector threads own subprocess completion while the main thread only signals timed-out process groups.
   - Fixed Loupe reviewer timeout handling to avoid blocking on detached child processes that inherit reviewer output handles.
   - Fixed Loupe reviewer availability checks to match the shell environment used for reviewer launch.
+  - Fixed Loupe reviewer dependency checks to skip missing Codex reviewers and fail launchable reviewers clearly when helper executables such as `jq` are missing.
   - Fixed Loupe reviewer runs to fail clearly instead of reporting success when no reviewers are launchable.
 
 - **Formatting:**
