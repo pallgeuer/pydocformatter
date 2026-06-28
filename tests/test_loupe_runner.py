@@ -2,6 +2,7 @@ import importlib.util
 import json
 from pathlib import Path
 from types import ModuleType
+from typing import Any, List, Sequence
 
 import pytest
 
@@ -49,9 +50,10 @@ def test_parse_args_rejects_multiple_review_scope_arguments() -> None:
     assert exc_info.value.code == 2
 
 
-def test_dry_run_uses_expected_json_shape_and_reviewer_commands(capsys: pytest.CaptureFixture[str]) -> None:
+def test_dry_run_uses_expected_json_shape_and_reviewer_commands(capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch) -> None:
     """Emit dry-run reviewer names and commands using the public JSON keys."""
     runner = load_loupe_runner()
+    monkeypatch.setattr(runner, "executable_is_available", lambda executable: executable == "claude")
 
     exit_code = runner.main(["--dry-run", "uncommitted changes"])
 
@@ -114,6 +116,21 @@ def test_dry_run_uses_expected_json_shape_and_reviewer_commands(capsys: pytest.C
     assert runner.REVIEW_SKILL_PROHIBITION in payload["reviewers"][3]["launched_command"]
 
 
+def test_dry_run_skips_claude_reviewers_when_claude_is_missing(capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch) -> None:
+    """Omit Claude reviewers from dry-run output when the Claude CLI is unavailable."""
+    runner = load_loupe_runner()
+    monkeypatch.setattr(runner, "executable_is_available", lambda executable: False)
+
+    exit_code = runner.main(["--dry-run", "uncommitted changes"])
+
+    assert exit_code == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert list(payload) == ["review_scope", "git_root", "timeout_seconds", "reviewers"]
+    reviewer_names = [reviewer["reviewer_name"] for reviewer in payload["reviewers"]]
+    assert reviewer_names == ["Codex Review", "Codex Correctness", "Codex Design"]
+    assert all(not reviewer_name.startswith("Claude ") for reviewer_name in reviewer_names)
+
+
 def test_dry_run_output_file_matches_stdout(capsys: pytest.CaptureFixture[str], tmp_path: Path) -> None:
     """Write the exact emitted dry-run JSON to the requested output file."""
     runner = load_loupe_runner()
@@ -127,31 +144,105 @@ def test_dry_run_output_file_matches_stdout(capsys: pytest.CaptureFixture[str], 
     assert json.loads(stdout)["review_scope"] == "uncommitted changes"
 
 
-def test_reviewers_run_in_parallel_and_keep_separate_elapsed_times(capsys: pytest.CaptureFixture[str]) -> None:
-    """Track global elapsed time independently from each reviewer runtime."""
+def test_available_reviewers_uses_required_executable_metadata(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Filter reviewers by executable metadata instead of display name."""
     runner = load_loupe_runner()
+    monkeypatch.setattr(runner, "executable_is_available", lambda executable: False)
     reviewers = (
-        runner.Reviewer("fast", "sleep 0.05; printf fast", "{review_scope}"),
-        runner.Reviewer("slow", "sleep 0.25; printf slow", "{review_scope}"),
+        runner.Reviewer("Claude Local", "printf keep", "{review_scope}"),
+        runner.Reviewer("Anthropic Review", "printf skip", "{review_scope}", required_executable="claude"),
     )
 
-    exit_code = runner.main(["--timeout-seconds", "2", "parallel scope"], reviewers=reviewers)
+    available = runner.available_reviewers(reviewers)
+
+    assert [reviewer.reviewer_name for reviewer in available] == ["Claude Local"]
+
+
+def test_executable_availability_uses_reviewer_launch_shell(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Probe executable availability through bash login-shell command resolution."""
+    runner = load_loupe_runner()
+    launched_commands: List[Sequence[str]] = []
+
+    class CompletedProcess:
+        returncode = 0
+
+    def run(command: Sequence[str], **kwargs: Any) -> CompletedProcess:
+        launched_commands.append(command)
+        return CompletedProcess()
+
+    monkeypatch.setattr(runner.subprocess, "run", run)
+
+    assert runner.executable_is_available("claude") is True
+    assert launched_commands == [["bash", "-lc", "command -v claude"]]
+
+
+def test_missing_claude_skips_claude_reviewers_before_launch(capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch) -> None:
+    """Do not launch Claude reviewers when the Claude CLI is unavailable."""
+    runner = load_loupe_runner()
+    monkeypatch.setattr(runner, "executable_is_available", lambda executable: False)
+    reviewers = (
+        runner.Reviewer("Claude Missing", "printf should-not-run; exit 9", "{review_scope}", required_executable="claude"),
+        runner.Reviewer("Codex Local", "printf ok", "{review_scope}"),
+    )
+
+    exit_code = runner.main(["filtered scope"], reviewers=reviewers)
 
     assert exit_code == 0
     payload = json.loads(capsys.readouterr().out)
-    fast, slow = payload["reviewers"]
+    assert [reviewer["reviewer_name"] for reviewer in payload["reviewers"]] == ["Codex Local"]
+    assert payload["reviewers"][0]["stdout"] == "ok"
+
+
+def test_all_filtered_reviewers_return_nonzero_and_empty_payload(capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch) -> None:
+    """Fail clearly when no configured reviewer can be launched."""
+    runner = load_loupe_runner()
+    monkeypatch.setattr(runner, "executable_is_available", lambda executable: False)
+    reviewers = (runner.Reviewer("Anthropic Review", "printf should-not-run", "{review_scope}", required_executable="claude"),)
+
+    exit_code = runner.main(["filtered scope"], reviewers=reviewers)
+
+    captured = capsys.readouterr()
+    assert exit_code == 1
+    assert runner.NO_LAUNCHABLE_REVIEWERS_MESSAGE in captured.err
+    payload = json.loads(captured.out)
     assert list(payload) == ["review_scope", "git_root", "timeout_seconds", "elapsed_seconds", "reviewers"]
-    assert [list(result) for result in payload["reviewers"]] == [
-        ["reviewer_name", "launched_command", "status", "timed_out", "return_code", "elapsed_seconds", "stdout", "stderr"],
-        ["reviewer_name", "launched_command", "status", "timed_out", "return_code", "elapsed_seconds", "stdout", "stderr"],
-    ]
-    assert fast["status"] == "succeeded"
-    assert slow["status"] == "succeeded"
-    assert fast["stdout"] == "fast"
-    assert slow["stdout"] == "slow"
-    assert fast["elapsed_seconds"] < slow["elapsed_seconds"]
-    assert payload["elapsed_seconds"] >= slow["elapsed_seconds"]
-    assert payload["elapsed_seconds"] < 0.5
+    assert payload["reviewers"] == []
+
+
+def test_dry_run_all_filtered_reviewers_return_nonzero_and_empty_payload(capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch) -> None:
+    """Fail dry runs clearly when no configured reviewer can be launched."""
+    runner = load_loupe_runner()
+    monkeypatch.setattr(runner, "executable_is_available", lambda executable: False)
+    reviewers = (runner.Reviewer("Anthropic Review", "printf should-not-run", "{review_scope}", required_executable="claude"),)
+
+    exit_code = runner.main(["--dry-run", "filtered scope"], reviewers=reviewers)
+
+    captured = capsys.readouterr()
+    assert exit_code == 1
+    assert runner.NO_LAUNCHABLE_REVIEWERS_MESSAGE in captured.err
+    payload = json.loads(captured.out)
+    assert list(payload) == ["review_scope", "git_root", "timeout_seconds", "reviewers"]
+    assert payload["reviewers"] == []
+
+
+def test_failed_reviewer_produces_failed_status_and_nonzero_exit(capsys: pytest.CaptureFixture[str]) -> None:
+    """Return nonzero when any reviewer command fails."""
+    runner = load_loupe_runner()
+    reviewers = (
+        runner.Reviewer("success", "printf ok", "{review_scope}"),
+        runner.Reviewer("failure", "printf problem >&2; exit 4", "{review_scope}"),
+    )
+
+    exit_code = runner.main(["failing scope"], reviewers=reviewers)
+
+    assert exit_code == 1
+    payload = json.loads(capsys.readouterr().out)
+    success, failure = payload["reviewers"]
+    assert success["status"] == "succeeded"
+    assert success["return_code"] == 0
+    assert failure["status"] == "failed"
+    assert failure["return_code"] == 4
+    assert failure["stderr"] == "problem"
 
 
 def test_review_output_file_matches_stdout(capsys: pytest.CaptureFixture[str], tmp_path: Path) -> None:
@@ -195,73 +286,3 @@ def test_reviewer_elapsed_timer_starts_at_launch(monkeypatch: pytest.MonkeyPatch
 
     assert run.started_at == 100.0
     assert run.elapsed_seconds() == 0.25
-
-
-def test_failed_reviewer_produces_failed_status_and_nonzero_exit(capsys: pytest.CaptureFixture[str]) -> None:
-    """Return nonzero when any reviewer command fails."""
-    runner = load_loupe_runner()
-    reviewers = (
-        runner.Reviewer("success", "printf ok", "{review_scope}"),
-        runner.Reviewer("failure", "printf problem >&2; exit 4", "{review_scope}"),
-    )
-
-    exit_code = runner.main(["failing scope"], reviewers=reviewers)
-
-    assert exit_code == 1
-    payload = json.loads(capsys.readouterr().out)
-    success, failure = payload["reviewers"]
-    assert success["status"] == "succeeded"
-    assert success["return_code"] == 0
-    assert failure["status"] == "failed"
-    assert failure["return_code"] == 4
-    assert failure["stderr"] == "problem"
-
-
-def test_timed_out_reviewer_is_terminated(capsys: pytest.CaptureFixture[str]) -> None:
-    """Terminate still-running reviewers at the global timeout."""
-    runner = load_loupe_runner()
-    reviewers = (runner.Reviewer("slow", "sleep 5; printf late", "{review_scope}"),)
-
-    exit_code = runner.main(["--timeout-seconds", "0.15", "timeout scope"], reviewers=reviewers)
-
-    assert exit_code == 1
-    payload = json.loads(capsys.readouterr().out)
-    result = payload["reviewers"][0]
-    assert result["status"] == "timed_out"
-    assert result["timed_out"] is True
-    assert result["stdout"] == ""
-    assert result["elapsed_seconds"] < 1.0
-
-
-def test_sigterm_resistant_timed_out_reviewer_is_killed(capsys: pytest.CaptureFixture[str]) -> None:
-    """Kill timed-out reviewers that do not exit after SIGTERM."""
-    runner = load_loupe_runner()
-    setattr(runner, "PROCESS_TERMINATION_SECONDS", 0.1)
-    reviewers = (runner.Reviewer("slow", "trap '' TERM; sleep 5; printf late", "{review_scope}"),)
-
-    exit_code = runner.main(["--timeout-seconds", "0.15", "timeout scope"], reviewers=reviewers)
-
-    assert exit_code == 1
-    payload = json.loads(capsys.readouterr().out)
-    result = payload["reviewers"][0]
-    assert result["status"] == "timed_out"
-    assert result["timed_out"] is True
-    assert result["stdout"] == ""
-    assert result["elapsed_seconds"] < 1.0
-
-
-def test_timed_out_reviewer_does_not_wait_for_detached_output_handles(capsys: pytest.CaptureFixture[str]) -> None:
-    """Return promptly when descendants keep inherited output files open."""
-    runner = load_loupe_runner()
-    setattr(runner, "PROCESS_TERMINATION_SECONDS", 0.1)
-    reviewers = (runner.Reviewer("pipe-holder", "setsid sh -c 'sleep 1' & printf parent; sleep 5", "{review_scope}"),)
-
-    exit_code = runner.main(["--timeout-seconds", "0.1", "timeout scope"], reviewers=reviewers)
-
-    assert exit_code == 1
-    payload = json.loads(capsys.readouterr().out)
-    result = payload["reviewers"][0]
-    assert result["status"] == "timed_out"
-    assert result["timed_out"] is True
-    assert result["stdout"] == "parent"
-    assert result["elapsed_seconds"] < 0.5

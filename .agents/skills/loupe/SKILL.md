@@ -22,7 +22,14 @@ Do not modify repository files, stage changes, commit, install dependencies, or 
    ```
 
    - Keep all Loupe artifacts in this directory: `review.diff` for the review-scope diff and `reviewers.json` for the exact reviewer JSON stdout.
-   - If the review is completed successfully, delete this directory at the end of the skill run after all needed information has been extracted.
+   - If the review is completed successfully, clean up the directory at the end of the skill run after all needed information has been extracted by deleting only the known Loupe artifact files and then removing the now-empty directory:
+
+     ```bash
+     rm "$LOUPE_ARTIFACT_DIR/review.diff" "$LOUPE_ARTIFACT_DIR/reviewers.json"
+     rmdir "$LOUPE_ARTIFACT_DIR"
+     ```
+
+     Do not use recursive force deletion. After running these commands, report the temporary artifact directory path to the user only if the directory or either known artifact file still exists.
    - If the review cannot be completed because of truncation, malformed JSON, verification blockers, or another unexpected issue, keep this directory and report its path to the user.
 
 3. Snapshot the diff corresponding to the target review scope before running the reviewers script:
@@ -30,7 +37,7 @@ Do not modify repository files, stage changes, commit, install dependencies, or 
    - For the default scope, run the bundled script:
 
      ```bash
-     <path to>/scripts/collect_review_diff.py "uncommitted changes (staged + unstaged + untracked)" --output "$LOUPE_ARTIFACT_DIR/review.diff"
+     <absolute path to>/scripts/collect_review_diff.py "uncommitted changes (staged + unstaged + untracked)" --output "$LOUPE_ARTIFACT_DIR/review.diff"
      ```
 
      The helper supports only that exact default scope. It writes to `review.diff` the concatenated diffs of the staged tracked changes, unstaged tracked changes, and untracked non-ignored files (meaning that files can appear more than once in `review.diff`). It does not request binary patch payloads; binary changes appear only as compact Git diff markers.
@@ -40,7 +47,7 @@ Do not modify repository files, stage changes, commit, install dependencies, or 
 4. Run the `scripts/run_reviewers.py` script that is bundled with this skill exactly once, and with escalated sandbox permissions, writing a copy of the exact stdout to an artifact file via the script's `--output` option:
 
    ```bash
-   <path to>/scripts/run_reviewers.py "<target review scope>" --output "$LOUPE_ARTIFACT_DIR/reviewers.json"
+   <absolute path to>/scripts/run_reviewers.py "<target review scope>" --output "$LOUPE_ARTIFACT_DIR/reviewers.json"
    ```
 
    - The script accepts a single positional argument with text corresponding to the target review scope.
@@ -56,7 +63,7 @@ Do not modify repository files, stage changes, commit, install dependencies, or 
 
 5. Decide how to use the diff artifact:
 
-   - If `$LOUPE_ARTIFACT_DIR/review.diff` is at most 200000 bytes, load it into chat once after the reviewers finish.
+   - If `$LOUPE_ARTIFACT_DIR/review.diff` is at most 200000 bytes, load the full file contents into chat once after the reviewers finish, using `cat` or explicit consecutive chunks that together cover the whole file. Do not use guessed line ranges such as `sed -n '1,220p'`; if any command output is truncated, keep reading non-overlapping later chunks until every byte of the diff has appeared in chat.
    - If it is above 200000 bytes, do not load it wholesale. Use targeted reads from the diff artifact together with direct source-file reads for verification of the findings.
 
 6. Manually verify each candidate finding from each reviewer:
@@ -65,7 +72,7 @@ Do not modify repository files, stage changes, commit, install dependencies, or 
    - Never reject findings simply because they are `cleanup only` or `performance only` or `not important/severe/impactful enough` (`Nit` and `Low` exist as severity categories for a reason).
    - Do not get rid of or omit rejected findings from the list; instead report them in the final review with a severity of `Unsure`.
 
-7. Organize all returned external reviewer findings into a coherent final review in chat. Do not edit repository files or write a persistent report file. After a successful final review, clean up `LOUPE_ARTIFACT_DIR` so the temporary artifacts are gone as if they were never there.
+7. Organize all returned external reviewer findings into a coherent final review in chat. Do not edit repository files or write a persistent report file. After a successful final review, clean up `LOUPE_ARTIFACT_DIR` with the targeted cleanup command from step 2 so the temporary artifacts are gone as if they were never there.
 
 ## Final Review
 

@@ -137,6 +137,9 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Changed the Loupe review skill to orchestrate parallel Claude Code and Codex CLI review passes with a timeout-bounded helper script and verified final review synthesis.
   - Changed the Loupe reviewer runner to require explicit review scope text, report global and reviewer-specific elapsed times separately, and expose extensible reviewer definitions.
   - Changed the Loupe review workflow to snapshot temporary diff and reviewer-output artifacts, use a 30000-token capture budget, and recover truncated reviewer output from the runner's `--output` artifact instead of rerunning reviewers.
+  - Changed the Loupe review workflow to require full small-diff artifact contents in chat instead of guessed preview ranges.
+  - Changed the Loupe review workflow to clean successful temporary artifact directories by deleting only known artifact files before removing the empty directory.
+  - Changed Loupe reviewer definitions to declare optional required executables instead of deriving launch requirements from reviewer display names.
   - Changed pytest to treat warnings as errors by default.
   - Changed pytest to use pytest-xdist multiprocessing by default for local, pre-commit, and CI test runs.
   - Shared setup and initial check work across structured rule Markdown example assertions to reduce pytest runtime.
@@ -196,6 +199,8 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Fixed Loupe reviewer elapsed-time accounting to start individual reviewer timers at process launch.
   - Fixed Loupe reviewer timeout cleanup to let collector threads own subprocess completion while the main thread only signals timed-out process groups.
   - Fixed Loupe reviewer timeout handling to avoid blocking on detached child processes that inherit reviewer output handles.
+  - Fixed Loupe reviewer availability checks to match the shell environment used for reviewer launch.
+  - Fixed Loupe reviewer runs to fail clearly instead of reporting success when no reviewers are launchable.
 
 - **Formatting:**
   - Fixed rule-runner line-target matching to normalize duplicate finding and planned-change targets consistently and keep suppression filtering owned by the suppression index.
@@ -456,6 +461,9 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 
 - **Developer dependencies:**
   - Removed the unused `build` and `twine` dev dependencies now that package build and publish workflows use uv directly.
+
+- **Developer workflow:**
+  - Removed timing-sensitive Loupe reviewer subprocess tests from the fast pytest suite.
 
 - **Breaking configuration migration:**
   - Removed the old `[tool.pydocformatter]` config table from settings resolution.

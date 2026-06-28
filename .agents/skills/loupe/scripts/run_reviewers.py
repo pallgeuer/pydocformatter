@@ -18,6 +18,7 @@ from typing import Any, BinaryIO, Dict, List, Optional, Sequence
 
 DEFAULT_TIMEOUT_SECONDS = 30 * 60
 PROCESS_TERMINATION_SECONDS = 5
+NO_LAUNCHABLE_REVIEWERS_MESSAGE = "No launchable reviewers are available."
 
 CODEX_COMMAND_TEMPLATE = """( set -o pipefail; codex exec --cd "$(git rev-parse --show-toplevel)" --ephemeral --sandbox workspace-write -c model_reasoning_effort='"high"' --json {prompt} | jq -ser 'map(select(.type == "item.completed" and .item.type == "agent_message") | .item.text) | last // empty' )"""
 CLAUDE_COMMAND_TEMPLATE = """( set -o pipefail; cd "$(git rev-parse --show-toplevel)" && claude -p --no-session-persistence --permission-mode auto --effort high --output-format json {prompt} | jq -er ".result" )"""  # fmt: skip
@@ -39,11 +40,12 @@ Note: {review_note}"""
 class Reviewer:
     """Command and prompt template for one external reviewer."""
 
-    def __init__(self, reviewer_name: str, command_template: str, prompt_template: str) -> None:
-        """Store the display name, shell command template, and prompt template."""
+    def __init__(self, reviewer_name: str, command_template: str, prompt_template: str, required_executable: Optional[str] = None) -> None:
+        """Store the display name, shell command template, prompt template, and required executable."""
         self.reviewer_name = reviewer_name
         self.command_template = command_template
         self.prompt_template = prompt_template
+        self.required_executable = required_executable
 
     def build_prompt(self, review_scope: str) -> str:
         """Return the complete prompt passed to this reviewer for a scope."""
@@ -190,6 +192,7 @@ REVIEWERS = (
         reviewer_name="Claude Code Review",
         command_template=CLAUDE_COMMAND_TEMPLATE,
         prompt_template=CODE_REVIEW_COMMAND_PROMPT_TEMPLATE,
+        required_executable="claude",
     ),
     Reviewer(
         reviewer_name="Codex Review",
@@ -207,6 +210,36 @@ REVIEWERS = (
         prompt_template=DESIGN_REVIEW_PROMPT_TEMPLATE,
     ),
 )
+
+
+def executable_is_available(executable: str) -> bool:
+    """Return whether the reviewer launch shell can resolve an executable."""
+    try:
+        completed = subprocess.run(
+            ["bash", "-lc", "command -v {}".format(shlex.quote(executable))],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            universal_newlines=True,
+        )
+    except OSError:
+        return False
+    return completed.returncode == 0
+
+
+def available_reviewers(reviewers: Sequence[Reviewer]) -> List[Reviewer]:
+    """Return configured reviewers that are launchable in this environment."""
+    availability_cache: Dict[str, bool] = {}
+    launchable_reviewers = []
+    for reviewer in reviewers:
+        required_executable = reviewer.required_executable
+        if required_executable is None:
+            launchable_reviewers.append(reviewer)
+            continue
+        if required_executable not in availability_cache:
+            availability_cache[required_executable] = executable_is_available(required_executable)
+        if availability_cache[required_executable]:
+            launchable_reviewers.append(reviewer)
+    return launchable_reviewers
 
 
 def parse_args(argv: Optional[Sequence[str]]) -> argparse.Namespace:
@@ -287,7 +320,7 @@ def wait_for_reviewer_runs(runs: Sequence[ReviewerRun], timeout_seconds: float) 
 
 def result_exit_code(results: Sequence[Dict[str, Any]]) -> int:
     """Return zero only when every reviewer succeeded."""
-    if all(result["status"] == "succeeded" for result in results):
+    if results and all(result["status"] == "succeeded" for result in results):
         return 0
     return 1
 
@@ -322,14 +355,26 @@ def emit_json_output(payload: Dict[str, Any], output_path: Optional[str]) -> Non
             output_file.write(output)
 
 
+def emit_no_launchable_reviewers_message() -> None:
+    """Report that every configured reviewer was filtered out."""
+    sys.stderr.write("{}\n".format(NO_LAUNCHABLE_REVIEWERS_MESSAGE))
+
+
 def main(argv: Optional[Sequence[str]] = None, reviewers: Sequence[Reviewer] = REVIEWERS) -> int:
     """Run configured external reviewers and emit combined JSON."""
     args = parse_args(argv)
-    runs = build_reviewer_runs(reviewers, args.review_scope)
+    runs = build_reviewer_runs(available_reviewers(reviewers), args.review_scope)
     git_root = get_repo_root()
     if args.dry_run:
         emit_json_output(dry_run_output(args.review_scope, git_root, args.timeout_seconds, runs), args.output)
+        if not runs:
+            emit_no_launchable_reviewers_message()
+            return 1
         return 0
+    if not runs:
+        emit_json_output(review_output(args.review_scope, git_root, args.timeout_seconds, 0.0, []), args.output)
+        emit_no_launchable_reviewers_message()
+        return 1
 
     try:
         started_at = time.monotonic()
