@@ -9,7 +9,7 @@ from pydocformatter.cli import global_args, settings_check
 from pydocformatter.rules.codes import RuleCode
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-SUPPRESSIONS_PATH = ROOT / "docs" / "suppressions.md"
+SUPPRESSIONS_PATH = ROOT / "docs" / "rule_suppressions.md"
 
 
 def test_suppression_markdown_examples_match_formatter_behavior() -> None:

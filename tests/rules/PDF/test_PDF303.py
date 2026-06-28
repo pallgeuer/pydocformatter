@@ -5,6 +5,7 @@ import pytest
 import pydocformatter.formatter as formatter
 import pydocformatter.rules.definition_helpers.source_text as source_text
 import pydocformatter.rules_selection as rules_selection
+import tests.rule_helpers as rule_helpers
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention
 from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
 from pydocformatter.rules.definitions.PDF.PDF import PDF
@@ -25,7 +26,6 @@ def contexts(source: str, *, settings: CheckSettings | None = None) -> tuple[Rul
         source=source,
         source_lines=tuple(source_text.source_lines(source)),
         line_bounds=None,
-        suppression_index=None,
     )
     return category, RuleContext(
         path=category.path,
@@ -37,9 +37,7 @@ def contexts(source: str, *, settings: CheckSettings | None = None) -> tuple[Rul
         source=category.source,
         source_lines=category.source_lines,
         line_bounds=category.line_bounds,
-        suppression_index=category.suppression_index,
         category_data=PDF.prepare(category),
-        effectively_fixable=False,
     )
 
 
@@ -128,8 +126,8 @@ def test_numpy_convention_ignores_broad_selection_but_exact_selection_still_appl
 def test_check_and_fix_false_findings_agree() -> None:
     source = 'def function(value):\n    """function(value)"""\n'
     _, context = contexts(source)
-    findings = PDF303SignatureLikeSummary.check(context)
-    fixed = PDF303SignatureLikeSummary.fix(context)
+    findings = rule_helpers.rule_findings(PDF303SignatureLikeSummary, context)
+    fixed = rule_helpers.rule_fix_result(PDF303SignatureLikeSummary, context)
     check_only = format_source(source, fix=False)
 
     assert tuple(finding.line_numbers for finding in findings) == ((2,),)

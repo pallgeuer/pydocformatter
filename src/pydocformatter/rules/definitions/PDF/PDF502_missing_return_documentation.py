@@ -7,11 +7,12 @@ import pydocformatter.rules.definition_helpers.missing_documentation as missing_
 import pydocformatter.rules.definition_helpers.value_documentation as value_documentation
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 import pydocformatter.rules.registration as rule_registration
+import pydocformatter.rules.violations as rule_violations
 from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase, RuleContext
 from pydocformatter.rules.definitions.PDF.PDF import PDF
-from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleFinding, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
+from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
 
 
 @rule_registration.register_rule_to(PDF)
@@ -39,11 +40,11 @@ class PDF502MissingReturnDocumentation(RuleBase):
     )
 
     @classmethod
-    def check(cls, context: RuleContext) -> tuple[RuleFinding, ...]:
-        """Return findings for undocumented meaningful return values."""
+    def violations(cls, context: RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
+        """Return violations for undocumented meaningful return values."""
         if docstring_conventions.missing_documentation_is_inert(context.settings.docstring_convention):
             return ()
-        findings: list[RuleFinding] = []
+        violations: list[rule_violations.RuleViolation] = []
         for definition, docstring, facts in value_documentation.documented_function_facts(context):
             return_targets = value_documentation.value_documentation_targets(docstring, PDF_definition.DocstringEntryKind.RETURN)
             if (
@@ -53,9 +54,5 @@ class PDF502MissingReturnDocumentation(RuleBase):
                 or not missing_documentation.should_check_missing_documentation(definition, docstring, context=context, has_relevant_documentation=bool(return_targets))
             ):
                 continue
-            findings.append(
-                RuleFinding(
-                    rule=cls.meta, line_numbers=facts.meaningful_returns[0].line_numbers, suppression_line_numbers=(PDF_definition.docstring_physical_line_numbers(docstring),), instance_fixable=None
-                )
-            )
-        return tuple(findings)
+            violations.append(rule_violations.diagnostic(cls.meta, facts.meaningful_returns[0].line_numbers, suppression_line_numbers=(PDF_definition.docstring_physical_line_numbers(docstring),)))
+        return tuple(violations)

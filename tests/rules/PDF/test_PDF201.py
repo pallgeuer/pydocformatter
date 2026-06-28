@@ -5,6 +5,7 @@ import pytest
 import pydocformatter.formatter as formatter
 import pydocformatter.rules.definition_helpers.source_text as source_text
 import pydocformatter.rules_selection as rules_selection
+import tests.rule_helpers as rule_helpers
 from pydocformatter.cli.settings_check import CheckSettings, DocstringBlankLineStyle, DocstringConvention, IndentStyle, LineEnding
 from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
 from pydocformatter.rules.definitions.PDF.PDF import PDF
@@ -25,7 +26,6 @@ def contexts(source: str, *, settings: CheckSettings | None = None) -> tuple[Rul
         source=source,
         source_lines=tuple(source_text.source_lines(source)),
         line_bounds=None,
-        suppression_index=None,
     )
     return category, RuleContext(
         path=category.path,
@@ -37,9 +37,7 @@ def contexts(source: str, *, settings: CheckSettings | None = None) -> tuple[Rul
         source=category.source,
         source_lines=category.source_lines,
         line_bounds=category.line_bounds,
-        suppression_index=category.suppression_index,
         category_data=PDF.prepare(category),
-        effectively_fixable=True,
     )
 
 
@@ -238,7 +236,7 @@ def test_multiple_missing_blank_lines_are_inserted_in_one_docstring() -> None:
     source = 'def function(value):\n    """Summary.\n    Args:\n        value: Description.\n    Returns:\n        bool: Result.\n    """\n'
     settings = CheckSettings(select=("PDF201",), docstring_convention=DocstringConvention.GOOGLE, docstring_blank_line_after_last_section=True)
     _, context = contexts(source, settings=settings)
-    findings = PDF201MissingBlankLine.check(context)
+    findings = rule_helpers.rule_findings(PDF201MissingBlankLine, context)
     result = format_source(source, settings=settings)
 
     assert result.new_source == 'def function(value):\n    """Summary.\n\n    Args:\n        value: Description.\n\n    Returns:\n        bool: Result.\n\n    """\n'
@@ -358,15 +356,15 @@ def test_check_fix_and_fix_false_findings_agree() -> None:
     source = 'def first():\n    """Summary.\n    Args:\n        value: Description.\n    """\n\ndef second():\n    """Summary.\n    - item\n    """\n'
     settings = CheckSettings(select=("PDF201",), docstring_convention=DocstringConvention.GOOGLE)
     _, context = contexts(source, settings=settings)
-    findings = PDF201MissingBlankLine.check(context)
-    fixed = PDF201MissingBlankLine.fix(context)
+    findings = rule_helpers.rule_findings(PDF201MissingBlankLine, context)
+    fixed = rule_helpers.rule_fix_result(PDF201MissingBlankLine, context)
     check_only = format_source(source, settings=settings, fix=False)
 
     assert tuple(finding.line_numbers for finding in findings) == ((3,), (9,))
     assert tuple(finding.line_numbers for finding in fixed.fixed_findings) == ((3,), (9,))
     assert tuple(finding.line_numbers for finding in check_only.unfixed_findings) == ((3,), (9,))
     _, fixed_context = contexts(fixed.module.code, settings=settings)
-    assert PDF201MissingBlankLine.check(fixed_context) == ()
+    assert rule_helpers.rule_findings(PDF201MissingBlankLine, fixed_context) == ()
 
 
 def test_skips_concatenated_escaped_and_non_docstring_strings() -> None:

@@ -74,6 +74,7 @@ dev = [
 
 [tool.pytest.ini_options]
 addopts = ["-n", "auto"]
+filterwarnings = ["error"]
 testpaths = ["tests"]
 markers = [
     "isolated_cwd: run the test in a fresh writable temporary working directory below the test session boundary",

@@ -1,4 +1,5 @@
 import argparse
+import ast
 import dataclasses
 import importlib
 import inspect
@@ -20,6 +21,7 @@ import pydocformatter.rules.definitions as rule_definitions
 import pydocformatter.rules.documentation as rule_documentation
 import pydocformatter.rules.models as rule_models
 import pydocformatter.rules.registration as rule_registration
+import pydocformatter.rules.violations as rule_violations
 import pydocformatter.rules_selection as rules_selection
 import pydocformatter.settings as settings_core
 from pydocformatter.cli.global_args import GlobalArgs
@@ -30,6 +32,12 @@ from pydocformatter.rules.models import FixAvailability, RuleCategoryMetadata, R
 
 EXPECTED_RULE_DOCUMENTATION_SECTIONS = ("What it does", "Why is this useful?", "Ruff compatibility", "Examples", "Options")
 EXPECTED_RULE_CATEGORY_DOCUMENTATION_SECTIONS = ("What it does", "Why is this useful?", "Rules", "Related tooling", "Code ranges", "Options")
+
+
+def _no_violations(cls: type[RuleBase], context: object) -> tuple[rule_violations.RuleViolation, ...]:
+    """Return no violations for metadata-only sample rules."""
+    del cls, context
+    return ()
 
 
 class PDFSampleCategory(RuleCategoryBase):
@@ -67,6 +75,7 @@ class PDF101SampleRule(RuleBase):
         incompatible_with=(),
         check_kind=RuleCheckKind.STANDARD,
     )
+    violations = classmethod(_no_violations)
 
 
 class PDF110SampleRule(RuleBase):
@@ -80,6 +89,7 @@ class PDF110SampleRule(RuleBase):
         incompatible_with=(),
         check_kind=RuleCheckKind.STANDARD,
     )
+    violations = classmethod(_no_violations)
 
 
 class PDF142SampleRule(RuleBase):
@@ -93,6 +103,7 @@ class PDF142SampleRule(RuleBase):
         incompatible_with=(),
         check_kind=RuleCheckKind.STANDARD,
     )
+    violations = classmethod(_no_violations)
 
 
 class PDF150SampleRule(RuleBase):
@@ -106,6 +117,7 @@ class PDF150SampleRule(RuleBase):
         incompatible_with=(),
         check_kind=RuleCheckKind.STANDARD,
     )
+    violations = classmethod(_no_violations)
 
 
 class PDF160SometimesFixableSampleRule(RuleBase):
@@ -119,6 +131,7 @@ class PDF160SometimesFixableSampleRule(RuleBase):
         incompatible_with=(),
         check_kind=RuleCheckKind.STANDARD,
     )
+    violations = classmethod(_no_violations)
 
 
 class PDF170UsuallyFixableSampleRule(RuleBase):
@@ -132,6 +145,7 @@ class PDF170UsuallyFixableSampleRule(RuleBase):
         incompatible_with=(),
         check_kind=RuleCheckKind.STANDARD,
     )
+    violations = classmethod(_no_violations)
 
 
 class PCF001SampleRule(RuleBase):
@@ -145,6 +159,7 @@ class PCF001SampleRule(RuleBase):
         incompatible_with=(),
         check_kind=RuleCheckKind.STANDARD,
     )
+    violations = classmethod(_no_violations)
 
 
 class TST001IgnoredSampleRule(RuleBase):
@@ -163,6 +178,7 @@ class TST001IgnoredSampleRule(RuleBase):
         incompatible_with=(),
         check_kind=RuleCheckKind.STANDARD,
     )
+    violations = classmethod(_no_violations)
 
 
 class TST002DisabledSampleRule(RuleBase):
@@ -185,6 +201,7 @@ class TST002DisabledSampleRule(RuleBase):
         incompatible_with=(),
         check_kind=RuleCheckKind.STANDARD,
     )
+    violations = classmethod(_no_violations)
 
 
 class TST001FirstIncompatibleSampleRule(RuleBase):
@@ -203,6 +220,7 @@ class TST001FirstIncompatibleSampleRule(RuleBase):
         incompatible_with=(RuleCode("TST002"), RuleCode("TST004")),
         check_kind=RuleCheckKind.STANDARD,
     )
+    violations = classmethod(_no_violations)
 
 
 class TST002SecondIncompatibleSampleRule(RuleBase):
@@ -216,6 +234,7 @@ class TST002SecondIncompatibleSampleRule(RuleBase):
         incompatible_with=(RuleCode("TST001"), RuleCode("TST003")),
         check_kind=RuleCheckKind.STANDARD,
     )
+    violations = classmethod(_no_violations)
 
 
 class TST003ThirdIncompatibleSampleRule(RuleBase):
@@ -229,6 +248,7 @@ class TST003ThirdIncompatibleSampleRule(RuleBase):
         incompatible_with=(RuleCode("TST002"), RuleCode("TST004")),
         check_kind=RuleCheckKind.STANDARD,
     )
+    violations = classmethod(_no_violations)
 
 
 class TST004FourthIncompatibleSampleRule(RuleBase):
@@ -242,6 +262,7 @@ class TST004FourthIncompatibleSampleRule(RuleBase):
         incompatible_with=(RuleCode("TST001"), RuleCode("TST003")),
         check_kind=RuleCheckKind.STANDARD,
     )
+    violations = classmethod(_no_violations)
 
 
 rule_registration.register_rule_to(PDFSampleCategory)(PDF101SampleRule)
@@ -290,18 +311,27 @@ def markdown_level_two_headings(markdown: str) -> tuple[str, ...]:
     return tuple(line.removeprefix("## ") for line in markdown.splitlines() if line.startswith("## "))
 
 
-def _rule_hooks_use_approved_shared_planning_pattern(rule_class: type[RuleBase], check_source: str, fix_source: str) -> bool:
-    """Return whether rule hooks use a known shared check/fix planning idiom."""
-    module = inspect.getmodule(rule_class)
-    module_source = inspect.getsource(module) if module is not None else ""
-    return (
-        ("_planned_changes(" in check_source and "_planned_changes(" in fix_source)
-        or ("_results(" in check_source and "_results(" in fix_source)
-        or ("summary_punctuation.results(" in check_source and "summary_punctuation.results(" in fix_source)
-        or ("section_edits.findings_for_results(" in check_source and "section_edits.fix_result_for_results(" in fix_source)
-        or ("_candidate_docstrings(" in check_source and "_finding_for_docstring(" in check_source and "_planned_changes(" in fix_source and "_planned_change_for_docstring(" in module_source)
-        or ("_docstring_results(" in check_source and "_planned_changes(" in fix_source and "_docstring_results(" in module_source)
-    )
+def _ast_call_name(node: ast.expr) -> str:
+    """Return a dotted best-effort call name for static rule-source checks."""
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        owner = _ast_call_name(node.value)
+        return f"{owner}.{node.attr}" if owner else node.attr
+    return ""
+
+
+def _exec_rule_definition(source: str) -> None:
+    """Execute a synthetic rule definition for runtime contract tests."""
+    namespace = {
+        "FixAvailability": FixAvailability,
+        "RuleBase": RuleBase,
+        "RuleCheckKind": RuleCheckKind,
+        "RuleCode": RuleCode,
+        "RuleMetadata": RuleMetadata,
+        "typing": typing,
+    }
+    exec(source, namespace)
 
 
 class TestRules(unittest.TestCase):
@@ -341,6 +371,10 @@ class TestRules(unittest.TestCase):
                 "@rule_registration.register_rule_to(PDF)\n"
                 "class PDF101Test(RuleBase):\n"
                 "    meta = RuleMetadata(code=RuleCode('PDF101'), name='test', message='Test', fix_availability=FixAvailability.ALWAYS, stable_since='1.0.0', setting_effects=(), incompatible_with=(), check_kind=RuleCheckKind.STANDARD)\n"
+                "    @classmethod\n"
+                "    def violations(cls, context):\n"
+                "        del cls, context\n"
+                "        return ()\n"
             ),
             "PDF/PDF101_test.md": "# test (PDF101)\n",
         }
@@ -421,29 +455,43 @@ class TestRules(unittest.TestCase):
                 expected_markdown_stem = f"{heading_code.removesuffix(')')}_{heading_name.replace('-', '_')}"
                 self.assertEqual(source_path.with_suffix(".md").stem, expected_markdown_stem)
 
-    def test_fixable_rules_use_shared_check_fix_planning_pattern(self) -> None:
-        """Check that fixable rules share check and fix planning.
-
-        This static pattern test is intentionally opinionated and should fail future fixable rules that implement
-        independent check and fix logic; if it fails for a newly implemented rule, first check whether the rule can be
-        expressed with an existing shared planning helper, then either refactor the rule to share findings and edits
-        through that helper or add a narrowly named shared helper pattern here with focused behavioral tests proving
-        that check findings, fixed findings, and remaining findings stay in correspondence.
-        """
+    def test_standard_rules_define_violations_api(self) -> None:
+        """Check that standard built-in rules define the canonical violation API."""
         for rule_class in rule_collection.RULE_COLLECTION.rules:
             with self.subTest(code=str(rule_class.meta.code)):
-                if rule_class.meta.fix_availability == FixAvailability.NEVER:
-                    self.assertNotIn("fix", rule_class.__dict__)
-                    continue
+                if rule_class.meta.check_kind == RuleCheckKind.STANDARD:
+                    self.assertIn("violations", rule_class.__dict__)
 
-                self.assertIn("check", rule_class.__dict__)
-                self.assertIn("fix", rule_class.__dict__)
-                check_source = inspect.getsource(rule_class.__dict__["check"])
-                fix_source = inspect.getsource(rule_class.__dict__["fix"])
-                self.assertTrue(
-                    _rule_hooks_use_approved_shared_planning_pattern(rule_class, check_source, fix_source),
-                    f"{rule_class.meta.code}: fixable rules must derive check findings and fix edits from an approved shared planning helper",
-                )
+    def test_builtin_rule_modules_use_violation_helpers(self) -> None:
+        """Built-in rules and reusable rule helpers should not construct violation records directly."""
+        source_root = Path(__file__).parents[1] / "src" / "pydocformatter" / "rules"
+        paths = tuple(sorted((source_root / "definitions").glob("*/*.py"))) + tuple(sorted((source_root / "definition_helpers").glob("*.py")))
+        forbidden: list[str] = []
+        forbidden_imports_by_module = {
+            "pydocformatter.rules.models": {"RuleFinding"},
+            "pydocformatter.rules.violations": {"RuleSourceFix", "RuleViolation"},
+        }
+        forbidden_suffixes = (
+            "RuleFinding",
+            "RuleViolation",
+            "RuleSourceFix",
+            "RuleSourceFix.from_change",
+            "_finding_for_planned_source_change",
+        )
+        for path in paths:
+            tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+            for node in ast.walk(tree):
+                if isinstance(node, ast.ImportFrom):
+                    forbidden_names = forbidden_imports_by_module.get(node.module or "", set())
+                    for alias in node.names:
+                        if alias.name in forbidden_names:
+                            forbidden.append(f"{path.relative_to(source_root.parent.parent)}:{node.lineno}: import {node.module}.{alias.name}")
+                elif isinstance(node, ast.Call):
+                    call_name = _ast_call_name(node.func)
+                    if call_name.endswith(forbidden_suffixes):
+                        forbidden.append(f"{path.relative_to(source_root.parent.parent)}:{node.lineno}: {call_name}")
+
+        self.assertEqual(forbidden, [])
 
     def test_rule_modules_import_before_collection_without_changing_default_collection(self) -> None:
         source_root = Path(__file__).parents[1] / "src"
@@ -491,6 +539,7 @@ class TestRules(unittest.TestCase):
                 incompatible_with=(),
                 check_kind=RuleCheckKind.STANDARD,
             )
+            violations = classmethod(_no_violations)
 
         registry.register(PDFTestCategory)
 
@@ -574,7 +623,7 @@ class TestRules(unittest.TestCase):
                 {
                     **valid_files,
                     "PDF/PDF101_test.py": valid_files["PDF/PDF101_test.py"]
-                    + "\nclass PDF100Test(RuleBase):\n    meta = RuleMetadata(code=RuleCode('PDF100'), name='test-two', message='Test two', fix_availability=FixAvailability.ALWAYS, stable_since='1.0.0', setting_effects=(), incompatible_with=(), check_kind=RuleCheckKind.STANDARD)\n",
+                    + "\nclass PDF100Test(RuleBase):\n    meta = RuleMetadata(code=RuleCode('PDF100'), name='test-two', message='Test two', fix_availability=FixAvailability.ALWAYS, stable_since='1.0.0', setting_effects=(), incompatible_with=(), check_kind=RuleCheckKind.STANDARD)\n    @classmethod\n    def violations(cls, context):\n        del cls, context\n        return ()\n",
                 },
                 "must define exactly one RuleBase subclass",
             ),
@@ -617,6 +666,10 @@ class TestRules(unittest.TestCase):
             "from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata\n\n"
             "class PDF100External(RuleBase):\n"
             "    meta = RuleMetadata(code=RuleCode('PDF100'), name='external', message='External', fix_availability=FixAvailability.ALWAYS, stable_since='1.0.0', setting_effects=(), incompatible_with=(), check_kind=RuleCheckKind.STANDARD)\n"
+            "    @classmethod\n"
+            "    def violations(cls, context):\n"
+            "        del cls, context\n"
+            "        return ()\n"
         )
         files["PDF/PDF.py"] += "\nfrom synthetic_rule_support import PDF100External\nrule_registration.register_rule_to(PDF)(PDF100External)\n"
 
@@ -632,6 +685,10 @@ class TestRules(unittest.TestCase):
             "from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata\n\n"
             "class PDF100PackageRule(RuleBase):\n"
             "    meta = RuleMetadata(code=RuleCode('PDF100'), name='package-rule', message='Package rule', fix_availability=FixAvailability.ALWAYS, stable_since='1.0.0', setting_effects=(), incompatible_with=(), check_kind=RuleCheckKind.STANDARD)\n"
+            "    @classmethod\n"
+            "    def violations(cls, context):\n"
+            "        del cls, context\n"
+            "        return ()\n"
         )
         files["PDF/PDF.py"] += f"\nfrom {package_name}.PDF import PDF100PackageRule\nrule_registration.register_rule_to(PDF)(PDF100PackageRule)\n"
 
@@ -663,6 +720,7 @@ class TestRules(unittest.TestCase):
                 incompatible_with=(),
                 check_kind=RuleCheckKind.STANDARD,
             )
+            violations = classmethod(_no_violations)
 
         with self.assertRaisesRegex(rule_registration.RuleError, "Duplicate rule code in category PDF: PDF999"):
 
@@ -678,6 +736,7 @@ class TestRules(unittest.TestCase):
                     incompatible_with=(),
                     check_kind=RuleCheckKind.STANDARD,
                 )
+                violations = classmethod(_no_violations)
 
     def test_rule_category_allows_registering_the_same_rule_class_twice(self) -> None:
         class PDFTestCategory(RuleCategoryBase):
@@ -694,6 +753,7 @@ class TestRules(unittest.TestCase):
                 incompatible_with=(),
                 check_kind=RuleCheckKind.STANDARD,
             )
+            violations = classmethod(_no_violations)
 
         rule_registration.register_rule_to(PDFTestCategory)(PDF999TestRule)
         rule_registration.register_rule_to(PDFTestCategory)(PDF999TestRule)
@@ -967,6 +1027,100 @@ class TestRules(unittest.TestCase):
             class InvalidMetaRule(RuleBase):
                 meta: typing.ClassVar[typing.Any] = None
 
+    def test_rule_base_rejects_standard_rule_without_violations(self) -> None:
+        with self.assertRaisesRegex(TypeError, "MissingViolationsRule must define violations"):
+
+            class MissingViolationsRule(RuleBase):
+                meta = RuleMetadata(
+                    code=RuleCode("PDF999"),
+                    name="missing-violations",
+                    message="Missing violations",
+                    fix_availability=FixAvailability.NEVER,
+                    stable_since="1.0.0",
+                    setting_effects=(),
+                    incompatible_with=(),
+                    check_kind=RuleCheckKind.STANDARD,
+                )
+
+    def test_rule_base_rejects_non_classmethod_violations_hook(self) -> None:
+        with self.assertRaisesRegex(TypeError, "InstanceViolationsRule\\.violations must be a @classmethod"):
+            _exec_rule_definition("""
+class InstanceViolationsRule(RuleBase):
+    meta = RuleMetadata(code=RuleCode("PDF999"), name="instance-violations", message="Instance violations", fix_availability=FixAvailability.NEVER, stable_since="1.0.0", setting_effects=(), incompatible_with=(), check_kind=RuleCheckKind.STANDARD)
+
+    def violations(self, context):
+        del self, context
+        return ()
+""")
+
+        with self.assertRaisesRegex(TypeError, "StaticViolationsRule\\.violations must be a @classmethod"):
+            _exec_rule_definition("""
+class StaticViolationsRule(RuleBase):
+    meta = RuleMetadata(code=RuleCode("PDF999"), name="static-violations", message="Static violations", fix_availability=FixAvailability.NEVER, stable_since="1.0.0", setting_effects=(), incompatible_with=(), check_kind=RuleCheckKind.STANDARD)
+
+    @staticmethod
+    def violations(context):
+        del context
+        return ()
+""")
+
+    def test_rule_base_rejects_bad_violations_signature(self) -> None:
+        with self.assertRaisesRegex(TypeError, "ExtraArgumentRule\\.violations must accept exactly one required positional argument named context"):
+            _exec_rule_definition("""
+class ExtraArgumentRule(RuleBase):
+    meta = RuleMetadata(code=RuleCode("PDF999"), name="extra-argument", message="Extra argument", fix_availability=FixAvailability.NEVER, stable_since="1.0.0", setting_effects=(), incompatible_with=(), check_kind=RuleCheckKind.STANDARD)
+
+    @classmethod
+    def violations(cls, context, extra):
+        del cls, context, extra
+        return ()
+""")
+
+        with self.assertRaisesRegex(TypeError, "WrongContextNameRule\\.violations must accept exactly one required positional argument named context"):
+            _exec_rule_definition("""
+class WrongContextNameRule(RuleBase):
+    meta = RuleMetadata(code=RuleCode("PDF999"), name="wrong-context-name", message="Wrong context name", fix_availability=FixAvailability.NEVER, stable_since="1.0.0", setting_effects=(), incompatible_with=(), check_kind=RuleCheckKind.STANDARD)
+
+    @classmethod
+    def violations(cls, node):
+        del cls, node
+        return ()
+""")
+
+        with self.assertRaisesRegex(TypeError, "OptionalArgumentRule\\.violations must accept exactly one required positional argument named context"):
+            _exec_rule_definition("""
+class OptionalArgumentRule(RuleBase):
+    meta = RuleMetadata(code=RuleCode("PDF999"), name="optional-argument", message="Optional argument", fix_availability=FixAvailability.NEVER, stable_since="1.0.0", setting_effects=(), incompatible_with=(), check_kind=RuleCheckKind.STANDARD)
+
+    @classmethod
+    def violations(cls, context, extra=None):
+        del cls, context, extra
+        return ()
+""")
+
+    def test_rule_base_rejects_noncallable_classmethod_violations_hook(self) -> None:
+        with self.assertRaisesRegex(TypeError, "NonCallableViolationsRule\\.violations must be callable"):
+            _exec_rule_definition("""
+class NonCallableViolationsRule(RuleBase):
+    meta = RuleMetadata(code=RuleCode("PDF999"), name="noncallable-violations", message="Noncallable violations", fix_availability=FixAvailability.NEVER, stable_since="1.0.0", setting_effects=(), incompatible_with=(), check_kind=RuleCheckKind.STANDARD)
+    violations = classmethod(typing.cast(typing.Any, None))
+""")
+
+    def test_rule_base_allows_suppression_audit_rule_without_violations(self) -> None:
+        class SuppressionAuditRule(RuleBase):
+            meta = RuleMetadata(
+                code=RuleCode("PDF999"),
+                name="suppression-audit",
+                message="Suppression audit",
+                fix_availability=FixAvailability.NEVER,
+                stable_since="1.0.0",
+                setting_effects=(),
+                incompatible_with=(),
+                check_kind=RuleCheckKind.SUPPRESSION_AUDIT,
+            )
+
+        self.assertEqual(SuppressionAuditRule.violations(typing.cast(typing.Any, object())), ())
+
     def test_rule_category_metadata_and_base_validate_definitions(self) -> None:
         metadata = RuleCategoryMetadata(prefix="PDF", name="test PDF", url=None)
 
@@ -1031,6 +1185,7 @@ class TestRules(unittest.TestCase):
                 incompatible_with=(RuleCode("TST001"),),
                 check_kind=RuleCheckKind.STANDARD,
             )
+            violations = classmethod(_no_violations)
 
         with self.assertRaisesRegex(rule_registration.RuleError, "Rule TST001 cannot be incompatible with itself"):
             rule_collection.RuleCollection((TSTSelfCategory,))
@@ -1041,6 +1196,7 @@ class TestRules(unittest.TestCase):
         @rule_registration.register_rule_to(TSTUnknownCategory)
         class TST001UnknownRule(RuleBase):
             meta = dataclasses.replace(TST001SelfRule.meta, incompatible_with=(RuleCode("TST999"),))
+            violations = classmethod(_no_violations)
 
         with self.assertRaisesRegex(rule_registration.RuleError, "Rule TST001 is incompatible with unknown rule code TST999"):
             rule_collection.RuleCollection((TSTUnknownCategory,))
@@ -1051,6 +1207,7 @@ class TestRules(unittest.TestCase):
         @rule_registration.register_rule_to(TSTAsymmetricCategory)
         class TST001AsymmetricRule(RuleBase):
             meta = dataclasses.replace(TST001SelfRule.meta, incompatible_with=(RuleCode("TST002"),))
+            violations = classmethod(_no_violations)
 
         @rule_registration.register_rule_to(TSTAsymmetricCategory)
         class TST002AsymmetricRule(RuleBase):
@@ -1064,6 +1221,7 @@ class TestRules(unittest.TestCase):
                 incompatible_with=(),
                 check_kind=RuleCheckKind.STANDARD,
             )
+            violations = classmethod(_no_violations)
 
         with self.assertRaisesRegex(rule_registration.RuleError, "Rule incompatibility between TST001 and TST002 must be declared by both rules"):
             rule_collection.RuleCollection((TSTAsymmetricCategory,))
@@ -1080,6 +1238,7 @@ class TestRules(unittest.TestCase):
                 incompatible_with=(),
                 check_kind=RuleCheckKind.STANDARD,
             )
+            violations = classmethod(_no_violations)
 
         rule = PDF999TestRule()
 
@@ -1525,6 +1684,7 @@ class TestRules(unittest.TestCase):
                 incompatible_with=(),
                 check_kind=RuleCheckKind.STANDARD,
             )
+            violations = classmethod(_no_violations)
 
         rule_registration.register_rule_to(TSTUnknownSettingEffectCategory)(TST999UnknownSettingEffectRule)
 

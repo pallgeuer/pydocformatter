@@ -4,14 +4,14 @@ from __future__ import annotations
 
 import pydocformatter.rules.definition_helpers.docstring_conventions as docstring_conventions
 import pydocformatter.rules.definition_helpers.docstring_sections as docstring_sections
-import pydocformatter.rules.definition_helpers.section_edits as section_edits
 import pydocformatter.rules.definition_helpers.section_name_replacements as section_name_replacements
 import pydocformatter.rules.registration as rule_registration
+import pydocformatter.rules.violations as rule_violations
 from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.codes import RuleCode
-from pydocformatter.rules.definition import RuleBase, RuleContext, RuleFixResult
+from pydocformatter.rules.definition import RuleBase, RuleContext
 from pydocformatter.rules.definitions.PDF.PDF import PDF
-from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleFinding, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
+from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
 
 
 @rule_registration.register_rule_to(PDF)
@@ -43,18 +43,13 @@ class PDF400SectionNameCapitalization(RuleBase):
     )
 
     @classmethod
-    def check(cls, context: RuleContext) -> tuple[RuleFinding, ...]:
-        """Return findings for non-canonical convention section capitalization."""
-        return section_edits.findings_for_results(_results(context, rule=cls.meta))
-
-    @classmethod
-    def fix(cls, context: RuleContext) -> RuleFixResult:
-        """Capitalize safely mapped convention section names."""
-        return section_edits.fix_result_for_results(context, cls.meta, _results(context, rule=cls.meta))
+    def violations(cls, context: RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
+        """Return violations for non-canonical convention section capitalization."""
+        return _results(context, rule=cls.meta)
 
 
-def _results(context: RuleContext, *, rule: RuleMetadata) -> tuple[section_edits.SectionEditResult, ...]:
-    """Return findings and fixes for section name capitalization."""
+def _results(context: RuleContext, *, rule: RuleMetadata) -> tuple[rule_violations.RuleViolation, ...]:
+    """Return violations for section name capitalization."""
     return section_name_replacements.results_for_mapped_names(
         context,
         rule=rule,

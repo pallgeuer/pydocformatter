@@ -4,6 +4,7 @@ import libcst.metadata as cst_metadata
 import pydocformatter.formatter as formatter
 import pydocformatter.rules.definition_helpers.source_text as source_text
 import pydocformatter.rules_selection as rules_selection
+import tests.rule_helpers as rule_helpers
 from pydocformatter.cli.settings_check import CheckSettings, DocstringBlankLineStyle, DocstringConvention, IndentStyle, LineEnding
 from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
 from pydocformatter.rules.definitions.PDF.PDF import PDF
@@ -24,7 +25,6 @@ def contexts(source: str, *, settings: CheckSettings | None = None) -> tuple[Rul
         source=source,
         source_lines=tuple(source_text.source_lines(source)),
         line_bounds=None,
-        suppression_index=None,
     )
     return category, RuleContext(
         path=category.path,
@@ -36,9 +36,7 @@ def contexts(source: str, *, settings: CheckSettings | None = None) -> tuple[Rul
         source=category.source,
         source_lines=category.source_lines,
         line_bounds=category.line_bounds,
-        suppression_index=category.suppression_index,
         category_data=PDF.prepare(category),
-        effectively_fixable=True,
     )
 
 
@@ -51,8 +49,8 @@ def format_pdf100(source: str, *, settings: CheckSettings | None = None, fix: bo
 def test_collapses_leading_internal_and_trailing_extra_blank_lines() -> None:
     source = 'def function():\n    """\n\n    Summary.\n\n\n    Body.\n\n    """\n'
     _, context = contexts(source)
-    findings = PDF200TooManyBlankLines.check(context)
-    fixed = PDF200TooManyBlankLines.fix(context)
+    findings = rule_helpers.rule_findings(PDF200TooManyBlankLines, context)
+    fixed = rule_helpers.rule_fix_result(PDF200TooManyBlankLines, context)
     check_only = format_pdf100(source, fix=False)
 
     assert fixed.module.code == 'def function():\n    """Summary.\n\n    Body.\n    """\n'
@@ -60,7 +58,7 @@ def test_collapses_leading_internal_and_trailing_extra_blank_lines() -> None:
     assert tuple(finding.line_numbers for finding in fixed.fixed_findings) == ((2, 3, 6, 8),)
     assert tuple(finding.line_numbers for finding in check_only.unfixed_findings) == ((2, 3, 6, 8),)
     _, fixed_context = contexts(fixed.module.code)
-    assert PDF200TooManyBlankLines.check(fixed_context) == ()
+    assert rule_helpers.rule_findings(PDF200TooManyBlankLines, fixed_context) == ()
 
 
 def test_preserves_first_line_content_whitespace_when_collapsing_later_blank_lines() -> None:

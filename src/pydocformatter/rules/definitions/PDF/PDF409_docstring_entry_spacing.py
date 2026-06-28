@@ -7,10 +7,11 @@ import pydocformatter.rules.definition_helpers.section_edits as section_edits
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 import pydocformatter.rules.edits as rule_edits
 import pydocformatter.rules.registration as rule_registration
+import pydocformatter.rules.violations as rule_violations
 from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.codes import RuleCode
-from pydocformatter.rules.definition import RuleBase, RuleContext, RuleFixResult
-from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleFinding, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
+from pydocformatter.rules.definition import RuleBase, RuleContext
+from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
 
 
 @rule_registration.register_rule_to(PDF_definition.PDF)
@@ -42,20 +43,15 @@ class PDF409DocstringEntrySpacing(RuleBase):
     )
 
     @classmethod
-    def check(cls, context: RuleContext) -> tuple[RuleFinding, ...]:
-        """Return findings for non-canonical convention entry spacing."""
-        return section_edits.findings_for_results(_results(context, rule=cls.meta))
-
-    @classmethod
-    def fix(cls, context: RuleContext) -> RuleFixResult:
-        """Normalize safely mapped convention entry spacing."""
-        return section_edits.fix_result_for_results(context, cls.meta, _results(context, rule=cls.meta))
+    def violations(cls, context: RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
+        """Return violations for non-canonical convention entry spacing."""
+        return _results(context, rule=cls.meta)
 
 
-def _results(context: RuleContext, *, rule: RuleMetadata) -> tuple[section_edits.SectionEditResult, ...]:
-    """Return findings and fixes for convention entry spacing."""
+def _results(context: RuleContext, *, rule: RuleMetadata) -> tuple[rule_violations.RuleViolation, ...]:
+    """Return violations for convention entry spacing."""
     data = PDF_definition.PDF.require_data(context)
-    results: list[section_edits.SectionEditResult] = []
+    results: list[rule_violations.RuleViolation] = []
     for docstring in data.docstrings:
         replacements: list[rule_edits.PlannedTextReplacement] = []
         value_lines = [line.raw_text for line in docstring.structure.lines]

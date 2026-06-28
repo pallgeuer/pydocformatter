@@ -2,16 +2,15 @@
 
 from __future__ import annotations
 
-import dataclasses
-
 import pydocformatter.rules.definition_helpers.summary_style as summary_style
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 import pydocformatter.rules.edits as rule_edits
 import pydocformatter.rules.registration as rule_registration
+import pydocformatter.rules.violations as rule_violations
 from pydocformatter.rules.codes import RuleCode
-from pydocformatter.rules.definition import RuleBase, RuleContext, RuleFixResult
+from pydocformatter.rules.definition import RuleBase, RuleContext
 from pydocformatter.rules.definitions.PDF.PDF import PDF
-from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleFinding, RuleMetadata
+from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata
 
 
 @rule_registration.register_rule_to(PDF)
@@ -34,37 +33,15 @@ class PDF304SummaryFirstWordCapitalization(RuleBase):
     )
 
     @classmethod
-    def check(cls, context: RuleContext) -> tuple[RuleFinding, ...]:
-        """Return findings for function summaries whose first word is not capitalized."""
-        return tuple(result.finding for result in _results(context, rule=cls.meta))
-
-    @classmethod
-    def fix(cls, context: RuleContext) -> RuleFixResult:
-        """Capitalize safely mapped summary first words."""
-        changes = tuple(result.change for result in _results(context, rule=cls.meta) if result.change is not None)
-        if not changes:
-            return RuleFixResult(module=context.module)
-        return rule_edits.fix_result_for_planned_source_changes(context, cls.meta, changes, instance_fixable=True)
+    def violations(cls, context: RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
+        """Return violations for function summaries whose first word is not capitalized."""
+        return _violations(context, rule=cls.meta)
 
 
-@dataclasses.dataclass(frozen=True)
-class _CapitalizationResult:
-    """Finding plus optional source change for one capitalization target.
-
-    Attributes:
-        finding (RuleFinding): Diagnostic reported for the summary word.
-        change (rule_edits.PlannedSourceChange | None): Safe source rewrite for the word, when the docstring can be
-            mapped back to source.
-    """
-
-    finding: RuleFinding
-    change: rule_edits.PlannedSourceChange | None
-
-
-def _results(context: RuleContext, *, rule: RuleMetadata) -> tuple[_CapitalizationResult, ...]:
-    """Return findings and optional fixes for summary capitalization."""
+def _violations(context: RuleContext, *, rule: RuleMetadata) -> tuple[rule_violations.RuleViolation, ...]:
+    """Return violations and optional fixes for summary capitalization."""
     data = PDF.require_data(context)
-    results: list[_CapitalizationResult] = []
+    violations: list[rule_violations.RuleViolation] = []
     for target in data.summary_line_targets:
         if not summary_style.is_function_docstring(target.docstring):
             continue
@@ -73,18 +50,12 @@ def _results(context: RuleContext, *, rule: RuleMetadata) -> tuple[_Capitalizati
             continue
         capitalized_word = f"{word.word[0].upper()}{word.word[1:]}"
         change = _planned_change(word, replacement=capitalized_word, context=context)
-        results.append(
-            _CapitalizationResult(
-                finding=RuleFinding(
-                    rule=rule,
-                    line_numbers=summary_style.line_numbers(word),
-                    instance_fixable=change is not None,
-                    instance_message=f"Docstring summary first word '{word.word}' should be capitalized",
-                ),
-                change=change,
+        violations.append(
+            rule_violations.violation_for_optional_planned_source_change(
+                rule, change, line_numbers=summary_style.line_numbers(word), instance_message=f"Docstring summary first word '{word.word}' should be capitalized"
             )
         )
-    return tuple(results)
+    return tuple(violations)
 
 
 def _should_capitalize(word: str) -> bool:

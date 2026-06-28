@@ -6,6 +6,7 @@ import dataclasses
 import enum
 import re
 
+import pydocformatter.rules.line_targets as line_targets
 from pydocformatter.rules.codes import ALL_RULE_SELECTOR_TAG, RuleCode
 
 _RULE_PREFIX_RE = re.compile(r"^[A-Z]+$")
@@ -197,6 +198,15 @@ class RuleFinding:
     suppression_line_numbers: tuple[tuple[int, ...], ...] = ()
     instance_message: str | None = None
     instance_fixable: bool | None = dataclasses.field(kw_only=True)
+
+    def __post_init__(self) -> None:
+        """Validate finding target lines."""
+        object.__setattr__(self, "line_numbers", line_targets.normalize_line_numbers(self.line_numbers, "Finding line numbers"))
+        object.__setattr__(
+            self,
+            "suppression_line_numbers",
+            line_targets.normalize_line_number_targets(self.suppression_line_numbers, "Finding suppression line-number targets", "Finding suppression line-number target"),
+        )
 
     @property
     def message(self) -> str:

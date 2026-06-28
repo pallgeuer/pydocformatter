@@ -4,6 +4,7 @@ import libcst.metadata as cst_metadata
 import pydocformatter.formatter as formatter
 import pydocformatter.rules.definition_helpers.source_text as source_text
 import pydocformatter.rules_selection as rules_selection
+import tests.rule_helpers as rule_helpers
 from pydocformatter.cli.settings_check import CheckSettings, IndentStyle, LineEnding
 from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
 from pydocformatter.rules.definitions.PDF.PDF import PDF
@@ -24,7 +25,6 @@ def contexts(source: str, *, settings: CheckSettings | None = None) -> tuple[Rul
         source=source,
         source_lines=tuple(source_text.source_lines(source)),
         line_bounds=None,
-        suppression_index=None,
     )
     return category, RuleContext(
         path=category.path,
@@ -36,9 +36,7 @@ def contexts(source: str, *, settings: CheckSettings | None = None) -> tuple[Rul
         source=category.source,
         source_lines=category.source_lines,
         line_bounds=category.line_bounds,
-        suppression_index=category.suppression_index,
         category_data=PDF.prepare(category),
-        effectively_fixable=True,
     )
 
 
@@ -143,15 +141,15 @@ def test_preserves_crlf_for_generated_closing_separator() -> None:
 def test_check_fix_line_numbers_and_fix_false_findings_agree() -> None:
     source = 'def first():\n    """Summary.\n\n    Body."""\n\ndef second():\n    """Other.\n\n    Body."""\n'
     _, context = contexts(source)
-    findings = PDF109MultilineClosingQuotesSeparateLine.check(context)
-    fixed = PDF109MultilineClosingQuotesSeparateLine.fix(context)
+    findings = rule_helpers.rule_findings(PDF109MultilineClosingQuotesSeparateLine, context)
+    fixed = rule_helpers.rule_fix_result(PDF109MultilineClosingQuotesSeparateLine, context)
     check_only = format_pdf105(source, fix=False)
 
     assert tuple(finding.line_numbers for finding in findings) == ((4,), (9,))
     assert tuple(finding.line_numbers for finding in fixed.fixed_findings) == ((4,), (9,))
     assert tuple(finding.line_numbers for finding in check_only.unfixed_findings) == ((4,), (9,))
     _, fixed_context = contexts(fixed.module.code)
-    assert PDF109MultilineClosingQuotesSeparateLine.check(fixed_context) == ()
+    assert rule_helpers.rule_findings(PDF109MultilineClosingQuotesSeparateLine, fixed_context) == ()
 
 
 def test_preserves_raw_prefix_quote_delimiter_and_skips_unsafe_shapes() -> None:
@@ -175,7 +173,7 @@ def test_pdf006_trims_final_content_whitespace_before_pdf105_separates_quotes() 
 def test_fix_noops_for_blank_and_single_content_docstrings() -> None:
     source = 'def blank():\n    """  \n    """\n\ndef one():\n    """Summary."""\n'
     _, context = contexts(source)
-    fixed = PDF109MultilineClosingQuotesSeparateLine.fix(context)
+    fixed = rule_helpers.rule_fix_result(PDF109MultilineClosingQuotesSeparateLine, context)
 
     assert fixed.module.code == source
     assert fixed.fixed_findings == ()

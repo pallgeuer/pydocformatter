@@ -4,6 +4,7 @@ import libcst.metadata as cst_metadata
 import pydocformatter.formatter as formatter
 import pydocformatter.rules.definition_helpers.source_text as source_text
 import pydocformatter.rules_selection as rules_selection
+import tests.rule_helpers as rule_helpers
 from pydocformatter.cli.settings_check import CheckSettings, LineEnding
 from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
 from pydocformatter.rules.definitions.PDF.PDF import PDF
@@ -25,7 +26,6 @@ def contexts(source: str, *, settings: CheckSettings | None = None) -> tuple[Rul
         source=source,
         source_lines=tuple(source_text.source_lines(source)),
         line_bounds=None,
-        suppression_index=None,
     )
     return category, RuleContext(
         path=category.path,
@@ -37,9 +37,7 @@ def contexts(source: str, *, settings: CheckSettings | None = None) -> tuple[Rul
         source=category.source,
         source_lines=category.source_lines,
         line_bounds=category.line_bounds,
-        suppression_index=category.suppression_index,
         category_data=PDF.prepare(category),
-        effectively_fixable=True,
     )
 
 
@@ -128,15 +126,15 @@ def test_module_parenthesized_simple_suite_and_crlf_line_endings() -> None:
 def test_check_fix_line_numbers_and_fix_false_findings_agree() -> None:
     source = 'def first():\n    """\n    Summary.\n\n    Body.\n    """\n\ndef second():\n    """\n\n    Other.\n\n    Body.\n    """\n'
     _, context = contexts(source)
-    findings = PDF106MultilineOpeningQuotesSameLine.check(context)
-    fixed = PDF106MultilineOpeningQuotesSameLine.fix(context)
+    findings = rule_helpers.rule_findings(PDF106MultilineOpeningQuotesSameLine, context)
+    fixed = rule_helpers.rule_fix_result(PDF106MultilineOpeningQuotesSameLine, context)
     check_only = format_pdf102(source, fix=False)
 
     assert tuple(finding.line_numbers for finding in findings) == ((2, 3), (9, 10, 11))
     assert tuple(finding.line_numbers for finding in fixed.fixed_findings) == ((2, 3), (9, 10, 11))
     assert tuple(finding.line_numbers for finding in check_only.unfixed_findings) == ((2, 3), (9, 10, 11))
     _, fixed_context = contexts(fixed.module.code)
-    assert PDF106MultilineOpeningQuotesSameLine.check(fixed_context) == ()
+    assert rule_helpers.rule_findings(PDF106MultilineOpeningQuotesSameLine, fixed_context) == ()
 
 
 def test_skips_concatenated_escaped_and_non_docstring_strings() -> None:

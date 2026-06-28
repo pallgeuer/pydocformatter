@@ -1,4 +1,4 @@
-# Formatting Rules
+# Rule List
 
 ## pydocformatter Rules
 
@@ -10,7 +10,7 @@
 | PCF002 | trailing-comment-spacing        | Trailing comment spacing should be normalized | Always  |    -     |    1.0.0     | Normalizes trailing-comment delimiter spacing without moving comments                                      |
 | PCF003 | comment-directive-normalization | Directive comment should be normalized        | Always  |    -     |    1.0.0     | Normalizes safe marker spacing and syntax for known type and tool directive comments                       |
 | PCF004 | trailing-comment-extraction     | Trailing comment should be extracted          | Always  |    -     |    1.0.0     | Extracts overlong ordinary trailing comments when syntax and content safety settings allow it              |
-| PCF005 | comment-ascii-only              | Comment should contain only ASCII characters  |  Never  | Required |    1.0.0     | Flags literal non-ASCII characters in Python comments                                                      |
+| PCF005 | comment-ascii-only              | Comment should contain only ASCII characters  |  Never  |  Opt-in  |    1.0.0     | Flags literal non-ASCII characters in Python comments                                                      |
 | PCF006 | unused-suppression              | Suppression directive is unused               |  Never  |    -     |    1.0.0     | Reports unused or invalid pydocfmt suppression selectors                                                   |
 
 ### pydocformatter docstrings (PDF)
@@ -20,7 +20,7 @@
 | PDF000 | docstring-literal-normalization        | Docstring literal should be normalized                                              |  Usually  |    -     |    -    |    -    |    -    |    -    |    -    |    1.0.0     |           |                                      | Normalizes docstring literals by rewriting implicit concatenations and literalizing safe normal whitespace escapes                                                                  |
 | PDF001 | docstring-quote-style                  | Docstring should use triple double quotes                                           | Sometimes |    -     |    -    |    -    |    -    |    -    |    -    |    1.0.0     |           | Disable D300                         | Normalizes simple docstring delimiters to triple double quotes when that preserves the evaluated value                                                                              |
 | PDF002 | docstring-backslash-raw-prefix         | Docstring with backslashes should use a raw string prefix                           | Sometimes |    -     |    -    |    -    |    -    |    -    |    -    |    1.0.0     |           | Disable D301                         | Reports non-raw simple docstrings with source backslashes, except ASCII-only non-ASCII character escapes, and adds a raw prefix only for value-preserving rewrites                  |
-| PDF003 | docstring-ascii-only                   | Docstring source should contain only ASCII characters                               |  Usually  | Required |    -    |    -    |    -    |    -    |    -    |    1.0.0     |           |                                      | Escapes literal non-ASCII source characters in simple docstrings when the evaluated value is preserved                                                                              |
+| PDF003 | docstring-ascii-only                   | Docstring source should contain only ASCII characters                               |  Usually  |  Opt-in  |    -    |    -    |    -    |    -    |    -    |    1.0.0     |           |                                      | Escapes literal non-ASCII source characters in simple docstrings when the evaluated value is preserved                                                                              |
 | PDF100 | docstring-indentation                  | Docstring line is incorrectly indented                                              |  Always   |    -     |    -    |    -    |    -    |    -    |    -    |    1.0.0     |           | Disable D206, D207, D208, D214, D215 | Normalizes simple-docstring continuation indentation, with convention-aware section indentation for Google and NumPy docstrings                                                     |
 | PDF101 | docstring-reflow                       | Docstring chunk needs reflow                                                        |  Usually  |    -     |    -    |    -    |    -    |    -    |    -    |    1.0.0     |           |                                      | Reflows docstring chunks after indentation has been normalized                                                                                                                      |
 | PDF102 | docstring-trailing-whitespace          | Non-empty docstring line has trailing whitespace                                    |  Always   |    -     |    -    |    -    |    -    |    -    |    -    |    1.0.0     |           | Related to W291                      | Removes trailing whitespace from non-empty docstring lines, except final non-empty content before closing quotes (see PDF105)                                                       |
@@ -62,30 +62,6 @@
 | PDF505 | extraneous-yield-documentation         | Docstring has a yield section for a function that does not yield a meaningful value |   Never   |    -     | Ignored | Ignored |    -    |    -    |    -    |    1.0.0     |           | Disable DOC403                       | Reports parsed yield documentation on functions without meaningful yielded values                                                                                                   |
 | PDF506 | missing-exception-documentation        | Raised exception is missing docstring documentation                                 |   Never   |    -     | Ignored | Ignored |    -    |    -    |    -    |    1.0.0     |           | Disable DOC501                       | Reports directly raised exception classes missing from parsed Raises sections or reST exception fields                                                                              |
 | PDF507 | extraneous-exception-documentation     | Docstring documents an exception that is not explicitly raised                      |   Never   |    -     | Ignored | Ignored | Ignored | Ignored | Ignored |    1.0.0     |           | Disable DOC502                       | Reports parsed documented exceptions that are not directly raised by the function body                                                                                              |
-
-## Rule Configuration
-
-`pydocfmt` accepts Ruff-style rule configuration under `[tool.pydocfmt]`:
-
-```toml
-[tool.pydocfmt]
-url-aware-wrapping = true
-select = ["ALL"]
-extend-select = []
-require-explicit = ["PCF005", "PDF003"]
-ignore = []
-fixable = ["ALL"]
-extend-fixable = []
-unfixable = []
-
-[tool.pydocfmt.per-file-ignores]
-"tests/*.py" = ["PCF001"]
-
-[tool.pydocfmt.comment]
-format-task-markers = true
-```
-
-pydocfmt source comments can suppress findings and fixes. Bare `# noqa` uses conventional same-line suppression, while pydocfmt-owned `# pydocfmt: noqa`, `# pydocfmt: file-ignore[...]`, and `# pydocfmt: ignore[...]` directives support file-level and local pydocformatter selectors. For the full source-suppression contract and executed examples, see [Source Suppressions](suppressions.md).
 
 ## Ruff Rules
 

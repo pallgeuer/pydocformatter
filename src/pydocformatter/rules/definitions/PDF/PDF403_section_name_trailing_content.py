@@ -10,11 +10,12 @@ import pydocformatter.rules.definition_helpers.section_edits as section_edits
 import pydocformatter.rules.definition_helpers.text_layout as text_layout
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 import pydocformatter.rules.registration as rule_registration
+import pydocformatter.rules.violations as rule_violations
 from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.codes import RuleCode
-from pydocformatter.rules.definition import RuleBase, RuleContext, RuleFixResult
+from pydocformatter.rules.definition import RuleBase, RuleContext
 from pydocformatter.rules.definitions.PDF.PDF import PDF
-from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleFinding, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
+from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
 
 _GOOGLE_TRAILING_CONTENT_RE = re.compile(r"^(?P<indent>[ \t]*)(?P<name>[A-Za-z][A-Za-z ]*?)[ \t]*:[ \t]+(?P<content>\S.*)$")
 
@@ -44,20 +45,15 @@ class PDF403SectionNameTrailingContent(RuleBase):
     )
 
     @classmethod
-    def check(cls, context: RuleContext) -> tuple[RuleFinding, ...]:
-        """Return findings for section names with content on the same line."""
-        return section_edits.findings_for_results(_results(context, rule=cls.meta))
-
-    @classmethod
-    def fix(cls, context: RuleContext) -> RuleFixResult:
-        """Move same-line Google section content below the section name."""
-        return section_edits.fix_result_for_results(context, cls.meta, _results(context, rule=cls.meta))
+    def violations(cls, context: RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
+        """Return violations for section names with content on the same line."""
+        return _results(context, rule=cls.meta)
 
 
-def _results(context: RuleContext, *, rule: RuleMetadata) -> tuple[section_edits.SectionEditResult, ...]:
-    """Return findings and fixes for section names followed by trailing content."""
+def _results(context: RuleContext, *, rule: RuleMetadata) -> tuple[rule_violations.RuleViolation, ...]:
+    """Return violations for section names followed by trailing content."""
     data = PDF.require_data(context)
-    results: list[section_edits.SectionEditResult] = []
+    results: list[rule_violations.RuleViolation] = []
     for docstring in data.docstrings:
         if docstring.structure.convention is not DocstringConvention.GOOGLE:
             continue

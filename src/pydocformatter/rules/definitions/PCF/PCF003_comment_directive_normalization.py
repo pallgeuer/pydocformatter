@@ -8,9 +8,10 @@ import pydocformatter.rules.definition_helpers.directives as directive_helpers
 import pydocformatter.rules.definitions.PCF.PCF as PCF_definition
 import pydocformatter.rules.edits as rule_edits
 import pydocformatter.rules.registration as rule_registration
+import pydocformatter.rules.violations as rule_violations
 from pydocformatter.rules.codes import RuleCode
-from pydocformatter.rules.definition import RuleBase, RuleContext, RuleFixResult
-from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleFinding, RuleMetadata
+from pydocformatter.rules.definition import RuleBase, RuleContext
+from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata
 
 _LIST_ITEM_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
 # ty: prefixes are accepted only in type: ignore[...] lists, where mixed type-checker payloads are used.
@@ -49,17 +50,9 @@ class PCF003CommentDirectiveNormalization(RuleBase):
     )
 
     @classmethod
-    def check(cls, context: RuleContext) -> tuple[RuleFinding, ...]:
-        """Return directive normalization findings."""
-        return rule_edits.findings_for_planned_source_changes(cls.meta, _planned_changes(context))
-
-    @classmethod
-    def fix(cls, context: RuleContext) -> RuleFixResult:
-        """Apply directive normalization fixes."""
-        changes = _planned_changes(context)
-        if not changes:
-            return RuleFixResult(module=context.module)
-        return rule_edits.fix_result_for_planned_source_changes(context, cls.meta, changes)
+    def violations(cls, context: RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
+        """Return directive normalization violations."""
+        return rule_violations.violations_for_planned_source_changes(cls.meta, _planned_changes(context))
 
 
 def _planned_changes(context: RuleContext) -> tuple[rule_edits.PlannedSourceChange, ...]:

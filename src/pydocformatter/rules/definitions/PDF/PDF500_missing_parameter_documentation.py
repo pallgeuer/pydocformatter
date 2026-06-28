@@ -6,11 +6,12 @@ import pydocformatter.rules.definition_helpers.docstring_conventions as docstrin
 import pydocformatter.rules.definition_helpers.parameter_documentation as parameter_documentation
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 import pydocformatter.rules.registration as rule_registration
+import pydocformatter.rules.violations as rule_violations
 from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase, RuleContext
 from pydocformatter.rules.definitions.PDF.PDF import PDF
-from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleFinding, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
+from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
 
 
 @rule_registration.register_rule_to(PDF)
@@ -38,12 +39,12 @@ class PDF500MissingParameterDocumentation(RuleBase):
     )
 
     @classmethod
-    def check(cls, context: RuleContext) -> tuple[RuleFinding, ...]:
-        """Return findings for signature parameters missing docstring documentation."""
+    def violations(cls, context: RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
+        """Return violations for signature parameters missing docstring documentation."""
         if docstring_conventions.missing_documentation_is_inert(context.settings.docstring_convention):
             return ()
         data = PDF.require_data(context)
-        findings: list[RuleFinding] = []
+        violations: list[rule_violations.RuleViolation] = []
         for definition in data.definitions:
             if definition.kind is not PDF_definition.DefinitionKind.FUNCTION or definition.parameters is None:
                 continue
@@ -55,13 +56,12 @@ class PDF500MissingParameterDocumentation(RuleBase):
             for parameter in parameter_documentation.signature_parameters(definition, context=context):
                 if parameter.implicit_receiver or parameter.unpacked or parameter.comparison_name in documented_names:
                     continue
-                findings.append(
-                    RuleFinding(
-                        rule=cls.meta,
-                        line_numbers=parameter.line_numbers,
+                violations.append(
+                    rule_violations.diagnostic(
+                        cls.meta,
+                        parameter.line_numbers,
                         suppression_line_numbers=docstring_suppression_target,
                         instance_message=f"Function parameter '{parameter.display_name}' is missing docstring documentation",
-                        instance_fixable=None,
                     )
                 )
-        return tuple(findings)
+        return tuple(violations)

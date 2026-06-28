@@ -8,9 +8,10 @@ import pydocformatter.rules.definition_helpers.string_literals as string_literal
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 import pydocformatter.rules.edits as rule_edits
 import pydocformatter.rules.registration as rule_registration
+import pydocformatter.rules.violations as rule_violations
 from pydocformatter.rules.codes import RuleCode
-from pydocformatter.rules.definition import RuleBase, RuleContext, RuleFixResult
-from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleFinding, RuleMetadata
+from pydocformatter.rules.definition import RuleBase, RuleContext
+from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata
 
 
 @rule_registration.register_rule_to(PDF_definition.PDF)
@@ -33,22 +34,9 @@ class PDF002DocstringBackslashRawPrefix(RuleBase):
     )
 
     @classmethod
-    def check(cls, context: RuleContext) -> tuple[RuleFinding, ...]:
-        """Return findings for non-raw docstrings containing source backslashes."""
-        return tuple(finding for docstring in _candidate_docstrings(context) if (finding := _finding_for_docstring(docstring, context=context)) is not None)
-
-    @classmethod
-    def fix(cls, context: RuleContext) -> RuleFixResult:
-        """Add raw prefixes to safely renderable docstrings."""
-        changes = _planned_changes(context)
-        if not changes:
-            return RuleFixResult(module=context.module)
-        return rule_edits.fix_result_for_planned_source_changes(context, cls.meta, changes, instance_fixable=True)
-
-
-def _planned_changes(context: RuleContext) -> tuple[rule_edits.PlannedSourceChange, ...]:
-    """Return raw-prefix replacements for all safely renderable docstrings."""
-    return tuple(change for docstring in _candidate_docstrings(context) if (change := _planned_change_for_docstring(docstring)) is not None)
+    def violations(cls, context: RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
+        """Return violations for non-raw docstrings containing source backslashes."""
+        return tuple(violation for docstring in _candidate_docstrings(context) if (violation := _violation_for_docstring(docstring, context=context)) is not None)
 
 
 def _candidate_docstrings(context: RuleContext) -> tuple[PDF_definition.DocstringInfo, ...]:
@@ -57,20 +45,20 @@ def _candidate_docstrings(context: RuleContext) -> tuple[PDF_definition.Docstrin
     return tuple(docstring for docstring in data.docstrings if _needs_raw_prefix(docstring))
 
 
-def _finding_for_docstring(docstring: PDF_definition.DocstringInfo, *, context: RuleContext) -> RuleFinding | None:
-    """Return a fixable or non-fixable finding for one docstring."""
+def _violation_for_docstring(docstring: PDF_definition.DocstringInfo, *, context: RuleContext) -> rule_violations.RuleViolation | None:
+    """Return a fixable or non-fixable violation for one docstring."""
     del context
     if not _needs_raw_prefix(docstring):
         return None
     planned_change = _planned_change_for_docstring(docstring)
     if planned_change is not None:
-        return RuleFinding(rule=PDF002DocstringBackslashRawPrefix.meta, line_numbers=_line_numbers(docstring), instance_fixable=True)
-    # Non-fixable findings point only to manually actionable backslash lines; fixable source changes still report the
+        return rule_violations.violation_for_optional_planned_source_change(PDF002DocstringBackslashRawPrefix.meta, planned_change, line_numbers=_line_numbers(docstring))
+    # Non-fixable violations point only to manually actionable backslash lines; fixable source changes still report the
     # whole docstring range.
     reportable_lines = reportable_backslash_line_numbers(docstring)
     if not reportable_lines:
         return None
-    return RuleFinding(rule=PDF002DocstringBackslashRawPrefix.meta, line_numbers=reportable_lines, instance_fixable=False)
+    return rule_violations.diagnostic(PDF002DocstringBackslashRawPrefix.meta, reportable_lines)
 
 
 def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo) -> rule_edits.PlannedSourceChange | None:

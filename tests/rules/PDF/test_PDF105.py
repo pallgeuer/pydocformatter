@@ -5,6 +5,7 @@ import pytest
 import pydocformatter.formatter as formatter
 import pydocformatter.rules.definition_helpers.source_text as source_text
 import pydocformatter.rules_selection as rules_selection
+import tests.rule_helpers as rule_helpers
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention, IndentStyle, LineEnding
 from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
 from pydocformatter.rules.definitions.PDF.PDF import PDF
@@ -25,7 +26,6 @@ def contexts(source: str, *, settings: CheckSettings | None = None) -> tuple[Rul
         source=source,
         source_lines=tuple(source_text.source_lines(source)),
         line_bounds=None,
-        suppression_index=None,
     )
     return category, RuleContext(
         path=category.path,
@@ -37,9 +37,7 @@ def contexts(source: str, *, settings: CheckSettings | None = None) -> tuple[Rul
         source=category.source,
         source_lines=category.source_lines,
         line_bounds=category.line_bounds,
-        suppression_index=category.suppression_index,
         category_data=PDF.prepare(category),
-        effectively_fixable=True,
     )
 
 
@@ -153,15 +151,15 @@ def test_non_space_tab_whitespace_counts_as_content() -> None:
 def test_check_fix_line_numbers_and_fix_false_findings_agree() -> None:
     source = 'def first():\n    """Summary.  """\n\ndef second():\n    """Other.\t"""\n'
     _, context = contexts(source)
-    findings = PDF105ClosingQuotesWhitespace.check(context)
-    fixed = PDF105ClosingQuotesWhitespace.fix(context)
+    findings = rule_helpers.rule_findings(PDF105ClosingQuotesWhitespace, context)
+    fixed = rule_helpers.rule_fix_result(PDF105ClosingQuotesWhitespace, context)
     check_only = format_pdf006(source, fix=False)
 
     assert tuple(finding.line_numbers for finding in findings) == ((2,), (5,))
     assert tuple(finding.line_numbers for finding in fixed.fixed_findings) == ((2,), (5,))
     assert tuple(finding.line_numbers for finding in check_only.unfixed_findings) == ((2,), (5,))
     _, fixed_context = contexts(fixed.module.code)
-    assert PDF105ClosingQuotesWhitespace.check(fixed_context) == ()
+    assert rule_helpers.rule_findings(PDF105ClosingQuotesWhitespace, fixed_context) == ()
 
 
 def test_skips_empty_concatenated_escaped_and_non_docstring_strings() -> None:

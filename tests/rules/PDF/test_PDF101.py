@@ -5,6 +5,7 @@ import pytest
 import pydocformatter.formatter as formatter
 import pydocformatter.rules.definition_helpers.source_text as source_text
 import pydocformatter.rules_selection as rules_selection
+import tests.rule_helpers as rule_helpers
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention, LineEnding
 from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
 from pydocformatter.rules.definitions.PDF.PDF import PDF
@@ -27,7 +28,6 @@ def contexts(source: str, *, settings: CheckSettings | None = None) -> tuple[Rul
         source=source,
         source_lines=tuple(source_text.source_lines(source)),
         line_bounds=None,
-        suppression_index=None,
     )
     return category, RuleContext(
         path=category.path,
@@ -39,9 +39,7 @@ def contexts(source: str, *, settings: CheckSettings | None = None) -> tuple[Rul
         source=category.source,
         source_lines=category.source_lines,
         line_bounds=category.line_bounds,
-        suppression_index=category.suppression_index,
         category_data=PDF.prepare(category),
-        effectively_fixable=True,
     )
 
 
@@ -60,14 +58,14 @@ def test_check_and_fix_single_line_summary() -> None:
     source = 'def area(radius):\n    """Return the area for a circle with the supplied radius after validating that the radius is finite and non-negative."""\n'
     _, context = contexts(source, settings=CheckSettings(select=("PDF101",), line_length=72))
 
-    findings = PDF101DocstringReflow.check(context)
-    result = PDF101DocstringReflow.fix(context)
+    findings = rule_helpers.rule_findings(PDF101DocstringReflow, context)
+    result = rule_helpers.rule_fix_result(PDF101DocstringReflow, context)
 
     assert tuple(finding.line_numbers for finding in findings) == ((2,),)
     assert tuple(finding.line_numbers for finding in result.fixed_findings) == ((2,),)
     assert result.module.code == 'def area(radius):\n    """Return the area for a circle with the supplied radius after\n    validating that the radius is finite and non-negative."""\n'
     _, fixed_context = contexts(result.module.code, settings=CheckSettings(select=("PDF101",), line_length=72))
-    assert PDF101DocstringReflow.check(fixed_context) == ()
+    assert rule_helpers.rule_findings(PDF101DocstringReflow, fixed_context) == ()
 
 
 def test_reflows_attribute_docstring_summaries() -> None:

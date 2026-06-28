@@ -4,6 +4,7 @@ import libcst.metadata as cst_metadata
 import pydocformatter.formatter as formatter
 import pydocformatter.rules.definition_helpers.source_text as source_text
 import pydocformatter.rules_selection as rules_selection
+import tests.rule_helpers as rule_helpers
 from pydocformatter.cli.settings_check import CheckSettings
 from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
 from pydocformatter.rules.definitions.PDF.PDF import PDF
@@ -24,7 +25,6 @@ def contexts(source: str, *, settings: CheckSettings | None = None) -> tuple[Rul
         source=source,
         source_lines=tuple(source_text.source_lines(source)),
         line_bounds=None,
-        suppression_index=None,
     )
     return category, RuleContext(
         path=category.path,
@@ -36,9 +36,7 @@ def contexts(source: str, *, settings: CheckSettings | None = None) -> tuple[Rul
         source=category.source,
         source_lines=category.source_lines,
         line_bounds=category.line_bounds,
-        suppression_index=category.suppression_index,
         category_data=PDF.prepare(category),
-        effectively_fixable=False,
     )
 
 
@@ -94,7 +92,7 @@ def test_reports_escaped_whitespace_but_skips_bytes_and_fstring_first_expression
 def test_check_and_fix_false_findings_agree() -> None:
     source = 'def function():\n    """   """\n'
     _, context = contexts(source)
-    findings = PDF202EmptyDocstring.check(context)
+    findings = rule_helpers.rule_findings(PDF202EmptyDocstring, context)
     check_only = format_source(source, fix=False)
     fix_enabled = format_source(source, fix=True)
 

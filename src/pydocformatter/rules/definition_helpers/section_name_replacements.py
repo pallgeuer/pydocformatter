@@ -8,6 +8,7 @@ import pydocformatter.rules.definition_helpers.rest_fields as rest_fields
 import pydocformatter.rules.definition_helpers.section_edits as section_edits
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 import pydocformatter.rules.edits as rule_edits
+import pydocformatter.rules.violations as rule_violations
 from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.definition import RuleContext
 from pydocformatter.rules.models import RuleMetadata
@@ -25,10 +26,10 @@ def results_for_mapped_names(
     section_message_builder: MessageBuilder,
     field_name_mapper: FieldNameMapper | None = None,
     field_message_builder: MessageBuilder | None = None,
-) -> tuple[section_edits.SectionEditResult, ...]:
-    """Return findings and fixes for mapped docstring section and reStructuredText field names."""
+) -> tuple[rule_violations.RuleViolation, ...]:
+    """Return violations for mapped docstring section and reStructuredText field names."""
     data = PDF_definition.PDF.require_data(context)
-    results: list[section_edits.SectionEditResult] = []
+    results: list[rule_violations.RuleViolation] = []
     for docstring in data.docstrings:
         replacements: list[rule_edits.PlannedTextReplacement] = []
         value_lines = [line.raw_text for line in docstring.structure.lines]

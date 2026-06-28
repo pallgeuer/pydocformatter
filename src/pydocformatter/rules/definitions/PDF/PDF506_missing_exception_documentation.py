@@ -7,11 +7,12 @@ import pydocformatter.rules.definition_helpers.missing_documentation as missing_
 import pydocformatter.rules.definition_helpers.value_documentation as value_documentation
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 import pydocformatter.rules.registration as rule_registration
+import pydocformatter.rules.violations as rule_violations
 from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase, RuleContext
 from pydocformatter.rules.definitions.PDF.PDF import PDF
-from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleFinding, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
+from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
 
 
 @rule_registration.register_rule_to(PDF)
@@ -39,11 +40,11 @@ class PDF506MissingExceptionDocumentation(RuleBase):
     )
 
     @classmethod
-    def check(cls, context: RuleContext) -> tuple[RuleFinding, ...]:
-        """Return findings for directly raised exceptions missing from docs."""
+    def violations(cls, context: RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
+        """Return violations for directly raised exceptions missing from docs."""
         if docstring_conventions.missing_documentation_is_inert(context.settings.docstring_convention):
             return ()
-        findings: list[RuleFinding] = []
+        violations: list[rule_violations.RuleViolation] = []
         for definition, docstring, facts in value_documentation.documented_function_facts(context):
             documented_names = tuple(
                 entry.name for entry in value_documentation.documented_entries(docstring, PDF_definition.DocstringEntryKind.EXCEPTION, require_content=False) if entry.name is not None
@@ -58,13 +59,12 @@ class PDF506MissingExceptionDocumentation(RuleBase):
                     continue
                 seen.append(raised.name)
                 if not any(value_documentation.exception_names_match(raised.name, documented_name) for documented_name in documented_names):
-                    findings.append(
-                        RuleFinding(
-                            rule=cls.meta,
-                            line_numbers=raised.line_numbers,
+                    violations.append(
+                        rule_violations.diagnostic(
+                            cls.meta,
+                            raised.line_numbers,
                             suppression_line_numbers=(PDF_definition.docstring_physical_line_numbers(docstring),),
                             instance_message=f"Raised exception '{raised.name}' is missing docstring documentation",
-                            instance_fixable=None,
                         )
                     )
-        return tuple(findings)
+        return tuple(violations)

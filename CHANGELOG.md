@@ -75,10 +75,10 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 
 - **Documentation:**
   - Added a test-performance audit plan for finding coverage-preserving speedups across the complete test set, fixtures, helpers, and testing approaches.
-  - Added a Ruff file-selection compatibility specification at `docs/file_selection_spec.md`, including exact defaults, precedence rules, force-exclude behavior, config-relative glob bases, and explicit pydocformatter deviations.
+  - Added a file-selection specification at `docs/file_selection_spec.md`, including exact defaults, precedence rules, force-exclude behavior, config-relative glob bases, and explicit pydocformatter deviations.
   - Added a rule-selection specification at `docs/rule_selection_spec.md`, covering rule collection, selectors, fixability, and rule explanation output.
   - Added adjacent Markdown documentation for all built-in pydocformatter rules, including Ruff compatibility notes where relevant.
-  - Added a new-rule checklist documenting the implementation, documentation, testing, and release-note touch points for adding rules.
+  - Added a rule implementation specification documenting the implementation, documentation, testing, and release-note touch points for adding rules.
   - Added source module, rule class, and public class attribute docstrings across the pydocformatter package surface, with code-informed attribute descriptions and guidance against low-information generated docstrings.
   - Expanded code-informed docstrings for internal rule helpers, docstring parser routines, descriptor methods, and section-normalization utilities.
   - Changed non-fixable findings in rule examples to label singular and plural line references explicitly.
@@ -87,14 +87,14 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Expanded the PDF110 and PDF203 documentation with explicit behavior boundaries, setting interactions, safety notes, and verified qualitative examples.
   - Added a reusable rule documentation Markdown template at `src/pydocformatter/rules/templates/rule_template.md`.
   - Added adjacent documentation for each rule category and a reusable rule category documentation template.
-  - Added a source-suppression guide at `docs/suppressions.md` with structured examples executed by pytest.
+  - Added a rule-suppression specification at `docs/rule_suppressions.md` with structured examples executed by pytest.
   - Added docstrings for public glob matching methods, the dependency-pin check tool, and important configuration, CLI, and file-selection helpers.
   - Completed Google-style docstrings for public source APIs and added concise docstrings for private helpers that previously lacked them.
 
 - **Developer workflow:**
   - Added a pytest pre-commit hook that runs the test suite before commits.
   - Added a guarded shared pytest working directory for tests that do not request filesystem isolation, with explicit `isolated_cwd` opt-in for tests that need a writable temporary CWD.
-  - Added pytest coverage that checks the pydocformatter rule tables in `docs/formatting_rules.md` against actual rule metadata.
+  - Added pytest coverage that checks the pydocformatter rule tables in `docs/rule_list.md` against actual rule metadata.
   - Added pytest coverage that checks Git-tracked Markdown pipe tables for padded cell widths and separator alignment.
   - Changed Markdown pipe table checks to enforce PyCharm-style separator rows without outer padding.
   - Added pytest coverage that executes structured examples from built-in rule Markdown documentation.
@@ -126,6 +126,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 ### Changed
 
 - **Documentation and settings:**
+  - Renamed the rule list, rule suppression, and rule implementation documents to `docs/rule_list.md`, `docs/rule_suppressions.md`, and `docs/rule_implementation_spec.md`, and refocused the rule selection, file selection, and performance audit specs.
   - Changed the default `docstring-convention` from `none` to `pep257`, keeping `none` as the stricter no-convention profile for generic rules that can act without Google, NumPy, or reST parsing.
   - Standardized docstring convention display order as None, PEP257, Google, NumPy, and reST, while keeping lowercase configuration values unchanged.
 
@@ -134,6 +135,9 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 
 - **Developer workflow:**
   - Changed the Loupe review skill to orchestrate parallel Claude Code and Codex CLI review passes with a timeout-bounded helper script and verified final review synthesis.
+  - Changed the Loupe reviewer runner to require explicit review scope text, report global and reviewer-specific elapsed times separately, and expose extensible reviewer definitions.
+  - Changed the Loupe review workflow to snapshot temporary diff and reviewer-output artifacts, use a 30000-token capture budget, and recover truncated reviewer output from the runner's `--output` artifact instead of rerunning reviewers.
+  - Changed pytest to treat warnings as errors by default.
   - Changed pytest to use pytest-xdist multiprocessing by default for local, pre-commit, and CI test runs.
   - Shared setup and initial check work across structured rule Markdown example assertions to reduce pytest runtime.
   - Cached rule-context source text and source lines per module state to reduce repeated LibCST source regeneration during checks.
@@ -145,6 +149,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Skipped fix passes when an initial clean check proves there are no effectively fixable findings.
   - Skipped PCF category CST traversal for source files that cannot contain Python comments because they have no `#` character.
   - Seeded the initial rule context from already-read LibCST-aligned source text to avoid redundant LibCST source regeneration for unchanged modules.
+  - Changed internal rule execution to use canonical `RuleViolation` values from `violations()` hooks, with runner-owned suppression filtering, configured fixability, source-edit application, and consistency validation.
   - Required explicit constructor values for important internal dataclass fields that previously supplied implicit defaults.
   - Renamed selected built-in rule names, rule definition files, and rule classes for clearer public metadata while keeping rule codes and selection behavior unchanged.
   - Reorganized rule helper modules so whole-rule logic lives in individual rule files while shared helper modules contain reusable source, layout, decorator, section-edit, and reStructuredText field primitives.
@@ -187,7 +192,14 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 - **Rule performance:**
   - Fixed PCF004 previous-comment boundary checks, PDF411 repeated type-like normalization, and PDF501 TypedDict key lookup to avoid repeated or unnecessary rule-local work.
 
+- **Developer workflow:**
+  - Fixed Loupe reviewer elapsed-time accounting to start individual reviewer timers at process launch.
+  - Fixed Loupe reviewer timeout cleanup to let collector threads own subprocess completion while the main thread only signals timed-out process groups.
+  - Fixed Loupe reviewer timeout handling to avoid blocking on detached child processes that inherit reviewer output handles.
+
 - **Formatting:**
+  - Fixed rule-runner line-target matching to normalize duplicate finding and planned-change targets consistently and keep suppression filtering owned by the suppression index.
+  - Fixed rule line-target validation to reject boolean values instead of accepting `True` as line `1`.
   - Fixed `PDF101` variable-width source wrapping to use equivalent greedy wrapping and avoid quadratic runtime on long non-URL docstring paragraphs.
   - Fixed repeated PDF docstring owner lookups to use cached identity-based lookup instead of rescanning prepared docstrings.
   - Fixed URL-aware wrapping to avoid recursive crashes on long URL-containing paragraphs and to fall back to greedy wrapping when balanced wrapping exceeds its search budget.
@@ -253,6 +265,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 
 - **Rule framework:**
   - Split rule models, authoring contracts, execution, and line-ending utilities into focused modules while keeping formatter file and source orchestration separate.
+  - Hardened built-in rule authoring around helper-based `RuleViolation` construction, import-time `violations()` signature validation, direct rule-test validation, and static tests that reject direct finding/fix construction in built-in rule modules.
   - Moved shared modern-rule text wrapping and display-width helpers into a neutral rules helper module.
   - Moved rule codes and selectors into `pydocformatter.rules.codes` and added immutable, hashable setting-effect metadata to rule definitions.
   - Changed internal PDF and PCF classification types from string-compatible enums to ordinary enums.

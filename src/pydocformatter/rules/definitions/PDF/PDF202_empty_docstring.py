@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 import pydocformatter.rules.registration as rule_registration
+import pydocformatter.rules.violations as rule_violations
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase, RuleContext
 from pydocformatter.rules.definitions.PDF.PDF import PDF
-from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleFinding, RuleMetadata
+from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata
 
 
 @rule_registration.register_rule_to(PDF)
@@ -30,10 +31,10 @@ class PDF202EmptyDocstring(RuleBase):
     )
 
     @classmethod
-    def check(cls, context: RuleContext) -> tuple[RuleFinding, ...]:
-        """Return findings for docstrings without meaningful content."""
+    def violations(cls, context: RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
+        """Return violations for docstrings without meaningful content."""
         data = PDF.require_data(context)
-        return tuple(RuleFinding(rule=cls.meta, line_numbers=_line_numbers(docstring), instance_fixable=None) for docstring in data.docstrings if not docstring.value.strip())
+        return tuple(rule_violations.diagnostic(cls.meta, _line_numbers(docstring)) for docstring in data.docstrings if not docstring.value.strip())
 
 
 def _line_numbers(docstring: PDF_definition.DocstringInfo) -> tuple[int, ...]:

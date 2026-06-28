@@ -1,34 +1,6 @@
-# File Selection Compatibility Specification
+# File Selection Specification
 
 This document specifies how `pydocfmt` selects files for processing.
-
-The Ruff compatibility surface relating to file selection is intentionally limited to:
-
-- `line-length`
-- `line-ending`
-- `indent-style`
-- `indent-width`
-- `include`
-- `extend-include`
-- `exclude`
-- `extend-exclude`
-- `respect-gitignore`
-- `force-exclude`
-
-Settings outside this list are not part of the Ruff compatibility contract. Per-file-ignore pattern bases follow the same source-base rules as file-selection patterns, but per-file ignores are specified in `docs/rule_selection_spec.md` because they affect rule selection after a file has already been selected.
-
-## Compatibility Deltas
-
-- **D1: pydocformatter include default.**
-  pydocformatter defaults to `["*.py", "*.pyi", "*.pyw"]`, because these are the file types it can process. This intentionally differs from Ruff's broader default include set.
-- **D2: gitignore scope.**
-  pydocformatter applies gitignore-style filtering through a git-based implementation. It does not add a separate Ruff-style `.ignore` file parser, only filters files below detected Git roots, and aborts file selection if gitignore checks fail.
-- **D3: show-files detail.**
-  `pydocfmt check --show-files` keeps pydocformatter's richer decision output: included files, ignored files, pruned directories, and reasons. Ruff's `--show-files` only prints selected files.
-- **D4: command-line `extend-include`.**
-  pydocformatter exposes `--extend-include` as a dedicated CLI option. Ruff supports `extend-include` in configuration but does not expose a `ruff check --extend-include` option.
-- **D5: list layering.**
-  pydocformatter uses the same highest-precedence-wins rule for all list settings. In particular, CLI `--extend-exclude` replaces configured `extend-exclude` instead of accumulating with it. This intentionally differs from Ruff's CLI `--extend-exclude` behavior.
 
 ## Defaults
 
@@ -42,8 +14,6 @@ Settings outside this list are not part of the Ruff compatibility contract. Per-
 - `extend-exclude = []`
 - `respect-gitignore = true`
 - `force-exclude = false`
-
-The `exclude` default is kept aligned with Ruff's current documented top-level default.
 
 ## Configuration Layout
 
@@ -63,11 +33,11 @@ For every setting, including `extend-include` and `extend-exclude`, the highest-
 
 `--config PATH` accepts either a pyproject-style file named `pyproject.toml` containing `[tool.pydocfmt]` or a dedicated config file with pydocfmt settings at top level. Supplying an explicit `--config PATH` file disables auto-discovered configuration for that settings resolution, and at most one explicit config file can be supplied. Inline `--config "<KEY> = <VALUE>"` overrides still layer over explicit config files or auto-discovered config. `--isolated` ignores auto-discovered configuration files. Inline `--config` settings can still be used with `--isolated`, but explicit config file paths cannot.
 
-Auto-discovered configuration is hierarchical and Ruff-style: the single closest config file applies to the file or directory being evaluated, and parent config files are not merged into child config files. During traversal, a parent directory exclude can still prune a child directory before that child directory's config is entered.
+Auto-discovered configuration is hierarchical: the single closest config file applies to the file or directory being evaluated, and parent config files are not merged into child config files. During traversal, a parent directory exclude can still prune a child directory before that child directory's config is entered.
 
 `--show-settings` displays settings resolved for the current working directory. The `respect-gitignore` value used during a file-selection run is also resolved from the current working directory, not separately from each traversed path.
 
-`line-ending` follows Ruff's formatter values: `"auto"`, `"lf"`, `"cr-lf"`, and `"native"`. `"auto"` uses the first line ending detected in the source file, defaulting to LF when the file has no line endings. The setting controls rewritten files; files that do not require formatting are not rewritten solely to normalize line endings.
+`line-ending = "auto"` uses the first line ending detected in the source file, defaulting to LF when the file has no line endings. The setting controls rewritten files; files that do not require formatting are not rewritten solely to normalize line endings.
 
 ## File Selection Algorithm
 
@@ -102,7 +72,7 @@ Directory arguments are not explicit files. A directory argument is skipped when
 
 When gitignore filtering is enabled, only accepted discovered files are queried. Explicit files bypass gitignore filtering, including when `force-exclude = true`. Paths are grouped by the nearest detected Git root of their real filesystem path; symlinked traversal paths keep their symlinked display path, but gitignore matching is queried against the real path. Files outside a Git root are not gitignore-filtered. If `git check-ignore` exits with a status other than `0` or `1`, file selection aborts.
 
-Glob lists cannot contain empty strings. Include patterns follow Ruff's permissive shape rules, so patterns such as `src/`, `src/**`, and `**` are accepted.
+Glob lists cannot contain empty strings. Include patterns allow patterns such as `src/`, `src/**`, and `**`.
 
 Existing filesystem paths are displayed as absolute normalized paths. Non-existing explicit paths are displayed as normalized lexical paths, and stdin uses `-`.
 
@@ -146,6 +116,30 @@ pydocfmt check --fix --include "*.py" --include "*.pyi" src/
 
 The resulting command-line list still replaces lower-precedence values for the same setting. For example, `--extend-exclude cli.py` replaces a configured `extend-exclude = ["config.py"]`, although the resolved final exclude list is still `exclude + extend-exclude`.
 
-## Validation Guidance
+## Ruff Compatibility Notes
 
-Tests should encode this contract directly and should not invoke Ruff as an oracle. Contract tests should be named or fixture-tagged with `ruff_spec`.
+pydocfmt intentionally uses Ruff-style file-selection settings where they map to pydocfmt behavior. The related settings are:
+
+- `line-length`
+- `line-ending`
+- `indent-style`
+- `indent-width`
+- `include`
+- `extend-include`
+- `exclude`
+- `extend-exclude`
+- `respect-gitignore`
+- `force-exclude`
+
+Settings outside this list are not part of the Ruff compatibility surface. Per-file-ignore pattern bases follow the same source-base rules as file-selection patterns, but per-file ignores are specified in `docs/rule_selection_spec.md` because they affect rule selection after a file has already been selected.
+
+- **D1: pydocformatter include default.**
+  pydocformatter defaults to `["*.py", "*.pyi", "*.pyw"]`, because these are the file types it can process. This intentionally differs from Ruff's broader default include set.
+- **D2: gitignore scope.**
+  pydocformatter applies gitignore-style filtering through a git-based implementation. It does not add a separate Ruff-style `.ignore` file parser, only filters files below detected Git roots, and aborts file selection if gitignore checks fail.
+- **D3: show-files detail.**
+  `pydocfmt check --show-files` keeps pydocformatter's richer decision output: included files, ignored files, pruned directories, and reasons. Ruff's `--show-files` only prints selected files.
+- **D4: command-line `extend-include`.**
+  pydocformatter exposes `--extend-include` as a dedicated CLI option. Ruff supports `extend-include` in configuration but does not expose a `ruff check --extend-include` option.
+- **D5: list layering.**
+  pydocformatter uses the same highest-precedence-wins rule for all list settings. In particular, CLI `--extend-exclude` replaces configured `extend-exclude` instead of accumulating with it. This intentionally differs from Ruff's CLI `--extend-exclude` behavior.

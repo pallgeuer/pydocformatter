@@ -21,9 +21,11 @@ import pydocformatter.rules.codes as rule_codes
 import pydocformatter.rules.collection as rule_collection
 import pydocformatter.rules.definition as rule_base
 import pydocformatter.rules.definition_helpers.source_text as source_text
+import pydocformatter.rules.edits as rule_edits
 import pydocformatter.rules.models as rule_models
 import pydocformatter.rules.registration as rule_registration
 import pydocformatter.rules.runner as rule_runner
+import pydocformatter.rules.violations as rule_violations
 import pydocformatter.rules_selection as rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention, DocstringMissingDocumentation, LineEnding
 from pydocformatter.formatter import FormatterResult
@@ -79,6 +81,49 @@ def isolated_rule_selection(*categories: type[rule_base.RuleCategoryBase], fixab
         errors=(),
         collection=collection,
     )
+
+
+def diagnostic_violation(rule: rule_models.RuleMetadata, line_numbers: tuple[int, ...] = (1,)) -> rule_violations.RuleViolation:
+    return rule_violations.RuleViolation(finding=rule_models.RuleFinding(rule=rule, line_numbers=line_numbers, instance_fixable=None))
+
+
+def source_replacement_change(context: rule_base.RuleContext, replacement: str, line_numbers: tuple[int, ...] = (1,)) -> rule_edits.PlannedSourceChange:
+    source_lines = context.source_lines
+    end_line = len(source_lines)
+    end_column = len(source_lines[-1].rstrip("\r\n")) if source_lines else 0
+    return rule_edits.PlannedSourceChange(
+        edit=rule_edits.SourceEdit(cst_metadata.CodeRange(start=cst_metadata.CodePosition(1, 0), end=cst_metadata.CodePosition(end_line, end_column)), replacement),
+        line_numbers=line_numbers,
+        suppression_line_numbers=(),
+    )
+
+
+def source_replacement_violation(rule: rule_models.RuleMetadata, context: rule_base.RuleContext, replacement: str, line_numbers: tuple[int, ...] = (1,)) -> rule_violations.RuleViolation:
+    change = source_replacement_change(context, replacement, line_numbers=line_numbers)
+    return rule_violations.RuleViolation(finding=rule_models.RuleFinding(rule=rule, line_numbers=line_numbers, instance_fixable=None), fix=rule_violations.RuleSourceFix.from_change(change))
+
+
+def no_violations(cls: type[rule_base.RuleBase], context: rule_base.RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
+    del cls, context
+    return ()
+
+
+def single_diagnostic_violations(cls: type[rule_base.RuleBase], context: rule_base.RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
+    del context
+    return (diagnostic_violation(cls.meta),)
+
+
+def insert_leading_line_violations(cls: type[rule_base.RuleBase], context: rule_base.RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
+    if context.module.header:
+        return ()
+    return (source_replacement_violation(cls.meta, context, f"\n{context.source}"),)
+
+
+def invalid_violation(finding: rule_models.RuleFinding, fix: rule_violations.RuleSourceFix | None) -> rule_violations.RuleViolation:
+    violation = object.__new__(rule_violations.RuleViolation)
+    object.__setattr__(violation, "finding", finding)
+    object.__setattr__(violation, "fix", fix)
+    return violation
 
 
 class TestFormatterResults(unittest.TestCase):
@@ -463,8 +508,7 @@ class TestFormatterResults(unittest.TestCase):
             )
 
             @classmethod
-            def check(cls, context: rule_base.RuleContext) -> tuple[rule_models.RuleFinding, ...]:
-                del cls
+            def violations(cls, context: rule_base.RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
                 self.assertEqual(context.source, expected_context_source)
                 return ()
 
@@ -517,6 +561,7 @@ class TestFormatterResults(unittest.TestCase):
                 incompatible_with=(),
                 check_kind=rule_models.RuleCheckKind.STANDARD,
             )
+            violations = classmethod(no_violations)
 
         source = "x = 1\ry = 2\r"
         expected_context_source = "x = 1\ry = 2"
@@ -558,13 +603,7 @@ class TestFormatterResults(unittest.TestCase):
                 check_kind=rule_models.RuleCheckKind.STANDARD,
             )
 
-            @classmethod
-            def fix(cls, context: rule_base.RuleContext) -> rule_base.RuleFixResult:
-                if context.module.header:
-                    return rule_base.RuleFixResult(module=context.module)
-                return rule_base.RuleFixResult(
-                    module=context.module.with_changes(header=(cst.EmptyLine(),)), fixed_findings=(rule_models.RuleFinding(rule=cls.meta, line_numbers=(1,), instance_fixable=None),)
-                )
+            violations = classmethod(insert_leading_line_violations)
 
         class TSW(rule_base.RuleCategoryBase):
             meta = rule_models.RuleCategoryMetadata(prefix="TSW", name="test two", url=None)
@@ -587,6 +626,7 @@ class TestFormatterResults(unittest.TestCase):
                 incompatible_with=(),
                 check_kind=rule_models.RuleCheckKind.STANDARD,
             )
+            violations = classmethod(no_violations)
 
         module = cst.parse_module("x = 1\n")
         selection = isolated_rule_selection(TST, TSW)
@@ -598,7 +638,7 @@ class TestFormatterResults(unittest.TestCase):
         self.assertEqual(result.fixed_findings, (RuleFinding(rule=TST001InsertLeadingLine.meta, line_numbers=(1,), instance_fixable=None),))
         self.assertEqual(result.errors, ())
         self.assertTrue(observed_sources)
-        self.assertEqual(set(observed_sources), {"\nx = 1\n"})
+        self.assertEqual(set(observed_sources), {"x = 1\n", "\nx = 1\n"})
         self.assertTrue(any(accessed_module is result.module for accessed_module in code_accesses))
 
     def test_rule_runner_skips_fix_hooks_when_precheck_has_no_fixable_findings(self) -> None:
@@ -620,10 +660,7 @@ class TestFormatterResults(unittest.TestCase):
                 check_kind=rule_models.RuleCheckKind.STANDARD,
             )
 
-            @classmethod
-            def check(cls, context: rule_base.RuleContext) -> tuple[rule_models.RuleFinding, ...]:
-                del context
-                return (rule_models.RuleFinding(rule=cls.meta, line_numbers=(1,), instance_fixable=None),)
+            violations = classmethod(single_diagnostic_violations)
 
         @rule_registration.register_rule_to(TST)
         class TST002UnexpectedFix(rule_base.RuleBase):
@@ -638,16 +675,7 @@ class TestFormatterResults(unittest.TestCase):
                 check_kind=rule_models.RuleCheckKind.STANDARD,
             )
 
-            @classmethod
-            def check(cls, context: rule_base.RuleContext) -> tuple[rule_models.RuleFinding, ...]:
-                del cls, context
-                return ()
-
-            @classmethod
-            def fix(cls, context: rule_base.RuleContext) -> rule_base.RuleFixResult:
-                del cls
-                fix_calls.append(context.source)
-                return rule_base.RuleFixResult(module=context.module)
+            violations = classmethod(no_violations)
 
         settings = CheckSettings()
         selection = isolated_rule_selection(TST, fixable_by_code={TST001Manual.meta.code: False, TST002UnexpectedFix.meta.code: True})
@@ -683,15 +711,8 @@ class TestFormatterResults(unittest.TestCase):
             )
 
             @classmethod
-            def check(cls, context: rule_base.RuleContext) -> tuple[rule_models.RuleFinding, ...]:
-                del context
-                return (rule_models.RuleFinding(rule=cls.meta, line_numbers=(1,), instance_fixable=None),)
-
-            @classmethod
-            def fix(cls, context: rule_base.RuleContext) -> rule_base.RuleFixResult:
-                del cls
-                fix_calls.append(context.source)
-                return rule_base.RuleFixResult(module=context.module)
+            def violations(cls, context: rule_base.RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
+                return (source_replacement_violation(cls.meta, context, f"\n{context.source}"),)
 
         settings = CheckSettings()
         selection = isolated_rule_selection(TST, fixable_by_code={TST001ConfiguredUnfixable.meta.code: False})
@@ -725,20 +746,7 @@ class TestFormatterResults(unittest.TestCase):
                 check_kind=rule_models.RuleCheckKind.STANDARD,
             )
 
-            @classmethod
-            def check(cls, context: rule_base.RuleContext) -> tuple[rule_models.RuleFinding, ...]:
-                if context.module.header:
-                    return ()
-                return (rule_models.RuleFinding(rule=cls.meta, line_numbers=(1,), instance_fixable=None),)
-
-            @classmethod
-            def fix(cls, context: rule_base.RuleContext) -> rule_base.RuleFixResult:
-                fix_calls.append(context.source)
-                if context.module.header:
-                    return rule_base.RuleFixResult(module=context.module)
-                return rule_base.RuleFixResult(
-                    module=context.module.with_changes(header=(cst.EmptyLine(),)), fixed_findings=(rule_models.RuleFinding(rule=cls.meta, line_numbers=(1,), instance_fixable=None),)
-                )
+            violations = classmethod(insert_leading_line_violations)
 
         settings = CheckSettings()
         result = formatter.format_source("x = 1\n", "a.py", settings=settings, rule_selection=isolated_rule_selection(TST), fix=True)
@@ -748,7 +756,7 @@ class TestFormatterResults(unittest.TestCase):
         self.assertEqual(result.fixed_findings, collections.Counter({TST001InsertLeadingLine.meta: 1}))
         self.assertEqual(result.unfixed_findings, ())
         self.assertEqual(result.errors, ())
-        self.assertEqual(fix_calls, ["x = 1\n", "\nx = 1\n"])
+        self.assertEqual(fix_calls, [])
 
     def test_rule_source_formatter_discards_precheck_errors_when_falling_back(self) -> None:
         fix_calls: list[str] = []
@@ -770,15 +778,9 @@ class TestFormatterResults(unittest.TestCase):
             )
 
             @classmethod
-            def check(cls, context: rule_base.RuleContext) -> tuple[rule_models.RuleFinding, ...]:
+            def violations(cls, context: rule_base.RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
                 del cls, context
                 raise RuntimeError("broken check")
-
-            @classmethod
-            def fix(cls, context: rule_base.RuleContext) -> rule_base.RuleFixResult:
-                del cls
-                fix_calls.append(context.source)
-                return rule_base.RuleFixResult(module=context.module)
 
         settings = CheckSettings()
         result = formatter.format_source("x = 1\n", "a.py", settings=settings, rule_selection=isolated_rule_selection(TST), fix=True)
@@ -787,8 +789,8 @@ class TestFormatterResults(unittest.TestCase):
         self.assertFalse(result.modified)
         self.assertEqual(result.fixed_findings, collections.Counter())
         self.assertEqual(result.unfixed_findings, ())
-        self.assertEqual(result.errors, ("a.py: TST001 check failed: broken check",))
-        self.assertEqual(fix_calls, ["x = 1\n"])
+        self.assertEqual(result.errors, ("a.py: TST001 automatic fix failed: broken check", "a.py: TST001 check failed: broken check"))
+        self.assertEqual(fix_calls, [])
 
     def test_rule_fix_pass_same_module_noop_skips_source_comparison(self) -> None:
         code_accesses: list[cst.Module] = []
@@ -814,12 +816,12 @@ class TestFormatterResults(unittest.TestCase):
             )
 
             @classmethod
-            def fix(cls, context: rule_base.RuleContext) -> rule_base.RuleFixResult:
-                del cls
+            def violations(cls, context: rule_base.RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
+                del cls, context
                 patcher = unittest.mock.patch.object(cst.Module, "code", new=property(_raise_code_access))
                 patcher.start()
                 self.addCleanup(patcher.stop)
-                return rule_base.RuleFixResult(module=context.module)
+                return ()
 
         module = cst.parse_module("x = 1\n")
         settings = CheckSettings()
@@ -837,13 +839,12 @@ class TestFormatterResults(unittest.TestCase):
         self.assertEqual(errors, [])
         self.assertEqual(code_accesses, [])
 
-    def test_rule_fix_pass_different_module_same_source_uses_source_comparison(self) -> None:
+    def test_rule_fix_pass_rejects_same_source_reported_fix(self) -> None:
         original_code_property = inspect.getattr_static(cst.Module, "code")
         if not isinstance(original_code_property, property) or original_code_property.fget is None:
             raise AssertionError("Expected LibCST Module.code to be a property")
         original_code_getter = typing.cast("typing.Callable[[cst.Module], str]", original_code_property.fget)
         code_accesses: list[cst.Module] = []
-        replacement_modules: list[cst.Module] = []
 
         def _count_code_access(module: cst.Module) -> str:
             code_accesses.append(module)
@@ -853,11 +854,11 @@ class TestFormatterResults(unittest.TestCase):
             meta = rule_models.RuleCategoryMetadata(prefix="TST", name="test", url=None)
 
         @rule_registration.register_rule_to(TST)
-        class TST001ReturnEquivalentModule(rule_base.RuleBase):
+        class TST001ReturnEquivalentSource(rule_base.RuleBase):
             meta = rule_models.RuleMetadata(
                 code=rule_codes.RuleCode("TST001"),
-                name="return-equivalent-module",
-                message="Return equivalent module",
+                name="return-equivalent-source",
+                message="Return equivalent source",
                 fix_availability=rule_models.FixAvailability.ALWAYS,
                 stable_since="1.0.0",
                 setting_effects=(),
@@ -866,14 +867,11 @@ class TestFormatterResults(unittest.TestCase):
             )
 
             @classmethod
-            def fix(cls, context: rule_base.RuleContext) -> rule_base.RuleFixResult:
-                del cls
-                replacement = cst.parse_module(context.source)
-                replacement_modules.append(replacement)
+            def violations(cls, context: rule_base.RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
                 patcher = unittest.mock.patch.object(cst.Module, "code", new=property(_count_code_access))
                 patcher.start()
                 self.addCleanup(patcher.stop)
-                return rule_base.RuleFixResult(module=replacement)
+                return (source_replacement_violation(cls.meta, context, context.source),)
 
         module = cst.parse_module("x = 1\n")
         settings = CheckSettings()
@@ -888,11 +886,176 @@ class TestFormatterResults(unittest.TestCase):
         self.assertIs(result_module, module)
         self.assertEqual(findings, ())
         self.assertFalse(changed)
-        self.assertEqual(errors, [])
-        self.assertEqual(len(replacement_modules), 1)
-        self.assertIsNot(replacement_modules[0], module)
+        self.assertEqual(errors, ["a.py: TST001 automatic fix must change source if and only if it reports fixed findings"])
         self.assertGreaterEqual(len(code_accesses), 1)
-        self.assertTrue(any(accessed_module is replacement_modules[0] for accessed_module in code_accesses))
+
+    def test_rule_fix_pass_does_not_apply_suppressed_violations(self) -> None:
+        class TST(rule_base.RuleCategoryBase):
+            meta = rule_models.RuleCategoryMetadata(prefix="TST", name="test", url=None)
+
+        @rule_registration.register_rule_to(TST)
+        class TST001SuppressedFix(rule_base.RuleBase):
+            meta = rule_models.RuleMetadata(
+                code=rule_codes.RuleCode("TST001"),
+                name="suppressed-fix",
+                message="Suppressed fix",
+                fix_availability=rule_models.FixAvailability.ALWAYS,
+                stable_since="1.0.0",
+                setting_effects=(),
+                incompatible_with=(),
+                check_kind=rule_models.RuleCheckKind.STANDARD,
+            )
+
+            @classmethod
+            def violations(cls, context: rule_base.RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
+                return (source_replacement_violation(cls.meta, context, "y = 2  # pydocfmt: ignore[TST001]\n"),)
+
+        module = cst.parse_module("x = 1  # pydocfmt: ignore[TST001]\n")
+        settings = CheckSettings()
+        selection = isolated_rule_selection(TST)
+        selected_rule_by_code = {selected_rule.rule.code: selected_rule for selected_rule in selection.for_path("a.py")}
+        errors: list[str] = []
+
+        result_module, findings, changed = rule_runner._run_fix_pass(
+            module, path="a.py", settings=settings, line_ending="\n", rule_selection=selection, selected_rule_by_code=selected_rule_by_code, errors=errors
+        )
+
+        self.assertIs(result_module, module)
+        self.assertEqual(findings, ())
+        self.assertFalse(changed)
+        self.assertEqual(errors, [])
+
+    def test_rule_check_pass_rejects_finding_outside_source(self) -> None:
+        class TST(rule_base.RuleCategoryBase):
+            meta = rule_models.RuleCategoryMetadata(prefix="TST", name="test", url=None)
+
+        @rule_registration.register_rule_to(TST)
+        class TST001OutsideSource(rule_base.RuleBase):
+            meta = rule_models.RuleMetadata(
+                code=rule_codes.RuleCode("TST001"),
+                name="outside-source",
+                message="Outside source",
+                fix_availability=rule_models.FixAvailability.NEVER,
+                stable_since="1.0.0",
+                setting_effects=(),
+                incompatible_with=(),
+                check_kind=rule_models.RuleCheckKind.STANDARD,
+            )
+
+            @classmethod
+            def violations(cls, context: rule_base.RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
+                del context
+                return (diagnostic_violation(cls.meta, line_numbers=(99,)),)
+
+        module = cst.parse_module("x = 1\n")
+        settings = CheckSettings()
+        selection = isolated_rule_selection(TST)
+        selected_rule_by_code = {selected_rule.rule.code: selected_rule for selected_rule in selection.for_path("a.py")}
+        errors: list[str] = []
+
+        findings = rule_runner._run_check_pass(module, path="a.py", settings=settings, line_ending="\n", rule_selection=selection, selected_rule_by_code=selected_rule_by_code, errors=errors)
+
+        self.assertEqual(findings, ())
+        self.assertEqual(errors, ["a.py: TST001 check returned a finding outside the source line range"])
+
+    def test_rule_fix_pass_rejects_violation_fixability_mismatch(self) -> None:
+        class TST(rule_base.RuleCategoryBase):
+            meta = rule_models.RuleCategoryMetadata(prefix="TST", name="test", url=None)
+
+        @rule_registration.register_rule_to(TST)
+        class TST001MissingFix(rule_base.RuleBase):
+            meta = rule_models.RuleMetadata(
+                code=rule_codes.RuleCode("TST001"),
+                name="missing-fix",
+                message="Missing fix",
+                fix_availability=rule_models.FixAvailability.ALWAYS,
+                stable_since="1.0.0",
+                setting_effects=(),
+                incompatible_with=(),
+                check_kind=rule_models.RuleCheckKind.STANDARD,
+            )
+
+            @classmethod
+            def violations(cls, context: rule_base.RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
+                del context
+                return (invalid_violation(rule_models.RuleFinding(rule=cls.meta, line_numbers=(1,), instance_fixable=None), None),)
+
+        @rule_registration.register_rule_to(TST)
+        class TST002UnexpectedFix(rule_base.RuleBase):
+            meta = rule_models.RuleMetadata(
+                code=rule_codes.RuleCode("TST002"),
+                name="unexpected-fix",
+                message="Unexpected fix",
+                fix_availability=rule_models.FixAvailability.NEVER,
+                stable_since="1.0.0",
+                setting_effects=(),
+                incompatible_with=(),
+                check_kind=rule_models.RuleCheckKind.STANDARD,
+            )
+
+            @classmethod
+            def violations(cls, context: rule_base.RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
+                fix = rule_violations.RuleSourceFix.from_change(source_replacement_change(context, "\nx = 1\n"))
+                return (invalid_violation(rule_models.RuleFinding(rule=cls.meta, line_numbers=(1,), instance_fixable=None), fix),)
+
+        module = cst.parse_module("x = 1\n")
+        settings = CheckSettings()
+        selection = isolated_rule_selection(TST)
+        selected_rule_by_code = {selected_rule.rule.code: selected_rule for selected_rule in selection.for_path("a.py")}
+        errors: list[str] = []
+
+        result_module, findings, changed = rule_runner._run_fix_pass(
+            module, path="a.py", settings=settings, line_ending="\n", rule_selection=selection, selected_rule_by_code=selected_rule_by_code, errors=errors
+        )
+
+        self.assertIs(result_module, module)
+        self.assertEqual(findings, ())
+        self.assertFalse(changed)
+        self.assertEqual(
+            errors,
+            [
+                "a.py: TST001 automatic fix returned a violation whose fix does not match finding fixability",
+                "a.py: TST002 automatic fix returned a violation whose fix does not match finding fixability",
+            ],
+        )
+
+    def test_rule_fix_pass_rejects_mismatched_source_change_targets(self) -> None:
+        class TST(rule_base.RuleCategoryBase):
+            meta = rule_models.RuleCategoryMetadata(prefix="TST", name="test", url=None)
+
+        @rule_registration.register_rule_to(TST)
+        class TST001MismatchedFix(rule_base.RuleBase):
+            meta = rule_models.RuleMetadata(
+                code=rule_codes.RuleCode("TST001"),
+                name="mismatched-fix",
+                message="Mismatched fix",
+                fix_availability=rule_models.FixAvailability.ALWAYS,
+                stable_since="1.0.0",
+                setting_effects=(),
+                incompatible_with=(),
+                check_kind=rule_models.RuleCheckKind.STANDARD,
+            )
+
+            @classmethod
+            def violations(cls, context: rule_base.RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
+                finding = rule_models.RuleFinding(rule=cls.meta, line_numbers=(1,), instance_fixable=None)
+                change = source_replacement_change(context, "x = 1\nz = 3\n", line_numbers=(2,))
+                return (rule_violations.RuleViolation(finding=finding, fix=rule_violations.RuleSourceFix.from_change(change)),)
+
+        module = cst.parse_module("x = 1\ny = 2\n")
+        settings = CheckSettings()
+        selection = isolated_rule_selection(TST)
+        selected_rule_by_code = {selected_rule.rule.code: selected_rule for selected_rule in selection.for_path("a.py")}
+        errors: list[str] = []
+
+        result_module, findings, changed = rule_runner._run_fix_pass(
+            module, path="a.py", settings=settings, line_ending="\n", rule_selection=selection, selected_rule_by_code=selected_rule_by_code, errors=errors
+        )
+
+        self.assertIs(result_module, module)
+        self.assertEqual(findings, ())
+        self.assertFalse(changed)
+        self.assertEqual(errors, ["a.py: TST001 automatic fix returned source changes whose line targets do not match the finding"])
 
     def test_rule_check_pass_reuses_position_metadata_across_categories(self) -> None:
         observed_contexts: list[tuple[cst.Module, cst_metadata.MetadataWrapper, object, str, tuple[str, ...]]] = []
@@ -925,6 +1088,7 @@ class TestFormatterResults(unittest.TestCase):
                 incompatible_with=(),
                 check_kind=rule_models.RuleCheckKind.STANDARD,
             )
+            violations = classmethod(no_violations)
 
         class TSW(rule_base.RuleCategoryBase):
             meta = rule_models.RuleCategoryMetadata(prefix="TSW", name="test two", url=None)
@@ -947,6 +1111,7 @@ class TestFormatterResults(unittest.TestCase):
                 incompatible_with=(),
                 check_kind=rule_models.RuleCheckKind.STANDARD,
             )
+            violations = classmethod(no_violations)
 
         module = cst.parse_module("x = 1\n")
         settings = CheckSettings()
@@ -990,6 +1155,7 @@ class TestFormatterResults(unittest.TestCase):
                 incompatible_with=(),
                 check_kind=rule_models.RuleCheckKind.STANDARD,
             )
+            violations = classmethod(no_violations)
 
         module = cst.parse_module("x = 1\n")
         settings = CheckSettings()
@@ -1034,6 +1200,7 @@ class TestFormatterResults(unittest.TestCase):
                 incompatible_with=(),
                 check_kind=rule_models.RuleCheckKind.STANDARD,
             )
+            violations = classmethod(no_violations)
 
         class TSW(rule_base.RuleCategoryBase):
             meta = rule_models.RuleCategoryMetadata(prefix="TSW", name="test two", url=None)
@@ -1056,6 +1223,7 @@ class TestFormatterResults(unittest.TestCase):
                 incompatible_with=(),
                 check_kind=rule_models.RuleCheckKind.STANDARD,
             )
+            violations = classmethod(no_violations)
 
         module = cst.parse_module("x = 1\n")
         settings = CheckSettings()
@@ -1099,6 +1267,7 @@ class TestFormatterResults(unittest.TestCase):
                 incompatible_with=(),
                 check_kind=rule_models.RuleCheckKind.STANDARD,
             )
+            violations = classmethod(no_violations)
 
         module = cst.parse_module("x = 1\n")
         settings = CheckSettings()
@@ -1143,11 +1312,7 @@ class TestFormatterResults(unittest.TestCase):
                 check_kind=rule_models.RuleCheckKind.STANDARD,
             )
 
-            @classmethod
-            def fix(cls, context: rule_base.RuleContext) -> rule_base.RuleFixResult:
-                return rule_base.RuleFixResult(
-                    module=context.module.with_changes(header=(cst.EmptyLine(),)), fixed_findings=(rule_models.RuleFinding(rule=cls.meta, line_numbers=(1,), instance_fixable=None),)
-                )
+            violations = classmethod(insert_leading_line_violations)
 
         class TSW(rule_base.RuleCategoryBase):
             meta = rule_models.RuleCategoryMetadata(prefix="TSW", name="test two", url=None)
@@ -1173,6 +1338,7 @@ class TestFormatterResults(unittest.TestCase):
                 incompatible_with=(),
                 check_kind=rule_models.RuleCheckKind.STANDARD,
             )
+            violations = classmethod(no_violations)
 
         class _NameCollector(cst.CSTVisitor):
             def __init__(self, name: str) -> None:
@@ -1230,13 +1396,7 @@ class TestFormatterResults(unittest.TestCase):
                 check_kind=rule_models.RuleCheckKind.STANDARD,
             )
 
-            @classmethod
-            def fix(cls, context: rule_base.RuleContext) -> rule_base.RuleFixResult:
-                if context.module.header:
-                    return rule_base.RuleFixResult(module=context.module)
-                return rule_base.RuleFixResult(
-                    module=context.module.with_changes(header=(cst.EmptyLine(),)), fixed_findings=(rule_models.RuleFinding(rule=cls.meta, line_numbers=(1,), instance_fixable=None),)
-                )
+            violations = classmethod(insert_leading_line_violations)
 
         @rule_registration.register_rule_to(TST)
         class TST002FindName(rule_base.RuleBase):
@@ -1252,11 +1412,11 @@ class TestFormatterResults(unittest.TestCase):
             )
 
             @classmethod
-            def check(cls, context: rule_base.RuleContext) -> tuple[rule_models.RuleFinding, ...]:
+            def violations(cls, context: rule_base.RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
                 collector = _NameCollector("x")
                 context.module.visit(collector)
                 line_numbers = tuple(context.positions[node].start.line for node in collector.nodes)
-                return (rule_models.RuleFinding(rule=cls.meta, line_numbers=line_numbers, instance_fixable=None),)
+                return (diagnostic_violation(cls.meta, line_numbers=line_numbers),)
 
         class _NameCollector(cst.CSTVisitor):
             def __init__(self, name: str) -> None:
@@ -1274,7 +1434,7 @@ class TestFormatterResults(unittest.TestCase):
         self.assertEqual(result.new_source, "\nx = 1\n")
         self.assertEqual(result.fixed_findings, collections.Counter({TST001InsertLeadingLine.meta: 1}))
         self.assertEqual(result.unfixed_findings, (RuleFinding(rule=TST002FindName.meta, line_numbers=(2,), instance_fixable=None),))
-        self.assertEqual(prepare_sources, ["x = 1\n", "\nx = 1\n", "\nx = 1\n", "\nx = 1\n"])
+        self.assertEqual(prepare_sources, ["x = 1\n", "x = 1\n", "\nx = 1\n", "\nx = 1\n", "\nx = 1\n"])
         self.assertEqual(result.errors, ())
 
     def test_rule_source_formatter_refreshes_and_reuses_category_data_after_a_fix(self) -> None:
@@ -1306,13 +1466,7 @@ class TestFormatterResults(unittest.TestCase):
                 check_kind=rule_models.RuleCheckKind.STANDARD,
             )
 
-            @classmethod
-            def fix(cls, context: rule_base.RuleContext) -> rule_base.RuleFixResult:
-                if context.module.header:
-                    return rule_base.RuleFixResult(module=context.module)
-                return rule_base.RuleFixResult(
-                    module=context.module.with_changes(header=(cst.EmptyLine(),)), fixed_findings=(rule_models.RuleFinding(rule=cls.meta, line_numbers=(1,), instance_fixable=None),)
-                )
+            violations = classmethod(insert_leading_line_violations)
 
         @rule_registration.register_rule_to(TST)
         class TST002ObserveCategoryData(rule_base.RuleBase):
@@ -1328,10 +1482,10 @@ class TestFormatterResults(unittest.TestCase):
             )
 
             @classmethod
-            def fix(cls, context: rule_base.RuleContext) -> rule_base.RuleFixResult:
+            def violations(cls, context: rule_base.RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
                 del cls
                 observed_data.append(context.category_data)
-                return rule_base.RuleFixResult(module=context.module)
+                return ()
 
         @rule_registration.register_rule_to(TST)
         class TST003ObserveCategoryDataAgain(rule_base.RuleBase):
@@ -1347,10 +1501,10 @@ class TestFormatterResults(unittest.TestCase):
             )
 
             @classmethod
-            def fix(cls, context: rule_base.RuleContext) -> rule_base.RuleFixResult:
+            def violations(cls, context: rule_base.RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
                 del cls
                 observed_data.append(context.category_data)
-                return rule_base.RuleFixResult(module=context.module)
+                return ()
 
         class _NameCollector(cst.CSTVisitor):
             def __init__(self, name: str) -> None:
@@ -1367,11 +1521,13 @@ class TestFormatterResults(unittest.TestCase):
 
         self.assertEqual(result.new_source, "\nx = 1\n")
         self.assertEqual(result.fixed_findings, collections.Counter({TST001InsertLeadingLine.meta: 1}))
-        self.assertEqual(observed_data, [("\nx = 1\n", (2,))] * 4)
+        self.assertEqual(observed_data[:2], [("x = 1\n", (1,))] * 2)
+        self.assertEqual(observed_data[2:], [("\nx = 1\n", (2,))] * len(observed_data[2:]))
         self.assertIs(observed_data[0], observed_data[1])
         self.assertIs(observed_data[2], observed_data[3])
         self.assertIsNot(observed_data[0], observed_data[2])
-        self.assertEqual(prepared_data, [("x = 1\n", (1,)), ("\nx = 1\n", (2,)), ("\nx = 1\n", (2,)), ("\nx = 1\n", (2,))])
+        self.assertEqual(prepared_data[:2], [("x = 1\n", (1,))] * 2)
+        self.assertEqual(prepared_data[2:], [("\nx = 1\n", (2,))] * len(prepared_data[2:]))
         self.assertEqual(result.errors, ())
 
     def test_rule_source_formatter_does_not_normalize_line_endings_without_a_fix(self) -> None:
@@ -1400,13 +1556,7 @@ class TestFormatterResults(unittest.TestCase):
                 check_kind=rule_models.RuleCheckKind.STANDARD,
             )
 
-            @classmethod
-            def fix(cls, context: rule_base.RuleContext) -> rule_base.RuleFixResult:
-                if context.module.header:
-                    return rule_base.RuleFixResult(module=context.module)
-                return rule_base.RuleFixResult(
-                    module=context.module.with_changes(header=(cst.EmptyLine(),)), fixed_findings=(rule_models.RuleFinding(rule=cls.meta, line_numbers=(1,), instance_fixable=None),)
-                )
+            violations = classmethod(insert_leading_line_violations)
 
         settings = CheckSettings(line_ending=LineEnding.CR_LF)
         result = formatter.format_source("x = 1\ny = 2\n", "a.py", settings=settings, rule_selection=isolated_rule_selection(TST), fix=True)
@@ -1430,13 +1580,7 @@ class TestFormatterResults(unittest.TestCase):
                 check_kind=rule_models.RuleCheckKind.STANDARD,
             )
 
-            @classmethod
-            def fix(cls, context: rule_base.RuleContext) -> rule_base.RuleFixResult:
-                if context.module.header:
-                    return rule_base.RuleFixResult(module=context.module)
-                return rule_base.RuleFixResult(
-                    module=context.module.with_changes(header=(cst.EmptyLine(),)), fixed_findings=(rule_models.RuleFinding(rule=cls.meta, line_numbers=(1,), instance_fixable=None),)
-                )
+            violations = classmethod(insert_leading_line_violations)
 
         settings = CheckSettings()
         result = formatter.format_source("\ufeffx = 1\n", "a.py", settings=settings, rule_selection=isolated_rule_selection(TST), fix=True)
@@ -1463,9 +1607,9 @@ class TestFormatterResults(unittest.TestCase):
             )
 
             @classmethod
-            def check(cls, context: rule_base.RuleContext) -> tuple[rule_models.RuleFinding, ...]:
+            def violations(cls, context: rule_base.RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
                 checks.append(context.path)
-                return (rule_models.RuleFinding(rule=cls.meta, line_numbers=(1,), instance_fixable=None),)
+                return (diagnostic_violation(cls.meta),)
 
         settings = CheckSettings(select=("TST",), per_file_ignores=(("skip.py", ("TST",)),))
         selection = rules_selection.select_rules(settings, collection=rule_collection.RuleCollection((TST,)))
@@ -1497,13 +1641,9 @@ class TestFormatterResults(unittest.TestCase):
             )
 
             @classmethod
-            def fix(cls, context: rule_base.RuleContext) -> rule_base.RuleFixResult:
-                return rule_base.RuleFixResult(module=context.module.visit(ToggleInteger()), fixed_findings=(rule_models.RuleFinding(rule=cls.meta, line_numbers=(1,), instance_fixable=None),))
-
-            @classmethod
-            def check(cls, context: rule_base.RuleContext) -> tuple[rule_models.RuleFinding, ...]:
-                del context
-                return (rule_models.RuleFinding(rule=cls.meta, line_numbers=(1,), instance_fixable=None),)
+            def violations(cls, context: rule_base.RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
+                toggled = context.module.visit(ToggleInteger()).code
+                return (source_replacement_violation(cls.meta, context, toggled),)
 
         settings = CheckSettings()
         with unittest.mock.patch.object(rule_runner, "MAX_FIX_ITERATIONS", 3):
@@ -1539,16 +1679,11 @@ class TestFormatterResults(unittest.TestCase):
             )
 
             @classmethod
-            def fix(cls, context: rule_base.RuleContext) -> rule_base.RuleFixResult:
-                if context.source == "x = 4\n":
-                    return rule_base.RuleFixResult(module=context.module)
-                return rule_base.RuleFixResult(module=context.module.visit(IncrementInteger()), fixed_findings=(rule_models.RuleFinding(rule=cls.meta, line_numbers=(1,), instance_fixable=None),))
-
-            @classmethod
-            def check(cls, context: rule_base.RuleContext) -> tuple[rule_models.RuleFinding, ...]:
+            def violations(cls, context: rule_base.RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
                 if context.source == "x = 4\n":
                     return ()
-                return (rule_models.RuleFinding(rule=cls.meta, line_numbers=(1,), instance_fixable=None),)
+                incremented = context.module.visit(IncrementInteger()).code
+                return (source_replacement_violation(cls.meta, context, incremented),)
 
         settings = CheckSettings()
         with unittest.mock.patch.object(rule_runner, "MAX_FIX_ITERATIONS", 3):

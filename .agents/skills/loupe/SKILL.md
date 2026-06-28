@@ -1,64 +1,98 @@
 ---
 name: loupe
-description: Run parallel external Claude Code and Codex CLI review passes for Git changes, then verify, deduplicate, and synthesize one actionable final review. Use only when the user explicitly invokes $loupe for uncommitted changes, commits, commit ranges, branches, pull requests, or another textual review scope.
+description: Run multiple parallel external code reviews for a given scope, then independently verify the findings and organize them into one final review. Possible scopes include uncommitted changes (default) or specific commits, commit ranges, branches, pull requests, or other custom textual review scopes.
 ---
 
-# Loupe
+# Loupe Skill
 
-Loupe runs two external reviewers in parallel through `scripts/run_reviewers.py` with a no-repository-edits policy, then requires Codex to verify and deduplicate their findings against the current repository before reporting.
+Use this skill when explicitly invoked by the user. The skill runs multiple parallel external code reviews for a given code/diff scope, then independently verifies the findings and organizes them into one coherent final review.
+
+Do not modify repository files, stage changes, commit, install dependencies, or use external network access except normal web search. As part of the finding verification process, you may inspect files and run local manual tests to confirm code behavior; incidental temp/cache artifacts are okay.
 
 ## Workflow
 
-1. Resolve the review scope text from the user request.
-   - Use `uncommitted changes` when the user does not provide scope text.
+1. Based on the user's specific request, resolve what string you need to pass to `scripts/run_reviewers.py` in order to precisely specify the target review scope:
+   - Use `uncommitted changes (staged + unstaged + untracked)` when the user does not provide a specific request.
    - Pass all user-provided scope text through to the script, for example `last two commits`, `HEAD~2..HEAD`, or `PR 123`.
-2. Run the bundled script from the current repository:
+
+2. Create a private temporary artifact directory and remember the exact path as `LOUPE_ARTIFACT_DIR` for future commands:
 
    ```bash
-   uv run python .agents/skills/loupe/scripts/run_reviewers.py <scope text>
+   mktemp -d "${TMPDIR:-/tmp}/loupe.XXXXXXXXXX"
    ```
 
-3. If the script exits nonzero, continue with any reviewer output it produced. A timeout or failure from one reviewer must not block analysis of the other reviewer.
-4. Independently inspect the current repository and the relevant diff before trusting any external finding.
-5. Verify each candidate finding:
+   - Keep all Loupe artifacts in this directory: `review.diff` for the review-scope diff and `reviewers.json` for the exact reviewer JSON stdout.
+   - If the review is completed successfully, delete this directory at the end of the skill run after all needed information has been extracted.
+   - If the review cannot be completed because of truncation, malformed JSON, verification blockers, or another unexpected issue, keep this directory and report its path to the user.
+
+3. Snapshot the diff corresponding to the target review scope before running the reviewers script:
+
+   - For the default scope, run the bundled script:
+
+     ```bash
+     <path to>/scripts/collect_review_diff.py "uncommitted changes (staged + unstaged + untracked)" --output "$LOUPE_ARTIFACT_DIR/review.diff"
+     ```
+
+     The helper supports only that exact default scope. It writes to `review.diff` the concatenated diffs of the staged tracked changes, unstaged tracked changes, and untracked non-ignored files (meaning that files can appear more than once in `review.diff`). It does not request binary patch payloads; binary changes appear only as compact Git diff markers.
+
+   - For any other custom review scope, choose the matching Git diff command yourself, write the result to `$LOUPE_ARTIFACT_DIR/review.diff`, and record its byte count with `wc -c`. Avoid `--binary` and `--text`. Include untracked non-ignored file diffs automatically when the user's custom scope simply asks for `unstaged changes`.
+
+4. Run the `scripts/run_reviewers.py` script that is bundled with this skill exactly once, and with escalated sandbox permissions, writing a copy of the exact stdout to an artifact file via the script's `--output` option:
+
+   ```bash
+   <path to>/scripts/run_reviewers.py "<target review scope>" --output "$LOUPE_ARTIFACT_DIR/reviewers.json"
+   ```
+
+   - The script accepts a single positional argument with text corresponding to the target review scope.
+   - The `--output` option writes exactly the same JSON text that the script emits on stdout.
+   - The script has a shebang that ensures it is automatically run with whichever `python3` has highest priority in the current environment's `PATH`.
+   - Request `sandbox_permissions: "require_escalated"` for this command, using the justification that the launched child `codex` and `claude` processes need to read and write their normal state to their respective home directory locations (`~/.codex` and `~/.claude`).
+   - Run the command and all polling reads with `max_output_tokens` set to `30000`.
+   - The script may take a very long time to return (default timeout is 30 minutes). Never kill the script yourself; allow its own timeout to trigger if it takes too long.
+   - The script emits JSON that includes both general and reviewer-specific information, including in particular each reviewer name (`reviewer_name`) and full response (`stdout`).
+   - Do not do anything other than keep the session alive until the script returns. Just say `Continuing to wait for the external reviews...` whenever needed to keep the session alive.
+   - If the script exits nonzero, continue with any reviewer output it produced. A timeout or failure of one reviewer must not block you from using the analysis of the remaining reviewers.
+   - Never automatically rerun this reviewers script. If the tool output is truncated, malformed, or otherwise unusable, read `$LOUPE_ARTIFACT_DIR/reviewers.json` instead. If that artifact is missing or unreadable, stop and report the artifact directory path to the user.
+
+5. Decide how to use the diff artifact:
+
+   - If `$LOUPE_ARTIFACT_DIR/review.diff` is at most 200000 bytes, load it into chat once after the reviewers finish.
+   - If it is above 200000 bytes, do not load it wholesale. Use targeted reads from the diff artifact together with direct source-file reads for verification of the findings.
+
+6. Manually verify each candidate finding from each reviewer:
    - Confirm the cited code exists in the current working tree.
-   - Reject obviously vague, stylistic, stale, duplicate, speculative, or non-actionable items.
-   - Merge duplicates from Claude and Codex into one finding and mark the source as `Multiple`.
-6. Produce a single final review in chat. Do not edit repository files, stage changes, commit, install dependencies, or write a report file.
+   - Confirm via analysis and manual testing that it is plausible that the stated issue exists.
+   - Never reject findings simply because they are `cleanup only` or `performance only` or `not important/severe/impactful enough` (`Nit` and `Low` exist as severity categories for a reason).
+   - Do not get rid of or omit rejected findings from the list; instead report them in the final review with a severity of `Unsure`.
 
-## Script Contract
+7. Organize all returned external reviewer findings into a coherent final review in chat. Do not edit repository files or write a persistent report file. After a successful final review, clean up `LOUPE_ARTIFACT_DIR` so the temporary artifacts are gone as if they were never there.
 
-`scripts/run_reviewers.py` accepts the scope text as positional arguments. With no arguments it uses `uncommitted changes`.
+## Final Review
 
-The script launches these reviewer commands concurrently and waits up to 30 minutes for each (`<scope text>` is replaced with the actual required scope text, like `uncommitted changes`):
-
-```bash
-( set -o pipefail; cd "$(git rev-parse --show-toplevel)" && claude -p --no-session-persistence --permission-mode auto --effort high --output-format json 'Review only. Do not modify repository files, stage changes, commit, install dependencies, or use external network access except normal web search. You may inspect files and run local validation, including manual tests; incidental temp/cache artifacts are okay. /code-review <scope text>' | jq -er '.result' )
-```
-
-```bash
-( set -o pipefail; codex exec --cd "$(git rev-parse --show-toplevel)" --ephemeral --sandbox workspace-write -c model_reasoning_effort='"high"' --json 'Review only. Do not modify repository files, stage changes, commit, install dependencies, or use external network access except normal web search. You may inspect files and run local validation, including manual tests; incidental temp/cache artifacts are okay. /review <scope text>' | jq -ser 'map(select(.type == "item.completed" and .item.type == "agent_message") | .item.text) | last // empty' )
-```
-
-The script emits JSON with `scope`, `repo_root`, and one result for each reviewer: `name`, `status`, `timed_out`, `returncode`, `elapsed_seconds`, `stdout`, `stderr`, and `command`. Treat `status` values of `failed`, `timed_out`, or `launch_failed` as reviewer coverage limitations, not as reasons to stop.
-
-## Final Report
-
-Produce a final report in chat, and not as a review file. Use this structure:
+Use this structure for the final review in chat:
 
 ```markdown
-Diff summary:
-- <content or purpose of changed area>
-- <additional content or purpose of changed area>
+**Diff summary:** <Suggested git commit message summary line if the analyzed diff is committed>
 
-Findings:
-1. [<Severity> · <Source>] <Concise summary sentence>. · `<path:line or symbol>` · Description: <Evidence and impact>. · Recommendation: <Concrete fix direction>.
+- <primary content or purpose of changed area>
+- <secondary content or purpose of changed area>
+- ...
+
+**<Reviewer name>:** <status> in <elapsed_seconds>
+
+1. [<Severity>] <Concise summary sentence>. · `<path:line or symbol>` · Description: <Evidence and impact>. · Recommendation: <Concrete fix direction>.
+
+**<Reviewer name>:**
+
+...
 ```
 
 Rules for final output:
 
-- `<Severity>` is one of `Critical`, `High`, `Medium`, `Low`, `Nit`.
-- `<Source>` is one of `Claude`, `Codex`, `Multiple`.
-- Sort findings by descending severity, then likely fix order.
+- `<Severity>` is one of `Critical`, `High`, `Medium`, `Low`, `Nit`, `Unsure`.
+- `<status>` should be the reviewer status exactly as per the script JSON output, only with the first letter capitalized and spaces instead of underscores, e.g. `Succeeded`, `Timed out`.
+- `<elapsed_seconds>` should be the elapsed time of that specific reviewer exactly as per the script JSON output, only rounded to the nearest second, e.g. `174s`.
+- Show all findings of all reviewers, whether they were rejected or not. Sort findings per reviewer by descending severity, then by likely fix order.
 - Every finding must be self-contained and contain all information required for the user to understand the problem.
-- If no actionable findings remain after verification, say that explicitly after the diff summary.
+- If a reviewer failed then provide a detailed description of what went wrong in place of the structured findings list.
+- If a reviewer succeeded but produced no findings then just say `No findings.` in place of the structured findings list.

@@ -2,7 +2,7 @@
 
 Test inventory up-to-date commit: `20d4d33a95ad72cc2435e4f45524824a3e9afb4a`; current refresh checked 1988 collected tests on 2026-06-23.
 
-Audit status: complete as of 2026-06-22 and refreshed on 2026-06-23 for the implemented Markdown-example consolidation and project-default pytest-xdist multiprocessing. This document is the source of truth for the test performance audit. The original audit covered every Git-tracked test file under `tests/`, shared test fixtures and helpers, and the cross-cutting testing approaches listed below. The original audit made no implementation fixes; later implementation passes resolved the documented test-side speedup and enabled default multiprocessing for pytest.
+Audit status: complete as of 2026-06-23. This document is the editable source of truth for test performance audits. Each future audit rerun should execute the goal command below, refresh the inventory tables from Git-tracked test and support files, update evidence and analysis as work proceeds, and add or update concrete findings with `Status:` fields.
 
 ## Goal Command
 
@@ -14,11 +14,11 @@ Paste this command into Codex when the audit needs to be rerun after tests are a
 
 ## Scope
 
-- Audited every Git-tracked test file under `tests/`.
-- Audited shared test fixtures and helpers, including `tests/conftest.py`, package-level helpers, and rule-specific helper modules.
-- Audited test data generation, subprocess usage, filesystem usage, parser/formatter setup, parametrization size, repeated imports, and repeated full-suite or integration-style checks.
-- Kept coverage-preserving opportunities separate from possible test-design changes.
-- Did not weaken any tests.
+- Audit every Git-tracked test file under `tests/`.
+- Audit shared test fixtures and helpers, including `tests/conftest.py`, package-level helpers, and rule-specific helper modules.
+- Audit test data generation, subprocess usage, filesystem usage, parser/formatter setup, parametrization size, repeated imports, and repeated full-suite or integration-style checks.
+- Keep coverage-preserving opportunities separate from possible test-design changes.
+- Do not weaken tests.
 
 ## Audit Commands
 
@@ -135,7 +135,7 @@ Current pytest commands use project-default multiprocessing through pytest-xdist
 | `tests/test_settings.py`                                       | Settings            | Done   | 88 items; aggregate `0.041s`, call `0.021s`, max call `0.001s`.                                                                                                               | Settings tests use temp config files only where config discovery/loading behavior requires them.                                                                                                                                                                                                                                              | None      | No finding.                                                                                                                                   |
 | `tests/test_utils.py`                                          | Utilities           | Done   | 6 items; aggregate `0.010s`, call `0.001s`.                                                                                                                                   | Utility tests include git-root cache behavior with temporary directories.                                                                                                                                                                                                                                                                     | None      | No finding.                                                                                                                                   |
 
-## Helper And Fixture Inventory
+## Helper and Fixture Inventory
 
 | File                         | Area            | Status | Performance evidence                                                                                                                                                                                                                                                        | Code-analysis notes                                                                                                                                                                                                                               | Potential | Findings                                                                                                                                   |
 |------------------------------|-----------------|--------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------|--------------------------------------------------------------------------------------------------------------------------------------------|
@@ -178,11 +178,11 @@ Current pytest commands use project-default multiprocessing through pytest-xdist
 |--------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------|--------|
 | Should the autouse per-test temporary working directory be narrowed to only tests that need config/filesystem isolation? | `tests/conftest.py`; settings, CLI, and selected formatter tests marked with `isolated_cwd`. | Setup plus teardown dropped from about `0.623s` to `0.304s`; full-suite timed samples were noisy, with the final median at `5.61s`/`real 5.88` versus the one-sample baseline `5.65s`/`real 5.88`. | Low after implementation. Unmarked tests run from a guarded shared CWD that fails on accidental config discovery, relative writes, and leaked CWD changes. Tests needing neutral writable CWD isolation opt in explicitly. | Implemented with guarded default CWD plus explicit `isolated_cwd` opt-in. | Done   |
 
-## Rule-Audit Refresh Notes
+## Rule-Audit Dependency Check
 
-| Rule implementation scope                      | Change evidence                                                                                                                         | Needed rule-audit action                                                                 | Status |
-|------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------|--------|
-| `src/pydocformatter/rules/definitions/**/*.py` | `git diff --name-status 20d4d33a95ad72cc2435e4f45524824a3e9afb4a -- 'src/pydocformatter/rules/definitions/**/*.py'` produced no output. | No category or rule needs rechecking before relying on `docs/rule_performance_audit.md`. | Done   |
+| Rule implementation scope                      | Change evidence                                                                                                                                                         | Needed rule-audit action                                                                  | Status |
+|------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------|--------|
+| `src/pydocformatter/rules/definitions/**/*.py` | `git diff --name-status 20d4d33a95ad72cc2435e4f45524824a3e9afb4a -- 'src/pydocformatter/rules/definitions/**/*.py'` currently reports 55 changed rule-definition paths. | Recheck affected categories and rules before relying on `docs/rule_performance_audit.md`. | Needed |
 
 ## Highest-Value Coverage-Preserving Opportunities
 

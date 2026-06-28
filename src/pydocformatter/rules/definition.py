@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import dataclasses
+import inspect
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, ClassVar
 
@@ -12,11 +13,11 @@ import libcst.metadata as cst_metadata
 import pydocformatter.rules.definition_helpers.source_text as source_text
 import pydocformatter.utils.misc as misc
 from pydocformatter.rules.codes import RuleCode
-from pydocformatter.rules.models import RuleCategoryMetadata, RuleFinding, RuleMetadata
+from pydocformatter.rules.models import RuleCategoryMetadata, RuleCheckKind, RuleMetadata
+from pydocformatter.rules.violations import RuleViolation
 
 if TYPE_CHECKING:
     from pydocformatter.cli.settings_check import CheckSettings
-    from pydocformatter.rules.suppressions import SuppressionIndex
 
 
 @dataclasses.dataclass(frozen=True)
@@ -33,7 +34,6 @@ class RuleCategoryContext:
         source (str): Current module source aligned with `module`.
         source_lines (tuple[str, ...]): Current source split into physical lines.
         line_bounds (source_text.LineBounds | None): Cached source offset lookup table, if available.
-        suppression_index (SuppressionIndex | None): Parsed pydocformatter suppression directives for this source state.
     """
 
     path: str
@@ -45,7 +45,6 @@ class RuleCategoryContext:
     source: str
     source_lines: tuple[str, ...]
     line_bounds: source_text.LineBounds | None = dataclasses.field(kw_only=True)
-    suppression_index: SuppressionIndex | None = dataclasses.field(kw_only=True)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -54,24 +53,9 @@ class RuleContext(RuleCategoryContext):
 
     Attributes:
         category_data (object | None): Shared data prepared by the rule category for this module.
-        effectively_fixable (bool): Whether this rule may apply fixes in the current run.
     """
 
     category_data: object | None
-    effectively_fixable: bool
-
-
-@dataclasses.dataclass(frozen=True)
-class RuleFixResult:
-    """Result returned by one rule automatic-fix attempt.
-
-    Attributes:
-        module (cst.Module): Module after applying the rule's fixes.
-        fixed_findings (tuple[RuleFinding, ...]): Findings fixed by the returned module.
-    """
-
-    module: cst.Module
-    fixed_findings: tuple[RuleFinding, ...] = ()
 
 
 class RuleBase:
@@ -105,23 +89,46 @@ class RuleBase:
     incompatible_with = misc.alias_to_class_field("meta.incompatible_with")
 
     def __init_subclass__(cls) -> None:
-        """Require implemented rule classes to define metadata."""
+        """Require implemented rule classes to define metadata and the current rule API."""
         super().__init_subclass__()
         if "meta" not in cls.__dict__:
             raise TypeError(f"{cls.__name__} must define RuleMetadata as 'meta'")
         if not isinstance(cls.meta, RuleMetadata):
             raise TypeError(f"{cls.__name__}.meta must be a RuleMetadata instance")
+        violations_hook = cls.__dict__.get("violations")
+        if cls.meta.check_kind == RuleCheckKind.STANDARD and violations_hook is None:
+            raise TypeError(f"{cls.__name__} must define violations()")
+        if violations_hook is not None:
+            _validate_violations_hook(cls, violations_hook)
 
     @classmethod
-    def check(cls, context: RuleContext) -> tuple[RuleFinding, ...]:
-        """Return findings for the current source without modifying it."""
+    def violations(cls, context: RuleContext) -> tuple[RuleViolation, ...]:
+        """Return canonical violations for the current source."""
         del context
         return ()
 
-    @classmethod
-    def fix(cls, context: RuleContext) -> RuleFixResult:
-        """Return the source after applying this rule's available automatic fixes."""
-        return RuleFixResult(module=context.module)
+
+def _validate_violations_hook(rule_class: type[RuleBase], hook: object) -> None:
+    """Validate the classmethod shape expected by the rule runner."""
+    if not isinstance(hook, classmethod):
+        raise TypeError(f"{rule_class.__name__}.violations must be a @classmethod accepting context")
+    if not callable(hook.__func__):
+        raise TypeError(f"{rule_class.__name__}.violations must be callable")
+    bound_hook = hook.__get__(None, rule_class)
+    if not callable(bound_hook):
+        raise TypeError(f"{rule_class.__name__}.violations must be callable")
+    try:
+        signature = inspect.signature(bound_hook)
+    except (TypeError, ValueError) as error:
+        raise TypeError(f"{rule_class.__name__}.violations signature could not be inspected: {error}") from None
+    parameters = tuple(signature.parameters.values())
+    if (
+        len(parameters) != 1
+        or parameters[0].kind not in {inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD}
+        or parameters[0].name != "context"
+        or parameters[0].default is not inspect.Parameter.empty
+    ):
+        raise TypeError(f"{rule_class.__name__}.violations must accept exactly one required positional argument named context")
 
 
 class RuleCategoryBase:

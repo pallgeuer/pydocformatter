@@ -9,10 +9,10 @@ import libcst as cst
 import libcst.metadata as cst_metadata
 
 import pydocformatter.rules.definition_helpers.source_text as source_text
-from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetadata
+import pydocformatter.rules.line_targets as line_targets
 
 if TYPE_CHECKING:
-    from pydocformatter.rules.definition import RuleCategoryContext, RuleFixResult
+    from pydocformatter.rules.definition import RuleCategoryContext
 
 
 @dataclasses.dataclass(frozen=True)
@@ -43,6 +43,15 @@ class PlannedSourceChange:
     line_numbers: tuple[int, ...]
     suppression_line_numbers: tuple[tuple[int, ...], ...]
 
+    def __post_init__(self) -> None:
+        """Validate planned change target lines."""
+        object.__setattr__(self, "line_numbers", line_targets.normalize_line_numbers(self.line_numbers, "Planned source change line numbers"))
+        object.__setattr__(
+            self,
+            "suppression_line_numbers",
+            line_targets.normalize_line_number_targets(self.suppression_line_numbers, "Planned source change suppression line-number targets", "Planned source change suppression line-number target"),
+        )
+
 
 @dataclasses.dataclass(frozen=True)
 class PlannedTextReplacement:
@@ -61,53 +70,12 @@ class PlannedTextReplacement:
     line_numbers: tuple[int, ...]
 
 
-def apply_planned_source_changes(
-    module: cst.Module,
-    changes: tuple[PlannedSourceChange, ...],
-    *,
-    source: str | None = None,
-    line_bounds: source_text.LineBounds | None = None,
-) -> cst.Module:
-    """Apply the source edits from planned changes to a module."""
-    return apply_source_edits(module, tuple(change.edit for change in changes), source=source, line_bounds=line_bounds)
-
-
 def apply_context_source_changes(context: RuleCategoryContext, changes: tuple[PlannedSourceChange, ...]) -> cst.Module:
     """Apply planned source changes using cached context source data when available."""
     edits = tuple(change.edit for change in changes)
     if context.line_bounds is None:
         return apply_source_edits(context.module, edits)
     return apply_source_edits(context.module, edits, source=context.source, line_bounds=context.line_bounds)
-
-
-def unsuppressed_planned_source_changes(context: RuleCategoryContext, rule: RuleMetadata, changes: tuple[PlannedSourceChange, ...]) -> tuple[PlannedSourceChange, ...]:
-    """Return planned changes whose associated finding is not suppressed."""
-    if context.suppression_index is None:
-        return changes
-    return tuple(
-        change
-        for change in changes
-        if not context.suppression_index.suppresses(RuleFinding(rule=rule, line_numbers=change.line_numbers, suppression_line_numbers=change.suppression_line_numbers, instance_fixable=None))
-    )
-
-
-def fix_result_for_planned_source_changes(context: RuleCategoryContext, rule: RuleMetadata, changes: tuple[PlannedSourceChange, ...], *, instance_fixable: bool | None = None) -> RuleFixResult:
-    """Return a fix result after dropping suppressed planned changes."""
-    from pydocformatter.rules.definition import RuleFixResult
-
-    changes = unsuppressed_planned_source_changes(context, rule, changes)
-    if not changes:
-        return RuleFixResult(module=context.module)
-    module = apply_context_source_changes(context, changes)
-    findings = findings_for_planned_source_changes(rule, changes, instance_fixable=instance_fixable)
-    return RuleFixResult(module=module, fixed_findings=findings)
-
-
-def findings_for_planned_source_changes(rule: RuleMetadata, changes: tuple[PlannedSourceChange, ...], *, instance_fixable: bool | None = None) -> tuple[RuleFinding, ...]:
-    """Return rule findings for planned source changes."""
-    if rule.fix_availability in {FixAvailability.USUALLY, FixAvailability.SOMETIMES} and instance_fixable is None:
-        raise ValueError(f"{rule.code}: Findings for {rule.fix_availability.lower()}-fixable rules must specify instance_fixable")
-    return tuple(RuleFinding(rule=rule, line_numbers=change.line_numbers, suppression_line_numbers=change.suppression_line_numbers, instance_fixable=instance_fixable) for change in changes)
 
 
 def apply_source_edits(

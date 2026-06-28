@@ -6,3 +6,7 @@ web_search = "live"
 
 [sandbox_workspace_write]
 network_access = true
+writable_roots = [
+  "~/.cache/pip",
+  "~/.cache/uv",
+]

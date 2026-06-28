@@ -7,9 +7,10 @@ import pydocformatter.rules.definition_helpers.text_layout as text_layout
 import pydocformatter.rules.definitions.PCF.PCF as PCF_definition
 import pydocformatter.rules.edits as rule_edits
 import pydocformatter.rules.registration as rule_registration
+import pydocformatter.rules.violations as rule_violations
 from pydocformatter.rules.codes import RuleCode
-from pydocformatter.rules.definition import RuleBase, RuleContext, RuleFixResult
-from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleFinding, RuleMetadata
+from pydocformatter.rules.definition import RuleBase, RuleContext
+from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata
 
 
 @rule_registration.register_rule_to(PCF_definition.PCF)
@@ -32,17 +33,9 @@ class PCF004TrailingCommentExtraction(RuleBase):
     )
 
     @classmethod
-    def check(cls, context: RuleContext) -> tuple[RuleFinding, ...]:
-        """Return trailing comment extraction findings."""
-        return rule_edits.findings_for_planned_source_changes(cls.meta, _planned_changes(context))
-
-    @classmethod
-    def fix(cls, context: RuleContext) -> RuleFixResult:
-        """Apply trailing comment extraction fixes."""
-        changes = _planned_changes(context)
-        if not changes:
-            return RuleFixResult(module=context.module)
-        return rule_edits.fix_result_for_planned_source_changes(context, cls.meta, changes)
+    def violations(cls, context: RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
+        """Return trailing comment extraction violations."""
+        return rule_violations.violations_for_planned_source_changes(cls.meta, _planned_changes(context))
 
 
 def _planned_changes(context: RuleContext) -> tuple[rule_edits.PlannedSourceChange, ...]:

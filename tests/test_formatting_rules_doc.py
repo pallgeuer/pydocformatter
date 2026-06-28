@@ -7,7 +7,7 @@ from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention
 from pydocformatter.rules.codes import RuleSelector
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-FORMAT_RULES_PATH = ROOT / "docs" / "formatting_rules.md"
+FORMAT_RULES_PATH = ROOT / "docs" / "rule_list.md"
 
 
 def _table_rows_after_heading(text: str, heading: str) -> list[dict[str, str]]:
@@ -65,7 +65,7 @@ def _conflicts_cell(rule: rule_models.RuleMetadata) -> str:
 def _explicit_cell(rule: rule_models.RuleMetadata) -> str:
     """Return the formatting rules table cell for explicit-selection requirements."""
     selectors = tuple(RuleSelector(selector) for selector in CheckSettings().require_explicit)
-    return "Required" if any(selector.selects_code(rule.code) for selector in selectors) else "-"
+    return "Opt-in" if any(selector.selects_code(rule.code) for selector in selectors) else "-"
 
 
 class TestFormattingRulesDoc(unittest.TestCase):

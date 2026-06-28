@@ -7,11 +7,12 @@ import pydocformatter.rules.definition_helpers.rest_fields as rest_fields
 import pydocformatter.rules.definition_helpers.section_edits as section_edits
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 import pydocformatter.rules.registration as rule_registration
+import pydocformatter.rules.violations as rule_violations
 from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase, RuleContext
 from pydocformatter.rules.definitions.PDF.PDF import PDF
-from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleFinding, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
+from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
 
 
 @rule_registration.register_rule_to(PDF)
@@ -39,40 +40,35 @@ class PDF408RepeatedSection(RuleBase):
     )
 
     @classmethod
-    def check(cls, context: RuleContext) -> tuple[RuleFinding, ...]:
-        """Return findings for repeated convention sections."""
-        return _findings(context, rule=cls.meta)
+    def violations(cls, context: RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
+        """Return violations for repeated convention sections."""
+        return _violations(context, rule=cls.meta)
 
 
-def _findings(context: RuleContext, *, rule: RuleMetadata) -> tuple[RuleFinding, ...]:
-    """Return findings for repeated convention sections or reST fields."""
+def _violations(context: RuleContext, *, rule: RuleMetadata) -> tuple[rule_violations.RuleViolation, ...]:
+    """Return violations for repeated convention sections or reST fields."""
     data = PDF.require_data(context)
-    findings: list[RuleFinding] = []
+    violations: list[rule_violations.RuleViolation] = []
     for docstring in data.docstrings:
         if docstring.structure.convention is DocstringConvention.REST:
-            findings.extend(_rest_field_findings(docstring, rule=rule))
+            violations.extend(_rest_field_violations(docstring, rule=rule))
         else:
             seen_keys: dict[str, str] = {}
             for section in docstring.structure.sections:
                 key = docstring_sections.repeated_section_key(docstring.structure.convention, section.name)
                 if key in seen_keys:
                     line = docstring.structure.lines[section.header_line]
-                    findings.append(
-                        RuleFinding(
-                            rule=rule,
-                            line_numbers=section_edits.line_numbers(docstring, line),
-                            instance_message=f"Docstring section '{section.name}' repeats earlier section '{seen_keys[key]}'",
-                            instance_fixable=None,
-                        )
+                    violations.append(
+                        rule_violations.diagnostic(rule, section_edits.line_numbers(docstring, line), instance_message=f"Docstring section '{section.name}' repeats earlier section '{seen_keys[key]}'")
                     )
                 else:
                     seen_keys[key] = section.name
-    return tuple(findings)
+    return tuple(violations)
 
 
-def _rest_field_findings(docstring: PDF_definition.DocstringInfo, *, rule: RuleMetadata) -> tuple[RuleFinding, ...]:
-    """Return findings for repeated reStructuredText fields."""
-    findings: list[RuleFinding] = []
+def _rest_field_violations(docstring: PDF_definition.DocstringInfo, *, rule: RuleMetadata) -> tuple[rule_violations.RuleViolation, ...]:
+    """Return violations for repeated reStructuredText fields."""
+    violations: list[rule_violations.RuleViolation] = []
     seen_keys: dict[tuple[str, str, str], str] = {}
     for entry in docstring.structure.entries:
         if entry.field_name is None:
@@ -83,11 +79,7 @@ def _rest_field_findings(docstring: PDF_definition.DocstringInfo, *, rule: RuleM
         label = rest_fields.label(entry)
         if key in seen_keys:
             line = docstring.structure.lines[entry.start_line]
-            findings.append(
-                RuleFinding(
-                    rule=rule, line_numbers=section_edits.line_numbers(docstring, line), instance_message=f"Docstring field '{label}' repeats earlier field '{seen_keys[key]}'", instance_fixable=None
-                )
-            )
+            violations.append(rule_violations.diagnostic(rule, section_edits.line_numbers(docstring, line), instance_message=f"Docstring field '{label}' repeats earlier field '{seen_keys[key]}'"))
         else:
             seen_keys[key] = label
-    return tuple(findings)
+    return tuple(violations)

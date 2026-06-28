@@ -7,11 +7,12 @@ import pydocformatter.rules.definition_helpers.rest_fields as rest_fields
 import pydocformatter.rules.definition_helpers.section_edits as section_edits
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 import pydocformatter.rules.registration as rule_registration
+import pydocformatter.rules.violations as rule_violations
 from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase, RuleContext
 from pydocformatter.rules.definitions.PDF.PDF import PDF
-from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleFinding, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
+from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
 
 
 @rule_registration.register_rule_to(PDF)
@@ -39,18 +40,18 @@ class PDF407SectionOrder(RuleBase):
     )
 
     @classmethod
-    def check(cls, context: RuleContext) -> tuple[RuleFinding, ...]:
-        """Return findings for convention sections that appear out of order."""
-        return _findings(context, rule=cls.meta)
+    def violations(cls, context: RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
+        """Return violations for convention sections that appear out of order."""
+        return _violations(context, rule=cls.meta)
 
 
-def _findings(context: RuleContext, *, rule: RuleMetadata) -> tuple[RuleFinding, ...]:
-    """Return findings for convention sections or reST fields that appear out of order."""
+def _violations(context: RuleContext, *, rule: RuleMetadata) -> tuple[rule_violations.RuleViolation, ...]:
+    """Return violations for convention sections or reST fields that appear out of order."""
     data = PDF.require_data(context)
-    findings: list[RuleFinding] = []
+    violations: list[rule_violations.RuleViolation] = []
     for docstring in data.docstrings:
         if docstring.structure.convention is DocstringConvention.REST:
-            findings.extend(_rest_field_findings(docstring, rule=rule))
+            violations.extend(_rest_field_violations(docstring, rule=rule))
         else:
             max_rank = -1
             max_rank_section_name = ""
@@ -60,23 +61,20 @@ def _findings(context: RuleContext, *, rule: RuleMetadata) -> tuple[RuleFinding,
                     continue
                 if rank < max_rank:
                     line = docstring.structure.lines[section.header_line]
-                    findings.append(
-                        RuleFinding(
-                            rule=rule,
-                            line_numbers=section_edits.line_numbers(docstring, line),
-                            instance_message=f"Docstring section '{section.name}' should appear before '{max_rank_section_name}'",
-                            instance_fixable=None,
+                    violations.append(
+                        rule_violations.diagnostic(
+                            rule, section_edits.line_numbers(docstring, line), instance_message=f"Docstring section '{section.name}' should appear before '{max_rank_section_name}'"
                         )
                     )
                 else:
                     max_rank = rank
                     max_rank_section_name = section.name
-    return tuple(findings)
+    return tuple(violations)
 
 
-def _rest_field_findings(docstring: PDF_definition.DocstringInfo, *, rule: RuleMetadata) -> tuple[RuleFinding, ...]:
-    """Return findings for out-of-order reStructuredText fields."""
-    findings: list[RuleFinding] = []
+def _rest_field_violations(docstring: PDF_definition.DocstringInfo, *, rule: RuleMetadata) -> tuple[rule_violations.RuleViolation, ...]:
+    """Return violations for out-of-order reStructuredText fields."""
+    violations: list[rule_violations.RuleViolation] = []
     max_rank = -1
     max_rank_label = ""
     for entry in docstring.structure.entries:
@@ -88,12 +86,8 @@ def _rest_field_findings(docstring: PDF_definition.DocstringInfo, *, rule: RuleM
         label = rest_fields.label(entry)
         if rank < max_rank:
             line = docstring.structure.lines[entry.start_line]
-            findings.append(
-                RuleFinding(
-                    rule=rule, line_numbers=section_edits.line_numbers(docstring, line), instance_message=f"Docstring field '{label}' should appear before '{max_rank_label}'", instance_fixable=None
-                )
-            )
+            violations.append(rule_violations.diagnostic(rule, section_edits.line_numbers(docstring, line), instance_message=f"Docstring field '{label}' should appear before '{max_rank_label}'"))
         else:
             max_rank = rank
             max_rank_label = label
-    return tuple(findings)
+    return tuple(violations)

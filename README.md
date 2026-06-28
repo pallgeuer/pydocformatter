@@ -338,7 +338,7 @@ Settings are resolved per path as defaults, then the closest containing `pyproje
 
 `--config PATH` accepts either a pyproject-style file containing `[tool.pydocfmt]` or a dedicated config file with pydocfmt settings at top level. `--isolated` ignores auto-discovered configuration files; it can be combined with inline `--config` setting overrides but not with `--config PATH`.
 
-For the full file-selection contract, see [File Selection Compatibility Specification](docs/file_selection_spec.md).
+For the full file-selection contract, see [File Selection Specification](docs/file_selection_spec.md).
 
 ---
 

@@ -1,3 +1,4 @@
+import typing
 import unittest
 import unittest.mock
 
@@ -7,6 +8,7 @@ import libcst.metadata as cst_metadata
 import pydocformatter.rules.definition_helpers.source_text as source_text
 import pydocformatter.rules.edits as rule_edits
 import pydocformatter.rules.suppressions as suppressions
+import pydocformatter.rules.violations as rule_violations
 from pydocformatter.cli.settings_check import CheckSettings
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleCategoryContext
@@ -14,7 +16,7 @@ from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleFind
 
 
 class TestSourceEdits(unittest.TestCase):
-    def test_planned_source_changes_apply_edits_and_create_findings(self) -> None:
+    def test_planned_source_changes_apply_edits_and_create_violations(self) -> None:
         module = cst.parse_module("value = 1\n")
         rule = RuleMetadata(
             code=RuleCode("PDF999"),
@@ -34,63 +36,14 @@ class TestSourceEdits(unittest.TestCase):
             ),
         )
 
-        result = rule_edits.apply_planned_source_changes(module, changes)
-        findings = rule_edits.findings_for_planned_source_changes(rule, changes)
-        explicitly_fixable_findings = rule_edits.findings_for_planned_source_changes(rule, changes, instance_fixable=True)
+        result = rule_edits.apply_source_edits(module, tuple(change.edit for change in changes))
+        violations = rule_violations.violations_for_planned_source_changes(rule, changes)
 
         self.assertEqual(result.code, "value = 2\n")
-        self.assertEqual(findings, (RuleFinding(rule=rule, line_numbers=(1,), suppression_line_numbers=((2,),), instance_fixable=None),))
-        self.assertEqual(explicitly_fixable_findings, (RuleFinding(rule=rule, line_numbers=(1,), suppression_line_numbers=((2,),), instance_fixable=True),))
+        self.assertEqual(tuple(violation.finding for violation in violations), (RuleFinding(rule=rule, line_numbers=(1,), suppression_line_numbers=((2,),), instance_fixable=None),))
+        self.assertEqual(violations[0].fix.planned_changes() if violations[0].fix is not None else (), changes)
 
-    def test_planned_source_change_suppression_uses_additional_targets(self) -> None:
-        source = "first = 1\nsecond = 2\nthird = 3\n"
-        module = cst.parse_module(source)
-        metadata_wrapper = cst_metadata.MetadataWrapper(module, unsafe_skip_copy=True)
-        rule = RuleMetadata(
-            code=RuleCode("PDF999"),
-            name="test-rule",
-            message="Test message",
-            fix_availability=FixAvailability.ALWAYS,
-            stable_since="1.0.0",
-            setting_effects=(),
-            incompatible_with=(),
-            check_kind=RuleCheckKind.STANDARD,
-        )
-        context = RuleCategoryContext(
-            path="example.py",
-            settings=CheckSettings(),
-            module=module,
-            metadata_wrapper=metadata_wrapper,
-            positions=metadata_wrapper.resolve(cst_metadata.PositionProvider),
-            line_ending="\n",
-            source=source,
-            source_lines=tuple(source_text.source_lines(source)),
-            suppression_index=suppressions.SuppressionIndex(
-                directives=(
-                    suppressions.SuppressionDirective(
-                        line=1,
-                        selectors=(suppressions.SuppressionSelector(text="PDF999", matched_codes=frozenset((rule.code,)), coverage_lines=frozenset((2,)), audit=True),),
-                    ),
-                )
-            ),
-            line_bounds=None,
-        )
-        suppressed = rule_edits.PlannedSourceChange(
-            edit=rule_edits.SourceEdit(cst_metadata.CodeRange(start=cst_metadata.CodePosition(3, 8), end=cst_metadata.CodePosition(3, 9)), "4"),
-            line_numbers=(3,),
-            suppression_line_numbers=((2,),),
-        )
-        unsuppressed = rule_edits.PlannedSourceChange(
-            edit=rule_edits.SourceEdit(cst_metadata.CodeRange(start=cst_metadata.CodePosition(3, 8), end=cst_metadata.CodePosition(3, 9)), "5"),
-            line_numbers=(3,),
-            suppression_line_numbers=(),
-        )
-
-        result = rule_edits.unsuppressed_planned_source_changes(context, rule, (suppressed, unsuppressed))
-
-        self.assertEqual(result, (unsuppressed,))
-
-    def test_sometimes_fixable_findings_require_explicit_instance_fixability(self) -> None:
+    def test_sometimes_fixable_planned_source_changes_infer_fixable_instance(self) -> None:
         rule = RuleMetadata(
             code=RuleCode("PDF999"),
             name="test-rule",
@@ -109,10 +62,11 @@ class TestSourceEdits(unittest.TestCase):
             ),
         )
 
-        with self.assertRaisesRegex(ValueError, "must specify instance_fixable"):
-            rule_edits.findings_for_planned_source_changes(rule, changes)
+        violations = rule_violations.violations_for_planned_source_changes(rule, changes)
 
-    def test_usually_fixable_findings_require_explicit_instance_fixability(self) -> None:
+        self.assertEqual(tuple(violation.finding.instance_fixable for violation in violations), (True,))
+
+    def test_usually_fixable_planned_source_changes_infer_fixable_instance(self) -> None:
         rule = RuleMetadata(
             code=RuleCode("PDF999"),
             name="test-rule",
@@ -131,8 +85,220 @@ class TestSourceEdits(unittest.TestCase):
             ),
         )
 
-        with self.assertRaisesRegex(ValueError, "must specify instance_fixable"):
-            rule_edits.findings_for_planned_source_changes(rule, changes)
+        violations = rule_violations.violations_for_planned_source_changes(rule, changes)
+
+        self.assertEqual(tuple(violation.finding.instance_fixable for violation in violations), (True,))
+
+    def test_diagnostic_helper_infers_nonfixable_instance_for_conditional_rules(self) -> None:
+        rule = RuleMetadata(
+            code=RuleCode("PDF999"),
+            name="test-rule",
+            message="Test message",
+            fix_availability=FixAvailability.SOMETIMES,
+            stable_since="1.0.0",
+            setting_effects=(),
+            incompatible_with=(),
+            check_kind=RuleCheckKind.STANDARD,
+        )
+
+        violation = rule_violations.diagnostic(rule, (1,))
+
+        self.assertFalse(violation.finding.fixable)
+        self.assertIsNone(violation.fix)
+
+    def test_diagnostic_helper_rejects_always_fixable_rules(self) -> None:
+        rule = RuleMetadata(
+            code=RuleCode("PDF999"),
+            name="test-rule",
+            message="Test message",
+            fix_availability=FixAvailability.ALWAYS,
+            stable_since="1.0.0",
+            setting_effects=(),
+            incompatible_with=(),
+            check_kind=RuleCheckKind.STANDARD,
+        )
+
+        with self.assertRaisesRegex(ValueError, "Always-fixable rules must attach a source fix"):
+            rule_violations.diagnostic(rule, (1,))
+
+    def test_optional_planned_source_change_helper_validates_diagnostic_lines(self) -> None:
+        rule = RuleMetadata(
+            code=RuleCode("PDF999"),
+            name="test-rule",
+            message="Test message",
+            fix_availability=FixAvailability.SOMETIMES,
+            stable_since="1.0.0",
+            setting_effects=(),
+            incompatible_with=(),
+            check_kind=RuleCheckKind.STANDARD,
+        )
+
+        with self.assertRaisesRegex(ValueError, "must specify line_numbers"):
+            rule_violations.violation_for_optional_planned_source_change(rule, None)
+
+    def test_optional_planned_source_change_helper_rejects_mismatched_lines(self) -> None:
+        rule = RuleMetadata(
+            code=RuleCode("PDF999"),
+            name="test-rule",
+            message="Test message",
+            fix_availability=FixAvailability.SOMETIMES,
+            stable_since="1.0.0",
+            setting_effects=(),
+            incompatible_with=(),
+            check_kind=RuleCheckKind.STANDARD,
+        )
+        change = rule_edits.PlannedSourceChange(
+            edit=rule_edits.SourceEdit(cst_metadata.CodeRange(start=cst_metadata.CodePosition(1, 0), end=cst_metadata.CodePosition(1, 0)), ""),
+            line_numbers=(1,),
+            suppression_line_numbers=(),
+        )
+
+        with self.assertRaisesRegex(ValueError, "line_numbers must match"):
+            rule_violations.violation_for_optional_planned_source_change(rule, change, line_numbers=(2,))
+
+    def test_optional_planned_source_change_helper_uses_planned_suppression_targets(self) -> None:
+        rule = RuleMetadata(
+            code=RuleCode("PDF999"),
+            name="test-rule",
+            message="Test message",
+            fix_availability=FixAvailability.SOMETIMES,
+            stable_since="1.0.0",
+            setting_effects=(),
+            incompatible_with=(),
+            check_kind=RuleCheckKind.STANDARD,
+        )
+        change = rule_edits.PlannedSourceChange(
+            edit=rule_edits.SourceEdit(cst_metadata.CodeRange(start=cst_metadata.CodePosition(1, 0), end=cst_metadata.CodePosition(1, 0)), ""),
+            line_numbers=(1,),
+            suppression_line_numbers=((2,),),
+        )
+
+        violation = rule_violations.violation_for_optional_planned_source_change(rule, change)
+
+        self.assertEqual(violation.finding.line_numbers, (1,))
+        self.assertEqual(violation.finding.suppression_line_numbers, ((2,),))
+
+    def test_optional_planned_source_change_helper_rejects_mismatched_suppression_targets(self) -> None:
+        rule = RuleMetadata(
+            code=RuleCode("PDF999"),
+            name="test-rule",
+            message="Test message",
+            fix_availability=FixAvailability.SOMETIMES,
+            stable_since="1.0.0",
+            setting_effects=(),
+            incompatible_with=(),
+            check_kind=RuleCheckKind.STANDARD,
+        )
+        change = rule_edits.PlannedSourceChange(
+            edit=rule_edits.SourceEdit(cst_metadata.CodeRange(start=cst_metadata.CodePosition(1, 0), end=cst_metadata.CodePosition(1, 0)), ""),
+            line_numbers=(1,),
+            suppression_line_numbers=((2,),),
+        )
+
+        with self.assertRaisesRegex(ValueError, "suppression targets must match"):
+            rule_violations.violation_for_optional_planned_source_change(rule, change, suppression_line_numbers=((3,),))
+
+    def test_line_targets_are_normalized_for_planned_change_findings_and_optional_arguments(self) -> None:
+        rule = RuleMetadata(
+            code=RuleCode("PDF999"),
+            name="test-rule",
+            message="Test message",
+            fix_availability=FixAvailability.SOMETIMES,
+            stable_since="1.0.0",
+            setting_effects=(),
+            incompatible_with=(),
+            check_kind=RuleCheckKind.STANDARD,
+        )
+        change = rule_edits.PlannedSourceChange(
+            edit=rule_edits.SourceEdit(cst_metadata.CodeRange(start=cst_metadata.CodePosition(1, 0), end=cst_metadata.CodePosition(1, 0)), ""),
+            line_numbers=(1, 1),
+            suppression_line_numbers=((2, 2), (2,)),
+        )
+
+        violation = rule_violations.violation_for_optional_planned_source_change(rule, change, line_numbers=(1, 1), suppression_line_numbers=((2, 2), (2,)))
+
+        self.assertEqual(change.line_numbers, (1,))
+        self.assertEqual(change.suppression_line_numbers, ((2,),))
+        self.assertEqual(violation.finding.line_numbers, (1,))
+        self.assertEqual(violation.finding.suppression_line_numbers, ((2,),))
+
+    def test_planned_source_change_rejects_invalid_line_targets(self) -> None:
+        edit = rule_edits.SourceEdit(cst_metadata.CodeRange(start=cst_metadata.CodePosition(1, 0), end=cst_metadata.CodePosition(1, 0)), "")
+
+        with self.assertRaisesRegex(ValueError, "must not be empty"):
+            rule_edits.PlannedSourceChange(edit=edit, line_numbers=(), suppression_line_numbers=())
+        with self.assertRaisesRegex(ValueError, "positive line numbers"):
+            rule_edits.PlannedSourceChange(edit=edit, line_numbers=(0,), suppression_line_numbers=())
+        with self.assertRaisesRegex(TypeError, "must contain integers"):
+            rule_edits.PlannedSourceChange(edit=edit, line_numbers=typing.cast(typing.Any, (True,)), suppression_line_numbers=())
+        with self.assertRaisesRegex(ValueError, "must not be empty"):
+            rule_edits.PlannedSourceChange(edit=edit, line_numbers=(1,), suppression_line_numbers=((),))
+
+    def test_rule_finding_rejects_invalid_line_targets(self) -> None:
+        rule = RuleMetadata(
+            code=RuleCode("PDF999"),
+            name="test-rule",
+            message="Test message",
+            fix_availability=FixAvailability.NEVER,
+            stable_since="1.0.0",
+            setting_effects=(),
+            incompatible_with=(),
+            check_kind=RuleCheckKind.STANDARD,
+        )
+
+        with self.assertRaisesRegex(ValueError, "must not be empty"):
+            RuleFinding(rule=rule, line_numbers=(), instance_fixable=None)
+        with self.assertRaisesRegex(ValueError, "positive line numbers"):
+            RuleFinding(rule=rule, line_numbers=(0,), instance_fixable=None)
+        with self.assertRaisesRegex(TypeError, "must be a tuple"):
+            RuleFinding(rule=rule, line_numbers=typing.cast(typing.Any, [1]), instance_fixable=None)
+        with self.assertRaisesRegex(TypeError, "must contain integers"):
+            RuleFinding(rule=rule, line_numbers=typing.cast(typing.Any, ("1",)), instance_fixable=None)
+        with self.assertRaisesRegex(TypeError, "must contain integers"):
+            RuleFinding(rule=rule, line_numbers=typing.cast(typing.Any, (True,)), instance_fixable=None)
+        with self.assertRaisesRegex(TypeError, "suppression line-number targets must be a tuple"):
+            RuleFinding(rule=rule, line_numbers=(1,), suppression_line_numbers=typing.cast(typing.Any, [(2,)]), instance_fixable=None)
+        with self.assertRaisesRegex(ValueError, "must not be empty"):
+            RuleFinding(rule=rule, line_numbers=(1,), suppression_line_numbers=((),), instance_fixable=None)
+        with self.assertRaisesRegex(ValueError, "positive line numbers"):
+            RuleFinding(rule=rule, line_numbers=(1,), suppression_line_numbers=((0,),), instance_fixable=None)
+        with self.assertRaisesRegex(TypeError, "must contain integers"):
+            RuleFinding(rule=rule, line_numbers=(1,), suppression_line_numbers=typing.cast(typing.Any, (("2",),)), instance_fixable=None)
+        with self.assertRaisesRegex(TypeError, "must contain integers"):
+            RuleFinding(rule=rule, line_numbers=(1,), suppression_line_numbers=typing.cast(typing.Any, ((True,),)), instance_fixable=None)
+
+    def test_rule_source_fix_rejects_invalid_change(self) -> None:
+        with self.assertRaisesRegex(TypeError, "PlannedSourceChange"):
+            rule_violations.RuleSourceFix.from_change(typing.cast(typing.Any, object()))
+        with self.assertRaisesRegex(TypeError, "PlannedSourceChange"):
+            rule_violations.RuleSourceFix(typing.cast(typing.Any, object()))
+
+    def test_suppression_index_filters_violations_and_reports_used_selector_keys(self) -> None:
+        rule = RuleMetadata(
+            code=RuleCode("PDF999"),
+            name="test-rule",
+            message="Test message",
+            fix_availability=FixAvailability.NEVER,
+            stable_since="1.0.0",
+            setting_effects=(),
+            incompatible_with=(),
+            check_kind=RuleCheckKind.STANDARD,
+        )
+        index = suppressions.SuppressionIndex(
+            directives=(
+                suppressions.SuppressionDirective(
+                    line=1,
+                    selectors=(suppressions.SuppressionSelector(text="PDF999", matched_codes=frozenset({rule.code}), coverage_lines=frozenset({1}), audit=True),),
+                ),
+            )
+        )
+        suppressed_violation = rule_violations.diagnostic(rule, (1,))
+        unsuppressed_violation = rule_violations.diagnostic(rule, (2,))
+
+        result = index.filter_violations((suppressed_violation, unsuppressed_violation))
+
+        self.assertEqual(result.violations, (unsuppressed_violation,))
+        self.assertEqual(result.used_selector_keys, frozenset({(0, 0)}))
 
     def test_empty_edits_return_original_module(self) -> None:
         module = cst.parse_module("x = 1\n")
@@ -193,7 +359,6 @@ class TestSourceEdits(unittest.TestCase):
             source=source,
             source_lines=lines,
             line_bounds=source_text.line_bounds_from_lines(lines),
-            suppression_index=None,
         )
         changes = (
             rule_edits.PlannedSourceChange(

@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import pydocformatter.rules.definition_helpers.summary_style as summary_style
 import pydocformatter.rules.registration as rule_registration
+import pydocformatter.rules.violations as rule_violations
 from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase, RuleContext
 from pydocformatter.rules.definitions.PDF.PDF import PDF
-from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleFinding, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
+from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
 
 
 @rule_registration.register_rule_to(PDF)
@@ -36,23 +37,20 @@ class PDF303SignatureLikeSummary(RuleBase):
     )
 
     @classmethod
-    def check(cls, context: RuleContext) -> tuple[RuleFinding, ...]:
-        """Return findings for summaries that include the function signature."""
+    def violations(cls, context: RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
+        """Return violations for summaries that include the function signature."""
         data = PDF.require_data(context)
-        findings: list[RuleFinding] = []
+        violations: list[rule_violations.RuleViolation] = []
         for target in data.summary_line_targets:
             if not summary_style.is_function_docstring(target.docstring):
                 continue
             if _contains_signature(target.line.text, target.docstring.owner.name):
-                findings.append(
-                    RuleFinding(
-                        rule=cls.meta,
-                        line_numbers=summary_style.line_numbers(target),
-                        instance_message=f"Docstring summary should not include signature for function '{target.docstring.owner.name}'",
-                        instance_fixable=None,
+                violations.append(
+                    rule_violations.diagnostic(
+                        cls.meta, summary_style.line_numbers(target), instance_message=f"Docstring summary should not include signature for function '{target.docstring.owner.name}'"
                     )
                 )
-        return tuple(findings)
+        return tuple(violations)
 
 
 def _contains_signature(line: str, function_name: str) -> bool:

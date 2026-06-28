@@ -1,8 +1,8 @@
-# Source Suppressions
+# Rule Suppressions
 
-pydocfmt supports source comments that suppress pydocformatter findings. Suppressions use pydocformatter rule selectors such as `PDF101`, `PDF`, `PCF001`, `PCF`, and `ALL`.
+This document specifies how pydocfmt source comments suppress pydocformatter rule findings and automatic fixes. Suppression payloads use pydocformatter rule selectors such as `PDF101`, `PDF`, `PCF001`, `PCF`, and `ALL`.
 
-Source suppressions filter both check findings and automatic fixes. A suppressed finding is not reported, and a suppressed fix is not applied.
+Rule suppression directives in source code filter both check findings and automatic fixes. A suppressed finding is not reported, and a suppressed fix is not applied.
 
 ## `# noqa`
 

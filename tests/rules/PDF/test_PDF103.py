@@ -4,6 +4,7 @@ import libcst.metadata as cst_metadata
 import pydocformatter.formatter as formatter
 import pydocformatter.rules.definition_helpers.source_text as source_text
 import pydocformatter.rules_selection as rules_selection
+import tests.rule_helpers as rule_helpers
 from pydocformatter.cli import settings_check
 from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
 from pydocformatter.rules.definitions.PDF.PDF import PDF
@@ -24,7 +25,6 @@ def contexts(source: str, *, settings: settings_check.CheckSettings | None = Non
         source=source,
         source_lines=tuple(source_text.source_lines(source)),
         line_bounds=None,
-        suppression_index=None,
     )
     return category, RuleContext(
         path=category.path,
@@ -36,9 +36,7 @@ def contexts(source: str, *, settings: settings_check.CheckSettings | None = Non
         source=category.source,
         source_lines=category.source_lines,
         line_bounds=category.line_bounds,
-        suppression_index=category.suppression_index,
         category_data=PDF.prepare(category),
-        effectively_fixable=True,
     )
 
 
@@ -60,7 +58,7 @@ def test_default_blank_style_makes_ordinary_blank_lines_truly_blank() -> None:
 def test_multiple_blank_line_kinds_in_one_docstring_are_reported_together() -> None:
     source = 'def function():\n    """Summary.\n   \n\t \n    Body.\n      """\n'
     _, context = contexts(source)
-    findings = PDF103DocstringBlankLineWhitespace.check(context)
+    findings = rule_helpers.rule_findings(PDF103DocstringBlankLineWhitespace, context)
     result = format_pdf004(source)
 
     assert result.new_source == 'def function():\n    """Summary.\n\n\n    Body.\n    """\n'
@@ -179,15 +177,15 @@ def test_does_not_treat_non_space_tab_whitespace_as_blank_lines() -> None:
 def test_check_fix_line_numbers_and_fix_false_findings_agree() -> None:
     source = 'def first():\n    """Summary.\n      \n    """\n\ndef second():\n    """   \n    Body.\n    """\n'
     _, context = contexts(source)
-    findings = PDF103DocstringBlankLineWhitespace.check(context)
-    fixed = PDF103DocstringBlankLineWhitespace.fix(context)
+    findings = rule_helpers.rule_findings(PDF103DocstringBlankLineWhitespace, context)
+    fixed = rule_helpers.rule_fix_result(PDF103DocstringBlankLineWhitespace, context)
     check_only = format_pdf004(source, fix=False)
 
     assert tuple(finding.line_numbers for finding in findings) == ((3,), (7,))
     assert tuple(finding.line_numbers for finding in fixed.fixed_findings) == ((3,), (7,))
     assert tuple(finding.line_numbers for finding in check_only.unfixed_findings) == ((3,), (7,))
     _, fixed_context = contexts(fixed.module.code)
-    assert PDF103DocstringBlankLineWhitespace.check(fixed_context) == ()
+    assert rule_helpers.rule_findings(PDF103DocstringBlankLineWhitespace, fixed_context) == ()
 
 
 def test_skips_concatenated_escaped_and_non_docstring_strings() -> None:

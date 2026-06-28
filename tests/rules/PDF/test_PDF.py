@@ -44,7 +44,6 @@ def category_context(source: str, *, settings: CheckSettings | None = None) -> R
         source=source,
         source_lines=tuple(source_text.source_lines(source)),
         line_bounds=None,
-        suppression_index=None,
     )
 
 
@@ -59,9 +58,7 @@ def rule_context(context: RuleCategoryContext, data: object | None) -> RuleConte
         source=context.source,
         source_lines=context.source_lines,
         line_bounds=context.line_bounds,
-        suppression_index=context.suppression_index,
         category_data=data,
-        effectively_fixable=True,
     )
 
 

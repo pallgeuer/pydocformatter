@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Run external Claude and Codex review processes with bounded concurrency."""
+"""Run configured Loupe reviewer commands and emit structured JSON.
 
-from __future__ import annotations
+This Python script must support Python 3.6+.
+"""
 
 import argparse
 import json
@@ -10,63 +11,224 @@ import shlex
 import signal
 import subprocess
 import sys
+import tempfile
+import threading
 import time
-from dataclasses import dataclass
-from typing import Any
+from typing import Any, BinaryIO, Dict, List, Optional, Sequence
 
-DEFAULT_SCOPE = "uncommitted changes"
 DEFAULT_TIMEOUT_SECONDS = 30 * 60
+PROCESS_TERMINATION_SECONDS = 5
+
+CODEX_COMMAND_TEMPLATE = """( set -o pipefail; codex exec --cd "$(git rev-parse --show-toplevel)" --ephemeral --sandbox workspace-write -c model_reasoning_effort='"high"' --json {prompt} | jq -ser 'map(select(.type == "item.completed" and .item.type == "agent_message") | .item.text) | last // empty' )"""
+CLAUDE_COMMAND_TEMPLATE = """( set -o pipefail; cd "$(git rev-parse --show-toplevel)" && claude -p --no-session-persistence --permission-mode auto --effort high --output-format json {prompt} | jq -er ".result" )"""  # fmt: skip
+
+REVIEW_SKILL_PROHIBITION = "Do not launch any kind of review skill."
 REVIEW_POLICY = "Review only. Do not modify repository files, stage changes, commit, install dependencies, or use external network access except normal web search. You may inspect files and run local validation, including manual tests; incidental temp/cache artifacts are okay."
+REVIEW_NOTE = "{} {}".format(REVIEW_SKILL_PROHIBITION, REVIEW_POLICY)
+
+CODE_REVIEW_COMMAND_PROMPT_TEMPLATE = "{review_policy} /code-review {review_scope}"
+REVIEW_COMMAND_PROMPT_TEMPLATE = "{review_policy} /review {review_scope}"
+CORRECTNESS_REVIEW_PROMPT_TEMPLATE = """Review scope: {review_scope}
+Task: It is very important to me that the code now works completely correctly and as intended, and robustly performs the exact required actions in all cases without the risk of unintended side-effects. Carefully analyze the code in detail to ensure this. Construct and run a large number of manual tests to test all conceivable unusual/complex/mixed situations, as well as special/edge cases, and on purposely try to find (in an adversarial manner) manual tests that make the current implementation fail or do the wrong thing. Explicitly consider measured test code coverage, if possible. If a manual test fails, then think critically whether the expectation of the test is truly correct or the current implementation behavior is actually truly correct.
+Note: {review_note}"""
+DESIGN_REVIEW_PROMPT_TEMPLATE = """Review scope: {review_scope}
+Task: It is very important to me that the code is well-structured, well-organized, maintainable long-term, has clean/meaningful interfaces/contracts/abstraction boundaries throughout, and exhibits good design patterns/architectural choices. Carefully analyze the code in detail to ensure this, and identify any code smells/recommended refactoring opportunities. Search also explicitly for any duplicated logic, unnecessary thin wrappers, dead code, old compatibility code that is no longer needed, and unnecessarily inefficient code.
+Note: {review_note}"""
 
 
-@dataclass(frozen=True)
-class ReviewerSpec:
-    """Shell command metadata for one external reviewer."""
+class Reviewer:
+    """Command and prompt template for one external reviewer."""
 
-    name: str
-    command: str
+    def __init__(self, reviewer_name: str, command_template: str, prompt_template: str) -> None:
+        """Store the display name, shell command template, and prompt template."""
+        self.reviewer_name = reviewer_name
+        self.command_template = command_template
+        self.prompt_template = prompt_template
+
+    def build_prompt(self, review_scope: str) -> str:
+        """Return the complete prompt passed to this reviewer for a scope."""
+        return self.prompt_template.format(review_scope=review_scope, review_policy=REVIEW_POLICY, review_skill_prohibition=REVIEW_SKILL_PROHIBITION, review_note=REVIEW_NOTE)
+
+    def build_command(self, review_scope: str) -> str:
+        """Return the launched shell command for this reviewer and scope."""
+        return self.command_template.format(prompt=shlex.quote(self.build_prompt(review_scope)))
 
 
-@dataclass
-class RunningReviewer:
-    """Subprocess state tracked while a reviewer is running."""
+class ReviewerRun:
+    """Mutable execution state for one launched reviewer process."""
 
-    spec: ReviewerSpec
-    process: subprocess.Popen[str] | None
-    started_at: float
-    launch_error: str | None = None
+    def __init__(self, reviewer: Reviewer, launched_command: str) -> None:
+        """Initialize process, timing, and captured output fields."""
+        self.reviewer = reviewer
+        self.launched_command = launched_command
+        self.process: Optional[subprocess.Popen] = None
+        self.started_at: Optional[float] = None
+        self.finished_at: Optional[float] = None
+        self.stdout = ""
+        self.stderr = ""
+        self.launch_error: Optional[str] = None
+        self.collection_error: Optional[str] = None
+        self.thread: Optional[threading.Thread] = None
+        self.stdout_file: Optional[BinaryIO] = None
+        self.stderr_file: Optional[BinaryIO] = None
+        self.timed_out = False
+
+    def launch(self) -> None:
+        """Start the reviewer process and begin collecting its output."""
+        try:
+            self.stdout_file = tempfile.TemporaryFile(mode="w+b")
+            self.stderr_file = tempfile.TemporaryFile(mode="w+b")
+            self.started_at = time.monotonic()
+            self.process = subprocess.Popen(
+                ["bash", "-lc", self.launched_command],
+                stdout=self.stdout_file,
+                stderr=self.stderr_file,
+                universal_newlines=True,
+                start_new_session=True,
+            )
+        except OSError as exc:
+            self.launch_error = str(exc)
+            self.finished_at = time.monotonic()
+            self.close()
+            return
+
+        self.thread = threading.Thread(target=self._collect_output)
+        self.thread.daemon = True
+        self.thread.start()
+
+    def _collect_output(self) -> None:
+        """Wait for the process to finish and capture stdout and stderr."""
+        if self.process is None:
+            self.finished_at = time.monotonic()
+            return
+        try:
+            self.process.wait()
+            self._refresh_output()
+        except OSError as exc:
+            self.collection_error = str(exc)
+        self.finished_at = time.monotonic()
+
+    def _read_output_file(self, output_file: BinaryIO) -> str:
+        """Return current text from a temporary output file."""
+        output_file.flush()
+        output_file.seek(0)
+        return output_file.read().decode("utf-8", errors="replace")
+
+    def _refresh_output(self) -> None:
+        """Read any output captured so far from temporary files."""
+        if self.stdout_file is not None:
+            self.stdout = self._read_output_file(self.stdout_file)
+        if self.stderr_file is not None:
+            self.stderr = self._read_output_file(self.stderr_file)
+
+    def close(self) -> None:
+        """Close temporary output files."""
+        for output_file in (self.stdout_file, self.stderr_file):
+            if output_file is not None:
+                output_file.close()
+        self.stdout_file = None
+        self.stderr_file = None
+
+    def is_running(self) -> bool:
+        """Return whether the reviewer process is still being collected."""
+        return self.thread is not None and self.thread.is_alive()
+
+    def elapsed_seconds(self) -> float:
+        """Return elapsed reviewer runtime in seconds."""
+        if self.started_at is None:
+            return 0.0
+        finished_at = self.finished_at
+        if finished_at is None:
+            finished_at = time.monotonic()
+        return round(finished_at - self.started_at, 3)
+
+    def return_code(self) -> Optional[int]:
+        """Return the subprocess return code when a process was launched."""
+        if self.process is None:
+            return None
+        return self.process.returncode
+
+    def status(self) -> str:
+        """Return the normalized status string for this reviewer run."""
+        if self.launch_error is not None:
+            return "launch_failed"
+        if self.timed_out:
+            return "timed_out"
+        if self.collection_error is not None:
+            return "failed"
+        if self.return_code() == 0:
+            return "succeeded"
+        return "failed"
+
+    def result(self) -> Dict[str, Any]:
+        """Return the JSON-serializable reviewer result."""
+        stderr_parts: List[str] = []
+        try:
+            self._refresh_output()
+        except OSError as exc:
+            self.collection_error = str(exc)
+        if self.stderr:
+            stderr_parts.append(self.stderr)
+        if self.launch_error is not None:
+            stderr_parts.append(self.launch_error)
+        if self.collection_error is not None:
+            stderr_parts.append(self.collection_error)
+        return {
+            "reviewer_name": self.reviewer.reviewer_name,
+            "launched_command": self.launched_command,
+            "status": self.status(),
+            "timed_out": self.timed_out,
+            "return_code": self.return_code(),
+            "elapsed_seconds": self.elapsed_seconds(),
+            "stdout": self.stdout,
+            "stderr": "\n".join(stderr_parts),
+        }
 
 
-def parse_args() -> argparse.Namespace:
-    """Parse command-line options."""
+REVIEWERS = (
+    Reviewer(
+        reviewer_name="Claude Code Review",
+        command_template=CLAUDE_COMMAND_TEMPLATE,
+        prompt_template=CODE_REVIEW_COMMAND_PROMPT_TEMPLATE,
+    ),
+    Reviewer(
+        reviewer_name="Codex Review",
+        command_template=CODEX_COMMAND_TEMPLATE,
+        prompt_template=REVIEW_COMMAND_PROMPT_TEMPLATE,
+    ),
+    Reviewer(
+        reviewer_name="Codex Correctness",
+        command_template=CODEX_COMMAND_TEMPLATE,
+        prompt_template=CORRECTNESS_REVIEW_PROMPT_TEMPLATE,
+    ),
+    Reviewer(
+        reviewer_name="Codex Design",
+        command_template=CODEX_COMMAND_TEMPLATE,
+        prompt_template=DESIGN_REVIEW_PROMPT_TEMPLATE,
+    ),
+)
+
+
+def parse_args(argv: Optional[Sequence[str]]) -> argparse.Namespace:
+    """Parse the runner command line and require explicit scope text."""
     parser = argparse.ArgumentParser(description="Run external Loupe reviewers and emit structured JSON.")
-    parser.add_argument("scope", nargs="*", help=f"Review scope text. Defaults to {DEFAULT_SCOPE!r}.")
-    parser.add_argument("--timeout-seconds", type=float, default=DEFAULT_TIMEOUT_SECONDS, help="Per-reviewer timeout in seconds.")
+    parser.add_argument("scope", help="Review scope text.")
+    parser.add_argument("--timeout-seconds", type=float, default=DEFAULT_TIMEOUT_SECONDS, help="Global reviewer timeout in seconds.")
+    parser.add_argument("--output", help="Path where the exact emitted JSON should also be written.")
     parser.add_argument("--dry-run", action="store_true", help="Print the commands that would run without launching reviewers.")
-    return parser.parse_args()
+    args = parser.parse_args(argv)
+    args.review_scope = args.scope.strip()
+    if not args.review_scope:
+        parser.error("review scope must not be empty")
+    return args
 
 
-def build_specs(scope: str) -> list[ReviewerSpec]:
-    """Build the exact reviewer shell commands for the requested scope."""
-    claude_prompt = f"{REVIEW_POLICY} /code-review {scope}"
-    codex_prompt = f"{REVIEW_POLICY} /review {scope}"
-    claude_command = (
-        '( set -o pipefail; cd "$(git rev-parse --show-toplevel)" && claude -p --no-session-persistence --permission-mode auto --effort high --output-format json '
-        + shlex.quote(claude_prompt)
-        + " | jq -er '.result' )"
-    )
-    codex_command = (
-        '( set -o pipefail; codex exec --cd "$(git rev-parse --show-toplevel)" --ephemeral --sandbox workspace-write -c model_reasoning_effort=\'"high"\' --json '
-        + shlex.quote(codex_prompt)
-        + ' | jq -ser \'map(select(.type == "item.completed" and .item.type == "agent_message") | .item.text) | last // empty\' )'
-    )
-    return [
-        ReviewerSpec(name="Claude", command=claude_command),
-        ReviewerSpec(name="Codex", command=codex_command),
-    ]
+def build_reviewer_runs(reviewers: Sequence[Reviewer], review_scope: str) -> List[ReviewerRun]:
+    """Create reviewer run states for all configured reviewers."""
+    return [ReviewerRun(reviewer=reviewer, launched_command=reviewer.build_command(review_scope)) for reviewer in reviewers]
 
 
-def get_repo_root() -> str | None:
+def get_repo_root() -> Optional[str]:
     """Return the current Git repository root, if available."""
     try:
         completed = subprocess.run(
@@ -74,109 +236,112 @@ def get_repo_root() -> str | None:
             check=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            text=True,
+            universal_newlines=True,
         )
     except (OSError, subprocess.CalledProcessError):
         return None
     return completed.stdout.strip() or None
 
 
-def launch_reviewer(spec: ReviewerSpec) -> RunningReviewer:
-    """Launch one reviewer in its own process group."""
-    started_at = time.monotonic()
+def send_process_group_signal(process: subprocess.Popen, signal_number: signal.Signals) -> None:
+    """Send a signal to a launched reviewer process group."""
     try:
-        process = subprocess.Popen(
-            ["bash", "-lc", spec.command],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            start_new_session=True,
-        )
-    except OSError as exc:
-        return RunningReviewer(spec=spec, process=None, started_at=started_at, launch_error=str(exc))
-    return RunningReviewer(spec=spec, process=process, started_at=started_at)
-
-
-def terminate_process_group(process: subprocess.Popen[str]) -> None:
-    """Terminate a launched reviewer process group."""
-    try:
-        os.killpg(process.pid, signal.SIGTERM)
+        os.killpg(process.pid, signal_number)
     except ProcessLookupError:
         return
-    try:
-        process.wait(timeout=5)
-    except subprocess.TimeoutExpired:
-        try:
-            os.killpg(process.pid, signal.SIGKILL)
-        except ProcessLookupError:
+
+
+def launch_reviewer_runs(runs: Sequence[ReviewerRun]) -> None:
+    """Launch every reviewer run."""
+    for run in runs:
+        run.launch()
+
+
+def wait_for_reviewer_runs(runs: Sequence[ReviewerRun], timeout_seconds: float) -> None:
+    """Wait for reviewer runs until completion or the global timeout."""
+    deadline = time.monotonic() + timeout_seconds
+    while True:
+        running = [run for run in runs if run.is_running()]
+        if not running:
             return
+        if time.monotonic() >= deadline:
+            for run in running:
+                run.timed_out = True
+                if run.process is not None:
+                    send_process_group_signal(run.process, signal.SIGTERM)
+            break
+        time.sleep(min(0.05, max(0.0, deadline - time.monotonic())))
+
+    termination_deadline = time.monotonic() + PROCESS_TERMINATION_SECONDS
+    for run in running:
+        if run.thread is not None:
+            run.thread.join(max(0.0, termination_deadline - time.monotonic()))
+    for run in running:
+        if run.is_running() and run.process is not None:
+            send_process_group_signal(run.process, signal.SIGKILL)
+    kill_deadline = time.monotonic() + PROCESS_TERMINATION_SECONDS
+    for run in runs:
+        if run.thread is not None:
+            run.thread.join(max(0.0, kill_deadline - time.monotonic()))
 
 
-def collect_reviewer(running: RunningReviewer, timeout_seconds: float) -> dict[str, Any]:
-    """Collect one reviewer result while respecting the per-reviewer timeout."""
-    if running.process is None:
-        return {
-            "name": running.spec.name,
-            "status": "launch_failed",
-            "timed_out": False,
-            "returncode": None,
-            "elapsed_seconds": round(time.monotonic() - running.started_at, 3),
-            "stdout": "",
-            "stderr": running.launch_error or "",
-            "command": running.spec.command,
-        }
+def result_exit_code(results: Sequence[Dict[str, Any]]) -> int:
+    """Return zero only when every reviewer succeeded."""
+    if all(result["status"] == "succeeded" for result in results):
+        return 0
+    return 1
 
-    remaining = max(0.0, timeout_seconds - (time.monotonic() - running.started_at))
-    timed_out = False
-    try:
-        stdout, stderr = running.process.communicate(timeout=remaining)
-    except subprocess.TimeoutExpired:
-        timed_out = True
-        terminate_process_group(running.process)
-        stdout, stderr = running.process.communicate()
 
-    elapsed_seconds = round(time.monotonic() - running.started_at, 3)
-    returncode = running.process.returncode
-    if timed_out:
-        status = "timed_out"
-    elif returncode == 0:
-        status = "succeeded"
-    else:
-        status = "failed"
+def dry_run_output(review_scope: str, git_root: Optional[str], timeout_seconds: float, runs: Sequence[ReviewerRun]) -> Dict[str, Any]:
+    """Return the dry-run JSON payload without reviewer result fields."""
     return {
-        "name": running.spec.name,
-        "status": status,
-        "timed_out": timed_out,
-        "returncode": returncode,
-        "elapsed_seconds": elapsed_seconds,
-        "stdout": stdout,
-        "stderr": stderr,
-        "command": running.spec.command,
+        "review_scope": review_scope,
+        "git_root": git_root,
+        "timeout_seconds": timeout_seconds,
+        "reviewers": [{"reviewer_name": run.reviewer.reviewer_name, "launched_command": run.launched_command} for run in runs],
     }
 
 
-def main() -> int:
-    """Run both external reviewers and emit combined JSON."""
-    args = parse_args()
-    scope = " ".join(args.scope).strip() or DEFAULT_SCOPE
-    specs = build_specs(scope)
-    repo_root = get_repo_root()
+def review_output(review_scope: str, git_root: Optional[str], timeout_seconds: float, elapsed_seconds: float, results: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
+    """Return the completed review JSON payload."""
+    return {
+        "review_scope": review_scope,
+        "git_root": git_root,
+        "timeout_seconds": timeout_seconds,
+        "elapsed_seconds": elapsed_seconds,
+        "reviewers": list(results),
+    }
+
+
+def emit_json_output(payload: Dict[str, Any], output_path: Optional[str]) -> None:
+    """Write identical JSON text to stdout and an optional artifact path."""
+    output = json.dumps(payload, indent=2) + "\n"
+    sys.stdout.write(output)
+    if output_path is not None:
+        with open(output_path, "w", encoding="utf-8") as output_file:
+            output_file.write(output)
+
+
+def main(argv: Optional[Sequence[str]] = None, reviewers: Sequence[Reviewer] = REVIEWERS) -> int:
+    """Run configured external reviewers and emit combined JSON."""
+    args = parse_args(argv)
+    runs = build_reviewer_runs(reviewers, args.review_scope)
+    git_root = get_repo_root()
     if args.dry_run:
-        print(json.dumps({"scope": scope, "repo_root": repo_root, "reviewers": [{"name": spec.name, "command": spec.command} for spec in specs]}, indent=2))
+        emit_json_output(dry_run_output(args.review_scope, git_root, args.timeout_seconds, runs), args.output)
         return 0
 
-    started_at = time.monotonic()
-    running_reviewers = [launch_reviewer(spec) for spec in specs]
-    results = [collect_reviewer(running, args.timeout_seconds) for running in running_reviewers]
-    output = {
-        "scope": scope,
-        "repo_root": repo_root,
-        "timeout_seconds": args.timeout_seconds,
-        "elapsed_seconds": round(time.monotonic() - started_at, 3),
-        "reviewers": results,
-    }
-    print(json.dumps(output, indent=2))
-    return 0
+    try:
+        started_at = time.monotonic()
+        launch_reviewer_runs(runs)
+        wait_for_reviewer_runs(runs, args.timeout_seconds)
+        elapsed_seconds = round(time.monotonic() - started_at, 3)
+        results = [run.result() for run in runs]
+        emit_json_output(review_output(args.review_scope, git_root, args.timeout_seconds, elapsed_seconds, results), args.output)
+        return result_exit_code(results)
+    finally:
+        for run in runs:
+            run.close()
 
 
 if __name__ == "__main__":

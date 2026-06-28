@@ -1,4 +1,4 @@
-"""Summary punctuation finding and fix helpers."""
+"""Summary punctuation violation helpers."""
 
 from __future__ import annotations
 
@@ -6,21 +6,9 @@ import dataclasses
 
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 import pydocformatter.rules.edits as rule_edits
+import pydocformatter.rules.violations as rule_violations
 from pydocformatter.rules.definition import RuleContext
-from pydocformatter.rules.models import RuleFinding, RuleMetadata
-
-
-@dataclasses.dataclass(frozen=True)
-class SummaryPunctuationResult:
-    """Finding and optional fix for one summary-punctuation issue.
-
-    Attributes:
-        finding (RuleFinding): Diagnostic reported for one summary-punctuation issue.
-        change (rule_edits.PlannedSourceChange | None): Planned edit that fixes the summary, if safe.
-    """
-
-    finding: RuleFinding
-    change: rule_edits.PlannedSourceChange | None
+from pydocformatter.rules.models import RuleMetadata
 
 
 @dataclasses.dataclass(frozen=True)
@@ -36,8 +24,8 @@ class SummaryPunctuationPolicy:
     nonfixable_endings: str
 
 
-def results(context: RuleContext, *, rule: RuleMetadata, policy: SummaryPunctuationPolicy) -> tuple[SummaryPunctuationResult, ...]:
-    """Return findings and optional fixes for summary punctuation."""
+def results(context: RuleContext, *, rule: RuleMetadata, policy: SummaryPunctuationPolicy) -> tuple[rule_violations.RuleViolation, ...]:
+    """Return violations for summary punctuation."""
     data = PDF_definition.PDF.require_data(context)
     return tuple(result for target in data.summary_terminal_line_targets if (result := result_for_target(target, context=context, rule=rule, policy=policy)) is not None)
 
@@ -48,16 +36,13 @@ def result_for_target(
     context: RuleContext,
     rule: RuleMetadata,
     policy: SummaryPunctuationPolicy,
-) -> SummaryPunctuationResult | None:
-    """Return one summary-punctuation result for a summary target."""
+) -> rule_violations.RuleViolation | None:
+    """Return one summary-punctuation violation for a summary target."""
     trimmed = target.line.text.rstrip(" \t")
     if not trimmed or trimmed.endswith("\\") or trimmed.endswith(tuple(policy.valid_endings)):
         return None
     change = None if trimmed.endswith(tuple(policy.nonfixable_endings)) else _planned_change(target, context=context)
-    return SummaryPunctuationResult(
-        finding=RuleFinding(rule=rule, line_numbers=PDF_definition.docstring_line_numbers(target.docstring, target.line), instance_fixable=change is not None),
-        change=change,
-    )
+    return rule_violations.violation_for_optional_planned_source_change(rule, change, line_numbers=PDF_definition.docstring_line_numbers(target.docstring, target.line))
 
 
 def _planned_change(

@@ -11,7 +11,7 @@ It also reports invalid or unknown selector payloads in pydocfmt suppression dir
 
 PCF006 findings are filtered through source suppressions like other pydocfmt findings, so pydocfmt selectors that include `PCF006` can suppress this rule's diagnostics.
 
-The full source-suppression contract, including target attachment rules and cross-rule examples, is documented in `docs/suppressions.md`.
+The full rule-suppression contract, including target attachment rules and cross-rule examples, is documented in `docs/rule_suppressions.md`.
 
 ## Why is this useful?
 Unused suppression comments hide intent and can make future checks harder to interpret. Reporting them keeps pydocfmt-specific suppressions tied to active findings.

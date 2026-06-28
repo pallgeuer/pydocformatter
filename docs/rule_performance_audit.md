@@ -2,15 +2,7 @@
 
 Rule inventory up-to-date commit: `20d4d33a95ad72cc2435e4f45524824a3e9afb4a`
 
-Audit status: complete as of 2026-06-22. This document is the source of truth for the rule performance audit. The audit covered every Git-tracked rule category and concrete rule implementation under `src/pydocformatter/rules/definitions/*/*.py`. The implementation follow-up fixes recorded in the findings have been applied.
-
-## Test-Audit Refresh Notes
-
-The test performance audit rerun on 2026-06-22 checked whether tracked rule definitions changed after this rule audit's inventory commit.
-
-| Rule implementation scope                      | Change evidence                                                                                                                         | Needed rule-audit action                                                            | Status |
-|------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------|--------|
-| `src/pydocformatter/rules/definitions/**/*.py` | `git diff --name-status 20d4d33a95ad72cc2435e4f45524824a3e9afb4a -- 'src/pydocformatter/rules/definitions/**/*.py'` produced no output. | No category or rule needs rechecking before relying on this rule-performance audit. | Done   |
+Audit status: complete as of 2026-06-22. This document is the editable source of truth for rule performance audits. Each future audit rerun should execute the goal command below, refresh the inventory tables from Git-tracked rule files, update evidence and analysis as work proceeds, and add or update concrete findings with `Status:` fields.
 
 ## Goal Command
 

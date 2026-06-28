@@ -6,11 +6,12 @@ import pydocformatter.rules.definition_helpers.docstring_conventions as docstrin
 import pydocformatter.rules.definition_helpers.parameter_documentation as parameter_documentation
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 import pydocformatter.rules.registration as rule_registration
+import pydocformatter.rules.violations as rule_violations
 from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase, RuleContext
 from pydocformatter.rules.definitions.PDF.PDF import PDF
-from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleFinding, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
+from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
 
 
 @rule_registration.register_rule_to(PDF)
@@ -42,10 +43,10 @@ class PDF501ExtraneousParameterDocumentation(RuleBase):
     )
 
     @classmethod
-    def check(cls, context: RuleContext) -> tuple[RuleFinding, ...]:
-        """Return findings for documented parameters absent from the signature."""
+    def violations(cls, context: RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
+        """Return violations for documented parameters absent from the signature."""
         data = PDF.require_data(context)
-        findings: list[RuleFinding] = []
+        violations: list[rule_violations.RuleViolation] = []
         typed_dict_keys_by_name: dict[str, frozenset[str]] | None = None
         for docstring in data.docstrings:
             definition = docstring.owner
@@ -68,12 +69,7 @@ class PDF501ExtraneousParameterDocumentation(RuleBase):
                 continue
             for parameter in parameter_documentation.documented_parameters(docstring):
                 if parameter.comparison_name not in allowed_names:
-                    findings.append(
-                        RuleFinding(
-                            rule=cls.meta,
-                            line_numbers=parameter.line_numbers,
-                            instance_message=f"Docstring documents parameter '{parameter.name}' that is not in the function signature",
-                            instance_fixable=None,
-                        )
+                    violations.append(
+                        rule_violations.diagnostic(cls.meta, parameter.line_numbers, instance_message=f"Docstring documents parameter '{parameter.name}' that is not in the function signature")
                     )
-        return tuple(findings)
+        return tuple(violations)

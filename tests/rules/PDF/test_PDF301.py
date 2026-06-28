@@ -5,6 +5,7 @@ import pytest
 import pydocformatter.formatter as formatter
 import pydocformatter.rules.definition_helpers.source_text as source_text
 import pydocformatter.rules_selection as rules_selection
+import tests.rule_helpers as rule_helpers
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention, LineEnding
 from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
 from pydocformatter.rules.definitions.PDF.PDF import PDF
@@ -27,7 +28,6 @@ def contexts(source: str, *, settings: CheckSettings | None = None) -> tuple[Rul
         source=source,
         source_lines=tuple(source_text.source_lines(source)),
         line_bounds=None,
-        suppression_index=None,
     )
     return category, RuleContext(
         path=category.path,
@@ -39,9 +39,7 @@ def contexts(source: str, *, settings: CheckSettings | None = None) -> tuple[Rul
         source=category.source,
         source_lines=category.source_lines,
         line_bounds=category.line_bounds,
-        suppression_index=category.suppression_index,
         category_data=PDF.prepare(category),
-        effectively_fixable=True,
     )
 
 
@@ -308,8 +306,8 @@ def test_pdf300_fix_satisfies_pdf301() -> None:
 def test_check_and_fix_false_findings_agree() -> None:
     source = 'def function():\n    """Return value"""\n'
     _, context = contexts(source)
-    findings = PDF301SummaryTerminalPunctuation.check(context)
-    fixed = PDF301SummaryTerminalPunctuation.fix(context)
+    findings = rule_helpers.rule_findings(PDF301SummaryTerminalPunctuation, context)
+    fixed = rule_helpers.rule_fix_result(PDF301SummaryTerminalPunctuation, context)
     check_only = format_source(source, fix=False)
 
     assert tuple(finding.line_numbers for finding in findings) == ((2,),)

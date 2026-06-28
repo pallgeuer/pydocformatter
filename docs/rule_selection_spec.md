@@ -1,6 +1,6 @@
 # Rule Selection Specification
 
-This document specifies how `pydocfmt` discovers rule definitions and resolves rule-selection, per-file-ignore, and fixability settings.
+This document specifies how `pydocfmt` discovers rule definitions and resolves rule-selection, per-file-ignore, and fixability settings, and how rule selection information is exposed via the CLI.
 
 ## Ruff Compatibility Deltas
 
@@ -28,26 +28,24 @@ src/pydocformatter/rules/definitions/PDF/PDF.md
 
 The class is also named after the prefix and defines `RuleCategoryMetadata` containing its `prefix`, user-facing `name`, and optional `url`. `RuleCategoryBase` rejects missing or invalid metadata at class definition time and provides `ordered_rules()` and `ordered_code_class_map()` views.
 
-Each implemented rule should be defined as one `RuleBase` subclass, normally in a module grouped by prefix:
+Each implemented rule is collected as one `RuleBase` subclass, normally in a module grouped by prefix:
 
 ```text
 src/pydocformatter/rules/definitions/PDF/PDF101_docstring_reflow.py
 ```
 
-Rule classes register with their category through `@register_rule_to(PDF)` and define a `meta` class attribute containing `RuleMetadata`:
+Rule classes register with their category through `@register_rule_to(PDF)`. Rule selection uses the rule's `meta` class attribute, a `RuleMetadata` record containing:
 
 - `code`: A `RuleCode`, such as `PDF101`.
 - `name`: A stable machine-readable name, such as `docstring-reflow`.
-- `message`: The default diagnostic message. It may include format fields for per-finding customization.
+- `message`: The default diagnostic message shown in rule listings and findings.
 - `fix_availability`: A `FixAvailability` value describing whether automatic fixes are `Always`, `Usually`, `Sometimes`, or `Never` available at the rule level.
 - `stable_since`: The pydocformatter version in which the rule became stable.
 - `setting_effects`: Immutable metadata mapping resolved setting fields and triggering values to `Ignored` or `Disabled` selection effects.
 - `incompatible_with`: An immutable tuple of `RuleCode` values for rules that cannot be selected together with this rule.
-- `check_kind`: A `RuleCheckKind` value describing whether the rule runs as a standard source check or an aggregate suppression-audit check.
+- `check_kind`: A `RuleCheckKind` value used to distinguish standard source-check rules from suppression-audit rules during rule collection and execution ordering.
 
 `RuleBase` rejects subclasses without `meta`, or with non-`RuleMetadata` metadata, at class definition time. `RuleMetadata` rejects non-`RuleCode` codes, non-`FixAvailability` fix availability values, non-`RuleCheckKind` check kinds, empty names, messages, or stable versions, malformed setting-effect records, malformed incompatibility tuples, and duplicate incompatible codes. Category registration rejects rules whose code prefix differs from the category prefix and rejects duplicate rule codes from different classes.
-
-No rule application or fix method interface is specified yet. That interface will be added when rule execution is implemented.
 
 ## Rule Codes
 
@@ -78,7 +76,7 @@ Collection behavior:
 - `matching_rules_exist(selector)` returns whether any collected rule matches the selector.
 - Incompatibility declarations must reference collected rules, cannot reference the declaring rule itself, and must be declared mutually by both rules.
 
-Built-in categories use the default registry through `@register_rule_category`, and their rules use `@register_rule_to(category)`. Tests and custom rule packages can use an isolated `RuleRegistry` with `register_rule_category_to(registry)`, pass that registry to `import_package_rule_categories`, then call `registry.collection()`.
+Built-in categories use the default registry through `@register_rule_category`, and their rules use `@register_rule_to(category)`. Tests and custom rule packages can use an isolated `RuleRegistry` with `register_rule_category_to(registry)`, pass that registry to `import_package_rule_categories`, then call `RuleCollection.from_registry(registry)`.
 
 Definition package loading validates the complete built-in layout: the definitions package contains only category packages; each category package is flat and contains a matching prefix-named category module and class; each rule module contains exactly one registered local rule whose code matches its filename and category; registered rules originate from and have modules in their category package; and every category and rule has adjacent Markdown documentation with no orphan Markdown files.
 
@@ -97,7 +95,7 @@ Selectors are case-sensitive and must use complete rule prefixes. For example, `
 
 Selectors outside the grammar are operational errors. Selectors that match no collected rule are operational errors, except `ALL`, which may match an empty collection without error. Invalid or unknown selectors resolve to no rules and resolution continues.
 
-## Source Priority And Specificity
+## Source Priority and Specificity
 
 Selection conflicts are resolved first by configuration source priority, then by selector specificity. Selector order inside one setting is not significant.
 
@@ -263,8 +261,6 @@ Effective fixability uses the same source-priority and specificity model as rule
 Settings cannot make a rule with `fix_availability = FixAvailability.NEVER` fixable. Rules with `FixAvailability.ALWAYS`, `FixAvailability.USUALLY`, and `FixAvailability.SOMETIMES` all have available fixes for selector purposes.
 
 A selector in `fixable` or `extend-fixable` that matches only rules with no available fixes is an operational error unless the selector is `ALL`. This means the default `fixable = ["ALL"]` does not warn merely because some collected rules have `FixAvailability.NEVER`.
-
-Rule findings still expose boolean fixability because each finding is either fixable or not. Findings for `FixAvailability.USUALLY` and `FixAvailability.SOMETIMES` rules must provide per-instance fixability.
 
 Examples:
 

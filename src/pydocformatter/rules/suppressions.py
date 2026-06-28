@@ -5,6 +5,7 @@ from __future__ import annotations
 import dataclasses
 import re
 from collections.abc import Iterable, Mapping
+from typing import TYPE_CHECKING
 
 import libcst as cst
 import libcst.metadata as cst_metadata
@@ -13,6 +14,9 @@ import pydocformatter.rules.definition_helpers.directives as directive_helpers
 from pydocformatter.rules.codes import ALL_RULE_SELECTOR_TAG, RuleCode, RuleSelector
 from pydocformatter.rules.collection import RuleCollection
 from pydocformatter.rules.models import RuleFinding, RuleMetadata
+
+if TYPE_CHECKING:
+    import pydocformatter.rules.violations as rule_violations
 
 SuppressionSelectorKey = tuple[int, int]
 
@@ -24,10 +28,10 @@ _TOOL_DIRECTIVE_RE = re.compile(
 
 
 @dataclasses.dataclass(frozen=True)
-class SuppressionFilterResult:
-    """Result of applying source suppressions to rule findings."""
+class SuppressionViolationFilterResult:
+    """Unsuppressed violations and selector keys used while filtering them."""
 
-    findings: tuple[RuleFinding, ...]
+    violations: tuple[rule_violations.RuleViolation, ...]
     used_selector_keys: frozenset[SuppressionSelectorKey]
 
 
@@ -37,10 +41,6 @@ class SuppressionIndex:
 
     directives: tuple[SuppressionDirective, ...]
 
-    def suppresses(self, finding: RuleFinding) -> bool:
-        """Return whether a directive suppresses the finding."""
-        return bool(self.used_selector_keys(finding))
-
     def used_selector_keys(self, finding: RuleFinding) -> frozenset[SuppressionSelectorKey]:
         """Return stable selector keys used by suppressing one finding."""
         used: set[SuppressionSelectorKey] = set()
@@ -48,28 +48,24 @@ class SuppressionIndex:
             used.update(directive.used_selector_keys(finding, directive_index=directive_index))
         return frozenset(used)
 
-    def filter_findings(self, findings: tuple[RuleFinding, ...]) -> SuppressionFilterResult:
-        """Return unsuppressed findings and selectors used during filtering."""
-        unsuppressed_findings: list[RuleFinding] = []
-        used_selector_keys: set[SuppressionSelectorKey] = set()
-        for finding in findings:
-            finding_used_selector_keys = self.used_selector_keys(finding)
-            if finding_used_selector_keys:
-                used_selector_keys.update(finding_used_selector_keys)
-            else:
-                unsuppressed_findings.append(finding)
-        return SuppressionFilterResult(findings=tuple(unsuppressed_findings), used_selector_keys=frozenset(used_selector_keys))
-
-    def unsuppressed_findings(self, findings: tuple[RuleFinding, ...]) -> tuple[RuleFinding, ...]:
-        """Return findings that are not suppressed by source directives."""
-        return self.filter_findings(findings).findings
-
     def unused_findings(self, used_selector_keys: frozenset[SuppressionSelectorKey], *, selected_rule_codes: frozenset[RuleCode], rule: RuleMetadata) -> tuple[RuleFinding, ...]:
         """Return PCF006-style findings for invalid or unused audited selectors."""
         findings: list[RuleFinding] = []
         for directive_index, directive in enumerate(self.directives):
             findings.extend(directive.unused_findings(directive_index=directive_index, used_selector_keys=used_selector_keys, selected_rule_codes=selected_rule_codes, rule=rule))
         return tuple(findings)
+
+    def filter_violations(self, violations: tuple[rule_violations.RuleViolation, ...]) -> SuppressionViolationFilterResult:
+        """Return unsuppressed violations and selector keys used during filtering."""
+        unsuppressed_violations: list[rule_violations.RuleViolation] = []
+        used_selector_keys: set[SuppressionSelectorKey] = set()
+        for violation in violations:
+            finding_used_selector_keys = self.used_selector_keys(violation.finding)
+            if finding_used_selector_keys:
+                used_selector_keys.update(finding_used_selector_keys)
+            else:
+                unsuppressed_violations.append(violation)
+        return SuppressionViolationFilterResult(violations=tuple(unsuppressed_violations), used_selector_keys=frozenset(used_selector_keys))
 
 
 @dataclasses.dataclass(frozen=True)

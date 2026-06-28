@@ -10,11 +10,14 @@ import libcst as cst
 import libcst.metadata as cst_metadata
 
 import pydocformatter.rules.definition_helpers.source_text as source_text
+import pydocformatter.rules.edits as rule_edits
+import pydocformatter.rules.line_targets as line_targets
 import pydocformatter.rules.suppressions as suppressions
+import pydocformatter.rules.violations as rule_violations
 from pydocformatter.cli.settings_check import CheckSettings
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.collection import RuleCollection
-from pydocformatter.rules.definition import RuleBase, RuleCategoryBase, RuleCategoryContext, RuleContext, RuleFixResult
+from pydocformatter.rules.definition import RuleBase, RuleCategoryBase, RuleCategoryContext, RuleContext
 from pydocformatter.rules.models import RuleCheckKind, RuleFinding, RuleMetadata
 from pydocformatter.rules_selection import RuleSelection, SelectedRule
 
@@ -103,17 +106,16 @@ def run_rules(
         )
 
     if fix:
-        if _fixable_rules_have_explicit_checks(rule_selection=rule_selection, selected_rule_by_code=selected_rule_by_code):
-            precheck_errors: list[str] = []
-            precheck_findings = run_check_pass(module, precheck_errors)
-            if not precheck_errors and not any(finding.fixable for finding in precheck_findings):
-                return RuleRunResult(
-                    module=module,
-                    fixed_findings=(),
-                    unfixed_findings=precheck_findings,
-                    source_changed=False,
-                    errors=(),
-                )
+        precheck_errors: list[str] = []
+        precheck_findings = run_check_pass(module, precheck_errors)
+        if not precheck_errors and not any(finding.fixable for finding in precheck_findings):
+            return RuleRunResult(
+                module=module,
+                fixed_findings=(),
+                unfixed_findings=precheck_findings,
+                source_changed=False,
+                errors=(),
+            )
 
         for iteration in range(1, MAX_FIX_ITERATIONS + 1):
             module, iteration_findings, changed = _run_fix_pass(
@@ -148,16 +150,6 @@ def run_rules(
     )
 
 
-def _fixable_rules_have_explicit_checks(*, rule_selection: RuleSelection, selected_rule_by_code: dict[RuleCode, SelectedRule]) -> bool:
-    """Return whether check findings can prove no selected fix hooks need to run."""
-    for category_class in rule_selection.collection.categories:
-        for rule_class in category_class.ordered_rules():
-            selected_rule = selected_rule_by_code.get(rule_class.meta.code)
-            if selected_rule is not None and selected_rule.fixable and "check" not in rule_class.__dict__:
-                return False
-    return True
-
-
 def _run_fix_pass(
     module: cst.Module,
     *,
@@ -174,53 +166,65 @@ def _run_fix_pass(
     changed = False
     pass_context: _ModulePassContext | None = None
     for category_class in rule_selection.collection.categories:
-        category_rules = tuple(
-            (rule_class, selected_rule_by_code[rule_class.meta.code])
+        category_rule_classes = tuple(
+            rule_class
             for rule_class in category_class.ordered_rules()
-            if rule_class.meta.code in selected_rule_by_code and selected_rule_by_code[rule_class.meta.code].fixable
+            if rule_class.meta.code in selected_rule_by_code and rule_class.meta.check_kind == RuleCheckKind.STANDARD and selected_rule_by_code[rule_class.meta.code].fixable
         )
-        if not category_rules:
+        if not category_rule_classes:
             continue
         prepared_category, pass_context = _prepare_category(
             category_class, module, pass_context, path=path, settings=settings, line_ending=line_ending, rule_collection=rule_selection.collection, errors=errors, source_seed=source_seed
         )
         if prepared_category is None:
             continue
-        for rule_class, selected_rule in category_rules:
+        source_line_count = len(prepared_category.context.source_lines)
+        for rule_class in category_rule_classes:
             if prepared_category.context.module is not module:
                 prepared_category, pass_context = _prepare_category(
                     category_class, module, pass_context, path=path, settings=settings, line_ending=line_ending, rule_collection=rule_selection.collection, errors=errors, source_seed=source_seed
                 )
                 if prepared_category is None:
                     break
+                source_line_count = len(prepared_category.context.source_lines)
             try:
-                context = _rule_context(prepared_category, effectively_fixable=selected_rule.fixable)
-                fix_result = rule_class.fix(context)
+                context = _rule_context(prepared_category)
+                reported_violations = rule_class.violations(context)
             except Exception as error:
                 errors.append(f"{path}: {rule_class.meta.code} automatic fix failed: {error}")
                 continue
-            if not isinstance(fix_result, RuleFixResult):
-                errors.append(f"{path}: {rule_class.meta.code} automatic fix returned {type(fix_result).__name__}, expected RuleFixResult")
+
+            validated_violations = _validated_rule_violations(rule_class, reported_violations, path=path, operation="automatic fix", source_line_count=source_line_count, errors=errors)
+            if not validated_violations:
                 continue
-            if not isinstance(fix_result.module, cst.Module):
-                errors.append(f"{path}: {rule_class.meta.code} automatic fix returned {type(fix_result.module).__name__}, expected LibCST Module")
+            if pass_context is None:
+                errors.append(f"{path}: {rule_class.meta.code} automatic fix lost source context")
                 continue
-            result_findings = _validated_rule_findings(rule_class, fix_result.fixed_findings, path=path, operation="automatic fix", errors=errors)
-            if fix_result.module is module:
-                result_changed = False
-            else:
-                try:
-                    result_changed = fix_result.module.code != module.code
-                except Exception as error:
-                    errors.append(f"{path}: {rule_class.meta.code} automatic fix source generation failed: {error}")
-                    continue
-            if result_changed != bool(result_findings):
+            unsuppressed_violations = pass_context.suppression_index.filter_violations(validated_violations).violations
+            fixable_violations = tuple(violation for violation in unsuppressed_violations if violation.finding.fixable)
+            if not fixable_violations:
+                continue
+            planned_changes = _planned_source_changes_for_violations(rule_class, fixable_violations, path=path, source_line_count=source_line_count, errors=errors)
+            if planned_changes is None:
+                continue
+            try:
+                fixed_module = rule_edits.apply_context_source_changes(prepared_category.context, planned_changes)
+            except Exception as error:
+                errors.append(f"{path}: {rule_class.meta.code} automatic fix failed: {error}")
+                continue
+            fixed_findings = tuple(violation.finding for violation in fixable_violations)
+            try:
+                result_changed = fixed_module.code != prepared_category.context.source
+            except Exception as error:
+                errors.append(f"{path}: {rule_class.meta.code} automatic fix source generation failed: {error}")
+                continue
+            if result_changed != bool(fixed_findings):
                 errors.append(f"{path}: {rule_class.meta.code} automatic fix must change source if and only if it reports fixed findings")
                 continue
             if result_changed:
-                module = fix_result.module
+                module = fixed_module
                 pass_context = None
-                pass_findings.extend(result_findings)
+                pass_findings.extend(fixed_findings)
                 changed = True
     return module, tuple(pass_findings), changed
 
@@ -251,28 +255,34 @@ def _run_check_pass(
         )
         if prepared_category is None:
             continue
+        source_line_count = len(prepared_category.context.source_lines)
         for rule_class, selected_rule in category_rules:
             if rule_class.meta.check_kind != RuleCheckKind.STANDARD:
                 continue
             try:
-                context = _rule_context(prepared_category, effectively_fixable=selected_rule.fixable)
-                rule_findings = rule_class.check(context)
+                context = _rule_context(prepared_category)
+                reported_violations = rule_class.violations(context)
             except Exception as error:
                 errors.append(f"{path}: {rule_class.meta.code} check failed: {error}")
                 continue
-            validated_findings = _validated_rule_findings(rule_class, rule_findings, path=path, operation="check", errors=errors)
-            if prepared_category.context.suppression_index is None:
-                unsuppressed_findings = validated_findings
-            else:
-                suppression_result = prepared_category.context.suppression_index.filter_findings(validated_findings)
-                used_selector_keys.update(suppression_result.used_selector_keys)
-                unsuppressed_findings = suppression_result.findings
-            findings.extend(_apply_effective_fixability(finding, selected_rule=selected_rule) for finding in unsuppressed_findings)
+            validated_violations = _validated_rule_violations(rule_class, reported_violations, path=path, operation="check", source_line_count=source_line_count, errors=errors)
+            if pass_context is None:
+                errors.append(f"{path}: {rule_class.meta.code} check lost source context")
+                continue
+            suppression_result = pass_context.suppression_index.filter_violations(validated_violations)
+            used_selector_keys.update(suppression_result.used_selector_keys)
+            findings.extend(_apply_effective_fixability(violation.finding, selected_rule=selected_rule) for violation in suppression_result.violations)
     if suppression_audit_rules and pass_context is not None:
+        rule_class_by_code = {rule_class.meta.code: rule_class for category_class in rule_selection.collection.categories for rule_class in category_class.ordered_rules()}
+        source_line_count = len(pass_context.source_lines)
         for selected_rule in suppression_audit_rules:
             audit_findings = pass_context.suppression_index.unused_findings(frozenset(used_selector_keys), selected_rule_codes=selected_standard_rule_codes, rule=selected_rule.rule)
-            audit_filter_result = pass_context.suppression_index.filter_findings(audit_findings)
-            findings.extend(_apply_effective_fixability(finding, selected_rule=selected_rule) for finding in audit_filter_result.findings)
+            audit_violations = tuple(rule_violations.RuleViolation(finding=finding) for finding in audit_findings)
+            validated_violations = _validated_rule_violations(
+                rule_class_by_code[selected_rule.rule.code], audit_violations, path=path, operation="check", source_line_count=source_line_count, errors=errors
+            )
+            audit_filter_result = pass_context.suppression_index.filter_violations(validated_violations)
+            findings.extend(_apply_effective_fixability(violation.finding, selected_rule=selected_rule) for violation in audit_filter_result.violations)
     return tuple(findings)
 
 
@@ -339,11 +349,10 @@ def _category_context(pass_context: _ModulePassContext, *, path: str, settings: 
         source=pass_context.source,
         source_lines=pass_context.source_lines,
         line_bounds=pass_context.line_bounds,
-        suppression_index=pass_context.suppression_index,
     )
 
 
-def _rule_context(prepared_category: _PreparedCategory, *, effectively_fixable: bool) -> RuleContext:
+def _rule_context(prepared_category: _PreparedCategory) -> RuleContext:
     """Build a rule context for the current module."""
     category_context = prepared_category.context
     return RuleContext(
@@ -356,29 +365,111 @@ def _rule_context(prepared_category: _PreparedCategory, *, effectively_fixable: 
         source=category_context.source,
         source_lines=category_context.source_lines,
         line_bounds=category_context.line_bounds,
-        suppression_index=category_context.suppression_index,
         category_data=prepared_category.data,
-        effectively_fixable=effectively_fixable,
     )
 
 
-def _validated_rule_findings(rule_class: type[RuleBase], findings: object, *, path: str, operation: str, errors: list[str]) -> tuple[RuleFinding, ...]:
-    """Validate findings returned by a rule hook."""
-    if not isinstance(findings, tuple):
-        errors.append(f"{path}: {rule_class.meta.code} {operation} returned non-tuple findings")
+def _validated_rule_violations(
+    rule_class: type[RuleBase],
+    violations: object,
+    *,
+    path: str,
+    operation: str,
+    source_line_count: int,
+    errors: list[str],
+) -> tuple[rule_violations.RuleViolation, ...]:
+    """Validate violations returned by a rule hook or synthesized by the runner."""
+    if not isinstance(violations, tuple):
+        errors.append(f"{path}: {rule_class.meta.code} {operation} returned non-tuple violations")
         return ()
-    if not all(isinstance(finding, RuleFinding) and finding.rule == rule_class.meta for finding in findings):
-        errors.append(f"{path}: {rule_class.meta.code} {operation} returned a finding for a different rule or an invalid finding")
+    if not all(isinstance(violation, rule_violations.RuleViolation) and violation.finding.rule == rule_class.meta for violation in violations):
+        errors.append(f"{path}: {rule_class.meta.code} {operation} returned a violation for a different rule or an invalid violation")
         return ()
     try:
-        finding_fixabilities = tuple(finding.fixable for finding in findings)
+        finding_fixabilities = tuple(violation.finding.fixable for violation in violations)
     except ValueError as error:
         errors.append(f"{path}: {rule_class.meta.code} {operation} returned a finding with unresolved fixability: {error}")
         return ()
-    if operation == "automatic fix" and not all(finding_fixabilities):
-        errors.append(f"{path}: {rule_class.meta.code} automatic fix returned a non-fixable finding")
+    # Rule hooks can only hit this by bypassing RuleViolation construction; keep the runner boundary hardened.
+    if not all((violation.fix is not None) == fixable for violation, fixable in zip(violations, finding_fixabilities, strict=True)):
+        errors.append(f"{path}: {rule_class.meta.code} {operation} returned a violation whose fix does not match finding fixability")
         return ()
-    return findings
+    invalid_findings = tuple(violation.finding for violation in violations if _finding_has_line_outside_source(violation.finding, source_line_count=source_line_count))
+    if invalid_findings:
+        errors.append(f"{path}: {rule_class.meta.code} {operation} returned a finding outside the source line range")
+        return ()
+    return violations
+
+
+def _planned_source_changes_for_violations(
+    rule_class: type[RuleBase],
+    violations: tuple[rule_violations.RuleViolation, ...],
+    *,
+    path: str,
+    source_line_count: int,
+    errors: list[str],
+) -> tuple[rule_edits.PlannedSourceChange, ...] | None:
+    """Build and validate source changes for unsuppressed fixable violations."""
+    planned_changes: list[rule_edits.PlannedSourceChange] = []
+    for violation in violations:
+        if violation.fix is None:
+            errors.append(f"{path}: {rule_class.meta.code} automatic fix returned a fixable violation without a source fix")
+            return None
+        try:
+            violation_changes = violation.fix.planned_changes()
+        except Exception as error:
+            errors.append(f"{path}: {rule_class.meta.code} automatic fix failed: {error}")
+            return None
+        if not _violation_fix_changes_are_valid(violation, violation_changes, source_line_count=source_line_count):
+            errors.append(f"{path}: {rule_class.meta.code} automatic fix returned source changes whose line targets do not match the finding")
+            return None
+        planned_changes.extend(violation_changes)
+    return tuple(planned_changes)
+
+
+def _violation_fix_changes_are_valid(
+    violation: rule_violations.RuleViolation,
+    changes: tuple[rule_edits.PlannedSourceChange, ...],
+    *,
+    source_line_count: int,
+) -> bool:
+    """Return whether one violation's planned changes match its finding targets."""
+    if not changes:
+        return False
+    if any(_change_has_line_outside_source(change, source_line_count=source_line_count) for change in changes):
+        return False
+    change_lines = _line_number_set(tuple(line_number for change in changes for line_number in change.line_numbers))
+    finding_lines = _line_number_set(violation.finding.line_numbers)
+    if change_lines != finding_lines:
+        return False
+    change_suppression_targets = _line_target_set(tuple(target for change in changes for target in change.suppression_line_numbers))
+    finding_suppression_targets = _line_target_set(violation.finding.suppression_line_numbers)
+    return change_suppression_targets == finding_suppression_targets
+
+
+def _line_number_set(line_numbers: tuple[int, ...]) -> frozenset[int]:
+    """Return the normalized set of one line-number target."""
+    return frozenset(line_targets.normalize_line_numbers(line_numbers, "Rule violation line numbers"))
+
+
+def _line_target_set(line_number_targets: tuple[tuple[int, ...], ...]) -> frozenset[tuple[int, ...]]:
+    """Return the normalized set of line-number target tuples."""
+    return frozenset(line_targets.normalize_line_number_targets(line_number_targets, "Rule violation line-number targets", "Rule violation line-number target"))
+
+
+def _finding_has_line_outside_source(finding: RuleFinding, *, source_line_count: int) -> bool:
+    """Return whether a finding targets a line outside the current source."""
+    return _has_line_outside_source(finding.suppression_targets, source_line_count=source_line_count)
+
+
+def _change_has_line_outside_source(change: rule_edits.PlannedSourceChange, *, source_line_count: int) -> bool:
+    """Return whether a planned source change targets a line outside the current source."""
+    return _has_line_outside_source((change.line_numbers, *change.suppression_line_numbers), source_line_count=source_line_count)
+
+
+def _has_line_outside_source(line_number_targets: tuple[tuple[int, ...], ...], *, source_line_count: int) -> bool:
+    """Return whether any line-number target points outside the current source."""
+    return any(line_number > source_line_count for target in line_number_targets for line_number in target)
 
 
 def _apply_effective_fixability(finding: RuleFinding, *, selected_rule: SelectedRule) -> RuleFinding:

@@ -6,11 +6,12 @@ import pydocformatter.rules.definition_helpers.decorators as decorator_helpers
 import pydocformatter.rules.definition_helpers.summary_style as summary_style
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 import pydocformatter.rules.registration as rule_registration
+import pydocformatter.rules.violations as rule_violations
 from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase, RuleContext
 from pydocformatter.rules.definitions.PDF.PDF import PDF
-from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleFinding, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
+from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
 
 
 @rule_registration.register_rule_to(PDF)
@@ -38,10 +39,10 @@ class PDF302NonImperativeSummary(RuleBase):
     )
 
     @classmethod
-    def check(cls, context: RuleContext) -> tuple[RuleFinding, ...]:
-        """Return findings for function summaries that are not imperative."""
+    def violations(cls, context: RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
+        """Return violations for function summaries that are not imperative."""
         data = PDF.require_data(context)
-        findings: list[RuleFinding] = []
+        violations: list[rule_violations.RuleViolation] = []
         for target in data.summary_line_targets:
             owner = target.docstring.owner
             if not isinstance(owner, PDF_definition.DefinitionInfo) or owner.kind is not PDF_definition.DefinitionKind.FUNCTION or _is_test_function(owner) or _is_property_function(owner):
@@ -51,10 +52,8 @@ class PDF302NonImperativeSummary(RuleBase):
                 continue
             normalized = summary_style.normalize_word(word.word)
             if normalized and _is_non_imperative(normalized):
-                findings.append(
-                    RuleFinding(rule=cls.meta, line_numbers=summary_style.line_numbers(word), instance_message=f"Docstring summary first word '{word.word}' is not imperative", instance_fixable=None)
-                )
-        return tuple(findings)
+                violations.append(rule_violations.diagnostic(cls.meta, summary_style.line_numbers(word), instance_message=f"Docstring summary first word '{word.word}' is not imperative"))
+        return tuple(violations)
 
 
 def _is_non_imperative(word: str) -> bool:

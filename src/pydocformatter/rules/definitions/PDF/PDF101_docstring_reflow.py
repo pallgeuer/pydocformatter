@@ -12,9 +12,10 @@ import pydocformatter.rules.definition_helpers.text_layout as text_layout
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 import pydocformatter.rules.edits as rule_edits
 import pydocformatter.rules.registration as rule_registration
+import pydocformatter.rules.violations as rule_violations
 from pydocformatter.rules.codes import RuleCode
-from pydocformatter.rules.definition import RuleBase, RuleContext, RuleFixResult
-from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleFinding, RuleMetadata
+from pydocformatter.rules.definition import RuleBase, RuleContext
+from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata
 
 
 @rule_registration.register_rule_to(PDF_definition.PDF)
@@ -37,30 +38,9 @@ class PDF101DocstringReflow(RuleBase):
     )
 
     @classmethod
-    def check(cls, context: RuleContext) -> tuple[RuleFinding, ...]:
-        """Return findings for docstring reflow changes."""
-        return tuple(result.finding for result in _docstring_results(context))
-
-    @classmethod
-    def fix(cls, context: RuleContext) -> RuleFixResult:
-        """Apply docstring reflow changes."""
-        changes = _planned_changes(context)
-        if not changes:
-            return RuleFixResult(module=context.module)
-        return rule_edits.fix_result_for_planned_source_changes(context, cls.meta, changes, instance_fixable=True)
-
-
-def _planned_changes(context: RuleContext) -> tuple[rule_edits.PlannedSourceChange, ...]:
-    """Return all safe docstring reflow changes for the current source."""
-    return tuple(result.change for result in _docstring_results(context) if result.change is not None)
-
-
-@dataclasses.dataclass(frozen=True)
-class _DocstringResult:
-    """Finding and optional fix for one docstring needing reflow."""
-
-    finding: RuleFinding
-    change: rule_edits.PlannedSourceChange | None
+    def violations(cls, context: RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
+        """Return violations for docstring reflow changes."""
+        return _docstring_violations(context)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -74,19 +54,19 @@ class _RegionReplacement:
     line_numbers: tuple[int, ...]
 
 
-def _docstring_results(context: RuleContext) -> tuple[_DocstringResult, ...]:
-    """Return all docstring reflow findings and any available fixes."""
+def _docstring_violations(context: RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
+    """Return all docstring reflow violations and any available fixes."""
     data = PDF_definition.PDF.require_data(context)
-    results: list[_DocstringResult] = []
+    violations: list[rule_violations.RuleViolation] = []
     for docstring in data.docstrings:
-        result = _docstring_result(docstring, context=context)
-        if result is not None:
-            results.append(result)
-    return tuple(results)
+        violation = _docstring_violation(docstring, context=context)
+        if violation is not None:
+            violations.append(violation)
+    return tuple(violations)
 
 
-def _docstring_result(docstring: PDF_definition.DocstringInfo, *, context: RuleContext) -> _DocstringResult | None:
-    """Return one reflow finding and any safe whole-literal replacement."""
+def _docstring_violation(docstring: PDF_definition.DocstringInfo, *, context: RuleContext) -> rule_violations.RuleViolation | None:
+    """Return one reflow violation and any safe whole-literal replacement."""
     if docstring.kind != PDF_definition.DocstringKind.SIMPLE or not isinstance(docstring.node, cst.SimpleString):
         return None
     if not docstring.structure.reflow_regions or not _has_safe_source_mapping(docstring):
@@ -110,10 +90,7 @@ def _docstring_result(docstring: PDF_definition.DocstringInfo, *, context: RuleC
         value = f"{value[: replacement.start_offset]}{replacement.value_text}{value[replacement.end_offset:]}"
     line_numbers = tuple(sorted({line_number for replacement in replacements for line_number in replacement.line_numbers}))
     change = _planned_change_from_replacements(docstring, replacements, fragments=fragments, value=value) if fragments is not None else None
-    return _DocstringResult(
-        finding=RuleFinding(rule=PDF101DocstringReflow.meta, line_numbers=line_numbers, instance_fixable=change is not None),
-        change=change,
-    )
+    return rule_violations.violation_for_optional_planned_source_change(PDF101DocstringReflow.meta, change, line_numbers=line_numbers)
 
 
 def _replacement_for_region(

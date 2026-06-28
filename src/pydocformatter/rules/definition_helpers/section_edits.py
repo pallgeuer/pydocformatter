@@ -2,43 +2,16 @@
 
 from __future__ import annotations
 
-import dataclasses
-
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 import pydocformatter.rules.edits as rule_edits
-from pydocformatter.rules.definition import RuleContext, RuleFixResult
-from pydocformatter.rules.models import RuleFinding, RuleMetadata
+import pydocformatter.rules.violations as rule_violations
+from pydocformatter.rules.definition import RuleContext
+from pydocformatter.rules.models import RuleMetadata
 
 
-@dataclasses.dataclass(frozen=True)
-class SectionEditResult:
-    """A section-style finding and its optional whole-docstring change.
-
-    Attributes:
-        finding (RuleFinding): Diagnostic reported for the section-style issue.
-        change (rule_edits.PlannedSourceChange | None): Whole-docstring edit that fixes the issue, if available.
-    """
-
-    finding: RuleFinding
-    change: rule_edits.PlannedSourceChange | None
-
-
-def findings_for_results(results: tuple[SectionEditResult, ...]) -> tuple[RuleFinding, ...]:
-    """Return findings from section edit results."""
-    return tuple(result.finding for result in results)
-
-
-def fix_result_for_results(context: RuleContext, rule: RuleMetadata, results: tuple[SectionEditResult, ...]) -> RuleFixResult:
-    """Apply planned section changes and return fixed findings."""
-    changes = tuple(result.change for result in results if result.change is not None)
-    if not changes:
-        return RuleFixResult(module=context.module)
-    return rule_edits.fix_result_for_planned_source_changes(context, rule, changes, instance_fixable=True)
-
-
-def result(rule: RuleMetadata, line_numbers: tuple[int, ...] | list[int], *, change: rule_edits.PlannedSourceChange | None, instance_message: str | None = None) -> SectionEditResult:
-    """Return one section edit result with deduplicated line numbers."""
-    return SectionEditResult(finding=RuleFinding(rule=rule, line_numbers=tuple(dict.fromkeys(line_numbers)), instance_fixable=change is not None, instance_message=instance_message), change=change)
+def result(rule: RuleMetadata, line_numbers: tuple[int, ...] | list[int], *, change: rule_edits.PlannedSourceChange | None, instance_message: str | None = None) -> rule_violations.RuleViolation:
+    """Return one section violation with deduplicated line numbers."""
+    return rule_violations.violation_for_optional_planned_source_change(rule, change, line_numbers=tuple(dict.fromkeys(line_numbers)), instance_message=instance_message)
 
 
 def replacement_results(
@@ -49,7 +22,7 @@ def replacement_results(
     change: rule_edits.PlannedSourceChange | None,
     replacement_messages: list[str],
     unfixable_messages: list[str],
-) -> tuple[SectionEditResult, ...]:
+) -> tuple[rule_violations.RuleViolation, ...]:
     """Return section edit results for mixed fixable and unfixable replacements."""
     if not replacement_line_numbers:
         return (result(rule, unfixable_line_numbers, change=None, instance_message=combined_instance_message(unfixable_messages)),)

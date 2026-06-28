@@ -18,7 +18,7 @@
 ## Workflows
 
 - Interview me for relevant details when making plans, unless the details are quite clear already from the provided information.
-- When implementing a new rule, refer to `docs/new_rule_checklist.md`.
+- When editing a rule implementation, refer to `docs/rule_implementation_spec.md`.
 - Rule documentation Markdown files follow the templates `rule_template.md` and `rule_category_template.md` in `src/pydocformatter/rules/`.
 - When changing function signatures or class attributes, update all affected docstrings in the same change.
 - If some tests fail only because the exact wording of a string has changed, then ask what to do instead of just blindly reverting the wording of the string.

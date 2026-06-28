@@ -5,6 +5,7 @@ import pytest
 import pydocformatter.formatter as formatter
 import pydocformatter.rules.definition_helpers.source_text as source_text
 import pydocformatter.rules_selection as rules_selection
+import tests.rule_helpers as rule_helpers
 from pydocformatter.cli.settings_check import CheckSettings, LineEnding
 from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
 from pydocformatter.rules.definitions.PDF.PDF import PDF
@@ -25,7 +26,6 @@ def contexts(source: str, *, settings: CheckSettings | None = None) -> tuple[Rul
         source=source,
         source_lines=tuple(source_text.source_lines(source)),
         line_bounds=None,
-        suppression_index=None,
     )
     return category, RuleContext(
         path=category.path,
@@ -37,9 +37,7 @@ def contexts(source: str, *, settings: CheckSettings | None = None) -> tuple[Rul
         source=category.source,
         source_lines=category.source_lines,
         line_bounds=category.line_bounds,
-        suppression_index=category.suppression_index,
         category_data=PDF.prepare(category),
-        effectively_fixable=True,
     )
 
 
@@ -99,8 +97,8 @@ def test_skips_uppercase_raw_prefix() -> None:
 def test_reports_recognized_escapes_as_non_fixable() -> None:
     source = 'def line():\n    """First\\nSecond."""\n\ndef tab():\n    """First\\tSecond."""\n\ndef unicode():\n    """Value \\u00e9."""\n'
     _, context = contexts(source)
-    findings = PDF002DocstringBackslashRawPrefix.check(context)
-    result = PDF002DocstringBackslashRawPrefix.fix(context)
+    findings = rule_helpers.rule_findings(PDF002DocstringBackslashRawPrefix, context)
+    result = rule_helpers.rule_fix_result(PDF002DocstringBackslashRawPrefix, context)
     check_only = format_pdf002(source, fix=False)
 
     assert tuple(finding.line_numbers for finding in findings) == ((2,), (5,))
@@ -209,8 +207,8 @@ def test_u_prefixed_backslash_docstring_is_non_fixable() -> None:
 def test_check_fix_line_numbers_and_fix_false_findings_agree() -> None:
     source = 'def first():\n    """Match \\d+."""\n\ndef second():\n    """Match \\w+."""\n'
     _, context = contexts(source)
-    findings = PDF002DocstringBackslashRawPrefix.check(context)
-    fixed = PDF002DocstringBackslashRawPrefix.fix(context)
+    findings = rule_helpers.rule_findings(PDF002DocstringBackslashRawPrefix, context)
+    fixed = rule_helpers.rule_fix_result(PDF002DocstringBackslashRawPrefix, context)
     check_only = format_pdf002(source, fix=False)
 
     assert tuple(finding.line_numbers for finding in findings) == ((2,), (5,))
@@ -219,7 +217,7 @@ def test_check_fix_line_numbers_and_fix_false_findings_agree() -> None:
     assert fixed.module.code == 'def first():\n    r"""Match \\d+."""\n\ndef second():\n    r"""Match \\w+."""\n'
     assert tuple(finding.line_numbers for finding in check_only.unfixed_findings) == ((2,), (5,))
     _, fixed_context = contexts(fixed.module.code)
-    assert PDF002DocstringBackslashRawPrefix.check(fixed_context) == ()
+    assert rule_helpers.rule_findings(PDF002DocstringBackslashRawPrefix, fixed_context) == ()
 
 
 @pytest.mark.filterwarnings("ignore:invalid escape sequence.*:DeprecationWarning")

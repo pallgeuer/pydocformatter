@@ -5,6 +5,7 @@ import pytest
 import pydocformatter.formatter as formatter
 import pydocformatter.rules.definition_helpers.source_text as source_text
 import pydocformatter.rules_selection as rules_selection
+import tests.rule_helpers as rule_helpers
 from pydocformatter.cli.settings_check import CheckSettings, LineEnding
 from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
 from pydocformatter.rules.definitions.PDF.PDF import PDF, DocstringKind
@@ -25,7 +26,6 @@ def contexts(source: str) -> tuple[RuleCategoryContext, RuleContext]:
         source=source,
         source_lines=tuple(source_text.source_lines(source)),
         line_bounds=None,
-        suppression_index=None,
     )
     return category, RuleContext(
         path=category.path,
@@ -37,9 +37,7 @@ def contexts(source: str) -> tuple[RuleCategoryContext, RuleContext]:
         source=category.source,
         source_lines=category.source_lines,
         line_bounds=category.line_bounds,
-        suppression_index=category.suppression_index,
         category_data=PDF.prepare(category),
-        effectively_fixable=True,
     )
 
 
@@ -51,8 +49,8 @@ def format_pdf000(source: str, *, settings: CheckSettings | None = None, fix: bo
 
 def test_check_and_fix_concatenated_docstring() -> None:
     _, context = contexts('def function():\n    ("first " "second")\n')
-    findings = PDF000DocstringLiteralNormalization.check(context)
-    result = PDF000DocstringLiteralNormalization.fix(context)
+    findings = rule_helpers.rule_findings(PDF000DocstringLiteralNormalization, context)
+    result = rule_helpers.rule_fix_result(PDF000DocstringLiteralNormalization, context)
     assert len(findings) == 1
     assert findings[0].line_numbers == (2,)
     assert result.module.code == 'def function():\n    ("""first second""")\n'
@@ -65,8 +63,8 @@ def test_check_and_fix_concatenated_docstring() -> None:
 def test_fix_literalizes_normal_whitespace_escapes_in_simple_docstring() -> None:
     _, context = contexts('def function():\n    """first\\n\\tsecond"""\n')
 
-    findings = PDF000DocstringLiteralNormalization.check(context)
-    result = PDF000DocstringLiteralNormalization.fix(context)
+    findings = rule_helpers.rule_findings(PDF000DocstringLiteralNormalization, context)
+    result = rule_helpers.rule_fix_result(PDF000DocstringLiteralNormalization, context)
 
     assert tuple(finding.line_numbers for finding in findings) == ((2,),)
     assert result.module.code == 'def function():\n    """first\n\tsecond"""\n'
@@ -74,7 +72,7 @@ def test_fix_literalizes_normal_whitespace_escapes_in_simple_docstring() -> None
     fixed = PDF.require_data(fixed_context).docstrings[0]
     assert fixed.kind == DocstringKind.SIMPLE
     assert fixed.value == "first\n\tsecond"
-    assert PDF000DocstringLiteralNormalization.check(fixed_context) == ()
+    assert rule_helpers.rule_findings(PDF000DocstringLiteralNormalization, fixed_context) == ()
 
 
 @pytest.mark.parametrize("prefix", ("u", "U"))
@@ -104,7 +102,7 @@ def test_fix_removes_unicode_prefix_while_literalizing_whitespace_escapes() -> N
 def test_fix_requotes_simple_single_quoted_docstring_when_literalizing_newline() -> None:
     _, context = contexts('def function():\n    "first\\n\\tsecond"\n')
 
-    result = PDF000DocstringLiteralNormalization.fix(context)
+    result = rule_helpers.rule_fix_result(PDF000DocstringLiteralNormalization, context)
 
     assert result.module.code == 'def function():\n    """first\n\tsecond"""\n'
     _, fixed_context = contexts(result.module.code)
@@ -126,7 +124,7 @@ def test_fix_requotes_simple_docstring_with_target_delimiter_in_one_pass() -> No
 def test_fix_literalizes_simple_docstring_newline_in_single_line_suite() -> None:
     _, context = contexts('def function(): "first\\nsecond"; return 1\n')
 
-    result = PDF000DocstringLiteralNormalization.fix(context)
+    result = rule_helpers.rule_fix_result(PDF000DocstringLiteralNormalization, context)
 
     assert tuple(finding.line_numbers for finding in result.fixed_findings) == ((1,),)
     assert result.module.code == 'def function(): """first\nsecond"""; return 1\n'
@@ -137,7 +135,7 @@ def test_fix_literalizes_simple_docstring_newline_in_single_line_suite() -> None
 def test_fix_literalizes_normal_whitespace_escapes_in_concatenated_docstring() -> None:
     _, context = contexts('def function():\n    ("first\\n" "\\tsecond")\n')
 
-    result = PDF000DocstringLiteralNormalization.fix(context)
+    result = rule_helpers.rule_fix_result(PDF000DocstringLiteralNormalization, context)
 
     assert result.module.code == 'def function():\n    ("""first\n\tsecond""")\n'
     _, fixed_context = contexts(result.module.code)
@@ -160,30 +158,30 @@ def test_fix_uses_configured_line_ending_for_literalized_newline() -> None:
 def test_fix_leaves_carriage_return_newline_escape_split_across_components_unchanged() -> None:
     _, context = contexts('def function():\n    ("first\\r" "\\nsecond")\n')
 
-    result = PDF000DocstringLiteralNormalization.fix(context)
+    result = rule_helpers.rule_fix_result(PDF000DocstringLiteralNormalization, context)
 
     assert result.module.code == 'def function():\n    ("""first\\r\\nsecond""")\n'
     _, fixed_context = contexts(result.module.code)
     assert PDF.require_data(fixed_context).docstrings[0].value == "first\r\nsecond"
-    assert PDF000DocstringLiteralNormalization.check(fixed_context) == ()
+    assert rule_helpers.rule_findings(PDF000DocstringLiteralNormalization, fixed_context) == ()
 
 
 def test_fix_preserves_complex_evaluated_values() -> None:
     source = 'def function():\n    (r"backslash\\n" "\\nquotes: \\"\\"\\"" "\\x00")\n'
     _, context = contexts(source)
     original = PDF.require_data(context).docstrings[0].value
-    result = PDF000DocstringLiteralNormalization.fix(context)
+    result = rule_helpers.rule_fix_result(PDF000DocstringLiteralNormalization, context)
     _, fixed_context = contexts(result.module.code)
     fixed = PDF.require_data(fixed_context).docstrings[0]
     assert fixed.kind == DocstringKind.SIMPLE
     assert fixed.value == original
-    assert PDF000DocstringLiteralNormalization.check(fixed_context) == ()
+    assert rule_helpers.rule_findings(PDF000DocstringLiteralNormalization, fixed_context) == ()
 
 
 def test_fix_keeps_non_ascii_code_points_escaped_for_ascii_source() -> None:
     source = '# -*- coding: ascii -*-\n"\\u00e9" "\\u20ac" "\\U0001f600"\n'
     _, context = contexts(source)
-    result = PDF000DocstringLiteralNormalization.fix(context)
+    result = rule_helpers.rule_fix_result(PDF000DocstringLiteralNormalization, context)
     assert result.module.code == '# -*- coding: ascii -*-\n"""\\u00e9\\u20ac\\U0001f600"""\n'
     compile(result.module.code.encode("ascii"), "example.py", "exec")
     _, fixed_context = contexts(result.module.code)
@@ -193,7 +191,7 @@ def test_fix_keeps_non_ascii_code_points_escaped_for_ascii_source() -> None:
 def test_fix_preserves_mixed_literal_and_escaped_non_ascii_spellings() -> None:
     source = '"café " "\\xe9" "\\u00e9"\n'
     _, context = contexts(source)
-    result = PDF000DocstringLiteralNormalization.fix(context)
+    result = rule_helpers.rule_fix_result(PDF000DocstringLiteralNormalization, context)
 
     assert result.module.code == '"""café \\xe9\\u00e9"""\n'
     _, fixed_context = contexts(result.module.code)
@@ -205,8 +203,8 @@ def test_unsupported_escape_reports_non_fixable_finding_without_crashing() -> No
     source = r'"bad \z" " words"' + "\n"
     _, context = contexts(source)
 
-    findings = PDF000DocstringLiteralNormalization.check(context)
-    result = PDF000DocstringLiteralNormalization.fix(context)
+    findings = rule_helpers.rule_findings(PDF000DocstringLiteralNormalization, context)
+    result = rule_helpers.rule_fix_result(PDF000DocstringLiteralNormalization, context)
 
     assert tuple(finding.line_numbers for finding in findings) == ((1,),)
     assert [finding.fixable for finding in findings] == [False]
@@ -219,8 +217,8 @@ def test_fixable_simple_docstring_and_nonfixable_concatenation_are_reported_inde
     source = '"""first\\nsecond"""\n\n\ndef unsupported():\n    "bad \\z" " words"\n'
     _, context = contexts(source)
 
-    findings = PDF000DocstringLiteralNormalization.check(context)
-    result = PDF000DocstringLiteralNormalization.fix(context)
+    findings = rule_helpers.rule_findings(PDF000DocstringLiteralNormalization, context)
+    result = rule_helpers.rule_fix_result(PDF000DocstringLiteralNormalization, context)
 
     assert tuple(finding.line_numbers for finding in findings) == ((1,), (5,))
     assert [finding.fixable for finding in findings] == [True, False]
@@ -231,8 +229,8 @@ def test_fixable_simple_docstring_and_nonfixable_concatenation_are_reported_inde
 def test_fix_handles_multiple_docstring_owners_in_one_pass() -> None:
     source = '"module " "doc"\n\nclass Outer:\n    "class " "doc"\n\n    def method(self):\n        "method " "doc"\n\n    def unchanged(self):\n        """simple doc"""\n'
     _, context = contexts(source)
-    findings = PDF000DocstringLiteralNormalization.check(context)
-    result = PDF000DocstringLiteralNormalization.fix(context)
+    findings = rule_helpers.rule_findings(PDF000DocstringLiteralNormalization, context)
+    result = rule_helpers.rule_fix_result(PDF000DocstringLiteralNormalization, context)
     assert tuple(finding.line_numbers for finding in findings) == ((1,), (4,), (7,))
     assert tuple(finding.line_numbers for finding in result.fixed_findings) == ((1,), (4,), (7,))
     assert result.module.code == '"""module doc"""\n\nclass Outer:\n    """class doc"""\n\n    def method(self):\n        """method doc"""\n\n    def unchanged(self):\n        """simple doc"""\n'
@@ -241,8 +239,8 @@ def test_fix_handles_multiple_docstring_owners_in_one_pass() -> None:
 def test_fix_replaces_complete_multiline_expression_and_reports_its_source_span() -> None:
     source = 'def function():\n    (\n        r"first\\n"  # Preserve the raw backslash.\n        " second" \\\n        "\\tthird"\n    )\n    return None\n'
     _, context = contexts(source)
-    findings = PDF000DocstringLiteralNormalization.check(context)
-    result = PDF000DocstringLiteralNormalization.fix(context)
+    findings = rule_helpers.rule_findings(PDF000DocstringLiteralNormalization, context)
+    result = rule_helpers.rule_fix_result(PDF000DocstringLiteralNormalization, context)
     assert findings[0].line_numbers == (3, 4, 5)
     assert result.module.code == 'def function():\n    (\n        """first\\\\n second\tthird"""\n    )\n    return None\n'
     _, fixed_context = contexts(result.module.code)
@@ -251,14 +249,14 @@ def test_fix_replaces_complete_multiline_expression_and_reports_its_source_span(
 
 def test_fix_preserves_single_line_suite_statements() -> None:
     _, context = contexts('def function(): "first " "second"; return 1\n')
-    result = PDF000DocstringLiteralNormalization.fix(context)
+    result = rule_helpers.rule_fix_result(PDF000DocstringLiteralNormalization, context)
     assert result.module.code == 'def function(): """first second"""; return 1\n'
 
 
 def test_fix_preserves_crlf_and_escaped_newline_spelling() -> None:
     source = 'def function():\r\n    ("first\\n"\r\n     "second")\r\n'
     category, context = contexts(source)
-    result = PDF000DocstringLiteralNormalization.fix(context)
+    result = rule_helpers.rule_fix_result(PDF000DocstringLiteralNormalization, context)
     assert result.fixed_findings[0].line_numbers == (2, 3)
     assert result.module.code == 'def function():\r\n    ("""first\r\nsecond""")\r\n'
     fixed_category, _ = contexts(result.module.code)
@@ -270,33 +268,33 @@ def test_fix_leaves_raw_string_and_carriage_return_escape_values_unchanged() -> 
     _, raw_context = contexts('def raw():\n    r"first\\nsecond"\n')
     _, carriage_return_context = contexts('def carriage_return():\n    """first\\r\\nsecond"""\n')
 
-    assert PDF000DocstringLiteralNormalization.check(raw_context) == ()
-    assert PDF000DocstringLiteralNormalization.fix(raw_context).module is raw_context.module
-    assert PDF000DocstringLiteralNormalization.check(carriage_return_context) == ()
-    assert PDF000DocstringLiteralNormalization.fix(carriage_return_context).module is carriage_return_context.module
+    assert rule_helpers.rule_findings(PDF000DocstringLiteralNormalization, raw_context) == ()
+    assert rule_helpers.rule_fix_result(PDF000DocstringLiteralNormalization, raw_context).module is raw_context.module
+    assert rule_helpers.rule_findings(PDF000DocstringLiteralNormalization, carriage_return_context) == ()
+    assert rule_helpers.rule_fix_result(PDF000DocstringLiteralNormalization, carriage_return_context).module is carriage_return_context.module
 
 
 @pytest.mark.filterwarnings("ignore:invalid escape sequence.*:DeprecationWarning")
 def test_unsupported_escape_in_simple_docstring_is_ignored() -> None:
     _, context = contexts('def function():\n    """bad \\z words"""\n')
 
-    assert PDF000DocstringLiteralNormalization.check(context) == ()
-    assert PDF000DocstringLiteralNormalization.fix(context).module is context.module
+    assert rule_helpers.rule_findings(PDF000DocstringLiteralNormalization, context) == ()
+    assert rule_helpers.rule_fix_result(PDF000DocstringLiteralNormalization, context).module is context.module
 
 
 def test_ignores_concatenations_that_are_not_string_valued_first_expressions() -> None:
     source = 'def formatted():\n    f"first" "second"\n\ndef assigned():\n    value = "first" "second"\n\ndef later():\n    pass\n    "first" "second"\n'
     _, context = contexts(source)
-    assert PDF000DocstringLiteralNormalization.check(context) == ()
-    assert PDF000DocstringLiteralNormalization.fix(context).module is context.module
+    assert rule_helpers.rule_findings(PDF000DocstringLiteralNormalization, context) == ()
+    assert rule_helpers.rule_fix_result(PDF000DocstringLiteralNormalization, context).module is context.module
 
 
 def test_ignores_simple_string_escapes_that_are_not_docstrings() -> None:
     source = 'def assigned():\n    value = "first\\nsecond"\n\ndef later():\n    pass\n    "first\\nsecond"\n'
     _, context = contexts(source)
 
-    assert PDF000DocstringLiteralNormalization.check(context) == ()
-    assert PDF000DocstringLiteralNormalization.fix(context).module is context.module
+    assert rule_helpers.rule_findings(PDF000DocstringLiteralNormalization, context) == ()
+    assert rule_helpers.rule_fix_result(PDF000DocstringLiteralNormalization, context).module is context.module
 
 
 def test_ignores_unicode_prefix_on_non_docstring_simple_string() -> None:
@@ -309,8 +307,8 @@ def test_ignores_unicode_prefix_on_non_docstring_simple_string() -> None:
 
 def test_simple_docstrings_are_unchanged() -> None:
     _, context = contexts('"""simple"""\n')
-    assert PDF000DocstringLiteralNormalization.check(context) == ()
-    assert PDF000DocstringLiteralNormalization.fix(context).module is context.module
+    assert rule_helpers.rule_findings(PDF000DocstringLiteralNormalization, context) == ()
+    assert rule_helpers.rule_fix_result(PDF000DocstringLiteralNormalization, context).module is context.module
 
 
 def test_normalization_rule_runs_before_other_pdf_rules() -> None:
