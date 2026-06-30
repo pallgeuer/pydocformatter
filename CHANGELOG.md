@@ -466,6 +466,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Removed the unused `build` and `twine` dev dependencies now that package build and publish workflows use uv directly.
 
 - **Developer workflow:**
+  - Removed the Loupe Codex skill from this repository after moving it to the standalone `pallgeuer/la-dev-codex-plugins` marketplace repository.
   - Removed timing-sensitive Loupe reviewer subprocess tests from the fast pytest suite.
 
 - **Breaking configuration migration:**
