@@ -9,4 +9,5 @@ network_access = true
 writable_roots = [
   "~/.cache/pip",
   "~/.cache/uv",
+  "~/.local/share/uv",
 ]

@@ -8,6 +8,13 @@
   "sandbox": {
     "enabled": true,
     "autoAllowBashIfSandboxed": true,
+    "filesystem": {
+      "allowWrite": [
+        "~/.cache/pip",
+        "~/.cache/uv",
+        "~/.local/share/uv"
+      ]
+    },
     "network": {
       "allowedDomains": [
         "pypi.org",
