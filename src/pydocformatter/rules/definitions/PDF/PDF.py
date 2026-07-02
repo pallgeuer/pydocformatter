@@ -509,7 +509,8 @@ class PDFCategoryData:
         definitions (tuple[DefinitionInfo, ...]): Documentable module, class, and function owners.
         attributes (tuple[AttributeInfo, ...]): Supported module, class, and `__init__` instance attribute assignments.
         docstrings (tuple[DocstringInfo, ...]): Existing docstrings paired with their parsed structure and owner.
-        summary_line_targets (tuple[SummaryLineTarget, ...]): Summary lines eligible for first-line style checks.
+        summary_line_targets (tuple[SummaryLineTarget, ...]): First summary lines for all parsed docstring owners; rules
+            apply owner-specific policy.
         summary_terminal_line_targets (tuple[SummaryLineTarget, ...]): Summary lines eligible for terminal-punctuation
             checks.
         _attributes_by_owner_id (Mapping[int, tuple[AttributeInfo, ...]] | None): Cached attributes keyed by owner
@@ -1827,7 +1828,7 @@ def docstring_physical_line_numbers(docstring: DocstringInfo) -> tuple[int, ...]
 
 
 def summary_first_line_targets(docstrings: tuple[DocstringInfo, ...]) -> tuple[SummaryLineTarget, ...]:
-    """Return first non-adornment summary lines for parsed top-level summaries."""
+    """Return first non-adornment summary lines for parsed top-level summaries from all docstring owners."""
     targets: list[SummaryLineTarget] = []
     for docstring in docstrings:
         block = first_summary_block(docstring)
