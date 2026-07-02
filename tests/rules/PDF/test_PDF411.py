@@ -69,13 +69,13 @@ def test_normalizes_numpy_parameter_return_yield_and_method_type_spacing() -> No
 
 
 def test_normalizes_rest_type_like_fields_and_parameter_type_arguments() -> None:
-    source = 'def function(value):\n    """Summary.\n\n    :param Mapping[ str, object ]   value: Description.\n    :type value: Sequence[ int | None  ]\n    :rtype: dict[ str, Sequence[int  ]]\n    :ytype value: Iterator[ tuple[str, int  ] ]\n    """\n'
+    source = 'def function(value):\n    """Summary.\n\n    :param Mapping[ str, object ]   value: Description.\n    :type value: Sequence[ int | None  ]\n    :rtype: dict[ str, Sequence[int  ]]\n    :ytype value: Iterator[ tuple[str, int  ] ]\n    :vartype timeout: Mapping[ str, object ]\n    """\n'
     settings = CheckSettings(select=("PDF411",), docstring_convention=DocstringConvention.REST)
     result = format_source(source, settings=settings)
 
     assert (
         result.new_source
-        == 'def function(value):\n    """Summary.\n\n    :param Mapping[str, object]   value: Description.\n    :type value: Sequence[int | None]\n    :rtype: dict[str, Sequence[int]]\n    :ytype value: Iterator[tuple[str, int]]\n    """\n'
+        == 'def function(value):\n    """Summary.\n\n    :param Mapping[str, object]   value: Description.\n    :type value: Sequence[int | None]\n    :rtype: dict[str, Sequence[int]]\n    :ytype value: Iterator[tuple[str, int]]\n    :vartype timeout: Mapping[str, object]\n    """\n'
     )
     assert result.fixed_findings[PDF411TypeLikeTokenSpacingNormalization.meta] == 1
     assert not format_source(result.new_source, settings=settings).modified

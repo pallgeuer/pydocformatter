@@ -77,6 +77,12 @@ def test_accepts_numpy_and_rest_module_attribute_documentation() -> None:
     assert_pdf510_lines(rest, ((7,),), settings=CheckSettings(select=("PDF510",), docstring_convention=DocstringConvention.REST))
 
 
+def test_rest_cvar_and_vartype_document_module_attributes() -> None:
+    source = '"""Client defaults.\n\n:cvar timeout: Request timeout.\n:vartype retries: int\n"""\n\ntimeout: float\nretries: int\nstale: str\n'
+
+    assert_pdf510_lines(source, ((9,),), settings=CheckSettings(select=("PDF510",), docstring_convention=DocstringConvention.REST))
+
+
 def test_numpy_comma_separated_attribute_entry_documents_multiple_module_attributes() -> None:
     source = '"""Client defaults.\n\nAttributes\n----------\nprimary, fallback : str\n    Request endpoints.\n"""\n\nprimary = fallback = "https://example.com"\nretries: int\n'
 

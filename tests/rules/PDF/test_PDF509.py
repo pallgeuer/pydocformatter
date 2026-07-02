@@ -42,7 +42,7 @@ def test_private_attributes_may_be_voluntarily_documented_when_present() -> None
 
 def test_reports_numpy_and_rest_stale_class_attributes() -> None:
     numpy = 'class Client:\n    """HTTP client.\n\n    Attributes\n    ----------\n    stale : str\n        Removed attribute.\n    """\n'
-    rest = 'class Client:\n    """HTTP client.\n\n    :ivar stale: Removed attribute.\n    :vartype other: str\n    """\n'
+    rest = 'class Client:\n    """HTTP client.\n\n    :cvar stale: Removed attribute.\n    :vartype other: str\n    """\n'
 
     assert_pdf509_lines(numpy, ((6,),), settings=CheckSettings(select=("PDF509",), docstring_convention=DocstringConvention.NUMPY))
     assert_pdf509_lines(rest, ((4,), (5,)), settings=CheckSettings(select=("PDF509",), docstring_convention=DocstringConvention.REST))

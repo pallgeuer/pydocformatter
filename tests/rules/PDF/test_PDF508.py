@@ -60,6 +60,12 @@ def test_accepts_numpy_and_rest_attribute_documentation() -> None:
     assert_pdf508_lines(rest, ((8,),), settings=CheckSettings(select=("PDF508",), docstring_convention=DocstringConvention.REST))
 
 
+def test_rest_cvar_and_vartype_document_class_attributes() -> None:
+    source = 'class Client:\n    """HTTP client.\n\n    :cvar timeout: Request timeout.\n    :vartype retries: int\n    """\n\n    timeout: float\n    retries: int\n    stale: str\n'
+
+    assert_pdf508_lines(source, ((10,),), settings=CheckSettings(select=("PDF508",), docstring_convention=DocstringConvention.REST))
+
+
 def test_numpy_comma_separated_attribute_entry_documents_multiple_class_attributes() -> None:
     source = 'class Client:\n    """HTTP client.\n\n    Attributes\n    ----------\n    primary, fallback : str\n        Request endpoints.\n    """\n\n    primary = fallback = "https://example.com"\n    retries: int\n'
 

@@ -42,7 +42,7 @@ def test_class_attributes_do_not_satisfy_module_attribute_documentation() -> Non
 
 def test_reports_numpy_and_rest_stale_module_attributes() -> None:
     numpy = '"""Client defaults.\n\nAttributes\n----------\nstale : str\n    Removed attribute.\n"""\n'
-    rest = '"""Client defaults.\n\n:ivar stale: Removed attribute.\n:vartype other: str\n"""\n'
+    rest = '"""Client defaults.\n\n:cvar stale: Removed attribute.\n:vartype other: str\n"""\n'
 
     assert_pdf511_lines(numpy, ((5,),), settings=CheckSettings(select=("PDF511",), docstring_convention=DocstringConvention.NUMPY))
     assert_pdf511_lines(rest, ((3,), (4,)), settings=CheckSettings(select=("PDF511",), docstring_convention=DocstringConvention.REST))

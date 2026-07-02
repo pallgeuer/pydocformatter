@@ -989,6 +989,8 @@ def test_section_block_contains_header_entries_blanks_and_generic_children() -> 
         (":cvar timeout: Description.", DocstringEntryKind.ATTRIBUTE, ("timeout",)),
         (":var timeout: Description.", DocstringEntryKind.ATTRIBUTE, ("timeout",)),
         (":vartype timeout: float", DocstringEntryKind.ATTRIBUTE, ("timeout",)),
+        (":attribute timeout: Description.", DocstringEntryKind.FIELD, ("timeout",)),
+        (":cvartype timeout: float", DocstringEntryKind.FIELD, ("timeout",)),
         (":meta private: Description.", DocstringEntryKind.FIELD, ("private",)),
     ),
 )

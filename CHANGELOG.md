@@ -244,6 +244,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Fixed `PDF501` to allow documented keys from same-module class-based `TypedDict` definitions used in `**kwargs: Unpack[...]` parameters, keep conservative suppression for unresolved unpack targets, and continue reporting unrelated documented names when the local keys are known.
   - Fixed PDF502 and PDF503 to treat bare `yield` and `yield None` as generator behavior when classifying generator stop values, and fixed PDF506/PDF507 qualified exception diagnostics and matching.
   - Fixed PDF500 and PDF501 to recognize typed reST parameter fields such as `:param int value:` and `:type value:` as documentation for the final parameter name.
+  - Fixed PDF411 to normalize type-like spacing in reST `:vartype name:` attribute type fields.
   - Fixed reST fields with protected continuation bodies, such as indented lists, to count as non-empty field content without reflowing the protected body.
   - Fixed `PDF101` reST field reflow to preserve protected continuation bodies after inline field descriptions and reflow later prose in the same reST field.
   - Fixed `PDF408` to allow Google `Warning`/`Warnings` admonition sections alongside the distinct `Warns` warning-documentation section.
