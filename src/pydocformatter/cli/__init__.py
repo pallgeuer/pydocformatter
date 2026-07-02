@@ -1,1 +1,1 @@
-"""pydocfmt command-line interface package."""
+"""The pydocfmt command-line interface package."""

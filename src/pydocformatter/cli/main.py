@@ -1,4 +1,4 @@
-"""pydocfmt command-line entry point."""
+"""The pydocfmt command-line entry point."""
 
 from __future__ import annotations
 

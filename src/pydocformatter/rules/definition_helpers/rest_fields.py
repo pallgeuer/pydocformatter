@@ -1,4 +1,4 @@
-"""reStructuredText field parsing helpers."""
+"""The reStructuredText field parsing helpers."""
 
 from __future__ import annotations
 
