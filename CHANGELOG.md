@@ -78,6 +78,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added a file-selection specification at `docs/file_selection_spec.md`, including exact defaults, precedence rules, force-exclude behavior, config-relative glob bases, and explicit pydocformatter deviations.
   - Added a rule-selection specification at `docs/rule_selection_spec.md`, covering rule collection, selectors, fixability, and rule explanation output.
   - Added adjacent Markdown documentation for all built-in pydocformatter rules, including Ruff compatibility notes where relevant.
+  - Clarified that PDF rules ignored under every docstring convention are effectively opt-in by exact rule-code selection, separately from `require-explicit` rules.
   - Added a rule implementation specification documenting the implementation, documentation, testing, and release-note touch points for adding rules.
   - Added source module, rule class, and public class attribute docstrings across the pydocformatter package surface, with code-informed attribute descriptions and guidance against low-information generated docstrings.
   - Expanded code-informed docstrings for internal rule helpers, docstring parser routines, descriptor methods, and section-normalization utilities.

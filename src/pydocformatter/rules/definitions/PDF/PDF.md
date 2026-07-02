@@ -65,6 +65,8 @@ Consistent docstring formatting improves readability and keeps documentation sta
 ## Rules
 Rules in this category cover literal and quote normalization, source-level formatting, blank-line layout, first-line style, convention section style, and consistency between docstrings and signatures. Reflow rules operate on the semantic regions prepared for the selected convention, while structural rules normalize spacing, section syntax, and documented parameters, return values, yields, and exceptions.
 
+Some PDF rules are ignored by broad selectors for every `docstring-convention` value. Because ignored setting effects are restored by exact rule-code selection, those rules are effectively opt-in by exact code even when they are not listed as `require-explicit` rules. The rule list shows this state as `Ignored` in every convention column; the `Explicit` column is reserved for rules controlled by `require-explicit`.
+
 ## Related tooling
 Individual rule documentation describes relevant Ruff compatibility and differences.
 
