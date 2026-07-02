@@ -3,9 +3,9 @@
 Fix is sometimes available.
 
 ## What it does
-Checks function and method docstring summaries whose first word starts with a lowercase ASCII letter when that word can be safely interpreted as ordinary ASCII prose.
+Checks docstring summaries whose first word starts with a lowercase ASCII letter when that word can be safely interpreted as ordinary ASCII prose. This includes module, class, function, method, and attached attribute docstrings.
 
-PDF304 skips module and class docstrings, empty docstrings, docstrings without a parsed summary, parser-recognized structures, all-uppercase words, non-ASCII starts, numeric starts, and words containing characters other than ASCII letters or apostrophes after the first character. This means `return` and `don't` can be fixed, while `"return"`, `(return)`, `return:`, `return_value`, and `return-value` are left alone. When fixing, it uppercases only the first character of the first word.
+PDF304 checks the first non-adornment line of the parsed top-level summary block, including summaries in multiline docstrings. It skips empty docstrings, docstrings without a parsed summary, parser-recognized structures, all-uppercase words, non-ASCII starts, numeric starts, and words containing characters other than ASCII letters or apostrophes after the first character. This means `return` and `don't` can be fixed, while `"return"`, `(return)`, `return:`, `return_value`, and `return-value` are left alone. When fixing, it uppercases only the first character of the first word.
 
 Unsafe source mappings are reported but not changed. This includes summaries whose first logical line is formed from concatenated strings or escaped newline text, because changing only one apparent word could require rewriting source text that does not map cleanly to that logical word.
 
@@ -15,7 +15,7 @@ With heading parsing enabled, underlined title-style content is a heading and is
 Consistent summary capitalization makes docstrings scan like complete prose.
 
 ## Ruff compatibility
-This rule replaces Ruff's `D403`. Like Ruff, it applies to functions and methods and only fixes ASCII words that can be capitalized safely.
+This rule replaces Ruff's `D403`. Unlike Ruff, it applies to all parsed docstring summaries, not only functions and methods. Like Ruff, it only fixes ASCII words that can be capitalized safely.
 
 ## Examples
 PDF304 capitalizes a safe function summary first word:
@@ -28,6 +28,46 @@ def value():
 [output]
 def value():
     """Return the value."""
+```
+
+It also capitalizes safe summary first words in module, class, and attached attribute docstrings:
+
+```pydocfmt-example
+[input]
+"""module defaults."""
+
+class Client:
+    """client configuration."""
+
+    timeout = 30
+    """request timeout in seconds."""
+
+[output]
+"""Module defaults."""
+
+class Client:
+    """Client configuration."""
+
+    timeout = 30
+    """Request timeout in seconds."""
+```
+
+Multiline docstrings are checked when their first parsed block is a summary:
+
+```pydocfmt-example
+[input]
+def value():
+    """return the value.
+
+    More details follow.
+    """
+
+[output]
+def value():
+    """Return the value.
+
+    More details follow.
+    """
 ```
 
 Other safe ASCII first words are fixed in the same narrow way:
@@ -96,14 +136,12 @@ def escaped():
 PDF304: Line 5: Docstring summary first word 'return' should be capitalized
 ```
 
-Non-function summaries are not checked:
+Parser-recognized non-summary structures are not checked:
 
 ```pydocfmt-example
 [input]
-"""module summary."""
-
-class Value:
-    """class summary."""
+def field():
+    """:return: field summary"""
 
 [output=unchanged]
 ```

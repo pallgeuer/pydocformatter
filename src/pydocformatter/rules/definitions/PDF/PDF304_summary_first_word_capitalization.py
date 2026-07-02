@@ -34,7 +34,7 @@ class PDF304SummaryFirstWordCapitalization(RuleBase):
 
     @classmethod
     def violations(cls, context: RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
-        """Return violations for function summaries whose first word is not capitalized."""
+        """Return violations for summaries whose first word is not capitalized."""
         return _violations(context, rule=cls.meta)
 
 
@@ -43,8 +43,6 @@ def _violations(context: RuleContext, *, rule: RuleMetadata) -> tuple[rule_viola
     data = PDF.require_data(context)
     violations: list[rule_violations.RuleViolation] = []
     for target in data.summary_line_targets:
-        if not summary_style.is_function_docstring(target.docstring):
-            continue
         word = summary_style.first_word_target(target)
         if word is None or not _should_capitalize(word.word):
             continue

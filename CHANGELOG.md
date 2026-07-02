@@ -169,6 +169,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Reset the planned next release to `1.0.0` and present pydocformatter as a new standalone Ruff-style formatter.
 
 - **Docstring formatting:**
+  - Changed `PDF304` to check all parsed docstring summaries, including module, class, and attached attribute docstrings.
   - Changed `PDF500` to be enabled by broad rule selections under the NumPy docstring convention.
   - Changed automatic fixing to stop after 20 fix iterations.
   - Added instance-specific diagnostic messages for parameter consistency, section-style, and selected summary-style rule findings where the offending parameter, section, function, word, or span length is useful context.

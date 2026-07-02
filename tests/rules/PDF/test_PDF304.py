@@ -78,6 +78,26 @@ def test_preserves_crlf_line_endings() -> None:
     assert result.fixed_findings[PDF304SummaryFirstWordCapitalization.meta] == 1
 
 
+def test_capitalizes_safe_summary_first_words_for_all_docstring_owners() -> None:
+    source = '"""module summary."""\n\nclass Example:\n    """class summary."""\n\n    class_value = 1\n    """class value."""\n\n    def __init__(self):\n        """initialize example."""\n        self.instance_value = 1\n        """instance value."""\n\nmodule_value = 1\n"""module value."""\n'
+    result = format_source(source)
+
+    assert (
+        result.new_source
+        == '"""Module summary."""\n\nclass Example:\n    """Class summary."""\n\n    class_value = 1\n    """Class value."""\n\n    def __init__(self):\n        """Initialize example."""\n        self.instance_value = 1\n        """Instance value."""\n\nmodule_value = 1\n"""Module value."""\n'
+    )
+    assert result.fixed_findings[PDF304SummaryFirstWordCapitalization.meta] == 6
+    assert not result.unfixed_findings
+
+
+def test_capitalizes_first_summary_word_in_multiline_docstrings() -> None:
+    source = '"""module summary.\n\nDetails follow.\n"""\n\n\ndef function():\n    """function summary.\n\n    Details follow.\n    """\n'
+    result = format_source(source)
+
+    assert result.new_source == '"""Module summary.\n\nDetails follow.\n"""\n\n\ndef function():\n    """Function summary.\n\n    Details follow.\n    """\n'
+    assert result.fixed_findings[PDF304SummaryFirstWordCapitalization.meta] == 2
+
+
 @pytest.mark.parametrize("summary", ("Return value.", "RETURN value.", "\u00e9clair value.", "return_value.", "123 value."))
 def test_skips_words_without_safe_ascii_capitalization(summary: str) -> None:
     source = f'def function():\n    """{summary}"""\n'
@@ -112,14 +132,14 @@ def test_reports_but_does_not_fix_unsafe_source_mappings() -> None:
     assert [finding.fixable for finding in result.unfixed_findings] == [False, False]
 
 
-def test_applies_only_to_functions_and_respects_summary_parsing() -> None:
+def test_applies_to_all_docstring_summaries_and_respects_summary_parsing() -> None:
     source = '"""module summary."""\n\nclass Example:\n    """class summary."""\n\n\ndef field():\n    """:return: field summary"""\n\n\ndef function():\n    """function summary."""\n'
     result = format_source(source)
 
     assert (
-        result.new_source == '"""module summary."""\n\nclass Example:\n    """class summary."""\n\n\ndef field():\n    """:return: field summary"""\n\n\ndef function():\n    """Function summary."""\n'
+        result.new_source == '"""Module summary."""\n\nclass Example:\n    """Class summary."""\n\n\ndef field():\n    """:return: field summary"""\n\n\ndef function():\n    """Function summary."""\n'
     )
-    assert result.fixed_findings[PDF304SummaryFirstWordCapitalization.meta] == 1
+    assert result.fixed_findings[PDF304SummaryFirstWordCapitalization.meta] == 3
 
 
 def test_underlined_title_style_summary_obeys_heading_parsing_setting() -> None:
