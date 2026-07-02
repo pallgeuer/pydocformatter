@@ -70,6 +70,16 @@ def test_inserts_period_for_safe_missing_period(source: str, expected: str) -> N
     assert not format_source(result.new_source).modified
 
 
+def test_inserts_period_for_attribute_docstring_summary() -> None:
+    source = 'value = 1\n"""summary without period"""\n'
+    result = format_source(source)
+
+    assert result.new_source == 'value = 1\n"""summary without period."""\n'
+    assert result.fixed_findings[PDF300SummaryTrailingPeriod.meta] == 1
+    assert not result.unfixed_findings
+    assert not format_source(result.new_source).modified
+
+
 @pytest.mark.parametrize("punctuation", (",", "?", "!", ":", ";"))
 def test_reports_but_does_not_fix_other_punctuation(punctuation: str) -> None:
     source = f'def function():\n    """Return value{punctuation}"""\n'

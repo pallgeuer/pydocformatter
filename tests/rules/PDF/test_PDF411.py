@@ -27,6 +27,16 @@ def test_normalizes_google_parameter_return_and_yield_type_spacing() -> None:
     assert not format_source(result.new_source).modified
 
 
+def test_normalizes_attribute_entry_type_spacing_in_attribute_docstring() -> None:
+    source = 'value = 1\n"""Summary.\n\nAttributes:\n    child ( Mapping[ str, object ] ): Child.\n"""\n'
+    result = format_source(source)
+
+    assert result.new_source == 'value = 1\n"""Summary.\n\nAttributes:\n    child (Mapping[str, object]): Child.\n"""\n'
+    assert result.fixed_findings[PDF411TypeLikeTokenSpacingNormalization.meta] == 1
+    assert not result.unfixed_findings
+    assert not format_source(result.new_source).modified
+
+
 def test_reuses_cached_type_like_normalization_for_repeated_text(monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[str] = []
     original_normalizer = PDF411_definition._normalized_type_like_text

@@ -57,6 +57,16 @@ def test_removes_trailing_whitespace_from_non_empty_lines_before_newlines() -> N
     assert not format_pdf003(result.new_source).modified
 
 
+def test_removes_trailing_whitespace_from_attribute_docstring_lines() -> None:
+    source = 'value = 1\n"""Summary.   \nBody.\t \n"""\n'
+    result = format_pdf003(source)
+
+    assert result.new_source == 'value = 1\n"""Summary.\nBody.\n"""\n'
+    assert result.fixed_findings[PDF102DocstringTrailingWhitespace.meta] == 1
+    assert not result.unfixed_findings
+    assert not format_pdf003(result.new_source).modified
+
+
 def test_does_not_touch_whitespace_only_lines_or_final_non_empty_content_before_closing_quotes() -> None:
     source = 'def one_line():\n    """Summary.  """\n\ndef multi_line():\n    """Summary.\n    Body.  """\n\ndef blank_lines():\n    """Summary.\n      \n    """\n'
     result = format_pdf003(source)

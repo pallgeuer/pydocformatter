@@ -57,6 +57,16 @@ def test_reports_summaries_starting_with_this(summary: str) -> None:
     assert not result.unfixed_findings[0].fixable
 
 
+def test_reports_attribute_docstring_summary_starting_with_this() -> None:
+    source = 'value = 1\n"""This returns value."""\n'
+    result = format_source(source)
+
+    assert result.new_source == source
+    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((2,),)
+    assert not result.fixed_findings
+    assert not result.unfixed_findings[0].fixable
+
+
 @pytest.mark.parametrize("summary", ("this returns value.", "THIS returns value.", "'this' returns value."))
 def test_this_detection_is_case_insensitive_after_normalization(summary: str) -> None:
     source = f'def function():\n    """{summary}"""\n'

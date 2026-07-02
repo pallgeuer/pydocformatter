@@ -70,6 +70,16 @@ def test_inserts_period_for_safe_missing_terminal_punctuation(source: str, expec
     assert not format_source(result.new_source).modified
 
 
+def test_inserts_terminal_punctuation_for_attribute_docstring_summary() -> None:
+    source = 'value = 1\n"""summary without punctuation"""\n'
+    result = format_source(source)
+
+    assert result.new_source == 'value = 1\n"""summary without punctuation."""\n'
+    assert result.fixed_findings[PDF301SummaryTerminalPunctuation.meta] == 1
+    assert not result.unfixed_findings
+    assert not format_source(result.new_source).modified
+
+
 @pytest.mark.parametrize("punctuation", (".", "?", "!"))
 def test_accepts_existing_terminal_punctuation(punctuation: str) -> None:
     source = f'def function():\n    """Return value{punctuation}"""\n'

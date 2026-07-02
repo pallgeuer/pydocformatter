@@ -111,6 +111,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added targeted PCF edge-case coverage for no-final-newline standalone wrapping, formatting after preserved standalone structures, and current standalone/trailing/directive rule-selection boundaries.
   - Vastly expanded PDF category preparation tests across docstring collection, source metadata, semantic sections and entries, protected structures, reflow regions, malformed inputs, and mixed edge cases.
   - Added PDF101 regression coverage for short-line joining, protected structures, disabled structure parsing, simple-suite docstrings, and line-ending settings.
+  - Added representative PDF rule regression coverage for formatting attached attribute docstrings across punctuation, summary-style, source-rewrite, structural, and parsed-entry rule families.
   - Added PDF parser regression coverage for generic-looking return, yield, and exception type spellings across Google, NumPy, and reStructuredText/reST conventions.
 
 - **Formatting:**

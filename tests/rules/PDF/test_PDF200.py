@@ -61,6 +61,16 @@ def test_collapses_leading_internal_and_trailing_extra_blank_lines() -> None:
     assert rule_helpers.rule_findings(PDF200TooManyBlankLines, fixed_context) == ()
 
 
+def test_collapses_extra_blank_lines_in_attribute_docstring() -> None:
+    source = 'value = 1\n"""Summary.\n\n\nBody.\n"""\n'
+    result = format_pdf100(source)
+
+    assert result.new_source == 'value = 1\n"""Summary.\n\nBody.\n"""\n'
+    assert result.fixed_findings[PDF200TooManyBlankLines.meta] == 1
+    assert not result.unfixed_findings
+    assert not format_pdf100(result.new_source).modified
+
+
 def test_preserves_first_line_content_whitespace_when_collapsing_later_blank_lines() -> None:
     source = 'def function():\n    """  Summary with leading spaces.\n\n\n    Body.\n    """\n'
     result = format_pdf100(source)
