@@ -87,7 +87,7 @@ class TestCLIRule(unittest.TestCase):
         output = json.loads(stdout.getvalue())
         self.assertEqual(exit_code, 0)
         self.assertEqual(output[0]["code"], "PCF001")
-        self.assertEqual(output[-1]["code"], "PDF511")
+        self.assertEqual(output[-1]["code"], "PDF513")
 
     def test_pydocfmt_rule_rejects_missing_rule(self) -> None:
         stdout = StringIO()

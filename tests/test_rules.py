@@ -1390,6 +1390,8 @@ class NonCallableViolationsRule(RuleBase):
                     DocstringConvention.REST: RuleSettingEffect.IGNORED,
                 },
                 "PDF511": {DocstringConvention.NONE: RuleSettingEffect.IGNORED, DocstringConvention.PEP257: RuleSettingEffect.IGNORED},
+                "PDF512": {DocstringConvention.NONE: RuleSettingEffect.IGNORED, DocstringConvention.PEP257: RuleSettingEffect.IGNORED},
+                "PDF513": {DocstringConvention.NONE: RuleSettingEffect.IGNORED, DocstringConvention.PEP257: RuleSettingEffect.IGNORED},
             },
         )
         self.assertEqual(

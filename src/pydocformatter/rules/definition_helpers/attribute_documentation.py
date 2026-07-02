@@ -235,3 +235,37 @@ def extraneous_attribute_violations(
                 )
             )
     return tuple(violations)
+
+
+def duplicate_attribute_violations(
+    data: PDF_definition.PDFCategoryData,
+    *,
+    meta: rule_models.RuleMetadata,
+    owner_kind: PDF_definition.DefinitionKind,
+    owner_label: str,
+    include_instance: bool,
+) -> tuple[rule_violations.RuleViolation, ...]:
+    """Return violations for attached docstrings duplicated by owner attribute docs."""
+    violations: list[rule_violations.RuleViolation] = []
+    for definition in data.definitions:
+        if definition.kind is not owner_kind:
+            continue
+        docstring = data.docstring_for(definition)
+        if docstring is None:
+            continue
+        attached_docstrings = attached_attribute_docstrings_by_name(data, definition)
+        if not attached_docstrings:
+            continue
+        for attribute in documented_attributes(docstring):
+            for attached_docstring in attached_docstrings.get(attribute.name, ()):
+                owner = attached_docstring.owner
+                if isinstance(owner, PDF_definition.AttributeInfo) and owner.instance and not include_instance:
+                    continue
+                violations.append(
+                    rule_violations.diagnostic(
+                        meta,
+                        PDF_definition.docstring_physical_line_numbers(attached_docstring),
+                        instance_message=f"Attached docstring for {owner_label.lower()} attribute '{attribute.name}' duplicates {owner_label.lower()} docstring attribute documentation",
+                    )
+                )
+    return tuple(violations)
