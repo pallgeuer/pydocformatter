@@ -19,7 +19,7 @@ class Client:
         """Method docstring."""
 ```
 
-PDF rules also consider attribute docstrings collected by common documentation tools. Supported forms are module attributes, class attributes, and `self.<name>` instance attributes assigned inside `__init__`, including same-line docstrings, next-line docstrings, annotations without values, and multi-target assignments:
+PDF rules also inventory module attributes, class attributes, and `self.<name>` instance attributes assigned inside `__init__`. Adjacent attribute docstrings collected by common documentation tools are treated as documentation attached to those inventory entries. Supported forms include same-line docstrings, next-line docstrings, annotations without values, multi-target assignments, and tuple-unpacked assignments:
 
 ```python
 module_value = 1
@@ -31,6 +31,9 @@ module_name: str
 first = second = 1
 """Shared docstring for both module attributes."""
 
+primary, (fallback, *aliases) = endpoints
+"""Shared docstring for tuple-unpacked module attributes."""
+
 
 class Client:
     class_value = 1
@@ -38,12 +41,14 @@ class Client:
 
     def __init__(self, enabled):
         self.instance_value = 1; """Same-line instance attribute docstring."""
+        self.instance_primary, _ = values
+        """Tuple-unpacked instance attribute docstring."""
         if enabled:
             self.conditional_value = 1
             """Nested instance attribute docstring."""
 ```
 
-PDF rules do not consider additional string literals after a primary docstring, local variable strings outside supported attribute locations, bytes literals, f-strings, unpacking targets, subscript targets, `cls.<name>` targets, or arbitrary object attributes:
+PDF rules do not consider additional string literals after a primary docstring, local variable strings outside supported attribute locations, bytes literals, f-strings, list destructuring targets, unsupported tuple leaves, subscript targets, `cls.<name>` targets, or arbitrary object attributes:
 
 ```python
 def function():
@@ -63,7 +68,7 @@ class Client:
 Consistent docstring formatting improves readability and keeps documentation stable across automated formatting runs.
 
 ## Rules
-Rules in this category cover literal and quote normalization, source-level formatting, blank-line layout, first-line style, convention section style, and consistency between docstrings and signatures. Reflow rules operate on the semantic regions prepared for the selected convention, while structural rules normalize spacing, section syntax, and documented parameters, return values, yields, and exceptions.
+Rules in this category cover literal and quote normalization, source-level formatting, blank-line layout, first-line style, convention section style, and consistency between docstrings and signatures or attribute inventories. Reflow rules operate on the semantic regions prepared for the selected convention, while structural rules normalize spacing, section syntax, and documented parameters, return values, yields, exceptions, and attributes.
 
 Some PDF rules are ignored by broad selectors for every `docstring-convention` value. Because ignored setting effects are restored by exact rule-code selection, those rules are effectively opt-in by exact code even when they are not listed as `require-explicit` rules. The rule list shows this state as `Ignored` in every convention column; the `Explicit` column is reserved for rules controlled by `require-explicit`.
 
@@ -80,23 +85,24 @@ PDF rules are grouped by contiguous hundred ranges so related rules stay close t
 | `PDF2xx` | Blank lines and empty docstrings | Excess or missing blank lines, empty docstrings, and ambiguous multiline summaries.                  |
 | `PDF3xx` | First-line style                 | Summary punctuation, imperative mood, signature duplication, capitalization, and first-word wording. |
 | `PDF4xx` | Section style                    | Section names, headers, underlines, section content, section order, and section punctuation.         |
-| `PDF5xx` | Docstring/signature validation   | Parameter, return, yield, and exception documentation consistency.                                   |
+| `PDF5xx` | Docstring/signature validation   | Parameter, return, yield, exception, and attribute documentation consistency.                        |
 
 ## Options
 Docstring options control which convention-specific structures are parsed, which generic structures are protected or reflowed, and how selected formatting and documentation checks behave.
 
-| Setting                                       |       Default | Effect                                                                                  |
-|-----------------------------------------------|--------------:|-----------------------------------------------------------------------------------------|
-| `docstring-convention`                        |      `pep257` | Parse Google sections, NumPy sections, or reStructuredText fields only when selected.   |
-| `docstring-parse-list-items`                  |        `true` | Parse list items as distinct structures for reflow and protection.                      |
-| `docstring-parse-headings`                    |        `true` | Parse Markdown and reStructuredText headings as protected structures.                   |
-| `docstring-parse-doctests`                    |        `true` | Parse doctest regions as protected structures.                                          |
-| `docstring-parse-code-fences`                 |        `true` | Parse fenced code blocks as protected structures.                                       |
-| `docstring-parse-block-quotes`                |        `true` | Parse Markdown block quotes for prefix-preserving reflow.                               |
-| `docstring-parse-tables`                      |        `true` | Parse Markdown and reStructuredText tables as protected structures.                     |
-| `docstring-parse-directives`                  |        `true` | Parse reStructuredText directives and their bodies as protected structures.             |
-| `docstring-parse-literal-blocks`              |        `true` | Parse reStructuredText literal blocks as protected structures.                          |
-| `docstring-blank-line-style`                  |       `blank` | Choose whether inserted blank lines are blank or aligned to the docstring indentation.  |
-| `docstring-blank-line-after-last-section`     |       `false` | Keep one blank line after the final recognized Google or NumPy section when enabled.    |
-| `docstring-missing-documentation`             | `has-section` | Select which missing parameter, return, yield, and exception documentation is reported. |
-| `docstring-missing-documentation-public-only` |        `true` | Limit missing documentation checks to public API names when enabled.                    |
+| Setting                                          |       Default | Effect                                                                                     |
+|--------------------------------------------------|--------------:|--------------------------------------------------------------------------------------------|
+| `docstring-convention`                           |      `pep257` | Parse Google sections, NumPy sections, or reStructuredText fields only when selected.      |
+| `docstring-parse-list-items`                     |        `true` | Parse list items as distinct structures for reflow and protection.                         |
+| `docstring-parse-headings`                       |        `true` | Parse Markdown and reStructuredText headings as protected structures.                      |
+| `docstring-parse-doctests`                       |        `true` | Parse doctest regions as protected structures.                                             |
+| `docstring-parse-code-fences`                    |        `true` | Parse fenced code blocks as protected structures.                                          |
+| `docstring-parse-block-quotes`                   |        `true` | Parse Markdown block quotes for prefix-preserving reflow.                                  |
+| `docstring-parse-tables`                         |        `true` | Parse Markdown and reStructuredText tables as protected structures.                        |
+| `docstring-parse-directives`                     |        `true` | Parse reStructuredText directives and their bodies as protected structures.                |
+| `docstring-parse-literal-blocks`                 |        `true` | Parse reStructuredText literal blocks as protected structures.                             |
+| `docstring-blank-line-style`                     |       `blank` | Choose whether inserted blank lines are blank or aligned to the docstring indentation.     |
+| `docstring-blank-line-after-last-section`        |       `false` | Keep one blank line after the final recognized Google or NumPy section when enabled.       |
+| `docstring-missing-documentation`                | `has-section` | Select which missing parameter, return, yield, exception, and attribute docs are reported. |
+| `docstring-missing-documentation-public-only`    |        `true` | Limit broad missing documentation checks to public API names when enabled.                 |
+| `docstring-require-init-attribute-documentation` |       `false` | Include supported `self.*` attributes in class missing-attribute documentation checks.     |

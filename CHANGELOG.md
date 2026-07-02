@@ -28,6 +28,8 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added `PDF409` to normalize spacing in parsed Google, NumPy, and reST convention entries and fields.
   - Added `PDF410` to normalize parsed Google, NumPy, and reST exception and warning entry names to no backticks and comma-separated exception lists.
   - Added `PDF411` to normalize internal spacing in parsed convention type-like tokens using conservative AST validation.
+  - Added `PDF508` through `PDF511` to validate missing and extraneous class and module attribute documentation against an explicit attribute inventory.
+  - Added tuple-unpacked module, class, and `__init__` instance attribute inventory support for `PDF508` through `PDF511`.
   - Added `PDF106` through `PDF109` to normalize multi-line docstring opening and closing quote placement.
   - Added `PDF110` and `PDF203` to collapse safe summary-only docstrings that fit on one line and report summaries that remain multi-line.
   - Added PDF processing for module, class, and `__init__` instance attribute docstrings recognized by common documentation tools.
@@ -64,6 +66,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added `url-aware-wrapping`, enabled by default, for URL-aware comment and docstring line balancing without splitting URL tokens.
   - Added `docstring-blank-line-style` with `"blank"` and `"aligned"` modes for PDF103 blank-line whitespace normalization.
   - Added `docstring-blank-line-after-last-section` to control whether PDF200 and PDF201 keep one blank line after the final recognized Google or NumPy docstring section.
+  - Added `docstring-require-init-attribute-documentation` to control whether class missing-attribute documentation checks require supported `self.*` assignments from `__init__`.
   - Added `comment-trailing-extraction-syntax-aware`, enabled by default, to keep overlong trailing comments inline in syntax-sensitive positions.
   - Added `comment-trailing-extraction-content-aware`, enabled by default, to keep overlong trailing comments inline when enabled standalone comment structure/code detectors or the operator heuristic make extraction unsafe.
   - Added `comment-format-task-markers`, enabled by default, to reflow recognized task-marker comments such as `TODO:`, `FIXME:`, and `HACK:` with hanging indentation.
@@ -212,6 +215,10 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Fixed rule line-target validation to reject boolean values instead of accepting `True` as line `1`.
   - Fixed `PDF101` variable-width source wrapping to use equivalent greedy wrapping and avoid quadratic runtime on long non-URL docstring paragraphs.
   - Fixed repeated PDF docstring owner lookups to use cached identity-based lookup instead of rescanning prepared docstrings.
+  - Fixed `PDF508` and `PDF510` missing-attribute documentation checks to respect inert docstring conventions, private package paths, and per-target tuple-unpacking lines.
+  - Fixed `PDF510` module privacy checks to ignore underscore-prefixed filesystem ancestors that are not part of the importable package path.
+  - Fixed `PDF508` and `PDF510` attached attribute docstring suppressions so an ignore on one documented attribute does not hide missing documentation for unrelated attributes.
+  - Fixed PDF attribute documentation helper caches to expose read-only prepared data and avoid repeated owner attribute scans.
   - Fixed URL-aware wrapping to avoid recursive crashes on long URL-containing paragraphs and to fall back to greedy wrapping when balanced wrapping exceeds its search budget.
 
 - **Comment formatting:**

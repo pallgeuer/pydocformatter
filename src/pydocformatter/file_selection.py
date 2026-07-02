@@ -79,6 +79,7 @@ class FileDecision:
         reason (DecisionReason): Stable machine-readable decision reason.
         explicit (bool): Whether the path came directly from a CLI argument rather than directory traversal.
         profile (settings_core.SettingsProfile[CheckSettings] | None): Settings profile used to make the decision.
+        respect_gitignore (bool): Whether gitignore filtering was enabled when the decision was made.
     """
 
     path: str

@@ -323,6 +323,7 @@ class TestSettings(unittest.TestCase):
                 "docstring_blank_line_after_last_section",
                 "docstring_missing_documentation",
                 "docstring_missing_documentation_public_only",
+                "docstring_require_init_attribute_documentation",
                 "docstring_parse_list_items",
                 "docstring_parse_headings",
                 "docstring_parse_doctests",
@@ -925,7 +926,7 @@ class TestSettings(unittest.TestCase):
             global_values=pydocformatter_global_args.GlobalArgs(
                 isolated=True,
                 config_options=(
-                    'docstring-convention = "google"\ndocstring-blank-line-style = "aligned"\ndocstring-blank-line-after-last-section = true\ndocstring-missing-documentation = "all-docstrings"\ndocstring-missing-documentation-public-only = false\ndocstring-parse-tables = false',
+                    'docstring-convention = "google"\ndocstring-blank-line-style = "aligned"\ndocstring-blank-line-after-last-section = true\ndocstring-missing-documentation = "all-docstrings"\ndocstring-missing-documentation-public-only = false\ndocstring-require-init-attribute-documentation = true\ndocstring-parse-tables = false',
                 ),
             )
         )
@@ -937,6 +938,7 @@ class TestSettings(unittest.TestCase):
                 docstring_blank_line_after_last_section=False,
                 docstring_missing_documentation="non-summary-docstrings",
                 docstring_missing_documentation_public_only=True,
+                docstring_require_init_attribute_documentation=False,
                 docstring_parse_tables=False,
             ),
         )
@@ -945,12 +947,14 @@ class TestSettings(unittest.TestCase):
         self.assertTrue(configured.docstring_blank_line_after_last_section)
         self.assertEqual(configured.docstring_missing_documentation, pydocformatter_settings.DocstringMissingDocumentation.ALL_DOCSTRINGS)
         self.assertFalse(configured.docstring_missing_documentation_public_only)
+        self.assertTrue(configured.docstring_require_init_attribute_documentation)
         self.assertFalse(configured.docstring_parse_tables)
         self.assertEqual(overridden.docstring_convention, pydocformatter_settings.DocstringConvention.NUMPY)
         self.assertEqual(overridden.docstring_blank_line_style, pydocformatter_settings.DocstringBlankLineStyle.BLANK)
         self.assertFalse(overridden.docstring_blank_line_after_last_section)
         self.assertEqual(overridden.docstring_missing_documentation, pydocformatter_settings.DocstringMissingDocumentation.NON_SUMMARY_DOCSTRINGS)
         self.assertTrue(overridden.docstring_missing_documentation_public_only)
+        self.assertFalse(overridden.docstring_require_init_attribute_documentation)
         self.assertFalse(overridden.docstring_parse_tables)
 
         config = pydocformatter_settings.SETTINGS_SCHEMA.load(

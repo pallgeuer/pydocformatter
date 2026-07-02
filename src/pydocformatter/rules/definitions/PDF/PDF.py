@@ -6,7 +6,8 @@ import dataclasses
 import enum
 import re
 import typing
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterator, Mapping, Sequence
+from types import MappingProxyType
 
 import libcst as cst
 import libcst.metadata as cst_metadata
@@ -363,12 +364,15 @@ class AttributeInfo:
     """Convention-neutral information about one documented attribute.
 
     Attributes:
-        node (cst.Assign | cst.AnnAssign): Assignment node that may be documented by the adjacent string literal.
-        kind (DefinitionKind): Always `DefinitionKind.ATTRIBUTE` for attribute documentation targets.
+        node (cst.Assign | cst.AnnAssign): Assignment node that declares or defines the attribute.
+        kind (DefinitionKind): Always `DefinitionKind.ATTRIBUTE` for attribute inventory and documentation targets.
         name (str): Primary attribute name used for diagnostics and lookup.
         qualified_name (str): Dotted attribute name relative to the module root.
         parent (DefinitionInfo): Definition whose body contains the assignment.
         targets (tuple[str, ...]): All simple assignment target names documented by the same docstring.
+        line_numbers (tuple[int, ...]): One-based source lines occupied by supported assignment targets.
+        target_line_numbers (tuple[tuple[int, ...], ...]): One-based source lines for each target in `targets`.
+        instance (bool): Whether the attribute comes from a `self.*` assignment in an `__init__` body.
     """
 
     node: cst.Assign | cst.AnnAssign
@@ -377,6 +381,9 @@ class AttributeInfo:
     qualified_name: str
     parent: DefinitionInfo
     targets: tuple[str, ...]
+    line_numbers: tuple[int, ...]
+    target_line_numbers: tuple[tuple[int, ...], ...]
+    instance: bool
 
 
 DocstringOwner = DefinitionInfo | AttributeInfo
@@ -495,31 +502,30 @@ DocumentedFunctionFact = tuple[DefinitionInfo, DocstringInfo, FunctionFacts]
 
 
 @dataclasses.dataclass(frozen=True)
-class _AttributeAssignment:
-    """One assignment that may be followed by an attribute docstring."""
-
-    node: cst.Assign | cst.AnnAssign
-    parent: DefinitionInfo
-    targets: tuple[str, ...]
-
-
-@dataclasses.dataclass(frozen=True)
 class PDFCategoryData:
     """Prepared definitions and docstrings shared by PDF rules.
 
     Attributes:
-        definitions (tuple[DefinitionInfo, ...]): Documentable module, class, function, and attribute owners.
+        definitions (tuple[DefinitionInfo, ...]): Documentable module, class, and function owners.
+        attributes (tuple[AttributeInfo, ...]): Supported module, class, and `__init__` instance attribute assignments.
         docstrings (tuple[DocstringInfo, ...]): Existing docstrings paired with their parsed structure and owner.
         summary_line_targets (tuple[SummaryLineTarget, ...]): Summary lines eligible for first-line style checks.
         summary_terminal_line_targets (tuple[SummaryLineTarget, ...]): Summary lines eligible for terminal-punctuation
             checks.
+        _attributes_by_owner_id (Mapping[int, tuple[AttributeInfo, ...]] | None): Cached attributes keyed by owner
+            identity.
+        _attached_attribute_docstrings_by_owner_id (Mapping[int, Mapping[str, tuple[DocstringInfo, ...]]] | None):
+            Cached attribute docstrings keyed by owner identity and target name.
     """
 
     definitions: tuple[DefinitionInfo, ...]
+    attributes: tuple[AttributeInfo, ...]
     docstrings: tuple[DocstringInfo, ...]
     summary_line_targets: tuple[SummaryLineTarget, ...]
     summary_terminal_line_targets: tuple[SummaryLineTarget, ...]
     _docstrings_by_owner_id: dict[int, DocstringInfo] | None = dataclasses.field(default=None, init=False, repr=False, compare=False)
+    _attributes_by_owner_id: Mapping[int, tuple[AttributeInfo, ...]] | None = dataclasses.field(default=None, init=False, repr=False, compare=False)
+    _attached_attribute_docstrings_by_owner_id: Mapping[int, Mapping[str, tuple[DocstringInfo, ...]]] | None = dataclasses.field(default=None, init=False, repr=False, compare=False)
     _documented_function_facts: tuple[DocumentedFunctionFact, ...] | None = dataclasses.field(default=None, init=False, repr=False, compare=False)
 
     def docstring_for(self, definition: DefinitionInfo) -> DocstringInfo | None:
@@ -532,6 +538,51 @@ class PDFCategoryData:
                     docstrings_by_owner_id.setdefault(id(docstring.owner), docstring)
             object.__setattr__(self, "_docstrings_by_owner_id", docstrings_by_owner_id)
         return docstrings_by_owner_id.get(id(definition))
+
+    def attributes_for(self, owner: DefinitionInfo) -> tuple[AttributeInfo, ...]:
+        """Return collected attributes for an owner."""
+        attributes_by_owner_id = self._attributes_by_owner_id
+        if attributes_by_owner_id is None:
+            mutable_index: dict[int, list[AttributeInfo]] = {}
+            for attribute in self.attributes:
+                mutable_index.setdefault(id(attribute.parent), []).append(attribute)
+            attributes_by_owner_id = MappingProxyType({owner_id: tuple(owner_attributes) for owner_id, owner_attributes in mutable_index.items()})
+            object.__setattr__(self, "_attributes_by_owner_id", attributes_by_owner_id)
+        return attributes_by_owner_id.get(id(owner), ())
+
+    def attached_attribute_docstrings_by_name(self, owner: DefinitionInfo) -> Mapping[str, tuple[DocstringInfo, ...]]:
+        """Return attached attribute docstrings for an owner indexed by target name."""
+        docstrings_by_owner_id = self._attached_attribute_docstrings_by_owner_id
+        if docstrings_by_owner_id is None:
+            mutable_index: dict[int, dict[str, list[DocstringInfo]]] = {}
+            for docstring in self.docstrings:
+                docstring_owner = docstring.owner
+                if not isinstance(docstring_owner, AttributeInfo):
+                    continue
+                owner_docstrings = mutable_index.setdefault(id(docstring_owner.parent), {})
+                for name in docstring_owner.targets:
+                    owner_docstrings.setdefault(name, []).append(docstring)
+            docstrings_by_owner_id = MappingProxyType(
+                {owner_id: MappingProxyType({name: tuple(name_docstrings) for name, name_docstrings in owner_docstrings.items()}) for owner_id, owner_docstrings in mutable_index.items()}
+            )
+            object.__setattr__(self, "_attached_attribute_docstrings_by_owner_id", docstrings_by_owner_id)
+        return docstrings_by_owner_id.get(id(owner), MappingProxyType({}))
+
+
+@dataclasses.dataclass(frozen=True)
+class _AttributeCollection:
+    """Attributes and docstrings collected from adjacent attribute string literals."""
+
+    attributes: tuple[AttributeInfo, ...]
+    docstrings: tuple[DocstringInfo, ...]
+
+
+@dataclasses.dataclass(frozen=True)
+class _AttributeTarget:
+    """One supported attribute target extracted from an assignment."""
+
+    name: str
+    line_numbers: tuple[int, ...]
 
 
 class _DefinitionCollector(cst.CSTVisitor):
@@ -626,13 +677,14 @@ class _AttributeDocstringCollector:
         """Index collected definitions before scanning for adjacent attribute docstrings."""
         self.context = context
         self.definitions_by_node_id = {id(definition.node): definition for definition in definitions}
-        self.docstrings: list[DocstringInfo] = []
+        self._attributes: list[AttributeInfo] = []
+        self._docstrings: list[DocstringInfo] = []
 
-    def collect(self) -> tuple[DocstringInfo, ...]:
-        """Return attribute docstrings in source order."""
+    def collect(self) -> _AttributeCollection:
+        """Return collected attribute inventory and docstrings in source order."""
         module_definition = self.definitions_by_node_id[id(self.context.module)]
         self._scan_statements(self.context.module.body, module_definition)
-        return tuple(self.docstrings)
+        return _AttributeCollection(attributes=tuple(self._attributes), docstrings=tuple(self._docstrings))
 
     def _scan_suite(self, suite: cst.BaseSuite, owner: DefinitionInfo) -> None:
         """Scan a simple or indented suite for attribute docstring patterns."""
@@ -643,7 +695,7 @@ class _AttributeDocstringCollector:
 
     def _scan_statements(self, statements: Sequence[cst.BaseStatement], owner: DefinitionInfo) -> None:
         """Scan a sequence of compound or simple statements under an owner."""
-        previous_assignment: _AttributeAssignment | None = None
+        previous_assignment: AttributeInfo | None = None
         for statement in statements:
             if isinstance(statement, cst.SimpleStatementLine):
                 pending_assignment = None if statement.leading_lines else previous_assignment
@@ -658,8 +710,8 @@ class _AttributeDocstringCollector:
         owner: DefinitionInfo,
         statement: cst.SimpleStatementLine | cst.SimpleStatementSuite,
         *,
-        previous_assignment: _AttributeAssignment | None,
-    ) -> _AttributeAssignment | None:
+        previous_assignment: AttributeInfo | None,
+    ) -> AttributeInfo | None:
         """Scan semicolon-separated small statements and return a pending assignment."""
         pending_assignment = previous_assignment
         for small_statement in statements:
@@ -667,22 +719,23 @@ class _AttributeDocstringCollector:
                 self._collect_after_assignment(small_statement, statement, pending_assignment)
                 pending_assignment = None
                 continue
-            pending_assignment = _attribute_assignment(small_statement, owner)
+            pending_assignment = _attribute_info(small_statement, owner, context=self.context)
+            if pending_assignment is not None:
+                self._attributes.append(pending_assignment)
         return pending_assignment
 
     def _collect_after_assignment(
         self,
         expression: cst.Expr,
         statement: cst.SimpleStatementLine | cst.SimpleStatementSuite,
-        assignment: _AttributeAssignment | None,
+        assignment: AttributeInfo | None,
     ) -> None:
         """Collect a string expression immediately following an attribute assignment."""
         if assignment is None:
             return
-        owner = _attribute_owner(assignment)
-        docstring = _docstring_info(expression, statement, owner=owner, context=self.context)
+        docstring = _docstring_info(expression, statement, owner=assignment, context=self.context)
         if docstring is not None:
-            self.docstrings.append(docstring)
+            self._docstrings.append(docstring)
 
     def _scan_compound_statement(self, statement: cst.BaseStatement, owner: DefinitionInfo) -> None:
         """Recurse into compound statements that can contain attribute docstrings."""
@@ -748,9 +801,11 @@ class PDF(RuleCategoryBase):
         collector = _DefinitionCollector(context)
         context.module.visit(collector)
         attribute_collector = _AttributeDocstringCollector(context, collector.definitions)
-        docstrings = tuple(sorted((*collector.docstrings, *attribute_collector.collect()), key=_docstring_sort_key))
+        attribute_collection = attribute_collector.collect()
+        docstrings = tuple(sorted((*collector.docstrings, *attribute_collection.docstrings), key=_docstring_sort_key))
         return PDFCategoryData(
             definitions=tuple(collector.definitions),
+            attributes=attribute_collection.attributes,
             docstrings=docstrings,
             summary_line_targets=summary_first_line_targets(docstrings),
             summary_terminal_line_targets=summary_terminal_line_targets(docstrings),
@@ -1569,6 +1624,8 @@ def _rest_entry_kind(field: str) -> DocstringEntryKind:
         return DocstringEntryKind.YIELD
     if field in docstring_sections.REST_EXCEPTION_FIELDS:
         return DocstringEntryKind.EXCEPTION
+    if field in docstring_sections.REST_ATTRIBUTE_VALUE_FIELDS or field in docstring_sections.REST_ATTRIBUTE_TYPE_FIELDS:
+        return DocstringEntryKind.ATTRIBUTE
     return DocstringEntryKind.FIELD
 
 
@@ -2112,17 +2169,30 @@ def _docstring_info(
     )
 
 
-def _attribute_assignment(statement: cst.BaseSmallStatement, owner: DefinitionInfo) -> _AttributeAssignment | None:
-    """Return attribute assignment metadata for supported assignment statements."""
+def _attribute_info(statement: cst.BaseSmallStatement, owner: DefinitionInfo, *, context: RuleCategoryContext) -> AttributeInfo | None:
+    """Return attribute inventory metadata for supported assignment statements."""
     if not isinstance(statement, (cst.Assign, cst.AnnAssign)):
         return None
     parent = _attribute_parent(owner)
     if parent is None:
         return None
-    targets = _assignment_target_names(statement, owner)
+    targets = _assignment_targets(statement, owner, context=context)
     if not targets:
         return None
-    return _AttributeAssignment(node=statement, parent=parent, targets=targets)
+    names = tuple(target.name for target in targets)
+    target_line_numbers = tuple(target.line_numbers for target in targets)
+    qualified_names = tuple(_qualified_name(parent, target) for target in names)
+    return AttributeInfo(
+        node=statement,
+        kind=DefinitionKind.ATTRIBUTE,
+        name=", ".join(names),
+        qualified_name=", ".join(qualified_names),
+        parent=parent,
+        targets=names,
+        line_numbers=tuple(dict.fromkeys(line_number for line_numbers in target_line_numbers for line_number in line_numbers)),
+        target_line_numbers=target_line_numbers,
+        instance=owner.kind is DefinitionKind.FUNCTION,
+    )
 
 
 def _attribute_parent(owner: DefinitionInfo) -> DefinitionInfo | None:
@@ -2134,34 +2204,38 @@ def _attribute_parent(owner: DefinitionInfo) -> DefinitionInfo | None:
     return None
 
 
-def _assignment_target_names(statement: cst.Assign | cst.AnnAssign, owner: DefinitionInfo) -> tuple[str, ...]:
-    """Return supported attribute target names for an assignment."""
+def _assignment_targets(statement: cst.Assign | cst.AnnAssign, owner: DefinitionInfo, *, context: RuleCategoryContext) -> tuple[_AttributeTarget, ...]:
+    """Return supported attribute targets for an assignment."""
     if isinstance(statement, cst.Assign):
-        return tuple(name for target in statement.targets if (name := _target_name(target.target, owner)) is not None)
-    name = _target_name(statement.target, owner)
-    return (name,) if name is not None else ()
+        return tuple(attribute_target for target in statement.targets for attribute_target in _target_attributes(target.target, owner, context=context))
+    attribute_target = _target_attribute(statement.target, owner, context=context)
+    return (attribute_target,) if attribute_target is not None else ()
 
 
-def _target_name(target: cst.BaseAssignTargetExpression, owner: DefinitionInfo) -> str | None:
-    """Return a documented attribute name for one supported assignment target."""
+def _target_attributes(target: cst.BaseAssignTargetExpression, owner: DefinitionInfo, *, context: RuleCategoryContext) -> tuple[_AttributeTarget, ...]:
+    """Return supported attributes from one assignment target."""
+    if isinstance(target, cst.Tuple):
+        attributes: list[_AttributeTarget] = []
+        for element in target.elements:
+            attributes.extend(_target_attributes(typing.cast(cst.BaseAssignTargetExpression, element.value), owner, context=context))
+        return tuple(attributes)
+    attribute_target = _target_attribute(target, owner, context=context)
+    return (attribute_target,) if attribute_target is not None else ()
+
+
+def _target_attribute(target: cst.BaseAssignTargetExpression, owner: DefinitionInfo, *, context: RuleCategoryContext) -> _AttributeTarget | None:
+    """Return a supported attribute target."""
     if owner.kind in {DefinitionKind.MODULE, DefinitionKind.CLASS} and isinstance(target, cst.Name):
-        return target.value
+        return _AttributeTarget(name=target.value, line_numbers=_target_line_numbers(target, context=context))
     if owner.kind is DefinitionKind.FUNCTION and isinstance(target, cst.Attribute) and isinstance(target.value, cst.Name) and target.value.value == "self" and isinstance(target.attr, cst.Name):
-        return target.attr.value
+        return _AttributeTarget(name=target.attr.value, line_numbers=_target_line_numbers(target.attr, context=context))
     return None
 
 
-def _attribute_owner(assignment: _AttributeAssignment) -> AttributeInfo:
-    """Return the docstring owner for one documented attribute assignment."""
-    qualified_names = tuple(_qualified_name(assignment.parent, target) for target in assignment.targets)
-    return AttributeInfo(
-        node=assignment.node,
-        kind=DefinitionKind.ATTRIBUTE,
-        name=", ".join(assignment.targets),
-        qualified_name=", ".join(qualified_names),
-        parent=assignment.parent,
-        targets=assignment.targets,
-    )
+def _target_line_numbers(target: cst.CSTNode, *, context: RuleCategoryContext) -> tuple[int, ...]:
+    """Return the source line for an attribute target."""
+    position = context.positions.get(target)
+    return (1,) if position is None else (position.start.line,)
 
 
 def _first_expression(body: cst.Module | cst.BaseSuite) -> tuple[cst.Expr, cst.SimpleStatementLine | cst.SimpleStatementSuite] | None:

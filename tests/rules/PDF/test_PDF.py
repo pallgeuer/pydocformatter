@@ -1,4 +1,5 @@
 import dataclasses
+import typing
 
 import libcst as cst
 import libcst.metadata as cst_metadata
@@ -125,8 +126,71 @@ def test_prepare_collects_attribute_docstrings_and_owner_metadata() -> None:
         ("Client.instance_plain", ("instance_plain",), "instance attr doc"),
         ("Client.conditional", ("conditional",), "conditional attr doc"),
     )
+    assert tuple((attribute.qualified_name, attribute.targets, attribute.line_numbers, attribute.target_line_numbers, attribute.instance) for attribute in data.attributes) == (
+        ("module_plain", ("module_plain",), (3,), ((3,),), False),
+        ("module_annotated", ("module_annotated",), (5,), ((5,),), False),
+        ("module_a, module_b", ("module_a", "module_b"), (7,), ((7,), (7,)), False),
+        ("Client.class_plain", ("class_plain",), (12,), ((12,),), False),
+        ("Client.class_annotated", ("class_annotated",), (14,), ((14,),), False),
+        ("Client.class_a, Client.class_b", ("class_a", "class_b"), (15,), ((15,), (15,)), False),
+        ("Client.instance_plain", ("instance_plain",), (19,), ((19,),), True),
+        ("Client.conditional", ("conditional",), (22,), ((22,),), True),
+    )
+    assert all(docstring.owner in data.attributes for docstring in attribute_docstrings)
     assert all(docstring.owner.kind is DefinitionKind.ATTRIBUTE for docstring in attribute_docstrings)
     assert data.docstring_for(data.definitions[1]) is data.docstrings[4]
+    assert data._attributes_by_owner_id is None
+    assert tuple(attribute.qualified_name for attribute in data.attributes_for(data.definitions[0])) == ("module_plain", "module_annotated", "module_a, module_b")
+    assert data._attributes_by_owner_id is not None
+    assert data._attached_attribute_docstrings_by_owner_id is None
+    attached_docstrings = data.attached_attribute_docstrings_by_name(data.definitions[0])
+    assert set(attached_docstrings) == {"module_plain", "module_annotated", "module_a", "module_b"}
+    with pytest.raises(TypeError):
+        typing.cast(dict[str, tuple[object, ...]], attached_docstrings)["other"] = ()
+    assert data._attached_attribute_docstrings_by_owner_id is not None
+
+
+def test_prepare_collects_tuple_unpacked_attribute_docstrings_and_owner_metadata() -> None:
+    source = 'module_primary, module_fallback = endpoints\n"""module tuple doc"""\n\n(module_nested, (module_inner, *module_rest)) = endpoints\n"""module nested tuple doc"""\n\n[module_list, module_other] = endpoints\n"""module list ignored"""\n\nclass Client:\n    class_primary, class_fallback = endpoints\n    """class tuple doc"""\n    class_supported, other.value = endpoints\n    """class mixed tuple doc"""\n    (class_nested, (class_inner, *class_rest)) = endpoints\n    """class nested tuple doc"""\n    [class_list, class_other] = endpoints\n    """class list ignored"""\n\n    def __init__(self):\n        self.instance_primary, _ = endpoints\n        """instance mixed tuple doc"""\n        (self.instance_nested, (self.instance_inner, *self.instance_rest)) = endpoints\n        """instance nested tuple doc"""\n        self.instance_supported, helper.value = endpoints\n        """instance object mixed tuple doc"""\n        [self.instance_list, self.instance_other] = endpoints\n        """instance list ignored"""\n'
+    data = PDF.prepare(category_context(source))
+    attribute_docstrings = tuple(docstring for docstring in data.docstrings if isinstance(docstring.owner, AttributeInfo))
+    attribute_details = []
+    for docstring in attribute_docstrings:
+        owner = docstring.owner
+        if isinstance(owner, AttributeInfo):
+            attribute_details.append((owner.qualified_name, owner.targets, docstring.value))
+
+    assert tuple(attribute_details) == (
+        ("module_primary, module_fallback", ("module_primary", "module_fallback"), "module tuple doc"),
+        ("module_nested, module_inner, module_rest", ("module_nested", "module_inner", "module_rest"), "module nested tuple doc"),
+        ("Client.class_primary, Client.class_fallback", ("class_primary", "class_fallback"), "class tuple doc"),
+        ("Client.class_supported", ("class_supported",), "class mixed tuple doc"),
+        ("Client.class_nested, Client.class_inner, Client.class_rest", ("class_nested", "class_inner", "class_rest"), "class nested tuple doc"),
+        ("Client.instance_primary", ("instance_primary",), "instance mixed tuple doc"),
+        ("Client.instance_nested, Client.instance_inner, Client.instance_rest", ("instance_nested", "instance_inner", "instance_rest"), "instance nested tuple doc"),
+        ("Client.instance_supported", ("instance_supported",), "instance object mixed tuple doc"),
+    )
+    assert tuple((attribute.qualified_name, attribute.targets, attribute.line_numbers, attribute.target_line_numbers, attribute.instance) for attribute in data.attributes) == (
+        ("module_primary, module_fallback", ("module_primary", "module_fallback"), (1,), ((1,), (1,)), False),
+        ("module_nested, module_inner, module_rest", ("module_nested", "module_inner", "module_rest"), (4,), ((4,), (4,), (4,)), False),
+        ("Client.class_primary, Client.class_fallback", ("class_primary", "class_fallback"), (11,), ((11,), (11,)), False),
+        ("Client.class_supported", ("class_supported",), (13,), ((13,),), False),
+        ("Client.class_nested, Client.class_inner, Client.class_rest", ("class_nested", "class_inner", "class_rest"), (15,), ((15,), (15,), (15,)), False),
+        ("Client.instance_primary", ("instance_primary",), (21,), ((21,),), True),
+        ("Client.instance_nested, Client.instance_inner, Client.instance_rest", ("instance_nested", "instance_inner", "instance_rest"), (23,), ((23,), (23,), (23,)), True),
+        ("Client.instance_supported", ("instance_supported",), (25,), ((25,),), True),
+    )
+
+
+def test_prepare_collects_multiline_tuple_attribute_target_lines() -> None:
+    source = '(\n    module_primary,\n    (\n        module_fallback,\n        *module_rest,\n    ),\n) = endpoints\n"""module tuple doc"""\n\nclass Client:\n    (\n        class_primary,\n        (\n            class_fallback,\n            *class_rest,\n        ),\n    ) = endpoints\n    """class tuple doc"""\n\n    def __init__(self):\n        (\n            self.instance_primary,\n            (\n                self.instance_fallback,\n                *self.instance_rest,\n            ),\n        ) = endpoints\n        """instance tuple doc"""\n'
+    data = PDF.prepare(category_context(source))
+
+    assert tuple((attribute.qualified_name, attribute.targets, attribute.line_numbers, attribute.target_line_numbers) for attribute in data.attributes) == (
+        ("module_primary, module_fallback, module_rest", ("module_primary", "module_fallback", "module_rest"), (2, 4, 5), ((2,), (4,), (5,))),
+        ("Client.class_primary, Client.class_fallback, Client.class_rest", ("class_primary", "class_fallback", "class_rest"), (12, 14, 15), ((12,), (14,), (15,))),
+        ("Client.instance_primary, Client.instance_fallback, Client.instance_rest", ("instance_primary", "instance_fallback", "instance_rest"), (22, 24, 25), ((22,), (24,), (25,))),
+    )
 
 
 def test_prepare_ignores_attribute_like_strings_after_blank_or_comment_lines() -> None:
@@ -921,6 +985,10 @@ def test_section_block_contains_header_entries_blanks_and_generic_children() -> 
         (":rtype : str", DocstringEntryKind.RETURN, ()),
         (":yield item: Description.", DocstringEntryKind.YIELD, ("item",)),
         (":raises ValueError: Description.", DocstringEntryKind.EXCEPTION, ("ValueError",)),
+        (":ivar timeout: Description.", DocstringEntryKind.ATTRIBUTE, ("timeout",)),
+        (":cvar timeout: Description.", DocstringEntryKind.ATTRIBUTE, ("timeout",)),
+        (":var timeout: Description.", DocstringEntryKind.ATTRIBUTE, ("timeout",)),
+        (":vartype timeout: float", DocstringEntryKind.ATTRIBUTE, ("timeout",)),
         (":meta private: Description.", DocstringEntryKind.FIELD, ("private",)),
     ),
 )

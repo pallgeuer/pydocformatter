@@ -151,6 +151,8 @@ REST_RETURN_TYPE_FIELDS = frozenset({"rtype"})
 REST_YIELD_VALUE_FIELDS = frozenset({"yield", "yields"})
 REST_YIELD_TYPE_FIELDS = frozenset({"ytype"})
 REST_EXCEPTION_FIELDS = frozenset({"raise", "raises", "except", "exception"})
+REST_ATTRIBUTE_VALUE_FIELDS = frozenset({"ivar", "cvar", "var"})
+REST_ATTRIBUTE_TYPE_FIELDS = frozenset({"vartype"})
 
 # Google style defines entry-section ordering, but does not define a canonical order for narrative admonition sections.
 GOOGLE_ORDER_RANKS = {

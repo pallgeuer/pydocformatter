@@ -138,9 +138,11 @@ class CheckSettings:
         docstring_blank_line_after_last_section (bool): Whether PDF200 and PDF201 keep one blank line after the last
             convention section.
         docstring_missing_documentation (DocstringMissingDocumentation): When missing-documentation rules report missing
-            function documentation.
+            documentation.
         docstring_missing_documentation_public_only (bool): Whether broad missing-documentation checks are limited to
-            public functions and methods.
+            public API definitions.
+        docstring_require_init_attribute_documentation (bool): Whether class missing-attribute checks require `self.*`
+            attributes assigned in `__init__`.
         docstring_parse_list_items (bool): Whether list items are parsed as distinct docstring structures.
         docstring_parse_headings (bool): Whether Markdown and reStructuredText headings are parsed.
         docstring_parse_doctests (bool): Whether doctest regions are parsed and protected.
@@ -198,6 +200,7 @@ class CheckSettings:
     docstring_blank_line_after_last_section: bool = False
     docstring_missing_documentation: DocstringMissingDocumentation = DocstringMissingDocumentation.HAS_SECTION
     docstring_missing_documentation_public_only: bool = True
+    docstring_require_init_attribute_documentation: bool = False
     docstring_parse_list_items: bool = True
     docstring_parse_headings: bool = True
     docstring_parse_doctests: bool = True
@@ -270,6 +273,12 @@ class CheckSettingsOverrides(TypedDict, total=False):
         docstring_blank_line_style (DocstringBlankLineStyle): Whitespace style used by PDF103 for blank docstring lines.
         docstring_blank_line_after_last_section (bool): Whether PDF200 and PDF201 keep one blank line after the last
             convention section.
+        docstring_missing_documentation (DocstringMissingDocumentation): When missing-documentation rules report missing
+            documentation.
+        docstring_missing_documentation_public_only (bool): Whether broad missing-documentation checks are limited to
+            public API definitions.
+        docstring_require_init_attribute_documentation (bool): Whether class missing-attribute checks require `self.*`
+            attributes assigned in `__init__`.
         docstring_parse_list_items (bool): Whether list items are parsed as distinct docstring structures.
         docstring_parse_headings (bool): Whether Markdown and reStructuredText headings are parsed.
         docstring_parse_doctests (bool): Whether doctest regions are parsed and protected.
@@ -327,6 +336,7 @@ class CheckSettingsOverrides(TypedDict, total=False):
     docstring_blank_line_after_last_section: bool
     docstring_missing_documentation: DocstringMissingDocumentation
     docstring_missing_documentation_public_only: bool
+    docstring_require_init_attribute_documentation: bool
     docstring_parse_list_items: bool
     docstring_parse_headings: bool
     docstring_parse_doctests: bool
@@ -477,15 +487,22 @@ SETTINGS_SCHEMA = SettingsSchema(
             field="docstring_missing_documentation",
             value_type=DocstringMissingDocumentation,
             group=SettingsGroup.DOCSTRING_FORMATTING,
-            help="When missing-documentation rules report missing function documentation.",
-            documentation='When missing-documentation rules report missing function documentation; one of "has-section", "non-summary-docstrings", or "all-docstrings".',
+            help="When missing-documentation rules report missing documentation.",
+            documentation='When missing-documentation rules report missing documentation; one of "has-section", "non-summary-docstrings", or "all-docstrings".',
         ),
         SettingDefinition(
             field="docstring_missing_documentation_public_only",
             value_type=bool,
             group=SettingsGroup.DOCSTRING_FORMATTING,
-            help="Limit broad missing-documentation checks to public functions.",
-            documentation="Whether broad missing-documentation checks only apply to public functions and methods; explicit relevant documentation is always checked for consistency.",
+            help="Limit broad missing-documentation checks to public API definitions.",
+            documentation="Whether broad missing-documentation checks only apply to public API definitions; explicit relevant documentation is always checked for consistency.",
+        ),
+        SettingDefinition(
+            field="docstring_require_init_attribute_documentation",
+            value_type=bool,
+            group=SettingsGroup.DOCSTRING_FORMATTING,
+            help="Require documented `__init__` instance attributes.",
+            documentation="Whether class missing-attribute documentation rules require supported `self.*` attributes assigned in `__init__`; extraneous class-attribute documentation checks always treat those attributes as present.",
         ),
         SettingDefinition(
             field="docstring_parse_list_items",
