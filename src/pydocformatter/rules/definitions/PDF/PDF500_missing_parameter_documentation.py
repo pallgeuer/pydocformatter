@@ -31,7 +31,11 @@ class PDF500MissingParameterDocumentation(RuleBase):
         setting_effects=(
             RuleSettingEffects(
                 setting="docstring_convention",
-                effects=(RuleSettingEffectValues(effect=RuleSettingEffect.IGNORED, values=docstring_conventions.ignored_conventions_except(DocstringConvention.GOOGLE, DocstringConvention.REST)),),
+                effects=(
+                    RuleSettingEffectValues(
+                        effect=RuleSettingEffect.IGNORED, values=docstring_conventions.ignored_conventions_except(DocstringConvention.GOOGLE, DocstringConvention.NUMPY, DocstringConvention.REST)
+                    ),
+                ),
             ),
         ),
         incompatible_with=(),

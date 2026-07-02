@@ -2,7 +2,7 @@
 
 Fix is not available.
 
-Rule is ignored if `docstring-convention` is `none`, `numpy`, or `pep257`.
+Rule is ignored if `docstring-convention` is `none` or `pep257`.
 
 ## What it does
 Checks that function signature parameters are documented in parsed docstring parameter documentation.
@@ -19,7 +19,7 @@ Implicit `self` and `cls` parameters on class-owned non-static methods are not r
 Documented parameters help callers understand accepted inputs without cross-checking implementation details.
 
 ## Ruff compatibility
-This rule replaces Ruff's `D417`. Like Ruff, broad convention-based selections enable it for Google-style docstrings and ignore it for NumPy and PEP 257 conventions. Unlike Ruff, it can also use parsed reST parameter fields and can be configured to require parameter documentation beyond docstrings that already contain parameter sections.
+This rule replaces Ruff's `D417`. Unlike Ruff, broad convention-based selections enable it for NumPy-style docstrings and parsed reST parameter fields in addition to Google-style docstrings. It can also be configured to require parameter documentation beyond docstrings that already contain parameter sections.
 
 ## Examples
 With the default `has-section` mode, a missing parameter is reported once parameter documentation is present:
@@ -263,6 +263,6 @@ class Builder:
 ```
 
 ## Options
-- `docstring-convention`: Controls whether Google parameter sections, NumPy parameter sections, or reST parameter fields are parsed. `none`, `numpy`, and `pep257` ignore this rule by default; exact selection remains inert for `none` and `pep257`.
+- `docstring-convention`: Controls whether Google parameter sections, NumPy parameter sections, or reST parameter fields are parsed. `none` and `pep257` ignore this rule by default; exact selection remains inert for those conventions.
 - `docstring-missing-documentation`: Controls when PDF500 is active. `has-section` reports only docstrings with recognized parameter documentation. `non-summary-docstrings` additionally reports public docstrings with more than just a summary. `all-docstrings` additionally reports all public docstrings.
 - `docstring-missing-documentation-public-only`: When `true`, the broad parts of `non-summary-docstrings` and `all-docstrings` apply only to public functions and methods. Normal public names plus `__init__`, `__new__`, and `__call__` are public for this setting; other underscore and dunder names are private. Explicit parameter documentation is always checked, including for private functions.

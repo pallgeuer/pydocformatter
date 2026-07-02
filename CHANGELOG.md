@@ -164,6 +164,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Reset the planned next release to `1.0.0` and present pydocformatter as a new standalone Ruff-style formatter.
 
 - **Docstring formatting:**
+  - Changed `PDF500` to be enabled by broad rule selections under the NumPy docstring convention.
   - Changed automatic fixing to stop after 20 fix iterations.
   - Added instance-specific diagnostic messages for parameter consistency, section-style, and selected summary-style rule findings where the offending parameter, section, function, word, or span length is useful context.
   - Changed Sphinx-style field parsing to the explicit `docstring-convention = "rest"` mode. The removed `docstring_parse_sphinx_fields` setting now raises an unknown-setting error; set the reST convention to parse and protect `:param:`/`:rtype:` style fields.
@@ -225,7 +226,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Fixed PCF003 directive normalization to avoid adding trailing whitespace for empty colon payloads.
 
 - **Docstring formatting:**
-  - Ignored PDF500 through PDF506 under the `none` and `pep257` docstring conventions for broad selections, while keeping exact-selected PDF500, PDF502, PDF504, and PDF506 inert so missing-documentation modes do not report convention-targeted findings without active convention parsing; PDF500 remains ignored under `numpy`.
+  - Ignored PDF500 through PDF506 under the `none` and `pep257` docstring conventions for broad selections, while keeping exact-selected PDF500, PDF502, PDF504, and PDF506 inert so missing-documentation modes do not report convention-targeted findings without active convention parsing.
   - Fixed same-line docstring reflow to keep wrapped summaries as one summary instead of letting later blank-line and punctuation fixes split and punctuate the sentence mid-summary.
   - Fixed `PDF200` to preserve one blank line between adjacent Google and NumPy sections after collapsing excess blank lines, matching `PDF201` missing-section-separator insertion.
   - Fixed `PDF409` and `PDF410` to preserve Google exception-entry parentheticals, and fixed Google and NumPy parsing to keep malformed exception-like prose continuations from being normalized as separate entries.

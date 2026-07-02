@@ -73,6 +73,12 @@ def test_reports_numpy_parameter_missing_from_existing_parameter_section() -> No
     assert_pdf500_lines(source, ((1,),), settings=CheckSettings(select=("PDF500",), docstring_convention=DocstringConvention.NUMPY))
 
 
+def test_numpy_convention_does_not_ignore_broad_pdf500_selection() -> None:
+    source = 'def function(first, second):\n    """Summary.\n\n    Parameters\n    ----------\n    first : int\n        First.\n    """\n'
+
+    assert_pdf500_lines(source, ((1,),), settings=CheckSettings(select=("PDF5",), docstring_convention=DocstringConvention.NUMPY))
+
+
 def test_accepts_numpy_comma_separated_documented_parameters() -> None:
     source = 'def function(first, second):\n    """Summary.\n\n    Parameters\n    ----------\n    first, second : int\n        Values.\n    """\n'
 
