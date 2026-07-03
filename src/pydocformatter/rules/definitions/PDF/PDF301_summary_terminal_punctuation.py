@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-import pydocformatter.rules.definition_helpers.summary_punctuation as summary_punctuation
+import pydocformatter.rules.definition_helpers.summary_terminal_punctuation as summary_terminal_punctuation
+import pydocformatter.rules.definition_helpers.terminal_punctuation as terminal_punctuation
 import pydocformatter.rules.registration as rule_registration
 import pydocformatter.rules.violations as rule_violations
 from pydocformatter.cli.settings_check import DocstringConvention
@@ -11,7 +12,7 @@ from pydocformatter.rules.definition import RuleBase, RuleContext
 from pydocformatter.rules.definitions.PDF.PDF import PDF
 from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
 
-_POLICY = summary_punctuation.SummaryPunctuationPolicy(valid_endings=".?!\u2026", nonfixable_endings=",:;")
+_POLICY = terminal_punctuation.TerminalPunctuationPolicy(valid_endings=".?!\u2026", nonfixable_endings=",:;")
 
 
 @rule_registration.register_rule_to(PDF)
@@ -48,4 +49,4 @@ class PDF301SummaryTerminalPunctuation(RuleBase):
         Returns:
             tuple[rule_violations.RuleViolation, ...]: Rule violations reported for the current source.
         """
-        return summary_punctuation.results(context, rule=cls.meta, policy=_POLICY)
+        return summary_terminal_punctuation.results(context, rule=cls.meta, policy=_POLICY)

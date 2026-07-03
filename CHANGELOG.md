@@ -32,6 +32,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added `PDF508` through `PDF511` to validate missing and extraneous class and module attribute documentation against an explicit attribute inventory.
   - Added `PDF512` and `PDF513` to report attached class and module attribute docstrings that duplicate owner docstring attribute documentation.
   - Added `PDF306` and `PDF307` to report parameter and attribute documentation that only restates the documented name with generic filler.
+  - Added `PDF308` through `PDF310` to normalize punctuation and safe first-word capitalization for parsed docstring entry descriptions.
   - Added signature-backed `PDF306` detection for variadic parameter descriptions such as `*args: Positional arguments.` and `**kwargs: Keyword arguments.`.
   - Added tuple-unpacked module, class, and `__init__` instance attribute inventory support for `PDF508` through `PDF511`.
   - Added `PDF106` through `PDF109` to normalize multi-line docstring opening and closing quote placement.
@@ -213,6 +214,11 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 
 - **Rule performance:**
   - Fixed PCF004 previous-comment boundary checks, PDF411 repeated type-like normalization, and PDF501 TypedDict key lookup to avoid repeated or unnecessary rule-local work.
+
+- **Docstring formatting:**
+  - Fixed `PDF304` and `PDF310` to skip mixed-case first words such as `iOS` and `eBay` instead of over-capitalizing them.
+  - Fixed `PDF308` through `PDF310` source edits when the configured output line ending differs from the current file line endings.
+  - Fixed `PDF308` through `PDF310` to report non-fixable findings instead of corrupting source for docstrings with mixed physical line endings.
 
 - **Developer workflow:**
   - Fixed the Markdown table normalizer to report non-fixable validation failures, normalize to header-row indentation while preserving existing line endings, handle escaped pipes, preserve indented code blocks, and follow stricter fenced-code parsing.

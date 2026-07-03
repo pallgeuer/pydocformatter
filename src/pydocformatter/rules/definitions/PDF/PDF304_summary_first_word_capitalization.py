@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pydocformatter.rules.definition_helpers.first_word_capitalization as first_word_capitalization
 import pydocformatter.rules.definition_helpers.summary_style as summary_style
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 import pydocformatter.rules.edits as rule_edits
@@ -51,7 +52,7 @@ def _violations(context: RuleContext, *, rule: RuleMetadata) -> tuple[rule_viola
     violations: list[rule_violations.RuleViolation] = []
     for target in data.summary_line_targets:
         word = summary_style.first_word_target(target)
-        if word is None or not _should_capitalize(word.word):
+        if word is None or not first_word_capitalization.should_capitalize(word.word):
             continue
         capitalized_word = f"{word.word[0].upper()}{word.word[1:]}"
         change = _planned_change(word, replacement=capitalized_word, context=context)
@@ -61,17 +62,6 @@ def _violations(context: RuleContext, *, rule: RuleMetadata) -> tuple[rule_viola
             )
         )
     return tuple(violations)
-
-
-def _should_capitalize(word: str) -> bool:
-    """Return whether a summary first word should be capitalized."""
-    trimmed = word.rstrip(".!?")
-    if not trimmed or trimmed == trimmed.upper():
-        return False
-    first = trimmed[0]
-    if not first.isascii() or first == first.upper():
-        return False
-    return all(char.isascii() and (char.isalpha() or char == "'") for char in trimmed[1:])
 
 
 def _planned_change(word: summary_style.SummaryWordTarget, *, replacement: str, context: RuleContext) -> rule_edits.PlannedSourceChange | None:

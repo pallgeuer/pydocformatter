@@ -32,7 +32,7 @@ class RuleStatusMetadata(TypedDict):
     """JSON metadata for a rule status entry.
 
     Attributes:
-        since (str): pydocformatter version in which the status became true.
+        since (str): Version of pydocformatter in which the status became true.
     """
 
     since: str

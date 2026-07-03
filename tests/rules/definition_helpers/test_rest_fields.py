@@ -11,7 +11,9 @@ def entry(
     description: str = "",
     end_line: int = 1,
 ) -> PDF_definition.DocstringEntry:
-    return PDF_definition.DocstringEntry(kind=kind, names=names, type_text=None, description=description, start_line=0, end_line=end_line, field_name=field_name, field_argument=field_argument)
+    return PDF_definition.DocstringEntry(
+        kind=kind, names=names, type_text=None, description=description, description_lines=(), start_line=0, end_line=end_line, field_name=field_name, field_argument=field_argument
+    )
 
 
 def line(text: str) -> PDF_definition.DocstringValueLine:

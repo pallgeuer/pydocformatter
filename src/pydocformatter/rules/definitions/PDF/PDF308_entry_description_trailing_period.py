@@ -1,8 +1,8 @@
-"""PDF300 summary-trailing-period rule."""
+"""PDF308 entry-description-trailing-period rule."""
 
 from __future__ import annotations
 
-import pydocformatter.rules.definition_helpers.summary_terminal_punctuation as summary_terminal_punctuation
+import pydocformatter.rules.definition_helpers.entry_description_style as entry_description_style
 import pydocformatter.rules.definition_helpers.terminal_punctuation as terminal_punctuation
 import pydocformatter.rules.registration as rule_registration
 import pydocformatter.rules.violations as rule_violations
@@ -16,17 +16,17 @@ _POLICY = terminal_punctuation.TerminalPunctuationPolicy(valid_endings=".", nonf
 
 
 @rule_registration.register_rule_to(PDF)
-class PDF300SummaryTrailingPeriod(RuleBase):
-    """Rule implementation for PDF300.
+class PDF308EntryDescriptionTrailingPeriod(RuleBase):
+    """Rule implementation for PDF308.
 
     Attributes:
         meta (RuleMetadata): Static metadata used for registration, diagnostics, and rule selection.
     """
 
     meta = RuleMetadata(
-        code=RuleCode("PDF300"),
-        name="summary-trailing-period",
-        message="Docstring summary should end with a period",
+        code=RuleCode("PDF308"),
+        name="entry-description-trailing-period",
+        message="Docstring entry description should end with a period",
         fix_availability=FixAvailability.SOMETIMES,
         stable_since="1.0.0",
         setting_effects=(
@@ -41,7 +41,7 @@ class PDF300SummaryTrailingPeriod(RuleBase):
 
     @classmethod
     def violations(cls, context: RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
-        """Return violations for summaries that do not end with a period.
+        """Return violations for entry descriptions that do not end with a period.
 
         Args:
             context (RuleContext): Current file context with parsed module, settings, and prepared category data.
@@ -49,4 +49,4 @@ class PDF300SummaryTrailingPeriod(RuleBase):
         Returns:
             tuple[rule_violations.RuleViolation, ...]: Rule violations reported for the current source.
         """
-        return summary_terminal_punctuation.results(context, rule=cls.meta, policy=_POLICY)
+        return entry_description_style.punctuation_violations(context, rule=cls.meta, policy=_POLICY)

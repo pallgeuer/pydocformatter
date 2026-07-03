@@ -25,6 +25,7 @@ import pydocformatter.rules.definition_helpers.source_text as source_text
 import pydocformatter.rules.definition_helpers.string_literals as string_literals
 import pydocformatter.rules.definition_helpers.text_layout as text_layout
 import pydocformatter.rules.edits as rule_edits
+import pydocformatter.rules.line_endings as line_endings
 import pydocformatter.rules.registration as rule_registration
 from pydocformatter.rules.definition import RuleCategoryBase, RuleCategoryContext, RuleContext
 from pydocformatter.rules.models import RuleCategoryMetadata
@@ -159,6 +160,8 @@ class DocstringEntry:
         names (tuple[str, ...]): Parameter, exception, attribute, or field argument names documented by this entry.
         type_text (str | None): Parsed type annotation text supplied by the docstring convention, if present.
         description (str): Entry description text after the entry head.
+        description_lines (tuple[DocstringTextFragment, ...]): Source-mapped fragments that make up the parsed entry
+            description.
         start_line (int): First logical docstring line occupied by the entry.
         end_line (int): Last logical docstring line occupied by the entry.
         field_name (str | None): Original reStructuredText field name, without the surrounding colons.
@@ -169,6 +172,7 @@ class DocstringEntry:
     names: tuple[str, ...]
     type_text: str | None
     description: str
+    description_lines: tuple[DocstringTextFragment, ...]
     start_line: int
     end_line: int
     field_name: str | None = None
@@ -176,16 +180,18 @@ class DocstringEntry:
 
 
 @dataclasses.dataclass(frozen=True)
-class ReflowRegionLine:
-    """One reflowable text line with its evaluated-value span.
+class DocstringTextFragment:
+    """One source-mapped fragment of logical docstring text.
 
     Attributes:
-        text (str): Text fragment that can participate in paragraph reflow.
+        text (str): Fragment text after semantic indentation trimming.
+        line_index (int): Logical docstring value line that owns the fragment.
         start_offset (int): Start offset of the fragment in the evaluated docstring value.
         end_offset (int): End offset of the fragment in the evaluated docstring value.
     """
 
     text: str
+    line_index: int
     start_offset: int
     end_offset: int
 
@@ -197,12 +203,12 @@ class ReflowRegionRun:
     Attributes:
         start_line (int): First logical docstring line in the contiguous run.
         end_line (int): Last logical docstring line in the contiguous run.
-        lines (tuple[ReflowRegionLine, ...]): Reflowable fragments from the run in source order.
+        lines (tuple[DocstringTextFragment, ...]): Reflowable fragments from the run in source order.
     """
 
     start_line: int
     end_line: int
-    lines: tuple[ReflowRegionLine, ...]
+    lines: tuple[DocstringTextFragment, ...]
 
 
 @dataclasses.dataclass(frozen=True)
@@ -215,7 +221,7 @@ class ReflowRegion:
         end_line (int): Last logical docstring line covered by the region.
         start_offset (int): Start offset of the region in the evaluated docstring value.
         end_offset (int): End offset of the region in the evaluated docstring value.
-        lines (tuple[ReflowRegionLine, ...]): Reflowable fragments grouped under this region.
+        lines (tuple[DocstringTextFragment, ...]): Reflowable fragments grouped under this region.
         initial_indent (str): Indentation to use for the first rendered output line.
         subsequent_indent (str): Indentation to use for continuation output lines.
     """
@@ -225,7 +231,7 @@ class ReflowRegion:
     end_line: int
     start_offset: int
     end_offset: int
-    lines: tuple[ReflowRegionLine, ...]
+    lines: tuple[DocstringTextFragment, ...]
     initial_indent: str
     subsequent_indent: str
 
@@ -1201,12 +1207,12 @@ class _DocstringParser:
             name = match.group("name").strip()
             type_text = match.groupdict().get("type")
             first_description = match.group("description").strip()
-            description_reflow_lines = []
+            description_fragments = []
             first_description_line = self._reflow_line_from_text_span(index, match.start("description"), len(self.lines[index].text))
             if first_description_line is not None and first_description_line.text:
-                description_reflow_lines.append(first_description_line)
-            description_reflow_lines.extend(self._stripped_reflow_lines(index + 1, entry_end, skip_empty=True))
-            description_lines = [line.text for line in description_reflow_lines]
+                description_fragments.append(first_description_line)
+            description_fragments.extend(self._stripped_reflow_lines(index + 1, entry_end, skip_empty=True))
+            description_lines = [line.text for line in description_fragments]
             names = _entry_names(kind, name)
             if names is None:
                 index = entry_end
@@ -1219,6 +1225,7 @@ class _DocstringParser:
                 names=names,
                 type_text=type_text.strip() if type_text else None,
                 description=" ".join(description_lines).strip(),
+                description_lines=tuple(description_fragments),
                 start_line=index,
                 end_line=entry_end,
             )
@@ -1227,7 +1234,7 @@ class _DocstringParser:
             prefix = f'{unit}{self.lines[index].text[len(match.group("indent")) : match.start("description")]}'
             if description_lines and not first_description and not prefix.endswith((" ", "\t")):
                 prefix = f"{prefix} "
-            self._add_reflow(DocstringBlockKind.SECTION_ENTRY, index, entry_end, lines=tuple(description_reflow_lines), initial_indent=prefix, subsequent_indent=unit * 2)
+            self._add_reflow(DocstringBlockKind.SECTION_ENTRY, index, entry_end, lines=tuple(description_fragments), initial_indent=prefix, subsequent_indent=unit * 2)
             index = entry_end
         return tuple(entries)
 
@@ -1248,17 +1255,18 @@ class _DocstringParser:
                 names = _exception_names(exception_match.group("name"))
                 if names is not None:
                     first_description_line = self._reflow_line_from_text_span(index, exception_match.start("description"), len(self.lines[index].text))
-                    description_reflow_lines = []
+                    description_fragments = []
                     if first_description_line is not None and first_description_line.text:
-                        description_reflow_lines.append(first_description_line)
-                    description_reflow_lines.extend(self._stripped_reflow_lines(index + 1, entry_end, skip_empty=True))
-                    description_lines = [line.text for line in description_reflow_lines]
+                        description_fragments.append(first_description_line)
+                    description_fragments.extend(self._stripped_reflow_lines(index + 1, entry_end, skip_empty=True))
+                    description_lines = [line.text for line in description_fragments]
                     entries.append(
                         DocstringEntry(
                             kind=kind,
                             names=names,
                             type_text=None,
                             description=" ".join(description_lines),
+                            description_lines=tuple(description_fragments),
                             start_line=index,
                             end_line=entry_end,
                         )
@@ -1268,7 +1276,7 @@ class _DocstringParser:
                             DocstringBlockKind.SECTION_ENTRY,
                             index,
                             entry_end,
-                            lines=tuple(description_reflow_lines),
+                            lines=tuple(description_fragments),
                             initial_indent=self.lines[index].text[: exception_match.start("description")],
                             subsequent_indent=text_layout.indent_unit(self.settings),
                         )
@@ -1277,8 +1285,8 @@ class _DocstringParser:
             match = _NUMPY_ENTRY_RE.match(text)
             if match is not None:
                 entry_end = self._entry_end(index, end, text_layout.leading_width(match.group("indent")))
-                description_reflow_lines = list(self._stripped_reflow_lines(index + 1, entry_end, skip_empty=True))
-                description_lines = [line.text for line in description_reflow_lines]
+                description_fragments = list(self._stripped_reflow_lines(index + 1, entry_end, skip_empty=True))
+                description_lines = [line.text for line in description_fragments]
                 names = _entry_names(kind, match.group("name"))
                 if names is None:
                     index = entry_end
@@ -1288,6 +1296,7 @@ class _DocstringParser:
                     names=names,
                     type_text=match.group("type").strip(),
                     description=" ".join(description_lines),
+                    description_lines=tuple(description_fragments),
                     start_line=index,
                     end_line=entry_end,
                 )
@@ -1297,7 +1306,7 @@ class _DocstringParser:
                         DocstringBlockKind.SECTION_ENTRY,
                         index + 1,
                         entry_end,
-                        lines=tuple(description_reflow_lines),
+                        lines=tuple(description_fragments),
                         initial_indent=text_layout.indent_unit(self.settings),
                         subsequent_indent=text_layout.indent_unit(self.settings),
                     )
@@ -1305,8 +1314,8 @@ class _DocstringParser:
                 continue
             if kind in (DocstringEntryKind.RETURN, DocstringEntryKind.YIELD, DocstringEntryKind.EXCEPTION) and text.strip():
                 entry_end = self._entry_end(index, end, text_layout.leading_width(text))
-                description_reflow_lines = list(self._stripped_reflow_lines(index + 1, entry_end, skip_empty=True))
-                description_lines = [line.text for line in description_reflow_lines]
+                description_fragments = list(self._stripped_reflow_lines(index + 1, entry_end, skip_empty=True))
+                description_lines = [line.text for line in description_fragments]
                 if kind == DocstringEntryKind.EXCEPTION:
                     names = _exception_names(text.strip())
                     if names is None:
@@ -1320,6 +1329,7 @@ class _DocstringParser:
                         names=names,
                         type_text=None if kind == DocstringEntryKind.EXCEPTION else text.strip(),
                         description=" ".join(description_lines),
+                        description_lines=tuple(description_fragments),
                         start_line=index,
                         end_line=entry_end,
                     )
@@ -1329,7 +1339,7 @@ class _DocstringParser:
                         DocstringBlockKind.SECTION_ENTRY,
                         index + 1,
                         entry_end,
-                        lines=tuple(description_reflow_lines),
+                        lines=tuple(description_fragments),
                         initial_indent=text_layout.indent_unit(self.settings),
                         subsequent_indent=text_layout.indent_unit(self.settings),
                     )
@@ -1345,13 +1355,13 @@ class _DocstringParser:
         argument = (match.group("argument") or "").strip()
         first_description_line = self._reflow_line_from_text_span(start, match.start("description"), len(self.lines[start].text))
         has_first_description = first_description_line is not None and bool(first_description_line.text)
-        description_reflow_lines: list[ReflowRegionLine] = []
+        description_fragments: list[DocstringTextFragment] = []
         reflow_runs: list[ReflowRegionRun] = []
         if has_first_description:
             assert first_description_line is not None
-            description_reflow_lines.append(first_description_line)
+            description_fragments.append(first_description_line)
         continuation_runs = self._rest_field_description_reflow_runs(start + 1, block_end)
-        description_reflow_lines.extend(line for run in continuation_runs for line in run.lines)
+        description_fragments.extend(line for run in continuation_runs for line in run.lines)
         if has_first_description:
             assert first_description_line is not None
             if continuation_runs and continuation_runs[0].start_line == start + 1:
@@ -1367,13 +1377,14 @@ class _DocstringParser:
             reflow_runs.extend(continuation_runs[1:])
         else:
             reflow_runs.extend(continuation_runs)
-        description_lines = [line.text for line in description_reflow_lines]
+        description_lines = [line.text for line in description_fragments]
         kind, names, type_text = _rest_entry_metadata(field, argument)
         entry = DocstringEntry(
             kind=kind,
             names=names,
             type_text=type_text,
             description=" ".join(description_lines).strip(),
+            description_lines=tuple(description_fragments),
             start_line=start,
             end_line=block_end,
             field_name=field,
@@ -1402,7 +1413,7 @@ class _DocstringParser:
         """Return reflowable runs from a reStructuredText field description body."""
         runs: list[ReflowRegionRun] = []
         run_start: int | None = None
-        run_lines: list[ReflowRegionLine] = []
+        run_lines: list[DocstringTextFragment] = []
         index = start
         while index < end:
             protected_end = self._protected_block_end(index, end)
@@ -1440,7 +1451,7 @@ class _DocstringParser:
         self._add_reflow(DocstringBlockKind.BLOCK_QUOTE, start, block_end, lines=tuple(texts), initial_indent=prefix, subsequent_indent=prefix)
         return DocstringBlock(DocstringBlockKind.BLOCK_QUOTE, start, block_end), block_end
 
-    def _add_reflow(self, kind: DocstringBlockKind, start: int, end: int, *, lines: tuple[ReflowRegionLine, ...], initial_indent: str, subsequent_indent: str) -> None:
+    def _add_reflow(self, kind: DocstringBlockKind, start: int, end: int, *, lines: tuple[DocstringTextFragment, ...], initial_indent: str, subsequent_indent: str) -> None:
         """Register a non-empty safely reflowable region."""
         if not lines or not any(line.text for line in lines):
             return
@@ -1457,16 +1468,16 @@ class _DocstringParser:
             )
         )
 
-    def _stripped_reflow_lines(self, start: int, end: int, *, skip_empty: bool = False) -> tuple[ReflowRegionLine, ...]:
+    def _stripped_reflow_lines(self, start: int, end: int, *, skip_empty: bool = False) -> tuple[DocstringTextFragment, ...]:
         """Return stripped reflow lines for a logical line range."""
-        lines: list[ReflowRegionLine] = []
+        lines: list[DocstringTextFragment] = []
         for index in range(start, end):
             line = self._reflow_line_from_text_span(index, 0, len(self.lines[index].text))
             if line is not None and (line.text or not skip_empty):
                 lines.append(line)
         return tuple(lines)
 
-    def _reflow_line_from_text_span(self, line_index: int, start_column: int, end_column: int) -> ReflowRegionLine | None:
+    def _reflow_line_from_text_span(self, line_index: int, start_column: int, end_column: int) -> DocstringTextFragment | None:
         """Return a reflow line from a trimmed column span in evaluated text."""
         line = self.lines[line_index]
         while start_column < end_column and line.text[start_column].isspace():
@@ -1477,7 +1488,7 @@ class _DocstringParser:
             return None
         start_offset = value_offset_for_text_column(line, start_column)
         end_offset = value_offset_for_text_column(line, end_column)
-        return ReflowRegionLine(text=line.text[start_column:end_column], start_offset=start_offset, end_offset=end_offset)
+        return DocstringTextFragment(text=line.text[start_column:end_column], line_index=line_index, start_offset=start_offset, end_offset=end_offset)
 
     def _fence_end(self, start: int, end: int, opening: str) -> int:
         """Return the end index for a fenced code block."""
@@ -1750,7 +1761,7 @@ def _google_none_value_entry(kind: DocstringEntryKind, text: str, *, start: int)
     """Return a Google return/yield entry for bare None spellings."""
     if kind not in (DocstringEntryKind.RETURN, DocstringEntryKind.YIELD) or not text[:1].isspace() or text.strip() not in {"None", "None."}:
         return None
-    return DocstringEntry(kind=kind, names=(), type_text="None", description="", start_line=start, end_line=start + 1)
+    return DocstringEntry(kind=kind, names=(), type_text="None", description="", description_lines=(), start_line=start, end_line=start + 1)
 
 
 def _is_adornment(text: str) -> bool:
@@ -1911,6 +1922,103 @@ def planned_simple_docstring_source_change(
         line_numbers=tuple(line_number for replacement in replacements for line_number in replacement.line_numbers),
         suppression_line_numbers=(),
     )
+
+
+def planned_simple_docstring_text_change(
+    docstring: DocstringInfo,
+    *,
+    context: RuleContext,
+    replacement: rule_edits.PlannedTextReplacement,
+    expected_value: str,
+    expected_source: str | None = None,
+) -> rule_edits.PlannedSourceChange | None:
+    """Return one source-slice replacement from an evaluated-value replacement.
+
+    Args:
+        docstring: Simple docstring whose source body should receive the replacement.
+        context: Rule context providing source lines and cached offset bounds.
+        replacement: Evaluated-offset replacement to map into current source text.
+        expected_value: Complete evaluated docstring value expected after applying the replacement.
+        expected_source: Optional exact source spelling required for the replaced value slice.
+
+    Returns:
+        Planned replacement for the mapped source slice, or None when the source mapping is unsafe.
+    """
+    if not is_safely_mapped_simple_docstring(docstring) or not isinstance(docstring.node, cst.SimpleString):
+        return None
+    body_source = string_literals.simple_string_body_source(docstring.node)
+    if body_source is None or _has_mixed_physical_line_endings(body_source):
+        return None
+    fragments = string_literals.value_fragments_for_simple_string(docstring.node, line_ending=_docstring_source_line_ending(docstring))
+    if fragments is None or replacement.start_offset < 0 or replacement.end_offset < replacement.start_offset or replacement.end_offset > len(fragments):
+        return None
+    if expected_source is not None and string_literals.source_for_value_slice(fragments, replacement.start_offset, replacement.end_offset) != expected_source:
+        return None
+    body_source_start = _source_body_offset(fragments, replacement.start_offset)
+    body_source_end = _source_body_offset(fragments, replacement.end_offset)
+    replacement_body = f"{body_source[:body_source_start]}{replacement.text}{body_source[body_source_end:]}"
+    if string_literals.render_simple_string_from_body_source(docstring.node.prefix, docstring.node.quote, replacement_body, expected_value=expected_value) is None:
+        return None
+    line_bounds = context.line_bounds if context.line_bounds is not None else source_text.line_bounds_from_lines(context.source_lines)
+    body_start = _offset_for_position(docstring.range.start, line_bounds=line_bounds) + len(docstring.node.prefix) + len(docstring.node.quote)
+    source_start = body_start + body_source_start
+    source_end = body_start + body_source_end
+    return rule_edits.PlannedSourceChange(
+        edit=rule_edits.SourceEdit(
+            range=cst_metadata.CodeRange(start=_position_for_offset(source_start, line_bounds=line_bounds), end=_position_for_offset(source_end, line_bounds=line_bounds)),
+            replacement=replacement.text,
+        ),
+        line_numbers=replacement.line_numbers,
+        suppression_line_numbers=(),
+    )
+
+
+def _docstring_source_line_ending(docstring: DocstringInfo) -> str:
+    """Return the first physical line ending in a docstring source literal."""
+    return line_endings.detect_line_ending(docstring.source)
+
+
+def _has_mixed_physical_line_endings(source: str) -> bool:
+    """Return whether source contains more than one physical line-ending spelling."""
+    endings: set[str] = set()
+    index = 0
+    while index < len(source):
+        char = source[index]
+        if char == "\r":
+            if index + 1 < len(source) and source[index + 1] == "\n":
+                endings.add("\r\n")
+                index += 2
+            else:
+                endings.add("\r")
+                index += 1
+        elif char == "\n":
+            endings.add("\n")
+            index += 1
+        else:
+            index += 1
+        if len(endings) > 1:
+            return True
+    return False
+
+
+def _source_body_offset(fragments: tuple[string_literals.StringValueFragment, ...], value_offset: int) -> int:
+    """Return source body offset corresponding to an evaluated-value offset."""
+    return sum(len(fragment.source) for fragment in fragments[:value_offset])
+
+
+def _offset_for_position(position: cst_metadata.CodePosition, *, line_bounds: source_text.LineBounds) -> int:
+    """Return absolute source offset for a LibCST position."""
+    line_start, _ = line_bounds[position.line - 1]
+    return line_start + position.column
+
+
+def _position_for_offset(offset: int, *, line_bounds: source_text.LineBounds) -> cst_metadata.CodePosition:
+    """Return a LibCST position for an absolute source offset."""
+    for line_number, (line_start, line_end) in enumerate(line_bounds, start=1):
+        if line_start <= offset <= line_end:
+            return cst_metadata.CodePosition(line=line_number, column=offset - line_start)
+    line_number = len(line_bounds)
+    return cst_metadata.CodePosition(line=line_number, column=max(0, offset - line_bounds[-1][0]))
 
 
 def planned_simple_docstring_output_change(

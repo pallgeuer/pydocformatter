@@ -98,7 +98,7 @@ def test_capitalizes_first_summary_word_in_multiline_docstrings() -> None:
     assert result.fixed_findings[PDF304SummaryFirstWordCapitalization.meta] == 2
 
 
-@pytest.mark.parametrize("summary", ("Return value.", "RETURN value.", "\u00e9clair value.", "return_value.", "123 value."))
+@pytest.mark.parametrize("summary", ("Return value.", "RETURN value.", "\u00e9clair value.", "return_value.", "123 value.", "iOS device.", "iPhone device.", "eBay item.", "macOS device."))
 def test_skips_words_without_safe_ascii_capitalization(summary: str) -> None:
     source = f'def function():\n    """{summary}"""\n'
     result = format_source(source)

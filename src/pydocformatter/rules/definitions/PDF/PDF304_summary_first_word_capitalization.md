@@ -5,7 +5,7 @@ Fix is sometimes available.
 ## What it does
 Checks docstring summaries whose first word starts with a lowercase ASCII letter when that word can be safely interpreted as ordinary ASCII prose. This includes module, class, function, method, and attached attribute docstrings.
 
-PDF304 checks the first non-adornment line of the parsed top-level summary block, including summaries in multiline docstrings. It skips empty docstrings, docstrings without a parsed summary, parser-recognized structures, all-uppercase words, non-ASCII starts, numeric starts, and words containing characters other than ASCII letters or apostrophes after the first character. This means `return` and `don't` can be fixed, while `"return"`, `(return)`, `return:`, `return_value`, and `return-value` are left alone. When fixing, it uppercases only the first character of the first word.
+PDF304 checks the first non-adornment line of the parsed top-level summary block, including summaries in multiline docstrings. It skips empty docstrings, docstrings without a parsed summary, parser-recognized structures, all-uppercase words, mixed-case words, non-ASCII starts, numeric starts, and words containing characters other than lowercase ASCII letters or apostrophes after the first character. This means `return` and `don't` can be fixed, while `"return"`, `(return)`, `return:`, `return_value`, `return-value`, `iOS`, and `eBay` are left alone. When fixing, it uppercases only the first character of the first word.
 
 Unsafe source mappings are reported but not changed. This includes summaries whose first logical line is formed from concatenated strings or escaped newline text, because changing only one apparent word could require rewriting source text that does not map cleanly to that logical word.
 
@@ -94,7 +94,7 @@ def raw_pattern():
     r"""Return \d+ values."""
 ```
 
-Words that are already capitalized, all-uppercase, non-ASCII, numeric, or punctuated in unsafe ways are skipped:
+Words that are already capitalized, mixed-case, all-uppercase, non-ASCII, numeric, or punctuated in unsafe ways are skipped:
 
 ```pydocfmt-example
 [input]
@@ -103,6 +103,9 @@ def capitalized():
 
 def acronym():
     """HTTP value."""
+
+def platform():
+    """iOS device."""
 
 def non_ascii():
     """\u00e9clair value."""

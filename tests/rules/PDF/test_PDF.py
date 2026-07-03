@@ -21,14 +21,14 @@ from pydocformatter.rules.definitions.PDF.PDF import (
     DocstringEntryKind,
     DocstringKind,
     DocstringStructure,
+    DocstringTextFragment,
     FunctionFacts,
-    ReflowRegionLine,
     escaped_closing_quote_body_source,
     simple_docstring_body_source_candidates,
 )
 
 
-def reflow_texts(lines: tuple[ReflowRegionLine, ...]) -> tuple[str, ...]:
+def reflow_texts(lines: tuple[DocstringTextFragment, ...]) -> tuple[str, ...]:
     return tuple(line.text for line in lines)
 
 

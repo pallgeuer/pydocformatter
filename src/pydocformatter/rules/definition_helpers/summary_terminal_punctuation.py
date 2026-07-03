@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-import dataclasses
-
+import pydocformatter.rules.definition_helpers.terminal_punctuation as terminal_punctuation
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 import pydocformatter.rules.edits as rule_edits
 import pydocformatter.rules.violations as rule_violations
@@ -11,26 +10,13 @@ from pydocformatter.rules.definition import RuleContext
 from pydocformatter.rules.models import RuleMetadata
 
 
-@dataclasses.dataclass(frozen=True)
-class SummaryPunctuationPolicy:
-    """Policy for one summary-punctuation rule.
-
-    Attributes:
-        valid_endings (str): Terminal characters accepted by the rule.
-        nonfixable_endings (str): Terminal characters that should report but not be rewritten automatically.
-    """
-
-    valid_endings: str
-    nonfixable_endings: str
-
-
-def results(context: RuleContext, *, rule: RuleMetadata, policy: SummaryPunctuationPolicy) -> tuple[rule_violations.RuleViolation, ...]:
+def results(context: RuleContext, *, rule: RuleMetadata, policy: terminal_punctuation.TerminalPunctuationPolicy) -> tuple[rule_violations.RuleViolation, ...]:
     """Return violations for summary punctuation.
 
     Args:
         context (RuleContext): Current file context with prepared PDF summary targets.
         rule (RuleMetadata): Rule metadata used for diagnostics and fixes.
-        policy (SummaryPunctuationPolicy): Valid and non-fixable terminal punctuation policy.
+        policy (terminal_punctuation.TerminalPunctuationPolicy): Valid and non-fixable terminal punctuation policy.
 
     Returns:
         tuple[rule_violations.RuleViolation, ...]: Summary punctuation violations for eligible docstrings.
@@ -44,7 +30,7 @@ def result_for_target(
     *,
     context: RuleContext,
     rule: RuleMetadata,
-    policy: SummaryPunctuationPolicy,
+    policy: terminal_punctuation.TerminalPunctuationPolicy,
 ) -> rule_violations.RuleViolation | None:
     """Return one summary-punctuation violation for a summary target.
 
@@ -52,16 +38,13 @@ def result_for_target(
         target (PDF_definition.SummaryLineTarget): Summary line to inspect.
         context (RuleContext): Current file context used to plan source edits.
         rule (RuleMetadata): Rule metadata used for diagnostics and fixes.
-        policy (SummaryPunctuationPolicy): Valid and non-fixable terminal punctuation policy.
+        policy (terminal_punctuation.TerminalPunctuationPolicy): Valid and non-fixable terminal punctuation policy.
 
     Returns:
         rule_violations.RuleViolation | None: Violation for a bad ending, or None when the summary already complies.
     """
-    trimmed = target.line.text.rstrip(" \t")
-    if not trimmed or trimmed.endswith("\\") or trimmed.endswith(tuple(policy.valid_endings)):
-        return None
-    change = None if trimmed.endswith(tuple(policy.nonfixable_endings)) else _planned_change(target, context=context)
-    return rule_violations.violation_for_optional_planned_source_change(rule, change, line_numbers=PDF_definition.docstring_line_numbers(target.docstring, target.line))
+    line_numbers = PDF_definition.docstring_line_numbers(target.docstring, target.line)
+    return terminal_punctuation.violation(text=target.line.text, policy=policy, rule=rule, line_numbers=line_numbers, planned_change=lambda: _planned_change(target, context=context))
 
 
 def _planned_change(

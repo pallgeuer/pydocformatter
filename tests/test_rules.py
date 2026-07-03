@@ -1335,6 +1335,8 @@ class NonCallableViolationsRule(RuleBase):
                 "PDF305": {DocstringConvention.PEP257: RuleSettingEffect.IGNORED, DocstringConvention.GOOGLE: RuleSettingEffect.IGNORED},
                 "PDF306": {DocstringConvention.NONE: RuleSettingEffect.IGNORED, DocstringConvention.PEP257: RuleSettingEffect.IGNORED},
                 "PDF307": {DocstringConvention.NONE: RuleSettingEffect.IGNORED, DocstringConvention.PEP257: RuleSettingEffect.IGNORED},
+                "PDF308": {DocstringConvention.GOOGLE: RuleSettingEffect.IGNORED},
+                "PDF309": {DocstringConvention.PEP257: RuleSettingEffect.IGNORED, DocstringConvention.NUMPY: RuleSettingEffect.IGNORED},
                 "PDF400": {DocstringConvention.NONE: RuleSettingEffect.IGNORED, DocstringConvention.PEP257: RuleSettingEffect.IGNORED},
                 "PDF401": {
                     DocstringConvention.NONE: RuleSettingEffect.IGNORED,
@@ -1456,6 +1458,9 @@ class NonCallableViolationsRule(RuleBase):
                 "PDF303",
                 "PDF304",
                 "PDF305",
+                "PDF308",
+                "PDF309",
+                "PDF310",
             ),
         )
         self.assertEqual(
@@ -1485,11 +1490,13 @@ class NonCallableViolationsRule(RuleBase):
                 "PDF302",
                 "PDF303",
                 "PDF304",
+                "PDF308",
+                "PDF310",
             ),
         )
         self.assertEqual(
             tuple(sorted(set(str(rule.rule.code) for rule in none_selection.rules) - set(str(rule.rule.code) for rule in pep257_selection.rules))),
-            ("PDF106", "PDF301", "PDF305"),
+            ("PDF106", "PDF301", "PDF305", "PDF309"),
         )
 
     def test_rule_collection_does_not_expose_selector_convenience_indexes(self) -> None:

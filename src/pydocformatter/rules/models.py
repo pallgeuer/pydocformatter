@@ -109,7 +109,7 @@ class RuleMetadata:
         name (str): Rule name.
         message (str): Default diagnostic message.
         fix_availability (FixAvailability): Rule-level automatic fix availability.
-        stable_since (str): pydocformatter version in which the rule became stable.
+        stable_since (str): Version of pydocformatter in which the rule became stable.
         setting_effects (tuple[RuleSettingEffects, ...]): Selection effects driven by resolved setting values.
         incompatible_with (tuple[RuleCode, ...]): Rule codes that cannot be selected together with this rule.
         check_kind (RuleCheckKind): Check-pass phase used to run the rule.
