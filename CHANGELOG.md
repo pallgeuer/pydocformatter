@@ -101,6 +101,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 
 - **Developer workflow:**
   - Ignored missing documentation rules `PDF500`, `PDF502`, `PDF504`, `PDF506`, `PDF508`, and `PDF510` for `tests/**/test_*.py` in the project pydocformatter configuration.
+  - Enabled comment disabled-code and expression detection in the project pydocformatter configuration.
   - Added a pytest pre-commit hook that runs the test suite before commits.
   - Added a guarded shared pytest working directory for tests that do not request filesystem isolation, with explicit `isolated_cwd` opt-in for tests that need a writable temporary CWD.
   - Added pytest coverage that checks the pydocformatter rule tables in `docs/rule_list.md` against actual rule metadata.
