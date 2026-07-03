@@ -267,18 +267,6 @@ def _validate_finding_line_label(label: str, line_numbers: tuple[int, ...], *, r
         raise RuleMarkdownExampleParseError(f"{rule_code} example {example_number}: expected {expected_label!r} for finding lines, got {label!r}")
 
 
-def load_rule_category_explanation(category_class: type[object]) -> str:
-    """Load Markdown documentation adjacent to a rule category module.
-
-    Args:
-        category_class (type[object]): Rule category class whose module basename identifies the Markdown resource.
-
-    Returns:
-        str: UTF-8 Markdown category explanation text.
-    """
-    return load_rule_explanation(category_class)
-
-
 def rule_explanation_body(rule_class: type[object]) -> str:
     """Return the Markdown explanation without the rule title and fixability lines.
 
@@ -350,7 +338,7 @@ def undocumented_rule_categories(collection: RuleCollection) -> tuple[RuleCatego
     missing: list[RuleCategoryMetadata] = []
     for category_class in collection.categories:
         try:
-            load_rule_category_explanation(category_class)
+            load_rule_explanation(category_class)
         except FileNotFoundError:
             missing.append(category_class.meta)
     return tuple(missing)

@@ -428,7 +428,7 @@ class TestRules(unittest.TestCase):
         self.assertTrue(rule_documentation.TEMPLATE_PATH.is_file())
         self.assertTrue(rule_documentation.CATEGORY_TEMPLATE_PATH.is_file())
         for category_class in collection.categories:
-            explanation = rule_documentation.load_rule_category_explanation(category_class)
+            explanation = rule_documentation.load_rule_explanation(category_class)
             self.assertTrue(explanation.startswith(f"# {category_class.meta.name} ({category_class.meta.prefix})\n\n"))
             self.assertEqual(markdown_level_two_headings(explanation), EXPECTED_RULE_CATEGORY_DOCUMENTATION_SECTIONS)
         for rule_class in collection.rules:

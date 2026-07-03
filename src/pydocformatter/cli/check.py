@@ -395,22 +395,6 @@ def _process_pool_worker_count(parallelism: float, selected_file_count: int) -> 
     return workers
 
 
-def _selected_file_format_request(
-    selected_file: file_selection.SelectedFile,
-    *,
-    rule_selections: dict[settings_core.SettingsProfile.Key[CheckSettings], RuleSelection],
-    fix: bool,
-    write: bool,
-) -> _SelectedFileFormatRequest:
-    """Return the resolved formatting request for one disk-backed selected file."""
-    return _SelectedFileFormatRequest(
-        selected_file=selected_file,
-        rule_selection=rule_selections[selected_file.profile.key()],
-        fix=fix,
-        write=write,
-    )
-
-
 def _format_selected_file_worker(
     request: _SelectedFileFormatRequest,
 ) -> FormatterResult:
@@ -472,7 +456,15 @@ def format_selected_files(
         ]
 
     workers = _process_pool_worker_count(parallelism, len(selected_files))
-    requests = tuple(_selected_file_format_request(selected_file, rule_selections=rule_selections, fix=fix, write=write) for selected_file in selected_files)
+    requests = tuple(
+        _SelectedFileFormatRequest(
+            selected_file=selected_file,
+            rule_selection=rule_selections[selected_file.profile.key()],
+            fix=fix,
+            write=write,
+        )
+        for selected_file in selected_files
+    )
     if workers == 1:
         return [_format_selected_file_worker(request) for request in requests]
 

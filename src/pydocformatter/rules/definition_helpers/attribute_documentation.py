@@ -5,7 +5,6 @@ from __future__ import annotations
 import dataclasses
 import os
 import pathlib
-from collections.abc import Mapping
 
 import pydocformatter.cli.settings_check as settings_check
 import pydocformatter.rules.definition_helpers.docstring_conventions as docstring_conventions
@@ -91,21 +90,6 @@ def documented_attributes(docstring: PDF_definition.DocstringInfo) -> tuple[Docu
     return tuple(attributes)
 
 
-def attached_attribute_docstrings_by_name(data: PDF_definition.PDFCategoryData, owner: PDF_definition.DefinitionInfo) -> Mapping[str, tuple[PDF_definition.DocstringInfo, ...]]:
-    """Return attached attribute docstrings for an owner indexed by target name.
-
-    Args:
-        data (PDF_definition.PDFCategoryData): Prepared PDF definitions, attributes, and docstrings for the current
-            file.
-        owner (PDF_definition.DefinitionInfo): Module or class whose adjacent attribute docstrings should be indexed.
-
-    Returns:
-        Mapping[str, tuple[PDF_definition.DocstringInfo, ...]]: Attribute names mapped to attached docstrings
-            documenting them.
-    """
-    return data.attached_attribute_docstrings_by_name(owner)
-
-
 def documented_attribute_names(data: PDF_definition.PDFCategoryData, owner: PDF_definition.DefinitionInfo) -> frozenset[str]:
     """Return owner and attached docstring attribute names for an owner.
 
@@ -117,7 +101,7 @@ def documented_attribute_names(data: PDF_definition.PDFCategoryData, owner: PDF_
     Returns:
         frozenset[str]: Names documented either in the owner docstring or by attached attribute docstrings.
     """
-    names: set[str] = set(attached_attribute_docstrings_by_name(data, owner))
+    names: set[str] = set(data.attached_attribute_docstrings_by_name(owner))
     owner_docstring = data.docstring_for(owner)
     if owner_docstring is not None:
         names.update(attribute.name for attribute in documented_attributes(owner_docstring))
@@ -135,7 +119,7 @@ def has_attribute_documentation(data: PDF_definition.PDFCategoryData, owner: PDF
     Returns:
         bool: Whether the owner has attached attribute docstrings, attribute entries, or an attribute section.
     """
-    if attached_attribute_docstrings_by_name(data, owner):
+    if data.attached_attribute_docstrings_by_name(owner):
         return True
     owner_docstring = data.docstring_for(owner)
     if owner_docstring is None:
@@ -192,7 +176,7 @@ def missing_suppression_targets(data: PDF_definition.PDFCategoryData, owner: PDF
     owner_docstring = data.docstring_for(owner)
     if owner_docstring is not None:
         targets.append(PDF_definition.docstring_physical_line_numbers(owner_docstring))
-    targets.extend(PDF_definition.docstring_physical_line_numbers(docstring) for docstring in attached_attribute_docstrings_by_name(data, owner).get(attribute_name, ()))
+    targets.extend(PDF_definition.docstring_physical_line_numbers(docstring) for docstring in data.attached_attribute_docstrings_by_name(owner).get(attribute_name, ()))
     return tuple(dict.fromkeys(targets))
 
 
@@ -376,7 +360,7 @@ def duplicate_attribute_violations(
         docstring = data.docstring_for(definition)
         if docstring is None:
             continue
-        attached_docstrings = attached_attribute_docstrings_by_name(data, definition)
+        attached_docstrings = data.attached_attribute_docstrings_by_name(definition)
         if not attached_docstrings:
             continue
         for attribute in documented_attributes(docstring):

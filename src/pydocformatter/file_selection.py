@@ -208,10 +208,6 @@ class _SelectionContext:
     respect_gitignore: bool
     matcher_cache: dict[int, tuple[_PatternMatcher, _PatternMatcher]] = dataclasses.field(default_factory=dict)
 
-    def profile_for_path(self, path: str | None = None) -> settings_core.SettingsProfile[CheckSettings]:
-        """Return the settings profile for a path."""
-        return self.resolver.profile_for_path(path)
-
     def matchers_for_profile(self, profile: settings_core.SettingsProfile[CheckSettings]) -> tuple[_PatternMatcher, _PatternMatcher]:
         """Return include and exclude matchers for a settings profile."""
         profile_id = id(profile)
@@ -284,7 +280,7 @@ def select_virtual_file(path: str, resolver: settings_core.SettingsResolver[Chec
         SelectionResult: Selection result containing the accepted virtual path or the rejection decision.
     """
     context = _selection_context(resolver)
-    profile = context.profile_for_path(None if path == STDIN_VIRTUAL_FILE else path)
+    profile = context.resolver.profile_for_path(None if path == STDIN_VIRTUAL_FILE else path)
     if path == STDIN_VIRTUAL_FILE:
         return _selection_result(
             (
@@ -329,14 +325,14 @@ def _collect_candidates(paths: list[str], context: _SelectionContext) -> tuple[_
     candidates: list[_CollectedPath] = []
     for path in paths:
         if os.path.isdir(path):
-            profile = context.profile_for_path(path)
+            profile = context.resolver.profile_for_path(path)
             _, exclude_matcher = context.matchers_for_profile(profile)
             if exclude_matcher.matches(path) or _force_excluded_explicit_directory(path, profile):
                 candidates.append(_excluded_directory_decision(path, explicit=True, profile=profile))
                 continue
             candidates.extend(_walk_directory(path, context, respect_gitignore=context.respect_gitignore))
         else:
-            candidates.append(_Candidate(path=path, explicit=True, profile=context.profile_for_path(path), respect_gitignore=False))
+            candidates.append(_Candidate(path=path, explicit=True, profile=context.resolver.profile_for_path(path), respect_gitignore=False))
     return tuple(candidates)
 
 
@@ -344,7 +340,7 @@ def _walk_directory(path: str, context: _SelectionContext, *, respect_gitignore:
     """Recursively collect candidates below one accepted directory."""
     candidates: list[_CollectedPath] = []
     for root, dirs, files in os.walk(path):
-        profile = context.profile_for_path(root)
+        profile = context.resolver.profile_for_path(root)
         _, exclude_matcher = context.matchers_for_profile(profile)
 
         kept_dirs = []
@@ -361,7 +357,7 @@ def _walk_directory(path: str, context: _SelectionContext, *, respect_gitignore:
             if name == ".git":
                 continue
             file_path = os.path.join(root, name)
-            candidates.append(_Candidate(path=file_path, explicit=False, profile=context.profile_for_path(file_path), respect_gitignore=respect_gitignore))
+            candidates.append(_Candidate(path=file_path, explicit=False, profile=context.resolver.profile_for_path(file_path), respect_gitignore=respect_gitignore))
     return tuple(candidates)
 
 
@@ -503,7 +499,7 @@ def _deduplicated_decisions(decisions: tuple[FileDecision, ...]) -> tuple[FileDe
     accepted_by_identity: dict[str, int] = {}
 
     for decision in decisions:
-        display_decision = _with_display_path(decision)
+        display_decision = dataclasses.replace(decision, path=_display_path(decision.path))
         if not display_decision.accepted:
             result.append(display_decision)
             continue
@@ -528,11 +524,6 @@ def _deduplicated_decisions(decisions: tuple[FileDecision, ...]) -> tuple[FileDe
             result.append(_duplicate_decision(display_decision))
 
     return tuple(result)
-
-
-def _with_display_path(decision: FileDecision) -> FileDecision:
-    """Return a decision with its path normalized for display."""
-    return dataclasses.replace(decision, path=_display_path(decision.path))
 
 
 def _duplicate_decision(decision: FileDecision) -> FileDecision:
