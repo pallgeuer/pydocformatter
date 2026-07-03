@@ -121,4 +121,4 @@ def test_reports_unsafe_rest_field_term_normalization_without_fixing() -> None:
     assert result.new_source == source
     assert not result.fixed_findings
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((2, 3),)
-    assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring reStructuredText field name 'parameter' should use equivalent term 'param'",)
+    assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring reST field name 'parameter' should use equivalent term 'param'",)

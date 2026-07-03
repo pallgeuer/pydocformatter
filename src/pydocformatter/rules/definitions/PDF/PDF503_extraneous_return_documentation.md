@@ -35,7 +35,7 @@ def log(value):
 
 [output=unchanged]
 [findings]
-PDF503: Line 4: Docstring has a return section for a function that does not return
+PDF503: Line 4: Docstring has return documentation for a function that does not return
 ```
 
 Functions with only bare returns do not have an ordinary return value to document. Empty return sections are still stale documentation and are reported even when the function also explicitly returns `None`:
@@ -56,7 +56,7 @@ def maybe_stop(flag):
 
 [output=unchanged]
 [findings]
-PDF503: Line 4: Docstring has a return section for a function that does not return
+PDF503: Line 4: Docstring has return documentation for a function that does not return
 ```
 
 Generator functions are treated as yield-value APIs for this rule. A `return` value in a generator is a stop value, not an ordinary function return to document:
@@ -80,7 +80,7 @@ def values():
 
 [output=unchanged]
 [findings]
-PDF503: Line 7: Docstring has a return section for a generator; generator return values are stop values, not ordinary returns
+PDF503: Line 7: Docstring has return documentation for a generator; generator return values are stop values, not ordinary returns
 ```
 
 Bare `yield` and `yield None` still make a function a generator, so return documentation is reported as generator return documentation even when no meaningful values are yielded:
@@ -101,7 +101,7 @@ def values():
 
 [output=unchanged]
 [findings]
-PDF503: Line 4: Docstring has a return section for a generator; generator return values are stop values, not ordinary returns
+PDF503: Line 4: Docstring has return documentation for a generator; generator return values are stop values, not ordinary returns
 ```
 
 When a function has a meaningful ordinary return, return documentation is allowed:

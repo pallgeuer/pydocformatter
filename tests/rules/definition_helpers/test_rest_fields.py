@@ -40,11 +40,31 @@ def test_order_rank_groups_parameters_values_and_exceptions() -> None:
 
 
 def test_repetition_key_distinguishes_rest_field_kinds() -> None:
-    assert rest_fields.repetition_key(entry(PDF_definition.DocstringEntryKind.PARAMETER, field_name="param", names=("value",))) == ("parameter", "value", "")
-    assert rest_fields.repetition_key(entry(PDF_definition.DocstringEntryKind.PARAMETER, field_name="type", field_argument="value")) == ("parameter-type", "value", "")
+    assert rest_fields.repetition_key(entry(PDF_definition.DocstringEntryKind.PARAMETER, field_name="param", names=("value",))) is None
+    assert rest_fields.repetition_key(entry(PDF_definition.DocstringEntryKind.PARAMETER, field_name="type", field_argument="value")) is None
     assert rest_fields.repetition_key(entry(PDF_definition.DocstringEntryKind.RETURN, field_name="returns")) == ("return", "", "")
     assert rest_fields.repetition_key(entry(PDF_definition.DocstringEntryKind.FIELD, field_name="meta", field_argument="private")) == ("field", "meta", "private")
     assert rest_fields.repetition_key(entry(PDF_definition.DocstringEntryKind.EXCEPTION, field_name="raises")) is None
+    assert rest_fields.repetition_key(entry(PDF_definition.DocstringEntryKind.ATTRIBUTE, field_name="ivar", names=("value",))) is None
+
+
+def test_named_repetition_keys_describe_pdf412_rest_entries() -> None:
+    assert rest_fields.named_repetition_keys(entry(PDF_definition.DocstringEntryKind.PARAMETER, field_name="param", names=("*value",))) == (
+        rest_fields.NamedRepetitionKey(("rest-parameter", "value"), "value", "reST parameter"),
+    )
+    assert rest_fields.named_repetition_keys(entry(PDF_definition.DocstringEntryKind.PARAMETER, field_name="type", field_argument="*value")) == (
+        rest_fields.NamedRepetitionKey(("rest-parameter-type", "value"), "value", "reST parameter type"),
+    )
+    assert rest_fields.named_repetition_keys(entry(PDF_definition.DocstringEntryKind.ATTRIBUTE, field_name="ivar", names=("value",))) == (
+        rest_fields.NamedRepetitionKey(("rest-attribute", "value"), "value", "reST attribute"),
+    )
+    assert rest_fields.named_repetition_keys(entry(PDF_definition.DocstringEntryKind.ATTRIBUTE, field_name="vartype", field_argument="value")) == (
+        rest_fields.NamedRepetitionKey(("rest-attribute-type", "value"), "value", "reST attribute type"),
+    )
+    assert rest_fields.named_repetition_keys(entry(PDF_definition.DocstringEntryKind.EXCEPTION, field_name="raises", names=("ValueError",))) == (
+        rest_fields.NamedRepetitionKey(("rest-exception", "ValueError"), "ValueError", "reST exception"),
+    )
+    assert rest_fields.named_repetition_keys(entry(PDF_definition.DocstringEntryKind.RETURN, field_name="returns")) == ()
 
 
 def test_field_name_span_stops_at_rest_field_delimiters() -> None:

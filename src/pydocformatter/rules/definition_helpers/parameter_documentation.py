@@ -132,7 +132,7 @@ def _signature_parameter(
     return SignatureParameter(
         name=parameter.name.value,
         display_name=_display_name(parameter, parameters),
-        comparison_name=_comparison_name(parameter.name.value),
+        comparison_name=parameter_comparison_name(parameter.name.value),
         line_numbers=_parameter_line_numbers(parameter, context=context, fallback_line=fallback_line),
         implicit_receiver=parameter.name.value == implicit_receiver_name,
         unpacked=unpack_annotation.unpacked,
@@ -157,8 +157,20 @@ def documented_parameters(docstring: PDF_definition.DocstringInfo) -> tuple[Docu
         line_numbers = PDF_definition.docstring_line_numbers(docstring, line)
         for name in entry.names:
             if name:
-                parameters.append(DocumentedParameter(name=name, comparison_name=_comparison_name(name), line_numbers=line_numbers))
+                parameters.append(DocumentedParameter(name=name, comparison_name=parameter_comparison_name(name), line_numbers=line_numbers))
     return tuple(parameters)
+
+
+def parameter_comparison_name(name: str) -> str:
+    """Return a docstring-comparison name without vararg marker stars.
+
+    Args:
+        name (str): Parameter name parsed from a signature or docstring entry.
+
+    Returns:
+        str: Name used to compare regular and variadic parameter spellings.
+    """
+    return name.lstrip("*")
 
 
 def should_check_missing_parameters(definition: PDF_definition.DefinitionInfo, docstring: PDF_definition.DocstringInfo, *, context: RuleContext) -> bool:
@@ -285,11 +297,6 @@ def _expression_name(expression: cst.BaseExpression) -> str | None:
     if isinstance(expression, cst.Name):
         return expression.value
     return None
-
-
-def _comparison_name(name: str) -> str:
-    """Return a docstring-comparison name without vararg marker stars."""
-    return name.lstrip("*")
 
 
 def _display_name(parameter: cst.Param, parameters: cst.Parameters) -> str:

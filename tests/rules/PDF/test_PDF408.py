@@ -254,13 +254,9 @@ def test_reports_repeated_rest_fields() -> None:
 
     assert result.new_source == source
     assert not result.fixed_findings
-    assert tuple(finding.rule for finding in result.unfixed_findings) == (PDF408RepeatedSection.meta, PDF408RepeatedSection.meta, PDF408RepeatedSection.meta)
-    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((6,), (8,), (11,))
-    assert tuple(finding.message for finding in result.unfixed_findings) == (
-        "Docstring field ':parameter value:' repeats earlier field ':param value:'",
-        "Docstring field ':return:' repeats earlier field ':returns:'",
-        "Docstring field ':exception ValueError:' repeats earlier field ':raises ValueError:'",
-    )
+    assert tuple(finding.rule for finding in result.unfixed_findings) == (PDF408RepeatedSection.meta,)
+    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((8,),)
+    assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring field ':return:' repeats earlier field ':returns:'",)
 
 
 def test_rest_type_fields_repeat_independently_from_value_fields() -> None:
@@ -269,12 +265,20 @@ def test_rest_type_fields_repeat_independently_from_value_fields() -> None:
 
     assert result.new_source == source
     assert not result.fixed_findings
-    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((6,), (9,), (12,))
+    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((9,), (12,))
     assert tuple(finding.message for finding in result.unfixed_findings) == (
-        "Docstring field ':type value:' repeats earlier field ':type value:'",
         "Docstring field ':rtype:' repeats earlier field ':rtype:'",
         "Docstring field ':ytype:' repeats earlier field ':ytype:'",
     )
+
+
+def test_rest_named_attribute_repeats_are_not_reported_by_pdf408() -> None:
+    source = 'class Example:\n    """Summary.\n\n    :ivar value: First value.\n    :vartype value: int\n    :var value: Second value.\n    :vartype value: str\n    """\n'
+    result = format_source(source, settings=CheckSettings(select=("PDF408",), docstring_convention=DocstringConvention.REST))
+
+    assert result.new_source == source
+    assert not result.fixed_findings
+    assert not result.unfixed_findings
 
 
 def test_unknown_rest_fields_repeat_only_with_same_field_name_and_argument() -> None:

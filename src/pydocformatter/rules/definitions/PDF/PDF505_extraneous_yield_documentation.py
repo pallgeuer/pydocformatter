@@ -25,7 +25,7 @@ class PDF505ExtraneousYieldDocumentation(RuleBase):
     meta = RuleMetadata(
         code=RuleCode("PDF505"),
         name="extraneous-yield-documentation",
-        message="Docstring has a yield section for a function that does not yield a meaningful value",
+        message="Docstring has yield documentation for a function that does not yield a meaningful value",
         fix_availability=FixAvailability.NEVER,
         stable_since="1.0.0",
         setting_effects=(

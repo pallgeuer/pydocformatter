@@ -5,9 +5,11 @@ Fix is not available.
 Rule is ignored if `docstring-convention` is `none` or `pep257`.
 
 ## What it does
-PDF408 reports recognized Google and NumPy sections, plus reST fields under the reST convention, that repeat within one docstring under the active convention. The first occurrence is allowed, and each later matching item is reported.
+PDF408 reports recognized Google and NumPy sections, plus non-named reST fields under the reST convention, that repeat within one docstring under the active convention. The first occurrence is allowed, and each later matching item is reported.
 
 Known spelling variants for the same section are treated as repeats, such as Google `Args` and `Arguments`, Google `Example` and `Examples`, Google `Return` and `Returns`, Google `Warning` and `Warnings`, or NumPy `Other Parameters` and `Other Params`. Matching is case-insensitive. Google `Warns` documents emitted warnings and is distinct from the `Warning`/`Warnings` admonition sections.
+
+Named reST parameter, attribute, exception, and named type field repetition is handled by PDF412 instead.
 
 The rule only considers syntax that is recognized by the active convention. Google-style recognition is used only when `docstring-convention = "google"`, NumPy-style recognition is used only when `docstring-convention = "numpy"`, and reST fields are recognized only when `docstring-convention = "rest"`. For example, a repeated NumPy-only `Parameters` section is ignored under the Google convention, and a Google-style `Parameters:` line is ignored under the NumPy convention.
 
@@ -270,7 +272,7 @@ def value(arg):
 PDF408: Line 9: Docstring section 'Other Params' repeats earlier section 'Other Parameters'
 ```
 
-PDF408 also reports repeated reST fields under the reST convention:
+PDF408 also reports repeated non-named reST fields under the reST convention:
 
 ```pydocfmt-example
 [settings]
@@ -287,6 +289,46 @@ def value(arg):
 [output=unchanged]
 [findings]
 PDF408: Line 5: Docstring field ':return:' repeats earlier field ':returns:'
+```
+
+Non-named type fields and unknown fields repeat within their own field family:
+
+```pydocfmt-example
+[settings]
+docstring-convention = "rest"
+
+[input]
+def value(arg):
+    """Return the value.
+
+    :rtype: int
+    :rtype: str
+    :meta private: yes
+    :meta public: yes
+    :meta private: still private
+    """
+
+[output=unchanged]
+[findings]
+PDF408: Line 5: Docstring field ':rtype:' repeats earlier field ':rtype:'
+PDF408: Line 8: Docstring field ':meta private:' repeats earlier field ':meta private:'
+```
+
+Repeated named reST entries are handled by PDF412 instead:
+
+```pydocfmt-example
+[settings]
+docstring-convention = "rest"
+
+[input]
+def value(arg):
+    """Return the value.
+
+    :param arg: The value.
+    :parameter arg: More detail.
+    """
+
+[output=unchanged]
 ```
 
 Convention recognition matters. A Google-style colon section is not counted as a NumPy section:

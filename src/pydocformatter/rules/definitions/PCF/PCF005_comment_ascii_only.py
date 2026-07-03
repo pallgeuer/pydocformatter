@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pydocformatter.rules.definition_helpers.source_text as source_text
 import pydocformatter.rules.definitions.PCF.PCF as PCF_definition
 import pydocformatter.rules.registration as rule_registration
 import pydocformatter.rules.violations as rule_violations
@@ -21,7 +22,7 @@ class PCF005CommentAsciiOnly(RuleBase):
     meta = RuleMetadata(
         code=RuleCode("PCF005"),
         name="comment-ascii-only",
-        message="Comment should contain only ASCII characters",
+        message="Comment contains non-ASCII characters",
         fix_availability=FixAvailability.NEVER,
         stable_since="1.0.0",
         setting_effects=(),
@@ -40,4 +41,12 @@ class PCF005CommentAsciiOnly(RuleBase):
             tuple[rule_violations.RuleViolation, ...]: Rule violations reported for the current source.
         """
         data = PCF_definition.PCF.require_data(context)
-        return tuple(rule_violations.diagnostic(cls.meta, (comment.range.start.line,)) for comment in data.comments if not comment.text.isascii())
+        return tuple(
+            rule_violations.diagnostic(
+                cls.meta,
+                (comment.range.start.line,),
+                instance_message=f"Comment contains non-ASCII character {source_text.first_non_ascii_code_point(comment.text)}",
+            )
+            for comment in data.comments
+            if not comment.text.isascii()
+        )

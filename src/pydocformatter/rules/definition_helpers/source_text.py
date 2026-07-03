@@ -77,6 +77,18 @@ def source_for_range(code_range: cst_metadata.CodeRange, *, source_lines: Sequen
     return "".join(lines)
 
 
+def first_non_ascii_code_point(text: str) -> str:
+    """Return the code point label for the first non-ASCII character in text.
+
+    Args:
+        text (str): Text known to contain at least one non-ASCII character.
+
+    Returns:
+        str: Uppercase `U+...` code point label for the first non-ASCII character.
+    """
+    return next(f"U+{ord(char):04X}" for char in text if not char.isascii())
+
+
 def _python_line_ending_length(line: str) -> int:
     """Return the length of a trailing Python physical line ending."""
     if line.endswith("\r\n"):

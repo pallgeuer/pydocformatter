@@ -25,7 +25,7 @@ class PDF503ExtraneousReturnDocumentation(RuleBase):
     meta = RuleMetadata(
         code=RuleCode("PDF503"),
         name="extraneous-return-documentation",
-        message="Docstring has a return section for a function that does not return",
+        message="Docstring has return documentation for a function that does not return",
         fix_availability=FixAvailability.NEVER,
         stable_since="1.0.0",
         setting_effects=(
@@ -60,6 +60,6 @@ class PDF503ExtraneousReturnDocumentation(RuleBase):
             for entry in value_documentation.value_documentation_targets(docstring, PDF_definition.DocstringEntryKind.RETURN):
                 if facts.explicit_none_returns and not facts.any_yields and entry.has_content:
                     continue
-                message = "Docstring has a return section for a generator; generator return values are stop values, not ordinary returns" if facts.any_yields else None
+                message = "Docstring has return documentation for a generator; generator return values are stop values, not ordinary returns" if facts.any_yields else None
                 violations.append(rule_violations.diagnostic(cls.meta, entry.line_numbers, instance_message=message))
         return tuple(violations)

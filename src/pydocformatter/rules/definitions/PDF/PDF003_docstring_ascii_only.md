@@ -81,7 +81,7 @@ def function():
 
 [output=unchanged]
 [findings]
-PDF003: Line 2: Docstring source should contain only ASCII characters
+PDF003: Line 2: Docstring source contains non-ASCII character U+00E9
 ```
 
 Docstrings with backslash spellings that PDF002 can act on are reported but not fixed by PDF003:
@@ -93,7 +93,7 @@ def function():
 
 [output=unchanged]
 [findings]
-PDF003: Line 2: Docstring source should contain only ASCII characters
+PDF003: Line 2: Docstring source contains non-ASCII character U+00E9
 ```
 
 Docstrings with value-changing backslashes are also non-fixable because escaping the non-ASCII source while preserving the existing escape spelling could change the evaluated text:
@@ -105,7 +105,7 @@ def function():
 
 [output=unchanged]
 [findings]
-PDF003: Line 2: Docstring source should contain only ASCII characters
+PDF003: Line 2: Docstring source contains non-ASCII character U+00E9
 ```
 
 When fixable and non-fixable docstrings appear together, PDF003 fixes only the value-preserving cases and leaves findings for the rest:
@@ -126,7 +126,7 @@ def unsafe():
     """Return café\nNext."""
 
 [findings]
-PDF003: Line 5: Docstring source should contain only ASCII characters
+PDF003: Line 5: Docstring source contains non-ASCII character U+00E9
 ```
 
 Only docstrings are checked. Non-ASCII source in ordinary strings, f-strings, and later string expressions is unchanged:

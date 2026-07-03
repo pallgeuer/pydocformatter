@@ -9,7 +9,10 @@ Attributes:
 
 from __future__ import annotations
 
+import dataclasses
+
 import pydocformatter.rules.definition_helpers.docstring_sections as docstring_sections
+import pydocformatter.rules.definition_helpers.parameter_documentation as parameter_documentation
 import pydocformatter.rules.definition_helpers.section_edits as section_edits
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 import pydocformatter.rules.edits as rule_edits
@@ -29,6 +32,21 @@ TERM_FIELD_NAMES = {
     "kwarg": "param",
     "parameter": "param",
 }
+
+
+@dataclasses.dataclass(frozen=True)
+class NamedRepetitionKey:
+    """Comparable and user-facing identity for one named reStructuredText entry.
+
+    Attributes:
+        comparison (tuple[str, str]): Semantic identity used to detect repeated entries.
+        label (str): Entry name shown in the diagnostic message.
+        message_kind (str): User-facing semantic entry kind shown in the diagnostic message.
+    """
+
+    comparison: tuple[str, str]
+    label: str
+    message_kind: str
 
 
 def label(entry: PDF_definition.DocstringEntry) -> str:
@@ -84,18 +102,13 @@ def repetition_key(entry: PDF_definition.DocstringEntry) -> tuple[str, str, str]
         entry (PDF_definition.DocstringEntry): Parsed field entry to compare for duplicate detection.
 
     Returns:
-        tuple[str, str, str] | None: Semantic field identity, or None when required field arguments are absent.
+        tuple[str, str, str] | None: Semantic field identity, or None when the field lacks a comparable argument or is a
+            named field handled by PDF412.
     """
     field_name = entry.field_name or ""
     argument = entry.field_argument or ""
-    if entry.kind is PDF_definition.DocstringEntryKind.PARAMETER and field_name in docstring_sections.REST_PARAMETER_VALUE_FIELDS:
-        if not entry.names:
-            return None
-        return ("parameter", ",".join(entry.names), "")
-    if entry.kind is PDF_definition.DocstringEntryKind.PARAMETER and field_name in docstring_sections.REST_PARAMETER_TYPE_FIELDS:
-        if not argument:
-            return None
-        return ("parameter-type", argument, "")
+    if entry.kind is PDF_definition.DocstringEntryKind.PARAMETER and field_name in docstring_sections.REST_PARAMETER_VALUE_FIELDS | docstring_sections.REST_PARAMETER_TYPE_FIELDS:
+        return None
     if entry.kind is PDF_definition.DocstringEntryKind.RETURN and field_name in docstring_sections.REST_RETURN_VALUE_FIELDS:
         return ("return", "", "")
     if entry.kind is PDF_definition.DocstringEntryKind.RETURN and field_name in docstring_sections.REST_RETURN_TYPE_FIELDS:
@@ -105,10 +118,47 @@ def repetition_key(entry: PDF_definition.DocstringEntry) -> tuple[str, str, str]
     if entry.kind is PDF_definition.DocstringEntryKind.YIELD and field_name in docstring_sections.REST_YIELD_TYPE_FIELDS:
         return ("yield-type", "", "")
     if entry.kind is PDF_definition.DocstringEntryKind.EXCEPTION and field_name in docstring_sections.REST_EXCEPTION_FIELDS:
-        if not entry.names:
-            return None
-        return ("exception", ",".join(entry.names), "")
+        return None
+    if entry.kind is PDF_definition.DocstringEntryKind.ATTRIBUTE and field_name in docstring_sections.REST_ATTRIBUTE_VALUE_FIELDS | docstring_sections.REST_ATTRIBUTE_TYPE_FIELDS:
+        return None
     return ("field", field_name, argument)
+
+
+def named_repetition_keys(entry: PDF_definition.DocstringEntry) -> tuple[NamedRepetitionKey, ...]:
+    """Return PDF412 duplicate keys for named reStructuredText entry fields.
+
+    Args:
+        entry (PDF_definition.DocstringEntry): Parsed reStructuredText field entry to compare for repeated named
+            documentation.
+
+    Returns:
+        tuple[NamedRepetitionKey, ...]: Comparable identities and diagnostic labels for named fields owned by PDF412.
+    """
+    field_name = entry.field_name or ""
+    argument = entry.field_argument or ""
+    if entry.kind is PDF_definition.DocstringEntryKind.PARAMETER and field_name in docstring_sections.REST_PARAMETER_VALUE_FIELDS:
+        return tuple(
+            NamedRepetitionKey(("rest-parameter", parameter_documentation.parameter_comparison_name(name)), parameter_documentation.parameter_comparison_name(name), "reST parameter")
+            for name in entry.names
+            if name
+        )
+    if entry.kind is PDF_definition.DocstringEntryKind.PARAMETER and field_name in docstring_sections.REST_PARAMETER_TYPE_FIELDS:
+        return (
+            (
+                NamedRepetitionKey(
+                    ("rest-parameter-type", parameter_documentation.parameter_comparison_name(argument)), parameter_documentation.parameter_comparison_name(argument), "reST parameter type"
+                ),
+            )
+            if argument
+            else ()
+        )
+    if entry.kind is PDF_definition.DocstringEntryKind.ATTRIBUTE and field_name in docstring_sections.REST_ATTRIBUTE_VALUE_FIELDS:
+        return tuple(NamedRepetitionKey(("rest-attribute", name), name, "reST attribute") for name in entry.names if name)
+    if entry.kind is PDF_definition.DocstringEntryKind.ATTRIBUTE and field_name in docstring_sections.REST_ATTRIBUTE_TYPE_FIELDS:
+        return (NamedRepetitionKey(("rest-attribute-type", argument), argument, "reST attribute type"),) if argument else ()
+    if entry.kind is PDF_definition.DocstringEntryKind.EXCEPTION and field_name in docstring_sections.REST_EXCEPTION_FIELDS:
+        return tuple(NamedRepetitionKey(("rest-exception", name), name, "reST exception") for name in entry.names if name)
+    return ()
 
 
 def original_field_name(line: PDF_definition.DocstringValueLine) -> str | None:

@@ -28,6 +28,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added `PDF409` to normalize spacing in parsed Google, NumPy, and reST convention entries and fields.
   - Added `PDF410` to normalize parsed Google, NumPy, and reST exception and warning entry names to no backticks and comma-separated exception lists.
   - Added `PDF411` to normalize internal spacing in parsed convention type-like tokens using conservative AST validation.
+  - Added `PDF412` to report repeated parsed Google, NumPy, and named reST docstring entries within one docstring.
   - Added `PDF508` through `PDF511` to validate missing and extraneous class and module attribute documentation against an explicit attribute inventory.
   - Added `PDF512` and `PDF513` to report attached class and module attribute docstrings that duplicate owner docstring attribute documentation.
   - Added tuple-unpacked module, class, and `__init__` instance attribute inventory support for `PDF508` through `PDF511`.

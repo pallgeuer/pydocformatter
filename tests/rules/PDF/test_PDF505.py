@@ -70,7 +70,7 @@ def test_reports_empty_yield_section_and_rest_field() -> None:
 
     assert_pdf505_lines('def section():\n    """Do work.\n\n    Yields:\n    """\n', ((4,),))
     assert_pdf505_lines(source, ((11,),), settings=CheckSettings(select=("PDF505",), docstring_convention=DocstringConvention.REST))
-    assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring has a yield section for a function that does not yield a meaningful value",)
+    assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring has yield documentation for a function that does not yield a meaningful value",)
 
 
 def test_reports_rest_ytype_field_but_allows_it_for_explicit_none_yield() -> None:

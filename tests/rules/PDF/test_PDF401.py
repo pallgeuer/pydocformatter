@@ -139,4 +139,4 @@ def test_reports_unsafe_rest_field_pluralization_without_fixing() -> None:
     assert result.new_source == source
     assert not result.fixed_findings
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((2, 3),)
-    assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring reStructuredText field name 'returns' should use preferred spelling 'return'",)
+    assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring reST field name 'returns' should use preferred spelling 'return'",)

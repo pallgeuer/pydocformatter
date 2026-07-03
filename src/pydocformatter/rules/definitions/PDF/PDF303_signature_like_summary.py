@@ -52,11 +52,7 @@ class PDF303SignatureLikeSummary(RuleBase):
             if not summary_style.is_function_docstring(target.docstring):
                 continue
             if _contains_signature(target.line.text, target.docstring.owner.name):
-                violations.append(
-                    rule_violations.diagnostic(
-                        cls.meta, summary_style.line_numbers(target), instance_message=f"Docstring summary should not include signature for function '{target.docstring.owner.name}'"
-                    )
-                )
+                violations.append(rule_violations.diagnostic(cls.meta, summary_style.line_numbers(target), instance_message="Docstring summary should not include a function signature"))
         return tuple(violations)
 
 

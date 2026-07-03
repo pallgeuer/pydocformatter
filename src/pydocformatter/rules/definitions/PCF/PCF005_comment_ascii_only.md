@@ -27,8 +27,8 @@ value = 1  # naïve
 
 [output=unchanged]
 [findings]
-PCF005: Line 1: Comment should contain only ASCII characters
-PCF005: Line 2: Comment should contain only ASCII characters
+PCF005: Line 1: Comment contains non-ASCII character U+00E9
+PCF005: Line 2: Comment contains non-ASCII character U+00EF
 ```
 
 All comment forms are checked, including tool directives and type comments:
@@ -43,9 +43,9 @@ value = 1  # type: inté
 
 [output=unchanged]
 [findings]
-PCF005: Line 3: Comment should contain only ASCII characters
-PCF005: Line 4: Comment should contain only ASCII characters
-PCF005: Line 5: Comment should contain only ASCII characters
+PCF005: Line 3: Comment contains non-ASCII character U+00E9
+PCF005: Line 4: Comment contains non-ASCII character U+00E9
+PCF005: Line 5: Comment contains non-ASCII character U+00E9
 ```
 
 Non-ASCII characters outside comments are ignored, and comments that use ASCII-only escape spellings are unchanged:

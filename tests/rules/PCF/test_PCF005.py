@@ -18,6 +18,11 @@ def test_reports_non_ascii_comments_without_fixing() -> None:
     assert result.new_source == source
     assert result.fixed_findings == {}
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((1,), (2,), (3,))
+    assert tuple(finding.message for finding in result.unfixed_findings) == (
+        "Comment contains non-ASCII character U+00E9",
+        "Comment contains non-ASCII character U+00EF",
+        "Comment contains non-ASCII character U+00E9",
+    )
     assert all(not finding.fixable for finding in result.unfixed_findings)
 
 
@@ -37,6 +42,7 @@ def test_ignores_non_ascii_outside_comments_and_ascii_escape_spellings() -> None
     assert result.new_source == source
     assert result.fixed_findings == {}
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((3,),)
+    assert tuple(finding.message for finding in result.unfixed_findings) == ("Comment contains non-ASCII character U+00E9",)
     assert all(not finding.fixable for finding in result.unfixed_findings)
 
 

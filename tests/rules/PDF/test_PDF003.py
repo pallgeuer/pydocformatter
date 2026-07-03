@@ -52,6 +52,7 @@ def test_fixes_multiline_crlf_docstring_and_reports_all_physical_lines() -> None
     assert result.new_source == 'def function():\r\n    """Return caf\\xe9.\r\n    Snowman \\u2603."""\r\n'
     assert result.fixed_findings[PDF003DocstringAsciiOnly.meta] == 1
     assert tuple(finding.line_numbers for finding in check_only.unfixed_findings) == ((2, 3),)
+    assert tuple(finding.message for finding in check_only.unfixed_findings) == ("Docstring source contains non-ASCII character U+00E9",)
     assert [finding.fixable for finding in check_only.unfixed_findings] == [True]
     assert not format_pdf003(result.new_source, settings=settings).modified
 
@@ -74,6 +75,7 @@ def test_reports_concatenated_docstring_as_non_fixable() -> None:
     assert result.new_source == source
     assert result.fixed_findings == {}
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((2,),)
+    assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring source contains non-ASCII character U+00E9",)
     assert [finding.fixable for finding in result.unfixed_findings] == [False]
 
 
@@ -85,6 +87,7 @@ def test_reports_raw_docstring_with_backslash_as_non_fixable() -> None:
     assert result.new_source == source
     assert result.fixed_findings == {}
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((2,),)
+    assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring source contains non-ASCII character U+00E9",)
     assert [finding.fixable for finding in result.unfixed_findings] == [False]
 
 
@@ -96,6 +99,7 @@ def test_reports_docstring_with_value_changing_backslash_as_non_fixable() -> Non
     assert result.new_source == source
     assert result.fixed_findings == {}
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((2,),)
+    assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring source contains non-ASCII character U+00E9",)
     assert [finding.fixable for finding in result.unfixed_findings] == [False]
 
 
@@ -107,6 +111,7 @@ def test_keeps_mixed_fixable_and_nonfixable_docstrings_in_one_run() -> None:
     assert result.new_source == 'def fixed():\n    """Return caf\\xe9."""\n\n\ndef unsafe():\n    """Return caf\xe9\\nNext."""\n'
     assert result.fixed_findings[PDF003DocstringAsciiOnly.meta] == 1
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((6,),)
+    assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring source contains non-ASCII character U+00E9",)
     assert [finding.fixable for finding in result.unfixed_findings] == [False]
 
 
@@ -130,6 +135,7 @@ def test_does_not_block_pdf002_raw_prefix_fix_for_literal_backslash_docstring() 
     assert result.fixed_findings[PDF002DocstringBackslashRawPrefix.meta] == 1
     assert result.fixed_findings.get(PDF003DocstringAsciiOnly.meta, 0) == 0
     assert tuple(finding.rule for finding in result.unfixed_findings) == (PDF003DocstringAsciiOnly.meta,)
+    assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring source contains non-ASCII character U+00E9",)
     assert [finding.fixable for finding in result.unfixed_findings] == [False]
 
 

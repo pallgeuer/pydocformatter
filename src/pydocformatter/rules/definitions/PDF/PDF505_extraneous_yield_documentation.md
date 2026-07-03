@@ -35,7 +35,7 @@ def value():
 
 [output=unchanged]
 [findings]
-PDF505: Line 4: Docstring has a yield section for a function that does not yield a meaningful value
+PDF505: Line 4: Docstring has yield documentation for a function that does not yield a meaningful value
 ```
 
 Functions with only bare yields do not have yielded values to document. Empty yield sections are still stale documentation and are reported even when the function also explicitly yields `None`:
@@ -55,7 +55,7 @@ def values():
 
 [output=unchanged]
 [findings]
-PDF505: Line 4: Docstring has a yield section for a function that does not yield a meaningful value
+PDF505: Line 4: Docstring has yield documentation for a function that does not yield a meaningful value
 ```
 
 A yield inside a lambda belongs to the lambda body, not to the enclosing function:
@@ -75,7 +75,7 @@ def callback():
 
 [output=unchanged]
 [findings]
-PDF505: Line 4: Docstring has a yield section for a function that does not yield a meaningful value
+PDF505: Line 4: Docstring has yield documentation for a function that does not yield a meaningful value
 ```
 
 When a function has a meaningful yield or `yield from`, yield documentation is allowed:

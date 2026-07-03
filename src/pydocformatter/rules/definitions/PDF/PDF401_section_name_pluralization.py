@@ -75,4 +75,4 @@ def _section_message(name: str, replacement: str) -> str:
 
 def _field_message(name: str, replacement: str) -> str:
     """Return the diagnostic message for a reST field spelling replacement."""
-    return f"Docstring reStructuredText field name '{name}' should use preferred spelling '{replacement}'"
+    return f"Docstring reST field name '{name}' should use preferred spelling '{replacement}'"

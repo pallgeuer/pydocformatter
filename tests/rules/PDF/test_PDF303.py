@@ -54,7 +54,7 @@ def test_reports_function_signature_summaries(summary: str) -> None:
 
     assert result.new_source == source
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((2,),)
-    assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring summary should not include signature for function 'function'",)
+    assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring summary should not include a function signature",)
     assert not result.unfixed_findings[0].fixable
 
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import libcst as cst
 
+import pydocformatter.rules.definition_helpers.source_text as source_text
 import pydocformatter.rules.definition_helpers.string_literals as string_literals
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 import pydocformatter.rules.definitions.PDF.PDF002_docstring_backslash_raw_prefix as PDF002
@@ -26,7 +27,7 @@ class PDF003DocstringAsciiOnly(RuleBase):
     meta = RuleMetadata(
         code=RuleCode("PDF003"),
         name="docstring-ascii-only",
-        message="Docstring source should contain only ASCII characters",
+        message="Docstring source contains non-ASCII characters",
         fix_availability=FixAvailability.USUALLY,
         stable_since="1.0.0",
         setting_effects=(),
@@ -56,7 +57,12 @@ def _candidate_docstrings(context: RuleContext) -> tuple[PDF_definition.Docstrin
 def _violation_for_docstring(docstring: PDF_definition.DocstringInfo, *, context: RuleContext) -> rule_violations.RuleViolation | None:
     """Return a fixable or non-fixable violation for one non-ASCII docstring."""
     planned_change = _planned_change_for_docstring(docstring, context=context)
-    return rule_violations.violation_for_optional_planned_source_change(PDF003DocstringAsciiOnly.meta, planned_change, line_numbers=_line_numbers(docstring))
+    return rule_violations.violation_for_optional_planned_source_change(
+        PDF003DocstringAsciiOnly.meta,
+        planned_change,
+        line_numbers=_line_numbers(docstring),
+        instance_message=f"Docstring source contains non-ASCII character {source_text.first_non_ascii_code_point(docstring.source)}",
+    )
 
 
 def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo, *, context: RuleContext) -> rule_edits.PlannedSourceChange | None:
