@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import dataclasses
 import fnmatch
+import os
 
 
 @dataclasses.dataclass(frozen=True)
@@ -131,6 +132,72 @@ class GlobPatternSet:
             )
             for pattern in self.patterns
         )
+
+
+@dataclasses.dataclass(frozen=True)
+class BaseRelativeGlobMatcher:
+    """A glob matcher evaluated against paths relative to one base directory.
+
+    Attributes:
+        base_path (str): Directory relative to which filesystem paths are normalized before matching.
+        matcher (GlobPatternSet): Compiled POSIX-style glob matcher used for normalized relative paths.
+    """
+
+    base_path: str
+    matcher: GlobPatternSet
+
+    @classmethod
+    def compile(
+        cls,
+        patterns: tuple[str, ...],
+        *,
+        base_path: str,
+        match_parent_segments_for_bare: bool,
+        match_descendants_for_slash: bool = False,
+    ) -> BaseRelativeGlobMatcher:
+        """Compile a base-relative glob matcher.
+
+        Args:
+            patterns (tuple[str, ...]): Raw POSIX-style glob patterns to compile.
+            base_path (str): Directory relative to which matched filesystem paths are normalized.
+            match_parent_segments_for_bare (bool): Whether slashless patterns can match parent directory segments.
+            match_descendants_for_slash (bool): Whether slash-containing patterns also match descendant paths.
+
+        Returns:
+            BaseRelativeGlobMatcher: Compiled matcher that normalizes filesystem paths against `base_path`.
+        """
+        return cls(
+            base_path=base_path,
+            matcher=GlobPatternSet.compile(
+                patterns,
+                match_parent_segments_for_bare=match_parent_segments_for_bare,
+                match_descendants_for_slash=match_descendants_for_slash,
+            ),
+        )
+
+    def matches(self, path: str) -> bool:
+        """Return whether `path` matches after base-relative POSIX normalization.
+
+        Args:
+            path (str): Filesystem path to normalize relative to this matcher's base path.
+
+        Returns:
+            bool: Whether the normalized relative path matches this matcher's glob patterns.
+        """
+        return self.matcher.matches(base_relative_posix_path(path, self.base_path))
+
+
+def base_relative_posix_path(path: str, base_path: str) -> str:
+    """Return a base-relative path using POSIX separators.
+
+    Args:
+        path (str): Filesystem path to normalize.
+        base_path (str): Directory used as the relative path base.
+
+    Returns:
+        str: Relative path from `base_path` to `path` using `/` separators.
+    """
+    return os.path.relpath(os.path.abspath(path), os.path.abspath(base_path)).replace(os.sep, "/")
 
 
 def _match_segment_glob(

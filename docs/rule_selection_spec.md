@@ -216,6 +216,10 @@ Examples:
 
 `pydocfmt check --show-rules` prints the global active rules and does not apply per-file ignores.
 
+## Per-File Settings Boundary
+
+Per-file settings are specified in [Settings Specification](settings_spec.md). They are intentionally outside rule selection: they apply after global rule selection, do not re-run selector resolution, and cannot change which rules are active. `pydocfmt check --show-rules` therefore remains global/cwd-oriented and does not apply path-specific per-file setting overrides.
+
 ## CLI List Options
 
 Rule-selection CLI list options accept comma-separated selector values per option occurrence:

@@ -12,7 +12,7 @@ import pydocformatter.cli.global_args as global_args
 import pydocformatter.cli.settings_check as settings_check
 import pydocformatter.settings as settings_core
 import pydocformatter.utils.argparser as argparser
-from pydocformatter.settings import MultiStringMap, SettingDefinition, StringList
+from pydocformatter.settings import MultiStringMap, PerFileSettingsMap, SettingDefinition, StringList
 
 
 class ConfigOptionMetadata(TypedDict):
@@ -162,6 +162,8 @@ def value_type_name(value_type: object) -> str:
         return "list[str]"
     elif value_type == MultiStringMap:
         return "dict[str, list[str]]"
+    elif value_type == PerFileSettingsMap:
+        return "dict[str, dict[str, value]]"
     elif isinstance(value_type, type) and issubclass(value_type, enum.StrEnum):
         return " | ".join(json.dumps(member.value) for member in value_type)
     else:

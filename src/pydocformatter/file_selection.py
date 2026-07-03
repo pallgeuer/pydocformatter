@@ -17,7 +17,7 @@ from enum import Enum
 import pydocformatter.settings as settings_core
 import pydocformatter.utils.misc as misc
 from pydocformatter.cli.settings_check import CheckSettings
-from pydocformatter.utils.globs import GlobPatternSet
+from pydocformatter.utils.globs import BaseRelativeGlobMatcher
 
 STDIN_VIRTUAL_FILE = "-"
 
@@ -67,15 +67,6 @@ class SelectedFile:
 
     path: str
     profile: settings_core.SettingsProfile[CheckSettings]
-
-    @property
-    def settings(self) -> CheckSettings:
-        """Return the resolved settings for this selected file.
-
-        Returns:
-            CheckSettings: Settings resolved from the profile that was selected for this path.
-        """
-        return self.profile.settings
 
 
 @dataclasses.dataclass(frozen=True)
@@ -151,22 +142,10 @@ class _Candidate:
 
 
 @dataclasses.dataclass(frozen=True)
-class _PatternGroup:
-    """Compiled patterns that share one base directory."""
-
-    base_path: str
-    matcher: GlobPatternSet
-
-    def matches(self, path: str) -> bool:
-        """Return whether this group matches a filesystem path."""
-        return self.matcher.matches(_base_relative_posix_path(path, self.base_path))
-
-
-@dataclasses.dataclass(frozen=True)
 class _PatternMatcher:
     """A matcher made from one or more source-base-specific pattern groups."""
 
-    groups: tuple[_PatternGroup, ...]
+    groups: tuple[BaseRelativeGlobMatcher, ...]
 
     @classmethod
     def compile(
@@ -178,19 +157,17 @@ class _PatternMatcher:
         match_descendants_for_slash: bool = False,
     ) -> "_PatternMatcher":
         """Compile path-pattern fields from a settings profile."""
-        groups: list[_PatternGroup] = []
+        groups: list[BaseRelativeGlobMatcher] = []
         for field in fields:
             patterns = getattr(profile.settings, field)
             if not patterns:
                 continue
             groups.append(
-                _PatternGroup(
+                BaseRelativeGlobMatcher.compile(
+                    patterns,
                     base_path=profile.base_for_field(field),
-                    matcher=GlobPatternSet.compile(
-                        patterns,
-                        match_parent_segments_for_bare=match_parent_segments_for_bare,
-                        match_descendants_for_slash=match_descendants_for_slash,
-                    ),
+                    match_parent_segments_for_bare=match_parent_segments_for_bare,
+                    match_descendants_for_slash=match_descendants_for_slash,
                 )
             )
         return cls(tuple(groups))
@@ -393,12 +370,13 @@ def _force_excluded_explicit_directory(path: str, profile: settings_core.Setting
     """Return whether force-exclude rejects an explicit directory path."""
     if not profile.settings.force_exclude:
         return False
-    matcher = GlobPatternSet.compile(
+    matcher = BaseRelativeGlobMatcher.compile(
         profile.settings.exclude_patterns,
+        base_path=os.getcwd(),
         match_parent_segments_for_bare=True,
         match_descendants_for_slash=True,
     )
-    return matcher.matches(_base_relative_posix_path(path, os.getcwd()))
+    return matcher.matches(path)
 
 
 def _excluded_directory_decision(path: str, *, explicit: bool, profile: settings_core.SettingsProfile[CheckSettings]) -> FileDecision:
@@ -573,11 +551,6 @@ def _display_path_score(path: str) -> tuple[int, int, int, str]:
         len(normalized_path),
         normalized_path,
     )
-
-
-def _base_relative_posix_path(path: str, base_path: str) -> str:
-    """Return a base-relative path using POSIX separators."""
-    return os.path.relpath(os.path.abspath(path), os.path.abspath(base_path)).replace(os.sep, "/")
 
 
 def _accepted_paths_by_git_root(decisions: tuple[FileDecision, ...]) -> dict[str, list[str]]:

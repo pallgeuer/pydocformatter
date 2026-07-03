@@ -13,7 +13,7 @@ from pydocformatter.cli.settings_check import DEFAULT_REQUIRE_EXPLICIT, CheckSet
 from pydocformatter.rules.codes import ALL_RULE_SELECTOR_TAG, RuleCode, RuleSelector
 from pydocformatter.rules.collection import RuleCollection
 from pydocformatter.rules.models import FixAvailability, RuleMetadata, RuleSettingEffect
-from pydocformatter.utils.globs import GlobPatternSet
+from pydocformatter.utils.globs import BaseRelativeGlobMatcher
 
 
 @dataclasses.dataclass(frozen=True)
@@ -61,7 +61,7 @@ class PerFileRuleIgnore:
         rule_specificities (tuple[tuple[RuleCode, int], ...]): Ignored rules paired with the selector specificity that
             selected them.
         negated (bool): Whether the pattern is a negated per-file-ignore entry.
-        matcher (GlobPatternSet): Compiled matcher reused for per-path checks.
+        matcher (BaseRelativeGlobMatcher): Compiled matcher reused for per-path checks.
     """
 
     pattern: str
@@ -69,14 +69,18 @@ class PerFileRuleIgnore:
     rule_codes: frozenset[RuleCode]
     rule_specificities: tuple[tuple[RuleCode, int], ...]
     negated: bool = dataclasses.field(init=False)
-    matcher: GlobPatternSet = dataclasses.field(init=False, compare=False, repr=False)
+    matcher: BaseRelativeGlobMatcher = dataclasses.field(init=False, compare=False, repr=False)
 
     def __post_init__(self) -> None:
         """Compile the ignore matcher once for repeated per-path checks."""
         negated = self.pattern.startswith("!")
         object.__setattr__(self, "negated", negated)
         pattern = self.pattern[1:] if negated else self.pattern
-        object.__setattr__(self, "matcher", GlobPatternSet.compile((pattern,), match_parent_segments_for_bare=False))
+        object.__setattr__(
+            self,
+            "matcher",
+            BaseRelativeGlobMatcher.compile((pattern,), base_path=self.base_path, match_parent_segments_for_bare=False),
+        )
 
     def matches(self, path: str) -> bool:
         """Return whether this per-file ignore entry matches a normalized path.
@@ -87,7 +91,7 @@ class PerFileRuleIgnore:
         Returns:
             bool: Whether the path is covered by the ignore entry after applying negation.
         """
-        matched = self.matcher.matches(_base_relative_posix_path(path, self.base_path))
+        matched = self.matcher.matches(path)
         return not matched if self.negated else matched
 
 
@@ -459,8 +463,3 @@ def _parse_selector(selector: str, *, context: str, errors: list[str]) -> RuleSe
         return None
 
     return RuleSelector(selector)
-
-
-def _base_relative_posix_path(path: str, base_path: str) -> str:
-    """Return a base-relative path using POSIX separators."""
-    return os.path.relpath(os.path.abspath(path), os.path.abspath(base_path)).replace(os.sep, "/")

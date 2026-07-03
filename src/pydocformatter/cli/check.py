@@ -60,9 +60,18 @@ class CheckRunContext:
 
 @dataclasses.dataclass(frozen=True)
 class _SelectedFileFormatRequest:
-    """Resolved inputs for formatting one disk-backed selected file."""
+    """Resolved inputs for formatting one disk-backed selected file.
+
+    Attributes:
+        selected_file (file_selection.SelectedFile): Accepted file path and base settings profile from file selection.
+        settings (CheckSettings): Effective formatter settings after matching per-file settings are applied.
+        rule_selection (RuleSelection): Rule selection resolved from the base settings profile.
+        fix (bool): Whether selected fixes should be applied before returning the result.
+        write (bool): Whether fixed disk-backed files should be written in place.
+    """
 
     selected_file: file_selection.SelectedFile
+    settings: CheckSettings
     rule_selection: RuleSelection
     fix: bool
     write: bool
@@ -293,7 +302,7 @@ def check_files(*, args: argparse.Namespace, settings_context: CheckRunContext) 
         if profile_key in seen_rule_profiles:
             continue
         seen_rule_profiles.add(profile_key)
-        selected_rules = rules_selection.select_rules(selected_file.settings, profile=selected_file.profile)
+        selected_rules = rules_selection.select_rules(selected_file.profile.settings, profile=selected_file.profile)
         rule_selections[profile_key] = selected_rules
         errors.extend(selected_rules.errors)
 
@@ -402,7 +411,7 @@ def _format_selected_file_worker(
     selected_file = request.selected_file
     return formatter.format_file(
         selected_file.path,
-        settings=selected_file.settings,
+        settings=request.settings,
         rule_selection=request.rule_selection,
         fix=request.fix,
         write=request.write,
@@ -424,7 +433,7 @@ def format_selected_files(
     Args:
         selected_files (tuple[file_selection.SelectedFile, ...]): Accepted files in diagnostic output order.
         rule_selections (dict[settings_core.SettingsProfile.Key[CheckSettings], RuleSelection]): Rule selections keyed
-            by the settings profile for each selected file.
+            by the base settings profile for each selected file.
         use_stdin (bool): Whether the single selected file should read source from standard input.
         fix (bool): Whether selected fixes should be applied before returning results.
         write (bool): Whether fixed disk-backed files should be written in place.
@@ -443,12 +452,13 @@ def format_selected_files(
         if len(selected_files) > 1:
             raise AssertionError(f"Expect at most one selected file when using stdin: {selected_files}")
         selected_file = selected_files[0]
+        effective_profile = settings_check.effective_profile_for_path(selected_file.profile, selected_file.path)
         rule_selection = rule_selections[selected_file.profile.key()]
         return [
             formatter.format_file(
                 selected_file.path,
                 file=sys.stdin,
-                settings=selected_file.settings,
+                settings=effective_profile.settings,
                 rule_selection=rule_selection,
                 fix=fix,
                 write=write,
@@ -459,6 +469,7 @@ def format_selected_files(
     requests = tuple(
         _SelectedFileFormatRequest(
             selected_file=selected_file,
+            settings=settings_check.effective_profile_for_path(selected_file.profile, selected_file.path).settings,
             rule_selection=rule_selections[selected_file.profile.key()],
             fix=fix,
             write=write,

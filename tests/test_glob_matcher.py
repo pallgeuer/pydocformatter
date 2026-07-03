@@ -1,8 +1,9 @@
+import tempfile
 import unittest
 
 import pydocformatter.file_selection as file_selection
 from pydocformatter.file_selection import FileSelectionError
-from pydocformatter.utils.globs import GlobPatternSet
+from pydocformatter.utils.globs import BaseRelativeGlobMatcher, GlobPatternSet
 
 
 class TestGlobMatcher(unittest.TestCase):
@@ -61,6 +62,13 @@ class TestGlobMatcher(unittest.TestCase):
         self.assertTrue(matcher.matches("src/test_a.py"))
         self.assertTrue(matcher.matches("src/pkg/test_a.py"))
         self.assertFalse(matcher.matches("pkg/test_a.py"))
+
+    def test_base_relative_matcher_normalizes_filesystem_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            matcher = BaseRelativeGlobMatcher.compile(("src/*.py",), base_path=td, match_parent_segments_for_bare=False)
+
+            self.assertTrue(matcher.matches(f"{td}/src/module.py"))
+            self.assertFalse(matcher.matches(f"{td}/pkg/module.py"))
 
     def test_empty_include_patterns_are_rejected(self) -> None:
         with self.assertRaises(FileSelectionError):

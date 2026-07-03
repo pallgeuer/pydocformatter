@@ -16,6 +16,8 @@ import pytest
 
 import pydocformatter.cli.check as check_command
 import pydocformatter.cli.main as pydocfmt_cli
+import pydocformatter.cli.settings_check as settings_check
+import pydocformatter.file_selection as file_selection
 import pydocformatter.formatter as formatter
 import pydocformatter.rules.codes as rule_codes
 import pydocformatter.rules.collection as rule_collection
@@ -27,6 +29,7 @@ import pydocformatter.rules.registration as rule_registration
 import pydocformatter.rules.runner as rule_runner
 import pydocformatter.rules.violations as rule_violations
 import pydocformatter.rules_selection as rules_selection
+from pydocformatter.cli.global_args import GlobalArgs
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention, DocstringMissingDocumentation, LineEnding
 from pydocformatter.formatter import FormatterResult
 from pydocformatter.rules.codes import RuleCode
@@ -1794,6 +1797,47 @@ class TestFormatterResults(unittest.TestCase):
 
         self.assertEqual(called_paths, ["a.py", str(target)])
         self.assertEqual([result.path for result in results], ["a.py", str(target)])
+
+    def test_check_formatter_applies_per_file_settings_without_reselecting_rules(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            target = root / "tests" / "test_example.py"
+            target.parent.mkdir()
+            target.write_text("x = 1\n", encoding="utf-8")
+            settings = CheckSettings(
+                line_length=88,
+                select=("PDF101",),
+                per_file_settings=(("tests/*.py", (("line-length", 100),)),),
+            )
+            previous_cwd = os.getcwd()
+            os.chdir(root)
+            try:
+                profile = settings_check.SETTINGS_SCHEMA.load_profile(
+                    global_values=GlobalArgs(isolated=True),
+                    field_overrides=dataclasses.asdict(settings),
+                )
+            finally:
+                os.chdir(previous_cwd)
+            selected_file = file_selection.SelectedFile(path=str(target), profile=profile)
+            rule_selection = rules_selection.select_rules(profile.settings, profile=profile)
+            calls: list[tuple[int, rules_selection.RuleSelection]] = []
+
+            def fake_format_file(path: str, *, file: object = None, settings: CheckSettings, rule_selection: rules_selection.RuleSelection, fix: bool, write: bool) -> FormatterResult:
+                del path, file, fix, write
+                calls.append((settings.line_length, rule_selection))
+                return FormatterResult(path=str(target), old_source="", new_source="", modified=False, fixed_findings=collections.Counter(), unfixed_findings=(), errors=())
+
+            with unittest.mock.patch("pydocformatter.formatter.format_file", side_effect=fake_format_file):
+                check_command.format_selected_files(
+                    (selected_file,),
+                    rule_selections={profile.key(): rule_selection},
+                    use_stdin=False,
+                    fix=False,
+                    write=False,
+                    parallelism=1,
+                )
+
+        self.assertEqual(calls, [(100, rule_selection)])
 
     @pytest.mark.isolated_cwd
     def test_check_exit_status_depends_on_remaining_findings_not_modified_results(self) -> None:

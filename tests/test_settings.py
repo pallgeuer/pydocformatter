@@ -297,22 +297,23 @@ class TestSettings(unittest.TestCase):
         )
 
     def test_setting_definitions_are_iterable_by_group(self) -> None:
+        run_fields = tuple(definition.field for definition in pydocformatter_settings.SETTINGS_SCHEMA.definitions if definition.group == SettingsGroup.RUN)
         formatting_fields = tuple(definition.field for definition in pydocformatter_settings.SETTINGS_SCHEMA.definitions if definition.group == SettingsGroup.FORMATTING)
         docstring_formatting_fields = tuple(definition.field for definition in pydocformatter_settings.SETTINGS_SCHEMA.definitions if definition.group == SettingsGroup.DOCSTRING_FORMATTING)
         comment_formatting_fields = tuple(definition.field for definition in pydocformatter_settings.SETTINGS_SCHEMA.definitions if definition.group == SettingsGroup.COMMENT_FORMATTING)
         rule_selection_fields = tuple(definition.field for definition in pydocformatter_settings.SETTINGS_SCHEMA.definitions if definition.group == SettingsGroup.RULE_SELECTION)
         file_selection_fields = tuple(definition.field for definition in pydocformatter_settings.SETTINGS_SCHEMA.definitions if definition.group == SettingsGroup.FILE_SELECTION)
+        configuration_fields = tuple(definition.field for definition in pydocformatter_settings.SETTINGS_SCHEMA.definitions if definition.group == SettingsGroup.CONFIGURATION)
 
+        self.assertEqual(run_fields, ("output_format", "parallelism"))
         self.assertEqual(
             formatting_fields,
             (
-                "output_format",
                 "line_length",
                 "url_aware_wrapping",
                 "line_ending",
                 "indent_style",
                 "indent_width",
-                "parallelism",
             ),
         )
         self.assertEqual(
@@ -378,6 +379,7 @@ class TestSettings(unittest.TestCase):
                 "force_exclude",
             ),
         )
+        self.assertEqual(configuration_fields, ("per_file_settings",))
 
     def test_settings_schema_add_arguments_adds_groups_in_order(self) -> None:
         parser = argparse.ArgumentParser()
@@ -385,11 +387,13 @@ class TestSettings(unittest.TestCase):
         pydocformatter_settings.SETTINGS_SCHEMA.add_arguments(parser, CheckSettings())
 
         group_titles = tuple(group.title for group in parser._action_groups)
+        self.assertLess(group_titles.index(SettingsGroup.RUN.value), group_titles.index(SettingsGroup.FORMATTING.value))
         self.assertLess(group_titles.index(SettingsGroup.FORMATTING.value), group_titles.index(SettingsGroup.COMMENT_FORMATTING.value))
         self.assertLess(group_titles.index(SettingsGroup.FORMATTING.value), group_titles.index(SettingsGroup.DOCSTRING_FORMATTING.value))
         self.assertLess(group_titles.index(SettingsGroup.DOCSTRING_FORMATTING.value), group_titles.index(SettingsGroup.COMMENT_FORMATTING.value))
         self.assertLess(group_titles.index(SettingsGroup.COMMENT_FORMATTING.value), group_titles.index(SettingsGroup.RULE_SELECTION.value))
         self.assertLess(group_titles.index(SettingsGroup.RULE_SELECTION.value), group_titles.index(SettingsGroup.FILE_SELECTION.value))
+        self.assertLess(group_titles.index(SettingsGroup.FILE_SELECTION.value), group_titles.index(SettingsGroup.CONFIGURATION.value))
         option_strings = {option for action in parser._actions for option in action.option_strings}
         schema_option_strings = {
             flag for definition in pydocformatter_settings.SETTINGS_SCHEMA.definitions if definition.available_in_cli for flag in typing.cast(SettingCLIDefinition, definition.cli).flags
@@ -473,11 +477,13 @@ class TestSettings(unittest.TestCase):
         self.assertEqual(overrides, {"line_length": 103})
         self.assertNotIn("line_ending", overrides)
 
-    def test_readme_configuration_options_document_all_settings(self) -> None:
+    def test_readme_configuration_links_to_detailed_specs(self) -> None:
         readme = (Path(__file__).resolve().parent.parent / "README.md").read_text(encoding="utf-8")
 
-        for definition in pydocformatter_settings.SETTINGS_SCHEMA.definitions:
-            self.assertIn(f"- `{definition.key}`:", readme)
+        self.assertIn("pydocfmt config", readme)
+        self.assertIn("docs/settings_spec.md", readme)
+        self.assertIn("docs/file_selection_spec.md", readme)
+        self.assertIn("docs/rule_selection_spec.md", readme)
 
     def test_load_settings_defaults_in_isolated_mode(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -525,6 +531,7 @@ class TestSettings(unittest.TestCase):
         self.assertEqual(config.unfixable, ())
         self.assertEqual(config.per_file_ignores, ())
         self.assertEqual(config.extend_per_file_ignores, ())
+        self.assertEqual(config.per_file_settings, ())
 
     def test_load_profile_tracks_field_source_priorities(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -823,6 +830,148 @@ class TestSettings(unittest.TestCase):
 
         self.assertEqual(config.per_file_ignores, (("tests/*.py", ("PCF001",)),))
         self.assertEqual(config.extend_per_file_ignores, (("generated/*.py", ("PCF002",)),))
+
+    def test_per_file_settings_are_loaded(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "pyproject.toml").write_text(
+                "[tool.pydocfmt.per-file-settings]\n"
+                '"tests/*.py" = { docstring = { missing-documentation = "has-section" }, comment = { detect-code = true } }\n'
+                '"generated/*.py" = { line-length = 100 }\n',
+                encoding="utf-8",
+            )
+            previous_cwd = os.getcwd()
+            os.chdir(root)
+            try:
+                config = pydocformatter_settings.SETTINGS_SCHEMA.load()
+            finally:
+                os.chdir(previous_cwd)
+
+        self.assertEqual(
+            config.per_file_settings,
+            (
+                (
+                    "tests/*.py",
+                    (
+                        ("docstring-missing-documentation", pydocformatter_settings.DocstringMissingDocumentation.HAS_SECTION),
+                        ("comment-detect-code", True),
+                    ),
+                ),
+                ("generated/*.py", (("line-length", 100),)),
+            ),
+        )
+
+    def test_per_file_settings_reject_disallowed_settings(self) -> None:
+        cases = (
+            ("rule selection", 'per-file-settings = {"tests/*.py" = { select = ["PDF101"] }}', "select"),
+            ("file selection", 'per-file-settings = {"tests/*.py" = { include = ["*.py"] }}', "include"),
+            ("run setting", 'per-file-settings = {"tests/*.py" = { parallelism = 1 }}', "parallelism"),
+            ("rule setting effect", 'per-file-settings = {"tests/*.py" = { docstring-convention = "google" }}', "docstring-convention"),
+        )
+        for name, config, key in cases:
+            with self.subTest(name=name):
+                with self.assertRaisesRegex(SettingsError, rf"{key} cannot be configured in per-file-settings"):
+                    pydocformatter_settings.SETTINGS_SCHEMA.load(
+                        global_values=pydocformatter_global_args.GlobalArgs(
+                            config_options=(config,),
+                            isolated=True,
+                        )
+                    )
+
+    def test_per_file_settings_reject_invalid_tables(self) -> None:
+        cases = (
+            ('per-file-settings = {"tests/*.py" = {}}', "must not be empty"),
+            ('per-file-settings = {"" = { line-length = 100 }}', "keys must not be empty"),
+            ('per-file-settings = {"tests/*.py" = { unknown = true }}', "unknown"),
+            (
+                'per-file-settings = {"tests/*.py" = { docstring-missing-documentation = "has-section", docstring = { missing-documentation = "all-docstrings" } }}',
+                "sets docstring-missing-documentation more than once",
+            ),
+        )
+        for config, message in cases:
+            with self.subTest(config=config):
+                with self.assertRaisesRegex(SettingsError, message):
+                    pydocformatter_settings.SETTINGS_SCHEMA.load(
+                        global_values=pydocformatter_global_args.GlobalArgs(
+                            config_options=(config,),
+                            isolated=True,
+                        )
+                    )
+
+    def test_effective_profile_applies_matching_per_file_settings(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            settings = CheckSettings(
+                docstring_missing_documentation=pydocformatter_settings.DocstringMissingDocumentation.ALL_DOCSTRINGS,
+                per_file_settings=(
+                    (
+                        "tests/*.py",
+                        (
+                            ("docstring-missing-documentation", pydocformatter_settings.DocstringMissingDocumentation.HAS_SECTION),
+                            ("line-length", 100),
+                        ),
+                    ),
+                ),
+            )
+            previous_cwd = os.getcwd()
+            os.chdir(root)
+            try:
+                profile = pydocformatter_settings.SETTINGS_SCHEMA.load_profile(
+                    global_values=pydocformatter_global_args.GlobalArgs(isolated=True),
+                    field_overrides=dataclasses.asdict(settings),
+                )
+                matching = pydocformatter_settings.effective_profile_for_path(profile, str(root / "tests" / "test_example.py"))
+                nonmatching = pydocformatter_settings.effective_profile_for_path(profile, str(root / "src" / "example.py"))
+            finally:
+                os.chdir(previous_cwd)
+
+        self.assertEqual(matching.settings.docstring_missing_documentation, pydocformatter_settings.DocstringMissingDocumentation.HAS_SECTION)
+        self.assertEqual(matching.settings.line_length, 100)
+        self.assertEqual(nonmatching.settings.docstring_missing_documentation, pydocformatter_settings.DocstringMissingDocumentation.ALL_DOCSTRINGS)
+        self.assertEqual(nonmatching.settings.line_length, 88)
+
+    def test_effective_profile_supports_negated_per_file_settings(self) -> None:
+        settings = CheckSettings(per_file_settings=(("!src/*.py", (("line-length", 100),)),))
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            previous_cwd = os.getcwd()
+            os.chdir(root)
+            try:
+                profile = pydocformatter_settings.SETTINGS_SCHEMA.load_profile(
+                    global_values=pydocformatter_global_args.GlobalArgs(isolated=True),
+                    field_overrides=dataclasses.asdict(settings),
+                )
+                included = pydocformatter_settings.effective_profile_for_path(profile, str(root / "src" / "example.py"))
+                excluded = pydocformatter_settings.effective_profile_for_path(profile, str(root / "tests" / "example.py"))
+            finally:
+                os.chdir(previous_cwd)
+
+        self.assertEqual(included.settings.line_length, 88)
+        self.assertEqual(excluded.settings.line_length, 100)
+
+    def test_command_line_setting_has_priority_over_config_per_file_setting(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            target = root / "tests" / "test_example.py"
+            target.parent.mkdir()
+            target.write_text("", encoding="utf-8")
+            (root / "pyproject.toml").write_text(
+                "[tool.pydocfmt.per-file-settings]\n" '"tests/*.py" = { docstring-missing-documentation = "has-section" }\n',
+                encoding="utf-8",
+            )
+            previous_cwd = os.getcwd()
+            os.chdir(root)
+            try:
+                profile = pydocformatter_settings.SETTINGS_SCHEMA.load_profile(
+                    args=argparse.Namespace(docstring_missing_documentation="all-docstrings"),
+                    path=str(target),
+                )
+                effective = pydocformatter_settings.effective_profile_for_path(profile, str(target))
+            finally:
+                os.chdir(previous_cwd)
+
+        self.assertEqual(profile.settings.docstring_missing_documentation, pydocformatter_settings.DocstringMissingDocumentation.ALL_DOCSTRINGS)
+        self.assertEqual(effective.settings.docstring_missing_documentation, pydocformatter_settings.DocstringMissingDocumentation.ALL_DOCSTRINGS)
 
     def test_cli_rule_overrides_are_applied(self) -> None:
         config = pydocformatter_settings.SETTINGS_SCHEMA.load(

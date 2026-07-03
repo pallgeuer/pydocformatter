@@ -99,7 +99,9 @@ docstring-missing-documentation = "all-docstrings"
 comment-detect-code = true
 comment-detect-expressions = true
 extend-select = ["PCF005", "PDF003", "PDF300", "PDF302", "PDF305", "PDF510"]
-extend-per-file-ignores = {"tests/**/test_*.py" = ["PDF500", "PDF502", "PDF504", "PDF506", "PDF508", "PDF510"]}
+
+[tool.pydocfmt.per-file-settings]
+"tests/**/test_*.py" = { docstring-missing-documentation = "has-section" }
 
 [tool.mypy]
 files = ["src/pydocformatter", "tests", "tools"]

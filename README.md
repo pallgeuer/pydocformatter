@@ -84,14 +84,16 @@ If no files or directories are specified, `pydocfmt check` checks the current di
 - `--show-files`: Show file-selection decisions without formatting files
 - `-o`, `--output-file FILE`: Write diagnostics and show output to a file instead of stdout
 
-**Formatting:**
+**Run:**
 - `--output-format {grouped}`: Output format for rule findings (default: grouped)
+- `--parallelism JOBS`: File-level parallelism, as a worker count, CPU ratio, or `0` for all logical CPUs subject to platform process-pool limits (default: 0.0)
+
+**Formatting:**
 - `--line-length LENGTH`: Maximum line length for docstrings and comments (default: 88)
 - `--url-aware-wrapping`, `--no-url-aware-wrapping`: Toggle URL-aware wrapping balance without splitting URLs (default: enabled)
 - `--line-ending {auto,lf,cr-lf,native}`: Line ending to use when rewriting files (default: auto)
 - `--indent-style {space,tab}`: Indentation style for generated docstring sections (default: space)
 - `--indent-width WIDTH`: Generated docstring indentation width and comment tab width (default: 4)
-- `--parallelism JOBS`: File-level parallelism, as a worker count, CPU ratio, or `0` for all logical CPUs subject to platform process-pool limits (default: 0.0)
 
 **Docstring formatting:**
 - `--docstring-convention {none,pep257,google,numpy,rest}`: Convention used to parse semantic docstring sections (default: pep257)
@@ -215,7 +217,7 @@ pydocfmt check --fix --force-exclude generated.py src/
 
 ## Configuration
 
-pydocformatter can be configured via `pyproject.toml` (example):
+pydocformatter can be configured via `pyproject.toml` (exhaustive example):
 
 ```toml
 [tool.pydocfmt]
@@ -273,75 +275,14 @@ trailing-extraction-content-aware = true
 detect-code = false
 detect-statements = true
 detect-expressions = false
+
+[tool.pydocfmt.per-file-settings]
+"tests/**/*.py" = { docstring-missing-documentation = "has-section" }
 ```
 
-For TOML configuration, `[tool.pydocfmt.docstring]` and `[tool.pydocfmt.comment]` are the intended way to specify docstring and comment settings. The flat hyphenated forms, such as `docstring-convention = "google"` and `comment-preserve-tables = false`, also work for compatibility, but do not specify both forms for the same setting in one configuration. CLI flags, `pydocfmt config`, and resolved settings output continue to use the flat hyphenated names.
+For TOML configuration, `[tool.pydocfmt.docstring]` and `[tool.pydocfmt.comment]` are the intended way to specify docstring and comment settings. Flat hyphenated forms such as `docstring-convention = "google"` also work for compatibility, but do not specify both forms for the same setting in one configuration.
 
-**Configuration Options:**
-- `output-format`: Output format for rule findings; currently only `"grouped"` is supported (default: `"grouped"`)
-- `line-length`: Maximum line length for docstrings and comments (default: 88)
-- `url-aware-wrapping`: Balance comment and docstring wrapping around URL tokens without splitting URLs (default: `true`)
-- `line-ending`: Line ending to use when rewriting files; one of `"auto"`, `"lf"`, `"cr-lf"`, or `"native"` (default: `"auto"`)
-- `indent-style`: Generated docstring section indentation style; one of `"space"` or `"tab"` (default: `"space"`)
-- `indent-width`: Generated docstring section indentation width and tab expansion width used when measuring comments (default: 4)
-- `parallelism`: File-level parallelism; use `0` for all logical CPUs subject to platform process-pool limits, a whole number greater than or equal to 1 for an exact worker count, or a fractional value greater than 0 and less than 1 for that ratio of logical CPU cores. Small file sets may be slower with parallelism due to process startup overhead (default: 0.0)
-- `docstring-convention`: Docstring convention; one of `"none"`, `"pep257"`, `"google"`, `"numpy"`, or `"rest"` (default: `"pep257"`)
-- `docstring-blank-line-style`: Blank docstring line whitespace style used by PDF103; one of `"blank"` or `"aligned"` (default: `"blank"`)
-- `docstring-blank-line-after-last-section`: Whether PDF200 and PDF201 keep one blank line after the last recognized Google or NumPy docstring section (default: `false`)
-- `docstring-missing-documentation`: When missing-documentation rules report missing documentation; one of `"has-section"`, `"non-summary-docstrings"`, or `"all-docstrings"` (default: `"has-section"`)
-- `docstring-missing-documentation-public-only`: Whether broad missing-documentation checks only apply to public API definitions; explicit relevant documentation is always checked for consistency (default: `true`)
-- `docstring-require-init-attribute-documentation`: Whether class missing-attribute documentation checks require supported `self.*` attributes assigned in `__init__` (default: `false`)
-- `docstring-parse-list-items`: Parse docstring list items as distinct structures (default: `true`)
-- `docstring-parse-headings`: Parse Markdown and reStructuredText docstring headings (default: `true`)
-- `docstring-parse-doctests`: Parse and protect doctest regions in docstrings (default: `true`)
-- `docstring-parse-code-fences`: Parse and protect fenced code blocks in docstrings (default: `true`)
-- `docstring-parse-block-quotes`: Parse Markdown block quotes in docstrings (default: `true`)
-- `docstring-parse-tables`: Parse and protect Markdown and reStructuredText tables in docstrings (default: `true`)
-- `docstring-parse-directives`: Parse reStructuredText directives and their bodies in docstrings (default: `true`)
-- `docstring-parse-literal-blocks`: Parse and protect reStructuredText literal blocks in docstrings (default: `true`)
-- `comment-join-standalone-lines`: Join consecutive standalone prose comment lines before wrapping (default: `false`)
-- `comment-format-list-items`: Detect ordered and unordered standalone comment list items and reflow them with hanging indentation (default: `true`)
-- `comment-format-task-markers`: Detect task markers such as `TODO:` and `FIXME:` and reflow them with hanging indentation (default: `true`)
-- `comment-preserve-headings`: Preserve detected Markdown and reStructuredText comment headings unchanged (default: `true`)
-- `comment-preserve-doctests`: Preserve standalone doctest comment regions from the first `>>>` prompt to the physical-run boundary (default: `true`)
-- `comment-preserve-code-fences`: Preserve backtick- and tilde-fenced standalone comment regions (default: `true`)
-- `comment-format-block-quotes`: Detect and reflow Markdown block quotes while retaining quote prefixes (default: `true`)
-- `comment-preserve-tables`: Preserve structurally detected Markdown pipe tables and reStructuredText grid/simple tables (default: `true`)
-- `comment-preserve-directives`: Preserve reStructuredText directives and their more-indented option/content lines (default: `true`)
-- `comment-trailing-extraction-syntax-aware`: Keep overlong trailing comments inline in decorators, compound statement headers, arguments, and parenthesized or continuation contexts (default: `true`)
-- `comment-trailing-extraction-content-aware`: Keep overlong trailing comments inline when enabled standalone comment structure/code detectors or the content-aware operator heuristic make extraction unsafe (default: `true`)
-- `comment-detect-code`: Protect whole standalone runs matching the disabled-code indentation or leading-keyword heuristic (default: `false`)
-- `comment-detect-statements`: Protect whole standalone runs containing parseable Python non-expression statements (default: `true`)
-- `comment-detect-expressions`: Protect whole standalone runs containing parseable nontrivial Python expressions (default: `false`)
-- `select`: Rule selectors to enable (default: `["ALL"]`)
-- `ignore`: Rule selectors to ignore
-- `extend-select`: Additional rule selectors to enable
-- `require-explicit`: Rule selectors that broad selectors do not enable unless an exact rule-code selector also participates (default: `["PCF005", "PDF003"]`)
-- `per-file-ignores`: File-pattern-specific ignored rule selectors
-- `extend-per-file-ignores`: Additional file-pattern-specific ignored rule selectors
-- `fixable`: Rule selectors eligible for automatic fixes (default: `["ALL"]`)
-- `unfixable`: Rule selectors ineligible for automatic fixes
-- `extend-fixable`: Additional rule selectors eligible for automatic fixes
-- `include`: Glob patterns for files to include
-- `extend-include`: Additional include glob patterns
-- `exclude`: Glob patterns for files/directories to exclude
-- `extend-exclude`: Additional exclude glob patterns
-- `respect-gitignore`: Respect `.gitignore` during file discovery (default: `true`)
-- `force-exclude`: Apply exclude rules to explicitly listed files (default: `false`)
-
-When `respect-gitignore` is enabled, pydocfmt aborts if gitignore filtering cannot be checked, because continuing without that filter could format files that should stay ignored.
-
-When `url-aware-wrapping` is enabled, pydocfmt may choose less greedy line breaks around URL tokens in comment and docstring prose, but URLs and other long words are still not split.
-
-The `comment-*` settings affect the rule-based formatter. PCF001 defaults to formatting each standalone physical line independently; joining and structured-markup interpretation are opt-in. PCF004 keeps syntax-sensitive and unsafe-content overlong trailing comments inline by default. See `pydocfmt rule PCF001`, `pydocfmt rule PCF002`, `pydocfmt rule PCF003`, and `pydocfmt rule PCF004` for exact detector precedence, spacing, extraction, and protected-comment behavior.
-
-The `docstring-convention` setting never auto-detects a convention. Google sections, NumPy sections, and reST fields are only parsed when their matching convention is selected; `none` and `pep257` leave those convention syntaxes as ordinary content. The default `pep257` convention applies PEP 257/pydocstyle-compatible broad-rule carve-outs, while `none` is the stricter no-convention profile for generic rules that can act without convention parsing. Compared with `pep257`, `none` broadly enables PDF106, PDF301, and PDF305. The resolved convention can also ignore incompatible PDF rules selected through broad selectors; selecting an exact rule code restores an ignored rule, but disabled rules stay off even when selected exactly. The `docstring-parse-*` settings control generic semantic structures independently, and PCF rules are not affected by docstring conventions.
-
-Settings are resolved per path as defaults, then the closest containing `pyproject.toml` with `[tool.pydocfmt]`, then explicit `--config` files, then inline `--config` setting overrides, then dedicated command-line options. Parent config files are not merged into child config files. The highest-precedence specified value wins for each key, including `extend-include` and `extend-exclude`.
-
-`--config PATH` accepts either a pyproject-style file containing `[tool.pydocfmt]` or a dedicated config file with pydocfmt settings at top level. `--isolated` ignores auto-discovered configuration files; it can be combined with inline `--config` setting overrides but not with `--config PATH`.
-
-For the full file-selection contract, see [File Selection Specification](docs/file_selection_spec.md).
+Use `pydocfmt config` to list supported settings and their accepted values. For the full configuration contract, see [Settings Specification](docs/settings_spec.md). File discovery is specified in [File Selection Specification](docs/file_selection_spec.md), and rule selectors, per-file ignores, and fixability are specified in [Rule Selection Specification](docs/rule_selection_spec.md).
 
 ---
 

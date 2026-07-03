@@ -75,6 +75,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added `comment-trailing-extraction-syntax-aware`, enabled by default, to keep overlong trailing comments inline in syntax-sensitive positions.
   - Added `comment-trailing-extraction-content-aware`, enabled by default, to keep overlong trailing comments inline when enabled standalone comment structure/code detectors or the operator heuristic make extraction unsafe.
   - Added `comment-format-task-markers`, enabled by default, to reflow recognized task-marker comments such as `TODO:`, `FIXME:`, and `HACK:` with hanging indentation.
+  - Added TOML-only `per-file-settings` for file-pattern-specific formatter behavior overrides that do not affect file selection or rule selection.
   - Added Ruff-style rule settings under `[tool.pydocfmt]`: `select`, `ignore`, `extend-select`, `per-file-ignores`, `extend-per-file-ignores`, `fixable`, `unfixable`, and `extend-fixable`.
   - Added `respect-gitignore` for formatter configuration, defaulting to `true`.
   - Added explicit config-file support for `--config PATH`, including pyproject-style `[tool.pydocfmt]` files and dedicated top-level pydocfmt TOML files.
@@ -83,6 +84,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 
 - **Documentation:**
   - Added a test-performance audit plan for finding coverage-preserving speedups across the complete test set, fixtures, helpers, and testing approaches.
+  - Added a settings specification at `docs/settings_spec.md`, covering configuration loading, path-pattern bases, per-file settings, and setting behavior notes formerly duplicated in the README and narrower specs.
   - Added a file-selection specification at `docs/file_selection_spec.md`, including exact defaults, precedence rules, force-exclude behavior, config-relative glob bases, and explicit pydocformatter deviations.
   - Added a rule-selection specification at `docs/rule_selection_spec.md`, covering rule collection, selectors, fixability, and rule explanation output.
   - Added adjacent Markdown documentation for all built-in pydocformatter rules, including Ruff compatibility notes where relevant.
@@ -104,7 +106,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Completed Google-style docstrings for public source APIs and added concise docstrings for private helpers that previously lacked them.
 
 - **Developer workflow:**
-  - Ignored missing documentation rules `PDF500`, `PDF502`, `PDF504`, `PDF506`, `PDF508`, and `PDF510` for `tests/**/test_*.py` in the project pydocformatter configuration.
+  - Applied `docstring-missing-documentation = "has-section"` to `tests/**/test_*.py` in the project pydocformatter configuration instead of blanket-ignoring missing-documentation PDF5xx rules.
   - Enabled comment disabled-code and expression detection in the project pydocformatter configuration.
   - Added a pytest pre-commit hook that runs the test suite before commits.
   - Added a guarded shared pytest working directory for tests that do not request filesystem isolation, with explicit `isolated_cwd` opt-in for tests that need a writable temporary CWD.

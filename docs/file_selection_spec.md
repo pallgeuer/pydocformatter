@@ -4,10 +4,6 @@ This document specifies how `pydocfmt` selects files for processing.
 
 ## Defaults
 
-- `line-length = 88`
-- `line-ending = "auto"`
-- `indent-style = "space"`
-- `indent-width = 4`
 - `include = ["*.py", "*.pyi", "*.pyw"]`
 - `extend-include = []`
 - `exclude = [".bzr", ".direnv", ".eggs", ".git", ".git-rewrite", ".hg", ".mypy_cache", ".nox", ".pants.d", ".pytype", ".ruff_cache", ".svn", ".tox", ".venv", "__pypackages__", "_build", "buck-out", "dist", "node_modules", "venv"]`
@@ -17,27 +13,11 @@ This document specifies how `pydocfmt` selects files for processing.
 
 ## Configuration Layout
 
-Auto-discovered configuration is read from `[tool.pydocfmt]` in `pyproject.toml`. Explicit `--config PATH` can also load a pyproject-style file named `pyproject.toml` with `[tool.pydocfmt]`, or a dedicated TOML config file with pydocfmt settings at top level.
-
-Resolution order:
-
-For each path being checked, settings resolution order is:
-
-1. Start with hard-coded defaults.
-2. Apply the explicit `--config PATH` file, when present.
-3. Otherwise, apply the single closest containing `pyproject.toml` with `[tool.pydocfmt]`, unless `--isolated` is set.
-4. Apply inline `--config "<KEY> = <VALUE>"` settings.
-5. Apply dedicated command-line options.
-
-For every setting, including `extend-include` and `extend-exclude`, the highest-precedence specified value wins. The same list setting does not accumulate across configuration and command-line layers. After resolution, `extend-include` is appended to `include`, and `extend-exclude` is appended to `exclude`.
-
-`--config PATH` accepts either a pyproject-style file named `pyproject.toml` containing `[tool.pydocfmt]` or a dedicated config file with pydocfmt settings at top level. Supplying an explicit `--config PATH` file disables auto-discovered configuration for that settings resolution, and at most one explicit config file can be supplied. Inline `--config "<KEY> = <VALUE>"` overrides still layer over explicit config files or auto-discovered config. `--isolated` ignores auto-discovered configuration files. Inline `--config` settings can still be used with `--isolated`, but explicit config file paths cannot.
+General configuration loading, source priority, and path-pattern bases are specified in [Settings Specification](settings_spec.md). File selection consumes the resolved `include`, `extend-include`, `exclude`, `extend-exclude`, `respect-gitignore`, and `force-exclude` settings for each evaluated path.
 
 Auto-discovered configuration is hierarchical: the single closest config file applies to the file or directory being evaluated, and parent config files are not merged into child config files. During traversal, a parent directory exclude can still prune a child directory before that child directory's config is entered.
 
 `--show-settings` displays settings resolved for the current working directory. The `respect-gitignore` value used during a file-selection run is also resolved from the current working directory, not separately from each traversed path.
-
-`line-ending = "auto"` uses the first line ending detected in the source file, defaulting to LF when the file has no line endings. The setting controls rewritten files; files that do not require formatting are not rewritten solely to normalize line endings.
 
 ## File Selection Algorithm
 
@@ -120,10 +100,6 @@ The resulting command-line list still replaces lower-precedence values for the s
 
 pydocfmt intentionally uses Ruff-style file-selection settings where they map to pydocfmt behavior. The related settings are:
 
-- `line-length`
-- `line-ending`
-- `indent-style`
-- `indent-width`
 - `include`
 - `extend-include`
 - `exclude`

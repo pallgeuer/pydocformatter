@@ -18,11 +18,12 @@ Attributes:
 
 import dataclasses
 import enum
-from typing import TypedDict
+from typing import Any, TypedDict, cast
 
 import pydocformatter.settings as settings_core
 from pydocformatter.rules.codes import ALL_RULE_SELECTOR_TAG
-from pydocformatter.settings import MultiStringMap, SettingDefinition, SettingsSchema, StringList
+from pydocformatter.settings import MultiStringMap, PerFileSettingsMap, SettingDefinition, SettingsSchema, StringList
+from pydocformatter.utils.globs import BaseRelativeGlobMatcher
 
 DEFAULT_EXCLUDE = (
     ".bzr",
@@ -193,6 +194,7 @@ class CheckSettings:
         require_explicit (StringList): Rule selectors that require exact rule-code selection.
         per_file_ignores (MultiStringMap): File-pattern-specific ignored selectors.
         extend_per_file_ignores (MultiStringMap): Additional file-specific ignores.
+        per_file_settings (PerFileSettingsMap): File-pattern-specific formatter setting overrides.
         fixable (StringList): Rule selectors eligible for automatic fixes.
         unfixable (StringList): Rule selectors ineligible for automatic fixes.
         extend_fixable (StringList): Additional fixable rule selectors.
@@ -245,6 +247,7 @@ class CheckSettings:
     require_explicit: StringList = DEFAULT_REQUIRE_EXPLICIT
     per_file_ignores: MultiStringMap = ()
     extend_per_file_ignores: MultiStringMap = ()
+    per_file_settings: PerFileSettingsMap = ()
     fixable: StringList = DEFAULT_RULE_FIXABLE
     unfixable: StringList = ()
     extend_fixable: StringList = ()
@@ -329,6 +332,7 @@ class CheckSettingsOverrides(TypedDict, total=False):
         require_explicit (StringList): Rule selectors that require exact rule-code selection.
         per_file_ignores (MultiStringMap): File-pattern-specific ignored selectors.
         extend_per_file_ignores (MultiStringMap): Additional file-specific ignores.
+        per_file_settings (PerFileSettingsMap): File-pattern-specific formatter setting overrides.
         fixable (StringList): Rule selectors eligible for automatic fixes.
         unfixable (StringList): Rule selectors ineligible for automatic fixes.
         extend_fixable (StringList): Additional fixable rule selectors.
@@ -381,6 +385,7 @@ class CheckSettingsOverrides(TypedDict, total=False):
     require_explicit: StringList
     per_file_ignores: MultiStringMap
     extend_per_file_ignores: MultiStringMap
+    per_file_settings: PerFileSettingsMap
     fixable: StringList
     unfixable: StringList
     extend_fixable: StringList
@@ -396,18 +401,22 @@ class SettingsGroup(enum.StrEnum):
     """Check settings groups used for ordered CLI/help presentation.
 
     Attributes:
+        RUN: Whole-run settings for output and parallel execution.
         FORMATTING: Formatting behavior settings.
         DOCSTRING_FORMATTING: Docstring semantic parsing settings.
         COMMENT_FORMATTING: Comment formatting settings.
         RULE_SELECTION: Rule selection settings.
         FILE_SELECTION: File discovery and filtering settings.
+        CONFIGURATION: Settings that affect how other settings are resolved.
     """
 
+    RUN = "Run"
     FORMATTING = "Formatting"
     DOCSTRING_FORMATTING = "Docstring formatting"
     COMMENT_FORMATTING = "Comment formatting"
     RULE_SELECTION = "Rule selection"
     FILE_SELECTION = "File selection"
+    CONFIGURATION = "Configuration"
 
 
 def validate_parallelism(value: object, context: str) -> float:
@@ -429,6 +438,135 @@ def validate_parallelism(value: object, context: str) -> float:
     return parallelism
 
 
+def validate_per_file_settings(value: object, context: str) -> PerFileSettingsMap:
+    """Validate and return per-file formatter setting overrides.
+
+    Args:
+        value (object): Raw per-file settings table from TOML or normalized internal overrides.
+        context (str): User-facing setting label included in validation errors.
+
+    Returns:
+        PerFileSettingsMap: Ordered pattern-to-setting mapping with validated public setting keys and values.
+
+    Raises:
+        settings_core.SettingsError: If the mapping shape, pattern, setting key, setting value, or per-file eligibility
+            is invalid.
+    """
+    if isinstance(value, tuple):
+        items = value
+    elif isinstance(value, dict):
+        items = tuple(value.items())
+    else:
+        raise settings_core.SettingsError(f"{context} must be a table mapping strings to setting tables")
+
+    definitions_by_key = _definitions_by_key()
+    allowed_fields = _per_file_settings_allowed_fields()
+    entries: list[tuple[str, tuple[tuple[str, object], ...]]] = []
+    for pattern, raw_updates in items:
+        if not isinstance(pattern, str):
+            raise settings_core.SettingsError(f"{context} keys must be strings")
+        if not pattern:
+            raise settings_core.SettingsError(f"{context} keys must not be empty")
+        if isinstance(raw_updates, tuple):
+            raw_update_items: dict[str, object] = dict(raw_updates)
+        elif isinstance(raw_updates, dict):
+            raw_update_items = raw_updates
+        else:
+            raise settings_core.SettingsError(f"{context}.{pattern} must be a table mapping setting keys to values")
+        flattened_updates = settings_core._flatten_prefixed_toml_setting_tables(raw_update_items, prefixes=("docstring", "comment"), context=f"{context}.{pattern}")
+        if not flattened_updates:
+            raise settings_core.SettingsError(f"{context}.{pattern} must not be empty")
+        unknown_keys = [key for key in flattened_updates if key not in definitions_by_key]
+        if unknown_keys:
+            unknown_keys.sort()
+            raise settings_core.SettingsError(f"{context}.{pattern} contains unknown setting(s): {', '.join(unknown_keys)}")
+
+        updates: list[tuple[str, object]] = []
+        for key, raw_value in flattened_updates.items():
+            definition = definitions_by_key[key]
+            if definition.field not in allowed_fields:
+                raise settings_core.SettingsError(f"{context}.{pattern}.{key} cannot be configured in per-file-settings")
+            updates.append((key, definition.validator(raw_value, f"{context}.{pattern}.{key}")))
+        entries.append((pattern, tuple(updates)))
+    return tuple(entries)
+
+
+def effective_profile_for_path(profile: settings_core.SettingsProfile[CheckSettings], path: str) -> settings_core.SettingsProfile[CheckSettings]:
+    """Return a settings profile after applying matching per-file formatter settings.
+
+    Args:
+        profile (settings_core.SettingsProfile[CheckSettings]): Base settings profile resolved for file and rule
+            selection.
+        path (str): Display or filesystem path used to match per-file setting patterns.
+
+    Returns:
+        settings_core.SettingsProfile[CheckSettings]: Effective formatter settings profile for `path`, or the original
+            profile when no override applies.
+    """
+    if not profile.settings.per_file_settings:
+        return profile
+
+    definitions_by_key = _definitions_by_key()
+    per_file_settings_priority = profile.priority_for_field("per_file_settings")
+    per_file_settings_base = profile.base_for_field("per_file_settings")
+    updates: dict[str, object] = {}
+    for pattern, pattern_updates in profile.settings.per_file_settings:
+        if not _per_file_settings_pattern_matches(pattern, path, base_path=per_file_settings_base):
+            continue
+        for key, value in pattern_updates:
+            field = definitions_by_key[key].field
+            if per_file_settings_priority >= profile.priority_for_field(field):
+                updates[field] = value
+
+    if not updates:
+        return profile
+
+    field_bases = dict(profile.field_bases)
+    field_priorities = dict(profile.field_priorities)
+    for field in updates:
+        field_bases[field] = per_file_settings_base
+        field_priorities[field] = per_file_settings_priority
+    return settings_core.SettingsProfile(
+        settings=dataclasses.replace(profile.settings, **cast(Any, updates)),
+        field_bases=field_bases,
+        field_priorities=field_priorities,
+    )
+
+
+def _definitions_by_key() -> dict[str, SettingDefinition[Any]]:
+    """Return TOML setting definitions keyed by public configuration key."""
+    return {definition.key: definition for definition in SETTINGS_SCHEMA.definitions if definition.available_in_toml}
+
+
+def _per_file_settings_allowed_fields() -> frozenset[str]:
+    """Return settings fields that may be overridden for matching files."""
+    behavior_groups = {
+        SettingsGroup.FORMATTING,
+        SettingsGroup.DOCSTRING_FORMATTING,
+        SettingsGroup.COMMENT_FORMATTING,
+    }
+    setting_effect_fields = _rule_setting_effect_fields()
+    return frozenset(
+        definition.field for definition in SETTINGS_SCHEMA.definitions if definition.available_in_toml and definition.group in behavior_groups and definition.field not in setting_effect_fields
+    )
+
+
+def _rule_setting_effect_fields() -> frozenset[str]:
+    """Return settings fields referenced by rule selection effects."""
+    import pydocformatter.rules.collection as rule_collection
+
+    return frozenset(setting_effects.setting for rule_class in rule_collection.RULE_COLLECTION.rules for setting_effects in rule_class.meta.setting_effects)
+
+
+def _per_file_settings_pattern_matches(pattern: str, path: str, *, base_path: str) -> bool:
+    """Return whether a per-file setting pattern applies to a path."""
+    negated = pattern.startswith("!")
+    pattern_body = pattern[1:] if negated else pattern
+    matcher = BaseRelativeGlobMatcher.compile((pattern_body,), base_path=base_path, match_parent_segments_for_bare=False)
+    matched = matcher.matches(path)
+    return not matched if negated else matched
+
+
 SETTINGS_SCHEMA = SettingsSchema(
     settings_type=CheckSettings,
     overrides_type=CheckSettingsOverrides,
@@ -437,7 +575,7 @@ SETTINGS_SCHEMA = SettingsSchema(
         SettingDefinition(
             field="output_format",
             value_type=OutputFormat,
-            group=SettingsGroup.FORMATTING,
+            group=SettingsGroup.RUN,
             help="Output format for rule findings.",
             documentation='Output format for rule findings; currently only "grouped" is supported.',
         ),
@@ -482,7 +620,7 @@ SETTINGS_SCHEMA = SettingsSchema(
         SettingDefinition(
             field="parallelism",
             value_type=float,
-            group=SettingsGroup.FORMATTING,
+            group=SettingsGroup.RUN,
             help="Number or ratio of logical CPU cores to use for file-level parallelism.",
             validator=validate_parallelism,
             cli={"metavar": "JOBS"},
@@ -716,6 +854,16 @@ SETTINGS_SCHEMA = SettingsSchema(
             help="TOML inline table mapping file patterns to additional ignored rule selectors.",
             cli={"metavar": "RULE_TOML"},
             documentation="Additional file-pattern-specific ignored rule selectors.",
+        ),
+        SettingDefinition(
+            field="per_file_settings",
+            value_type=PerFileSettingsMap,
+            group=SettingsGroup.CONFIGURATION,
+            help="TOML table mapping file patterns to formatter setting overrides.",
+            available_in_cli=False,
+            validator=validate_per_file_settings,
+            documentation="File-pattern-specific formatter setting overrides. Rule-selection, file-selection, run-level, and rule-selection-effect settings cannot be overridden per file.",
+            example='[tool.pydocfmt.per-file-settings]\n"tests/**/*.py" = { docstring-missing-documentation = "has-section" }',
         ),
         SettingDefinition(
             field="fixable",

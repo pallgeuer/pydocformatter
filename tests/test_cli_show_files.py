@@ -759,17 +759,21 @@ class TestCLIShowFiles(unittest.TestCase):
 
         self.assertEqual(cm.exception.code, 0)
         output = stdout.getvalue()
+        self.assertIn("Run:", output)
         self.assertIn("Formatting:", output)
         self.assertIn("Rule selection:", output)
         self.assertIn("File selection:", output)
-        options = output[output.index("Options:") : output.index("Formatting:")]
+        options = output[output.index("Options:") : output.index("Run:")]
+        run_options = output[output.index("Run:") : output.index("Formatting:")]
         formatting = output[output.index("Formatting:") : output.index("Rule selection:")]
         self.assertLess(options.index("--fix"), options.index("--diff"))
         self.assertLess(options.index("--diff"), options.index("--show-settings"))
         self.assertLess(options.index("--show-settings"), options.index("--show-rules"))
         self.assertLess(options.index("--show-rules"), options.index("--show-files"))
         self.assertLess(options.index("--show-files"), options.index("--output-file"))
-        self.assertLess(formatting.index("--output-format"), formatting.index("--line-length"))
+        self.assertLess(run_options.index("--output-format"), run_options.index("--parallelism"))
+        self.assertIn("--line-length", formatting)
+        self.assertLess(output.index("Run:"), output.index("Formatting:"))
         self.assertLess(output.index("File selection:"), output.index("Miscellaneous:"))
         self.assertLess(output.index("Miscellaneous:"), output.index("Global options:"))
         self.assertIn("--output-file FILE", output)

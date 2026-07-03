@@ -19,6 +19,8 @@ Attributes:
     SettingCLIMetavar (TypeAlias): Display placeholder passed to argparse for generated setting option help.
     SettingsOverridesType (TypeAlias): Runtime type shape accepted for inline `--config` overrides before field-specific
         validation runs.
+    PerFileSettingsMap (TypeAlias): Ordered mapping representation for glob-pattern keys whose values are field-keyed
+        settings overrides.
     DEFAULT_SOURCE_PRIORITY (int): Base priority for settings supplied by dataclass defaults.
     CONFIG_FILE_SOURCE_PRIORITY (int): Priority assigned to values loaded from discovered or explicit TOML configuration
         files.
@@ -50,6 +52,7 @@ SettingValueT = TypeVar("SettingValueT")
 
 StringList: TypeAlias = tuple[str, ...]
 MultiStringMap: TypeAlias = tuple[tuple[str, StringList], ...]
+PerFileSettingsMap: TypeAlias = tuple[tuple[str, tuple[tuple[str, object], ...]], ...]
 SettingValidator: TypeAlias = Callable[[Any, str], SettingValueT]
 SettingCLIAction: TypeAlias = str | type[argparse.Action]
 SettingCLIChoices: TypeAlias = Iterable[Any]
@@ -663,6 +666,8 @@ def format_value(value: Any, value_type: type[Any] | GenericAlias) -> str:
         return _format_string_list(value)
     elif value_type_ == MultiStringMap:
         return _format_multi_string_map(value)
+    elif value_type_ == PerFileSettingsMap:
+        return _format_per_file_settings_map(value)
     else:
         return str(value)
 
@@ -680,6 +685,42 @@ def _format_multi_string_map(value: Any) -> str:
         items = tuple(value)
     entries = [f"{_format_string(pattern)} = {_format_string_list(selectors)}" for pattern, selectors in items]
     return "{" + ", ".join(entries) + "}"
+
+
+def _format_per_file_settings_map(value: Any) -> str:
+    """Format a per-file settings mapping as a TOML inline table."""
+    if isinstance(value, Mapping):
+        items = tuple(value.items())
+    else:
+        items = tuple(value)
+    entries = [f"{_format_string(pattern)} = {_format_flat_settings_map(updates)}" for pattern, updates in items]
+    return "{" + ", ".join(entries) + "}"
+
+
+def _format_flat_settings_map(value: Any) -> str:
+    """Format a flat setting-keyed override mapping as a TOML inline table."""
+    if isinstance(value, Mapping):
+        items = tuple(value.items())
+    else:
+        items = tuple(value)
+    entries = [f"{key} = {_format_resolved_setting_value(setting_value)}" for key, setting_value in items]
+    return "{" + ", ".join(entries) + "}"
+
+
+def _format_resolved_setting_value(value: Any) -> str:
+    """Format one already validated setting value as TOML."""
+    if isinstance(value, bool):
+        return str(value).lower()
+    elif isinstance(value, enum.StrEnum):
+        return _format_string(value.value)
+    elif isinstance(value, str):
+        return _format_string(value)
+    elif isinstance(value, float):
+        return repr(value)
+    elif isinstance(value, tuple):
+        return _format_string_list(value)
+    else:
+        return str(value)
 
 
 def validate_bool(value: Any, context: str) -> bool:
