@@ -32,7 +32,14 @@ class PDF203SummaryTooLong(RuleBase):
 
     @classmethod
     def violations(cls, context: RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
-        """Return violations for summaries that still span multiple logical lines."""
+        """Return violations for summaries that still span multiple logical lines.
+
+        Args:
+            context (RuleContext): Current file context with parsed module, settings, and prepared category data.
+
+        Returns:
+            tuple[rule_violations.RuleViolation, ...]: Rule violations reported for the current source.
+        """
         data = PDF_definition.PDF.require_data(context)
         return tuple(violation for docstring in data.docstrings if (violation := _violation_for_docstring(docstring)) is not None)
 

@@ -1,4 +1,20 @@
-"""Settings schema for `pydocfmt check`."""
+"""Settings schema for `pydocfmt check`.
+
+Attributes:
+    DEFAULT_EXCLUDE (tuple[str, ...]): Directory names excluded from recursive file discovery unless a caller extends or
+        replaces file-selection settings.
+    DEFAULT_INCLUDE (tuple[str, ...]): Default filename patterns considered Python source during directory traversal.
+    DEFAULT_RULE_SELECT (tuple[str, ...]): Initial broad rule selector used when users do not provide an explicit
+        `select` setting.
+    DEFAULT_RULE_FIXABLE (tuple[str, ...]): Initial broad fixability selector used when users do not restrict automatic
+        fixes.
+    DEFAULT_REQUIRE_EXPLICIT (tuple[str, ...]): Rules that broad selectors skip so projects must opt into ASCII-only
+        comment and docstring checks deliberately.
+    PARALLELISM_CONSTRAINT_MESSAGE (str): Shared validation text for the worker-count setting accepted by the check
+        command.
+    SETTINGS_SCHEMA (SettingsSchema[CheckSettings]): Complete `pydocfmt check` schema used for config loading, CLI
+        option generation, validation, and settings display.
+"""
 
 import dataclasses
 import enum
@@ -43,8 +59,8 @@ class IndentStyle(enum.StrEnum):
     """Indentation styles for generated and normalized docstring indentation.
 
     Attributes:
-        SPACE (IndentStyle): Use spaces for generated and normalized docstring indentation.
-        TAB (IndentStyle): Use tabs for generated docstring indentation.
+        SPACE: Use spaces for generated and normalized docstring indentation.
+        TAB: Use tabs for generated docstring indentation.
     """
 
     SPACE = "space"
@@ -55,10 +71,10 @@ class LineEnding(enum.StrEnum):
     """Line ending modes for rewritten files.
 
     Attributes:
-        AUTO (LineEnding): Preserve the first detected line ending in each file, defaulting to LF.
-        LF (LineEnding): Rewrite generated lines with LF endings.
-        CR_LF (LineEnding): Rewrite generated lines with CRLF endings.
-        NATIVE (LineEnding): Rewrite generated lines with the platform-native line ending.
+        AUTO: Preserve the first detected line ending in each file, defaulting to LF.
+        LF: Rewrite generated lines with LF endings.
+        CR_LF: Rewrite generated lines with CRLF endings.
+        NATIVE: Rewrite generated lines with the platform-native line ending.
     """
 
     AUTO = "auto"
@@ -115,7 +131,7 @@ class OutputFormat(enum.StrEnum):
     """Output formats for rule findings.
 
     Attributes:
-        GROUPED (OutputFormat): Group diagnostics by file.
+        GROUPED: Group diagnostics by file.
     """
 
     GROUPED = "grouped"
@@ -380,11 +396,11 @@ class SettingsGroup(enum.StrEnum):
     """Check settings groups used for ordered CLI/help presentation.
 
     Attributes:
-        FORMATTING (SettingsGroup): Formatting behavior settings.
-        DOCSTRING_FORMATTING (SettingsGroup): Docstring semantic parsing settings.
-        COMMENT_FORMATTING (SettingsGroup): Comment formatting settings.
-        RULE_SELECTION (SettingsGroup): Rule selection settings.
-        FILE_SELECTION (SettingsGroup): File discovery and filtering settings.
+        FORMATTING: Formatting behavior settings.
+        DOCSTRING_FORMATTING: Docstring semantic parsing settings.
+        COMMENT_FORMATTING: Comment formatting settings.
+        RULE_SELECTION: Rule selection settings.
+        FILE_SELECTION: File discovery and filtering settings.
     """
 
     FORMATTING = "Formatting"
@@ -395,7 +411,18 @@ class SettingsGroup(enum.StrEnum):
 
 
 def validate_parallelism(value: object, context: str) -> float:
-    """Validate a file-level parallelism setting."""
+    """Validate a file-level parallelism setting.
+
+    Args:
+        value (object): Raw parallelism value from configuration or the CLI.
+        context (str): User-facing setting label included in validation errors.
+
+    Returns:
+        float: Normalized non-negative value accepted by worker-count resolution.
+
+    Raises:
+        settings_core.SettingsError: If the value is negative, non-numeric, fractional above one, or otherwise invalid.
+    """
     parallelism = _validate_non_negative_float(value, context)
     if parallelism > 1 and not parallelism.is_integer():
         raise settings_core.SettingsError(f"{context} {PARALLELISM_CONSTRAINT_MESSAGE}")

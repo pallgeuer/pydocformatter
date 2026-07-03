@@ -32,7 +32,14 @@ class PDF202EmptyDocstring(RuleBase):
 
     @classmethod
     def violations(cls, context: RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
-        """Return violations for docstrings without meaningful content."""
+        """Return violations for docstrings without meaningful content.
+
+        Args:
+            context (RuleContext): Current file context with parsed module, settings, and prepared category data.
+
+        Returns:
+            tuple[rule_violations.RuleViolation, ...]: Rule violations reported for the current source.
+        """
         data = PDF.require_data(context)
         return tuple(rule_violations.diagnostic(cls.meta, _line_numbers(docstring)) for docstring in data.docstrings if not docstring.value.strip())
 

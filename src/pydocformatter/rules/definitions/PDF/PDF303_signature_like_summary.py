@@ -38,7 +38,14 @@ class PDF303SignatureLikeSummary(RuleBase):
 
     @classmethod
     def violations(cls, context: RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
-        """Return violations for summaries that include the function signature."""
+        """Return violations for summaries that include the function signature.
+
+        Args:
+            context (RuleContext): Current file context with parsed module, settings, and prepared category data.
+
+        Returns:
+            tuple[rule_violations.RuleViolation, ...]: Rule violations reported for the current source.
+        """
         data = PDF.require_data(context)
         violations: list[rule_violations.RuleViolation] = []
         for target in data.summary_line_targets:

@@ -39,6 +39,13 @@ class PDF509ExtraneousClassAttributeDocumentation(RuleBase):
 
     @classmethod
     def violations(cls, context: RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
-        """Return violations for class attribute docs absent from class attributes."""
+        """Return violations for class attribute docs absent from class attributes.
+
+        Args:
+            context (RuleContext): Current file context with parsed module, settings, and prepared category data.
+
+        Returns:
+            tuple[rule_violations.RuleViolation, ...]: Rule violations reported for the current source.
+        """
         data = PDF.require_data(context)
         return attribute_documentation.extraneous_attribute_violations(data, meta=cls.meta, owner_kind=PDF_definition.DefinitionKind.CLASS, owner_label="Class", include_instance=True)

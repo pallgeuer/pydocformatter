@@ -1,4 +1,8 @@
-"""File and stdin formatting orchestration."""
+"""File and stdin formatting orchestration.
+
+Attributes:
+    UTF8_BOM (str): Unicode byte order mark stripped from decoded UTF-8 source before LibCST parsing and rule execution.
+"""
 
 from __future__ import annotations
 
@@ -54,6 +58,9 @@ def format_file(path: str, *, file: typing.TextIO | None = None, settings: Check
 
     Returns:
         FormatterResult: Formatting result with source text, findings, and operational errors.
+
+    Raises:
+        AssertionError: If `format_source` returns an invalid result without source text.
     """
     try:
         if file is None:

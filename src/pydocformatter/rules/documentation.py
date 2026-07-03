@@ -1,4 +1,11 @@
-"""Rule Markdown documentation parsing."""
+"""Rule Markdown documentation parsing.
+
+Attributes:
+    TEMPLATE_PATH (pathlib.Path): Rule documentation template used by tests and docs tooling to validate individual
+        Markdown files.
+    CATEGORY_TEMPLATE_PATH (pathlib.Path): Category documentation template used to keep prefix-level Markdown files
+        structurally consistent.
+"""
 
 from __future__ import annotations
 
@@ -43,7 +50,17 @@ class RuleMarkdownExample:
 
 
 def rule_fix_text(rule: RuleMetadata) -> str:
-    """Return user-facing fix availability text for one rule."""
+    """Return user-facing fix availability text for one rule.
+
+    Args:
+        rule (RuleMetadata): Rule metadata whose fix availability should be described.
+
+    Returns:
+        str: Complete sentence used in rule explanation output.
+
+    Raises:
+        AssertionError: If rule metadata contains an unknown fix-availability value.
+    """
     if rule.fix_availability == FixAvailability.ALWAYS:
         return "Fix is always available."
     elif rule.fix_availability == FixAvailability.USUALLY:
@@ -70,7 +87,17 @@ class RuleSourceLocation:
 
 
 def load_rule_explanation(rule_class: type[object]) -> str:
-    """Load the Markdown explanation file adjacent to a rule definition module."""
+    """Load the Markdown explanation file adjacent to a rule definition module.
+
+    Args:
+        rule_class (type[object]): Rule or category class whose module basename identifies the Markdown resource.
+
+    Returns:
+        str: UTF-8 Markdown explanation text.
+
+    Raises:
+        FileNotFoundError: If the class module cannot be mapped to an adjacent package resource path.
+    """
     module_name = rule_class.__module__
     package_name, _, module_basename = module_name.rpartition(".")
     if not package_name or not module_basename:
@@ -79,7 +106,18 @@ def load_rule_explanation(rule_class: type[object]) -> str:
 
 
 def parse_rule_markdown_examples(markdown: str, *, rule_code: str) -> tuple[RuleMarkdownExample, ...]:
-    """Parse structured examples from one rule Markdown document."""
+    """Parse structured examples from one rule Markdown document.
+
+    Args:
+        markdown (str): Full rule Markdown document to scan for `pydocfmt-example` fences.
+        rule_code (str): Rule code used in parse-error messages and finding examples.
+
+    Returns:
+        tuple[RuleMarkdownExample, ...]: Structured examples in document order.
+
+    Raises:
+        RuleMarkdownExampleParseError: If an example fence is unterminated or has invalid section or finding syntax.
+    """
     examples: list[RuleMarkdownExample] = []
     lines = markdown.splitlines(keepends=True)
     line_index = 0
@@ -230,12 +268,26 @@ def _validate_finding_line_label(label: str, line_numbers: tuple[int, ...], *, r
 
 
 def load_rule_category_explanation(category_class: type[object]) -> str:
-    """Load Markdown documentation adjacent to a rule category module."""
+    """Load Markdown documentation adjacent to a rule category module.
+
+    Args:
+        category_class (type[object]): Rule category class whose module basename identifies the Markdown resource.
+
+    Returns:
+        str: UTF-8 Markdown category explanation text.
+    """
     return load_rule_explanation(category_class)
 
 
 def rule_explanation_body(rule_class: type[object]) -> str:
-    """Return the Markdown explanation without the rule title and fixability lines."""
+    """Return the Markdown explanation without the rule title and fixability lines.
+
+    Args:
+        rule_class (type[object]): Rule class whose explanation should be loaded and trimmed.
+
+    Returns:
+        str: Explanation body suitable for JSON output and embedded text rendering.
+    """
     explanation = load_rule_explanation(rule_class)
     lines = explanation.splitlines()
     if len(lines) >= 4 and lines[0].startswith("# ") and lines[1] == "" and lines[2].startswith("Fix is ") and lines[3] == "":
@@ -244,7 +296,14 @@ def rule_explanation_body(rule_class: type[object]) -> str:
 
 
 def rule_source_location(rule_class: type[object]) -> RuleSourceLocation | None:
-    """Return the source location of a rule class if it is available."""
+    """Return the source location of a rule class if it is available.
+
+    Args:
+        rule_class (type[object]): Rule class to locate with Python inspection metadata.
+
+    Returns:
+        RuleSourceLocation | None: Relative source file and definition line, or None when inspection cannot locate it.
+    """
     try:
         source_lines, line_number = inspect.getsourcelines(rule_class)
     except OSError:
@@ -262,7 +321,14 @@ def rule_source_location(rule_class: type[object]) -> RuleSourceLocation | None:
 
 
 def undocumented_rules(collection: RuleCollection) -> tuple[RuleMetadata, ...]:
-    """Return built-in rules whose adjacent Markdown explanation cannot be loaded."""
+    """Return built-in rules whose adjacent Markdown explanation cannot be loaded.
+
+    Args:
+        collection (RuleCollection): Rule collection whose rule classes should be checked for adjacent Markdown.
+
+    Returns:
+        tuple[RuleMetadata, ...]: Metadata for rules missing loadable documentation resources.
+    """
     missing: list[RuleMetadata] = []
     for rule_class in collection.rules:
         try:
@@ -273,7 +339,14 @@ def undocumented_rules(collection: RuleCollection) -> tuple[RuleMetadata, ...]:
 
 
 def undocumented_rule_categories(collection: RuleCollection) -> tuple[RuleCategoryMetadata, ...]:
-    """Return built-in rule categories whose adjacent Markdown cannot be loaded."""
+    """Return built-in rule categories whose adjacent Markdown cannot be loaded.
+
+    Args:
+        collection (RuleCollection): Rule collection whose category classes should be checked for adjacent Markdown.
+
+    Returns:
+        tuple[RuleCategoryMetadata, ...]: Metadata for categories missing loadable documentation resources.
+    """
     missing: list[RuleCategoryMetadata] = []
     for category_class in collection.categories:
         try:

@@ -44,7 +44,14 @@ class PDF501ExtraneousParameterDocumentation(RuleBase):
 
     @classmethod
     def violations(cls, context: RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
-        """Return violations for documented parameters absent from the signature."""
+        """Return violations for documented parameters absent from the signature.
+
+        Args:
+            context (RuleContext): Current file context with parsed module, settings, and prepared category data.
+
+        Returns:
+            tuple[rule_violations.RuleViolation, ...]: Rule violations reported for the current source.
+        """
         data = PDF.require_data(context)
         violations: list[rule_violations.RuleViolation] = []
         typed_dict_keys_by_name: dict[str, frozenset[str]] | None = None

@@ -45,7 +45,18 @@ class DocumentedAttribute:
 
 
 def inventory_attributes(data: PDF_definition.PDFCategoryData, owner: PDF_definition.DefinitionInfo, *, include_instance: bool) -> tuple[InventoryAttribute, ...]:
-    """Return first-seen inventory attribute targets for an owner."""
+    """Return first-seen inventory attribute targets for an owner.
+
+    Args:
+        data (PDF_definition.PDFCategoryData): Prepared PDF definitions, attributes, and docstrings for the current
+            file.
+        owner (PDF_definition.DefinitionInfo): Module or class whose attribute inventory should be collected.
+        include_instance (bool): Whether supported `self.*` assignments from `__init__` should be included for class
+            owners.
+
+    Returns:
+        tuple[InventoryAttribute, ...]: Unique attribute targets in first-seen order.
+    """
     attributes: list[InventoryAttribute] = []
     seen: set[str] = set()
     for attribute in data.attributes_for(owner):
@@ -60,7 +71,14 @@ def inventory_attributes(data: PDF_definition.PDFCategoryData, owner: PDF_defini
 
 
 def documented_attributes(docstring: PDF_definition.DocstringInfo) -> tuple[DocumentedAttribute, ...]:
-    """Return comparable attribute names parsed from an owner docstring."""
+    """Return comparable attribute names parsed from an owner docstring.
+
+    Args:
+        docstring (PDF_definition.DocstringInfo): Parsed module or class docstring to inspect for attribute entries.
+
+    Returns:
+        tuple[DocumentedAttribute, ...]: Documented attribute names with diagnostic line targets.
+    """
     attributes: list[DocumentedAttribute] = []
     for entry in docstring.structure.entries:
         if entry.kind is not PDF_definition.DocstringEntryKind.ATTRIBUTE:
@@ -74,12 +92,31 @@ def documented_attributes(docstring: PDF_definition.DocstringInfo) -> tuple[Docu
 
 
 def attached_attribute_docstrings_by_name(data: PDF_definition.PDFCategoryData, owner: PDF_definition.DefinitionInfo) -> Mapping[str, tuple[PDF_definition.DocstringInfo, ...]]:
-    """Return attached attribute docstrings for an owner indexed by target name."""
+    """Return attached attribute docstrings for an owner indexed by target name.
+
+    Args:
+        data (PDF_definition.PDFCategoryData): Prepared PDF definitions, attributes, and docstrings for the current
+            file.
+        owner (PDF_definition.DefinitionInfo): Module or class whose adjacent attribute docstrings should be indexed.
+
+    Returns:
+        Mapping[str, tuple[PDF_definition.DocstringInfo, ...]]: Attribute names mapped to attached docstrings
+            documenting them.
+    """
     return data.attached_attribute_docstrings_by_name(owner)
 
 
 def documented_attribute_names(data: PDF_definition.PDFCategoryData, owner: PDF_definition.DefinitionInfo) -> frozenset[str]:
-    """Return owner and attached docstring attribute names for an owner."""
+    """Return owner and attached docstring attribute names for an owner.
+
+    Args:
+        data (PDF_definition.PDFCategoryData): Prepared PDF definitions, attributes, and docstrings for the current
+            file.
+        owner (PDF_definition.DefinitionInfo): Module or class whose documented attribute names should be collected.
+
+    Returns:
+        frozenset[str]: Names documented either in the owner docstring or by attached attribute docstrings.
+    """
     names: set[str] = set(attached_attribute_docstrings_by_name(data, owner))
     owner_docstring = data.docstring_for(owner)
     if owner_docstring is not None:
@@ -88,7 +125,16 @@ def documented_attribute_names(data: PDF_definition.PDFCategoryData, owner: PDF_
 
 
 def has_attribute_documentation(data: PDF_definition.PDFCategoryData, owner: PDF_definition.DefinitionInfo) -> bool:
-    """Return whether an owner has any recognized attribute documentation."""
+    """Return whether an owner has any recognized attribute documentation.
+
+    Args:
+        data (PDF_definition.PDFCategoryData): Prepared PDF definitions, attributes, and docstrings for the current
+            file.
+        owner (PDF_definition.DefinitionInfo): Module or class whose documentation should be inspected.
+
+    Returns:
+        bool: Whether the owner has attached attribute docstrings, attribute entries, or an attribute section.
+    """
     if attached_attribute_docstrings_by_name(data, owner):
         return True
     owner_docstring = data.docstring_for(owner)
@@ -98,7 +144,20 @@ def has_attribute_documentation(data: PDF_definition.PDFCategoryData, owner: PDF
 
 
 def should_check_missing_attributes(data: PDF_definition.PDFCategoryData, owner: PDF_definition.DefinitionInfo, *, context: RuleContext) -> bool:
-    """Return whether a missing-attribute rule should inspect an owner."""
+    """Return whether a missing-attribute rule should inspect an owner.
+
+    Args:
+        data (PDF_definition.PDFCategoryData): Prepared PDF definitions, attributes, and docstrings for the current
+            file.
+        owner (PDF_definition.DefinitionInfo): Module or class whose attributes might require documentation.
+        context (RuleContext): Current file context with resolved missing-documentation settings.
+
+    Returns:
+        bool: Whether missing-attribute checks should report for this owner.
+
+    Raises:
+        AssertionError: If settings contain an unexpected missing-documentation policy value.
+    """
     if context.settings.docstring_missing_documentation_public_only and not is_public_attribute_owner(owner, context=context):
         return False
     has_relevant_documentation = has_attribute_documentation(data, owner)
@@ -118,7 +177,17 @@ def should_check_missing_attributes(data: PDF_definition.PDFCategoryData, owner:
 
 
 def missing_suppression_targets(data: PDF_definition.PDFCategoryData, owner: PDF_definition.DefinitionInfo, attribute_name: str) -> tuple[tuple[int, ...], ...]:
-    """Return docstring line targets that can suppress a missing attribute finding."""
+    """Return docstring line targets that can suppress a missing attribute finding.
+
+    Args:
+        data (PDF_definition.PDFCategoryData): Prepared PDF definitions, attributes, and docstrings for the current
+            file.
+        owner (PDF_definition.DefinitionInfo): Module or class that owns the missing attribute.
+        attribute_name (str): Attribute name whose attached docstrings should also suppress the finding.
+
+    Returns:
+        tuple[tuple[int, ...], ...]: Owner and attached docstring physical line groups accepted by suppressions.
+    """
     targets: list[tuple[int, ...]] = []
     owner_docstring = data.docstring_for(owner)
     if owner_docstring is not None:
@@ -128,14 +197,29 @@ def missing_suppression_targets(data: PDF_definition.PDFCategoryData, owner: PDF
 
 
 def is_public_attribute_owner(owner: PDF_definition.DefinitionInfo, *, context: RuleContext) -> bool:
-    """Return whether an attribute owner is public for missing-attribute checks."""
+    """Return whether an attribute owner is public for missing-attribute checks.
+
+    Args:
+        owner (PDF_definition.DefinitionInfo): Module or class definition that owns attribute inventory entries.
+        context (RuleContext): Current file context used to evaluate module path privacy.
+
+    Returns:
+        bool: Whether broad public-only missing-attribute checks should inspect this owner.
+    """
     if owner.kind is PDF_definition.DefinitionKind.MODULE:
         return _is_public_module_path(context.path)
     return missing_documentation.is_public_definition(owner)
 
 
 def is_private_attribute_name(name: str) -> bool:
-    """Return whether an attribute name is private for missing-attribute checks."""
+    """Return whether an attribute name is private for missing-attribute checks.
+
+    Args:
+        name (str): Attribute target name to classify.
+
+    Returns:
+        bool: Whether the name is underscore-prefixed and therefore not required by missing-attribute rules.
+    """
     return name.startswith("_")
 
 
@@ -184,7 +268,20 @@ def missing_attribute_violations(
     owner_label: str,
     include_instance: bool,
 ) -> tuple[rule_violations.RuleViolation, ...]:
-    """Return violations for inventory attributes missing documentation."""
+    """Return violations for inventory attributes missing documentation.
+
+    Args:
+        data (PDF_definition.PDFCategoryData): Prepared PDF definitions, attributes, and docstrings for the current
+            file.
+        context (RuleContext): Current file context with convention and missing-documentation settings.
+        meta (rule_models.RuleMetadata): Rule metadata to attach to diagnostics.
+        owner_kind (PDF_definition.DefinitionKind): Definition kind, module or class, whose owners should be checked.
+        owner_label (str): Human-readable owner label used in diagnostic messages.
+        include_instance (bool): Whether supported `self.*` assignments from `__init__` should be required.
+
+    Returns:
+        tuple[rule_violations.RuleViolation, ...]: Missing-attribute diagnostics for the requested owner kind.
+    """
     if docstring_conventions.missing_documentation_is_inert(context.settings.docstring_convention):
         return ()
     violations: list[rule_violations.RuleViolation] = []
@@ -215,7 +312,20 @@ def extraneous_attribute_violations(
     owner_label: str,
     include_instance: bool,
 ) -> tuple[rule_violations.RuleViolation, ...]:
-    """Return violations for docstring attributes absent from inventory."""
+    """Return violations for docstring attributes absent from inventory.
+
+    Args:
+        data (PDF_definition.PDFCategoryData): Prepared PDF definitions, attributes, and docstrings for the current
+            file.
+        meta (rule_models.RuleMetadata): Rule metadata to attach to diagnostics.
+        owner_kind (PDF_definition.DefinitionKind): Definition kind, module or class, whose docstrings should be
+            checked.
+        owner_label (str): Human-readable owner label used in diagnostic messages.
+        include_instance (bool): Whether supported `self.*` assignments from `__init__` count as class inventory.
+
+    Returns:
+        tuple[rule_violations.RuleViolation, ...]: Extraneous attribute documentation diagnostics.
+    """
     violations: list[rule_violations.RuleViolation] = []
     for definition in data.definitions:
         if definition.kind is not owner_kind:
@@ -245,7 +355,20 @@ def duplicate_attribute_violations(
     owner_label: str,
     include_instance: bool,
 ) -> tuple[rule_violations.RuleViolation, ...]:
-    """Return violations for attached docstrings duplicated by owner attribute docs."""
+    """Return violations for attached docstrings duplicated by owner attribute docs.
+
+    Args:
+        data (PDF_definition.PDFCategoryData): Prepared PDF definitions, attributes, and docstrings for the current
+            file.
+        meta (rule_models.RuleMetadata): Rule metadata to attach to diagnostics.
+        owner_kind (PDF_definition.DefinitionKind): Definition kind, module or class, whose duplicated docs should be
+            checked.
+        owner_label (str): Human-readable owner label used in diagnostic messages.
+        include_instance (bool): Whether attached `self.*` docstrings from `__init__` participate in duplicate checks.
+
+    Returns:
+        tuple[rule_violations.RuleViolation, ...]: Duplicate attached-attribute documentation diagnostics.
+    """
     violations: list[rule_violations.RuleViolation] = []
     for definition in data.definitions:
         if definition.kind is not owner_kind:

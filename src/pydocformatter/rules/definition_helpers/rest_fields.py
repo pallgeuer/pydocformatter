@@ -1,4 +1,11 @@
-"""The reStructuredText field parsing helpers."""
+"""The reStructuredText field parsing helpers.
+
+Attributes:
+    PLURAL_FIELD_NAMES (dict[str, str]): ReStructuredText field spellings that should collapse to the singular canonical
+        value-documentation form.
+    TERM_FIELD_NAMES (dict[str, str]): ReStructuredText field aliases that should normalize to the preferred parameter
+        or exception field term.
+"""
 
 from __future__ import annotations
 
@@ -25,7 +32,14 @@ TERM_FIELD_NAMES = {
 
 
 def label(entry: PDF_definition.DocstringEntry) -> str:
-    """Return the user-facing spelling of a reStructuredText field."""
+    """Return the user-facing spelling of a reStructuredText field.
+
+    Args:
+        entry (PDF_definition.DocstringEntry): Parsed field entry to render.
+
+    Returns:
+        str: Field label including surrounding colons and any field argument.
+    """
     field_name = entry.field_name or ""
     if entry.field_argument:
         return f":{field_name} {entry.field_argument}:"
@@ -33,13 +47,27 @@ def label(entry: PDF_definition.DocstringEntry) -> str:
 
 
 def has_content(entry: PDF_definition.DocstringEntry) -> bool:
-    """Return whether a reStructuredText field has inline or continuation content."""
+    """Return whether a reStructuredText field has inline or continuation content.
+
+    Args:
+        entry (PDF_definition.DocstringEntry): Parsed field entry to inspect.
+
+    Returns:
+        bool: Whether the field has a description or protected continuation body.
+    """
     # A protected continuation body counts as content even when it has no reflowable description text.
     return bool(entry.description or entry.end_line > entry.start_line + 1)
 
 
 def order_rank(entry: PDF_definition.DocstringEntry) -> int | None:
-    """Return the canonical order rank for a comparable reStructuredText field."""
+    """Return the canonical order rank for a comparable reStructuredText field.
+
+    Args:
+        entry (PDF_definition.DocstringEntry): Parsed field entry to rank by semantic kind.
+
+    Returns:
+        int | None: Relative order rank for comparable value-documentation fields, or None for unordered fields.
+    """
     if entry.kind is PDF_definition.DocstringEntryKind.PARAMETER:
         return 0
     if entry.kind in (PDF_definition.DocstringEntryKind.RETURN, PDF_definition.DocstringEntryKind.YIELD):
@@ -50,7 +78,14 @@ def order_rank(entry: PDF_definition.DocstringEntry) -> int | None:
 
 
 def repetition_key(entry: PDF_definition.DocstringEntry) -> tuple[str, str, str] | None:
-    """Return the comparable repetition key for a reStructuredText field."""
+    """Return the comparable repetition key for a reStructuredText field.
+
+    Args:
+        entry (PDF_definition.DocstringEntry): Parsed field entry to compare for duplicate detection.
+
+    Returns:
+        tuple[str, str, str] | None: Semantic field identity, or None when required field arguments are absent.
+    """
     field_name = entry.field_name or ""
     argument = entry.field_argument or ""
     if entry.kind is PDF_definition.DocstringEntryKind.PARAMETER and field_name in docstring_sections.REST_PARAMETER_VALUE_FIELDS:
@@ -77,29 +112,65 @@ def repetition_key(entry: PDF_definition.DocstringEntry) -> tuple[str, str, str]
 
 
 def original_field_name(line: PDF_definition.DocstringValueLine) -> str | None:
-    """Return the field name spelling from a parsed reStructuredText field line."""
+    """Return the field name spelling from a parsed reStructuredText field line.
+
+    Args:
+        line (PDF_definition.DocstringValueLine): Parsed docstring line containing a reStructuredText field.
+
+    Returns:
+        str | None: Field name as written in source, or None if the span is empty.
+    """
     start_column, end_column = field_name_span(line)
     return line.text[start_column:end_column] or None
 
 
 def plural_field_name(name: str) -> str | None:
-    """Return the preferred singular or plural spelling for a reStructuredText field name."""
+    """Return the preferred singular or plural spelling for a reStructuredText field name.
+
+    Args:
+        name (str): Field name spelling to normalize.
+
+    Returns:
+        str | None: Preferred spelling for pluralization checks, or None when no replacement is configured.
+    """
     return PLURAL_FIELD_NAMES.get(name.lower())
 
 
 def term_normalized_field_name(name: str) -> str | None:
-    """Return the preferred equivalent term for a reStructuredText field name."""
+    """Return the preferred equivalent term for a reStructuredText field name.
+
+    Args:
+        name (str): Field name spelling to normalize.
+
+    Returns:
+        str | None: Preferred field term, or None when no replacement is configured.
+    """
     return TERM_FIELD_NAMES.get(name.lower())
 
 
 def replacement_for_field_name(line: PDF_definition.DocstringValueLine, new_name: str) -> rule_edits.PlannedTextReplacement | None:
-    """Return a replacement for a reStructuredText field name span."""
+    """Return a replacement for a reStructuredText field name span.
+
+    Args:
+        line (PDF_definition.DocstringValueLine): Parsed docstring line containing a reStructuredText field.
+        new_name (str): Replacement field name without surrounding colons.
+
+    Returns:
+        rule_edits.PlannedTextReplacement | None: Planned text replacement, or None if the span cannot be mapped safely.
+    """
     start_column, end_column = field_name_span(line)
     return section_edits.text_replacement(line, start_column, end_column, new_name)
 
 
 def field_name_span(line: PDF_definition.DocstringValueLine) -> tuple[int, int]:
-    """Return the text column span for a reStructuredText field name."""
+    """Return the text column span for a reStructuredText field name.
+
+    Args:
+        line (PDF_definition.DocstringValueLine): Parsed docstring line containing a reStructuredText field.
+
+    Returns:
+        tuple[int, int]: Start and end text columns of the field name without colons or arguments.
+    """
     start_column = field_name_start_column(line)
     end_column = start_column
     while end_column < len(line.text) and line.text[end_column] not in " \t:":
@@ -108,6 +179,13 @@ def field_name_span(line: PDF_definition.DocstringValueLine) -> tuple[int, int]:
 
 
 def field_name_start_column(line: PDF_definition.DocstringValueLine) -> int:
-    """Return the text column where a reStructuredText field name starts."""
+    """Return the text column where a reStructuredText field name starts.
+
+    Args:
+        line (PDF_definition.DocstringValueLine): Parsed docstring line containing a reStructuredText field.
+
+    Returns:
+        int: Text column immediately after the opening field colon.
+    """
     # Parsed reStructuredText field lines start with a colon after indentation.
     return len(line.text) - len(line.text.lstrip(" \t")) + 1

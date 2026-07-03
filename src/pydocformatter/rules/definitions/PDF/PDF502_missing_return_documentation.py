@@ -41,7 +41,14 @@ class PDF502MissingReturnDocumentation(RuleBase):
 
     @classmethod
     def violations(cls, context: RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
-        """Return violations for undocumented meaningful return values."""
+        """Return violations for undocumented meaningful return values.
+
+        Args:
+            context (RuleContext): Current file context with parsed module, settings, and prepared category data.
+
+        Returns:
+            tuple[rule_violations.RuleViolation, ...]: Rule violations reported for the current source.
+        """
         if docstring_conventions.missing_documentation_is_inert(context.settings.docstring_convention):
             return ()
         violations: list[rule_violations.RuleViolation] = []

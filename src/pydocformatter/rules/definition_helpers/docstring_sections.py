@@ -1,4 +1,39 @@
-"""Docstring section name metadata and matching."""
+"""Docstring section name metadata and matching.
+
+Attributes:
+    GOOGLE_SECTIONS (set[str]): Lowercase Google-style section headings recognized by convention-aware parsing rules.
+    NUMPY_SECTIONS (set[str]): Lowercase NumPy-style section headings recognized before underline validation and entry
+        parsing.
+    PARAMETER_SECTION_NAMES (set[str]): Section headings whose entries document callable parameters across supported
+        docstring conventions.
+    GOOGLE_SECTION_PLURAL_NAMES (dict[str, str]): Google headings that should use plural or canonical display spelling
+        when PDF401 is selected.
+    NUMPY_SECTION_PLURAL_NAMES (dict[str, str]): NumPy headings that should use plural or canonical display spelling
+        when PDF401 is selected.
+    GOOGLE_SECTION_TERM_NAMES (dict[str, str]): Google heading synonyms that should normalize to the preferred
+        terminology when PDF402 is selected.
+    NUMPY_SECTION_TERM_NAMES (dict[str, str]): NumPy heading synonyms that should normalize to the preferred terminology
+        when PDF402 is selected.
+    REST_PARAMETER_VALUE_FIELDS (frozenset[str]): ReStructuredText field names that provide parameter descriptions.
+    REST_PARAMETER_TYPE_FIELDS (frozenset[str]): ReStructuredText field names that provide parameter type descriptions.
+    REST_RETURN_VALUE_FIELDS (frozenset[str]): ReStructuredText field names that document return values.
+    REST_RETURN_TYPE_FIELDS (frozenset[str]): ReStructuredText field names that document return value types.
+    REST_YIELD_VALUE_FIELDS (frozenset[str]): ReStructuredText field names that document yielded values.
+    REST_YIELD_TYPE_FIELDS (frozenset[str]): ReStructuredText field names that document yielded value types.
+    REST_EXCEPTION_FIELDS (frozenset[str]): ReStructuredText field names that document raised exceptions.
+    REST_ATTRIBUTE_VALUE_FIELDS (frozenset[str]): ReStructuredText field names that document class, instance, or module
+        attributes.
+    REST_ATTRIBUTE_TYPE_FIELDS (frozenset[str]): ReStructuredText field names that document attribute types.
+    REST_TYPE_DESCRIPTION_FIELDS (frozenset[str]): ReStructuredText type-only fields whose descriptions are paired with
+        value documentation entries.
+    GOOGLE_ORDER_RANKS (dict[str, int]): Relative Google entry-section ordering used by PDF407 while leaving narrative
+        sections unordered.
+    NUMPY_ORDER_RANKS (dict[str, int]): Relative NumPy section ordering used by PDF407.
+    GOOGLE_REPEATED_SECTION_KEYS (dict[str, str]): Google section-equivalence keys used to detect repeated sections
+        across singular, plural, and synonym spellings.
+    NUMPY_REPEATED_SECTION_KEYS (dict[str, str]): NumPy section-equivalence keys used to detect repeated sections across
+        singular, plural, and synonym spellings.
+"""
 
 from __future__ import annotations
 
@@ -252,12 +287,27 @@ NUMPY_REPEATED_SECTION_KEYS = {
 
 
 def convention_parses_sections(convention: settings_check.DocstringConvention) -> bool:
-    """Return whether a docstring convention recognizes named sections."""
+    """Return whether a docstring convention recognizes named sections.
+
+    Args:
+        convention (settings_check.DocstringConvention): Active docstring convention.
+
+    Returns:
+        bool: Whether section-heading parsing is enabled for the convention.
+    """
     return convention in (settings_check.DocstringConvention.GOOGLE, settings_check.DocstringConvention.NUMPY)
 
 
 def canonical_section_name(convention: settings_check.DocstringConvention, name: str) -> str | None:
-    """Return the canonical spelling for a recognized convention section."""
+    """Return the canonical spelling for a recognized convention section.
+
+    Args:
+        convention (settings_check.DocstringConvention): Active convention whose section names should be considered.
+        name (str): Section heading text as parsed from a docstring.
+
+    Returns:
+        str | None: Title-cased canonical heading, or None when the convention does not recognize `name`.
+    """
     normalized = name.lower()
     if convention == settings_check.DocstringConvention.GOOGLE and normalized in GOOGLE_SECTIONS:
         return normalized.title()
@@ -267,7 +317,15 @@ def canonical_section_name(convention: settings_check.DocstringConvention, name:
 
 
 def plural_section_name(convention: settings_check.DocstringConvention, name: str) -> str | None:
-    """Return the preferred plural spelling for a convention section."""
+    """Return the preferred plural spelling for a convention section.
+
+    Args:
+        convention (settings_check.DocstringConvention): Active convention whose pluralization policy should be used.
+        name (str): Section heading text as parsed from a docstring.
+
+    Returns:
+        str | None: Preferred plural or canonical heading, or None when no plural replacement is configured.
+    """
     normalized = name.lower()
     if convention == settings_check.DocstringConvention.GOOGLE:
         return GOOGLE_SECTION_PLURAL_NAMES.get(normalized)
@@ -277,7 +335,15 @@ def plural_section_name(convention: settings_check.DocstringConvention, name: st
 
 
 def term_normalized_section_name(convention: settings_check.DocstringConvention, name: str) -> str | None:
-    """Return the preferred equivalent section term for a convention section."""
+    """Return the preferred equivalent section term for a convention section.
+
+    Args:
+        convention (settings_check.DocstringConvention): Active convention whose terminology policy should be used.
+        name (str): Section heading text as parsed from a docstring.
+
+    Returns:
+        str | None: Preferred equivalent heading, or None when no terminology replacement is configured.
+    """
     normalized = name.lower()
     if convention == settings_check.DocstringConvention.GOOGLE:
         return GOOGLE_SECTION_TERM_NAMES.get(normalized)
@@ -287,7 +353,15 @@ def term_normalized_section_name(convention: settings_check.DocstringConvention,
 
 
 def section_order_rank(convention: settings_check.DocstringConvention, section_name: str) -> int | None:
-    """Return the ordering rank for a convention section, if it is ordered."""
+    """Return the ordering rank for a convention section, if it is ordered.
+
+    Args:
+        convention (settings_check.DocstringConvention): Active convention whose ordering policy should be used.
+        section_name (str): Section heading text as parsed from a docstring.
+
+    Returns:
+        int | None: Relative order rank, or None for sections with no enforced order.
+    """
     normalized = section_name.lower()
     if convention == settings_check.DocstringConvention.GOOGLE:
         return GOOGLE_ORDER_RANKS.get(normalized)
@@ -297,7 +371,16 @@ def section_order_rank(convention: settings_check.DocstringConvention, section_n
 
 
 def repeated_section_key(convention: settings_check.DocstringConvention, section_name: str) -> str:
-    """Return the repeated-section identity key for a convention section."""
+    """Return the repeated-section identity key for a convention section.
+
+    Args:
+        convention (settings_check.DocstringConvention): Active convention whose repeat-equivalence policy should be
+            used.
+        section_name (str): Section heading text as parsed from a docstring.
+
+    Returns:
+        str: Normalized key used to compare headings for duplicate-section detection.
+    """
     normalized = section_name.lower()
     if convention == settings_check.DocstringConvention.GOOGLE:
         return GOOGLE_REPEATED_SECTION_KEYS.get(normalized, normalized)

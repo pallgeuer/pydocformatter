@@ -50,7 +50,11 @@ class CheckRunContext:
 
     @property
     def cwd_settings(self) -> CheckSettings:
-        """Return settings resolved for the current working directory."""
+        """Return settings resolved for the current working directory.
+
+        Returns:
+            CheckSettings: Settings profile data used for command-level options such as output format and parallelism.
+        """
         return self.cwd_profile.settings
 
 
@@ -170,6 +174,9 @@ def run(args: argparse.Namespace) -> int:
 
     Returns:
         int: Process exit status code.
+
+    Raises:
+        AssertionError: If stdin mode is paired with more than one accepted display path.
     """
     if args.show_settings + args.show_rules + args.show_files > 1:
         print("pydocfmt check: Argument error: Cannot use more than one of {--show-settings, --show-rules, --show-files} together", file=sys.stderr)
@@ -262,6 +269,9 @@ def check_files(*, args: argparse.Namespace, settings_context: CheckRunContext) 
 
     Returns:
         int: Process exit status code.
+
+    Raises:
+        AssertionError: If stdin mode is paired with more than one accepted display path.
     """
     errors: list[str] = []
 
@@ -360,7 +370,15 @@ def output_stream(output_file: str | None) -> Iterator[TextIO | None]:
 
 
 def resolve_parallelism(parallelism: float) -> int:
-    """Return the worker count represented by a parallelism setting."""
+    """Return the worker count represented by a parallelism setting.
+
+    Args:
+        parallelism (float): Configured parallelism value, where 0 means all CPUs, fractions scale CPUs, and integers
+            are exact worker counts.
+
+    Returns:
+        int: Concrete worker count after validation and CPU-count expansion.
+    """
     parallelism = settings_check.validate_parallelism(parallelism, "parallelism")
     if parallelism == 0:
         return max(1, os.cpu_count() or 1)
@@ -417,7 +435,24 @@ def format_selected_files(
     parallelism: float,
     executor_factory: _ExecutorFactory = concurrent.futures.ProcessPoolExecutor,
 ) -> list[FormatterResult]:
-    """Format selected files with each file's resolved settings profile."""
+    """Format selected files with each file's resolved settings profile.
+
+    Args:
+        selected_files (tuple[file_selection.SelectedFile, ...]): Accepted files in diagnostic output order.
+        rule_selections (dict[settings_core.SettingsProfile.Key[CheckSettings], RuleSelection]): Rule selections keyed
+            by the settings profile for each selected file.
+        use_stdin (bool): Whether the single selected file should read source from standard input.
+        fix (bool): Whether selected fixes should be applied before returning results.
+        write (bool): Whether fixed disk-backed files should be written in place.
+        parallelism (float): Configured worker-count value used for disk-backed files.
+        executor_factory (_ExecutorFactory): Executor constructor used to parallelize disk-backed formatting.
+
+    Returns:
+        list[FormatterResult]: Formatting results in the same order as the selected inputs.
+
+    Raises:
+        AssertionError: If stdin mode is requested with more than one selected file.
+    """
     if not selected_files:
         return []
     if use_stdin:

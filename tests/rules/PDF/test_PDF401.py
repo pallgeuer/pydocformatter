@@ -11,12 +11,12 @@ def format_source(source: str, *, settings: CheckSettings | None = None) -> form
 
 
 def test_pluralizes_google_section_names() -> None:
-    source = 'def function(value):\n    """Summary.\n\n    Arg:\n        value: Description.\n\n    Raise:\n        ValueError: Bad value.\n\n    Attribute:\n        name: Name.\n\n    Return:\n        int: Result.\n\n    Yield:\n        int: Item.\n\n    Example:\n        function(1)\n\n    Method:\n        run: Run it.\n\n    Note:\n        Worth noting.\n\n    Reference:\n        docs.\n\n    Warning:\n        Be careful.\n\n    Warn:\n        RuntimeWarning: May warn.\n    """\n'
+    source = 'def function(value):\n    """Summary.\n\n    Arg:\n        value: Description.\n\n    Raise:\n        ValueError: Bad value.\n\n    Attribute:\n        name (str): Name.\n\n    Return:\n        int: Result.\n\n    Yield:\n        int: Item.\n\n    Example:\n        function(1)\n\n    Method:\n        run: Run it.\n\n    Note:\n        Worth noting.\n\n    Reference:\n        docs.\n\n    Warning:\n        Be careful.\n\n    Warn:\n        RuntimeWarning: May warn.\n    """\n'
     result = format_source(source)
 
     assert (
         result.new_source
-        == 'def function(value):\n    """Summary.\n\n    Args:\n        value: Description.\n\n    Raises:\n        ValueError: Bad value.\n\n    Attributes:\n        name: Name.\n\n    Returns:\n        int: Result.\n\n    Yields:\n        int: Item.\n\n    Examples:\n        function(1)\n\n    Methods:\n        run: Run it.\n\n    Notes:\n        Worth noting.\n\n    References:\n        docs.\n\n    Warnings:\n        Be careful.\n\n    Warns:\n        RuntimeWarning: May warn.\n    """\n'
+        == 'def function(value):\n    """Summary.\n\n    Args:\n        value: Description.\n\n    Raises:\n        ValueError: Bad value.\n\n    Attributes:\n        name (str): Name.\n\n    Returns:\n        int: Result.\n\n    Yields:\n        int: Item.\n\n    Examples:\n        function(1)\n\n    Methods:\n        run: Run it.\n\n    Notes:\n        Worth noting.\n\n    References:\n        docs.\n\n    Warnings:\n        Be careful.\n\n    Warns:\n        RuntimeWarning: May warn.\n    """\n'
     )
     assert result.fixed_findings[PDF401SectionNamePluralization.meta] == 1
     assert not format_source(result.new_source).modified

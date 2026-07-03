@@ -1,4 +1,9 @@
-"""Rule code and selector parsing."""
+"""Rule code and selector parsing.
+
+Attributes:
+    ALL_RULE_SELECTOR_TAG (str): Reserved selector spelling that expands to every registered rule without being a valid
+        concrete rule code.
+"""
 
 from __future__ import annotations
 
@@ -28,7 +33,14 @@ class RuleCode:
 
     @staticmethod
     def is_valid_tag(tag: str) -> bool:
-        """Return whether a string is a valid rule code tag."""
+        """Return whether a string is a valid rule code tag.
+
+        Args:
+            tag (str): Candidate concrete rule code such as `PDF101`.
+
+        Returns:
+            bool: Whether the tag has a prefix and numeric suffix and is not the reserved `ALL` selector.
+        """
         return _RULE_CODE_RE.fullmatch(tag) is not None and not tag.startswith(ALL_RULE_SELECTOR_TAG)
 
     def __post_init__(self) -> None:
@@ -66,7 +78,14 @@ class RuleSelector:
 
     @staticmethod
     def is_valid_tag(tag: str) -> bool:
-        """Return whether a string is a valid rule selector tag."""
+        """Return whether a string is a valid rule selector tag.
+
+        Args:
+            tag (str): Candidate selector such as `PDF`, `PDF10`, `PDF101`, or `ALL`.
+
+        Returns:
+            bool: Whether the tag can be parsed as a broad or exact rule selector.
+        """
         return tag == ALL_RULE_SELECTOR_TAG or (_RULE_SELECTOR_RE.fullmatch(tag) is not None and not tag.startswith(ALL_RULE_SELECTOR_TAG))
 
     def __post_init__(self) -> None:
@@ -84,7 +103,14 @@ class RuleSelector:
         object.__setattr__(self, "number_str", number_str)
 
     def selects_code(self, code: RuleCode) -> bool:
-        """Return whether this selector selects a rule code."""
+        """Return whether this selector selects a rule code.
+
+        Args:
+            code (RuleCode): Concrete rule code to compare against this selector.
+
+        Returns:
+            bool: Whether the selector covers the rule code by `ALL`, category prefix, numeric prefix, or exact match.
+        """
         return self.prefix == ALL_RULE_SELECTOR_TAG or (self.prefix == code.prefix and (not self.number_str or code.number_str.startswith(self.number_str)))
 
     def __str__(self) -> str:

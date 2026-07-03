@@ -48,20 +48,20 @@ class PDF411TypeLikeTokenSpacingNormalization(RuleBase):
 
     @classmethod
     def violations(cls, context: RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
-        """Return violations for non-canonical type-like token spacing."""
+        """Return violations for non-canonical type-like token spacing.
+
+        Args:
+            context (RuleContext): Current file context with parsed module, settings, and prepared category data.
+
+        Returns:
+            tuple[rule_violations.RuleViolation, ...]: Rule violations reported for the current source.
+        """
         return _results(context, rule=cls.meta)
 
 
 @dataclasses.dataclass(frozen=True)
 class _LineReplacement:
-    """Replacement span for one normalized type-like token.
-
-    Attributes:
-        line (PDF_definition.DocstringValueLine): Logical docstring line containing the token.
-        start_column (int): Zero-based evaluated-text column where the token starts.
-        end_column (int): Zero-based evaluated-text column just after the token.
-        text (str): Normalized replacement text.
-    """
+    """Replacement span for one normalized type-like token."""
 
     line: PDF_definition.DocstringValueLine
     start_column: int

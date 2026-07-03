@@ -28,8 +28,8 @@ docstring-convention = "google"
 """Client defaults.
 
 Attributes:
-    timeout: Request timeout.
-    stale: Removed attribute.
+    timeout (float): Request timeout.
+    stale (object): Removed attribute.
 """
 
 timeout: float
@@ -49,10 +49,10 @@ docstring-convention = "google"
 """Client defaults.
 
 Attributes:
-    _timeout: Internal timeout.
-    primary: Primary endpoint.
-    fallback: Fallback endpoint.
-    aliases: Endpoint aliases.
+    _timeout (float): Internal timeout.
+    primary (str): Primary endpoint.
+    fallback (str): Fallback endpoint.
+    aliases (tuple[str, ...]): Endpoint aliases.
 """
 
 _timeout: float
@@ -72,7 +72,7 @@ docstring-convention = "google"
 """Client defaults.
 
 Attributes:
-    timeout: Request timeout.
+    timeout (float): Request timeout.
 """
 
 class Client:
@@ -134,7 +134,7 @@ docstring-convention = "google"
 """Client defaults.
 
 Attributes:
-    primary: Primary endpoint.
+    primary (str): Primary endpoint.
 """
 
 [primary, fallback] = endpoints

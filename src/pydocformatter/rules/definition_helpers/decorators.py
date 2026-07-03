@@ -6,7 +6,14 @@ import libcst as cst
 
 
 def decorator_qualified_name(expression: cst.BaseExpression) -> str | None:
-    """Return a dotted decorator name, unwrapping decorator calls."""
+    """Return a dotted decorator name, unwrapping decorator calls.
+
+    Args:
+        expression (cst.BaseExpression): Decorator expression or call expression to inspect.
+
+    Returns:
+        str | None: Dotted name such as `abc.abstractmethod`, or None for dynamic decorator expressions.
+    """
     if isinstance(expression, cst.Call):
         return decorator_qualified_name(expression.func)
     if isinstance(expression, cst.Name):

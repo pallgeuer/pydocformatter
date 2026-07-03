@@ -39,7 +39,14 @@ class PDF508MissingClassAttributeDocumentation(RuleBase):
 
     @classmethod
     def violations(cls, context: RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
-        """Return violations for class attributes missing documentation."""
+        """Return violations for class attributes missing documentation.
+
+        Args:
+            context (RuleContext): Current file context with parsed module, settings, and prepared category data.
+
+        Returns:
+            tuple[rule_violations.RuleViolation, ...]: Rule violations reported for the current source.
+        """
         data = PDF.require_data(context)
         return attribute_documentation.missing_attribute_violations(
             data,

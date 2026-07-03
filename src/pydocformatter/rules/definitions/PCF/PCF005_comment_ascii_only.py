@@ -31,6 +31,13 @@ class PCF005CommentAsciiOnly(RuleBase):
 
     @classmethod
     def violations(cls, context: RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
-        """Return violations for comments containing non-ASCII source characters."""
+        """Return violations for comments containing non-ASCII source characters.
+
+        Args:
+            context (RuleContext): Current file context with parsed module, settings, and prepared category data.
+
+        Returns:
+            tuple[rule_violations.RuleViolation, ...]: Rule violations reported for the current source.
+        """
         data = PCF_definition.PCF.require_data(context)
         return tuple(rule_violations.diagnostic(cls.meta, (comment.range.start.line,)) for comment in data.comments if not comment.text.isascii())

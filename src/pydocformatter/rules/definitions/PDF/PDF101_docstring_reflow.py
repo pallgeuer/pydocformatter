@@ -39,7 +39,14 @@ class PDF101DocstringReflow(RuleBase):
 
     @classmethod
     def violations(cls, context: RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
-        """Return violations for docstring reflow changes."""
+        """Return violations for docstring reflow changes.
+
+        Args:
+            context (RuleContext): Current file context with parsed module, settings, and prepared category data.
+
+        Returns:
+            tuple[rule_violations.RuleViolation, ...]: Rule violations reported for the current source.
+        """
         return _docstring_violations(context)
 
 

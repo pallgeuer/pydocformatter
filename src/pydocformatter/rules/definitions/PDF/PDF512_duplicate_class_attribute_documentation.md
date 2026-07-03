@@ -29,7 +29,7 @@ class Client:
     """HTTP client.
 
     Attributes:
-        timeout: Request timeout.
+        timeout (float): Request timeout.
     """
 
     timeout: float
@@ -51,7 +51,7 @@ class Client:
     """HTTP client.
 
     Attributes:
-        timeout: Request timeout.
+        timeout (float): Request timeout.
     """
 
     timeout: float
@@ -99,8 +99,8 @@ class Client:
     """HTTP client.
 
     Attributes:
-        primary: Primary endpoint.
-        aliases: Endpoint aliases.
+        primary (str): Primary endpoint.
+        aliases (tuple[str, ...]): Endpoint aliases.
     """
 
     primary, (fallback, *aliases) = endpoints
@@ -149,8 +149,8 @@ class Client:
     """HTTP client.
 
     Attributes:
-        timeout: Request timeout.
-        retries: Retry count.
+        timeout (float): Request timeout.
+        retries (int): Retry count.
     """
 
     def __init__(self):

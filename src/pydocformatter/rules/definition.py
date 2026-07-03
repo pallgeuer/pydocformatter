@@ -63,16 +63,16 @@ class RuleBase:
 
     Attributes:
         meta (ClassVar[RuleMetadata]): Rule metadata supplied by concrete rule classes.
-        code: Alias for the full rule code tag.
-        prefix: Alias for the rule-code prefix.
-        number_str: Alias for the zero-padded rule number string.
-        number: Alias for the integer rule number.
-        name: Alias for the rule name.
-        message: Alias for the default diagnostic message.
-        fix_availability: Alias for the rule-level automatic fix availability.
-        stable_since: Alias for the pydocformatter version in which the rule became stable.
-        setting_effects: Alias for selection effects driven by resolved settings.
-        incompatible_with: Alias for rule codes that cannot be selected with this rule.
+        code (str): Alias for the full rule code tag.
+        prefix (str): Alias for the rule-code prefix.
+        number_str (str): Alias for the zero-padded rule number string.
+        number (int): Alias for the integer rule number.
+        name (str): Alias for the rule name.
+        message (str): Alias for the default diagnostic message.
+        fix_availability (FixAvailability): Alias for the rule-level automatic fix availability.
+        stable_since (str): Alias for the pydocformatter version in which the rule became stable.
+        setting_effects (tuple[RuleSettingEffects, ...]): Alias for selection effects driven by resolved settings.
+        incompatible_with (tuple[RuleCode, ...]): Alias for rule codes that cannot be selected with this rule.
     """
 
     meta: ClassVar[RuleMetadata]
@@ -103,7 +103,14 @@ class RuleBase:
 
     @classmethod
     def violations(cls, context: RuleContext) -> tuple[RuleViolation, ...]:
-        """Return canonical violations for the current source."""
+        """Return canonical violations for the current source.
+
+        Args:
+            context (RuleContext): Parsed source, settings, category data, and effective fix mode for the current file.
+
+        Returns:
+            tuple[RuleViolation, ...]: Violations reported by this rule before suppression filtering.
+        """
         del context
         return ()
 
@@ -137,9 +144,9 @@ class RuleCategoryBase:
     Attributes:
         meta (ClassVar[RuleCategoryMetadata]): Category metadata supplied by concrete category classes.
         code_class_map (ClassVar[dict[RuleCode, type[RuleBase]]]): Registered rules indexed by rule code.
-        prefix: Alias for the category rule-code prefix.
-        name: Alias for the category name.
-        url: Alias for the optional category documentation URL.
+        prefix (str): Alias for the category rule-code prefix.
+        name (str): Alias for the category name.
+        url (str | None): Alias for the optional category documentation URL.
     """
 
     meta: ClassVar[RuleCategoryMetadata]
@@ -160,16 +167,31 @@ class RuleCategoryBase:
 
     @classmethod
     def ordered_rules(cls) -> tuple[type[RuleBase], ...]:
-        """Return registered rules in deterministic rule-code order."""
+        """Return registered rules in deterministic rule-code order.
+
+        Returns:
+            tuple[type[RuleBase], ...]: Rule classes registered to this category sorted by rule code.
+        """
         return tuple(rule_class for _, rule_class in sorted(cls.code_class_map.items()))
 
     @classmethod
     def ordered_code_class_map(cls) -> dict[RuleCode, type[RuleBase]]:
-        """Return registered rules indexed in deterministic rule-code order."""
+        """Return registered rules indexed in deterministic rule-code order.
+
+        Returns:
+            dict[RuleCode, type[RuleBase]]: Rule-code mapping sorted by code for stable collection and display.
+        """
         return dict(sorted(cls.code_class_map.items()))
 
     @classmethod
     def prepare(cls, context: RuleCategoryContext) -> object | None:
-        """Return optional read-only data shared by this category's rules for one module."""
+        """Return optional read-only data shared by this category's rules for one module.
+
+        Args:
+            context (RuleCategoryContext): Parsed module, source text, settings, and category-selected rule classes.
+
+        Returns:
+            object | None: Category-specific prepared data, or None when the category has no shared preparation.
+        """
         del context
         return None

@@ -1,4 +1,11 @@
-"""PDF docstring-formatting rule category."""
+"""PDF docstring-formatting rule category.
+
+Attributes:
+    DocstringOwner (TypeAlias): Union of definition and attribute records that can own an attached or conventional
+        docstring.
+    DocumentedFunctionFact (TypeAlias): Cached tuple pairing a function definition, its parsed docstring, and its
+        return/yield/raise inventory.
+"""
 
 from __future__ import annotations
 
@@ -513,10 +520,6 @@ class PDFCategoryData:
             apply owner-specific policy.
         summary_terminal_line_targets (tuple[SummaryLineTarget, ...]): Summary lines eligible for terminal-punctuation
             checks.
-        _attributes_by_owner_id (Mapping[int, tuple[AttributeInfo, ...]] | None): Cached attributes keyed by owner
-            identity.
-        _attached_attribute_docstrings_by_owner_id (Mapping[int, Mapping[str, tuple[DocstringInfo, ...]]] | None):
-            Cached attribute docstrings keyed by owner identity and target name.
     """
 
     definitions: tuple[DefinitionInfo, ...]
@@ -530,7 +533,14 @@ class PDFCategoryData:
     _documented_function_facts: tuple[DocumentedFunctionFact, ...] | None = dataclasses.field(default=None, init=False, repr=False, compare=False)
 
     def docstring_for(self, definition: DefinitionInfo) -> DocstringInfo | None:
-        """Return the docstring owned by a definition, if one exists."""
+        """Return the docstring owned by a definition, if one exists.
+
+        Args:
+            definition: Module, class, or function definition whose direct docstring should be retrieved.
+
+        Returns:
+            The cached docstring whose owner is the definition, or None when the definition is undocumented.
+        """
         docstrings_by_owner_id = self._docstrings_by_owner_id
         if docstrings_by_owner_id is None:
             docstrings_by_owner_id = {}
@@ -541,7 +551,14 @@ class PDFCategoryData:
         return docstrings_by_owner_id.get(id(definition))
 
     def attributes_for(self, owner: DefinitionInfo) -> tuple[AttributeInfo, ...]:
-        """Return collected attributes for an owner."""
+        """Return collected attributes for an owner.
+
+        Args:
+            owner: Definition whose assigned attributes should be exposed to attribute-documentation rules.
+
+        Returns:
+            Attribute facts collected directly below the owner, preserving collection order.
+        """
         attributes_by_owner_id = self._attributes_by_owner_id
         if attributes_by_owner_id is None:
             mutable_index: dict[int, list[AttributeInfo]] = {}
@@ -552,7 +569,14 @@ class PDFCategoryData:
         return attributes_by_owner_id.get(id(owner), ())
 
     def attached_attribute_docstrings_by_name(self, owner: DefinitionInfo) -> Mapping[str, tuple[DocstringInfo, ...]]:
-        """Return attached attribute docstrings for an owner indexed by target name."""
+        """Return attached attribute docstrings for an owner indexed by target name.
+
+        Args:
+            owner: Definition whose attribute-level string literals should be grouped by assigned target.
+
+        Returns:
+            Read-only mapping from attribute target name to all attached docstrings collected for that name.
+        """
         docstrings_by_owner_id = self._attached_attribute_docstrings_by_owner_id
         if docstrings_by_owner_id is None:
             mutable_index: dict[int, dict[str, list[DocstringInfo]]] = {}
@@ -797,7 +821,14 @@ class PDF(RuleCategoryBase):
 
     @classmethod
     def prepare(cls, context: RuleCategoryContext) -> PDFCategoryData:
-        """Collect documentable definitions and existing docstrings."""
+        """Collect documentable definitions and existing docstrings.
+
+        Args:
+            context: Parsed module and settings shared by every PDF rule for the current file.
+
+        Returns:
+            Shared category data containing definitions, attributes, docstrings, and precomputed summary targets.
+        """
         del cls
         collector = _DefinitionCollector(context)
         context.module.visit(collector)
@@ -814,19 +845,43 @@ class PDF(RuleCategoryBase):
 
     @classmethod
     def require_data(cls, context: RuleContext) -> PDFCategoryData:
-        """Return prepared PDF data or raise for an invalid rule context."""
+        """Return prepared PDF data or raise for an invalid rule context.
+
+        Args:
+            context: Rule execution context expected to carry the PDF category preparation result.
+
+        Returns:
+            Prepared PDF category data for the current file.
+
+        Raises:
+            TypeError: Raised when the context was not prepared by the PDF rule category.
+        """
         if not isinstance(context.category_data, PDFCategoryData):
             raise TypeError(f"{cls.meta.prefix} rules require PDFCategoryData")
         return context.category_data
 
 
 def is_adornment(text: str) -> bool:
-    """Return whether text is a heading or section adornment line."""
+    """Return whether text is a heading or section adornment line.
+
+    Args:
+        text: Logical docstring line text to classify.
+
+    Returns:
+        True when the line consists only of a repeated reStructuredText-style adornment character.
+    """
     return _is_adornment(text)
 
 
 def final_convention_section(docstring: DocstringInfo) -> DocstringBlock | None:
-    """Return the final top-level convention section, if there is one."""
+    """Return the final top-level convention section, if there is one.
+
+    Args:
+        docstring: Parsed docstring whose convention-aware block tree should be inspected.
+
+    Returns:
+        The final non-blank section block, or None when the convention has no parseable sections or the docstring ends with another block kind.
+    """
     if not docstring_sections.convention_parses_sections(docstring.structure.convention):
         return None
     non_blank_blocks = tuple(block for block in docstring.structure.blocks if block.kind is not DocstringBlockKind.BLANK)
@@ -836,7 +891,14 @@ def final_convention_section(docstring: DocstringInfo) -> DocstringBlock | None:
 
 
 def final_convention_section_spacing(docstring: DocstringInfo) -> FinalConventionSectionSpacing | None:
-    """Return final convention section content and trailing blank facts."""
+    """Return final convention section content and trailing blank facts.
+
+    Args:
+        docstring: Parsed docstring whose last convention section should be analyzed.
+
+    Returns:
+        Section spacing facts for the final section, or None when there is no final parseable convention section.
+    """
     section = final_convention_section(docstring)
     if section is None:
         return None
@@ -853,7 +915,17 @@ def docstring_line_source(
     fragments: tuple[string_literals.StringValueFragment, ...],
     strip_docstring_margin: bool,
 ) -> str:
-    """Return source spelling for a logical docstring line."""
+    """Return source spelling for a logical docstring line.
+
+    Args:
+        line: Evaluated-value line whose source body slice should be reconstructed.
+        fragments: Simple-string value fragments that map evaluated offsets back to source spelling.
+        strip_docstring_margin: Whether to discard the literal indentation margin and keep only text content with
+            virtual indentation.
+
+    Returns:
+        Source text for the line body, preserving escapes unless margin stripping is requested.
+    """
     if not strip_docstring_margin:
         return string_literals.source_for_value_slice(fragments, line.start_offset, line.end_offset)
     start_offset = line.start_offset + line.text_raw_start_column
@@ -1693,12 +1765,29 @@ def _is_doctest_prompt(text: str) -> bool:
 
 
 def is_same_line_closing_delimiter_prefix(docstring: DocstringInfo, line: DocstringValueLine) -> bool:
-    """Return whether a value line prefixes same-line closing quotes."""
+    """Return whether a value line prefixes same-line closing quotes.
+
+    Args:
+        docstring: Simple or suite docstring that owns the logical line.
+        line: Logical value line to compare against the docstring terminator position.
+
+    Returns:
+        True when the line is the final logical line of a non-empty docstring value without a trailing newline.
+    """
     return line.index == len(docstring.structure.lines) - 1 and docstring.value != "" and not docstring_value_ends_with_newline(docstring)
 
 
 def is_safely_mapped_simple_docstring(docstring: DocstringInfo, *, require_multiline: bool = False) -> bool:
-    """Return whether a simple docstring can be safely rewritten by evaluated line."""
+    """Return whether a simple docstring can be safely rewritten by evaluated line.
+
+    Args:
+        docstring: Docstring candidate whose source mapping must be a LibCST simple string with mapped logical lines.
+        require_multiline: Whether single-line simple strings should be rejected for callers that only operate on
+            multiline layouts.
+
+    Returns:
+        True when every parsed value line maps back to a concrete source line and whole-literal replacement can preserve spelling safely.
+    """
     return (
         docstring.kind is DocstringKind.SIMPLE
         and isinstance(docstring.node, cst.SimpleString)
@@ -1708,14 +1797,31 @@ def is_safely_mapped_simple_docstring(docstring: DocstringInfo, *, require_multi
 
 
 def docstring_value_fragments(docstring: DocstringInfo, *, line_ending: str) -> tuple[string_literals.StringValueFragment, ...] | None:
-    """Return source fragments for a safely rewritable simple docstring."""
+    """Return source fragments for a safely rewritable simple docstring.
+
+    Args:
+        docstring: Docstring whose simple-string node should be decomposed into value/source fragments.
+        line_ending: Canonical line ending used when normalizing physical source lines.
+
+    Returns:
+        Fragment mapping for translating evaluated offsets into source slices, or None for non-simple docstring nodes.
+    """
     if not isinstance(docstring.node, cst.SimpleString):
         return None
     return string_literals.value_fragments_for_simple_string(docstring.node, line_ending=line_ending)
 
 
 def docstring_canonical_margin(docstring: DocstringInfo, *, context: RuleContext, source_lines: Sequence[str] | None = None) -> str:
-    """Return the raw indentation margin for continuation and aligned blank lines."""
+    """Return the raw indentation margin for continuation and aligned blank lines.
+
+    Args:
+        docstring: Docstring whose opening source column determines the reusable margin.
+        context: Rule context providing file source and indentation settings.
+        source_lines: Optional alternate source text to use after a planned rewrite has been applied.
+
+    Returns:
+        Raw whitespace prefix that should be used for generated continuation lines in the docstring body.
+    """
     lines = source_lines if source_lines is not None else context.source_lines
     source_line = lines[docstring.range.start.line - 1]
     line_indent = source_line[: len(source_line) - len(source_line.lstrip(" \t"))]
@@ -1731,7 +1837,19 @@ def planned_simple_docstring_line_change(
     context: RuleContext,
     raw_line_targets: tuple[str | None, ...],
 ) -> rule_edits.PlannedSourceChange | None:
-    """Return one whole-literal replacement for changed raw evaluated lines."""
+    """Return one whole-literal replacement for changed raw evaluated lines.
+
+    Args:
+        docstring: Simple docstring whose logical line bodies may be replaced.
+        context: Rule context providing line endings and source formatting settings.
+        raw_line_targets: Target raw value text for each logical line, with None preserving the existing line.
+
+    Returns:
+        Planned replacement for the whole string literal, or None when no line changes or no safe source rendering is available.
+
+    Raises:
+        ValueError: Raised when the caller provides a target tuple that does not match the parsed logical line count.
+    """
     if len(raw_line_targets) != len(docstring.structure.lines):
         raise ValueError("Raw line targets must match the docstring line count")
     replacements: list[rule_edits.PlannedTextReplacement] = []
@@ -1760,7 +1878,18 @@ def planned_simple_docstring_source_change(
     replacements: tuple[rule_edits.PlannedTextReplacement, ...],
     value_lines: list[str],
 ) -> rule_edits.PlannedSourceChange | None:
-    """Return one whole-literal replacement from evaluated-value replacements."""
+    """Return one whole-literal replacement from evaluated-value replacements.
+
+    Args:
+        docstring: Simple docstring whose body source should be rebuilt from evaluated-value edits.
+        context: Rule context providing the file line ending used to map string fragments.
+        replacements: Evaluated-offset replacements that identify changed slices and affected source lines.
+        value_lines: Complete logical value lines after all replacements, used to verify that the rendered literal still
+            evaluates correctly.
+
+    Returns:
+        Planned replacement for the whole string literal, or None when rendering would be unsafe or unchanged.
+    """
     if not replacements:
         return None
     fragments = docstring_value_fragments(docstring, line_ending=context.line_ending)
@@ -1793,7 +1922,20 @@ def planned_simple_docstring_output_change(
     preserve_trailing_newline: bool | None = None,
     separator_fallback: DocstringOutputSeparatorFallback | None = None,
 ) -> rule_edits.PlannedSourceChange | None:
-    """Return one whole-literal replacement from target output lines."""
+    """Return one whole-literal replacement from target output lines.
+
+    Args:
+        docstring: Simple docstring whose full literal source should be replaced.
+        context: Rule context providing source line endings and string fragment mapping.
+        output_lines: Render-ready line descriptors combining preserved source lines and synthesized text.
+        line_numbers: Source lines that should be reported as affected by the resulting change.
+        preserve_trailing_newline: Optional override for whether the rendered docstring value keeps a final newline.
+        separator_fallback: Optional strategy for adding boundary spaces when adjacent quote delimiters cannot be
+            represented safely.
+
+    Returns:
+        Planned whole-literal source change, or None when the docstring is not safely renderable or the rendered source is unchanged.
+    """
     if not isinstance(docstring.node, cst.SimpleString):
         return None
     fragments = docstring_value_fragments(docstring, line_ending=context.line_ending)
@@ -1813,22 +1955,50 @@ def planned_simple_docstring_output_change(
 
 
 def docstring_content_indexes(docstring: DocstringInfo) -> tuple[int, ...]:
-    """Return logical line indexes containing non-space-tab text."""
+    """Return logical line indexes containing non-space-tab text.
+
+    Args:
+        docstring: Parsed docstring whose logical value lines should be scanned.
+
+    Returns:
+        Zero-based logical line indexes that contain content other than spaces or tabs.
+    """
     return tuple(line.index for line in docstring.structure.lines if line.text.strip(" \t"))
 
 
 def docstring_value_line_numbers(lines: tuple[DocstringValueLine, ...]) -> tuple[int, ...]:
-    """Return deduplicated source line numbers for changed logical lines."""
+    """Return deduplicated source line numbers for changed logical lines.
+
+    Args:
+        lines: Logical docstring lines that may map to physical source lines.
+
+    Returns:
+        Source line numbers for mapped logical lines, preserving first occurrence order and omitting unmapped lines.
+    """
     return tuple(dict.fromkeys(line.source_line_number for line in lines if line.source_line_number is not None))
 
 
 def docstring_physical_line_numbers(docstring: DocstringInfo) -> tuple[int, ...]:
-    """Return physical source lines occupied by a docstring expression."""
+    """Return physical source lines occupied by a docstring expression.
+
+    Args:
+        docstring: Docstring expression whose LibCST source range has already been collected.
+
+    Returns:
+        Physical source line numbers covered by the complete docstring literal expression.
+    """
     return tuple(source_line.line_number for source_line in docstring.physical_lines)
 
 
 def summary_first_line_targets(docstrings: tuple[DocstringInfo, ...]) -> tuple[SummaryLineTarget, ...]:
-    """Return first non-adornment summary lines for parsed top-level summaries from all docstring owners."""
+    """Return first non-adornment summary lines for parsed top-level summaries from all docstring owners.
+
+    Args:
+        docstrings: Docstrings whose first parsed summary block may produce a rule target.
+
+    Returns:
+        Summary targets pointing at the first content line in each top-level summary block.
+    """
     targets: list[SummaryLineTarget] = []
     for docstring in docstrings:
         block = first_summary_block(docstring)
@@ -1841,7 +2011,14 @@ def summary_first_line_targets(docstrings: tuple[DocstringInfo, ...]) -> tuple[S
 
 
 def summary_terminal_line_targets(docstrings: tuple[DocstringInfo, ...]) -> tuple[SummaryLineTarget, ...]:
-    """Return final non-adornment summary lines for parsed top-level summaries."""
+    """Return final non-adornment summary lines for parsed top-level summaries.
+
+    Args:
+        docstrings: Docstrings whose first parsed summary block may produce a terminal-line target.
+
+    Returns:
+        Summary targets pointing at the final content line in each top-level summary block.
+    """
     targets: list[SummaryLineTarget] = []
     for docstring in docstrings:
         block = first_summary_block(docstring)
@@ -1854,7 +2031,14 @@ def summary_terminal_line_targets(docstrings: tuple[DocstringInfo, ...]) -> tupl
 
 
 def first_summary_block(docstring: DocstringInfo) -> DocstringBlock | None:
-    """Return the first non-blank block when it is a parsed top-level summary."""
+    """Return the first non-blank block when it is a parsed top-level summary.
+
+    Args:
+        docstring: Parsed docstring whose leading blocks should be inspected.
+
+    Returns:
+        First non-blank block when it is a summary block, otherwise None.
+    """
     first_block = next((block for block in docstring.structure.blocks if block.kind is not DocstringBlockKind.BLANK), None)
     if first_block is None or first_block.kind is not DocstringBlockKind.SUMMARY:
         return None
@@ -1862,7 +2046,16 @@ def first_summary_block(docstring: DocstringInfo) -> DocstringBlock | None:
 
 
 def first_non_adornment_line(docstring: DocstringInfo, start: int, end: int) -> DocstringValueLine | None:
-    """Return the first non-empty, non-adornment logical line in a summary block."""
+    """Return the first non-empty, non-adornment logical line in a summary block.
+
+    Args:
+        docstring: Docstring that owns the summary block range.
+        start: Inclusive logical line index where the block begins.
+        end: Exclusive logical line index where the block ends.
+
+    Returns:
+        First content line in the requested range, excluding blank and adornment-only lines.
+    """
     for index in range(start, end):
         line = docstring.structure.lines[index]
         if line.text.strip(" \t") and not is_adornment(line.text):
@@ -1871,7 +2064,16 @@ def first_non_adornment_line(docstring: DocstringInfo, start: int, end: int) -> 
 
 
 def final_non_adornment_line(docstring: DocstringInfo, start: int, end: int) -> DocstringValueLine | None:
-    """Return the final non-empty, non-adornment logical line in a summary block."""
+    """Return the final non-empty, non-adornment logical line in a summary block.
+
+    Args:
+        docstring: Docstring that owns the summary block range.
+        start: Inclusive logical line index where the block begins.
+        end: Exclusive logical line index where the block ends.
+
+    Returns:
+        Final content line in the requested range, excluding blank and adornment-only lines.
+    """
     for index in range(end - 1, start - 1, -1):
         line = docstring.structure.lines[index]
         if line.text.strip(" \t") and not is_adornment(line.text):
@@ -1880,14 +2082,29 @@ def final_non_adornment_line(docstring: DocstringInfo, start: int, end: int) -> 
 
 
 def docstring_line_numbers(docstring: DocstringInfo, line: DocstringValueLine) -> tuple[int, ...]:
-    """Return concrete source lines for a docstring value line."""
+    """Return concrete source lines for a docstring value line.
+
+    Args:
+        docstring: Docstring whose physical range is used when the logical line lacks a direct source mapping.
+        line: Logical docstring line being reported by a rule.
+
+    Returns:
+        Direct logical line source numbers when available, otherwise the complete physical docstring range.
+    """
     if line.source_line_number is not None:
         return docstring_value_line_numbers((line,))
     return docstring_physical_line_numbers(docstring)
 
 
 def docstring_value_ends_with_newline(docstring: DocstringInfo) -> bool:
-    """Return whether an evaluated docstring value ends with a newline."""
+    """Return whether an evaluated docstring value ends with a newline.
+
+    Args:
+        docstring: Docstring whose evaluated Python string value should be checked.
+
+    Returns:
+        True when the value ends with any supported newline spelling.
+    """
     return docstring.value.endswith(("\r\n", "\r", "\n"))
 
 
@@ -1920,7 +2137,16 @@ def _render_output_with_separator_fallback(
 
 
 def render_simple_docstring_body_with_separator_fallbacks(docstring: DocstringInfo, *, body_source: str, expected_value: str) -> str | None:
-    """Render output source after trying value-preserving quote escapes and separator fallbacks."""
+    """Render output source after trying value-preserving quote escapes and separator fallbacks.
+
+    Args:
+        docstring: Simple-string docstring whose quote style should be kept if possible.
+        body_source: Desired literal body before escape or separator adjustments.
+        expected_value: Desired evaluated value before separator fallbacks potentially add boundary spaces.
+
+    Returns:
+        First renderable full literal source from the candidate sequence, or None when every candidate is unsafe.
+    """
     if not isinstance(docstring.node, cst.SimpleString):
         return None
     for candidate_body, candidate_value in simple_docstring_body_source_candidates(docstring.node, body_source, expected_value=expected_value):
@@ -1931,10 +2157,27 @@ def render_simple_docstring_body_with_separator_fallbacks(docstring: DocstringIn
 
 
 def simple_docstring_body_source_candidates(node: cst.SimpleString, body_source: str, *, expected_value: str) -> Iterator[tuple[str, str]]:
-    """Yield source-body candidates ordered by value preservation before separator fallback."""
+    """Yield source-body candidates ordered by value preservation before separator fallback.
+
+    Args:
+        node: Simple-string syntax node whose prefix and delimiter determine which escapes are legal.
+        body_source: Desired literal body before trying quote escapes or separator spaces.
+        expected_value: Evaluated value corresponding to the desired body source.
+
+    Yields:
+        Candidate body source and the evaluated value expected from rendering it.
+    """
     seen: set[tuple[str, str]] = set()
 
     def candidate_once(candidate: tuple[str, str]) -> Iterator[tuple[str, str]]:
+        """Yield a candidate pair only the first time it appears.
+
+        Args:
+            candidate: Body-source and expected-value pair produced by an escape or separator strategy.
+
+        Yields:
+            The candidate pair when it has not already been emitted.
+        """
         if candidate not in seen:
             seen.add(candidate)
             yield candidate
@@ -1989,7 +2232,15 @@ def _opening_quote_separator_output(docstring: DocstringInfo, *, body_source: st
 
 
 def escaped_opening_quote_body_source(node: cst.SimpleString, body_source: str) -> str | None:
-    """Return body source with a leading delimiter quote escaped where possible."""
+    """Return body source with a leading delimiter quote escaped where possible.
+
+    Args:
+        node: Simple-string node whose raw prefix and delimiter control whether escaping is allowed.
+        body_source: Literal body source that may start with the delimiter quote character.
+
+    Returns:
+        Body source with an inserted leading backslash escape, or None for raw strings and non-conflicting bodies.
+    """
     if "r" in node.prefix.lower():
         return None
     quote_char = "'" if "'" in node.quote else '"'
@@ -1999,7 +2250,15 @@ def escaped_opening_quote_body_source(node: cst.SimpleString, body_source: str) 
 
 
 def escaped_closing_quote_body_source(node: cst.SimpleString, body_source: str) -> str | None:
-    """Return body source with trailing delimiter quotes escaped where possible."""
+    """Return body source with trailing delimiter quotes escaped where possible.
+
+    Args:
+        node: Simple-string node whose delimiter length limits how many trailing quotes may be escaped.
+        body_source: Literal body source that may end with delimiter quote characters.
+
+    Returns:
+        Body source with safe trailing quote escapes, or None when raw-string semantics or the body shape prevent escaping.
+    """
     if "r" in node.prefix.lower():
         return None
     quote_char = "'" if "'" in node.quote else '"'
@@ -2077,7 +2336,15 @@ def _output_expected_value(output_lines: tuple[DocstringOutputLine, ...], *, pre
 
 
 def join_docstring_value_lines(docstring: DocstringInfo, lines: list[str]) -> str:
-    """Join replacement logical lines with the original evaluated newline spellings."""
+    """Join replacement logical lines with the original evaluated newline spellings.
+
+    Args:
+        docstring: Docstring whose evaluated value contains the separators between logical lines.
+        lines: Replacement logical line text in parsed line order.
+
+    Returns:
+        Full evaluated docstring value with caller-provided line text and original inter-line separators.
+    """
     chunks: list[str] = []
     for index, (line_info, line) in enumerate(zip(docstring.structure.lines, lines)):
         chunks.append(line)
@@ -2106,7 +2373,17 @@ def value_offset_for_text_column(line: DocstringValueLine, column: int, *, requi
 
 
 def value_offset_for_text_column(line: DocstringValueLine, column: int, *, require_source_text: bool = False) -> int | None:
-    """Return the evaluated-value offset for a line.text column."""
+    """Return the evaluated-value offset for a line.text column.
+
+    Args:
+        line: Logical docstring line whose visible text column should be translated.
+        column: Zero-based column within the virtualized text field of the line.
+        require_source_text: Whether columns that exist only in virtual indentation should return None instead of
+            clamping to the first source-backed character.
+
+    Returns:
+        Evaluated-value offset corresponding to the text column, or None when source-backed text is required but the column is outside the raw text span.
+    """
     unclamped_raw_column = line.text_raw_start_column + column - line.text_virtual_prefix_length
     if require_source_text and (unclamped_raw_column < line.text_raw_start_column or unclamped_raw_column > len(line.raw_text)):
         return None

@@ -9,6 +9,7 @@ import libcst as cst
 import pydocformatter.rules.definition_helpers.decorators as decorator_helpers
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
+from pydocformatter.rules.definitions.PDF.PDF import DocumentedFunctionFact, FunctionFacts, RaisedException, StatementTarget
 
 
 @dataclasses.dataclass(frozen=True)
@@ -26,17 +27,19 @@ class DocumentedEntry:
     has_content: bool
 
 
-StatementTarget = PDF_definition.StatementTarget
-RaisedException = PDF_definition.RaisedException
-FunctionFacts = PDF_definition.FunctionFacts
-DocumentedFunctionFact = PDF_definition.DocumentedFunctionFact
-
-
 _ABSTRACT_DECORATOR_NAMES = {"abstractmethod", "abstractclassmethod", "abstractstaticmethod", "abstractproperty"}
 
 
 def documented_function_facts(context: RuleContext) -> tuple[DocumentedFunctionFact, ...]:
-    """Return documented non-stub function facts for value documentation rules."""
+    """Return documented non-stub function facts for value documentation rules.
+
+    Args:
+        context (RuleContext): Current file context with prepared PDF data and LibCST metadata.
+
+    Returns:
+        tuple[DocumentedFunctionFact, ...]: Function definitions with docstrings and collected return, yield, and raise
+            facts.
+    """
     data = PDF_definition.PDF.require_data(context)
     cached_facts = data._documented_function_facts
     if cached_facts is not None:
@@ -61,7 +64,16 @@ def _collect_documented_function_facts(data: PDF_definition.PDFCategoryData, *, 
 
 
 def documented_entries(docstring: PDF_definition.DocstringInfo, kind: PDF_definition.DocstringEntryKind, *, require_content: bool) -> tuple[DocumentedEntry, ...]:
-    """Return documented docstring entries of one semantic kind."""
+    """Return documented docstring entries of one semantic kind.
+
+    Args:
+        docstring (PDF_definition.DocstringInfo): Parsed docstring whose entries should be inspected.
+        kind (PDF_definition.DocstringEntryKind): Semantic entry kind to collect.
+        require_content (bool): Whether empty entries should be ignored.
+
+    Returns:
+        tuple[DocumentedEntry, ...]: Matching entries with names, line targets, and content flags.
+    """
     entries: list[DocumentedEntry] = []
     skipped_exception_entries = _non_exception_documentation_entries(docstring) if kind is PDF_definition.DocstringEntryKind.EXCEPTION else set()
     for entry in docstring.structure.entries:
@@ -86,14 +98,29 @@ def _non_exception_documentation_entries(docstring: PDF_definition.DocstringInfo
 
 
 def has_exception_documentation(docstring: PDF_definition.DocstringInfo) -> bool:
-    """Return whether a docstring contains exception documentation structures."""
+    """Return whether a docstring contains exception documentation structures.
+
+    Args:
+        docstring (PDF_definition.DocstringInfo): Parsed docstring to inspect for exception sections or fields.
+
+    Returns:
+        bool: Whether the docstring has recognized exception documentation.
+    """
     return any(section.name.lower() in {"raise", "raises"} for section in docstring.structure.sections) or bool(
         documented_entries(docstring, PDF_definition.DocstringEntryKind.EXCEPTION, require_content=False)
     )
 
 
 def value_documentation_targets(docstring: PDF_definition.DocstringInfo, kind: PDF_definition.DocstringEntryKind) -> tuple[DocumentedEntry, ...]:
-    """Return section and entry targets for return or yield documentation."""
+    """Return section and entry targets for return or yield documentation.
+
+    Args:
+        docstring (PDF_definition.DocstringInfo): Parsed docstring to inspect for return or yield structures.
+        kind (PDF_definition.DocstringEntryKind): Value-documentation kind to collect.
+
+    Returns:
+        tuple[DocumentedEntry, ...]: Section headers and standalone fields that document the requested value kind.
+    """
     entries: list[DocumentedEntry] = []
     for section in docstring.structure.sections:
         if _section_entry_kind(section) is not kind:
@@ -280,7 +307,15 @@ def _exception_name_parent(expression: cst.BaseExpression) -> str | None:
 
 
 def exception_names_match(raised_name: str, documented_name: str) -> bool:
-    """Return whether a raised exception name matches a documented exception name."""
+    """Return whether a raised exception name matches a documented exception name.
+
+    Args:
+        raised_name (str): Exception name detected in a `raise` statement.
+        documented_name (str): Exception name parsed from docstring documentation.
+
+    Returns:
+        bool: Whether fully qualified names match exactly or unqualified final name components match.
+    """
     if "." in raised_name and "." in documented_name:
         return raised_name == documented_name
     return raised_name.rpartition(".")[2] == documented_name.rpartition(".")[2]

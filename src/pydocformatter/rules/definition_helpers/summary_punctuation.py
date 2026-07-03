@@ -25,7 +25,16 @@ class SummaryPunctuationPolicy:
 
 
 def results(context: RuleContext, *, rule: RuleMetadata, policy: SummaryPunctuationPolicy) -> tuple[rule_violations.RuleViolation, ...]:
-    """Return violations for summary punctuation."""
+    """Return violations for summary punctuation.
+
+    Args:
+        context (RuleContext): Current file context with prepared PDF summary targets.
+        rule (RuleMetadata): Rule metadata used for diagnostics and fixes.
+        policy (SummaryPunctuationPolicy): Valid and non-fixable terminal punctuation policy.
+
+    Returns:
+        tuple[rule_violations.RuleViolation, ...]: Summary punctuation violations for eligible docstrings.
+    """
     data = PDF_definition.PDF.require_data(context)
     return tuple(result for target in data.summary_terminal_line_targets if (result := result_for_target(target, context=context, rule=rule, policy=policy)) is not None)
 
@@ -37,7 +46,17 @@ def result_for_target(
     rule: RuleMetadata,
     policy: SummaryPunctuationPolicy,
 ) -> rule_violations.RuleViolation | None:
-    """Return one summary-punctuation violation for a summary target."""
+    """Return one summary-punctuation violation for a summary target.
+
+    Args:
+        target (PDF_definition.SummaryLineTarget): Summary line to inspect.
+        context (RuleContext): Current file context used to plan source edits.
+        rule (RuleMetadata): Rule metadata used for diagnostics and fixes.
+        policy (SummaryPunctuationPolicy): Valid and non-fixable terminal punctuation policy.
+
+    Returns:
+        rule_violations.RuleViolation | None: Violation for a bad ending, or None when the summary already complies.
+    """
     trimmed = target.line.text.rstrip(" \t")
     if not trimmed or trimmed.endswith("\\") or trimmed.endswith(tuple(policy.valid_endings)):
         return None

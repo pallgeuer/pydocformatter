@@ -28,7 +28,7 @@ docstring-convention = "google"
 """Client defaults.
 
 Attributes:
-    timeout: Request timeout.
+    timeout (float): Request timeout.
 """
 
 timeout: float
@@ -49,7 +49,7 @@ docstring-convention = "google"
 """Client defaults.
 
 Attributes:
-    timeout: Request timeout.
+    timeout (float): Request timeout.
 """
 
 timeout: float
@@ -94,8 +94,8 @@ docstring-convention = "google"
 """Client defaults.
 
 Attributes:
-    primary: Primary endpoint.
-    aliases: Endpoint aliases.
+    primary (str): Primary endpoint.
+    aliases (tuple[str, ...]): Endpoint aliases.
 """
 
 primary, (fallback, *aliases) = endpoints
@@ -141,8 +141,8 @@ docstring-convention = "google"
 """Client defaults.
 
 Attributes:
-    timeout: Request timeout.
-    retries: Retry count.
+    timeout (float): Request timeout.
+    retries (int): Retry count.
 """
 
 class Client:

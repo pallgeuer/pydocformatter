@@ -1,4 +1,29 @@
-"""Comment structure detection helpers."""
+"""Comment structure detection helpers.
+
+Attributes:
+    DISABLED_CODE_RE (re.Pattern[str]): Conservative keyword detector for comment lines that likely contain disabled
+        Python statements.
+    LIST_RE (re.Pattern[str]): List-item parser used to preserve marker indentation while reflowing standalone comment
+        prose.
+    BLOCK_QUOTE_RE (re.Pattern[str]): Markdown block-quote parser that keeps nested quote prefixes attached to wrapped
+        output lines.
+    TASK_MARKERS (tuple[str, ...]): Uppercase task labels that receive hanging-indent formatting instead of ordinary
+        paragraph wrapping.
+    TASK_MARKER_RE (re.Pattern[str]): Task-comment parser that separates the recognized marker from the prose payload.
+    ATX_HEADING_RE (re.Pattern[str]): Markdown ATX heading detector used to keep standalone heading comments unchanged.
+    HEADING_ADORNMENT_RE (re.Pattern[str]): Setext and reStructuredText adornment detector for preserving underlined or
+        overlined headings.
+    FENCE_RE (re.Pattern[str]): Markdown code-fence detector used to protect fenced blocks from prose wrapping.
+    DIRECTIVE_RE (re.Pattern[str]): ReStructuredText directive opener detector used to preserve directive bodies by
+        indentation.
+    MARKDOWN_TABLE_DELIMITER_RE (re.Pattern[str]): Markdown pipe-table separator detector used as structural evidence
+        for table preservation.
+    REST_GRID_BORDER_RE (re.Pattern[str]): ReStructuredText grid-table border detector used to keep table rows aligned.
+    REST_SIMPLE_BORDER_RE (re.Pattern[str]): ReStructuredText simple-table border detector used to preserve column
+        layout.
+    OPERATOR_LIKE_RE (re.Pattern[str]): Leading operator heuristic that keeps continuation-like trailing comments inline
+        when extraction would be ambiguous.
+"""
 
 from __future__ import annotations
 
@@ -28,14 +53,27 @@ OPERATOR_LIKE_RE = re.compile(r"^(?:<=|>=|==|!=|->|=>|[-<>|&+*/%])(?:\s|$)")
 
 @dataclasses.dataclass(frozen=True)
 class TaskMarkerMatch:
-    """Recognized task-marker comment content."""
+    """Recognized task-marker comment content.
+
+    Attributes:
+        marker (str): Uppercase task label such as `TODO` without the trailing colon.
+        text (str): Payload text following the task marker.
+    """
 
     marker: str
     text: str
 
 
 def preserved_indices(run: PCF_definition.StandaloneCommentRun, *, settings: CheckSettings) -> set[int]:
-    """Return physical line indices protected by enabled structure detectors."""
+    """Return physical line indices protected by enabled structure detectors.
+
+    Args:
+        run (PCF_definition.StandaloneCommentRun): Consecutive standalone comments to classify.
+        settings (CheckSettings): Comment-formatting settings controlling which structures are preserved.
+
+    Returns:
+        set[int]: Zero-based indices into `run.comments` that should not be prose-formatted or code-detected.
+    """
     preserved: set[int] = set()
     bodies = tuple(comment.body.rstrip() for comment in run.comments)
     if settings.comment_preserve_headings:
@@ -96,7 +134,14 @@ def preserved_indices(run: PCF_definition.StandaloneCommentRun, *, settings: Che
 
 
 def table_indices(bodies: tuple[str, ...]) -> set[int]:
-    """Return indices belonging to conservatively detected Markdown or reST tables."""
+    """Return indices belonging to conservatively detected Markdown or reST tables.
+
+    Args:
+        bodies (tuple[str, ...]): Comment body text for one standalone run, without syntactic comment markers.
+
+    Returns:
+        set[int]: Zero-based indices of lines that appear to participate in Markdown or reStructuredText tables.
+    """
     indices: set[int] = set()
     for index, body in enumerate(bodies):
         if MARKDOWN_TABLE_DELIMITER_RE.fullmatch(body) is not None:
@@ -123,12 +168,29 @@ def table_indices(bodies: tuple[str, ...]) -> set[int]:
 
 
 def is_table_border(body: str) -> bool:
-    """Return whether one line is a conservatively detected table border."""
+    """Return whether one line is a conservatively detected table border.
+
+    Args:
+        body (str): Comment body text without the syntactic comment marker.
+
+    Returns:
+        bool: Whether the body matches a Markdown or reStructuredText table delimiter.
+    """
     return MARKDOWN_TABLE_DELIMITER_RE.fullmatch(body) is not None or REST_GRID_BORDER_RE.fullmatch(body) is not None or REST_SIMPLE_BORDER_RE.fullmatch(body) is not None
 
 
 def run_contains_code(run: PCF_definition.StandaloneCommentRun, *, preserved: set[int], settings: CheckSettings, ignore_task_markers: bool = False) -> bool:
-    """Return whether enabled detectors classify any part of a run as code."""
+    """Return whether enabled detectors classify any part of a run as code.
+
+    Args:
+        run (PCF_definition.StandaloneCommentRun): Consecutive standalone comments to inspect.
+        preserved (set[int]): Comment indices already protected by structure detectors.
+        settings (CheckSettings): Code-detection settings controlling statement, expression, and heuristic checks.
+        ignore_task_markers (bool): Whether recognized task-marker units should be skipped by run-level code detection.
+
+    Returns:
+        bool: Whether enabled detectors classify any unpreserved candidate line or multiline segment as code-like.
+    """
     lines = code_detection_lines(run, settings=settings)
     ignored = task_marker_unit_indices(run, preserved=preserved) if ignore_task_markers and settings.comment_format_task_markers else set()
     candidates = tuple(lines[index] for index in range(len(lines)) if index not in preserved and index not in ignored and lines[index].strip())
@@ -146,7 +208,15 @@ def run_contains_code(run: PCF_definition.StandaloneCommentRun, *, preserved: se
 
 
 def code_detection_lines(run: PCF_definition.StandaloneCommentRun, *, settings: CheckSettings) -> tuple[str, ...]:
-    """Return semantic lines after stripping enabled structure prefixes."""
+    """Return semantic lines after stripping enabled structure prefixes.
+
+    Args:
+        run (PCF_definition.StandaloneCommentRun): Consecutive standalone comments to normalize for code detection.
+        settings (CheckSettings): Settings controlling list-item and block-quote prefix handling.
+
+    Returns:
+        tuple[str, ...]: Candidate text lines aligned with `run.comments`.
+    """
     lines: list[str] = []
     list_item_active = False
     for comment in run.comments:
@@ -170,7 +240,15 @@ def code_detection_lines(run: PCF_definition.StandaloneCommentRun, *, settings: 
 
 
 def multiline_code_candidates(lines: tuple[str, ...], *, preserved: set[int]) -> tuple[str, ...]:
-    """Return dedented candidates from contiguous non-preserved line segments."""
+    """Return dedented candidates from contiguous non-preserved line segments.
+
+    Args:
+        lines (tuple[str, ...]): Code-detection text lines aligned with a standalone run.
+        preserved (set[int]): Indices that split and exclude protected structures.
+
+    Returns:
+        tuple[str, ...]: Non-empty dedented multiline candidates for AST-based code detection.
+    """
     candidates: list[str] = []
     current: list[str] = []
     for index, line in enumerate(lines):
@@ -186,7 +264,14 @@ def multiline_code_candidates(lines: tuple[str, ...], *, preserved: set[int]) ->
 
 
 def is_python_statement(text: str) -> bool:
-    """Return whether text parses as Python containing a non-expression statement."""
+    """Return whether text parses as Python containing a non-expression statement.
+
+    Args:
+        text (str): Candidate comment text to parse as a Python module.
+
+    Returns:
+        bool: Whether parsing succeeds and at least one top-level statement is not a bare expression.
+    """
     try:
         module = ast.parse(text)
     except SyntaxError:
@@ -195,7 +280,14 @@ def is_python_statement(text: str) -> bool:
 
 
 def is_nontrivial_expression(text: str) -> bool:
-    """Return whether text parses as a nontrivial Python expression."""
+    """Return whether text parses as a nontrivial Python expression.
+
+    Args:
+        text (str): Candidate comment text to parse in expression mode.
+
+    Returns:
+        bool: Whether parsing succeeds as an expression more complex than a bare name or scalar constant.
+    """
     try:
         expression = ast.parse(text, mode="eval").body
     except SyntaxError:
@@ -229,7 +321,14 @@ def is_nontrivial_expression(text: str) -> bool:
 
 
 def task_marker_match(body: str) -> TaskMarkerMatch | None:
-    """Return a recognized task-marker match for comment body text."""
+    """Return a recognized task-marker match for comment body text.
+
+    Args:
+        body (str): Comment body text without the syntactic comment marker.
+
+    Returns:
+        TaskMarkerMatch | None: Parsed task marker and payload, or None when the body is not a supported marker.
+    """
     match = TASK_MARKER_RE.match(body.rstrip())
     if match is None:
         return None
@@ -237,7 +336,16 @@ def task_marker_match(body: str) -> TaskMarkerMatch | None:
 
 
 def task_marker_continuation_text(body: str, *, marker: str) -> str | None:
-    """Return text from an exact task-marker continuation line."""
+    """Return text from an exact task-marker continuation line.
+
+    Args:
+        body (str): Candidate continuation body without the syntactic comment marker.
+        marker (str): Task marker whose hanging indentation width should be matched.
+
+    Returns:
+        str | None: Continuation payload text, empty string for a blank continuation, or None when indentation does not
+            match.
+    """
     prefix = " " * len(f"{marker}: ")
     if not body.startswith(prefix):
         return None
@@ -248,7 +356,15 @@ def task_marker_continuation_text(body: str, *, marker: str) -> str | None:
 
 
 def task_marker_unit_indices(run: PCF_definition.StandaloneCommentRun, *, preserved: set[int]) -> set[int]:
-    """Return indices belonging to recognized task-marker units."""
+    """Return indices belonging to recognized task-marker units.
+
+    Args:
+        run (PCF_definition.StandaloneCommentRun): Consecutive standalone comments to scan.
+        preserved (set[int]): Structure-protected indices that cannot belong to task-marker units.
+
+    Returns:
+        set[int]: Zero-based indices covered by task-marker heads and exact hanging continuation lines.
+    """
     indices: set[int] = set()
     index = 0
     while index < len(run.comments):
@@ -268,7 +384,15 @@ def task_marker_unit_indices(run: PCF_definition.StandaloneCommentRun, *, preser
 
 
 def task_marker_body_is_code_like(text: str, *, settings: CheckSettings) -> bool:
-    """Return whether task-marker payload text should be protected as code-like."""
+    """Return whether task-marker payload text should be protected as code-like.
+
+    Args:
+        text (str): Task-marker payload line to inspect.
+        settings (CheckSettings): Code-detection settings controlling the active heuristics.
+
+    Returns:
+        bool: Whether the task-marker payload should be normalized but not wrapped as prose.
+    """
     body = text.strip()
     if not body:
         return False
@@ -276,12 +400,30 @@ def task_marker_body_is_code_like(text: str, *, settings: CheckSettings) -> bool
 
 
 def task_marker_texts_are_code_like(texts: tuple[str, ...], *, settings: CheckSettings) -> bool:
-    """Return whether any task-marker payload line should be protected as code-like."""
+    """Return whether any task-marker payload line should be protected as code-like.
+
+    Args:
+        texts (tuple[str, ...]): Task-marker payload and continuation payload lines.
+        settings (CheckSettings): Code-detection settings controlling the active heuristics.
+
+    Returns:
+        bool: Whether any payload line should make the whole task-marker unit avoid prose wrapping.
+    """
     return any(task_marker_body_is_code_like(text, settings=settings) for text in texts)
 
 
 def format_task_marker_lines(marker: str, texts: tuple[str, ...], *, indent: str, settings: CheckSettings) -> tuple[str, ...]:
-    """Return task-marker comment content lines with hanging indentation."""
+    """Return task-marker comment content lines with hanging indentation.
+
+    Args:
+        marker (str): Task label without the trailing colon.
+        texts (tuple[str, ...]): Payload and continuation payload lines to normalize.
+        indent (str): Source indentation before the syntactic comment marker.
+        settings (CheckSettings): Wrapping, indentation, URL, and code-detection settings.
+
+    Returns:
+        tuple[str, ...]: Comment body lines after task-marker formatting.
+    """
     prefix = f"{marker}: "
     body = " ".join(text for text in texts if text).strip()
     if not body:
@@ -295,7 +437,15 @@ def format_task_marker_lines(marker: str, texts: tuple[str, ...], *, indent: str
 
 
 def trailing_content_is_unsafe(content: str, *, settings: CheckSettings) -> bool:
-    """Return whether content should not be reinterpreted as standalone comment text."""
+    """Return whether content should not be reinterpreted as standalone comment text.
+
+    Args:
+        content (str): Raw trailing-comment content after the syntactic comment marker.
+        settings (CheckSettings): Comment structure and code-detection settings used for content-aware extraction.
+
+    Returns:
+        bool: Whether extraction could change the meaning of code-like, structural, directive, or operator-like content.
+    """
     raw_body = content.rstrip()
     body = raw_body.strip()
     if not body:

@@ -44,7 +44,14 @@ class PDF500MissingParameterDocumentation(RuleBase):
 
     @classmethod
     def violations(cls, context: RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
-        """Return violations for signature parameters missing docstring documentation."""
+        """Return violations for signature parameters missing docstring documentation.
+
+        Args:
+            context (RuleContext): Current file context with parsed module, settings, and prepared category data.
+
+        Returns:
+            tuple[rule_violations.RuleViolation, ...]: Rule violations reported for the current source.
+        """
         if docstring_conventions.missing_documentation_is_inert(context.settings.docstring_convention):
             return ()
         data = PDF.require_data(context)

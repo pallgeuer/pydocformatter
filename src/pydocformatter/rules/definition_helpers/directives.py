@@ -1,4 +1,13 @@
-"""Directive comment syntax shared by comment rules and suppression parsing."""
+"""Directive comment syntax shared by comment rules and suppression parsing.
+
+Attributes:
+    NOQA_RE (re.Pattern[str]): Generic `noqa` parser that keeps selector payloads and trailing rationale comments
+        separate.
+    PYDOCFMT_NOQA_RE (re.Pattern[str]): Pydocfmt line-suppression parser for optional rule selectors and preserved
+        rationale text.
+    PYDOCFMT_BRACKET_RE (re.Pattern[str]): Pydocfmt bracket-directive parser used by normalization and suppression
+        handling.
+"""
 
 from __future__ import annotations
 

@@ -79,7 +79,14 @@ class PerFileRuleIgnore:
         object.__setattr__(self, "matcher", GlobPatternSet.compile((pattern,), match_parent_segments_for_bare=False))
 
     def matches(self, path: str) -> bool:
-        """Return whether this per-file ignore entry matches a normalized path."""
+        """Return whether this per-file ignore entry matches a normalized path.
+
+        Args:
+            path (str): Filesystem path to compare against the configured pattern base.
+
+        Returns:
+            bool: Whether the path is covered by the ignore entry after applying negation.
+        """
         matched = self.matcher.matches(_base_relative_posix_path(path, self.base_path))
         return not matched if self.negated else matched
 
@@ -101,7 +108,14 @@ class RuleSelection:
     collection: RuleCollection
 
     def for_path(self, path: str) -> tuple[SelectedRule, ...]:
-        """Return selected rules after applying per-file ignores to a path."""
+        """Return selected rules after applying per-file ignores to a path.
+
+        Args:
+            path (str): Source path whose per-file ignore patterns should be evaluated.
+
+        Returns:
+            tuple[SelectedRule, ...]: Globally selected rules with path-specific ignored rules removed.
+        """
         ignored_rule_codes: set[RuleCode] = set()
         for ignore in self.per_file_ignores:
             if ignore.matches(path):
@@ -119,7 +133,19 @@ def select_rules(
     field_priorities: Mapping[str, int] | None = None,
     profile: settings_core.SettingsProfile[CheckSettings] | None = None,
 ) -> RuleSelection:
-    """Resolve rule selection and fixability settings against collected rules."""
+    """Resolve rule selection and fixability settings against collected rules.
+
+    Args:
+        settings (CheckSettings): Resolved check settings to use when no profile override is supplied.
+        collection (RuleCollection | None): Rule collection to select from, or the built-in collection by default.
+        field_bases (Mapping[str, str] | None): Source-base directories for path-like rule settings.
+        field_priorities (Mapping[str, int] | None): Source priorities used to break ties between selector groups.
+        profile (settings_core.SettingsProfile[CheckSettings] | None): Complete settings profile that overrides the
+            separate settings and metadata arguments.
+
+    Returns:
+        RuleSelection: Effective rule set, fixability flags, per-file ignores, and non-fatal selector errors.
+    """
     if collection is None:
         collection = rule_collection.RULE_COLLECTION
     if profile is not None:

@@ -28,7 +28,7 @@ docstring-convention = "google"
 """Client defaults.
 
 Attributes:
-    timeout: Request timeout.
+    timeout (float): Request timeout.
 """
 
 timeout: float

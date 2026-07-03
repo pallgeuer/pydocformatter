@@ -69,33 +69,79 @@ class _UseGreedyWrap(Exception):
 
 
 def display_width(text: str, *, tab_width: int) -> int:
-    """Return the display width after expanding tabs to configured stops."""
+    """Return the display width after expanding tabs to configured stops.
+
+    Args:
+        text (str): Text whose rendered width should be measured.
+        tab_width (int): Tab stop width used by wrapping and indentation calculations.
+
+    Returns:
+        int: Number of display columns occupied by the text.
+    """
     return len(text.expandtabs(tab_width))
 
 
 def leading_width(text: str) -> int:
-    """Return the tab-expanded width of leading whitespace."""
+    """Return the tab-expanded width of leading whitespace.
+
+    Args:
+        text (str): Text whose leading spaces and tabs should be measured.
+
+    Returns:
+        int: Display columns occupied by the leading whitespace prefix, using Python's default tab expansion.
+    """
     return display_width(text[: len(text) - len(text.lstrip(" \t"))], tab_width=8)
 
 
 def indent_unit(settings: settings_check.CheckSettings) -> str:
-    """Return one generated indentation unit."""
+    """Return one generated indentation unit.
+
+    Args:
+        settings (settings_check.CheckSettings): Resolved indentation style and width settings.
+
+    Returns:
+        str: One tab or the configured number of spaces for generated indentation.
+    """
     return "\t" if settings.indent_style == settings_check.IndentStyle.TAB else " " * settings.indent_width
 
 
 def has_space_tab_content(text: str) -> bool:
-    """Return whether text contains content other than spaces and tabs."""
+    """Return whether text contains content other than spaces and tabs.
+
+    Args:
+        text (str): Text to inspect for semantic content.
+
+    Returns:
+        bool: Whether any character remains after stripping spaces and tabs.
+    """
     return bool(text.strip(" \t"))
 
 
 def strip_indent(text: str, width: int) -> str:
-    """Strip up to a tab-expanded indentation width from text."""
+    """Strip up to a tab-expanded indentation width from text.
+
+    Args:
+        text (str): Raw line text whose indentation should be removed.
+        width (int): Display-width indentation budget to remove.
+
+    Returns:
+        str: Text after removing up to `width` display columns of indentation.
+    """
     stripped, _, _ = strip_indent_with_mapping(text, width)
     return stripped
 
 
 def strip_indent_with_mapping(text: str, width: int) -> tuple[str, int, int]:
-    """Strip indentation and return the raw/virtual mapping for text column zero."""
+    """Strip indentation and return the raw/virtual mapping for text column zero.
+
+    Args:
+        text (str): Raw line text whose indentation should be removed.
+        width (int): Display-width indentation budget to remove.
+
+    Returns:
+        tuple[str, int, int]: Stripped text, raw source index where stripped text begins, and virtual spaces retained
+            for a partially consumed tab.
+    """
     index = 0
     column = 0
     while index < len(text) and text[index] in " \t" and column < width:
@@ -106,13 +152,32 @@ def strip_indent_with_mapping(text: str, width: int) -> tuple[str, int, int]:
 
 
 def is_url_token(text: str) -> bool:
-    """Return whether text is a URL-like wrapping token."""
+    """Return whether text is a URL-like wrapping token.
+
+    Args:
+        text (str): Wrapping token to classify after trimming surrounding punctuation.
+
+    Returns:
+        bool: Whether the token should be kept intact by URL-aware wrapping.
+    """
     candidate = text.lstrip(_URL_TOKEN_LEADING_PUNCTUATION).rstrip(_URL_TOKEN_TRAILING_PUNCTUATION)
     return _URL_TOKEN_RE.match(candidate) is not None
 
 
 def wrap_text(text: str, *, width: int, initial_indent: str = "", subsequent_indent: str = "", tab_width: int = 8, url_aware: bool = False) -> tuple[str, ...]:
-    """Wrap normalized text using the shared modern-rule wrapping policy."""
+    """Wrap normalized text using the shared modern-rule wrapping policy.
+
+    Args:
+        text (str): Whitespace-normalized prose to wrap.
+        width (int): Maximum output line width in display columns.
+        initial_indent (str): Prefix for the first output line.
+        subsequent_indent (str): Prefix for continuation output lines.
+        tab_width (int): Tab stop width used when measuring indentation.
+        url_aware (bool): Whether URL tokens should remain intact and line breaks should be balanced around them.
+
+    Returns:
+        tuple[str, ...]: Wrapped output lines including the requested indentation prefixes.
+    """
     if width <= 0:
         return (f"{initial_indent}{text}",)
     words = tuple(text.split())
@@ -149,7 +214,25 @@ def balanced_word_spans(
     subsequent_width: int | None = None,
     final_suffix_width: int = 0,
 ) -> tuple[WordSpan, ...]:
-    """Return URL-aware balanced word spans without splitting tokens."""
+    """Return URL-aware balanced word spans without splitting tokens.
+
+    Args:
+        words (tuple[str, ...]): Original tokens to group into output lines.
+        width_words (tuple[str, ...]): Tokens used for width scoring, aligned one-to-one with `words`.
+        width (int): Maximum line width in display columns.
+        initial_indent (str): Prefix measured for the first output line when explicit widths are not supplied.
+        subsequent_indent (str): Prefix measured for continuation lines when explicit widths are not supplied.
+        tab_width (int): Tab stop width used when measuring indentation.
+        initial_width (int | None): Optional precomputed content width for the first output line.
+        subsequent_width (int | None): Optional precomputed content width for continuation lines.
+        final_suffix_width (int): Display width reserved on the final line for suffix text.
+
+    Returns:
+        tuple[WordSpan, ...]: Half-open word-index spans for each output line.
+
+    Raises:
+        ValueError: If `words` and `width_words` are not aligned.
+    """
     if len(width_words) != len(words):
         raise ValueError("words and width_words must have the same length")
     if not words:
@@ -295,7 +378,16 @@ def _greedy_word_spans(
 
 
 def advance_display_column(column: int, text: str, *, tab_width: int) -> int:
-    """Return the display column after rendering text from an existing column."""
+    """Return the display column after rendering text from an existing column.
+
+    Args:
+        column (int): Starting display column.
+        text (str): Text to render from the starting column.
+        tab_width (int): Tab stop width used when advancing over tabs.
+
+    Returns:
+        int: Display column immediately after the rendered text.
+    """
     for char in text:
         if char == "\t":
             column = ((column // tab_width) + 1) * tab_width if tab_width > 0 else column

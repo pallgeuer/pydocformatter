@@ -95,35 +95,60 @@ class CommentInfo:
 
     @property
     def syntax_sensitive(self) -> bool:
-        """Return whether trailing-comment extraction needs syntax-sensitive protection."""
+        """Return whether trailing-comment extraction needs syntax-sensitive protection.
+
+        Returns:
+            bool: Whether moving this trailing comment could alter syntax around decorators, arguments, or compound
+                headers.
+        """
         if self.placement != CommentPlacement.TRAILING or self._syntax_sensitivity is None:
             return False
         return self._syntax_sensitivity.is_sensitive(self.node)
 
     @property
     def raw_content(self) -> str:
-        """Return comment text after exactly one leading hash."""
+        """Return comment text after exactly one leading hash.
+
+        Returns:
+            str: Comment source with the syntactic `#` removed and all remaining marker/content text preserved.
+        """
         return self.text.removeprefix("#")
 
     @property
     def body(self) -> str:
-        """Return comment text after one optional conventional marker space."""
+        """Return comment text after one optional conventional marker space.
+
+        Returns:
+            str: Comment content used for prose and structure parsing.
+        """
         content = self.raw_content
         return content[1:] if content.startswith(" ") else content
 
     @property
     def content(self) -> str:
-        """Return normalized comment content without surrounding whitespace."""
+        """Return normalized comment content without surrounding whitespace.
+
+        Returns:
+            str: Trimmed payload after the syntactic comment marker.
+        """
         return self.raw_content.strip()
 
     @property
     def is_empty(self) -> bool:
-        """Return whether the comment has no non-whitespace content."""
+        """Return whether the comment has no non-whitespace content.
+
+        Returns:
+            bool: Whether the comment payload is empty after whitespace trimming.
+        """
         return not self.content
 
     @property
     def is_hash_only(self) -> bool:
-        """Return whether the comment consists only of hashes and whitespace."""
+        """Return whether the comment consists only of hashes and whitespace.
+
+        Returns:
+            bool: Whether all characters are marker hashes or whitespace.
+        """
         return not self.text.strip("# \t\f")
 
 
@@ -160,7 +185,14 @@ class PCFCategoryData:
     trailing_comments: tuple[CommentInfo, ...]
 
     def source_for(self, code_range: cst_metadata.CodeRange) -> str:
-        """Return exact source text for a half-open LibCST code range."""
+        """Return exact source text for a half-open LibCST code range.
+
+        Args:
+            code_range (cst_metadata.CodeRange): One-based source range to slice from the original module text.
+
+        Returns:
+            str: Exact source text covered by the range.
+        """
         return source_text.source_for_range(code_range, source_lines=self.source_lines)
 
 
@@ -193,7 +225,14 @@ class PCF(RuleCategoryBase):
 
     @classmethod
     def prepare(cls, context: RuleCategoryContext) -> PCFCategoryData:
-        """Collect and classify comments for one module."""
+        """Collect and classify comments for one module.
+
+        Args:
+            context (RuleCategoryContext): Parsed module, source lines, settings, and selected PCF rule classes.
+
+        Returns:
+            PCFCategoryData: Source lines, all comments, standalone runs, and trailing comments prepared for PCF rules.
+        """
         del cls
         if "#" not in context.source:
             return PCFCategoryData(
@@ -222,25 +261,62 @@ class PCF(RuleCategoryBase):
 
     @classmethod
     def require_data(cls, context: RuleContext) -> PCFCategoryData:
-        """Return prepared PCF data or raise for an invalid rule context."""
+        """Return prepared PCF data or raise for an invalid rule context.
+
+        Args:
+            context (RuleContext): Rule context whose category data should have been prepared by PCF.
+
+        Returns:
+            PCFCategoryData: Prepared comment data for the current module.
+
+        Raises:
+            TypeError: If the rule context does not contain PCF category data.
+        """
         if not isinstance(context.category_data, PCFCategoryData):
             raise TypeError(f"{cls.meta.prefix} rules require PCFCategoryData")
         return context.category_data
 
 
 def available_comment_width(indent: str, *, line_length: int, tab_width: int, prefix: str = "") -> int:
-    """Return available content width after indentation and comment prefixes."""
+    """Return available content width after indentation and comment prefixes.
+
+    Args:
+        indent (str): Source indentation before the comment marker.
+        line_length (int): Maximum configured output line width.
+        tab_width (int): Tab stop width used when measuring indentation.
+        prefix (str): Additional structural prefix, such as a task marker or list prefix, after `# `.
+
+    Returns:
+        int: Remaining display columns available for comment payload text.
+    """
     return line_length - text_layout.display_width(f"{indent}# {prefix}", tab_width=tab_width)
 
 
 def render_comment(content: str, *, indent: str = "", include_indent: bool = True) -> str:
-    """Render one canonical comment line."""
+    """Render one canonical comment line.
+
+    Args:
+        content (str): Comment payload after the canonical marker space.
+        indent (str): Source indentation to include before the comment marker.
+        include_indent (bool): Whether `indent` should be emitted in the returned line.
+
+    Returns:
+        str: Canonical standalone comment source without a line ending.
+    """
     prefix = indent if include_indent else ""
     return f"{prefix}# {content}" if content else f"{prefix}#"
 
 
 def render_inline_trailing_comment(code: str, content: str) -> str:
-    """Return canonical inline trailing-comment source."""
+    """Return canonical inline trailing-comment source.
+
+    Args:
+        code (str): Source code before the trailing comment marker.
+        content (str): Comment payload after the canonical marker space.
+
+    Returns:
+        str: Source line with two spaces before `#` and canonical marker spacing.
+    """
     return f"{code}  # {content}" if content else f"{code}  #"
 
 
@@ -249,7 +325,16 @@ def planned_full_line_change(
     comment: CommentInfo,
     replacement: str,
 ) -> rule_edits.PlannedSourceChange | None:
-    """Return a full-line source change unless source already matches."""
+    """Return a full-line source change unless source already matches.
+
+    Args:
+        data (PCFCategoryData): Prepared PCF source lines used to compare existing source.
+        comment (CommentInfo): Comment whose physical line should be replaced.
+        replacement (str): Full replacement line without a line ending.
+
+    Returns:
+        rule_edits.PlannedSourceChange | None: Full-line replacement, or None when source already matches.
+    """
     code_range = cst_metadata.CodeRange(
         start=cst_metadata.CodePosition(line=comment.range.start.line, column=0),
         end=comment.range.end,

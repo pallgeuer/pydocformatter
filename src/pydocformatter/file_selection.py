@@ -1,4 +1,9 @@
-"""File discovery and filtering for checkable Python sources."""
+"""File discovery and filtering for checkable Python sources.
+
+Attributes:
+    STDIN_VIRTUAL_FILE (str): CLI path sentinel that requests formatting source text read from standard input instead of
+        a filesystem path.
+"""
 
 from __future__ import annotations
 
@@ -25,12 +30,12 @@ class DecisionReason(str, Enum):
     """Stable reason codes for file-selection decisions.
 
     Attributes:
-        INCLUDED (DecisionReason): The path matched include rules and did not match exclude rules.
-        EXPLICIT_INCLUDED (DecisionReason): The path was passed explicitly and accepted.
-        NOT_INCLUDED (DecisionReason): The path did not match configured include patterns.
-        EXCLUDED (DecisionReason): The path matched configured exclude patterns.
-        GITIGNORED (DecisionReason): The path was rejected because git reported it as ignored.
-        DUPLICATE (DecisionReason): The path resolves to the same file as another accepted path.
+        INCLUDED: The path matched include rules and did not match exclude rules.
+        EXPLICIT_INCLUDED: The path was passed explicitly and accepted.
+        NOT_INCLUDED: The path did not match configured include patterns.
+        EXCLUDED: The path matched configured exclude patterns.
+        GITIGNORED: The path was rejected because git reported it as ignored.
+        DUPLICATE: The path resolves to the same file as another accepted path.
     """
 
     INCLUDED = "included"
@@ -65,7 +70,11 @@ class SelectedFile:
 
     @property
     def settings(self) -> CheckSettings:
-        """Return the resolved settings for this selected file."""
+        """Return the resolved settings for this selected file.
+
+        Returns:
+            CheckSettings: Settings resolved from the profile that was selected for this path.
+        """
         return self.profile.settings
 
 
@@ -114,7 +123,17 @@ class SelectionResult:
     selected_files: tuple[SelectedFile, ...]
 
     def profile_for_path(self, path: str) -> settings_core.SettingsProfile[CheckSettings]:
-        """Return the selected settings profile for an accepted display path."""
+        """Return the selected settings profile for an accepted display path.
+
+        Args:
+            path (str): Display path previously accepted by file selection.
+
+        Returns:
+            settings_core.SettingsProfile[CheckSettings]: Settings profile associated with the accepted path.
+
+        Raises:
+            KeyError: If `path` is not one of the accepted display paths in this result.
+        """
         for selected_file in self.selected_files:
             if selected_file.path == path:
                 return selected_file.profile

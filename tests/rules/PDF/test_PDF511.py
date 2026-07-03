@@ -21,7 +21,7 @@ def assert_pdf511_lines(source: str, expected: tuple[tuple[int, ...], ...], *, s
 
 
 def test_reports_google_module_attribute_documentation_absent_from_module() -> None:
-    source = '"""Client defaults.\n\nAttributes:\n    timeout: Request timeout.\n    stale: Removed attribute.\n"""\n\ntimeout: float\n'
+    source = '"""Client defaults.\n\nAttributes:\n    timeout (float): Request timeout.\n    stale (object): Removed attribute.\n"""\n\ntimeout: float\n'
     result = format_source(source)
 
     assert_pdf511_lines(source, ((5,),))
@@ -29,13 +29,13 @@ def test_reports_google_module_attribute_documentation_absent_from_module() -> N
 
 
 def test_private_module_attributes_may_be_voluntarily_documented_when_present() -> None:
-    source = '"""Client defaults.\n\nAttributes:\n    _timeout: Internal timeout.\n"""\n\n_timeout: float\n'
+    source = '"""Client defaults.\n\nAttributes:\n    _timeout (float): Internal timeout.\n"""\n\n_timeout: float\n'
 
     assert_pdf511_lines(source, ())
 
 
 def test_class_attributes_do_not_satisfy_module_attribute_documentation() -> None:
-    source = '"""Client defaults.\n\nAttributes:\n    timeout: Request timeout.\n"""\n\nclass Client:\n    timeout: float\n'
+    source = '"""Client defaults.\n\nAttributes:\n    timeout (float): Request timeout.\n"""\n\nclass Client:\n    timeout: float\n'
 
     assert_pdf511_lines(source, ((4,),))
 
@@ -55,25 +55,25 @@ def test_numpy_comma_separated_attribute_entry_reports_only_stale_module_names()
 
 
 def test_none_and_pep257_conventions_do_not_parse_attribute_sections() -> None:
-    source = '"""Client defaults.\n\nAttributes:\n    stale: Removed attribute.\n"""\n'
+    source = '"""Client defaults.\n\nAttributes:\n    stale (object): Removed attribute.\n"""\n'
 
     for convention in (DocstringConvention.NONE, DocstringConvention.PEP257):
         assert_pdf511_lines(source, (), settings=CheckSettings(select=("PDF511",), docstring_convention=convention))
 
 
 def test_multi_target_assignment_makes_each_target_present() -> None:
-    source = '"""Client defaults.\n\nAttributes:\n    primary: Primary endpoint.\n    fallback: Fallback endpoint.\n"""\n\nprimary = fallback = "https://example.com"\n'
+    source = '"""Client defaults.\n\nAttributes:\n    primary (str): Primary endpoint.\n    fallback (str): Fallback endpoint.\n"""\n\nprimary = fallback = "https://example.com"\n'
 
     assert_pdf511_lines(source, ())
 
 
 def test_tuple_unpacked_assignment_makes_each_target_present() -> None:
-    source = '"""Client defaults.\n\nAttributes:\n    primary: Primary endpoint.\n    fallback: Fallback endpoint.\n    aliases: Endpoint aliases.\n"""\n\nprimary, (fallback, *aliases) = endpoints\n'
+    source = '"""Client defaults.\n\nAttributes:\n    primary (str): Primary endpoint.\n    fallback (str): Fallback endpoint.\n    aliases (tuple[str, ...]): Endpoint aliases.\n"""\n\nprimary, (fallback, *aliases) = endpoints\n'
 
     assert_pdf511_lines(source, ())
 
 
 def test_unsupported_list_destructuring_assignment_does_not_make_attribute_present() -> None:
-    source = '"""Client defaults.\n\nAttributes:\n    primary: Primary endpoint.\n"""\n\n[primary, fallback] = endpoints\n'
+    source = '"""Client defaults.\n\nAttributes:\n    primary (str): Primary endpoint.\n"""\n\n[primary, fallback] = endpoints\n'
 
     assert_pdf511_lines(source, ((4,),))

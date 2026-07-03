@@ -11,11 +11,7 @@ from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetada
 
 @dataclasses.dataclass(frozen=True)
 class RuleSourceFix:
-    """Source-edit plan for one fixable rule violation.
-
-    Attributes:
-        _change (rule_edits.PlannedSourceChange): Source change for this fix.
-    """
+    """Source-edit plan for one fixable rule violation."""
 
     _change: rule_edits.PlannedSourceChange = dataclasses.field(repr=False)
 
@@ -25,11 +21,22 @@ class RuleSourceFix:
 
     @classmethod
     def from_change(cls, change: rule_edits.PlannedSourceChange) -> RuleSourceFix:
-        """Return a source fix backed by one already-planned source change."""
+        """Return a source fix backed by one already-planned source change.
+
+        Args:
+            change (rule_edits.PlannedSourceChange): Validated source replacement to expose as a fix.
+
+        Returns:
+            RuleSourceFix: Fix wrapper that can provide planned changes to the rule runner.
+        """
         return cls(change)
 
     def planned_changes(self) -> tuple[rule_edits.PlannedSourceChange, ...]:
-        """Return planned source changes for this fix."""
+        """Return planned source changes for this fix.
+
+        Returns:
+            tuple[rule_edits.PlannedSourceChange, ...]: Single replacement associated with this fix.
+        """
         return (self._change,)
 
 
@@ -61,7 +68,16 @@ def violation_for_planned_source_change(
     *,
     instance_message: str | None = None,
 ) -> RuleViolation:
-    """Return one violation backed by one planned source change."""
+    """Return one violation backed by one planned source change.
+
+    Args:
+        rule (RuleMetadata): Rule metadata attached to the finding.
+        change (rule_edits.PlannedSourceChange): Source replacement and diagnostic line targets.
+        instance_message (str | None): Optional message overriding the rule default for this violation.
+
+    Returns:
+        RuleViolation: Fixable violation whose finding targets come from the planned change.
+    """
     finding = _finding_for_planned_source_change(rule, change, instance_message=instance_message)
     return RuleViolation(finding=finding, fix=RuleSourceFix.from_change(change))
 
@@ -74,7 +90,22 @@ def violation_for_optional_planned_source_change(
     suppression_line_numbers: tuple[tuple[int, ...], ...] | None = None,
     instance_message: str | None = None,
 ) -> RuleViolation:
-    """Return a change-backed violation when a change exists, otherwise use the explicit diagnostic targets."""
+    """Return a change-backed violation when a change exists, otherwise use the explicit diagnostic targets.
+
+    Args:
+        rule (RuleMetadata): Rule metadata attached to the finding.
+        change (rule_edits.PlannedSourceChange | None): Optional source replacement when the issue is fixable.
+        line_numbers (tuple[int, ...] | None): Diagnostic line targets required when no change is available.
+        suppression_line_numbers (tuple[tuple[int, ...], ...] | None): Alternate complete line groups accepted by
+            suppressions.
+        instance_message (str | None): Optional message overriding the rule default for this violation.
+
+    Returns:
+        RuleViolation: Fixable or diagnostic-only violation with consistent line targets.
+
+    Raises:
+        ValueError: If diagnostic-only calls omit line numbers or explicit targets disagree with the planned change.
+    """
     if change is None:
         if line_numbers is None:
             raise ValueError("Diagnostic-only optional source-change violations must specify line_numbers")
@@ -98,7 +129,16 @@ def violations_for_planned_source_changes(
     *,
     instance_message: str | None = None,
 ) -> tuple[RuleViolation, ...]:
-    """Return one planned-source-backed violation for each source change."""
+    """Return one planned-source-backed violation for each source change.
+
+    Args:
+        rule (RuleMetadata): Rule metadata attached to every finding.
+        changes (tuple[rule_edits.PlannedSourceChange, ...]): Source replacements to expose as independent violations.
+        instance_message (str | None): Optional message overriding the rule default for each violation.
+
+    Returns:
+        tuple[RuleViolation, ...]: Fixable violations in the same order as the planned changes.
+    """
     return tuple(violation_for_planned_source_change(rule, change, instance_message=instance_message) for change in changes)
 
 
@@ -119,7 +159,17 @@ def _finding_for_planned_source_change(
 
 
 def diagnostic(rule: RuleMetadata, line_numbers: tuple[int, ...], *, suppression_line_numbers: tuple[tuple[int, ...], ...] = (), instance_message: str | None = None) -> RuleViolation:
-    """Return one diagnostic-only violation."""
+    """Return one diagnostic-only violation.
+
+    Args:
+        rule (RuleMetadata): Rule metadata attached to the finding.
+        line_numbers (tuple[int, ...]): Primary one-based diagnostic line targets.
+        suppression_line_numbers (tuple[tuple[int, ...], ...]): Alternate complete line groups accepted by suppressions.
+        instance_message (str | None): Optional message overriding the rule default for this violation.
+
+    Returns:
+        RuleViolation: Non-fixable violation suitable for reporting only.
+    """
     return RuleViolation(
         finding=RuleFinding(
             rule=rule, line_numbers=line_numbers, suppression_line_numbers=suppression_line_numbers, instance_message=instance_message, instance_fixable=_diagnostic_instance_fixability(rule)

@@ -27,7 +27,15 @@ class CategoryMetadataOutput(TypedDict, total=False):
 
 
 def add_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> argparse.ArgumentParser:
-    """Add the linter subcommand parser."""
+    """Add the linter subcommand parser.
+
+    Args:
+        subparsers (argparse._SubParsersAction[argparse.ArgumentParser]): Parent parser collection that receives the
+            subcommand.
+
+    Returns:
+        argparse.ArgumentParser: Configured `linter` subcommand parser.
+    """
     parser = argparser.create_subparser(
         subparsers,
         name="linter",
@@ -46,7 +54,14 @@ def add_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) 
 
 
 def run(args: argparse.Namespace) -> int:
-    """Run the linter subcommand."""
+    """Run the linter subcommand.
+
+    Args:
+        args (argparse.Namespace): Parsed linter command arguments.
+
+    Returns:
+        int: Process exit status code.
+    """
     categories = rule_collection.RULE_COLLECTION.categories
     if args.output_format == "json":
         print(json.dumps([category_json(category) for category in categories], indent=2))
@@ -56,7 +71,14 @@ def run(args: argparse.Namespace) -> int:
 
 
 def category_json(category: type[RuleCategoryBase]) -> CategoryMetadataOutput:
-    """Return Ruff-style linter JSON metadata for one rule category."""
+    """Return Ruff-style linter JSON metadata for one rule category.
+
+    Args:
+        category (type[RuleCategoryBase]): Rule category class whose public metadata should be serialized.
+
+    Returns:
+        CategoryMetadataOutput: JSON-ready metadata using Ruff's linter-listing field names.
+    """
     output = CategoryMetadataOutput(prefix=category.meta.prefix, name=category.meta.name)
     if category.meta.url is not None:
         output["url"] = category.meta.url
@@ -64,7 +86,14 @@ def category_json(category: type[RuleCategoryBase]) -> CategoryMetadataOutput:
 
 
 def format_categories_text(categories: tuple[type[RuleCategoryBase], ...]) -> str:
-    """Return Ruff-style linter text metadata for rule categories."""
+    """Return Ruff-style linter text metadata for rule categories.
+
+    Args:
+        categories (tuple[type[RuleCategoryBase], ...]): Rule category classes to render in listing order.
+
+    Returns:
+        str: Aligned text table of category prefixes and names.
+    """
     if not categories:
         return ""
     prefix_width = max(len(category.meta.prefix) for category in categories)

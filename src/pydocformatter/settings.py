@@ -1,4 +1,32 @@
-"""Layered pydocformatter settings resolution."""
+"""Layered pydocformatter settings resolution.
+
+Attributes:
+    SettingsT (TypeVar): Settings dataclass type carried by generic schemas, profiles, and path-aware resolvers.
+    SettingsKeyT (TypeVar): Hashable settings identity type used by cached profile keys.
+    StrEnumT (TypeVar): String enum type accepted by enum parsing and formatting helpers.
+    SettingValueT (TypeVar): Validated setting value type returned by schema validators.
+    StringList (TypeAlias): Repeated string setting values from TOML or comma-separated CLI input.
+    MultiStringMap (TypeAlias): Ordered mapping representation for glob-pattern keys whose values are rule-selector or
+        string lists.
+    SettingValidator (TypeAlias): Callable contract for converting raw setting input into the normalized value stored on
+        a settings dataclass.
+    SettingCLIAction (TypeAlias): Argparse action specifier accepted by setting definitions when exposing a field as a
+        dedicated command-line option.
+    SettingCLIChoices (TypeAlias): Allowed CLI choices advertised for a setting after schema-level validation has
+        normalized the value.
+    SettingCLIType (TypeAlias): Argparse type hook shape used for setting options that need command-line value
+        conversion before schema validation.
+    SettingCLIMetavar (TypeAlias): Display placeholder passed to argparse for generated setting option help.
+    SettingsOverridesType (TypeAlias): Runtime type shape accepted for inline `--config` overrides before field-specific
+        validation runs.
+    DEFAULT_SOURCE_PRIORITY (int): Base priority for settings supplied by dataclass defaults.
+    CONFIG_FILE_SOURCE_PRIORITY (int): Priority assigned to values loaded from discovered or explicit TOML configuration
+        files.
+    INLINE_CONFIG_SOURCE_PRIORITY (int): Priority assigned to `--config KEY=VALUE` overrides.
+    ARGUMENT_SOURCE_PRIORITY (int): Priority assigned to dedicated command-line options.
+    FIELD_OVERRIDE_SOURCE_PRIORITY (int): Priority assigned to internal field overrides injected by callers after normal
+        CLI and config loading.
+"""
 
 from __future__ import annotations
 
@@ -56,7 +84,13 @@ class SettingsProfile(Generic[SettingsT]):
 
     @dataclasses.dataclass(frozen=True)
     class Key(Generic[SettingsKeyT]):
-        """Hashable identity for equivalent resolved settings profiles."""
+        """Hashable identity for equivalent resolved settings profiles.
+
+        Attributes:
+            settings (SettingsKeyT): Hashable representation of the resolved settings object.
+            field_bases (tuple[tuple[str, str], ...]): Sorted source-base mapping for path-like settings.
+            field_priorities (tuple[tuple[str, int], ...]): Sorted priority mapping for resolved setting fields.
+        """
 
         settings: SettingsKeyT
         field_bases: tuple[tuple[str, str], ...]
@@ -67,15 +101,33 @@ class SettingsProfile(Generic[SettingsT]):
     field_priorities: Mapping[str, int]
 
     def key(self) -> SettingsProfile.Key[SettingsT]:
-        """Return a stable hashable identity for this resolved settings profile."""
+        """Return a stable hashable identity for this resolved settings profile.
+
+        Returns:
+            SettingsProfile.Key[SettingsT]: Cache key combining settings values, field bases, and field priorities.
+        """
         return SettingsProfile.Key(settings=self.settings, field_bases=tuple(sorted(self.field_bases.items())), field_priorities=tuple(sorted(self.field_priorities.items())))
 
     def base_for_field(self, field: str) -> str:
-        """Return the absolute base directory associated with a resolved field."""
+        """Return the absolute base directory associated with a resolved field.
+
+        Args:
+            field (str): Settings field name whose path base should be queried.
+
+        Returns:
+            str: Config-relative base directory for `field`, or the current working directory for defaulted fields.
+        """
         return self.field_bases.get(field, os.getcwd())
 
     def priority_for_field(self, field: str) -> int:
-        """Return the configuration-source priority associated with a resolved field."""
+        """Return the configuration-source priority associated with a resolved field.
+
+        Args:
+            field (str): Settings field name whose winning source should be queried.
+
+        Returns:
+            int: Priority for the source that supplied `field`, defaulting to dataclass-default priority.
+        """
         return self.field_priorities.get(field, DEFAULT_SOURCE_PRIORITY)
 
 
@@ -97,7 +149,15 @@ class SettingsResolver(Generic[SettingsT]):
     _profiles_by_start_dir: dict[str, SettingsProfile[SettingsT]] = dataclasses.field(default_factory=dict)
 
     def profile_for_path(self, path: str | None = None) -> SettingsProfile[SettingsT]:
-        """Return settings for a path, caching by the path's containing directory."""
+        """Return settings for a path, caching by the path's containing directory.
+
+        Args:
+            path (str | None): File or directory path whose closest applicable config should be resolved, or the current
+                working directory when omitted.
+
+        Returns:
+            SettingsProfile[SettingsT]: Settings and source metadata for the containing directory.
+        """
         start_dir = _settings_start_dir(path)
         cached_profile = self._profiles_by_start_dir.get(start_dir)
         if cached_profile is not None:
@@ -111,9 +171,9 @@ class SettingCLIValueKind(enum.StrEnum):
     """CLI value parsing strategy for a setting.
 
     Attributes:
-        RAW (SettingCLIValueKind): Use argparse's parsed value directly.
-        COMMA_LIST (SettingCLIValueKind): Split repeated CLI values on commas and return a tuple.
-        TOML_MAP (SettingCLIValueKind): Parse repeated CLI values as TOML inline tables and merge them.
+        RAW: Use argparse's parsed value directly.
+        COMMA_LIST: Split repeated CLI values on commas and return a tuple.
+        TOML_MAP: Parse repeated CLI values as TOML inline tables and merge them.
     """
 
     RAW = "raw"
@@ -302,18 +362,22 @@ class SettingsSchema(Generic[SettingsT]):
     """Generic schema describing one dataclass-backed settings object.
 
     Attributes:
-        settings_type: Resolved dataclass type constructed for defaults and returned by config loading.
-        overrides_type: TypedDict-like class describing partial field overrides accepted from CLI/config layers.
-        group_type: Enum type that defines accepted settings groups and argparse group ordering.
-        definitions: Ordered metadata mapping settings dataclass fields to TOML keys, CLI options, validation, and help
-            text.
-        table_path: Nested TOML table to read from files named `pyproject.toml`, expressed as non-empty path segments.
-            For example, `("tool", "pydocfmt")` reads settings from `[tool.pydocfmt]`. Explicit config files with any
-            other basename are treated as dedicated config files and read settings from the top-level table instead.
-        table_name: Dotted TOML table name derived from table_path.
-        post_validate: Optional validation hook called after per-field validation with only the updates from the current
-            layer, keyed by dataclass field name, and a user-facing path string. The hook should raise SettingsError for
-            cross-field or domain validation failures and should not mutate values.
+        settings_type (type[SettingsT]): Resolved dataclass type constructed for defaults and returned by config
+            loading.
+        overrides_type (SettingsOverridesType): TypedDict-like class describing partial field overrides accepted from
+            CLI/config layers.
+        group_type (type[enum.StrEnum]): Enum type that defines accepted settings groups and argparse group ordering.
+        definitions (tuple[SettingDefinition[Any], ...]): Ordered metadata mapping settings dataclass fields to TOML
+            keys, CLI options, validation, and help text.
+        table_path (tuple[str, ...]): Nested TOML table to read from files named `pyproject.toml`, expressed as
+            non-empty path segments. For example, `("tool", "pydocfmt")` reads settings from `[tool.pydocfmt]`. Explicit
+            config files with any other basename are treated as dedicated config files and read settings from the
+            top-level table instead.
+        table_name (str): Dotted TOML table name derived from table_path.
+        post_validate (Callable[[dict[str, Any], str], None] | None): Optional validation hook called after per-field
+            validation with only the updates from the current layer, keyed by dataclass field name, and a user-facing
+            path string. The hook should raise SettingsError for cross-field or domain validation failures and should
+            not mutate values.
     """
 
     settings_type: type[SettingsT]
@@ -366,7 +430,16 @@ class SettingsSchema(Generic[SettingsT]):
         return self.load_profile(global_values=global_values, args=args, field_overrides=field_overrides).settings
 
     def resolver(self, *, global_values: GlobalArgs | None = None, args: argparse.Namespace | None = None, field_overrides: Mapping[str, Any] | None = None) -> SettingsResolver[SettingsT]:
-        """Return a path-aware settings resolver for repeated per-path lookups."""
+        """Return a path-aware settings resolver for repeated per-path lookups.
+
+        Args:
+            global_values (GlobalArgs | None): Global configuration options and isolated-mode flag.
+            args (argparse.Namespace | None): Parsed CLI namespace for dedicated option overrides.
+            field_overrides (Mapping[str, Any] | None): Final field-keyed raw overrides.
+
+        Returns:
+            SettingsResolver[SettingsT]: Resolver that caches settings profiles by containing directory.
+        """
         return SettingsResolver(
             schema=self,
             global_values=GlobalArgs() if global_values is None else global_values,
@@ -639,7 +712,18 @@ def validate_int(*, min_value: int | None = None, max_value: int | None = None) 
     """
 
     def validate(value: Any, context: str) -> int:
-        """Validate one integer setting value."""
+        """Validate one integer setting value.
+
+        Args:
+            value (Any): Raw value supplied by a config file, inline override, or CLI conversion.
+            context (str): User-facing setting label included in validation errors.
+
+        Returns:
+            int: Integer value within the configured bounds.
+
+        Raises:
+            SettingsError: If the value is not an integer or violates the bounds captured by the validator.
+        """
         if isinstance(value, bool) or not isinstance(value, int):
             raise SettingsError(f"{context} must be an integer")
         if min_value is not None and value < min_value:
@@ -663,7 +747,18 @@ def validate_float(*, min_value: float | None = None, max_value: float | None = 
     """
 
     def validate(value: Any, context: str) -> float:
-        """Validate one float setting value."""
+        """Validate one float setting value.
+
+        Args:
+            value (Any): Raw numeric value supplied by a config file, inline override, or CLI conversion.
+            context (str): User-facing setting label included in validation errors.
+
+        Returns:
+            float: Finite float value within the configured bounds.
+
+        Raises:
+            SettingsError: If the value is not numeric, is not finite, or violates the bounds captured by the validator.
+        """
         if isinstance(value, bool) or not isinstance(value, (int, float)):
             raise SettingsError(f"{context} must be a number")
         float_value = float(value)
@@ -689,7 +784,18 @@ def validate_str_enum(enum_class: type[StrEnumT]) -> Callable[[Any, str], StrEnu
     """
 
     def validate(value: Any, context: str) -> StrEnumT:
-        """Validate one string enum setting value."""
+        """Validate one string enum setting value.
+
+        Args:
+            value (Any): Raw value to convert through the captured enum class.
+            context (str): User-facing setting label included in validation errors.
+
+        Returns:
+            StrEnumT: Enum member matching the supplied string value.
+
+        Raises:
+            SettingsError: If the value is not one of the enum's configured string values.
+        """
         try:
             return enum_class(value)
         except ValueError as error:

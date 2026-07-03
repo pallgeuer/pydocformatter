@@ -22,7 +22,7 @@ def assert_pdf513_lines(source: str, expected: tuple[tuple[int, ...], ...], *, s
 
 
 def test_reports_google_duplicate_module_attribute_documentation_on_attached_docstring() -> None:
-    source = '"""Client defaults.\n\nAttributes:\n    timeout: Request timeout.\n"""\n\ntimeout: float\n"""Request timeout in seconds."""\n'
+    source = '"""Client defaults.\n\nAttributes:\n    timeout (float): Request timeout.\n"""\n\ntimeout: float\n"""Request timeout in seconds."""\n'
     result = assert_pdf513_lines(source, ((8,),))
 
     assert tuple(finding.message for finding in result.unfixed_findings) == ("Attached docstring for module attribute 'timeout' duplicates module docstring attribute documentation",)
@@ -30,21 +30,21 @@ def test_reports_google_duplicate_module_attribute_documentation_on_attached_doc
 
 def test_no_finding_when_only_one_module_attribute_documentation_style_is_present() -> None:
     attached_only = 'timeout: float\n"""Request timeout in seconds."""\n'
-    owner_only = '"""Client defaults.\n\nAttributes:\n    timeout: Request timeout.\n"""\n\ntimeout: float\n'
+    owner_only = '"""Client defaults.\n\nAttributes:\n    timeout (float): Request timeout.\n"""\n\ntimeout: float\n'
 
     assert_pdf513_lines(attached_only, ())
     assert_pdf513_lines(owner_only, ())
 
 
 def test_none_and_pep257_conventions_do_not_parse_module_attribute_entries() -> None:
-    source = '"""Client defaults.\n\nAttributes:\n    timeout: Request timeout.\n"""\n\ntimeout: float\n"""Request timeout in seconds."""\n'
+    source = '"""Client defaults.\n\nAttributes:\n    timeout (float): Request timeout.\n"""\n\ntimeout: float\n"""Request timeout in seconds."""\n'
 
     for convention in (DocstringConvention.NONE, DocstringConvention.PEP257):
         assert_pdf513_lines(source, (), settings=CheckSettings(select=("PDF513",), docstring_convention=convention))
 
 
 def test_broad_pdf5_selection_includes_module_duplicate_rule_under_parsed_conventions() -> None:
-    source = '"""Client defaults.\n\nAttributes:\n    timeout: Request timeout.\n"""\n\ntimeout: float\n"""Request timeout in seconds."""\n'
+    source = '"""Client defaults.\n\nAttributes:\n    timeout (float): Request timeout.\n"""\n\ntimeout: float\n"""Request timeout in seconds."""\n'
 
     active = format_source(source, settings=CheckSettings(select=("PDF5",), docstring_convention=DocstringConvention.GOOGLE))
     inert = format_source(source, settings=CheckSettings(select=("PDF5",), docstring_convention=DocstringConvention.PEP257))
@@ -65,13 +65,13 @@ def test_reports_numpy_comma_separated_module_attribute_duplicates_by_name() -> 
 
 
 def test_multi_target_module_docstring_reports_only_targets_also_documented_by_module_docstring() -> None:
-    source = '"""Client defaults.\n\nAttributes:\n    primary: Primary endpoint.\n"""\n\nprimary = fallback = "https://example.com"\n"""Request endpoint values."""\n'
+    source = '"""Client defaults.\n\nAttributes:\n    primary (str): Primary endpoint.\n"""\n\nprimary = fallback = "https://example.com"\n"""Request endpoint values."""\n'
 
     assert_pdf513_lines(source, ((8,),))
 
 
 def test_tuple_unpacked_module_attribute_docstring_duplicates_each_documented_target() -> None:
-    source = '"""Client defaults.\n\nAttributes:\n    primary: Primary endpoint.\n    aliases: Endpoint aliases.\n"""\n\nprimary, (fallback, *aliases) = endpoints\n"""Request endpoints."""\n'
+    source = '"""Client defaults.\n\nAttributes:\n    primary (str): Primary endpoint.\n    aliases (tuple[str, ...]): Endpoint aliases.\n"""\n\nprimary, (fallback, *aliases) = endpoints\n"""Request endpoints."""\n'
 
     assert_pdf513_lines(source, ((9,), (9,)))
 
@@ -89,48 +89,50 @@ def test_rest_cvar_and_vartype_module_attribute_duplicates() -> None:
 
 
 def test_reports_each_attached_module_docstring_duplicate_for_same_owner_entry() -> None:
-    source = '"""Client defaults.\n\nAttributes:\n    timeout: Request timeout.\n"""\n\ntimeout: float\n"""Request timeout in seconds."""\n\ntimeout = 30.0\n"""Default timeout in seconds."""\n'
+    source = (
+        '"""Client defaults.\n\nAttributes:\n    timeout (float): Request timeout.\n"""\n\ntimeout: float\n"""Request timeout in seconds."""\n\ntimeout = 30.0\n"""Default timeout in seconds."""\n'
+    )
 
     assert_pdf513_lines(source, ((8,), (11,)))
 
 
 def test_repeated_module_attribute_entries_each_duplicate_attached_docstring() -> None:
-    source = '"""Client defaults.\n\nAttributes:\n    timeout: Request timeout.\n    timeout: Timeout in seconds.\n"""\n\ntimeout: float\n"""Request timeout in seconds."""\n'
+    source = '"""Client defaults.\n\nAttributes:\n    timeout (float): Request timeout.\n    timeout (float): Timeout in seconds.\n"""\n\ntimeout: float\n"""Request timeout in seconds."""\n'
 
     assert_pdf513_lines(source, ((9,), (9,)))
 
 
 def test_multiline_attached_module_docstring_targets_all_docstring_lines() -> None:
-    source = '"""Client defaults.\n\nAttributes:\n    timeout: Request timeout.\n"""\n\ntimeout: float\n"""Request timeout.\n\nMeasured in seconds.\n"""\n'
+    source = '"""Client defaults.\n\nAttributes:\n    timeout (float): Request timeout.\n"""\n\ntimeout: float\n"""Request timeout.\n\nMeasured in seconds.\n"""\n'
 
     assert_pdf513_lines(source, ((8, 9, 10, 11),))
 
 
 def test_attached_module_docstring_suppression_only_suppresses_that_duplicate() -> None:
-    source = '"""Client defaults.\n\nAttributes:\n    timeout: Request timeout.\n    retries: Retry count.\n"""\n\ntimeout: float\n"""Request timeout in seconds."""  # pydocfmt: ignore[PDF513]\n\nretries: int\n"""Retry attempts."""\n'
+    source = '"""Client defaults.\n\nAttributes:\n    timeout (float): Request timeout.\n    retries (int): Retry count.\n"""\n\ntimeout: float\n"""Request timeout in seconds."""  # pydocfmt: ignore[PDF513]\n\nretries: int\n"""Retry attempts."""\n'
 
     assert_pdf513_lines(source, ((12,),))
 
 
 def test_module_docstring_suppression_does_not_suppress_attached_docstring_duplicate() -> None:
-    source = '"""Client defaults.\n\nAttributes:\n    timeout: Request timeout.  # pydocfmt: ignore[PDF513]\n"""\n\ntimeout: float\n"""Request timeout in seconds."""\n'
+    source = '"""Client defaults.\n\nAttributes:\n    timeout (float): Request timeout.  # pydocfmt: ignore[PDF513]\n"""\n\ntimeout: float\n"""Request timeout in seconds."""\n'
 
     assert_pdf513_lines(source, ((8,),))
 
 
 def test_private_module_path_and_private_attribute_duplicates_are_reported() -> None:
-    source = '"""Client defaults.\n\nAttributes:\n    _token: Internal token.\n"""\n\n_token: str\n"""Internal token."""\n'
+    source = '"""Client defaults.\n\nAttributes:\n    _token (str): Internal token.\n"""\n\n_token: str\n"""Internal token."""\n'
 
     assert_pdf513_lines(source, ((8,),), settings=CheckSettings(select=("PDF513",), docstring_convention=DocstringConvention.GOOGLE, docstring_missing_documentation_public_only=True))
 
 
 def test_class_attached_docstring_does_not_duplicate_module_docstring() -> None:
-    source = '"""Client defaults.\n\nAttributes:\n    timeout: Request timeout.\n"""\n\nclass Client:\n    timeout: float\n    """Request timeout in seconds."""\n'
+    source = '"""Client defaults.\n\nAttributes:\n    timeout (float): Request timeout.\n"""\n\nclass Client:\n    timeout: float\n    """Request timeout in seconds."""\n'
 
     assert_pdf513_lines(source, ())
 
 
 def test_function_local_attached_docstring_does_not_duplicate_module_docstring() -> None:
-    source = '"""Client defaults.\n\nAttributes:\n    timeout: Request timeout.\n"""\n\ndef configure():\n    timeout = 30.0\n    """Request timeout in seconds."""\n'
+    source = '"""Client defaults.\n\nAttributes:\n    timeout (float): Request timeout.\n"""\n\ndef configure():\n    timeout = 30.0\n    """Request timeout in seconds."""\n'
 
     assert_pdf513_lines(source, ())

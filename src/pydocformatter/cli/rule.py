@@ -69,7 +69,15 @@ class RuleMetadataOutput(TypedDict):
 
 
 def add_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> argparse.ArgumentParser:
-    """Add the rule subcommand parser."""
+    """Add the rule subcommand parser.
+
+    Args:
+        subparsers (argparse._SubParsersAction[argparse.ArgumentParser]): Parent parser collection that receives the
+            subcommand.
+
+    Returns:
+        argparse.ArgumentParser: Configured `rule` subcommand parser.
+    """
     parser = argparser.create_subparser(
         subparsers,
         name="rule",
@@ -99,7 +107,14 @@ def add_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) 
 
 
 def run(args: argparse.Namespace) -> int:
-    """Run the rule subcommand."""
+    """Run the rule subcommand.
+
+    Args:
+        args (argparse.Namespace): Parsed rule command arguments.
+
+    Returns:
+        int: Process exit status code.
+    """
     if args.rule is None and not args.all:
         print("pydocfmt rule: Argument error: Must specify RULE or --all", file=sys.stderr)
         return 2
@@ -138,7 +153,14 @@ def _rule_class_for_tag(rule_tag: str, *, collection: rule_collection.RuleCollec
 
 
 def rule_json(rule_class: type[RuleBase]) -> RuleMetadataOutput:
-    """Return Ruff-style JSON metadata for one rule."""
+    """Return Ruff-style JSON metadata for one rule.
+
+    Args:
+        rule_class (type[RuleBase]): Rule class whose metadata and Markdown explanation should be serialized.
+
+    Returns:
+        RuleMetadataOutput: JSON-ready rule explanation metadata using Ruff-compatible field names where possible.
+    """
     rule = rule_class.meta
     source_location = rule_documentation.rule_source_location(rule_class)
     source_location_json: RuleSourceLocationMetadata | None
@@ -162,5 +184,12 @@ def rule_json(rule_class: type[RuleBase]) -> RuleMetadataOutput:
 
 
 def format_rule_text(rule_class: type[RuleBase]) -> str:
-    """Return Ruff-style Markdown text for one rule."""
+    """Return Ruff-style Markdown text for one rule.
+
+    Args:
+        rule_class (type[RuleBase]): Rule class whose adjacent Markdown explanation should be loaded.
+
+    Returns:
+        str: Rule explanation body with exactly one trailing newline.
+    """
     return f"{rule_documentation.load_rule_explanation(rule_class).rstrip()}\n"

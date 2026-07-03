@@ -1,4 +1,9 @@
-"""Built-in rule collection loading."""
+"""Built-in rule collection loading.
+
+Attributes:
+    RULE_COLLECTION (RuleCollection): Process-wide built-in rule catalog populated from registered category packages at
+        import time.
+"""
 
 from __future__ import annotations
 
@@ -36,7 +41,15 @@ class RuleCollection:
     rule_class: dict[RuleCode, type[RuleBase]]
 
     def __init__(self, categories: Iterable[type[RuleCategoryBase]]) -> None:
-        """Create a deterministically ordered rule collection from category classes."""
+        """Create a deterministically ordered rule collection from category classes.
+
+        Args:
+            categories (Iterable[type[RuleCategoryBase]]): Registered category classes to validate and index.
+
+        Raises:
+            RuleError: If a category is invalid, prefixes or rule codes collide, or incompatibility metadata is
+                inconsistent.
+        """
         category_class_by_prefix: dict[str, type[RuleCategoryBase]] = {}
         for category in categories:
             if not isinstance(category, type) or not issubclass(category, RuleCategoryBase):
@@ -63,7 +76,14 @@ class RuleCollection:
 
     @classmethod
     def from_registry(cls, registry: RuleRegistry) -> RuleCollection:
-        """Create a rule collection from registered category classes."""
+        """Create a rule collection from registered category classes.
+
+        Args:
+            registry (RuleRegistry): Mutable registry populated by rule category decorators.
+
+        Returns:
+            RuleCollection: Immutable indexed collection built from the registry's category classes.
+        """
         return cls(registry.category_classes)
 
     def _validate_rule_incompatibilities(self) -> None:
@@ -80,16 +100,39 @@ class RuleCollection:
                     raise RuleError(f"Rule incompatibility between {code} and {incompatible_code} must be declared by both rules")
 
     def matching_rules_exist(self, selector: RuleSelector) -> bool:
-        """Return whether a selector matches at least one collected rule."""
+        """Return whether a selector matches at least one collected rule.
+
+        Args:
+            selector (RuleSelector): Parsed selector to compare against registered rule codes.
+
+        Returns:
+            bool: Whether the selector covers at least one rule in this collection.
+        """
         return any(selector.selects_code(rule.meta.code) for rule in self.rules)
 
     def matching_rules(self, selector: RuleSelector) -> tuple[type[RuleBase], ...]:
-        """Return collected rules matched by a selector."""
+        """Return collected rules matched by a selector.
+
+        Args:
+            selector (RuleSelector): Parsed selector to compare against registered rule codes.
+
+        Returns:
+            tuple[type[RuleBase], ...]: Rule classes covered by the selector in collection order.
+        """
         return tuple(rule for rule in self.rules if selector.selects_code(rule.meta.code))
 
 
 def import_package_rule_categories(*, package: ModuleType, registry: RuleRegistry | None = None) -> None:
-    """Import and validate category modules followed by rule modules."""
+    """Import and validate category modules followed by rule modules.
+
+    Args:
+        package (ModuleType): Rule definitions package containing one subpackage per rule category.
+        registry (RuleRegistry | None): Registry expected to receive imported category classes.
+
+    Raises:
+        RuleError: If the package layout, category registration, rule modules, Markdown files, or incompatibility
+            metadata are invalid.
+    """
     if not hasattr(package, "__path__"):
         raise RuleError(f"Rule definitions package has no __path__: {package.__name__}")
     if registry is None:

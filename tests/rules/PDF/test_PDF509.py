@@ -21,7 +21,7 @@ def assert_pdf509_lines(source: str, expected: tuple[tuple[int, ...], ...], *, s
 
 
 def test_reports_google_class_attribute_documentation_absent_from_class() -> None:
-    source = 'class Client:\n    """HTTP client.\n\n    Attributes:\n        timeout: Request timeout.\n        stale: Removed attribute.\n    """\n\n    timeout: float\n'
+    source = 'class Client:\n    """HTTP client.\n\n    Attributes:\n        timeout (float): Request timeout.\n        stale (object): Removed attribute.\n    """\n\n    timeout: float\n'
     result = format_source(source)
 
     assert_pdf509_lines(source, ((6,),))
@@ -29,13 +29,13 @@ def test_reports_google_class_attribute_documentation_absent_from_class() -> Non
 
 
 def test_init_instance_attributes_count_as_present_for_extraneous_checks() -> None:
-    source = 'class Client:\n    """HTTP client.\n\n    Attributes:\n        timeout: Request timeout.\n    """\n\n    def __init__(self):\n        self.timeout = 30.0\n'
+    source = 'class Client:\n    """HTTP client.\n\n    Attributes:\n        timeout (float): Request timeout.\n    """\n\n    def __init__(self):\n        self.timeout = 30.0\n'
 
     assert_pdf509_lines(source, ())
 
 
 def test_private_attributes_may_be_voluntarily_documented_when_present() -> None:
-    source = 'class Client:\n    """HTTP client.\n\n    Attributes:\n        _token: Internal token.\n    """\n\n    _token: str\n'
+    source = 'class Client:\n    """HTTP client.\n\n    Attributes:\n        _token (str): Internal token.\n    """\n\n    _token: str\n'
 
     assert_pdf509_lines(source, ())
 
@@ -55,45 +55,43 @@ def test_numpy_comma_separated_attribute_entry_reports_only_stale_class_names() 
 
 
 def test_repeated_stale_documentation_reports_each_entry() -> None:
-    source = 'class Client:\n    """HTTP client.\n\n    Attributes:\n        stale: Removed attribute.\n        stale: Still removed.\n    """\n'
+    source = 'class Client:\n    """HTTP client.\n\n    Attributes:\n        stale (object): Removed attribute.\n        stale (object): Still removed.\n    """\n'
 
     assert_pdf509_lines(source, ((5,), (6,)))
 
 
 def test_none_and_pep257_conventions_do_not_parse_attribute_sections() -> None:
-    source = 'class Client:\n    """HTTP client.\n\n    Attributes:\n        stale: Removed attribute.\n    """\n'
+    source = 'class Client:\n    """HTTP client.\n\n    Attributes:\n        stale (object): Removed attribute.\n    """\n'
 
     for convention in (DocstringConvention.NONE, DocstringConvention.PEP257):
         assert_pdf509_lines(source, (), settings=CheckSettings(select=("PDF509",), docstring_convention=convention))
 
 
 def test_multi_target_assignment_makes_each_target_present() -> None:
-    source = (
-        'class Client:\n    """HTTP client.\n\n    Attributes:\n        primary: Primary endpoint.\n        fallback: Fallback endpoint.\n    """\n\n    primary = fallback = "https://example.com"\n'
-    )
+    source = 'class Client:\n    """HTTP client.\n\n    Attributes:\n        primary (str): Primary endpoint.\n        fallback (str): Fallback endpoint.\n    """\n\n    primary = fallback = "https://example.com"\n'
 
     assert_pdf509_lines(source, ())
 
 
 def test_tuple_unpacked_assignment_makes_each_target_present() -> None:
-    source = 'class Client:\n    """HTTP client.\n\n    Attributes:\n        primary: Primary endpoint.\n        fallback: Fallback endpoint.\n        aliases: Endpoint aliases.\n    """\n\n    primary, (fallback, *aliases) = endpoints\n'
+    source = 'class Client:\n    """HTTP client.\n\n    Attributes:\n        primary (str): Primary endpoint.\n        fallback (str): Fallback endpoint.\n        aliases (tuple[str, ...]): Endpoint aliases.\n    """\n\n    primary, (fallback, *aliases) = endpoints\n'
 
     assert_pdf509_lines(source, ())
 
 
 def test_tuple_unpacked_init_attribute_mixed_with_discard_counts_as_present() -> None:
-    source = 'class Client:\n    """HTTP client.\n\n    Attributes:\n        timeout: Request timeout.\n    """\n\n    def __init__(self):\n        self.timeout, _ = values\n'
+    source = 'class Client:\n    """HTTP client.\n\n    Attributes:\n        timeout (float): Request timeout.\n    """\n\n    def __init__(self):\n        self.timeout, _ = values\n'
 
     assert_pdf509_lines(source, ())
 
 
 def test_unsupported_list_destructuring_assignment_does_not_make_attribute_present() -> None:
-    source = 'class Client:\n    """HTTP client.\n\n    Attributes:\n        primary: Primary endpoint.\n    """\n\n    [primary, fallback] = endpoints\n'
+    source = 'class Client:\n    """HTTP client.\n\n    Attributes:\n        primary (str): Primary endpoint.\n    """\n\n    [primary, fallback] = endpoints\n'
 
     assert_pdf509_lines(source, ((5,),))
 
 
 def test_nested_class_attributes_do_not_satisfy_outer_class_documentation() -> None:
-    source = 'class Outer:\n    """Outer client.\n\n    Attributes:\n        inner_timeout: Inner timeout.\n    """\n\n    class Inner:\n        inner_timeout: float\n'
+    source = 'class Outer:\n    """Outer client.\n\n    Attributes:\n        inner_timeout (float): Inner timeout.\n    """\n\n    class Inner:\n        inner_timeout: float\n'
 
     assert_pdf509_lines(source, ((5,),))

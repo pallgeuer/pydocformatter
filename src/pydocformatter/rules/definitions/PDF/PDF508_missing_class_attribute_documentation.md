@@ -29,7 +29,7 @@ class Client:
     """HTTP client.
 
     Attributes:
-        timeout: Request timeout.
+        timeout (float): Request timeout.
     """
 
     timeout: float
@@ -139,7 +139,7 @@ class Client:
     """HTTP client.
 
     Attributes:
-        timeout: Request timeout.
+        timeout (float): Request timeout.
     """
 
     timeout: float

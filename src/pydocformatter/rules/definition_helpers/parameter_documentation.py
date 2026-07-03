@@ -65,7 +65,16 @@ class DocumentedParameter:
 
 
 def signature_parameters(definition: PDF_definition.DefinitionInfo, *, context: RuleContext) -> tuple[SignatureParameter, ...]:
-    """Return comparable signature parameters for a function definition."""
+    """Return comparable signature parameters for a function definition.
+
+    Args:
+        definition (PDF_definition.DefinitionInfo): Function definition whose LibCST parameters should be normalized.
+        context (RuleContext): Current file context with position metadata for parameter line targets.
+
+    Returns:
+        tuple[SignatureParameter, ...]: Signature parameters in declaration order, including variadic and keyword-only
+            parameters.
+    """
     if definition.parameters is None or not isinstance(definition.node, cst.FunctionDef):
         return ()
     raw_parameters = [*definition.parameters.posonly_params, *definition.parameters.params]
@@ -82,7 +91,14 @@ def signature_parameters(definition: PDF_definition.DefinitionInfo, *, context: 
 
 
 def typed_dict_keys_by_name(module: cst.Module) -> dict[str, frozenset[str]]:
-    """Return same-module class-based TypedDict keys by TypedDict class name."""
+    """Return same-module class-based TypedDict keys by TypedDict class name.
+
+    Args:
+        module (cst.Module): Parsed module to scan for class-based TypedDict declarations.
+
+    Returns:
+        dict[str, frozenset[str]]: TypedDict class names mapped to field names declared in the class body.
+    """
     keys_by_name: dict[str, frozenset[str]] = {}
     for statement in module.body:
         if not isinstance(statement, cst.ClassDef) or not _is_typed_dict_class(statement):
@@ -92,7 +108,14 @@ def typed_dict_keys_by_name(module: cst.Module) -> dict[str, frozenset[str]]:
 
 
 def unpacked_keyword_parameters(parameters: tuple[SignatureParameter, ...]) -> tuple[SignatureParameter, ...]:
-    """Return unpacked keyword-pack parameters from prepared signature parameters."""
+    """Return unpacked keyword-pack parameters from prepared signature parameters.
+
+    Args:
+        parameters (tuple[SignatureParameter, ...]): Normalized signature parameters to filter.
+
+    Returns:
+        tuple[SignatureParameter, ...]: Parameters displayed as `**...` and annotated with an unpack target.
+    """
     return tuple(parameter for parameter in parameters if parameter.unpacked and parameter.display_name.startswith("**"))
 
 
@@ -118,7 +141,14 @@ def _signature_parameter(
 
 
 def documented_parameters(docstring: PDF_definition.DocstringInfo) -> tuple[DocumentedParameter, ...]:
-    """Return comparable parameter names parsed from a docstring."""
+    """Return comparable parameter names parsed from a docstring.
+
+    Args:
+        docstring (PDF_definition.DocstringInfo): Parsed docstring to inspect for parameter entries.
+
+    Returns:
+        tuple[DocumentedParameter, ...]: Documented parameter names with comparison keys and diagnostic line targets.
+    """
     parameters: list[DocumentedParameter] = []
     for entry in docstring.structure.entries:
         if entry.kind is not PDF_definition.DocstringEntryKind.PARAMETER:
@@ -132,12 +162,28 @@ def documented_parameters(docstring: PDF_definition.DocstringInfo) -> tuple[Docu
 
 
 def should_check_missing_parameters(definition: PDF_definition.DefinitionInfo, docstring: PDF_definition.DocstringInfo, *, context: RuleContext) -> bool:
-    """Return whether missing parameter documentation should be checked for a docstring."""
+    """Return whether missing parameter documentation should be checked for a docstring.
+
+    Args:
+        definition (PDF_definition.DefinitionInfo): Function definition that owns the docstring.
+        docstring (PDF_definition.DocstringInfo): Parsed docstring to inspect for parameter documentation.
+        context (RuleContext): Current file context with resolved missing-documentation settings.
+
+    Returns:
+        bool: Whether PDF500 should report missing parameters for this function.
+    """
     return missing_documentation.should_check_missing_documentation(definition, docstring, context=context, has_relevant_documentation=has_parameter_documentation(docstring))
 
 
 def has_parameter_documentation(docstring: PDF_definition.DocstringInfo) -> bool:
-    """Return whether a docstring contains parameter documentation structures."""
+    """Return whether a docstring contains parameter documentation structures.
+
+    Args:
+        docstring (PDF_definition.DocstringInfo): Parsed docstring to inspect for parameter sections or entries.
+
+    Returns:
+        bool: Whether the docstring contains recognized parameter documentation.
+    """
     return any(entry.kind is PDF_definition.DocstringEntryKind.PARAMETER for entry in docstring.structure.entries) or any(
         section.name.lower() in docstring_sections.PARAMETER_SECTION_NAMES for section in docstring.structure.sections
     )

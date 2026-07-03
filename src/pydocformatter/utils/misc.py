@@ -25,7 +25,11 @@ class classproperty(Generic[_R_co]):
     __isabstractmethod__: bool
 
     def __init__(self, fget: Callable[[type[Any]], _R_co]) -> None:
-        """Bind the class-level getter used by this descriptor."""
+        """Bind the class-level getter used by this descriptor.
+
+        Args:
+            fget: Callable that receives the resolved owner class and returns the computed property value.
+        """
         self.fget = fget
         functools.update_wrapper(cast(Callable[..., Any], self), fget)
         self.__isabstractmethod__ = getattr(fget, "__isabstractmethod__", False)
@@ -60,7 +64,14 @@ class classproperty(Generic[_R_co]):
 
 
 def alias_to_class_field(field_path: str) -> classproperty[Any]:
-    """Create a classproperty that delegates to a nested field path."""
+    """Create a classproperty that delegates to a nested field path.
+
+    Args:
+        field_path: Dotted attribute path to resolve from the owner class each time the property is read.
+
+    Returns:
+        Class property that exposes the nested class attribute without copying its current value.
+    """
     return classproperty(operator.attrgetter(field_path))
 
 
@@ -78,7 +89,16 @@ def auto_plural(count: int, word: str) -> str:
 
 
 def find_git_root_for_path(path: str, root_cache: dict[str, str | None] | None = None) -> str | None:
-    """Find and optionally cache the nearest containing Git root for a path."""
+    """Find and optionally cache the nearest containing Git root for a path.
+
+    Args:
+        path: File or directory path whose containing worktree should be discovered.
+        root_cache: Optional mutable cache keyed by searched directories, storing the discovered Git root or None for
+            paths outside a worktree.
+
+    Returns:
+        Absolute path of the nearest containing Git root, or None when no valid .git marker is found.
+    """
     absolute_path = os.path.abspath(path)
     start_dir = absolute_path if os.path.isdir(absolute_path) else os.path.dirname(absolute_path)
     if root_cache is not None and start_dir in root_cache:

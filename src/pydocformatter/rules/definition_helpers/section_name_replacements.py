@@ -1,4 +1,12 @@
-"""Preferred docstring section name lookup tables."""
+"""Preferred docstring section name lookup tables.
+
+Attributes:
+    SectionNameMapper (TypeAlias): Callable that maps a convention-specific section heading to its preferred spelling,
+        or None when already canonical.
+    FieldNameMapper (TypeAlias): Callable that maps a reStructuredText field name to its preferred spelling, or None
+        when no replacement is needed.
+    MessageBuilder (TypeAlias): Callable that creates a diagnostic message from the original and replacement spellings.
+"""
 
 from __future__ import annotations
 
@@ -27,7 +35,19 @@ def results_for_mapped_names(
     field_name_mapper: FieldNameMapper | None = None,
     field_message_builder: MessageBuilder | None = None,
 ) -> tuple[rule_violations.RuleViolation, ...]:
-    """Return violations for mapped docstring section and reStructuredText field names."""
+    """Return violations for mapped docstring section and reStructuredText field names.
+
+    Args:
+        context (RuleContext): Current file context with prepared PDF docstring structures.
+        rule (RuleMetadata): Rule metadata used for diagnostics and fixes.
+        section_name_mapper (SectionNameMapper): Mapper for convention section headings.
+        section_message_builder (MessageBuilder): Diagnostic message builder for section heading replacements.
+        field_name_mapper (FieldNameMapper | None): Optional mapper for reStructuredText field names.
+        field_message_builder (MessageBuilder | None): Diagnostic message builder for field-name replacements.
+
+    Returns:
+        tuple[rule_violations.RuleViolation, ...]: Fixable and unfixable name-normalization violations.
+    """
     data = PDF_definition.PDF.require_data(context)
     results: list[rule_violations.RuleViolation] = []
     for docstring in data.docstrings:

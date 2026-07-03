@@ -37,7 +37,14 @@ class PDF105ClosingQuotesWhitespace(RuleBase):
 
     @classmethod
     def violations(cls, context: RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
-        """Return violations for extra whitespace before closing quotes."""
+        """Return violations for extra whitespace before closing quotes.
+
+        Args:
+            context (RuleContext): Current file context with parsed module, settings, and prepared category data.
+
+        Returns:
+            tuple[rule_violations.RuleViolation, ...]: Rule violations reported for the current source.
+        """
         return rule_violations.violations_for_planned_source_changes(cls.meta, _planned_changes(context))
 
 

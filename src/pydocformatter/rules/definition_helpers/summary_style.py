@@ -6,8 +6,7 @@ import dataclasses
 import re
 
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
-
-SummaryLineTarget = PDF_definition.SummaryLineTarget
+from pydocformatter.rules.definitions.PDF.PDF import SummaryLineTarget
 
 
 @dataclasses.dataclass(frozen=True)
@@ -28,17 +27,32 @@ class SummaryWordTarget:
 
     @property
     def line(self) -> PDF_definition.DocstringValueLine:
-        """Return the logical line containing the word."""
+        """Return the logical line containing the word.
+
+        Returns:
+            PDF_definition.DocstringValueLine: Parsed docstring value line that owns the target word.
+        """
         return self.summary.line
 
     @property
     def docstring(self) -> PDF_definition.DocstringInfo:
-        """Return the docstring containing the word."""
+        """Return the docstring containing the word.
+
+        Returns:
+            PDF_definition.DocstringInfo: Parsed docstring that owns the target word.
+        """
         return self.summary.docstring
 
 
 def first_word_target(summary: SummaryLineTarget) -> SummaryWordTarget | None:
-    """Return the first whitespace-delimited word in a summary target line."""
+    """Return the first whitespace-delimited word in a summary target line.
+
+    Args:
+        summary (SummaryLineTarget): Summary line selected by PDF category preparation.
+
+    Returns:
+        SummaryWordTarget | None: First word and its line-local columns, or None for an empty summary line.
+    """
     match = re.search(r"\S+", summary.line.text)
     if match is None:
         return None
@@ -46,15 +60,36 @@ def first_word_target(summary: SummaryLineTarget) -> SummaryWordTarget | None:
 
 
 def line_numbers(target: SummaryLineTarget | SummaryWordTarget) -> tuple[int, ...]:
-    """Return concrete source lines for a summary style target."""
+    """Return concrete source lines for a summary style target.
+
+    Args:
+        target (SummaryLineTarget | SummaryWordTarget): Summary line or summary word target.
+
+    Returns:
+        tuple[int, ...]: One-based physical source lines occupied by the target's docstring line.
+    """
     return PDF_definition.docstring_line_numbers(target.docstring, target.line)
 
 
 def normalize_word(word: str) -> str:
-    """Return Ruff/pydocstyle-style lowercase alphanumeric word content."""
+    """Return Ruff/pydocstyle-style lowercase alphanumeric word content.
+
+    Args:
+        word (str): Raw first word extracted from a summary line.
+
+    Returns:
+        str: Lowercase alphanumeric-only content used by summary style checks.
+    """
     return "".join(character for character in word if character.isalnum()).lower()
 
 
 def is_function_docstring(docstring: PDF_definition.DocstringInfo) -> bool:
-    """Return whether a docstring belongs to a function or method."""
+    """Return whether a docstring belongs to a function or method.
+
+    Args:
+        docstring (PDF_definition.DocstringInfo): Parsed docstring to classify by owner kind.
+
+    Returns:
+        bool: Whether the owner is a function definition.
+    """
     return docstring.owner.kind is PDF_definition.DefinitionKind.FUNCTION

@@ -71,7 +71,15 @@ class PlannedTextReplacement:
 
 
 def apply_context_source_changes(context: RuleCategoryContext, changes: tuple[PlannedSourceChange, ...]) -> cst.Module:
-    """Apply planned source changes using cached context source data when available."""
+    """Apply planned source changes using cached context source data when available.
+
+    Args:
+        context (RuleCategoryContext): Current module context, including original source and line bounds when available.
+        changes (tuple[PlannedSourceChange, ...]): Planned source-level changes to apply in order-independent form.
+
+    Returns:
+        cst.Module: Reparsed module after applying the planned changes.
+    """
     edits = tuple(change.edit for change in changes)
     if context.line_bounds is None:
         return apply_source_edits(context.module, edits)
@@ -85,7 +93,20 @@ def apply_source_edits(
     source: str | None = None,
     line_bounds: source_text.LineBounds | None = None,
 ) -> cst.Module:
-    """Apply non-overlapping source edits to a module and parse the result."""
+    """Apply non-overlapping source edits to a module and parse the result.
+
+    Args:
+        module (cst.Module): Original parsed module to return unchanged when there are no edits.
+        edits (tuple[SourceEdit, ...]): Source replacements with LibCST ranges that must not overlap.
+        source (str | None): Original source text to edit, required when precomputed line bounds are supplied.
+        line_bounds (source_text.LineBounds | None): Absolute offsets for each physical source line.
+
+    Returns:
+        cst.Module: Reparsed module after applying all source edits.
+
+    Raises:
+        ValueError: If only one of `source` and `line_bounds` is supplied or if edit ranges overlap.
+    """
     if (source is None) != (line_bounds is None):
         raise ValueError("source and line_bounds must be provided together")
     if not edits:

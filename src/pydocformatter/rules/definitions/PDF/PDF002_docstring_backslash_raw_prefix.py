@@ -35,7 +35,14 @@ class PDF002DocstringBackslashRawPrefix(RuleBase):
 
     @classmethod
     def violations(cls, context: RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
-        """Return violations for non-raw docstrings containing source backslashes."""
+        """Return violations for non-raw docstrings containing source backslashes.
+
+        Args:
+            context (RuleContext): Current file context with parsed module, settings, and prepared category data.
+
+        Returns:
+            tuple[rule_violations.RuleViolation, ...]: Rule violations reported for the current source.
+        """
         return tuple(violation for docstring in _candidate_docstrings(context) if (violation := _violation_for_docstring(docstring, context=context)) is not None)
 
 
@@ -94,7 +101,14 @@ def _rendered_docstring(docstring: PDF_definition.DocstringInfo) -> str | None:
 
 
 def reportable_backslash_line_numbers(docstring: PDF_definition.DocstringInfo) -> tuple[int, ...]:
-    """Return lines with non-fixable backslashes other than non-ASCII character escapes."""
+    """Return lines with non-fixable backslashes other than non-ASCII character escapes.
+
+    Args:
+        docstring (PDF_definition.DocstringInfo): Parsed docstring whose source spelling contains backslashes.
+
+    Returns:
+        tuple[int, ...]: One-based physical source lines containing reportable backslash escapes.
+    """
     if not isinstance(docstring.node, cst.SimpleString):
         return _line_numbers(docstring)
     body_source = string_literals.simple_string_body_source(docstring.node)

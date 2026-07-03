@@ -1,4 +1,11 @@
-"""Rule check and fix pass execution."""
+"""Rule check and fix pass execution.
+
+Attributes:
+    MAX_FIX_ITERATIONS (int): Upper bound on repeated fix passes, preventing cyclic or non-converging rules from running
+        indefinitely.
+    UTF8_BOM (str): Unicode byte order mark removed before parsing so reported source positions align with user-visible
+        text.
+"""
 
 from __future__ import annotations
 
@@ -83,7 +90,20 @@ def run_rules(
     fix: bool,
     source: str | None = None,
 ) -> RuleRunResult:
-    """Run selected rule fixes and checks against one parsed module."""
+    """Run selected rule fixes and checks against one parsed module.
+
+    Args:
+        module (cst.Module): Parsed LibCST module to check or transform.
+        path (str): Display path used for per-file ignores, diagnostics, and operational errors.
+        settings (CheckSettings): Resolved settings for the current source.
+        line_ending (str): Line ending sequence to use for generated replacement text.
+        rule_selection (RuleSelection): Globally selected rules and per-file ignores for this run.
+        fix (bool): Whether enabled fixes should be applied before the final check pass.
+        source (str | None): Original source text aligned with `module`, used for source-range edits when available.
+
+    Returns:
+        RuleRunResult: Final module, fixed and unfixed findings, source-change flag, and operational errors.
+    """
     errors: list[str] = []
     selected_rules = rule_selection.for_path(path)
     selected_rule_by_code = {selected_rule.rule.code: selected_rule for selected_rule in selected_rules}

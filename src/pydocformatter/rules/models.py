@@ -187,7 +187,13 @@ class RuleFinding:
 
     @dataclasses.dataclass(frozen=True, order=True)
     class Key:
-        """Key used to merge findings that differ only by line numbers."""
+        """Key used to merge findings that differ only by line numbers.
+
+        Attributes:
+            rule (RuleMetadata): Rule metadata shared by merge-compatible findings.
+            message (str): Effective diagnostic message after instance-specific overrides.
+            fixable (bool): Effective fixability for the merged finding group.
+        """
 
         rule: RuleMetadata
         message: str
@@ -210,12 +216,24 @@ class RuleFinding:
 
     @property
     def message(self) -> str:
-        """Return the instance-specific or default rule message."""
+        """Return the instance-specific or default rule message.
+
+        Returns:
+            str: Diagnostic text that should be displayed for this finding.
+        """
         return self.rule.message if self.instance_message is None else self.instance_message
 
     @property
     def fixable(self) -> bool:
-        """Return whether this specific finding can be automatically fixed."""
+        """Return whether this specific finding can be automatically fixed.
+
+        Returns:
+            bool: Whether this finding has an enabled source fix.
+
+        Raises:
+            ValueError: If a conditionally fixable rule did not specify per-instance fixability.
+            AssertionError: If rule metadata contains an unknown fix-availability value.
+        """
         if self.instance_fixable is not None:
             return self.instance_fixable
         if self.rule.fix_availability == FixAvailability.ALWAYS:
@@ -229,14 +247,29 @@ class RuleFinding:
 
     @property
     def grouping_key(self) -> RuleFinding.Key:
-        """Return the key used to merge findings that differ only by line numbers."""
+        """Return the key used to merge findings that differ only by line numbers.
+
+        Returns:
+            RuleFinding.Key: Merge key that excludes line targets but preserves rule, message, and fixability.
+        """
         return RuleFinding.Key(rule=self.rule, message=self.message, fixable=self.fixable)
 
     @property
     def suppression_targets(self) -> tuple[tuple[int, ...], ...]:
-        """Return line-number targets that can suppress this finding."""
+        """Return line-number targets that can suppress this finding.
+
+        Returns:
+            tuple[tuple[int, ...], ...]: Primary and alternate one-based line groups accepted by suppression directives.
+        """
         return (self.line_numbers, *self.suppression_line_numbers)
 
     def with_line_numbers(self, line_numbers: tuple[int, ...]) -> RuleFinding:
-        """Return this finding with updated line numbers."""
+        """Return this finding with updated line numbers.
+
+        Args:
+            line_numbers (tuple[int, ...]): Replacement primary diagnostic target lines.
+
+        Returns:
+            RuleFinding: Copy of this finding with normalized line numbers.
+        """
         return dataclasses.replace(self, line_numbers=line_numbers)

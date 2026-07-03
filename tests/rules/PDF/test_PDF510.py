@@ -31,14 +31,14 @@ def test_every_convention_ignores_broad_selection_but_exact_selection_still_appl
 
     assert "PDF510" not in active_codes
 
-    source = '"""Client defaults.\n\nAttributes:\n    timeout: Request timeout.\n"""\n\ntimeout: float\nretries: int\n'
+    source = '"""Client defaults.\n\nAttributes:\n    timeout (float): Request timeout.\n"""\n\ntimeout: float\nretries: int\n'
     exact = format_source(source, settings=CheckSettings(select=("PDF510",), docstring_convention=DocstringConvention.GOOGLE))
 
     assert tuple(finding.line_numbers for finding in exact.unfixed_findings) == ((8,),)
 
 
 def test_reports_google_module_attribute_missing_from_attributes_section() -> None:
-    source = '"""Client defaults.\n\nAttributes:\n    timeout: Request timeout.\n"""\n\ntimeout: float\nretries: int\n'
+    source = '"""Client defaults.\n\nAttributes:\n    timeout (float): Request timeout.\n"""\n\ntimeout: float\nretries: int\n'
 
     assert_pdf510_lines(source, ((8,),))
 
@@ -90,13 +90,13 @@ def test_numpy_comma_separated_attribute_entry_documents_multiple_module_attribu
 
 
 def test_private_module_attributes_are_not_required() -> None:
-    source = '"""Client defaults.\n\nAttributes:\n    timeout: Request timeout.\n"""\n\ntimeout: float\n_token: str\n'
+    source = '"""Client defaults.\n\nAttributes:\n    timeout (float): Request timeout.\n"""\n\ntimeout: float\n_token: str\n'
 
     assert_pdf510_lines(source, ())
 
 
 def test_private_module_path_is_skipped_by_public_only_but_checked_when_disabled() -> None:
-    source = '"""Client defaults.\n\nAttributes:\n    timeout: Request timeout.\n"""\n\ntimeout: float\nretries: int\n'
+    source = '"""Client defaults.\n\nAttributes:\n    timeout (float): Request timeout.\n"""\n\ntimeout: float\nretries: int\n'
 
     assert_pdf510_lines(source, (), path="_internal.py")
     assert_pdf510_lines(source, (), path="_package/public.py")
@@ -113,7 +113,7 @@ def test_private_module_path_is_skipped_by_public_only_but_checked_when_disabled
 
 
 def test_existing_module_path_privacy_ignores_non_package_underscore_parents(tmp_path: pathlib.Path) -> None:
-    source = '"""Client defaults.\n\nAttributes:\n    timeout: Request timeout.\n"""\n\ntimeout: float\nretries: int\n'
+    source = '"""Client defaults.\n\nAttributes:\n    timeout (float): Request timeout.\n"""\n\ntimeout: float\nretries: int\n'
     workspace = tmp_path / "_workspace"
     package = workspace / "pkg"
     package.mkdir(parents=True)
@@ -128,7 +128,7 @@ def test_existing_module_path_privacy_ignores_non_package_underscore_parents(tmp
 
 
 def test_existing_module_path_privacy_uses_package_suffix(tmp_path: pathlib.Path) -> None:
-    source = '"""Client defaults.\n\nAttributes:\n    timeout: Request timeout.\n"""\n\ntimeout: float\nretries: int\n'
+    source = '"""Client defaults.\n\nAttributes:\n    timeout (float): Request timeout.\n"""\n\ntimeout: float\nretries: int\n'
     workspace = tmp_path / "_workspace"
     private_package = workspace / "_package"
     private_package.mkdir(parents=True)
@@ -180,19 +180,19 @@ def test_inert_conventions_do_not_report_broad_module_missing_policies() -> None
 
 
 def test_multi_target_assignment_reports_only_undocumented_targets_on_shared_line() -> None:
-    source = '"""Client defaults.\n\nAttributes:\n    timeout: Request timeout.\n    primary: Primary endpoint.\n"""\n\nprimary = fallback = "https://example.com"\n'
+    source = '"""Client defaults.\n\nAttributes:\n    timeout (float): Request timeout.\n    primary (str): Primary endpoint.\n"""\n\nprimary = fallback = "https://example.com"\n'
 
     assert_pdf510_lines(source, ((8,),))
 
 
 def test_tuple_unpacked_assignment_reports_only_undocumented_module_targets() -> None:
-    source = '"""Client defaults.\n\nAttributes:\n    timeout: Request timeout.\n    primary: Primary endpoint.\n"""\n\nprimary, (fallback, *aliases) = endpoints\n'
+    source = '"""Client defaults.\n\nAttributes:\n    timeout (float): Request timeout.\n    primary (str): Primary endpoint.\n"""\n\nprimary, (fallback, *aliases) = endpoints\n'
 
     assert_pdf510_lines(source, ((8,), (8,)))
 
 
 def test_multiline_tuple_unpacked_assignment_reports_target_lines() -> None:
-    source = '"""Client defaults.\n\nAttributes:\n    primary: Primary endpoint.\n"""\n\n(\n    primary,\n    (\n        fallback,\n        *aliases,\n    ),\n) = endpoints\n'
+    source = '"""Client defaults.\n\nAttributes:\n    primary (str): Primary endpoint.\n"""\n\n(\n    primary,\n    (\n        fallback,\n        *aliases,\n    ),\n) = endpoints\n'
 
     assert_pdf510_lines(source, ((10,), (11,)))
 
@@ -214,6 +214,6 @@ def test_non_summary_policy_reports_body_only_module_docstring() -> None:
 
 
 def test_class_attribute_documentation_does_not_trigger_module_missing_check() -> None:
-    source = 'class Client:\n    """HTTP client.\n\n    Attributes:\n        timeout: Request timeout.\n    """\n\n    timeout: float\n\nmodule_timeout: float\n'
+    source = 'class Client:\n    """HTTP client.\n\n    Attributes:\n        timeout (float): Request timeout.\n    """\n\n    timeout: float\n\nmodule_timeout: float\n'
 
     assert_pdf510_lines(source, ())

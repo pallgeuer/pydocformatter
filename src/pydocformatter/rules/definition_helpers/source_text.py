@@ -1,4 +1,9 @@
-"""Source text range and line-bound helpers."""
+"""Source text range and line-bound helpers.
+
+Attributes:
+    LineBounds (TypeAlias): Per-line absolute source offsets excluding line-ending bytes, used to map LibCST positions
+        back to slices.
+"""
 
 from __future__ import annotations
 
@@ -10,7 +15,14 @@ LineBounds = tuple[tuple[int, int], ...]
 
 
 def source_lines(source: str) -> list[str]:
-    """Split source into lines retaining only Python physical line endings."""
+    """Split source into lines retaining only Python physical line endings.
+
+    Args:
+        source (str): Full Python source text.
+
+    Returns:
+        list[str]: Physical source lines, preserving line endings and returning one empty line for empty source.
+    """
     if not source:
         return [""]
 
@@ -27,7 +39,14 @@ def source_lines(source: str) -> list[str]:
 
 
 def line_bounds_from_lines(source_lines: Sequence[str]) -> LineBounds:
-    """Return source offsets bounding each line without its line ending."""
+    """Return source offsets bounding each line without its line ending.
+
+    Args:
+        source_lines (Sequence[str]): Physical source lines with their original line endings.
+
+    Returns:
+        LineBounds: Absolute start and content-end offsets for each physical line.
+    """
     bounds: list[tuple[int, int]] = []
     line_start = 0
     for line in source_lines:
@@ -39,7 +58,15 @@ def line_bounds_from_lines(source_lines: Sequence[str]) -> LineBounds:
 
 
 def source_for_range(code_range: cst_metadata.CodeRange, *, source_lines: Sequence[str]) -> str:
-    """Return the exact source inside a LibCST code range."""
+    """Return the exact source inside a LibCST code range.
+
+    Args:
+        code_range (cst_metadata.CodeRange): One-based LibCST source range to slice.
+        source_lines (Sequence[str]): Physical source lines indexed by the range line numbers.
+
+    Returns:
+        str: Exact source text covered by the range.
+    """
     first_index = code_range.start.line - 1
     last_index = code_range.end.line - 1
     if first_index == last_index:

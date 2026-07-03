@@ -44,7 +44,14 @@ class PDF507ExtraneousExceptionDocumentation(RuleBase):
 
     @classmethod
     def violations(cls, context: RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
-        """Return violations for exception docs absent from direct raises."""
+        """Return violations for exception docs absent from direct raises.
+
+        Args:
+            context (RuleContext): Current file context with parsed module, settings, and prepared category data.
+
+        Returns:
+            tuple[rule_violations.RuleViolation, ...]: Rule violations reported for the current source.
+        """
         violations: list[rule_violations.RuleViolation] = []
         for definition, docstring, facts in value_documentation.documented_function_facts(context):
             del definition

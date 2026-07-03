@@ -85,6 +85,9 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Clarified that PDF rules ignored under every docstring convention are effectively opt-in by exact rule-code selection, separately from `require-explicit` rules.
   - Added a rule implementation specification documenting the implementation, documentation, testing, and release-note touch points for adding rules.
   - Added source module, rule class, and public class attribute docstrings across the pydocformatter package surface, with code-informed attribute descriptions and guidance against low-information generated docstrings.
+  - Centralized module attribute documentation in owning module docstrings instead of standalone attribute docstrings.
+  - Removed helper module alias reexports of PDF definition types.
+  - Trimmed private implementation docstrings and private attribute entries from public `Attributes` sections.
   - Expanded code-informed docstrings for internal rule helpers, docstring parser routines, descriptor methods, and section-normalization utilities.
   - Changed non-fixable findings in rule examples to label singular and plural line references explicitly.
   - Expanded the PDF101 documentation with explicit behavior notes, setting interactions, safety limits, and verified qualitative examples.
@@ -97,6 +100,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Completed Google-style docstrings for public source APIs and added concise docstrings for private helpers that previously lacked them.
 
 - **Developer workflow:**
+  - Ignored missing documentation rules `PDF500`, `PDF502`, `PDF504`, `PDF506`, `PDF508`, and `PDF510` for `tests/**/test_*.py` in the project pydocformatter configuration.
   - Added a pytest pre-commit hook that runs the test suite before commits.
   - Added a guarded shared pytest working directory for tests that do not request filesystem isolation, with explicit `isolated_cwd` opt-in for tests that need a writable temporary CWD.
   - Added pytest coverage that checks the pydocformatter rule tables in `docs/rule_list.md` against actual rule metadata.

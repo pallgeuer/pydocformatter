@@ -21,7 +21,7 @@ def assert_pdf508_lines(source: str, expected: tuple[tuple[int, ...], ...], *, s
 
 
 def test_reports_google_class_attribute_missing_from_attributes_section() -> None:
-    source = 'class Client:\n    """HTTP client.\n\n    Attributes:\n        timeout: Request timeout.\n    """\n\n    timeout: float\n    retries: int\n'
+    source = 'class Client:\n    """HTTP client.\n\n    Attributes:\n        timeout (float): Request timeout.\n    """\n\n    timeout: float\n    retries: int\n'
 
     assert_pdf508_lines(source, ((9,),))
 
@@ -73,20 +73,20 @@ def test_numpy_comma_separated_attribute_entry_documents_multiple_class_attribut
 
 
 def test_private_attributes_are_not_required() -> None:
-    source = 'class Client:\n    """HTTP client.\n\n    Attributes:\n        timeout: Request timeout.\n    """\n\n    timeout: float\n    _token: str\n'
+    source = 'class Client:\n    """HTTP client.\n\n    Attributes:\n        timeout (float): Request timeout.\n    """\n\n    timeout: float\n    _token: str\n'
 
     assert_pdf508_lines(source, ())
 
 
 def test_private_class_is_skipped_by_public_only_but_checked_when_disabled() -> None:
-    source = 'class _Client:\n    """HTTP client.\n\n    Attributes:\n        timeout: Request timeout.\n    """\n\n    timeout: float\n    retries: int\n'
+    source = 'class _Client:\n    """HTTP client.\n\n    Attributes:\n        timeout (float): Request timeout.\n    """\n\n    timeout: float\n    retries: int\n'
 
     assert_pdf508_lines(source, ())
     assert_pdf508_lines(source, ((9,),), settings=CheckSettings(select=("PDF508",), docstring_convention=DocstringConvention.GOOGLE, docstring_missing_documentation_public_only=False))
 
 
 def test_init_instance_attributes_are_required_only_when_setting_enabled() -> None:
-    source = 'class Client:\n    """HTTP client.\n\n    Attributes:\n        timeout: Request timeout.\n    """\n\n    timeout: float\n\n    def __init__(self):\n        self.retries = 3\n'
+    source = 'class Client:\n    """HTTP client.\n\n    Attributes:\n        timeout (float): Request timeout.\n    """\n\n    timeout: float\n\n    def __init__(self):\n        self.retries = 3\n'
 
     assert_pdf508_lines(source, ())
     assert_pdf508_lines(source, ((11,),), settings=CheckSettings(select=("PDF508",), docstring_convention=DocstringConvention.GOOGLE, docstring_require_init_attribute_documentation=True))
@@ -121,25 +121,25 @@ def test_inert_conventions_do_not_report_broad_class_missing_policies() -> None:
 
 
 def test_repeated_assignment_reports_first_missing_attribute_line_once() -> None:
-    source = 'class Client:\n    """HTTP client.\n\n    Attributes:\n        timeout: Request timeout.\n    """\n\n    timeout: float\n    retries: int\n    retries = 3\n'
+    source = 'class Client:\n    """HTTP client.\n\n    Attributes:\n        timeout (float): Request timeout.\n    """\n\n    timeout: float\n    retries: int\n    retries = 3\n'
 
     assert_pdf508_lines(source, ((9,),))
 
 
 def test_multi_target_assignment_reports_only_undocumented_targets_on_shared_line() -> None:
-    source = 'class Client:\n    """HTTP client.\n\n    Attributes:\n        timeout: Request timeout.\n        primary: Primary endpoint.\n    """\n\n    primary = fallback = "https://example.com"\n'
+    source = 'class Client:\n    """HTTP client.\n\n    Attributes:\n        timeout (float): Request timeout.\n        primary (str): Primary endpoint.\n    """\n\n    primary = fallback = "https://example.com"\n'
 
     assert_pdf508_lines(source, ((9,),))
 
 
 def test_tuple_unpacked_assignment_reports_only_undocumented_class_targets() -> None:
-    source = 'class Client:\n    """HTTP client.\n\n    Attributes:\n        timeout: Request timeout.\n        primary: Primary endpoint.\n    """\n\n    primary, (fallback, *aliases) = endpoints\n'
+    source = 'class Client:\n    """HTTP client.\n\n    Attributes:\n        timeout (float): Request timeout.\n        primary (str): Primary endpoint.\n    """\n\n    primary, (fallback, *aliases) = endpoints\n'
 
     assert_pdf508_lines(source, ((9,), (9,)))
 
 
 def test_multiline_tuple_unpacked_assignment_reports_target_lines() -> None:
-    source = 'class Client:\n    """HTTP client.\n\n    Attributes:\n        primary: Primary endpoint.\n    """\n\n    (\n        primary,\n        (\n            fallback,\n            *aliases,\n        ),\n    ) = endpoints\n'
+    source = 'class Client:\n    """HTTP client.\n\n    Attributes:\n        primary (str): Primary endpoint.\n    """\n\n    (\n        primary,\n        (\n            fallback,\n            *aliases,\n        ),\n    ) = endpoints\n'
 
     assert_pdf508_lines(source, ((11,), (12,)))
 
@@ -151,7 +151,9 @@ def test_tuple_unpacked_attribute_docstring_documents_supported_class_targets() 
 
 
 def test_tuple_unpacked_init_attribute_mixed_with_discard_is_required_when_enabled() -> None:
-    source = 'class Client:\n    """HTTP client.\n\n    Attributes:\n        timeout: Request timeout.\n    """\n\n    timeout: float\n\n    def __init__(self):\n        self.retries, _ = values\n'
+    source = (
+        'class Client:\n    """HTTP client.\n\n    Attributes:\n        timeout (float): Request timeout.\n    """\n\n    timeout: float\n\n    def __init__(self):\n        self.retries, _ = values\n'
+    )
 
     assert_pdf508_lines(
         source,
@@ -171,6 +173,6 @@ def test_non_summary_policy_reports_body_only_class_docstring() -> None:
 
 
 def test_nested_class_attributes_are_checked_against_their_own_class_docstring() -> None:
-    source = 'class Outer:\n    """Outer client.\n\n    Attributes:\n        outer_timeout: Outer timeout.\n    """\n\n    outer_timeout: float\n\n    class Inner:\n        """Inner client.\n\n        Attributes:\n            inner_timeout: Inner timeout.\n        """\n\n        inner_timeout: float\n        retries: int\n'
+    source = 'class Outer:\n    """Outer client.\n\n    Attributes:\n        outer_timeout (float): Outer timeout.\n    """\n\n    outer_timeout: float\n\n    class Inner:\n        """Inner client.\n\n        Attributes:\n            inner_timeout (float): Inner timeout.\n        """\n\n        inner_timeout: float\n        retries: int\n'
 
     assert_pdf508_lines(source, ((18,),))

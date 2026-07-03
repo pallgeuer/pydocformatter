@@ -95,7 +95,9 @@ skip = [".github", ".eggs", ".git", ".hg", ".mypy_cache", ".tox", ".venv", "html
 line-length = 120
 indent-style = "space"
 docstring-convention = "google"
-extend-select = ["PCF005", "PDF003"]
+docstring-missing-documentation = "all-docstrings"
+extend-select = ["PCF005", "PDF003", "PDF300", "PDF302", "PDF305", "PDF510"]
+extend-per-file-ignores = {"tests/**/test_*.py" = ["PDF500", "PDF502", "PDF504", "PDF506", "PDF508", "PDF510"]}
 
 [tool.mypy]
 files = ["src/pydocformatter", "tests"]

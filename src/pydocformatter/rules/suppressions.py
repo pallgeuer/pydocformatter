@@ -1,4 +1,9 @@
-"""Source directive parsing for pydocformatter finding suppression."""
+"""Source directive parsing for pydocformatter finding suppression.
+
+Attributes:
+    SuppressionSelectorKey (TypeAlias): Line and selector-index pair used to track whether each parsed suppression
+        selector was consumed.
+"""
 
 from __future__ import annotations
 
@@ -29,7 +34,13 @@ _TOOL_DIRECTIVE_RE = re.compile(
 
 @dataclasses.dataclass(frozen=True)
 class SuppressionViolationFilterResult:
-    """Unsuppressed violations and selector keys used while filtering them."""
+    """Unsuppressed violations and selector keys used while filtering them.
+
+    Attributes:
+        violations (tuple[rule_violations.RuleViolation, ...]): Violations that no source directive suppressed.
+        used_selector_keys (frozenset[SuppressionSelectorKey]): Directive selector entries that suppressed at least one
+            finding.
+    """
 
     violations: tuple[rule_violations.RuleViolation, ...]
     used_selector_keys: frozenset[SuppressionSelectorKey]
@@ -37,26 +48,54 @@ class SuppressionViolationFilterResult:
 
 @dataclasses.dataclass(frozen=True)
 class SuppressionIndex:
-    """Parsed pydocformatter suppression directives for one source state."""
+    """Parsed pydocformatter suppression directives for one source state.
+
+    Attributes:
+        directives (tuple[SuppressionDirective, ...]): Suppression directives collected from comments outside strings.
+    """
 
     directives: tuple[SuppressionDirective, ...]
 
     def used_selector_keys(self, finding: RuleFinding) -> frozenset[SuppressionSelectorKey]:
-        """Return stable selector keys used by suppressing one finding."""
+        """Return stable selector keys used by suppressing one finding.
+
+        Args:
+            finding (RuleFinding): Finding whose suppression coverage should be checked.
+
+        Returns:
+            frozenset[SuppressionSelectorKey]: Directive selector keys that suppress the finding.
+        """
         used: set[SuppressionSelectorKey] = set()
         for directive_index, directive in enumerate(self.directives):
             used.update(directive.used_selector_keys(finding, directive_index=directive_index))
         return frozenset(used)
 
     def unused_findings(self, used_selector_keys: frozenset[SuppressionSelectorKey], *, selected_rule_codes: frozenset[RuleCode], rule: RuleMetadata) -> tuple[RuleFinding, ...]:
-        """Return PCF006-style findings for invalid or unused audited selectors."""
+        """Return PCF006-style findings for invalid or unused audited selectors.
+
+        Args:
+            used_selector_keys (frozenset[SuppressionSelectorKey]): Selector keys consumed while filtering findings.
+            selected_rule_codes (frozenset[RuleCode]): Rules active for the current file after selection and ignores.
+            rule (RuleMetadata): PCF006 metadata to attach to unused-suppression findings.
+
+        Returns:
+            tuple[RuleFinding, ...]: Diagnostics for invalid selectors and selected-but-unused suppressions.
+        """
         findings: list[RuleFinding] = []
         for directive_index, directive in enumerate(self.directives):
             findings.extend(directive.unused_findings(directive_index=directive_index, used_selector_keys=used_selector_keys, selected_rule_codes=selected_rule_codes, rule=rule))
         return tuple(findings)
 
     def filter_violations(self, violations: tuple[rule_violations.RuleViolation, ...]) -> SuppressionViolationFilterResult:
-        """Return unsuppressed violations and selector keys used during filtering."""
+        """Return unsuppressed violations and selector keys used during filtering.
+
+        Args:
+            violations (tuple[rule_violations.RuleViolation, ...]): Rule violations before source suppressions are
+                applied.
+
+        Returns:
+            SuppressionViolationFilterResult: Remaining violations plus selector keys that were consumed.
+        """
         unsuppressed_violations: list[rule_violations.RuleViolation] = []
         used_selector_keys: set[SuppressionSelectorKey] = set()
         for violation in violations:
@@ -70,17 +109,40 @@ class SuppressionIndex:
 
 @dataclasses.dataclass(frozen=True)
 class SuppressionDirective:
-    """One parsed source suppression directive."""
+    """One parsed source suppression directive.
+
+    Attributes:
+        line (int): One-based source line where the directive comment appears.
+        selectors (tuple[SuppressionSelector, ...]): Parsed selector entries carried by the directive.
+    """
 
     line: int
     selectors: tuple[SuppressionSelector, ...]
 
     def used_selector_keys(self, finding: RuleFinding, *, directive_index: int) -> set[SuppressionSelectorKey]:
-        """Return selector keys used by suppressing this finding."""
+        """Return selector keys used by suppressing this finding.
+
+        Args:
+            finding (RuleFinding): Finding whose suppression coverage should be checked.
+            directive_index (int): Position of this directive in the source-level directive tuple.
+
+        Returns:
+            set[SuppressionSelectorKey]: Selector keys from this directive that suppress the finding.
+        """
         return {(directive_index, selector_index) for selector_index, selector in enumerate(self.selectors) if selector.suppresses(finding)}
 
     def unused_findings(self, *, directive_index: int, used_selector_keys: frozenset[SuppressionSelectorKey], selected_rule_codes: frozenset[RuleCode], rule: RuleMetadata) -> list[RuleFinding]:
-        """Return unused or invalid findings for audited selectors."""
+        """Return unused or invalid findings for audited selectors.
+
+        Args:
+            directive_index (int): Position of this directive in the source-level directive tuple.
+            used_selector_keys (frozenset[SuppressionSelectorKey]): Selector keys consumed while filtering findings.
+            selected_rule_codes (frozenset[RuleCode]): Rules active for the current file after selection and ignores.
+            rule (RuleMetadata): PCF006 metadata to attach to unused-suppression findings.
+
+        Returns:
+            list[RuleFinding]: Diagnostics for invalid selectors and selected-but-unused suppressions on this directive.
+        """
         findings: list[RuleFinding] = []
         for selector_index, selector in enumerate(self.selectors):
             if not selector.audit:
@@ -95,7 +157,15 @@ class SuppressionDirective:
 
 @dataclasses.dataclass(frozen=True)
 class SuppressionSelector:
-    """One selector entry inside a suppression directive."""
+    """One selector entry inside a suppression directive.
+
+    Attributes:
+        text (str): Original selector text used for unused-suppression messages.
+        matched_codes (frozenset[RuleCode]): Concrete rules covered by the selector.
+        coverage_lines (frozenset[int]): One-based source lines that the directive is allowed to suppress.
+        audit (bool): Whether PCF006 should report this selector when it is invalid or unused.
+        invalid_message (str | None): Precomputed diagnostic text for selectors that failed to parse or match rules.
+    """
 
     text: str
     matched_codes: frozenset[RuleCode]
@@ -104,7 +174,14 @@ class SuppressionSelector:
     invalid_message: str | None = None
 
     def suppresses(self, finding: RuleFinding) -> bool:
-        """Return whether this selector suppresses one finding."""
+        """Return whether this selector suppresses one finding.
+
+        Args:
+            finding (RuleFinding): Finding to compare against matched rule codes and coverage lines.
+
+        Returns:
+            bool: Whether the selector covers the finding's rule and at least one complete suppression target.
+        """
         if self.invalid_message is not None:
             return False
         if finding.rule.code not in self.matched_codes:
@@ -183,7 +260,18 @@ class _SourceCollector(cst.CSTVisitor):
 
 
 def suppression_index(module: cst.Module, *, positions: Mapping[cst.CSTNode, cst_metadata.CodeRange], source_lines: tuple[str, ...], collection: RuleCollection) -> SuppressionIndex:
-    """Return parsed suppression directives for a module source state."""
+    """Return parsed suppression directives for a module source state.
+
+    Args:
+        module (cst.Module): Parsed source module to scan for comments and string ranges.
+        positions (Mapping[cst.CSTNode, cst_metadata.CodeRange]): LibCST position metadata for excluding
+            string-contained comments.
+        source_lines (tuple[str, ...]): Physical source lines used to recover exact comment text.
+        collection (RuleCollection): Rule collection used to resolve suppression selectors to concrete rule codes.
+
+    Returns:
+        SuppressionIndex: Parsed suppression directives ordered by source location.
+    """
     if not any("#" in line for line in source_lines):
         return SuppressionIndex(directives=())
     collector = _SourceCollector(positions, source_lines)

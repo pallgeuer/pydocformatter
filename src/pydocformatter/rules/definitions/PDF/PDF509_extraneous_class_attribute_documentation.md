@@ -29,8 +29,8 @@ class Client:
     """HTTP client.
 
     Attributes:
-        timeout: Request timeout.
-        stale: Removed attribute.
+        timeout (float): Request timeout.
+        stale (object): Removed attribute.
     """
 
     timeout: float
@@ -51,8 +51,8 @@ class Client:
     """HTTP client.
 
     Attributes:
-        timeout: Request timeout.
-        _token: Internal token.
+        timeout (float): Request timeout.
+        _token (str): Internal token.
     """
 
     _token: str
@@ -74,9 +74,9 @@ class Client:
     """HTTP client.
 
     Attributes:
-        primary: Primary endpoint.
-        fallback: Fallback endpoint.
-        aliases: Endpoint aliases.
+        primary (str): Primary endpoint.
+        fallback (str): Fallback endpoint.
+        aliases (tuple[str, ...]): Endpoint aliases.
     """
 
     primary = fallback = "https://example.com"
@@ -119,7 +119,7 @@ class Client:
     """HTTP client.
 
     Attributes:
-        primary: Primary endpoint.
+        primary (str): Primary endpoint.
     """
 
     [primary, fallback] = endpoints
@@ -140,7 +140,7 @@ class Outer:
     """Outer client.
 
     Attributes:
-        inner_timeout: Inner timeout.
+        inner_timeout (float): Inner timeout.
     """
 
     class Inner:
