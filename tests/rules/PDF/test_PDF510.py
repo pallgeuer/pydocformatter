@@ -5,7 +5,7 @@ import pytest
 import pydocformatter.formatter as formatter
 import pydocformatter.rules_selection as rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention, DocstringMissingDocumentation
-from pydocformatter.rules.definitions.PDF.PDF510_missing_module_attribute_documentation import PDF510MissingModuleAttributeDocumentation
+from pydocformatter.rules.definitions.PDF.PDF510_missing_public_module_attribute_documentation import PDF510MissingPublicModuleAttributeDocumentation
 
 
 def format_source(source: str, *, settings: CheckSettings | None = None, path: str = "example.py") -> formatter.FormatterResult:
@@ -14,14 +14,15 @@ def format_source(source: str, *, settings: CheckSettings | None = None, path: s
     return formatter.format_source(source, path, settings=resolved_settings, rule_selection=rules_selection.select_rules(resolved_settings), fix=True)
 
 
-def assert_pdf510_lines(source: str, expected: tuple[tuple[int, ...], ...], *, settings: CheckSettings | None = None, path: str = "example.py") -> None:
+def assert_pdf510_lines(source: str, expected: tuple[tuple[int, ...], ...], *, settings: CheckSettings | None = None, path: str = "example.py") -> formatter.FormatterResult:
     """Assert PDF510 line findings for source."""
     result = format_source(source, settings=settings, path=path)
 
     assert result.new_source == source
     assert not result.fixed_findings
-    assert tuple(finding.rule for finding in result.unfixed_findings) == (PDF510MissingModuleAttributeDocumentation.meta,) * len(expected)
+    assert tuple(finding.rule for finding in result.unfixed_findings) == (PDF510MissingPublicModuleAttributeDocumentation.meta,) * len(expected)
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == expected
+    return result
 
 
 @pytest.mark.parametrize("convention", tuple(DocstringConvention))
@@ -40,7 +41,8 @@ def test_every_convention_ignores_broad_selection_but_exact_selection_still_appl
 def test_reports_google_module_attribute_missing_from_attributes_section() -> None:
     source = '"""Client defaults.\n\nAttributes:\n    timeout (float): Request timeout.\n"""\n\ntimeout: float\nretries: int\n'
 
-    assert_pdf510_lines(source, ((8,),))
+    result = assert_pdf510_lines(source, ((8,),))
+    assert tuple(finding.message for finding in result.unfixed_findings) == ("Public module attribute 'retries' is missing docstring documentation",)
 
 
 def test_empty_attributes_section_still_triggers_module_missing_check() -> None:

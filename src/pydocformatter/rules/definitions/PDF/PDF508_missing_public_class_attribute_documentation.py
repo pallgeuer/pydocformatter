@@ -1,4 +1,4 @@
-"""PDF510 missing-module-attribute-documentation rule."""
+"""PDF508 missing-public-class-attribute-documentation rule."""
 
 from __future__ import annotations
 
@@ -14,23 +14,23 @@ from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMeta
 
 
 @rule_registration.register_rule_to(PDF)
-class PDF510MissingModuleAttributeDocumentation(RuleBase):
-    """Rule implementation for PDF510.
+class PDF508MissingPublicClassAttributeDocumentation(RuleBase):
+    """Rule implementation for PDF508.
 
     Attributes:
         meta (RuleMetadata): Static metadata used for registration, diagnostics, and rule selection.
     """
 
     meta = RuleMetadata(
-        code=RuleCode("PDF510"),
-        name="missing-module-attribute-documentation",
-        message="Module attribute is missing docstring documentation",
+        code=RuleCode("PDF508"),
+        name="missing-public-class-attribute-documentation",
+        message="Public class attribute is missing docstring documentation",
         fix_availability=FixAvailability.NEVER,
         stable_since="1.0.0",
         setting_effects=(
             RuleSettingEffects(
                 setting="docstring_convention",
-                effects=(RuleSettingEffectValues(effect=RuleSettingEffect.IGNORED, values=tuple(DocstringConvention)),),
+                effects=(RuleSettingEffectValues(effect=RuleSettingEffect.IGNORED, values=(DocstringConvention.NONE, DocstringConvention.PEP257)),),
             ),
         ),
         incompatible_with=(),
@@ -39,7 +39,7 @@ class PDF510MissingModuleAttributeDocumentation(RuleBase):
 
     @classmethod
     def violations(cls, context: RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
-        """Return violations for module attributes missing documentation.
+        """Return violations for class attributes missing documentation.
 
         Args:
             context (RuleContext): Current file context with parsed module, settings, and prepared category data.
@@ -52,7 +52,7 @@ class PDF510MissingModuleAttributeDocumentation(RuleBase):
             data,
             context=context,
             meta=cls.meta,
-            owner_kind=PDF_definition.DefinitionKind.MODULE,
-            owner_label="Module",
-            include_instance=False,
+            owner_kind=PDF_definition.DefinitionKind.CLASS,
+            owner_label="Public class",
+            include_instance=context.settings.docstring_require_init_attribute_documentation,
         )

@@ -1,4 +1,4 @@
-# missing-class-attribute-documentation (PDF508)
+# missing-public-class-attribute-documentation (PDF508)
 
 Fix is not available.
 
@@ -18,7 +18,7 @@ Class attribute documentation can otherwise drift from the actual class surface.
 None.
 
 ## Examples
-Missing class attribute documentation is reported when a class has attribute documentation but omits a public class attribute:
+Missing public class attribute documentation is reported when a class has attribute documentation but omits a public class attribute:
 
 ```pydocfmt-example
 [settings]
@@ -37,7 +37,7 @@ class Client:
 
 [output=unchanged]
 [findings]
-PDF508: Line 9: Class attribute 'retries' is missing docstring documentation
+PDF508: Line 9: Public class attribute 'retries' is missing docstring documentation
 ```
 
 An empty recognized `Attributes` section still opts the class into missing attribute checks:
@@ -57,7 +57,7 @@ class Client:
 
 [output=unchanged]
 [findings]
-PDF508: Line 7: Class attribute 'timeout' is missing docstring documentation
+PDF508: Line 7: Public class attribute 'timeout' is missing docstring documentation
 ```
 
 Adjacent attribute docstrings document their assignments, including every simple target in a multi-target assignment and supported tuple-unpacked assignment. Private attributes are not required:
@@ -103,7 +103,7 @@ class Client:
 
 [output=unchanged]
 [findings]
-PDF508: Line 11: Class attribute 'retries' is missing docstring documentation
+PDF508: Line 11: Public class attribute 'retries' is missing docstring documentation
 ```
 
 reStructuredText attribute fields are parsed under the `rest` convention:
@@ -124,7 +124,7 @@ class Client:
 
 [output=unchanged]
 [findings]
-PDF508: Line 8: Class attribute 'retries' is missing docstring documentation
+PDF508: Line 8: Public class attribute 'retries' is missing docstring documentation
 ```
 
 `self.*` assignments in `__init__` are required only when `docstring-require-init-attribute-documentation` is enabled:
@@ -149,7 +149,7 @@ class Client:
 
 [output=unchanged]
 [findings]
-PDF508: Line 11: Class attribute 'retries' is missing docstring documentation
+PDF508: Line 11: Public class attribute 'retries' is missing docstring documentation
 ```
 
 ## Options

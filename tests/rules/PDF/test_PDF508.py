@@ -1,7 +1,7 @@
 import pydocformatter.formatter as formatter
 import pydocformatter.rules_selection as rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention, DocstringMissingDocumentation
-from pydocformatter.rules.definitions.PDF.PDF508_missing_class_attribute_documentation import PDF508MissingClassAttributeDocumentation
+from pydocformatter.rules.definitions.PDF.PDF508_missing_public_class_attribute_documentation import PDF508MissingPublicClassAttributeDocumentation
 
 
 def format_source(source: str, *, settings: CheckSettings | None = None) -> formatter.FormatterResult:
@@ -10,20 +10,22 @@ def format_source(source: str, *, settings: CheckSettings | None = None) -> form
     return formatter.format_source(source, "example.py", settings=resolved_settings, rule_selection=rules_selection.select_rules(resolved_settings), fix=True)
 
 
-def assert_pdf508_lines(source: str, expected: tuple[tuple[int, ...], ...], *, settings: CheckSettings | None = None) -> None:
+def assert_pdf508_lines(source: str, expected: tuple[tuple[int, ...], ...], *, settings: CheckSettings | None = None) -> formatter.FormatterResult:
     """Assert PDF508 line findings for source."""
     result = format_source(source, settings=settings)
 
     assert result.new_source == source
     assert not result.fixed_findings
-    assert tuple(finding.rule for finding in result.unfixed_findings) == (PDF508MissingClassAttributeDocumentation.meta,) * len(expected)
+    assert tuple(finding.rule for finding in result.unfixed_findings) == (PDF508MissingPublicClassAttributeDocumentation.meta,) * len(expected)
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == expected
+    return result
 
 
 def test_reports_google_class_attribute_missing_from_attributes_section() -> None:
     source = 'class Client:\n    """HTTP client.\n\n    Attributes:\n        timeout (float): Request timeout.\n    """\n\n    timeout: float\n    retries: int\n'
 
-    assert_pdf508_lines(source, ((9,),))
+    result = assert_pdf508_lines(source, ((9,),))
+    assert tuple(finding.message for finding in result.unfixed_findings) == ("Public class attribute 'retries' is missing docstring documentation",)
 
 
 def test_empty_attributes_section_still_triggers_class_missing_check() -> None:

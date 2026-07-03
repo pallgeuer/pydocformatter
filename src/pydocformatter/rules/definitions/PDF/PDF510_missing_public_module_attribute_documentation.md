@@ -1,4 +1,4 @@
-# missing-module-attribute-documentation (PDF510)
+# missing-public-module-attribute-documentation (PDF510)
 
 Fix is not available.
 
@@ -18,7 +18,7 @@ Module attribute documentation can otherwise drift from exported module state.
 None.
 
 ## Examples
-Missing module attribute documentation is reported when a module has attribute documentation but omits a public module attribute:
+Missing public module attribute documentation is reported when a module has attribute documentation but omits a public module attribute:
 
 ```pydocfmt-example
 [settings]
@@ -36,7 +36,7 @@ retries: int
 
 [output=unchanged]
 [findings]
-PDF510: Line 8: Module attribute 'retries' is missing docstring documentation
+PDF510: Line 8: Public module attribute 'retries' is missing docstring documentation
 ```
 
 An empty recognized `Attributes` section still opts the module into missing attribute checks:
@@ -55,7 +55,7 @@ timeout: float
 
 [output=unchanged]
 [findings]
-PDF510: Line 6: Module attribute 'timeout' is missing docstring documentation
+PDF510: Line 6: Public module attribute 'timeout' is missing docstring documentation
 ```
 
 Adjacent module attribute docstrings document their assignments, including every simple target in a multi-target assignment and supported tuple-unpacked assignment. Private module attributes are not required:
@@ -72,7 +72,7 @@ retries: int
 
 [output=unchanged]
 [findings]
-PDF510: Line 4: Module attribute 'retries' is missing docstring documentation
+PDF510: Line 4: Public module attribute 'retries' is missing docstring documentation
 ```
 
 ```pydocfmt-example
@@ -114,7 +114,7 @@ retries: int
 
 [output=unchanged]
 [findings]
-PDF510: Line 10: Module attribute 'retries' is missing docstring documentation
+PDF510: Line 10: Public module attribute 'retries' is missing docstring documentation
 ```
 
 reStructuredText attribute fields are parsed under the `rest` convention:
@@ -134,7 +134,7 @@ retries: int
 
 [output=unchanged]
 [findings]
-PDF510: Line 7: Module attribute 'retries' is missing docstring documentation
+PDF510: Line 7: Public module attribute 'retries' is missing docstring documentation
 ```
 
 The `non-summary-docstrings` policy reports missing attributes for public modules whose docstring has more than a summary, even without an attribute section:
@@ -154,7 +154,7 @@ timeout: float
 
 [output=unchanged]
 [findings]
-PDF510: Line 6: Module attribute 'timeout' is missing docstring documentation
+PDF510: Line 6: Public module attribute 'timeout' is missing docstring documentation
 ```
 
 ## Options
