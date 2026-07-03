@@ -1,18 +1,20 @@
 import pathlib
-import re
-import subprocess
+
+import pytest
+
+import tools.fix_markdown_tables as markdown_tables
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-SEPARATOR_CELL_RE = re.compile(r":?-{3,}:?")
+FIX_COMMAND = "uv run python tools/fix_markdown_tables.py"
 
 
 def test_markdown_tables_are_pycharm_style_aligned_and_minimal() -> None:
     """Check that repository Markdown pipe tables use minimal PyCharm-style alignment."""
     failures: list[str] = []
-    for path in _tracked_markdown_paths():
-        failures.extend(_markdown_table_failures(path))
+    for path in markdown_tables.tracked_markdown_paths():
+        failures.extend(markdown_tables.markdown_table_failures(path))
 
-    assert not failures, "Markdown table style failures:\n" + "\n".join(failures)
+    assert not failures, f"Markdown table style failures. Run: {FIX_COMMAND}\n" + "\n".join(failures)
 
 
 def test_table_failures_rejects_oversized_columns() -> None:
@@ -23,7 +25,7 @@ def test_table_failures_rejects_oversized_columns() -> None:
         "| one   | two   |",
     ]
 
-    failures = _table_failures(ROOT / "example.md", 0, table_lines)
+    failures = markdown_tables.table_failures(ROOT / "example.md", 0, table_lines)
 
     assert failures == [
         "example.md:1: expected '| Name | Value |', found '| Name  | Value |'",
@@ -40,7 +42,7 @@ def test_table_failures_accepts_minimal_pycharm_style_table() -> None:
         "| one  | two   |",
     ]
 
-    assert _table_failures(ROOT / "example.md", 0, table_lines) == []
+    assert markdown_tables.table_failures(ROOT / "example.md", 0, table_lines) == []
 
 
 def test_table_failures_preserves_separator_alignment_markers() -> None:
@@ -51,147 +53,278 @@ def test_table_failures_preserves_separator_alignment_markers() -> None:
         "| a       | b    |   c    |     d |",
     ]
 
-    assert _table_failures(ROOT / "example.md", 0, table_lines) == []
+    assert markdown_tables.table_failures(ROOT / "example.md", 0, table_lines) == []
 
 
-def _tracked_markdown_paths() -> tuple[pathlib.Path, ...]:
-    """Return Git-tracked Markdown paths."""
-    output = subprocess.check_output(("git", "ls-files", "*.md"), cwd=ROOT, text=True)
-    return tuple(ROOT / line for line in output.splitlines())
+def test_normalize_markdown_tables_text_rewrites_tables_and_preserves_fences() -> None:
+    """Check that the helper rewrites tables outside fences only."""
+    source = "\n".join(
+        [
+            "| Name  | Value |",
+            "|-------|-------|",
+            "| one   | two   |",
+            "",
+            "```",
+            "| Name  | Value |",
+            "|-------|-------|",
+            "```",
+            "",
+        ]
+    )
+
+    assert markdown_tables.normalize_markdown_tables_text(source) == "\n".join(
+        [
+            "| Name | Value |",
+            "|------|-------|",
+            "| one  | two   |",
+            "",
+            "```",
+            "| Name  | Value |",
+            "|-------|-------|",
+            "```",
+            "",
+        ]
+    )
 
 
-def _markdown_table_failures(path: pathlib.Path) -> list[str]:
-    """Return table alignment failures for one Markdown file."""
-    lines = path.read_text(encoding="utf-8").splitlines()
-    failures: list[str] = []
-    fence: tuple[str, int] | None = None
-    line_index = 0
+def test_normalize_markdown_tables_text_preserves_table_indentation() -> None:
+    """Check that table normalization uses the header row indentation."""
+    source = "\n".join(
+        [
+            "  | Name  | Value |",
+            "|-------|-------|",
+            "    | one   | two   |",
+            "",
+        ]
+    )
 
-    while line_index < len(lines):
-        fence_marker = _fence_marker(lines[line_index])
-        if fence_marker is not None:
-            if fence is None:
-                fence = fence_marker
-            elif fence_marker[0] == fence[0] and fence_marker[1] >= fence[1]:
-                fence = None
-            line_index += 1
-            continue
-
-        if fence is None and line_index + 1 < len(lines) and _is_table_row(lines[line_index]) and _is_separator_row(lines[line_index + 1]):
-            table_start = line_index
-            table_lines = [lines[line_index], lines[line_index + 1]]
-            line_index += 2
-            while line_index < len(lines) and _is_table_row(lines[line_index]):
-                table_lines.append(lines[line_index])
-                line_index += 1
-            failures.extend(_table_failures(path, table_start, table_lines))
-            continue
-
-        line_index += 1
-
-    return failures
+    assert markdown_tables.normalize_markdown_tables_text(source) == "\n".join(
+        [
+            "  | Name | Value |",
+            "  |------|-------|",
+            "  | one  | two   |",
+            "",
+        ]
+    )
 
 
-def _table_failures(path: pathlib.Path, table_start: int, table_lines: list[str]) -> list[str]:
-    """Return alignment failures for one Markdown pipe table."""
-    failures: list[str] = []
-    rows = tuple(tuple(cell.strip() for cell in _split_table_row(line)) for line in table_lines)
-    header_cells = rows[0]
-    separator_cells = _split_table_row(table_lines[1])
+@pytest.mark.parametrize("indent", ("    ", "\t"))
+def test_normalize_markdown_tables_text_preserves_indented_code_blocks(indent: str) -> None:
+    """Check that indented code blocks that look like tables are not rewritten."""
+    source = "\n".join(
+        [
+            f"{indent}| Name  | Value |",
+            f"{indent}|-------|-------|",
+            f"{indent}| one   | two   |",
+            "",
+        ]
+    )
 
-    if len(separator_cells) != len(header_cells):
-        return [f"{_display_path(path)}:{table_start + 2}: expected {len(header_cells)} cells, found {len(separator_cells)}"]
-
-    alignments = tuple(_alignment_for_separator_cell(cell) for cell in separator_cells)
-    for row_offset, cells in enumerate(rows):
-        line_number = table_start + row_offset + 1
-        if len(cells) != len(header_cells):
-            failures.append(f"{_display_path(path)}:{line_number}: expected {len(header_cells)} cells, found {len(cells)}")
-
-    if failures:
-        return failures
-
-    column_widths = tuple(max(len(row[column]) for row in rows[:1] + rows[2:]) for column in range(len(header_cells)))
-    expected_lines = _render_table(rows, alignments=alignments, column_widths=column_widths)
-
-    for row_offset, (line, expected_line) in enumerate(zip(table_lines, expected_lines, strict=True)):
-        line_number = table_start + row_offset + 1
-        if line != expected_line:
-            failures.append(f"{_display_path(path)}:{line_number}: expected {expected_line!r}, found {line!r}")
-            continue
-
-    return failures
+    assert markdown_tables.normalize_markdown_tables_text(source) == source
 
 
-def _render_table(rows: tuple[tuple[str, ...], ...], *, alignments: tuple[str, ...], column_widths: tuple[int, ...]) -> tuple[str, ...]:
-    """Return Markdown table lines in PyCharm's pipe-table style."""
-    rendered = ["|" + "|".join(_render_data_cell(cell, width=column_widths[column], alignment=alignments[column]) for column, cell in enumerate(rows[0])) + "|"]
-    rendered.append("|" + "|".join(_render_separator_cell(width=width, alignment=alignment) for width, alignment in zip(column_widths, alignments, strict=True)) + "|")
-    rendered.extend("|" + "|".join(_render_data_cell(cell, width=column_widths[column], alignment=alignments[column]) for column, cell in enumerate(row)) + "|" for row in rows[2:])
-    return tuple(rendered)
+def test_normalize_markdown_tables_text_removes_mixed_indentation_when_header_is_unindented() -> None:
+    """Check that mixed table indentation normalizes to the header row indentation."""
+    source = "\n".join(
+        [
+            "| Name  | Value |",
+            "  |-------|-------|",
+            "    | one   | two   |",
+            "",
+        ]
+    )
+
+    assert markdown_tables.normalize_markdown_tables_text(source) == "\n".join(
+        [
+            "| Name | Value |",
+            "|------|-------|",
+            "| one  | two   |",
+            "",
+        ]
+    )
 
 
-def _render_data_cell(cell: str, *, width: int, alignment: str) -> str:
-    """Return one padded Markdown table data cell."""
-    if alignment in {"default", "left"}:
-        return f" {cell.ljust(width)} "
-    if alignment == "right":
-        return f" {cell.rjust(width)} "
-    left_padding = (width - len(cell)) // 2
-    right_padding = width - len(cell) - left_padding
-    return f"{' ' * (left_padding + 1)}{cell}{' ' * (right_padding + 1)}"
+def test_normalize_markdown_tables_text_treats_four_space_code_as_non_fence() -> None:
+    """Check that indented code lines do not suppress later real tables."""
+    source = "\n".join(
+        [
+            "    ```",
+            "| Name  | Value |",
+            "|-------|-------|",
+            "| one   | two   |",
+            "",
+        ]
+    )
+
+    assert markdown_tables.normalize_markdown_tables_text(source) == "\n".join(
+        [
+            "    ```",
+            "| Name | Value |",
+            "|------|-------|",
+            "| one  | two   |",
+            "",
+        ]
+    )
 
 
-def _render_separator_cell(*, width: int, alignment: str) -> str:
-    """Return one unpadded Markdown table separator cell."""
-    cell_width = max(width + 2, 3)
-    if alignment == "left":
-        return ":" + "-" * (cell_width - 1)
-    if alignment == "right":
-        return "-" * (cell_width - 1) + ":"
-    if alignment == "center":
-        return ":" + "-" * (cell_width - 2) + ":"
-    return "-" * cell_width
+def test_normalize_markdown_tables_text_rejects_invalid_closing_fence() -> None:
+    """Check that invalid closing fences keep table-like fenced content untouched."""
+    source = "\n".join(
+        [
+            "```",
+            "``` not a close",
+            "| Name  | Value |",
+            "|-------|-------|",
+            "| one   | two   |",
+            "```",
+            "",
+        ]
+    )
+
+    assert markdown_tables.normalize_markdown_tables_text(source) == source
 
 
-def _alignment_for_separator_cell(cell: str) -> str:
-    """Return the Markdown alignment indicated by one separator cell."""
-    stripped = cell.strip()
-    if stripped.startswith(":") and stripped.endswith(":"):
-        return "center"
-    if stripped.startswith(":"):
-        return "left"
-    if stripped.endswith(":"):
-        return "right"
-    return "default"
+def test_normalize_markdown_tables_text_rejects_invalid_backtick_opening_fence() -> None:
+    """Check that backticks in backtick-fence info strings do not suppress tables."""
+    source = "\n".join(
+        [
+            "``` info `",
+            "| Name  | Value |",
+            "|-------|-------|",
+            "| one   | two   |",
+            "```",
+            "",
+        ]
+    )
+
+    assert markdown_tables.normalize_markdown_tables_text(source) == "\n".join(
+        [
+            "``` info `",
+            "| Name | Value |",
+            "|------|-------|",
+            "| one  | two   |",
+            "```",
+            "",
+        ]
+    )
 
 
-def _fence_marker(line: str) -> tuple[str, int] | None:
-    """Return a Markdown fence marker character and width if the line opens or closes a fence."""
-    stripped = line.lstrip()
-    match = re.match(r"([`~])\1{2,}", stripped)
-    if match is None:
-        return None
-    marker = match.group(0)
-    return marker[0], len(marker)
+def test_normalize_markdown_tables_text_allows_backticks_in_tilde_fence_info() -> None:
+    """Check that tilde-fence info strings may contain backticks."""
+    source = "\n".join(
+        [
+            "~~~ info `",
+            "| Name  | Value |",
+            "|-------|-------|",
+            "~~~",
+            "",
+        ]
+    )
+
+    assert markdown_tables.normalize_markdown_tables_text(source) == source
 
 
-def _is_table_row(line: str) -> bool:
-    """Return whether a line is a pipe table row."""
-    stripped = line.rstrip().lstrip()
-    return stripped.startswith("|") and stripped.endswith("|")
+def test_table_failures_accepts_escaped_pipes_in_cell_content() -> None:
+    """Check that escaped Markdown pipes do not create extra table cells."""
+    table_lines = [
+        "| A    | B |",
+        "|------|---|",
+        "| x\\|y | z |",
+    ]
+
+    assert markdown_tables.table_failures(ROOT / "example.md", 0, table_lines) == []
 
 
-def _is_separator_row(line: str) -> bool:
-    """Return whether a line is a Markdown table separator row."""
-    return _is_table_row(line) and all(SEPARATOR_CELL_RE.fullmatch(cell.strip()) is not None for cell in _split_table_row(line))
+def test_table_failures_accepts_inline_code_pipes_in_cell_content() -> None:
+    """Check that Markdown pipes inside inline code do not create extra table cells."""
+    table_lines = [
+        "| A       | B |",
+        "|---------|---|",
+        "| `x | y` | z |",
+    ]
+
+    assert markdown_tables.table_failures(ROOT / "example.md", 0, table_lines) == []
 
 
-def _split_table_row(line: str) -> list[str]:
-    """Split a pipe table row into raw cell strings."""
-    return line.rstrip().lstrip()[1:-1].split("|")
+def test_table_failures_accepts_unmatched_backtick_pipes_as_cell_boundaries() -> None:
+    """Check that unmatched backticks do not hide real table cell boundaries."""
+    table_lines = [
+        "| A  | B |",
+        "|----|---|",
+        "| `x | y |",
+    ]
+
+    assert markdown_tables.table_failures(ROOT / "example.md", 0, table_lines) == []
 
 
-def _display_path(path: pathlib.Path) -> str:
-    """Return a stable repository-relative display path."""
-    return path.relative_to(ROOT).as_posix()
+def test_normalize_markdown_tables_text_rewrites_inline_code_pipe_tables() -> None:
+    """Check that Markdown pipes inside inline code stay in their original table cell."""
+    source = "| A | B |\n|---|---|\n| `x | y` | z |\n"
+
+    assert markdown_tables.normalize_markdown_tables_text(source) == "| A       | B |\n|---------|---|\n| `x | y` | z |\n"
+
+
+def test_normalize_markdown_tables_file_check_reports_without_writing(tmp_path: pathlib.Path) -> None:
+    """Check that check mode reports needed fixes without modifying files."""
+    path = tmp_path / "example.md"
+    source = "| Name  | Value |\n|-------|-------|\n| one   | two   |\n"
+    path.write_text(source, encoding="utf-8")
+
+    assert markdown_tables.normalize_markdown_tables_file(path, check=True)
+    assert path.read_text(encoding="utf-8") == source
+
+
+def test_normalize_markdown_tables_file_preserves_existing_newlines(tmp_path: pathlib.Path) -> None:
+    """Check that table fixes preserve each line's existing newline spelling."""
+    path = tmp_path / "example.md"
+    path.write_bytes(b"| Name  | Value |\r\n|-------|-------|\n| one   | two   |\r\n")
+
+    assert markdown_tables.normalize_markdown_tables_file(path)
+    assert path.read_bytes() == b"| Name | Value |\r\n|------|-------|\n| one  | two   |\r\n"
+
+
+def test_normalize_markdown_tables_file_writes_fix(tmp_path: pathlib.Path) -> None:
+    """Check that the helper writes normalized Markdown tables."""
+    path = tmp_path / "example.md"
+    path.write_text("| Name  | Value |\n|-------|-------|\n| one   | two   |\n", encoding="utf-8")
+
+    assert markdown_tables.normalize_markdown_tables_file(path)
+    assert path.read_text(encoding="utf-8") == "| Name | Value |\n|------|-------|\n| one  | two   |\n"
+
+
+def test_main_check_reports_pending_table_fix(tmp_path: pathlib.Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """Check that the command-line check mode reports files that need fixes."""
+    path = tmp_path / "example.md"
+    path.write_text("| Name  | Value |\n|-------|-------|\n| one   | two   |\n", encoding="utf-8")
+
+    assert markdown_tables.main(["--check", str(path)]) == 1
+
+    captured = capsys.readouterr()
+    assert "Markdown table style fixes needed:" in captured.err
+    assert path.as_posix() in captured.err
+
+
+def test_main_check_reports_non_fixable_table_failures(tmp_path: pathlib.Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """Check that check mode fails for malformed tables the fixer cannot rewrite."""
+    path = tmp_path / "example.md"
+    source = "| A | B |\n|---|---|\n| 1 | 2 | 3 |\n"
+    path.write_text(source, encoding="utf-8")
+
+    assert markdown_tables.main(["--check", str(path)]) == 1
+
+    captured = capsys.readouterr()
+    assert "Markdown table validation failures:" in captured.err
+    assert f"{path.as_posix()}:3: expected 2 cells, found 3" in captured.err
+    assert path.read_text(encoding="utf-8") == source
+
+
+def test_main_write_reports_remaining_non_fixable_table_failures(tmp_path: pathlib.Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """Check that write mode fails when malformed tables remain after fixing."""
+    path = tmp_path / "example.md"
+    path.write_text("| A | B |\n|---|---|\n| 1 | 2 | 3 |\n", encoding="utf-8")
+
+    assert markdown_tables.main([str(path)]) == 1
+
+    captured = capsys.readouterr()
+    assert "Markdown table validation failures:" in captured.err
+    assert f"{path.as_posix()}:3: expected 2 cells, found 3" in captured.err

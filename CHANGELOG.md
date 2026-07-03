@@ -31,6 +31,8 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added `PDF412` to report repeated parsed Google, NumPy, and named reST docstring entries within one docstring.
   - Added `PDF508` through `PDF511` to validate missing and extraneous class and module attribute documentation against an explicit attribute inventory.
   - Added `PDF512` and `PDF513` to report attached class and module attribute docstrings that duplicate owner docstring attribute documentation.
+  - Added `PDF306` and `PDF307` to report parameter and attribute documentation that only restates the documented name with generic filler.
+  - Added signature-backed `PDF306` detection for variadic parameter descriptions such as `*args: Positional arguments.` and `**kwargs: Keyword arguments.`.
   - Added tuple-unpacked module, class, and `__init__` instance attribute inventory support for `PDF508` through `PDF511`.
   - Added `PDF106` through `PDF109` to normalize multi-line docstring opening and closing quote placement.
   - Added `PDF110` and `PDF203` to collapse safe summary-only docstrings that fit on one line and report summaries that remain multi-line.
@@ -108,6 +110,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added pytest coverage that checks the pydocformatter rule tables in `docs/rule_list.md` against actual rule metadata.
   - Added pytest coverage that checks Git-tracked Markdown pipe tables for padded cell widths and separator alignment.
   - Changed Markdown pipe table checks to enforce PyCharm-style separator rows without outer padding.
+  - Added a `tools/fix_markdown_tables.py` helper for normalizing Markdown pipe table alignment, and mention it in the pytest failure message for table-style failures.
   - Added pytest coverage that executes structured examples from built-in rule Markdown documentation.
   - Added pytest coverage that check/fix findings for structured rule Markdown examples stay in correspondence.
   - Added exact diagnostic message checks to structured rule Markdown examples.
@@ -212,6 +215,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Fixed PCF004 previous-comment boundary checks, PDF411 repeated type-like normalization, and PDF501 TypedDict key lookup to avoid repeated or unnecessary rule-local work.
 
 - **Developer workflow:**
+  - Fixed the Markdown table normalizer to report non-fixable validation failures, normalize to header-row indentation while preserving existing line endings, handle escaped pipes, preserve indented code blocks, and follow stricter fenced-code parsing.
   - Fixed Loupe reviewer elapsed-time accounting to start individual reviewer timers at process launch.
   - Fixed Loupe reviewer timeout cleanup to let collector threads own subprocess completion while the main thread only signals timed-out process groups.
   - Fixed Loupe reviewer timeout handling to avoid blocking on detached child processes that inherit reviewer output handles.
@@ -244,6 +248,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 
 - **Docstring formatting:**
   - Ignored PDF500 through PDF506 under the `none` and `pep257` docstring conventions for broad selections, while keeping exact-selected PDF500, PDF502, PDF504, and PDF506 inert so missing-documentation modes do not report convention-targeted findings without active convention parsing.
+  - Fixed `PDF306` and `PDF307` to skip reStructuredText type-only parameter and attribute fields instead of treating type names as generic prose descriptions.
   - Fixed same-line docstring reflow to keep wrapped summaries as one summary instead of letting later blank-line and punctuation fixes split and punctuate the sentence mid-summary.
   - Fixed `PDF200` to preserve one blank line between adjacent Google and NumPy sections after collapsing excess blank lines, matching `PDF201` missing-section-separator insertion.
   - Fixed `PDF409` and `PDF410` to preserve Google exception-entry parentheticals, and fixed Google and NumPy parsing to keep malformed exception-like prose continuations from being normalized as separate entries.

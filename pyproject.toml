@@ -88,7 +88,7 @@ exclude = '/(\.github|\.eggs|\.git|\.hg|\.mypy_cache|\.tox|\.venv|htmlcov|__pyca
 [tool.isort]
 profile = "black"
 line_length = 200
-known_first_party = ["pydocformatter"]
+known_first_party = ["pydocformatter", "tools"]
 skip = [".github", ".eggs", ".git", ".hg", ".mypy_cache", ".tox", ".venv", "htmlcov", "__pycache__", "_build", "buck-out", "build", "dist", "tests/data"]
 
 [tool.pydocfmt]
@@ -102,7 +102,7 @@ extend-select = ["PCF005", "PDF003", "PDF300", "PDF302", "PDF305", "PDF510"]
 extend-per-file-ignores = {"tests/**/test_*.py" = ["PDF500", "PDF502", "PDF504", "PDF506", "PDF508", "PDF510"]}
 
 [tool.mypy]
-files = ["src/pydocformatter", "tests"]
+files = ["src/pydocformatter", "tests", "tools"]
 show_error_codes = true
 pretty = true
 strict = true
