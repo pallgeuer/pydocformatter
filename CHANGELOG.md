@@ -22,6 +22,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added `PDF104` and `PDF105` to normalize quote-adjacent whitespace around safely mapped simple docstring content.
   - Added `PDF200` to collapse excess blank lines around docstring chunks and collapse blank-only docstrings to empty docstrings.
   - Added `PDF201` to insert safe missing blank lines before recognized docstring structures and convention sections.
+  - Added `PDF204` through `PDF211` to normalize blank-line spacing immediately before and after function and class docstring statements.
   - Added `PDF202`, `PDF300` through `PDF305`, `PDF400` through `PDF409`, and `PDF500` through `PDF507` as implementation-pending stubs for the remaining Ruff docstring style and validation rules.
   - Added `PDF401` and `PDF402` to normalize Google/NumPy section-name pluralization, preferred equivalent Google/NumPy section-name terms, and reStructuredText field-name aliases.
   - Added `PDF408` to report repeated recognized Google and NumPy docstring sections and reST fields, including known spelling variants for the same semantic item.

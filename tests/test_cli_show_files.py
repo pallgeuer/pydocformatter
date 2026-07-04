@@ -1012,15 +1012,19 @@ class TestCLIShowFiles(unittest.TestCase):
             ):
                 exit_code = pydocfmt_cli.main()
             output = stdout.getvalue()
-            rules = tuple(line.split(maxsplit=1)[0].removesuffix("*") for line in output.splitlines() if line.startswith(("PDF201", "PDF106", "PDF107", "PDF108", "PDF109")))
+            rules = tuple(
+                line.split(maxsplit=1)[0].removesuffix("*")
+                for line in output.splitlines()
+                if line.startswith(("PDF106", "PDF107", "PDF108", "PDF109", "PDF201", "PDF204", "PDF205", "PDF206", "PDF207", "PDF208", "PDF209", "PDF210", "PDF211"))
+            )
             return exit_code, rules, output
 
         broad_expectations = {
-            "none": (0, ("PDF106", "PDF109", "PDF201")),
-            "google": (0, ("PDF106", "PDF109", "PDF201")),
-            "numpy": (0, ("PDF109", "PDF201")),
-            "rest": (0, ("PDF106", "PDF109", "PDF201")),
-            "pep257": (0, ("PDF109", "PDF201")),
+            "none": (0, ("PDF106", "PDF109", "PDF201", "PDF204", "PDF208", "PDF211")),
+            "google": (0, ("PDF106", "PDF109", "PDF201", "PDF204", "PDF208", "PDF211")),
+            "numpy": (0, ("PDF109", "PDF201", "PDF204", "PDF208", "PDF211")),
+            "rest": (0, ("PDF106", "PDF109", "PDF201", "PDF204", "PDF208", "PDF211")),
+            "pep257": (0, ("PDF109", "PDF201", "PDF204", "PDF208", "PDF211")),
         }
         for convention, (expected_exit_code, expected_rules) in broad_expectations.items():
             with self.subTest(variation="broad", convention=convention):
@@ -1031,13 +1035,13 @@ class TestCLIShowFiles(unittest.TestCase):
         for convention in broad_expectations:
             with self.subTest(variation="exact-extend-select", convention=convention):
                 exit_code, rules, output = show_convention_rules("--docstring-convention", convention, "--extend-select", "PDF106,PDF107,PDF108,PDF109")
-                self.assertEqual((exit_code, rules, output.count("has been disabled")), (1, ("PDF106", "PDF108", "PDF201"), 2))
+                self.assertEqual((exit_code, rules, output.count("has been disabled")), (1, ("PDF106", "PDF108", "PDF201", "PDF204", "PDF208", "PDF211"), 2))
 
-        self.assertEqual(show_convention_rules("--docstring-convention", "google", "--extend-select", "PDF10")[:2], (0, ("PDF106", "PDF109", "PDF201")))
-        self.assertEqual(show_convention_rules("--docstring-convention", "numpy", "--extend-select", "PDF10")[:2], (0, ("PDF109", "PDF201")))
+        self.assertEqual(show_convention_rules("--docstring-convention", "google", "--extend-select", "PDF10")[:2], (0, ("PDF106", "PDF109", "PDF201", "PDF204", "PDF208", "PDF211")))
+        self.assertEqual(show_convention_rules("--docstring-convention", "numpy", "--extend-select", "PDF10")[:2], (0, ("PDF109", "PDF201", "PDF204", "PDF208", "PDF211")))
         self.assertEqual(show_convention_rules("--docstring-convention", "google", "--select", "PDF107")[:2], (0, ("PDF107",)))
         exit_code, rules, output = show_convention_rules("--docstring-convention", "google", "--extend-select", "PDF107,PDF108", "--ignore", "PDF107")
-        self.assertEqual((exit_code, rules, output.count("has been disabled")), (1, ("PDF106", "PDF108", "PDF201"), 1))
+        self.assertEqual((exit_code, rules, output.count("has been disabled")), (1, ("PDF106", "PDF108", "PDF201", "PDF204", "PDF208", "PDF211"), 1))
 
     def test_pydocfmt_check_config_file_prints_resolved_settings(self) -> None:
         with tempfile.TemporaryDirectory() as td:

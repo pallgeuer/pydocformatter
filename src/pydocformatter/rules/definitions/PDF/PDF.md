@@ -78,14 +78,14 @@ Individual rule documentation describes relevant Ruff compatibility and differen
 ## Code ranges
 PDF rules are grouped by contiguous hundred ranges so related rules stay close together and future rules have predictable homes.
 
-| Range    | Topic                            | Notes                                                                                                                                              |
-|:---------|:---------------------------------|:---------------------------------------------------------------------------------------------------------------------------------------------------|
-| `PDF0xx` | Literal and quote normalization  | Docstring literal shape, quote style, and value-preserving string spelling.                                                                        |
-| `PDF1xx` | Core source formatting           | Indentation, reflow, whitespace, quote placement, and one-line docstring layout.                                                                   |
-| `PDF2xx` | Blank lines and empty docstrings | Excess or missing blank lines, empty docstrings, and ambiguous multiline summaries.                                                                |
-| `PDF3xx` | Summary and entry wording style  | Summary punctuation, imperative mood, signature duplication, capitalization, first-word wording, and generic parameter or attribute documentation. |
-| `PDF4xx` | Section style                    | Section names, headers, underlines, section content, section order, and section punctuation.                                                       |
-| `PDF5xx` | Docstring/signature validation   | Parameter, return, yield, exception, and attribute documentation consistency.                                                                      |
+| Range    | Topic                            | Notes                                                                                                                                                 |
+|:---------|:---------------------------------|:------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `PDF0xx` | Literal and quote normalization  | Docstring literal shape, quote style, and value-preserving string spelling.                                                                           |
+| `PDF1xx` | Core source formatting           | Indentation, reflow, whitespace, quote placement, and one-line docstring layout.                                                                      |
+| `PDF2xx` | Blank lines and empty docstrings | Excess or missing blank lines inside docstrings, blank-line spacing around docstring statements, empty docstrings, and ambiguous multiline summaries. |
+| `PDF3xx` | Summary and entry wording style  | Summary punctuation, imperative mood, signature duplication, capitalization, first-word wording, and generic parameter or attribute documentation.    |
+| `PDF4xx` | Section style                    | Section names, headers, underlines, section content, section order, and section punctuation.                                                          |
+| `PDF5xx` | Docstring/signature validation   | Parameter, return, yield, exception, and attribute documentation consistency.                                                                         |
 
 ## Options
 Docstring options control which convention-specific structures are parsed, which generic structures are protected or reflowed, and how selected formatting and documentation checks behave.

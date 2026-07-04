@@ -1328,6 +1328,41 @@ class NonCallableViolationsRule(RuleBase):
                     DocstringConvention.NUMPY: RuleSettingEffect.IGNORED,
                     DocstringConvention.REST: RuleSettingEffect.IGNORED,
                 },
+                "PDF205": {
+                    DocstringConvention.NONE: RuleSettingEffect.IGNORED,
+                    DocstringConvention.PEP257: RuleSettingEffect.IGNORED,
+                    DocstringConvention.GOOGLE: RuleSettingEffect.IGNORED,
+                    DocstringConvention.NUMPY: RuleSettingEffect.IGNORED,
+                    DocstringConvention.REST: RuleSettingEffect.IGNORED,
+                },
+                "PDF206": {
+                    DocstringConvention.NONE: RuleSettingEffect.IGNORED,
+                    DocstringConvention.PEP257: RuleSettingEffect.IGNORED,
+                    DocstringConvention.GOOGLE: RuleSettingEffect.IGNORED,
+                    DocstringConvention.NUMPY: RuleSettingEffect.IGNORED,
+                    DocstringConvention.REST: RuleSettingEffect.IGNORED,
+                },
+                "PDF207": {
+                    DocstringConvention.NONE: RuleSettingEffect.IGNORED,
+                    DocstringConvention.PEP257: RuleSettingEffect.IGNORED,
+                    DocstringConvention.GOOGLE: RuleSettingEffect.IGNORED,
+                    DocstringConvention.NUMPY: RuleSettingEffect.IGNORED,
+                    DocstringConvention.REST: RuleSettingEffect.IGNORED,
+                },
+                "PDF209": {
+                    DocstringConvention.NONE: RuleSettingEffect.IGNORED,
+                    DocstringConvention.PEP257: RuleSettingEffect.IGNORED,
+                    DocstringConvention.GOOGLE: RuleSettingEffect.IGNORED,
+                    DocstringConvention.NUMPY: RuleSettingEffect.IGNORED,
+                    DocstringConvention.REST: RuleSettingEffect.IGNORED,
+                },
+                "PDF210": {
+                    DocstringConvention.NONE: RuleSettingEffect.IGNORED,
+                    DocstringConvention.PEP257: RuleSettingEffect.IGNORED,
+                    DocstringConvention.GOOGLE: RuleSettingEffect.IGNORED,
+                    DocstringConvention.NUMPY: RuleSettingEffect.IGNORED,
+                    DocstringConvention.REST: RuleSettingEffect.IGNORED,
+                },
                 "PDF300": {DocstringConvention.GOOGLE: RuleSettingEffect.IGNORED},
                 "PDF301": {DocstringConvention.PEP257: RuleSettingEffect.IGNORED, DocstringConvention.NUMPY: RuleSettingEffect.IGNORED},
                 "PDF302": {DocstringConvention.GOOGLE: RuleSettingEffect.IGNORED},
@@ -1406,13 +1441,21 @@ class NonCallableViolationsRule(RuleBase):
                 "PDF107": ("PDF106",),
                 "PDF108": ("PDF109",),
                 "PDF109": ("PDF108",),
+                "PDF204": ("PDF205",),
+                "PDF205": ("PDF204",),
+                "PDF206": ("PDF207",),
+                "PDF207": ("PDF206",),
+                "PDF208": ("PDF209",),
+                "PDF209": ("PDF208",),
+                "PDF210": ("PDF211",),
+                "PDF211": ("PDF210",),
             },
         )
 
-    def test_builtin_opt_in_quote_placement_rules_ignore_every_docstring_convention(self) -> None:
+    def test_builtin_opt_in_style_variant_rules_ignore_every_docstring_convention(self) -> None:
         rule_classes = {rule_class.meta.code.tag: rule_class for rule_class in rule_collection.RULE_COLLECTION.rules}
 
-        for code in ("PDF107", "PDF108"):
+        for code in ("PDF107", "PDF108", "PDF205", "PDF206", "PDF207", "PDF209", "PDF210"):
             ignored_conventions: set[DocstringConvention] = set()
             for setting_effects in rule_classes[code].meta.setting_effects:
                 if setting_effects.setting == "docstring_convention":
@@ -1452,6 +1495,9 @@ class NonCallableViolationsRule(RuleBase):
                 "PDF201",
                 "PDF202",
                 "PDF203",
+                "PDF204",
+                "PDF208",
+                "PDF211",
                 "PDF300",
                 "PDF301",
                 "PDF302",
@@ -1486,6 +1532,9 @@ class NonCallableViolationsRule(RuleBase):
                 "PDF201",
                 "PDF202",
                 "PDF203",
+                "PDF204",
+                "PDF208",
+                "PDF211",
                 "PDF300",
                 "PDF302",
                 "PDF303",
