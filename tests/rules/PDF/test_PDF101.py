@@ -226,6 +226,52 @@ def test_protected_blocks_are_unchanged_while_adjacent_prose_reflows() -> None:
     assert result.new_source == 'def function():\n    """Prose before a code fence that is long enough to\n    require wrapping.\n\n    ```python\n    value = compute()\n    ```\n    """\n'
 
 
+def test_colon_headers_stop_reflow_across_boundary_while_adjacent_prose_reflows() -> None:
+    source = 'def function():\n    """Introductory prose before the colon boundary that is long enough to require wrapping.\n\n    The accepted values are:\n    pending, active, and disabled.\n\n    Trailing prose after the colon boundary that is long enough to require wrapping.\n    """\n'
+    result = format_pdf001(source, settings=CheckSettings(select=("PDF101",), line_length=64))
+
+    assert (
+        result.new_source
+        == 'def function():\n    """Introductory prose before the colon boundary that is long\n    enough to require wrapping.\n\n    The accepted values are:\n    pending, active, and disabled.\n\n    Trailing prose after the colon boundary that is long enough\n    to require wrapping.\n    """\n'
+    )
+
+
+def test_colon_at_end_of_reflow_region_does_not_pull_following_region_into_wrap() -> None:
+    source = 'def function():\n    """This sentence has been deliberately split\n    over three physical lines and ends\n    with a colon:\n    the following two lines should be\n    wrapped as their own paragraph.\n    """\n'
+    result = format_pdf001(source, settings=CheckSettings(select=("PDF101",), line_length=56))
+
+    assert (
+        result.new_source
+        == 'def function():\n    """This sentence has been deliberately split over\n    three physical lines and ends with a colon:\n    the following two lines should be wrapped as their\n    own paragraph.\n    """\n'
+    )
+
+
+def test_single_token_colon_labels_stop_reflow_across_boundary() -> None:
+    source = 'def function():\n    """Use one of these values\n    values:\n    pending, active, disabled.\n\n    Choose one of these cases\n    1:\n    first case.\n    """\n'
+    result = format_pdf001(source, settings=CheckSettings(select=("PDF101",), line_length=80))
+
+    assert result.new_source == source
+
+
+def test_colon_headers_stay_protected_when_generic_structure_parsing_is_disabled() -> None:
+    source = 'def function():\n    """# Heading\n    The accepted values are:\n    pending, active, and disabled.\n    >>> call()\n    """\n'
+    settings = CheckSettings(
+        select=("PDF101",),
+        line_length=44,
+        docstring_parse_list_items=False,
+        docstring_parse_headings=False,
+        docstring_parse_doctests=False,
+        docstring_parse_code_fences=False,
+        docstring_parse_block_quotes=False,
+        docstring_parse_tables=False,
+        docstring_parse_directives=False,
+        docstring_parse_literal_blocks=False,
+    )
+    result = format_pdf001(source, settings=settings)
+
+    assert result.new_source == 'def function():\n    """# Heading\n    The accepted values are:\n    pending, active, and disabled. >>>\n    call()\n    """\n'
+
+
 def test_fix_preserves_crlf_for_generated_lines() -> None:
     source = 'def function():\r\n    """Summary text with enough words to wrap onto another line."""\r\n'
     result = format_pdf001(source, settings=CheckSettings(select=("PDF101",), line_length=48, line_ending=LineEnding.CR_LF))

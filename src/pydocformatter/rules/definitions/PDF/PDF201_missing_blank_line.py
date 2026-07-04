@@ -126,6 +126,7 @@ def _is_recognized_structure(block: PDF_definition.DocstringBlock) -> bool:
     """Return whether a block is structured enough to safely separate from a summary."""
     return block.kind in {
         PDF_definition.DocstringBlockKind.SECTION,
+        PDF_definition.DocstringBlockKind.COLON_HEADER,
         PDF_definition.DocstringBlockKind.LIST_ITEM,
         PDF_definition.DocstringBlockKind.HEADING,
         PDF_definition.DocstringBlockKind.DOCTEST,

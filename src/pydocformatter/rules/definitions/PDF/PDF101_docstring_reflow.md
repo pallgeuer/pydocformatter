@@ -7,7 +7,7 @@ Checks for docstring text regions whose normalized wrapping does not match the c
 
 This rule rewrites safely mapped simple string docstrings by replacing the complete string literal with an equivalent literal that preserves the original string prefix, quote delimiter, and reusable source spellings for moved text. It can reflow summaries, paragraphs, convention section descriptions, reST field descriptions, list items, and block quotes.
 
-PDF101 treats each reflowable semantic region independently. It joins consecutive physical lines in the same region before wrapping, so a finding can be emitted even when no individual input line is over the configured line length. Blank lines and protected structures remain region boundaries.
+PDF101 treats each reflowable semantic region independently. It joins consecutive physical lines in the same region before wrapping, so a finding can be emitted even when no individual input line is over the configured line length. Blank lines, standalone colon-ended lines, and protected structures remain region boundaries.
 
 The rule intentionally skips docstrings whose evaluated value cannot be mapped back to source text safely. This includes concatenated string docstrings and docstrings whose logical lines come from escape sequences such as `\n`. If a docstring needs reflow but cannot be rendered back with the existing prefix and delimiter without changing its evaluated value, the finding is reported without an automatic fix.
 
@@ -186,6 +186,35 @@ def example():
     its own paragraph.
     """
 ````
+
+Standalone colon-ended lines also stop adjacent prose from being joined across the line:
+
+```pydocfmt-example
+[settings]
+line-length = 64
+
+[input]
+def choices():
+    """Introductory prose before the values list that is long enough to require wrapping.
+
+    The accepted values are:
+    pending, active, and disabled.
+
+    Trailing prose after the values list that is long enough to require wrapping.
+    """
+
+[output]
+def choices():
+    """Introductory prose before the values list that is long
+    enough to require wrapping.
+
+    The accepted values are:
+    pending, active, and disabled.
+
+    Trailing prose after the values list that is long enough to
+    require wrapping.
+    """
+```
 
 Disabling structural parsing makes matching lines fall back to ordinary paragraph reflow instead of list-item or block-quote reflow:
 

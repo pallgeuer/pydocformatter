@@ -7,7 +7,7 @@ Checks ordinary standalone comments for canonical marker spacing, trailing white
 
 Canonical ordinary output uses one syntactic `#`, one following space for non-empty content, and normalized content without surrounding whitespace. Additional hashes are content and are retained, so `##Heading` becomes `# #Heading` unless heading preservation protects that line. Empty comments and hash-only comments are boundaries and remain unchanged. Long words and hyphenated words are never split.
 
-PCF001 operates on physical runs of consecutive, same-indent, regular, non-empty standalone comments. Empty comments, hash-only separators, protected comments, blank lines, code lines, and indentation changes end a run. By default, each ordinary physical prose line is normalized and wrapped independently; consecutive ordinary lines are joined into paragraphs only when `comment-join-standalone-lines` is enabled.
+PCF001 operates on physical runs of consecutive, same-indent, regular, non-empty standalone comments. Empty comments, hash-only separators, protected comments, blank lines, code lines, and indentation changes end a run. By default, each ordinary physical prose line is normalized and wrapped independently; consecutive ordinary lines are joined into paragraphs only when `comment-join-standalone-lines` is enabled. Joined paragraphs do not cross standalone colon-ended label lines, while lowercase colon-ended lines can complete unfinished preceding prose.
 
 Within a run, PCF001 first identifies enabled preserved structures, then applies enabled code detectors to the remaining semantic text, and finally formats the remaining list items, block quotes, paragraphs, or physical lines. Lines inside an explicitly preserved structure are excluded from code detection, so code in a fenced or directive region does not prevent adjacent prose from formatting. If any code detector matches another non-preserved line or multiline candidate, the entire physical standalone run remains unchanged.
 
@@ -69,6 +69,38 @@ comment-join-standalone-lines = true
 [output]
 # First prose line. Second prose
 # line with more words.
+```
+
+Colon-ended label lines stop standalone-line joining before adjacent prose:
+
+```pydocfmt-example
+[settings]
+line-length = 80
+comment-join-standalone-lines = true
+
+[input]
+# Summary.
+# Accepted values:
+# pending, active, disabled.
+
+[output=unchanged]
+```
+
+A lowercase colon-ended line can still complete unfinished preceding prose, but following prose starts a separate unit:
+
+```pydocfmt-example
+[settings]
+line-length = 80
+comment-join-standalone-lines = true
+
+[input]
+# This sentence has been split
+# with a colon:
+# following prose continues here.
+
+[output]
+# This sentence has been split with a colon:
+# following prose continues here.
 ```
 
 List-item and block-quote formatting retain structural prefixes and align wrapped lines:
@@ -176,7 +208,7 @@ Wrapping settings:
 
 Structure settings:
 
-- `comment-join-standalone-lines` defaults to `false`. When enabled, adjacent ordinary prose lines are joined with one space. Preserved structures, list items, and block quotes remain formatting boundaries.
+- `comment-join-standalone-lines` defaults to `false`. When enabled, adjacent ordinary prose lines are joined with one space. Preserved structures, list items, block quotes, and standalone colon-ended label lines remain formatting boundaries.
 - `comment-format-list-items` defaults to `true`. It recognizes `-`, `+`, `*`, `1.`, and `1)` markers, including marker indentation and more-indented continuation lines. Each item is reflowed independently with hanging indentation.
 - `comment-format-task-markers` defaults to `true`. It recognizes uppercase `TODO`, `FIXME`, `XXX`, `HACK`, `BUG`, `DEBUG`, `NOTE`, `OPTIMIZE`, and `REVIEW` markers followed by `:` and reflows their payloads with hanging indentation.
 - `comment-preserve-headings` defaults to `true`. It preserves ATX headings and paired Setext/reStructuredText adornment headings unchanged.

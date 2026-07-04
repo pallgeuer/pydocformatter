@@ -5,7 +5,7 @@ Fix is always available.
 ## What it does
 Checks for safely provable missing blank logical lines inside docstrings.
 
-PDF201 inserts exactly one blank line when a blank separator is required and the surrounding structure is unambiguous. It inserts a separator between a one-line summary and a following recognized structure, including convention sections, reST fields under the reST convention, headings, lists, doctests, code fences, block quotes, tables, directives, literal blocks, and verbatim blocks.
+PDF201 inserts exactly one blank line when a blank separator is required and the surrounding structure is unambiguous. It inserts a separator between a one-line summary and a following recognized structure, including convention sections, reST fields under the reST convention, standalone colon-ended lines, headings, lists, doctests, code fences, block quotes, tables, directives, literal blocks, and verbatim blocks.
 
 With `docstring-convention = "google"` or `docstring-convention = "numpy"`, PDF201 also inserts missing blank lines before recognized top-level sections. This covers a section that follows a paragraph and adjacent recognized sections. It does not insert blank lines between a section header and its content, and it does not insert blank lines between consecutive convention entries inside a section.
 
@@ -128,6 +128,12 @@ def choices() -> None:
       first choice
     """
 
+def statuses() -> None:
+    """Choose a status.
+    Accepted values:
+    pending, active, or disabled.
+    """
+
 [output]
 def example() -> None:
     """Run the example.
@@ -143,6 +149,13 @@ def choices() -> None:
 
     - alpha
       first choice
+    """
+
+def statuses() -> None:
+    """Choose a status.
+
+    Accepted values:
+    pending, active, or disabled.
     """
 ````
 

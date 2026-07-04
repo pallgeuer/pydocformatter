@@ -106,13 +106,13 @@ def test_recognized_first_blocks_are_not_summary_targets() -> None:
     assert not result.unfixed_findings
 
 
-def test_disabled_literal_block_parsing_can_make_literal_marker_reportable() -> None:
+def test_disabled_literal_block_parsing_still_protects_colon_boundary_marker() -> None:
     source = 'def literal():\n    """This::\n        value\n    """\n'
     protected = format_source(source)
     disabled = format_source(source, settings=CheckSettings(select=("PDF305",), docstring_parse_literal_blocks=False))
 
     assert not protected.unfixed_findings
-    assert tuple(finding.line_numbers for finding in disabled.unfixed_findings) == ((2,),)
+    assert not disabled.unfixed_findings
 
 
 def test_underlined_title_style_summary_obeys_heading_parsing_setting() -> None:

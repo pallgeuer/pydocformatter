@@ -30,6 +30,8 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added `PDF410` to normalize parsed Google, NumPy, and reST exception and warning entry names to no backticks and comma-separated exception lists.
   - Added `PDF411` to normalize internal spacing in parsed convention type-like tokens using conservative AST validation.
   - Added `PDF412` to report repeated parsed Google, NumPy, and named reST docstring entries within one docstring.
+  - Added `PDF413` to remove superfluous trailing colons from recognized NumPy section names.
+  - Added parser support for standalone colon-ended docstring lines so docstring reflow does not merge them with adjacent prose.
   - Added `PDF508` through `PDF511` to validate missing and extraneous class and module attribute documentation against an explicit attribute inventory.
   - Added `PDF512` and `PDF513` to report attached class and module attribute docstrings that duplicate owner docstring attribute documentation.
   - Added `PDF306` and `PDF307` to report parameter and attribute documentation that only restates the documented name with generic filler.
@@ -217,10 +219,15 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 - **CLI:**
   - Fixed `parallelism` worker resolution to cap Windows process pools at the platform-supported maximum.
 
+- **Comment formatting:**
+  - Fixed `PCF001` standalone-line joining to avoid merging colon-ended label comments, including lowercase and numeric labels, with adjacent prose, while still allowing lowercase multi-word colon continuations to complete unfinished preceding prose.
+
 - **Rule performance:**
   - Fixed PCF004 previous-comment boundary checks, PDF411 repeated type-like normalization, and PDF501 TypedDict key lookup to avoid repeated or unnecessary rule-local work.
 
 - **Docstring formatting:**
+  - Fixed `PDF101` docstring reflow to avoid merging lowercase and numeric colon-ended label lines with preceding prose.
+  - Fixed `PDF413` to apply mixed parsed and unparsed section-name colon fixes in source order and to avoid removing colons from prose-adjacent lowercase continuation lines or capitalized labels inside NumPy section prose.
   - Fixed `PDF304` and `PDF310` to skip mixed-case first words such as `iOS` and `eBay` instead of over-capitalizing them.
   - Fixed `PDF308` through `PDF310` source edits when the configured output line ending differs from the current file line endings.
   - Fixed `PDF308` through `PDF310` to report non-fixable findings instead of corrupting source for docstrings with mixed physical line endings.

@@ -20,6 +20,7 @@ import libcst as cst
 import libcst.metadata as cst_metadata
 
 import pydocformatter.cli.settings_check as settings_check
+import pydocformatter.rules.definition_helpers.colon_boundaries as colon_boundaries
 import pydocformatter.rules.definition_helpers.docstring_sections as docstring_sections
 import pydocformatter.rules.definition_helpers.source_text as source_text
 import pydocformatter.rules.definition_helpers.string_literals as string_literals
@@ -69,6 +70,7 @@ class DocstringBlockKind(enum.Enum):
         SECTION: A recognized convention section including its header and body.
         SECTION_HEADER: The heading line or underline that names a section.
         SECTION_ENTRY: One parsed Google or NumPy section entry.
+        COLON_HEADER: A standalone colon-ended line protected as a structure boundary.
         LIST_ITEM: A Markdown or reStructuredText list item.
         HEADING: A Markdown or reStructuredText heading protected from prose reflow.
         DOCTEST: A doctest prompt block protected from prose reflow.
@@ -87,6 +89,7 @@ class DocstringBlockKind(enum.Enum):
     SECTION = "section"
     SECTION_HEADER = "section-header"
     SECTION_ENTRY = "section-entry"
+    COLON_HEADER = "colon-header"
     LIST_ITEM = "list-item"
     HEADING = "heading"
     DOCTEST = "doctest"
@@ -1083,6 +1086,11 @@ class _DocstringParser:
                 blocks.append(block)
                 self.summary_pending = False
                 continue
+            if self._is_colon_header(index):
+                blocks.append(DocstringBlock(DocstringBlockKind.COLON_HEADER, index, index + 1))
+                index += 1
+                self.summary_pending = False
+                continue
             if text[:1].isspace():
                 block_end = index + 1
                 while block_end < end and (not self.lines[block_end].text.strip() or self.lines[block_end].text[:1].isspace()):
@@ -1092,15 +1100,24 @@ class _DocstringParser:
                 index = block_end
                 self.summary_pending = False
                 continue
-            block_end = index + 1
-            while block_end < end and self.lines[block_end].text.strip() and not self._starts_special(block_end, end) and not self.lines[block_end].text[:1].isspace():
-                block_end += 1
+            block_end = self._plain_block_end(index, end)
             kind = DocstringBlockKind.SUMMARY if self.summary_pending else DocstringBlockKind.PARAGRAPH
             blocks.append(DocstringBlock(kind, index, block_end))
             self._add_reflow(kind, index, block_end, lines=self._stripped_reflow_lines(index, block_end), initial_indent="", subsequent_indent="")
             self.summary_pending = False
             index = block_end
         return blocks
+
+    def _plain_block_end(self, start: int, end: int) -> int:
+        """Return the end of one plain prose block."""
+        block_end = start + 1
+        while block_end < end and self.lines[block_end].text.strip() and not self._starts_special(block_end, end) and not self.lines[block_end].text[:1].isspace():
+            if self._is_colon_header(block_end):
+                if self._allows_colon_continuation(block_end - 1, block_end):
+                    block_end += 1
+                break
+            block_end += 1
+        return block_end
 
     def _starts_special(self, index: int, end: int) -> bool:
         """Return whether a line begins a structure that should stop paragraph collection."""
@@ -1117,6 +1134,14 @@ class _DocstringParser:
             or (self.settings.docstring_parse_list_items and _LIST_RE.match(text) is not None)
             or (self.settings.docstring_parse_block_quotes and _BLOCK_QUOTE_RE.match(text) is not None)
         )
+
+    def _is_colon_header(self, index: int) -> bool:
+        """Return whether a line should be treated as a colon-ended structure boundary."""
+        return colon_boundaries.is_colon_header_text(self.lines[index].text, require_unindented=True)
+
+    def _allows_colon_continuation(self, previous_index: int, colon_index: int) -> bool:
+        """Return whether a colon-ended line may continue the previous prose line."""
+        return colon_boundaries.allows_colon_continuation(self.lines[previous_index].text, self.lines[colon_index].text)
 
     def _section_at(self, index: int, end: int, *, max_indent: int | None = None) -> str | None:
         """Return a recognized convention section name at a line index."""
@@ -2139,18 +2164,23 @@ def summary_terminal_line_targets(docstrings: tuple[DocstringInfo, ...]) -> tupl
 
 
 def first_summary_block(docstring: DocstringInfo) -> DocstringBlock | None:
-    """Return the first non-blank block when it is a parsed top-level summary.
+    """Return the first non-blank block when it can be treated as a top-level summary.
 
     Args:
         docstring: Parsed docstring whose leading blocks should be inspected.
 
     Returns:
-        First non-blank block when it is a summary block, otherwise None.
+        First non-blank block when it is a summary block or a single standalone colon-ended line, otherwise None.
     """
-    first_block = next((block for block in docstring.structure.blocks if block.kind is not DocstringBlockKind.BLANK), None)
-    if first_block is None or first_block.kind is not DocstringBlockKind.SUMMARY:
+    non_blank_blocks = tuple(block for block in docstring.structure.blocks if block.kind is not DocstringBlockKind.BLANK)
+    if not non_blank_blocks:
         return None
-    return first_block
+    first_block = non_blank_blocks[0]
+    if first_block.kind is DocstringBlockKind.SUMMARY:
+        return first_block
+    if first_block.kind is DocstringBlockKind.COLON_HEADER and len(non_blank_blocks) == 1:
+        return first_block
+    return None
 
 
 def first_non_adornment_line(docstring: DocstringInfo, start: int, end: int) -> DocstringValueLine | None:

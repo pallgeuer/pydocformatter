@@ -6,6 +6,7 @@ import re
 
 import libcst.metadata as cst_metadata
 
+import pydocformatter.rules.definition_helpers.colon_boundaries as colon_boundaries
 import pydocformatter.rules.definition_helpers.comments as comment_helpers
 import pydocformatter.rules.definition_helpers.text_layout as text_layout
 import pydocformatter.rules.definitions.PCF.PCF as PCF_definition
@@ -193,6 +194,8 @@ def _expanded_structure_prefix(prefix: str, *, indent: str, tab_width: int) -> s
 
 def _ordinary_paragraph_end(run: PCF_definition.StandaloneCommentRun, index: int, *, preserved: set[int], settings: CheckSettings) -> int:
     """Return the exclusive end of one ordinary prose paragraph."""
+    if _is_colon_header(run.comments[index]):
+        return index + 1
     end = index + 1
     while end < len(run.comments) and end not in preserved:
         body = run.comments[end].body.rstrip()
@@ -202,5 +205,19 @@ def _ordinary_paragraph_end(run: PCF_definition.StandaloneCommentRun, index: int
             break
         if settings.comment_format_block_quotes and comment_helpers.BLOCK_QUOTE_RE.match(body) is not None:
             break
+        if _is_colon_header(run.comments[end]):
+            if _allows_colon_continuation(run.comments[end - 1], run.comments[end]):
+                end += 1
+            break
         end += 1
     return end
+
+
+def _is_colon_header(comment: PCF_definition.CommentInfo) -> bool:
+    """Return whether a comment line should stop ordinary paragraph joining."""
+    return colon_boundaries.is_colon_header_text(comment.content)
+
+
+def _allows_colon_continuation(previous: PCF_definition.CommentInfo, current: PCF_definition.CommentInfo) -> bool:
+    """Return whether a colon-ended comment may continue the previous prose line."""
+    return colon_boundaries.allows_colon_continuation(previous.content, current.content)

@@ -21,6 +21,78 @@ def test_standalone_joining_is_opt_in() -> None:
     assert result.new_source == "# First prose line. Second prose\n# line with more words.\n"
 
 
+def test_standalone_joining_does_not_cross_colon_header_lines() -> None:
+    source = "# Summary.\n# Accepted values:\n# pending, active, disabled.\n"
+
+    result = pcf_helpers.format_pcf(source, line_length=80, comment_join_standalone_lines=True)
+
+    assert result.new_source == source
+
+
+def test_standalone_joining_keeps_colon_header_separate_from_following_line() -> None:
+    source = "# Accepted values:\n# pending, active, disabled.\n"
+
+    result = pcf_helpers.format_pcf(source, line_length=80, comment_join_standalone_lines=True)
+
+    assert result.new_source == source
+
+
+def test_colon_header_continues_unfinished_standalone_comment_line() -> None:
+    source = "# This sentence has been split\n# with a colon:\n# following prose continues here.\n"
+
+    result = pcf_helpers.format_pcf(source, line_length=80, comment_join_standalone_lines=True)
+
+    assert result.new_source == "# This sentence has been split with a colon:\n# following prose continues here.\n"
+
+
+def test_colon_header_does_not_continue_after_terminal_punctuation() -> None:
+    source = "# This sentence is complete.\n# with a colon:\n# following prose continues here.\n"
+
+    result = pcf_helpers.format_pcf(source, line_length=80, comment_join_standalone_lines=True)
+
+    assert result.new_source == source
+
+
+def test_colon_header_does_not_continue_for_uppercase_label() -> None:
+    source = "# Introductory prose without terminal punctuation\n# Accepted values:\n# pending, active, disabled.\n"
+
+    result = pcf_helpers.format_pcf(source, line_length=80, comment_join_standalone_lines=True)
+
+    assert result.new_source == source
+
+
+def test_colon_header_does_not_continue_for_single_token_label() -> None:
+    source = "# Use one of these values\n# values:\n# pending, active, disabled.\n"
+
+    result = pcf_helpers.format_pcf(source, line_length=80, comment_join_standalone_lines=True)
+
+    assert result.new_source == source
+
+
+def test_colon_header_does_not_continue_for_numeric_label() -> None:
+    source = "# Choose one of these cases\n# 1:\n# first case.\n"
+
+    result = pcf_helpers.format_pcf(source, line_length=80, comment_join_standalone_lines=True)
+
+    assert result.new_source == source
+
+
+def test_colon_header_boundary_preserves_more_specific_comment_units() -> None:
+    source = "# Introductory prose without terminal punctuation\n# - Item:\n# > Quote:\n"
+
+    result = pcf_helpers.format_pcf(source, line_length=80, comment_join_standalone_lines=True)
+
+    assert result.new_source == source
+
+
+def test_default_standalone_formatting_already_keeps_colon_header_lines_independent() -> None:
+    source = "# Accepted values:\n# pending, active, disabled.\n"
+
+    result = pcf_helpers.format_pcf(source, line_length=80, comment_join_standalone_lines=False)
+
+    assert result.new_source == source
+
+
 def test_standalone_normalization_preserves_additional_hashes_and_eof_state() -> None:
     result = pcf_helpers.format_pcf("##Heading")
 

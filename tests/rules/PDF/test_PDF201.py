@@ -85,6 +85,7 @@ def test_inserts_blank_line_between_summary_and_recognized_structure() -> None:
         "    | A | B |\n    | --- | --- |\n    | 1 | 2 |",
         "    .. note:: Title\n\n        detail",
         "    Example::\n\n        code",
+        "    Accepted values:",
         "        verbatim line",
     ),
 )
@@ -140,13 +141,13 @@ def test_existing_whitespace_only_separator_prevents_duplicate_insertion() -> No
 
 
 @pytest.mark.parametrize("convention", (DocstringConvention.NONE, DocstringConvention.NUMPY, DocstringConvention.PEP257))
-def test_google_section_syntax_is_not_separated_without_google_convention(convention: DocstringConvention) -> None:
+def test_google_section_syntax_is_separated_as_colon_header_without_google_convention(convention: DocstringConvention) -> None:
     source = 'def function(value):\n    """Summary.\n    Args:\n        value: Description.\n    """\n'
     settings = CheckSettings(select=("PDF201",), docstring_convention=convention)
     result = format_source(source, settings=settings)
 
-    assert result.new_source == source
-    assert not result.fixed_findings
+    assert result.new_source == 'def function(value):\n    """Summary.\n\n    Args:\n        value: Description.\n    """\n'
+    assert result.fixed_findings[PDF201MissingBlankLine.meta] == 1
 
 
 @pytest.mark.parametrize("convention", (DocstringConvention.NONE, DocstringConvention.PEP257, DocstringConvention.GOOGLE))

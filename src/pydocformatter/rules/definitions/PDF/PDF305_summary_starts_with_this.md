@@ -9,7 +9,7 @@ Checks module, class, function, and method docstring summaries whose first norma
 
 PDF305 removes non-alphanumeric characters from the first summary word and lowercases it before comparing. This catches forms such as `This`, `this`, `THIS`, `"This"`, `` `This` ``, and `This:`, but it does not treat `ThisReturns`, `this_module`, or `This\u00e9` as the word `this`.
 
-It skips empty docstrings, docstrings without a parsed summary, and parser-recognized structures such as sections, reST fields under the reST convention, headings, lists, doctests, code fences, block quotes, tables, directives, literal blocks, and verbatim blocks. With heading parsing enabled, underlined title-style content is a heading and is skipped. With heading parsing disabled, the first non-adornment summary line is checked.
+It skips empty docstrings, docstrings without a parsed summary, and parser-recognized structures such as sections, reST fields under the reST convention, standalone colon-ended lines with following content, headings, lists, doctests, code fences, block quotes, tables, directives, literal blocks, and verbatim blocks. With heading parsing enabled, underlined title-style content is a heading and is skipped. With heading parsing disabled, the first non-adornment summary line is checked.
 
 ## Why is this useful?
 Summaries that begin with "This" are often indirect and can usually be rewritten more concisely around the action or object being documented.
@@ -83,7 +83,7 @@ def module_name():
 [output=unchanged]
 ```
 
-Parser-recognized structures are protected. Disabling the matching parser setting can make the same text become a summary target:
+Parser-recognized structures are protected. Standalone colon-ended lines with following content are protected even when a more specific parser setting is disabled:
 
 ```pydocfmt-example
 [settings]
@@ -93,6 +93,21 @@ docstring-parse-literal-blocks = false
 def value():
     """This::
         value
+    """
+
+[output=unchanged]
+```
+
+Disabling a matching parser setting can make some structure-like text become a summary target:
+
+```pydocfmt-example
+[settings]
+docstring-parse-headings = false
+
+[input]
+def value():
+    """This
+    ====
     """
 
 [output=unchanged]

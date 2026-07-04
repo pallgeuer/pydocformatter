@@ -115,7 +115,7 @@ class TestFormattingRulesDoc(unittest.TestCase):
             if replacements:
                 replaced_by_ruff_rule[row["Code"]] = replacements
 
-        self.assertEqual(disabled_by_ruff_rule, replaced_by_ruff_rule)
+        self.assertEqual(_sorted_mapping_values(disabled_by_ruff_rule), _sorted_mapping_values(replaced_by_ruff_rule))
 
     def test_rule_list_ruff_related_mappings_are_bidirectional(self) -> None:
         text = FORMAT_RULES_PATH.read_text(encoding="utf-8")
@@ -133,7 +133,12 @@ class TestFormattingRulesDoc(unittest.TestCase):
             if related_rules:
                 related_by_pydocformatter_rule[row["Code"]] = related_rules
 
-        self.assertEqual(related_by_ruff_rule, related_by_pydocformatter_rule)
+        self.assertEqual(_sorted_mapping_values(related_by_ruff_rule), _sorted_mapping_values(related_by_pydocformatter_rule))
+
+
+def _sorted_mapping_values(mapping: dict[str, list[str]]) -> dict[str, list[str]]:
+    """Return mapping values sorted for order-insensitive code comparisons."""
+    return {key: sorted(values) for key, values in mapping.items()}
 
 
 if __name__ == "__main__":

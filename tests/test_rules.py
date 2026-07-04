@@ -1403,6 +1403,12 @@ class NonCallableViolationsRule(RuleBase):
                 "PDF410": {DocstringConvention.NONE: RuleSettingEffect.IGNORED, DocstringConvention.PEP257: RuleSettingEffect.IGNORED},
                 "PDF411": {DocstringConvention.NONE: RuleSettingEffect.IGNORED, DocstringConvention.PEP257: RuleSettingEffect.IGNORED},
                 "PDF412": {DocstringConvention.NONE: RuleSettingEffect.IGNORED, DocstringConvention.PEP257: RuleSettingEffect.IGNORED},
+                "PDF413": {
+                    DocstringConvention.NONE: RuleSettingEffect.IGNORED,
+                    DocstringConvention.PEP257: RuleSettingEffect.IGNORED,
+                    DocstringConvention.GOOGLE: RuleSettingEffect.IGNORED,
+                    DocstringConvention.REST: RuleSettingEffect.IGNORED,
+                },
                 "PDF500": {
                     DocstringConvention.NONE: RuleSettingEffect.IGNORED,
                     DocstringConvention.PEP257: RuleSettingEffect.IGNORED,

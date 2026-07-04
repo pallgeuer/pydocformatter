@@ -506,6 +506,97 @@ def test_summary_paragraph_blank_and_verbatim_blocks_preserve_ranges() -> None:
     )
 
 
+def test_colon_header_blocks_split_prose_reflow_regions() -> None:
+    value = "Summary first\nsummary second\n\nThe accepted values are:\npending, active, and disabled.\n\nTrailing prose\ncontinues here."
+    structure = structure_for(value)
+
+    assert tuple((block.kind, block.start_line, block.end_line) for block in structure.blocks) == (
+        (DocstringBlockKind.SUMMARY, 0, 2),
+        (DocstringBlockKind.BLANK, 2, 3),
+        (DocstringBlockKind.COLON_HEADER, 3, 4),
+        (DocstringBlockKind.PARAGRAPH, 4, 5),
+        (DocstringBlockKind.BLANK, 5, 6),
+        (DocstringBlockKind.PARAGRAPH, 6, 8),
+    )
+    assert tuple((region.kind, reflow_texts(region.lines)) for region in structure.reflow_regions) == (
+        (DocstringBlockKind.SUMMARY, ("Summary first", "summary second")),
+        (DocstringBlockKind.PARAGRAPH, ("pending, active, and disabled.",)),
+        (DocstringBlockKind.PARAGRAPH, ("Trailing prose", "continues here.")),
+    )
+
+
+def test_colon_continuation_line_ends_current_reflow_region() -> None:
+    value = "This sentence has been deliberately split\nover three physical lines and ends\nwith a colon:\nthe following two lines should be\nwrapped as their own paragraph."
+    structure = structure_for(value)
+
+    assert tuple((block.kind, block.start_line, block.end_line) for block in structure.blocks) == (
+        (DocstringBlockKind.SUMMARY, 0, 3),
+        (DocstringBlockKind.PARAGRAPH, 3, 5),
+    )
+    assert tuple((region.kind, reflow_texts(region.lines)) for region in structure.reflow_regions) == (
+        (DocstringBlockKind.SUMMARY, ("This sentence has been deliberately split", "over three physical lines and ends", "with a colon:")),
+        (DocstringBlockKind.PARAGRAPH, ("the following two lines should be", "wrapped as their own paragraph.")),
+    )
+
+
+def test_single_token_colon_label_stays_separate_from_preceding_prose() -> None:
+    structure = structure_for("Use one of these values\nvalues:\npending, active, disabled.")
+
+    assert tuple((block.kind, block.start_line, block.end_line) for block in structure.blocks) == (
+        (DocstringBlockKind.SUMMARY, 0, 1),
+        (DocstringBlockKind.COLON_HEADER, 1, 2),
+        (DocstringBlockKind.PARAGRAPH, 2, 3),
+    )
+    assert tuple((region.kind, reflow_texts(region.lines)) for region in structure.reflow_regions) == (
+        (DocstringBlockKind.SUMMARY, ("Use one of these values",)),
+        (DocstringBlockKind.PARAGRAPH, ("pending, active, disabled.",)),
+    )
+
+
+def test_numeric_colon_label_stays_separate_from_preceding_prose() -> None:
+    structure = structure_for("Choose one of these cases\n1:\nfirst case.")
+
+    assert tuple((block.kind, block.start_line, block.end_line) for block in structure.blocks) == (
+        (DocstringBlockKind.SUMMARY, 0, 1),
+        (DocstringBlockKind.COLON_HEADER, 1, 2),
+        (DocstringBlockKind.PARAGRAPH, 2, 3),
+    )
+
+
+def test_colon_header_after_complete_sentence_stays_separate() -> None:
+    structure = structure_for("Summary.\nThe accepted values are:\npending, active, and disabled.")
+
+    assert tuple((block.kind, block.start_line, block.end_line) for block in structure.blocks) == (
+        (DocstringBlockKind.SUMMARY, 0, 1),
+        (DocstringBlockKind.COLON_HEADER, 1, 2),
+        (DocstringBlockKind.PARAGRAPH, 2, 3),
+    )
+    assert tuple((region.kind, reflow_texts(region.lines)) for region in structure.reflow_regions) == (
+        (DocstringBlockKind.SUMMARY, ("Summary.",)),
+        (DocstringBlockKind.PARAGRAPH, ("pending, active, and disabled.",)),
+    )
+
+
+def test_colon_header_first_content_line_is_not_summary() -> None:
+    structure = structure_for("Accepted values:\npending, active, and disabled.")
+
+    assert tuple((block.kind, block.start_line, block.end_line) for block in structure.blocks) == (
+        (DocstringBlockKind.COLON_HEADER, 0, 1),
+        (DocstringBlockKind.PARAGRAPH, 1, 2),
+    )
+    assert tuple(region.kind for region in structure.reflow_regions) == (DocstringBlockKind.PARAGRAPH,)
+
+
+def test_colon_header_respects_more_specific_structure_precedence() -> None:
+    google = structure_for("Args:\n    value: Description.", settings=CheckSettings(docstring_convention=DocstringConvention.GOOGLE))
+    numpy = structure_for("Returns\n-------\nint\n    Result.", settings=CheckSettings(docstring_convention=DocstringConvention.NUMPY))
+    literal = structure_for("Example::\n\n    value = 1")
+
+    assert tuple(block.kind for block in google.blocks) == (DocstringBlockKind.SECTION,)
+    assert tuple(block.kind for block in numpy.blocks) == (DocstringBlockKind.SECTION,)
+    assert tuple(block.kind for block in literal.blocks) == (DocstringBlockKind.LITERAL_BLOCK,)
+
+
 def test_verbatim_blocks_exclude_trailing_blank_lines() -> None:
     structure = structure_for("Summary.\n\n    indented\n    verbatim\n\n\nBody.")
 
@@ -1339,7 +1430,7 @@ def test_disabling_directives_falls_back_to_literal_blocks_before_plain_text() -
     plain = structure_for(value, settings=CheckSettings(docstring_parse_directives=False, docstring_parse_literal_blocks=False))
     assert tuple(block.kind for block in directive.blocks) == (DocstringBlockKind.DIRECTIVE,)
     assert tuple(block.kind for block in literal.blocks) == (DocstringBlockKind.LITERAL_BLOCK,)
-    assert tuple(block.kind for block in plain.blocks) == (DocstringBlockKind.SUMMARY, DocstringBlockKind.BLANK, DocstringBlockKind.VERBATIM)
+    assert tuple(block.kind for block in plain.blocks) == (DocstringBlockKind.COLON_HEADER, DocstringBlockKind.BLANK, DocstringBlockKind.VERBATIM)
 
 
 def test_disabling_all_generic_recognizers_produces_one_plain_reflow_region() -> None:

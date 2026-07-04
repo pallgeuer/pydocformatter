@@ -91,6 +91,15 @@ def test_reports_but_does_not_fix_other_punctuation(punctuation: str) -> None:
     assert [finding.fixable for finding in result.unfixed_findings] == [False]
 
 
+def test_colon_header_with_following_content_is_not_summary_punctuation_target() -> None:
+    source = 'def function():\n    """Accepted values:\n    pending, active, and disabled.\n    """\n'
+    result = format_source(source)
+
+    assert result.new_source == source
+    assert not result.fixed_findings
+    assert not result.unfixed_findings
+
+
 def test_accepts_existing_period_and_ellipsis() -> None:
     source = 'def first():\n    """Return value."""\n\n\ndef second():\n    """Return value..."""\n'
     result = format_source(source)
