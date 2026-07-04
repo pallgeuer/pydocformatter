@@ -144,6 +144,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 ### Changed
 
 - **Documentation and settings:**
+  - Updated the Ruff compatibility table with current pydocformatter-relevant Ruff rules and bidirectional replacement guidance for comment and docstring rules.
   - Renamed the rule list, rule suppression, and rule implementation documents to `docs/rule_list.md`, `docs/rule_suppressions.md`, and `docs/rule_implementation_spec.md`, and refocused the rule selection, file selection, and performance audit specs.
   - Renamed `PDF508` and `PDF510` user-facing rule names and diagnostics to refer to missing public class and module attribute documentation.
   - Changed the default `docstring-convention` from `none` to `pep257`, keeping `none` as the stricter no-convention profile for generic rules that can act without Google, NumPy, or reST parsing.
