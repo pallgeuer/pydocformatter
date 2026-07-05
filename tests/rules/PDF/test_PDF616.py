@@ -21,12 +21,12 @@ def assert_findings(source: str, *, expected: tuple[tuple[str, tuple[int, ...], 
 
 
 def test_default_overload_decorators_should_not_have_docstrings() -> None:
-    source = '@overload\ndef parse(value: int):\n    """Parse int."""\n    pass\n\n@typing.overload()\ndef parse(value: str):\n    """Parse str."""\n    pass\n\n@typing_extensions.overload\ndef parse(value: bytes):\n    """Parse bytes."""\n    pass\n\n@project.overload\ndef parse(value: object):\n    """Parse project."""\n    pass\n\ndef parse(value):\n    """Parse."""\n    pass\n'
+    source = '@typing.overload\ndef parse(value: int):\n    """Parse int."""\n    pass\n\n@typing.overload()\ndef parse(value: str):\n    """Parse str."""\n    pass\n\n@typing_extensions.overload\ndef parse(value: bytes):\n    """Parse bytes."""\n    pass\n\n@project.overload\ndef parse(value: object):\n    """Parse project."""\n    pass\n\ndef parse(value):\n    """Parse."""\n    pass\n'
 
     assert_findings(
         source,
         expected=(
-            ("PDF616", (3,), "Function decorated with '@overload' should not have a docstring"),
+            ("PDF616", (3,), "Function decorated with '@typing.overload' should not have a docstring"),
             ("PDF616", (8,), "Function decorated with '@typing.overload' should not have a docstring"),
             ("PDF616", (13,), "Function decorated with '@typing_extensions.overload' should not have a docstring"),
         ),
@@ -34,7 +34,7 @@ def test_default_overload_decorators_should_not_have_docstrings() -> None:
 
 
 def test_configured_forbidden_function_decorators_are_exact_names() -> None:
-    source = '@project.overload()\ndef project(value: int):\n    """Project overload."""\n    pass\n\n@overload\ndef standard(value: int):\n    """Standard overload."""\n    pass\n'
+    source = '@project.overload()\ndef parse(value: int):\n    """Project overload."""\n    pass\n\n@overload\ndef standard(value: int):\n    """Standard overload."""\n    pass\n'
     settings = CheckSettings(select=("PDF616",), docstring_forbidden_function_decorators=("project.overload",))
 
     assert_findings(source, settings=settings, expected=(("PDF616", (3,), "Function decorated with '@project.overload' should not have a docstring"),))
@@ -47,7 +47,7 @@ def test_absent_docstrings_are_not_reported() -> None:
 
 
 def test_existing_forbidden_docstrings_remain_visible_to_other_rules() -> None:
-    source = '@overload\ndef parse(value: int):\n    """Parse int"""\n    pass\n'
+    source = '@typing.overload\ndef parse(value: int):\n    """Parse int"""\n    pass\n'
     settings = CheckSettings(select=("PDF300", "PDF616"))
 
     result = assert_findings(
@@ -56,7 +56,7 @@ def test_existing_forbidden_docstrings_remain_visible_to_other_rules() -> None:
         fix=False,
         expected=(
             ("PDF300", (3,), "Docstring summary should end with a period"),
-            ("PDF616", (3,), "Function decorated with '@overload' should not have a docstring"),
+            ("PDF616", (3,), "Function decorated with '@typing.overload' should not have a docstring"),
         ),
     )
 
@@ -64,16 +64,16 @@ def test_existing_forbidden_docstrings_remain_visible_to_other_rules() -> None:
 
 
 def test_function_shapes_with_forbidden_docstrings_are_reported() -> None:
-    source = 'class Client:\n    """Client."""\n\n    @overload\n    def connect(self, value: int):\n        """Connect int."""\n        pass\n\n    @typing.overload\n    async def fetch(self, value: int):\n        """Fetch int."""\n        pass\n\n    @typing_extensions.overload\n    def __str__(self):\n        """Format client."""\n        return "client"\n\n    @overload\n    def __init__(self, value: int):\n        """Initialize int."""\n        self.value = value\n\n\ndef outer():\n    """Outer."""\n\n    @overload\n    def inner(value: int):\n        """Inner int."""\n        return value\n'
+    source = 'class Client:\n    """Client."""\n\n    @typing.overload\n    def connect(self, value: int):\n        """Connect int."""\n        pass\n\n    @typing.overload\n    async def fetch(self, value: int):\n        """Fetch int."""\n        pass\n\n    @typing_extensions.overload\n    def __str__(self):\n        """Format client."""\n        return "client"\n\n    @typing.overload\n    def __init__(self, value: int):\n        """Initialize int."""\n        self.value = value\n\n\ndef outer():\n    """Outer."""\n\n    @typing.overload\n    def inner(value: int):\n        """Inner int."""\n        return value\n'
 
     assert_findings(
         source,
         expected=(
-            ("PDF616", (6,), "Function decorated with '@overload' should not have a docstring"),
+            ("PDF616", (6,), "Function decorated with '@typing.overload' should not have a docstring"),
             ("PDF616", (11,), "Function decorated with '@typing.overload' should not have a docstring"),
             ("PDF616", (16,), "Function decorated with '@typing_extensions.overload' should not have a docstring"),
-            ("PDF616", (21,), "Function decorated with '@overload' should not have a docstring"),
-            ("PDF616", (30,), "Function decorated with '@overload' should not have a docstring"),
+            ("PDF616", (21,), "Function decorated with '@typing.overload' should not have a docstring"),
+            ("PDF616", (30,), "Function decorated with '@typing.overload' should not have a docstring"),
         ),
     )
 
@@ -85,13 +85,13 @@ def test_non_function_dynamic_and_non_exact_decorators_are_not_reported() -> Non
 
 
 def test_multiline_and_compact_docstring_targets_use_docstring_physical_lines() -> None:
-    source = '@overload\ndef compact(): """Compact."""\n\n@overload\ndef multiline():\n    """Summary.\n\n    Details.\n    """\n    pass\n'
+    source = '@typing.overload\ndef compact(): """Compact."""\n\n@typing.overload\ndef multiline():\n    """Summary.\n\n    Details.\n    """\n    pass\n'
 
     assert_findings(
         source,
         expected=(
-            ("PDF616", (2,), "Function decorated with '@overload' should not have a docstring"),
-            ("PDF616", (6, 7, 8, 9), "Function decorated with '@overload' should not have a docstring"),
+            ("PDF616", (2,), "Function decorated with '@typing.overload' should not have a docstring"),
+            ("PDF616", (6, 7, 8, 9), "Function decorated with '@typing.overload' should not have a docstring"),
         ),
     )
 
@@ -104,10 +104,10 @@ def test_empty_forbidden_decorator_setting_disables_rule() -> None:
 
 
 def test_broad_pdf_selection_includes_forbidden_function_docstrings() -> None:
-    source = '"""Module."""\n\n@overload\ndef parse(value: int):\n    """Parse int."""\n    pass\n'
+    source = '"""Module."""\n\n@typing.overload\ndef parse(value: int):\n    """Parse int."""\n    pass\n'
     settings = CheckSettings(select=("PDF",))
 
-    assert_findings(source, settings=settings, expected=(("PDF616", (5,), "Function decorated with '@overload' should not have a docstring"),))
+    assert_findings(source, settings=settings, expected=(("PDF616", (5,), "Function decorated with '@typing.overload' should not have a docstring"),))
 
 
 def test_optional_decorators_do_not_trigger_forbidden_docstring_rule() -> None:
@@ -134,32 +134,57 @@ def test_first_matching_forbidden_decorator_controls_message() -> None:
 
 
 def test_suppression_targets_docstring_lines_not_decorator_or_definition_lines() -> None:
-    source = '@overload  # pydocfmt: ignore[PDF616]\ndef decorator_suppressed(value: int):\n    """Decorator directive does not suppress."""\n    pass\n\n@overload\ndef definition_suppressed(value: int):  # pydocfmt: ignore[PDF616]\n    """Definition directive does not suppress."""\n    pass\n\n@overload\ndef docstring_suppressed(value: int):\n    """Docstring directive suppresses."""  # pydocfmt: ignore[PDF616]\n    pass\n'
+    source = '@typing.overload  # pydocfmt: ignore[PDF616]\ndef decorator_suppressed(value: int):\n    """Decorator directive does not suppress."""\n    pass\n\n@typing.overload\ndef definition_suppressed(value: int):  # pydocfmt: ignore[PDF616]\n    """Definition directive does not suppress."""\n    pass\n\n@typing.overload\ndef docstring_suppressed(value: int):\n    """Docstring directive suppresses."""  # pydocfmt: ignore[PDF616]\n    pass\n'
 
     assert_findings(
         source,
         expected=(
-            ("PDF616", (3,), "Function decorated with '@overload' should not have a docstring"),
-            ("PDF616", (8,), "Function decorated with '@overload' should not have a docstring"),
+            ("PDF616", (3,), "Function decorated with '@typing.overload' should not have a docstring"),
+            ("PDF616", (8,), "Function decorated with '@typing.overload' should not have a docstring"),
         ),
     )
 
 
 def test_preceding_directive_suppresses_multiline_forbidden_docstring() -> None:
-    source = '@overload\ndef parse(value: int):\n    # pydocfmt: ignore[PDF616]\n    """Parse int.\n\n    Details.\n    """\n    pass\n'
+    source = '@typing.overload\ndef parse(value: int):\n    # pydocfmt: ignore[PDF616]\n    """Parse int.\n\n    Details.\n    """\n    pass\n'
 
     assert_findings(source, expected=())
 
 
-def test_alias_like_decorator_names_require_explicit_configuration() -> None:
-    source = '@t.overload\ndef parse(value: int):\n    """Parse int."""\n    pass\n'
+def test_import_alias_decorator_names_match_qualified_configuration() -> None:
+    source = 'import typing as t\n\n@t.overload\ndef parse(value: int):\n    """Parse int."""\n    pass\n'
 
-    assert_findings(source, expected=())
+    assert_findings(source, expected=(("PDF616", (5,), "Function decorated with '@t.overload' should not have a docstring"),))
     assert_findings(
         source,
         settings=CheckSettings(select=("PDF616",), docstring_forbidden_function_decorators=("t.overload",)),
-        expected=(("PDF616", (3,), "Function decorated with '@t.overload' should not have a docstring"),),
+        expected=(("PDF616", (5,), "Function decorated with '@t.overload' should not have a docstring"),),
     )
+
+
+def test_called_import_alias_decorator_names_match_qualified_configuration() -> None:
+    source = 'from typing import overload as ov\n\n@ov()\ndef parse(value: int):\n    """Parse int."""\n    pass\n'
+
+    assert_findings(source, expected=(("PDF616", (5,), "Function decorated with '@ov' should not have a docstring"),))
+
+
+def test_unqualified_decorator_configuration_is_syntactic_only() -> None:
+    source = 'from typing import overload as ov\n\n@ov\ndef parse(value: int):\n    """Parse int."""\n    pass\n\n@overload\ndef build(value: int):\n    """Build int."""\n    pass\n'
+    settings = CheckSettings(select=("PDF616",), docstring_forbidden_function_decorators=("overload",))
+
+    assert_findings(source, settings=settings, expected=(("PDF616", (10,), "Function decorated with '@overload' should not have a docstring"),))
+
+
+def test_shadowed_import_alias_decorator_does_not_match_qualified_configuration() -> None:
+    source = 'from typing import overload as ov\nov = decorator\n\n@ov\ndef parse(value: int):\n    """Parse int."""\n    pass\n'
+
+    assert_findings(source, expected=())
+
+
+def test_shadowed_dotted_decorator_does_not_match_qualified_configuration() -> None:
+    source = 'class Typing:\n    overload = object()\n\ntyping = Typing()\n\n@typing.overload\ndef parse(value: int):\n    """Parse int."""\n    pass\n'
+
+    assert_findings(source, expected=())
 
 
 def test_source_decorator_order_controls_message_not_setting_order() -> None:
@@ -170,6 +195,6 @@ def test_source_decorator_order_controls_message_not_setting_order() -> None:
 
 
 def test_concatenated_forbidden_docstring_targets_all_physical_string_lines() -> None:
-    source = '@overload\ndef parse(value: int):\n    (\n        "Parse "\n        "int."\n    )\n    pass\n'
+    source = '@typing.overload\ndef parse(value: int):\n    (\n        "Parse "\n        "int."\n    )\n    pass\n'
 
-    assert_findings(source, expected=(("PDF616", (4, 5), "Function decorated with '@overload' should not have a docstring"),))
+    assert_findings(source, expected=(("PDF616", (4, 5), "Function decorated with '@typing.overload' should not have a docstring"),))

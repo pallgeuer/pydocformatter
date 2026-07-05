@@ -28,7 +28,8 @@ class classproperty(Generic[_R_co]):
         """Bind the class-level getter used by this descriptor.
 
         Args:
-            fget: Callable that receives the resolved owner class and returns the computed property value.
+            fget (Callable[[type[Any]], _R_co]): Callable that receives the resolved owner class and returns the
+                computed property value.
         """
         self.fget = fget
         functools.update_wrapper(cast(Callable[..., Any], self), fget)
@@ -67,7 +68,7 @@ def alias_to_class_field(field_path: str) -> classproperty[Any]:
     """Create a classproperty that delegates to a nested field path.
 
     Args:
-        field_path: Dotted attribute path to resolve from the owner class each time the property is read.
+        field_path (str): Dotted attribute path to resolve from the owner class each time the property is read.
 
     Returns:
         Class property that exposes the nested class attribute without copying its current value.
@@ -92,9 +93,9 @@ def find_git_root_for_path(path: str, root_cache: dict[str, str | None] | None =
     """Find and optionally cache the nearest containing Git root for a path.
 
     Args:
-        path: File or directory path whose containing worktree should be discovered.
-        root_cache: Optional mutable cache keyed by searched directories, storing the discovered Git root or None for
-            paths outside a worktree.
+        path (str): File or directory path whose containing worktree should be discovered.
+        root_cache (dict[str, str | None] | None): Optional mutable cache keyed by searched directories, storing the
+            discovered Git root or None for paths outside a worktree.
 
     Returns:
         Absolute path of the nearest containing Git root, or None when no valid .git marker is found.

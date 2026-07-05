@@ -11,8 +11,8 @@ def is_colon_header_text(text: str, *, require_unindented: bool = False) -> bool
     """Return whether text is a non-empty colon-ended boundary line.
 
     Args:
-        text: Logical line content to classify.
-        require_unindented: Whether indented text should be excluded from colon-header classification.
+        text (str): Logical line content to classify.
+        require_unindented (bool): Whether indented text should be excluded from colon-header classification.
 
     Returns:
         Whether the text should act as a colon-ended structure boundary.
@@ -27,8 +27,8 @@ def allows_colon_continuation(previous_text: str, current_text: str) -> bool:
     """Return whether a colon-ended line may continue the previous prose line.
 
     Args:
-        previous_text: Previous logical line content in the candidate prose region.
-        current_text: Current logical line content ending with a colon.
+        previous_text (str): Previous logical line content in the candidate prose region.
+        current_text (str): Current logical line content ending with a colon.
 
     Returns:
         Whether current text can be joined to previous text as one prose continuation.

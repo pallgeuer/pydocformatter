@@ -66,7 +66,7 @@ def main(argv: list[str] | None = None) -> int:
     """Normalize Markdown pipe tables in selected files.
 
     Args:
-        argv: Command-line arguments, excluding the executable name.
+        argv (list[str] | None): Command-line arguments, excluding the executable name.
 
     Returns:
         Zero when all selected files are already normalized or were fixed, otherwise one in check mode when any selected file would change.
@@ -120,8 +120,8 @@ def normalize_markdown_tables_file(path: pathlib.Path, *, check: bool = False) -
     """Normalize Markdown pipe tables in one file.
 
     Args:
-        path: Markdown file to inspect.
-        check: Whether to skip writing normalized content.
+        path (pathlib.Path): Markdown file to inspect.
+        check (bool): Whether to skip writing normalized content.
 
     Returns:
         Whether the file content changed or would change.
@@ -136,7 +136,7 @@ def normalize_markdown_tables_text(text: str) -> str:
     """Return text with Markdown pipe tables normalized.
 
     Args:
-        text: Markdown text whose pipe tables should be normalized.
+        text (str): Markdown text whose pipe tables should be normalized.
 
     Returns:
         Markdown text with pipe tables normalized outside fenced code blocks.
@@ -150,7 +150,7 @@ def markdown_table_failures(path: pathlib.Path) -> list[str]:
     """Return table alignment failures for one Markdown file.
 
     Args:
-        path: Markdown file to inspect.
+        path (pathlib.Path): Markdown file to inspect.
 
     Returns:
         Human-readable table alignment failures with repository-relative paths when possible.
@@ -171,9 +171,9 @@ def table_failures(path: pathlib.Path, table_start: int, table_lines: list[str])
     """Return alignment failures for one Markdown pipe table.
 
     Args:
-        path: Markdown file containing the table.
-        table_start: Zero-based line index of the first table row.
-        table_lines: Physical lines belonging to the table.
+        path (pathlib.Path): Markdown file containing the table.
+        table_start (int): Zero-based line index of the first table row.
+        table_lines (list[str]): Physical lines belonging to the table.
 
     Returns:
         Human-readable alignment failures for the table.

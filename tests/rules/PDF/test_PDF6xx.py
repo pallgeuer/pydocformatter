@@ -199,21 +199,19 @@ def test_decorated_regular_methods_still_require_docstrings() -> None:
 
 
 def test_override_methods_are_not_required_to_repeat_inherited_documentation() -> None:
-    source = '"""Module."""\n\nclass Client:\n    """Client."""\n\n    @typing.override\n    def connect(self):\n        pass\n\n    @typing_extensions.override()\n    def close(self):\n        pass\n\n    @override\n    def flush(self):\n        pass\n\n    def send(self):\n        pass\n'
+    source = '"""Module."""\n\nclass Client:\n    """Client."""\n\n    @typing.override\n    def connect(self):\n        pass\n\n    @typing_extensions.override()\n    def close(self):\n        pass\n\n    @typing.override\n    def flush(self):\n        pass\n\n    def send(self):\n        pass\n'
 
     assert_findings(source, select=("PDF610",), expected=(("PDF610", (18,), "Public method 'Client.send' is missing docstring"),))
 
 
 def test_optional_function_decorators_apply_to_all_function_owner_rules() -> None:
-    source = '"""Module."""\n\n@typing.override\ndef build():\n    pass\n\n@typing_extensions.override()\ndef _build():\n    pass\n\nclass Client:\n    """Client."""\n\n    @override\n    def connect(self):\n        pass\n\n    @typing.override\n    def __str__(self):\n        return "client"\n\n    @typing_extensions.override()\n    def __init__(self):\n        pass\n\nclass _Private:\n    """Private."""\n\n    @override\n    def connect(self):\n        pass\n\n    @typing.override\n    def __str__(self):\n        return "private"\n\n    @typing_extensions.override()\n    def __init__(self):\n        pass\n'
+    source = '"""Module."""\n\n@typing.override\ndef build():\n    pass\n\n@typing_extensions.override()\ndef _build():\n    pass\n\nclass Client:\n    """Client."""\n\n    @typing.override\n    def connect(self):\n        pass\n\n    @typing.override\n    def __str__(self):\n        return "client"\n\n    @typing_extensions.override()\n    def __init__(self):\n        pass\n\nclass _Private:\n    """Private."""\n\n    @typing.override\n    def connect(self):\n        pass\n\n    @typing.override\n    def __str__(self):\n        return "private"\n\n    @typing_extensions.override()\n    def __init__(self):\n        pass\n'
 
     assert_findings(source, select=("PDF608", "PDF609", "PDF610", "PDF611", "PDF612", "PDF613", "PDF614", "PDF615"), expected=())
 
 
 def test_forbidden_function_decorators_also_make_owner_docstrings_optional() -> None:
-    source = (
-        '"""Module."""\n\n@typing.overload\ndef build(value: int) -> int:\n    pass\n\nclass Client:\n    """Client."""\n\n    @overload()\n    def connect(self, value: int) -> int:\n        pass\n'
-    )
+    source = '"""Module."""\n\n@typing.overload\ndef build(value: int) -> int:\n    pass\n\nclass Client:\n    """Client."""\n\n    @typing.overload()\n    def connect(self, value: int) -> int:\n        pass\n'
 
     assert_findings(source, select=("PDF608", "PDF610"), expected=())
 
@@ -231,6 +229,27 @@ def test_configured_optional_function_decorators_are_exact_names() -> None:
             ("PDF610", (19,), "Public method 'Client.unconfigured' is missing docstring"),
         ),
     )
+
+
+def test_import_alias_optional_function_decorators_match_qualified_configuration() -> None:
+    source = '"""Module."""\n\nfrom typing import override as ov\n\n@ov\ndef build():\n    pass\n\n@override\ndef unconfigured():\n    pass\n'
+    settings = CheckSettings(select=("PDF608",), docstring_optional_function_decorators=("typing.override",), docstring_forbidden_function_decorators=())
+
+    assert_findings(source, select=("PDF608",), settings=settings, expected=(("PDF608", (10,), "Public function 'unconfigured' is missing docstring"),))
+
+
+def test_called_import_alias_optional_function_decorators_match_qualified_configuration() -> None:
+    source = '"""Module."""\n\nfrom typing import override as ov\n\n@ov()\ndef build():\n    pass\n\n@override()\ndef unconfigured():\n    pass\n'
+    settings = CheckSettings(select=("PDF608",), docstring_optional_function_decorators=("typing.override",), docstring_forbidden_function_decorators=())
+
+    assert_findings(source, select=("PDF608",), settings=settings, expected=(("PDF608", (10,), "Public function 'unconfigured' is missing docstring"),))
+
+
+def test_shadowed_optional_decorator_import_alias_does_not_skip_documentation() -> None:
+    source = '"""Module."""\n\nfrom typing import override as ov\nov = decorator\n\n@ov\ndef build():\n    pass\n'
+    settings = CheckSettings(select=("PDF608",), docstring_optional_function_decorators=("typing.override",), docstring_forbidden_function_decorators=())
+
+    assert_findings(source, select=("PDF608",), settings=settings, expected=(("PDF608", (7,), "Public function 'build' is missing docstring"),))
 
 
 def test_dynamic_and_similarly_named_decorators_do_not_skip_method_documentation() -> None:

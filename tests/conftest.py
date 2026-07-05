@@ -13,7 +13,8 @@ def isolated_test_root(tmp_path_factory: pytest.TempPathFactory) -> Generator[Pa
     """Create a session-wide boundary for configuration and temporary files.
 
     Args:
-        tmp_path_factory: Pytest factory used to allocate one temporary root shared by the test session.
+        tmp_path_factory (pytest.TempPathFactory): Pytest factory used to allocate one temporary root shared by the test
+            session.
 
     Yields:
         Directory containing neutral configuration and all per-test temporary working directories.
@@ -42,7 +43,7 @@ def guarded_test_cwd(isolated_test_root: Path) -> Generator[Path, None, None]:
     """Create a poisoned default CWD for tests that did not request isolation.
 
     Args:
-        isolated_test_root: Session boundary under which the guarded directory is created.
+        isolated_test_root (Path): Session boundary under which the guarded directory is created.
 
     Yields:
         Read-only directory containing malformed local configuration for catching accidental CWD-dependent behavior.
@@ -72,9 +73,10 @@ def guard_working_directory(request: pytest.FixtureRequest, isolated_test_root: 
     fresh writable directory below the session boundary.
 
     Args:
-        request: Current pytest request, used to detect whether the test opted into a writable isolated CWD.
-        isolated_test_root: Session boundary that owns writable per-test directories.
-        guarded_test_cwd: Poisoned fallback working directory for tests without explicit isolation.
+        request (pytest.FixtureRequest): Current pytest request, used to detect whether the test opted into a writable
+            isolated CWD.
+        isolated_test_root (Path): Session boundary that owns writable per-test directories.
+        guarded_test_cwd (Path): Poisoned fallback working directory for tests without explicit isolation.
     """
     previous_cwd = os.getcwd()
     use_isolated_cwd = request.node.get_closest_marker("isolated_cwd") is not None or "isolated_cwd" in request.fixturenames
@@ -102,8 +104,8 @@ def isolated_cwd(guard_working_directory: None) -> Path:
     """Return the fresh writable working directory requested by this test.
 
     Args:
-        guard_working_directory: Autouse fixture dependency that switches the process into the isolated directory before
-            this fixture is read.
+        guard_working_directory (None): Autouse fixture dependency that switches the process into the isolated directory
+            before this fixture is read.
 
     Returns:
         Current working directory allocated for the requesting test.

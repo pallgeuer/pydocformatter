@@ -23,9 +23,10 @@ class RuleFormatter(typing.Protocol):
         """Format source with optional settings.
 
         Args:
-            source: Python source text to format.
-            settings: Explicit settings overriding the helper's default rule selection and docstring convention.
-            fix: Whether automatic fixes should be applied.
+            source (str): Python source text to format.
+            settings (CheckSettings | None): Explicit settings overriding the helper's default rule selection and
+                docstring convention.
+            fix (bool): Whether automatic fixes should be applied.
         """
 
 
@@ -36,8 +37,9 @@ class RuleContextBuilder(typing.Protocol):
         """Build matching category and rule contexts for source.
 
         Args:
-            source: Python source text to parse.
-            settings: Explicit settings overriding the helper's default rule selection and docstring convention.
+            source (str): Python source text to parse.
+            settings (CheckSettings | None): Explicit settings overriding the helper's default rule selection and
+                docstring convention.
         """
 
 
@@ -45,8 +47,8 @@ def formatter_for(rule_code: str, *, convention: DocstringConvention = Docstring
     """Return a source formatter using one default PDF rule code.
 
     Args:
-        rule_code: PDF rule code used when settings are not supplied.
-        convention: Docstring convention used when settings are not supplied.
+        rule_code (str): PDF rule code used when settings are not supplied.
+        convention (DocstringConvention): Docstring convention used when settings are not supplied.
 
     Returns:
         Source formatter with the supplied default rule selection.
@@ -70,11 +72,11 @@ def assert_unfixed_lines(
     """Assert unfixed findings for one diagnostic-only rule.
 
     Args:
-        format_source: Formatter helper configured for the rule under test.
-        source: Python source text to format.
-        expected: Expected finding line-number targets.
-        meta: Rule metadata expected on every finding.
-        settings: Explicit settings overriding the formatter helper default.
+        format_source (RuleFormatter): Formatter helper configured for the rule under test.
+        source (str): Python source text to format.
+        expected (tuple[tuple[int, ...], ...]): Expected finding line-number targets.
+        meta (RuleMetadata): Rule metadata expected on every finding.
+        settings (CheckSettings | None): Explicit settings overriding the formatter helper default.
 
     Returns:
         Formatter result produced by the configured rule.
@@ -92,8 +94,8 @@ def contexts_for(rule_code: str, *, convention: DocstringConvention = DocstringC
     """Return a context builder using one default PDF rule code.
 
     Args:
-        rule_code: PDF rule code used when settings are not supplied.
-        convention: Docstring convention used when settings are not supplied.
+        rule_code (str): PDF rule code used when settings are not supplied.
+        convention (DocstringConvention): Docstring convention used when settings are not supplied.
 
     Returns:
         Context builder with the supplied default rule selection.

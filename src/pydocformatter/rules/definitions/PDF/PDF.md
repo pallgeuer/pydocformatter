@@ -87,6 +87,7 @@ PDF rules are grouped by contiguous hundred ranges so related rules stay close t
 | `PDF4xx` | Section style                    | Section names, headers, underlines, section content, section order, and section punctuation.                                                          |
 | `PDF5xx` | Docstring/signature validation   | Parameter, return, yield, exception, and attribute documentation consistency.                                                                         |
 | `PDF6xx` | Owner docstring presence         | Package, module, class, nested class, function, method, dunder method, `__init__`, and decorator-driven function docstring presence.                  |
+| `PDF7xx` | Typed entry completeness         | Parsed owning-docstring entry descriptions, type presence policies, and conservative annotation/type mismatch checks.                                 |
 
 ## Options
 Docstring options control which convention-specific structures are parsed, which generic structures are protected or reflowed, and how selected formatting and documentation checks behave.
@@ -107,7 +108,8 @@ Docstring options control which convention-specific structures are parsed, which
 | `docstring-missing-documentation`                | `has-section` | Select which missing parameter, return, yield, exception, and attribute docs are reported.    |
 | `docstring-missing-documentation-public-only`    |        `true` | Limit broad missing documentation checks to public API names when enabled.                    |
 | `docstring-require-init-attribute-documentation` |       `false` | Include supported `self.*` attributes in class missing-attribute documentation checks.        |
-| `docstring-forbidden-function-decorators`        |          list | Report docstrings on functions decorated by exact configured no-docstring decorators.         |
-| `docstring-optional-function-decorators`         |          list | Allow functions decorated by exact configured decorators to omit docstrings.                  |
-| `docstring-property-decorators`                  |          list | Treat functions decorated by exact configured decorators as properties.                       |
+| `docstring-class-attribute-no-type-base-classes` |          list | Direct class bases whose class attribute entries should not include docstring types.          |
+| `docstring-forbidden-function-decorators`        |          list | Report docstrings on functions decorated by configured no-docstring decorators.               |
+| `docstring-optional-function-decorators`         |          list | Allow functions decorated by configured decorators to omit docstrings.                        |
+| `docstring-property-decorators`                  |          list | Treat functions decorated by configured decorators as properties.                             |
 | `require-explicit`                               |          list | Broad selectors skip noisy or policy-dependent checks unless the exact rule code is selected. |

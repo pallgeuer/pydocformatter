@@ -1,7 +1,6 @@
 import libcst as cst
 
 import pydocformatter.rules.definition_helpers.decorators as decorators
-from pydocformatter.cli.settings_check import CheckSettings
 
 
 def test_decorator_qualified_name_unwraps_calls_and_attributes() -> None:
@@ -16,14 +15,10 @@ def test_decorator_qualified_name_returns_none_for_dynamic_expression() -> None:
     assert decorators.decorator_qualified_name(cst.parse_expression("factory()[0]")) is None
 
 
-def test_is_property_decorator_name_uses_exact_configured_names_and_accessor_suffixes() -> None:
-    settings = CheckSettings(docstring_property_decorators=("property", "project.Property"))
-
-    assert decorators.is_property_decorator_name("property", settings=settings)
-    assert decorators.is_property_decorator_name("project.Property", settings=settings)
-    assert decorators.is_property_decorator_name("value.getter", settings=settings)
-    assert decorators.is_property_decorator_name("value.setter", settings=settings)
-    assert decorators.is_property_decorator_name("value.deleter", settings=settings)
-    assert not decorators.is_property_decorator_name("project.property", settings=settings)
-    assert not decorators.is_property_decorator_name("project.Property.extra", settings=settings)
-    assert not decorators.is_property_decorator_name("getter", settings=settings)
+def test_is_property_accessor_decorator_name_requires_parent_and_accessor_suffix() -> None:
+    assert decorators.is_property_accessor_decorator_name("value.getter")
+    assert decorators.is_property_accessor_decorator_name("value.setter")
+    assert decorators.is_property_accessor_decorator_name("value.deleter")
+    assert not decorators.is_property_accessor_decorator_name("getter")
+    assert not decorators.is_property_accessor_decorator_name("project.property")
+    assert not decorators.is_property_accessor_decorator_name("project.Property.extra")

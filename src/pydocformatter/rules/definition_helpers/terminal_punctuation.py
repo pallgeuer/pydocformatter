@@ -15,8 +15,8 @@ class TerminalPunctuationPolicy:
     """Policy for one terminal-punctuation rule.
 
     Attributes:
-        valid_endings: Terminal characters accepted by the rule.
-        nonfixable_endings: Terminal characters that should report but not be rewritten automatically.
+        valid_endings (str): Terminal characters accepted by the rule.
+        nonfixable_endings (str): Terminal characters that should report but not be rewritten automatically.
     """
 
     valid_endings: str
@@ -34,11 +34,12 @@ def violation(
     """Return one terminal-punctuation violation.
 
     Args:
-        text: Target text whose terminal punctuation should be checked.
-        policy: Valid and non-fixable terminal punctuation policy.
-        rule: Rule metadata used for diagnostics and fixes.
-        line_numbers: Source line numbers reported for the target text.
-        planned_change: Callback that plans the automatic fix only when needed.
+        text (str): Target text whose terminal punctuation should be checked.
+        policy (TerminalPunctuationPolicy): Valid and non-fixable terminal punctuation policy.
+        rule (RuleMetadata): Rule metadata used for diagnostics and fixes.
+        line_numbers (tuple[int, ...]): Source line numbers reported for the target text.
+        planned_change (Callable[[], rule_edits.PlannedSourceChange | None]): Callback that plans the automatic fix only
+            when needed.
 
     Returns:
         Terminal-punctuation violation, or None when the target text already complies.

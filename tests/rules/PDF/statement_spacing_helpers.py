@@ -17,8 +17,8 @@ def contexts(source: str, *, rule_code: str) -> tuple[RuleCategoryContext, RuleC
     """Return matching category and rule contexts for source.
 
     Args:
-        source: Python source text to parse.
-        rule_code: Rule code selected in the generated settings.
+        source (str): Python source text to parse.
+        rule_code (str): Rule code selected in the generated settings.
 
     Returns:
         Category and rule contexts with prepared PDF data.
@@ -54,9 +54,9 @@ def format_source(source: str, *, rule_code: str, fix: bool = True) -> formatter
     """Format source with one selected rule.
 
     Args:
-        source: Python source text to format.
-        rule_code: Rule code selected in the generated settings.
-        fix: Whether automatic fixes should be applied.
+        source (str): Python source text to format.
+        rule_code (str): Rule code selected in the generated settings.
+        fix (bool): Whether automatic fixes should be applied.
 
     Returns:
         Formatter result for the supplied source.

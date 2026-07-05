@@ -50,7 +50,7 @@ class PDF311PropertyDocstringStartsWithVerb(RuleBase):
                 not isinstance(owner, PDF_definition.DefinitionInfo)
                 or owner.kind is not PDF_definition.DefinitionKind.FUNCTION
                 or summary_style.is_test_function(owner)
-                or not decorator_helpers.has_property_decorator(owner.decorators, settings=context.settings)
+                or not decorator_helpers.has_property_decorator(owner.decorators, context=context, settings=context.settings)
             ):
                 continue
             word = summary_style.first_word_target(target)

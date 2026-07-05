@@ -1,7 +1,7 @@
 """Definition docstring presence helpers.
 
 Attributes:
-    MissingOwnerDocumentationEntity: Supported owner kinds for missing docstring policies.
+    MissingOwnerDocumentationEntity (TypeAlias): Supported owner kinds for missing docstring policies.
 """
 
 from __future__ import annotations
@@ -49,10 +49,10 @@ def missing_owner_docstring_violations(
     """Return violations for definitions missing owner docstrings.
 
     Args:
-        data: Prepared PDF definitions and docstrings for the current file.
-        context: Current file context used for path privacy and source positions.
-        meta: Rule metadata attached to diagnostics.
-        policy: Entity and public/private policy for this rule.
+        data (PDF_definition.PDFCategoryData): Prepared PDF definitions and docstrings for the current file.
+        context (RuleContext): Current file context used for path privacy and source positions.
+        meta (rule_models.RuleMetadata): Rule metadata attached to diagnostics.
+        policy (MissingOwnerDocumentationPolicy): Entity and public/private policy for this rule.
 
     Returns:
         Missing owner-docstring diagnostics for matching definitions.
@@ -71,7 +71,7 @@ def _matches_policy(definition: PDF_definition.DefinitionInfo, *, context: RuleC
     """Return whether a definition is in scope for a missing owner-docstring rule."""
     if not _matches_entity(definition, path_policy=path_policy, entity=policy.entity):
         return False
-    if function_decorators.function_missing_docstring_is_exempt(definition, settings=context.settings):
+    if function_decorators.function_missing_docstring_is_exempt(definition, context=context, settings=context.settings):
         return False
     return _is_public_owner(definition, path_policy=path_policy, policy=policy) is policy.public
 

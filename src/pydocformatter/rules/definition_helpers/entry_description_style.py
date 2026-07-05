@@ -20,8 +20,8 @@ class EntryDescriptionLineTarget:
     """One source-mapped documentation entry description fragment.
 
     Attributes:
-        docstring: Parsed docstring that owns the entry.
-        fragment: Source-mapped description fragment selected for a style check.
+        docstring (PDF_definition.DocstringInfo): Parsed docstring that owns the entry.
+        fragment (PDF_definition.DocstringTextFragment): Source-mapped description fragment selected for a style check.
     """
 
     docstring: PDF_definition.DocstringInfo
@@ -42,10 +42,10 @@ class EntryDescriptionWordTarget:
     """One first word in a documentation entry description.
 
     Attributes:
-        target: Description fragment that contains the word.
-        word: First whitespace-delimited word selected for capitalization.
-        start_offset: Evaluated docstring value offset where the word starts.
-        end_offset: Evaluated docstring value offset immediately after the word.
+        target (EntryDescriptionLineTarget): Description fragment that contains the word.
+        word (str): First whitespace-delimited word selected for capitalization.
+        start_offset (int): Evaluated docstring value offset where the word starts.
+        end_offset (int): Evaluated docstring value offset immediately after the word.
     """
 
     target: EntryDescriptionLineTarget
@@ -58,7 +58,7 @@ def first_line_targets(context: RuleContext) -> tuple[EntryDescriptionLineTarget
     """Return first non-empty parsed entry description fragments.
 
     Args:
-        context: Current file context with prepared PDF data.
+        context (RuleContext): Current file context with prepared PDF data.
 
     Returns:
         Entry description targets pointing at first description fragments.
@@ -70,7 +70,7 @@ def terminal_line_targets(context: RuleContext) -> tuple[EntryDescriptionLineTar
     """Return final non-empty parsed entry description fragments.
 
     Args:
-        context: Current file context with prepared PDF data.
+        context (RuleContext): Current file context with prepared PDF data.
 
     Returns:
         Entry description targets pointing at final description fragments.
@@ -82,9 +82,9 @@ def punctuation_violations(context: RuleContext, *, rule: RuleMetadata, policy: 
     """Return entry-description punctuation violations.
 
     Args:
-        context: Current file context with prepared PDF data.
-        rule: Rule metadata used for diagnostics and fixes.
-        policy: Valid and non-fixable terminal punctuation policy.
+        context (RuleContext): Current file context with prepared PDF data.
+        rule (RuleMetadata): Rule metadata used for diagnostics and fixes.
+        policy (terminal_punctuation.TerminalPunctuationPolicy): Valid and non-fixable terminal punctuation policy.
 
     Returns:
         Entry-description punctuation violations for eligible entries.
@@ -96,8 +96,8 @@ def capitalization_violations(context: RuleContext, *, rule: RuleMetadata) -> tu
     """Return entry-description first-word capitalization violations.
 
     Args:
-        context: Current file context with prepared PDF data.
-        rule: Rule metadata used for diagnostics and fixes.
+        context (RuleContext): Current file context with prepared PDF data.
+        rule (RuleMetadata): Rule metadata used for diagnostics and fixes.
 
     Returns:
         Entry-description first-word capitalization violations for eligible entries.
@@ -121,7 +121,7 @@ def first_word_target(target: EntryDescriptionLineTarget) -> EntryDescriptionWor
     """Return the first whitespace-delimited word in an entry description fragment.
 
     Args:
-        target: Entry description fragment whose first word should be selected.
+        target (EntryDescriptionLineTarget): Entry description fragment whose first word should be selected.
 
     Returns:
         First word target and evaluated-value offsets, or None for an empty fragment.
@@ -136,7 +136,7 @@ def line_numbers(target: EntryDescriptionLineTarget) -> tuple[int, ...]:
     """Return concrete source lines for an entry description target.
 
     Args:
-        target: Entry description fragment to map back to source lines.
+        target (EntryDescriptionLineTarget): Entry description fragment to map back to source lines.
 
     Returns:
         Concrete one-based source lines occupied by the target fragment.

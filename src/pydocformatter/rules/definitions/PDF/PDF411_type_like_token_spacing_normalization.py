@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-import ast
 import dataclasses
 
 import pydocformatter.rules.definition_helpers.docstring_conventions as docstring_conventions
 import pydocformatter.rules.definition_helpers.docstring_sections as docstring_sections
 import pydocformatter.rules.definition_helpers.section_edits as section_edits
+import pydocformatter.rules.definition_helpers.type_expressions as type_expressions
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 import pydocformatter.rules.edits as rule_edits
 import pydocformatter.rules.registration as rule_registration
@@ -212,50 +212,4 @@ def _cached_normalized_type_like_text(text: str, *, normalized_type_cache: dict[
 
 def _normalized_type_like_text(text: str) -> str | None:
     """Return AST-stable normalized spacing for a type-like expression."""
-    stripped = text.strip()
-    if not stripped:
-        return None
-    parsed = _parse_type_like_expr(stripped)
-    if parsed is None or not _is_type_like_node(parsed.body, allow_sequence=False):
-        return None
-    normalized = ast.unparse(parsed)
-    if normalized == stripped:
-        return None
-    if _without_whitespace(normalized) != _without_whitespace(stripped):
-        return None
-    reparsed = _parse_type_like_expr(normalized)
-    if reparsed is None or not _is_type_like_node(reparsed.body, allow_sequence=False):
-        return None
-    if ast.dump(parsed, include_attributes=False) != ast.dump(reparsed, include_attributes=False):
-        return None
-    return normalized
-
-
-def _parse_type_like_expr(text: str) -> ast.Expression | None:
-    """Parse text as a Python expression, returning None for syntax errors."""
-    try:
-        return ast.parse(text, mode="eval")
-    except SyntaxError:
-        return None
-
-
-def _without_whitespace(text: str) -> str:
-    """Return text with all whitespace removed for token-preservation checks."""
-    return "".join(text.split())
-
-
-def _is_type_like_node(node: ast.AST, *, allow_sequence: bool) -> bool:
-    """Return whether an AST node is accepted as a conservative type-like expression."""
-    if isinstance(node, ast.Name):
-        return True
-    if isinstance(node, ast.Attribute):
-        return _is_type_like_node(node.value, allow_sequence=False)
-    if isinstance(node, ast.Subscript):
-        return _is_type_like_node(node.value, allow_sequence=False) and _is_type_like_node(node.slice, allow_sequence=True)
-    if isinstance(node, ast.Tuple | ast.List) and allow_sequence:
-        return all(_is_type_like_node(element, allow_sequence=True) for element in node.elts)
-    if isinstance(node, ast.BinOp):
-        return isinstance(node.op, ast.BitOr) and _is_type_like_node(node.left, allow_sequence=False) and _is_type_like_node(node.right, allow_sequence=False)
-    if isinstance(node, ast.Constant):
-        return node.value is None or node.value is Ellipsis
-    return False
+    return type_expressions.normalized_type_like_text(text)

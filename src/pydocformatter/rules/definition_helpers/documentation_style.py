@@ -14,10 +14,11 @@ class DocumentedValueTarget:
     """One documented name and its prose description.
 
     Attributes:
-        name: Documented parameter, attribute, or value name as written in the documentation.
-        description: Description text associated with the documented name.
-        line_numbers: One-based source lines occupied by the documentation target.
-        extra_generic_sequences: Additional normalized token sequences that are generic for this specific target.
+        name (str): Documented parameter, attribute, or value name as written in the documentation.
+        description (str): Description text associated with the documented name.
+        line_numbers (tuple[int, ...]): One-based source lines occupied by the documentation target.
+        extra_generic_sequences (frozenset[tuple[str, ...]]): Additional normalized token sequences that are generic for
+            this specific target.
     """
 
     name: str
@@ -31,8 +32,8 @@ class DocumentedValueStylePolicy:
     """Generic wording policy for one documented-value kind.
 
     Attributes:
-        nouns: Generic nouns that do not add meaning beyond the documented name.
-        message_subject: Lowercase subject used in per-instance diagnostic messages.
+        nouns (frozenset[str]): Generic nouns that do not add meaning beyond the documented name.
+        message_subject (str): Lowercase subject used in per-instance diagnostic messages.
     """
 
     nouns: frozenset[str]
@@ -43,9 +44,9 @@ def too_generic_violations(targets: tuple[DocumentedValueTarget, ...], *, rule: 
     """Return violations for documented-value descriptions that only restate their names.
 
     Args:
-        targets: Documented values to inspect.
-        rule: Rule metadata used for diagnostics.
-        policy: Wording policy for the documented value kind.
+        targets (tuple[DocumentedValueTarget, ...]): Documented values to inspect.
+        rule (RuleMetadata): Rule metadata used for diagnostics.
+        policy (DocumentedValueStylePolicy): Wording policy for the documented value kind.
 
     Returns:
         Violations for generic documentation descriptions.
@@ -61,10 +62,11 @@ def is_too_generic(name: str, description: str, *, policy: DocumentedValueStyleP
     """Return whether a description only restates a documented name with generic filler.
 
     Args:
-        name: Documented parameter or attribute name.
-        description: Documentation prose associated with the name.
-        policy: Generic nouns accepted by the target kind.
-        extra_generic_sequences: Additional normalized token sequences that are generic for this target.
+        name (str): Documented parameter or attribute name.
+        description (str): Documentation prose associated with the name.
+        policy (DocumentedValueStylePolicy): Generic nouns accepted by the target kind.
+        extra_generic_sequences (frozenset[tuple[str, ...]]): Additional normalized token sequences that are generic for
+            this target.
 
     Returns:
         Whether the normalized description has no meaningful words beyond the documented name and generic filler.

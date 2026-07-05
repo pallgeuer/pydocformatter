@@ -44,7 +44,7 @@ class PDF616ForbiddenFunctionDocstring(RuleBase):
         data = PDF.require_data(context)
         violations: list[rule_violations.RuleViolation] = []
         for definition in data.definitions:
-            decorator_name = function_decorators.forbidden_docstring_decorator(definition, settings=context.settings)
+            decorator_name = function_decorators.forbidden_docstring_decorator(definition, context=context, settings=context.settings)
             if decorator_name is None:
                 continue
             docstring = data.docstring_for(definition)

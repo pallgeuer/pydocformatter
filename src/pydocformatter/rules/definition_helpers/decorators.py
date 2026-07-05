@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import libcst as cst
 
+import pydocformatter.rules.definition_helpers.static_names as static_names
 from pydocformatter.cli.settings_check import CheckSettings
+from pydocformatter.rules.definition import RuleCategoryContext
 
 
 def decorator_qualified_name(expression: cst.BaseExpression) -> str | None:
@@ -17,47 +19,55 @@ def decorator_qualified_name(expression: cst.BaseExpression) -> str | None:
         str | None: Dotted name such as `abc.abstractmethod`, or None for dynamic decorator expressions.
     """
     if isinstance(expression, cst.Call):
-        return _static_qualified_name(expression.func)
-    return _static_qualified_name(expression)
+        return static_names.expression_name(expression.func)
+    return static_names.expression_name(expression)
 
 
-def has_property_decorator(decorators: tuple[cst.Decorator, ...], *, settings: CheckSettings) -> bool:
+def matched_property_decorator_name(decorator: cst.Decorator, *, context: RuleCategoryContext, settings: CheckSettings) -> str | None:
+    """Return a property-like decorator source name when the decorator matches.
+
+    Args:
+        decorator (cst.Decorator): Decorator to inspect.
+        context (RuleCategoryContext): Current source context used for import-aware matching.
+        settings (CheckSettings): Resolved settings containing exact property decorator names.
+
+    Returns:
+        Matched decorator source name, or None when the decorator is not property-like.
+    """
+    decorator_name = static_names.configured_expression_name(decorator.decorator, settings.docstring_property_decorators, context=context, unwrap_call=True)
+    if decorator_name is not None:
+        return decorator_name
+    source_name = decorator_qualified_name(decorator.decorator)
+    if source_name is None or not is_property_accessor_decorator_name(source_name):
+        return None
+    return source_name
+
+
+def has_property_decorator(decorators: tuple[cst.Decorator, ...], *, context: RuleCategoryContext, settings: CheckSettings) -> bool:
     """Return whether decorators identify a property-like function.
 
     Args:
         decorators (tuple[cst.Decorator, ...]): Function decorators to inspect.
+        context (RuleCategoryContext): Current source context used for import-aware matching.
         settings (CheckSettings): Resolved settings containing exact property decorator names.
 
     Returns:
         bool: Whether any decorator matches configured property decorators or a property accessor suffix.
     """
-    return any((decorator_name := decorator_qualified_name(decorator.decorator)) is not None and is_property_decorator_name(decorator_name, settings=settings) for decorator in decorators)
+    return any(matched_property_decorator_name(decorator, context=context, settings=settings) is not None for decorator in decorators)
 
 
-def is_property_decorator_name(decorator_name: str, *, settings: CheckSettings) -> bool:
-    """Return whether a decorator name identifies a property-like decorator.
+def is_property_accessor_decorator_name(decorator_name: str) -> bool:
+    """Return whether a decorator source name is a property accessor.
 
     Args:
         decorator_name (str): Dotted decorator name after direct call unwrapping.
-        settings (CheckSettings): Resolved settings containing exact property decorator names.
 
     Returns:
-        bool: Whether the name exactly matches configured property decorators or a property accessor suffix.
+        bool: Whether the name has a parent and a property accessor suffix.
     """
     parent, _, accessor = decorator_name.rpartition(".")
-    return decorator_name in settings.docstring_property_decorators or (bool(parent) and accessor in _PROPERTY_ACCESSOR_DECORATOR_NAMES)
-
-
-def _static_qualified_name(expression: cst.BaseExpression) -> str | None:
-    """Return a dotted static expression name."""
-    if isinstance(expression, cst.Name):
-        return expression.value
-    if isinstance(expression, cst.Attribute):
-        parent = _static_qualified_name(expression.value)
-        if parent is None:
-            return None
-        return f"{parent}.{expression.attr.value}"
-    return None
+    return bool(parent) and accessor in _PROPERTY_ACCESSOR_DECORATOR_NAMES
 
 
 _PROPERTY_ACCESSOR_DECORATOR_NAMES = {"getter", "setter", "deleter"}

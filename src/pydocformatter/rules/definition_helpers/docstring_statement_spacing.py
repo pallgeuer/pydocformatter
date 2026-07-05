@@ -30,10 +30,10 @@ def planned_changes(
     """Return source changes for docstring statement blank-line spacing.
 
     Args:
-        context: Current file context with parsed module, settings, and prepared category data.
-        owner_kind: Definition kind whose docstrings should be checked.
-        position: Adjacent side of the docstring statement to inspect.
-        desired_blank_lines: Required number of blank physical lines.
+        context (RuleContext): Current file context with parsed module, settings, and prepared category data.
+        owner_kind (PDF_definition.DefinitionKind): Definition kind whose docstrings should be checked.
+        position (DocstringStatementSpacingPosition): Adjacent side of the docstring statement to inspect.
+        desired_blank_lines (int): Required number of blank physical lines.
 
     Returns:
         Planned source replacements for docstring statement spacing findings.
@@ -62,11 +62,12 @@ def planned_change_for_docstring(
     """Return a blank-run source replacement for one docstring statement.
 
     Args:
-        docstring: Prepared docstring whose owner and statement spacing should be checked.
-        context: Current file context with parsed module, settings, and prepared category data.
-        owner_kind: Definition kind whose docstrings should be checked.
-        position: Adjacent side of the docstring statement to inspect.
-        desired_blank_lines: Required number of blank physical lines.
+        docstring (PDF_definition.DocstringInfo): Prepared docstring whose owner and statement spacing should be
+            checked.
+        context (RuleContext): Current file context with parsed module, settings, and prepared category data.
+        owner_kind (PDF_definition.DefinitionKind): Definition kind whose docstrings should be checked.
+        position (DocstringStatementSpacingPosition): Adjacent side of the docstring statement to inspect.
+        desired_blank_lines (int): Required number of blank physical lines.
 
     Returns:
         Planned source replacement for the docstring statement, or None when it already has the requested spacing or is outside this rule's scope.

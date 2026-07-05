@@ -25,6 +25,8 @@ import pydocformatter.rules.definition_helpers.docstring_sections as docstring_s
 import pydocformatter.rules.definition_helpers.source_text as source_text
 import pydocformatter.rules.definition_helpers.string_literals as string_literals
 import pydocformatter.rules.definition_helpers.text_layout as text_layout
+import pydocformatter.rules.definition_helpers.type_expressions as type_expressions
+import pydocformatter.rules.definition_helpers.typed_documentation_models as typed_documentation_models
 import pydocformatter.rules.edits as rule_edits
 import pydocformatter.rules.line_endings as line_endings
 import pydocformatter.rules.registration as rule_registration
@@ -540,12 +542,17 @@ class PDFCategoryData:
     _attributes_by_owner_id: Mapping[int, tuple[AttributeInfo, ...]] | None = dataclasses.field(default=None, init=False, repr=False, compare=False)
     _attached_attribute_docstrings_by_owner_id: Mapping[int, Mapping[str, tuple[DocstringInfo, ...]]] | None = dataclasses.field(default=None, init=False, repr=False, compare=False)
     _documented_function_facts: tuple[DocumentedFunctionFact, ...] | None = dataclasses.field(default=None, init=False, repr=False, compare=False)
+    _typed_documentation_targets: dict[typed_documentation_models.TypedDocumentationSubject, tuple[typed_documentation_models.TypedDocumentationTarget, ...]] | None = dataclasses.field(
+        default=None, init=False, repr=False, compare=False
+    )
+    _type_aliases: type_expressions.TypeAliasMap | None = dataclasses.field(default=None, init=False, repr=False, compare=False)
 
     def docstring_for(self, definition: DefinitionInfo) -> DocstringInfo | None:
         """Return the docstring owned by a definition, if one exists.
 
         Args:
-            definition: Module, class, or function definition whose direct docstring should be retrieved.
+            definition (DefinitionInfo): Module, class, or function definition whose direct docstring should be
+                retrieved.
 
         Returns:
             The cached docstring whose owner is the definition, or None when the definition is undocumented.
@@ -563,7 +570,8 @@ class PDFCategoryData:
         """Return collected attributes for an owner.
 
         Args:
-            owner: Definition whose assigned attributes should be exposed to attribute-documentation rules.
+            owner (DefinitionInfo): Definition whose assigned attributes should be exposed to attribute-documentation
+                rules.
 
         Returns:
             Attribute facts collected directly below the owner, preserving collection order.
@@ -581,7 +589,8 @@ class PDFCategoryData:
         """Return attached attribute docstrings for an owner indexed by target name.
 
         Args:
-            owner: Definition whose attribute-level string literals should be grouped by assigned target.
+            owner (DefinitionInfo): Definition whose attribute-level string literals should be grouped by assigned
+                target.
 
         Returns:
             Read-only mapping from attribute target name to all attached docstrings collected for that name.
@@ -833,7 +842,7 @@ class PDF(RuleCategoryBase):
         """Collect documentable definitions and existing docstrings.
 
         Args:
-            context: Parsed module and settings shared by every PDF rule for the current file.
+            context (RuleCategoryContext): Parsed module and settings shared by every PDF rule for the current file.
 
         Returns:
             Shared category data containing definitions, attributes, docstrings, and precomputed summary targets.
@@ -857,7 +866,7 @@ class PDF(RuleCategoryBase):
         """Return prepared PDF data or raise for an invalid rule context.
 
         Args:
-            context: Rule execution context expected to carry the PDF category preparation result.
+            context (RuleContext): Rule execution context expected to carry the PDF category preparation result.
 
         Returns:
             Prepared PDF category data for the current file.
@@ -874,7 +883,7 @@ def is_adornment(text: str) -> bool:
     """Return whether text is a heading or section adornment line.
 
     Args:
-        text: Logical docstring line text to classify.
+        text (str): Logical docstring line text to classify.
 
     Returns:
         True when the line consists only of a repeated reStructuredText-style adornment character.
@@ -886,7 +895,7 @@ def final_convention_section(docstring: DocstringInfo) -> DocstringBlock | None:
     """Return the final top-level convention section, if there is one.
 
     Args:
-        docstring: Parsed docstring whose convention-aware block tree should be inspected.
+        docstring (DocstringInfo): Parsed docstring whose convention-aware block tree should be inspected.
 
     Returns:
         The final non-blank section block, or None when the convention has no parseable sections or the docstring ends with another block kind.
@@ -903,7 +912,7 @@ def final_convention_section_spacing(docstring: DocstringInfo) -> FinalConventio
     """Return final convention section content and trailing blank facts.
 
     Args:
-        docstring: Parsed docstring whose last convention section should be analyzed.
+        docstring (DocstringInfo): Parsed docstring whose last convention section should be analyzed.
 
     Returns:
         Section spacing facts for the final section, or None when there is no final parseable convention section.
@@ -927,9 +936,10 @@ def docstring_line_source(
     """Return source spelling for a logical docstring line.
 
     Args:
-        line: Evaluated-value line whose source body slice should be reconstructed.
-        fragments: Simple-string value fragments that map evaluated offsets back to source spelling.
-        strip_docstring_margin: Whether to discard the literal indentation margin and keep only text content with
+        line (DocstringValueLine): Evaluated-value line whose source body slice should be reconstructed.
+        fragments (tuple[string_literals.StringValueFragment, ...]): Simple-string value fragments that map evaluated
+            offsets back to source spelling.
+        strip_docstring_margin (bool): Whether to discard the literal indentation margin and keep only text content with
             virtual indentation.
 
     Returns:
@@ -1804,8 +1814,8 @@ def is_same_line_closing_delimiter_prefix(docstring: DocstringInfo, line: Docstr
     """Return whether a value line prefixes same-line closing quotes.
 
     Args:
-        docstring: Simple or suite docstring that owns the logical line.
-        line: Logical value line to compare against the docstring terminator position.
+        docstring (DocstringInfo): Simple or suite docstring that owns the logical line.
+        line (DocstringValueLine): Logical value line to compare against the docstring terminator position.
 
     Returns:
         True when the line is the final logical line of a non-empty docstring value without a trailing newline.
@@ -1817,8 +1827,9 @@ def is_safely_mapped_simple_docstring(docstring: DocstringInfo, *, require_multi
     """Return whether a simple docstring can be safely rewritten by evaluated line.
 
     Args:
-        docstring: Docstring candidate whose source mapping must be a LibCST simple string with mapped logical lines.
-        require_multiline: Whether single-line simple strings should be rejected for callers that only operate on
+        docstring (DocstringInfo): Docstring candidate whose source mapping must be a LibCST simple string with mapped
+            logical lines.
+        require_multiline (bool): Whether single-line simple strings should be rejected for callers that only operate on
             multiline layouts.
 
     Returns:
@@ -1836,8 +1847,8 @@ def docstring_value_fragments(docstring: DocstringInfo, *, line_ending: str) -> 
     """Return source fragments for a safely rewritable simple docstring.
 
     Args:
-        docstring: Docstring whose simple-string node should be decomposed into value/source fragments.
-        line_ending: Canonical line ending used when normalizing physical source lines.
+        docstring (DocstringInfo): Docstring whose simple-string node should be decomposed into value/source fragments.
+        line_ending (str): Canonical line ending used when normalizing physical source lines.
 
     Returns:
         Fragment mapping for translating evaluated offsets into source slices, or None for non-simple docstring nodes.
@@ -1851,9 +1862,10 @@ def docstring_canonical_margin(docstring: DocstringInfo, *, context: RuleContext
     """Return the raw indentation margin for continuation and aligned blank lines.
 
     Args:
-        docstring: Docstring whose opening source column determines the reusable margin.
-        context: Rule context providing file source and indentation settings.
-        source_lines: Optional alternate source text to use after a planned rewrite has been applied.
+        docstring (DocstringInfo): Docstring whose opening source column determines the reusable margin.
+        context (RuleContext): Rule context providing file source and indentation settings.
+        source_lines (Sequence[str] | None): Optional alternate source text to use after a planned rewrite has been
+            applied.
 
     Returns:
         Raw whitespace prefix that should be used for generated continuation lines in the docstring body.
@@ -1876,9 +1888,10 @@ def planned_simple_docstring_line_change(
     """Return one whole-literal replacement for changed raw evaluated lines.
 
     Args:
-        docstring: Simple docstring whose logical line bodies may be replaced.
-        context: Rule context providing line endings and source formatting settings.
-        raw_line_targets: Target raw value text for each logical line, with None preserving the existing line.
+        docstring (DocstringInfo): Simple docstring whose logical line bodies may be replaced.
+        context (RuleContext): Rule context providing line endings and source formatting settings.
+        raw_line_targets (tuple[str | None, ...]): Target raw value text for each logical line, with None preserving the
+            existing line.
 
     Returns:
         Planned replacement for the whole string literal, or None when no line changes or no safe source rendering is available.
@@ -1917,11 +1930,12 @@ def planned_simple_docstring_source_change(
     """Return one whole-literal replacement from evaluated-value replacements.
 
     Args:
-        docstring: Simple docstring whose body source should be rebuilt from evaluated-value edits.
-        context: Rule context providing the file line ending used to map string fragments.
-        replacements: Evaluated-offset replacements that identify changed slices and affected source lines.
-        value_lines: Complete logical value lines after all replacements, used to verify that the rendered literal still
-            evaluates correctly.
+        docstring (DocstringInfo): Simple docstring whose body source should be rebuilt from evaluated-value edits.
+        context (RuleContext): Rule context providing the file line ending used to map string fragments.
+        replacements (tuple[rule_edits.PlannedTextReplacement, ...]): Evaluated-offset replacements that identify
+            changed slices and affected source lines.
+        value_lines (list[str]): Complete logical value lines after all replacements, used to verify that the rendered
+            literal still evaluates correctly.
 
     Returns:
         Planned replacement for the whole string literal, or None when rendering would be unsafe or unchanged.
@@ -1960,11 +1974,11 @@ def planned_simple_docstring_text_change(
     """Return one source-slice replacement from an evaluated-value replacement.
 
     Args:
-        docstring: Simple docstring whose source body should receive the replacement.
-        context: Rule context providing source lines and cached offset bounds.
-        replacement: Evaluated-offset replacement to map into current source text.
-        expected_value: Complete evaluated docstring value expected after applying the replacement.
-        expected_source: Optional exact source spelling required for the replaced value slice.
+        docstring (DocstringInfo): Simple docstring whose source body should receive the replacement.
+        context (RuleContext): Rule context providing source lines and cached offset bounds.
+        replacement (rule_edits.PlannedTextReplacement): Evaluated-offset replacement to map into current source text.
+        expected_value (str): Complete evaluated docstring value expected after applying the replacement.
+        expected_source (str | None): Optional exact source spelling required for the replaced value slice.
 
     Returns:
         Planned replacement for the mapped source slice, or None when the source mapping is unsafe.
@@ -2058,13 +2072,15 @@ def planned_simple_docstring_output_change(
     """Return one whole-literal replacement from target output lines.
 
     Args:
-        docstring: Simple docstring whose full literal source should be replaced.
-        context: Rule context providing source line endings and string fragment mapping.
-        output_lines: Render-ready line descriptors combining preserved source lines and synthesized text.
-        line_numbers: Source lines that should be reported as affected by the resulting change.
-        preserve_trailing_newline: Optional override for whether the rendered docstring value keeps a final newline.
-        separator_fallback: Optional strategy for adding boundary spaces when adjacent quote delimiters cannot be
-            represented safely.
+        docstring (DocstringInfo): Simple docstring whose full literal source should be replaced.
+        context (RuleContext): Rule context providing source line endings and string fragment mapping.
+        output_lines (tuple[DocstringOutputLine, ...]): Render-ready line descriptors combining preserved source lines
+            and synthesized text.
+        line_numbers (tuple[int, ...]): Source lines that should be reported as affected by the resulting change.
+        preserve_trailing_newline (bool | None): Optional override for whether the rendered docstring value keeps a
+            final newline.
+        separator_fallback (DocstringOutputSeparatorFallback | None): Optional strategy for adding boundary spaces when
+            adjacent quote delimiters cannot be represented safely.
 
     Returns:
         Planned whole-literal source change, or None when the docstring is not safely renderable or the rendered source is unchanged.
@@ -2091,7 +2107,7 @@ def docstring_content_indexes(docstring: DocstringInfo) -> tuple[int, ...]:
     """Return logical line indexes containing non-space-tab text.
 
     Args:
-        docstring: Parsed docstring whose logical value lines should be scanned.
+        docstring (DocstringInfo): Parsed docstring whose logical value lines should be scanned.
 
     Returns:
         Zero-based logical line indexes that contain content other than spaces or tabs.
@@ -2103,7 +2119,7 @@ def docstring_value_line_numbers(lines: tuple[DocstringValueLine, ...]) -> tuple
     """Return deduplicated source line numbers for changed logical lines.
 
     Args:
-        lines: Logical docstring lines that may map to physical source lines.
+        lines (tuple[DocstringValueLine, ...]): Logical docstring lines that may map to physical source lines.
 
     Returns:
         Source line numbers for mapped logical lines, preserving first occurrence order and omitting unmapped lines.
@@ -2115,7 +2131,7 @@ def docstring_physical_line_numbers(docstring: DocstringInfo) -> tuple[int, ...]
     """Return physical source lines occupied by a docstring expression.
 
     Args:
-        docstring: Docstring expression whose LibCST source range has already been collected.
+        docstring (DocstringInfo): Docstring expression whose LibCST source range has already been collected.
 
     Returns:
         Physical source line numbers covered by the complete docstring literal expression.
@@ -2127,7 +2143,7 @@ def summary_first_line_targets(docstrings: tuple[DocstringInfo, ...]) -> tuple[S
     """Return first non-adornment summary lines for parsed top-level summaries from all docstring owners.
 
     Args:
-        docstrings: Docstrings whose first parsed summary block may produce a rule target.
+        docstrings (tuple[DocstringInfo, ...]): Docstrings whose first parsed summary block may produce a rule target.
 
     Returns:
         Summary targets pointing at the first content line in each top-level summary block.
@@ -2147,7 +2163,8 @@ def summary_terminal_line_targets(docstrings: tuple[DocstringInfo, ...]) -> tupl
     """Return final non-adornment summary lines for parsed top-level summaries.
 
     Args:
-        docstrings: Docstrings whose first parsed summary block may produce a terminal-line target.
+        docstrings (tuple[DocstringInfo, ...]): Docstrings whose first parsed summary block may produce a terminal-line
+            target.
 
     Returns:
         Summary targets pointing at the final content line in each top-level summary block.
@@ -2167,7 +2184,7 @@ def first_summary_block(docstring: DocstringInfo) -> DocstringBlock | None:
     """Return the first non-blank block when it can be treated as a top-level summary.
 
     Args:
-        docstring: Parsed docstring whose leading blocks should be inspected.
+        docstring (DocstringInfo): Parsed docstring whose leading blocks should be inspected.
 
     Returns:
         First non-blank block when it is a summary block or a single standalone colon-ended line, otherwise None.
@@ -2187,9 +2204,9 @@ def first_non_adornment_line(docstring: DocstringInfo, start: int, end: int) -> 
     """Return the first non-empty, non-adornment logical line in a summary block.
 
     Args:
-        docstring: Docstring that owns the summary block range.
-        start: Inclusive logical line index where the block begins.
-        end: Exclusive logical line index where the block ends.
+        docstring (DocstringInfo): Docstring that owns the summary block range.
+        start (int): Inclusive logical line index where the block begins.
+        end (int): Exclusive logical line index where the block ends.
 
     Returns:
         First content line in the requested range, excluding blank and adornment-only lines.
@@ -2205,9 +2222,9 @@ def final_non_adornment_line(docstring: DocstringInfo, start: int, end: int) -> 
     """Return the final non-empty, non-adornment logical line in a summary block.
 
     Args:
-        docstring: Docstring that owns the summary block range.
-        start: Inclusive logical line index where the block begins.
-        end: Exclusive logical line index where the block ends.
+        docstring (DocstringInfo): Docstring that owns the summary block range.
+        start (int): Inclusive logical line index where the block begins.
+        end (int): Exclusive logical line index where the block ends.
 
     Returns:
         Final content line in the requested range, excluding blank and adornment-only lines.
@@ -2223,8 +2240,9 @@ def docstring_line_numbers(docstring: DocstringInfo, line: DocstringValueLine) -
     """Return concrete source lines for a docstring value line.
 
     Args:
-        docstring: Docstring whose physical range is used when the logical line lacks a direct source mapping.
-        line: Logical docstring line being reported by a rule.
+        docstring (DocstringInfo): Docstring whose physical range is used when the logical line lacks a direct source
+            mapping.
+        line (DocstringValueLine): Logical docstring line being reported by a rule.
 
     Returns:
         Direct logical line source numbers when available, otherwise the complete physical docstring range.
@@ -2238,7 +2256,7 @@ def docstring_value_ends_with_newline(docstring: DocstringInfo) -> bool:
     """Return whether an evaluated docstring value ends with a newline.
 
     Args:
-        docstring: Docstring whose evaluated Python string value should be checked.
+        docstring (DocstringInfo): Docstring whose evaluated Python string value should be checked.
 
     Returns:
         True when the value ends with any supported newline spelling.
@@ -2278,9 +2296,9 @@ def render_simple_docstring_body_with_separator_fallbacks(docstring: DocstringIn
     """Render output source after trying value-preserving quote escapes and separator fallbacks.
 
     Args:
-        docstring: Simple-string docstring whose quote style should be kept if possible.
-        body_source: Desired literal body before escape or separator adjustments.
-        expected_value: Desired evaluated value before separator fallbacks potentially add boundary spaces.
+        docstring (DocstringInfo): Simple-string docstring whose quote style should be kept if possible.
+        body_source (str): Desired literal body before escape or separator adjustments.
+        expected_value (str): Desired evaluated value before separator fallbacks potentially add boundary spaces.
 
     Returns:
         First renderable full literal source from the candidate sequence, or None when every candidate is unsafe.
@@ -2298,9 +2316,9 @@ def simple_docstring_body_source_candidates(node: cst.SimpleString, body_source:
     """Yield source-body candidates ordered by value preservation before separator fallback.
 
     Args:
-        node: Simple-string syntax node whose prefix and delimiter determine which escapes are legal.
-        body_source: Desired literal body before trying quote escapes or separator spaces.
-        expected_value: Evaluated value corresponding to the desired body source.
+        node (cst.SimpleString): Simple-string syntax node whose prefix and delimiter determine which escapes are legal.
+        body_source (str): Desired literal body before trying quote escapes or separator spaces.
+        expected_value (str): Evaluated value corresponding to the desired body source.
 
     Yields:
         Candidate body source and the evaluated value expected from rendering it.
@@ -2311,7 +2329,8 @@ def simple_docstring_body_source_candidates(node: cst.SimpleString, body_source:
         """Yield a candidate pair only the first time it appears.
 
         Args:
-            candidate: Body-source and expected-value pair produced by an escape or separator strategy.
+            candidate (tuple[str, str]): Body-source and expected-value pair produced by an escape or separator
+                strategy.
 
         Yields:
             The candidate pair when it has not already been emitted.
@@ -2373,8 +2392,8 @@ def escaped_opening_quote_body_source(node: cst.SimpleString, body_source: str) 
     """Return body source with a leading delimiter quote escaped where possible.
 
     Args:
-        node: Simple-string node whose raw prefix and delimiter control whether escaping is allowed.
-        body_source: Literal body source that may start with the delimiter quote character.
+        node (cst.SimpleString): Simple-string node whose raw prefix and delimiter control whether escaping is allowed.
+        body_source (str): Literal body source that may start with the delimiter quote character.
 
     Returns:
         Body source with an inserted leading backslash escape, or None for raw strings and non-conflicting bodies.
@@ -2391,8 +2410,9 @@ def escaped_closing_quote_body_source(node: cst.SimpleString, body_source: str) 
     """Return body source with trailing delimiter quotes escaped where possible.
 
     Args:
-        node: Simple-string node whose delimiter length limits how many trailing quotes may be escaped.
-        body_source: Literal body source that may end with delimiter quote characters.
+        node (cst.SimpleString): Simple-string node whose delimiter length limits how many trailing quotes may be
+            escaped.
+        body_source (str): Literal body source that may end with delimiter quote characters.
 
     Returns:
         Body source with safe trailing quote escapes, or None when raw-string semantics or the body shape prevent escaping.
@@ -2477,8 +2497,8 @@ def join_docstring_value_lines(docstring: DocstringInfo, lines: list[str]) -> st
     """Join replacement logical lines with the original evaluated newline spellings.
 
     Args:
-        docstring: Docstring whose evaluated value contains the separators between logical lines.
-        lines: Replacement logical line text in parsed line order.
+        docstring (DocstringInfo): Docstring whose evaluated value contains the separators between logical lines.
+        lines (list[str]): Replacement logical line text in parsed line order.
 
     Returns:
         Full evaluated docstring value with caller-provided line text and original inter-line separators.
@@ -2514,9 +2534,9 @@ def value_offset_for_text_column(line: DocstringValueLine, column: int, *, requi
     """Return the evaluated-value offset for a line.text column.
 
     Args:
-        line: Logical docstring line whose visible text column should be translated.
-        column: Zero-based column within the virtualized text field of the line.
-        require_source_text: Whether columns that exist only in virtual indentation should return None instead of
+        line (DocstringValueLine): Logical docstring line whose visible text column should be translated.
+        column (int): Zero-based column within the virtualized text field of the line.
+        require_source_text (bool): Whether columns that exist only in virtual indentation should return None instead of
             clamping to the first source-backed character.
 
     Returns:

@@ -7,7 +7,7 @@ def should_capitalize(word: str) -> bool:
     """Return whether a first word can be safely capitalized.
 
     Args:
-        word: First word selected from summary or entry-description text.
+        word (str): First word selected from summary or entry-description text.
 
     Returns:
         Whether the word is lowercase ASCII prose whose first character can be uppercased safely.

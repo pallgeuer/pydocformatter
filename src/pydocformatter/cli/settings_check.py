@@ -12,6 +12,8 @@ Attributes:
         deliberately.
     DEFAULT_DOCSTRING_FORBIDDEN_FUNCTION_DECORATORS (tuple[str, ...]): Function decorators whose definitions should not
         have docstrings.
+    DEFAULT_DOCSTRING_CLASS_ATTRIBUTE_NO_TYPE_BASE_CLASSES (tuple[str, ...]): Class base names whose attribute entries
+        should not include docstring types.
     DEFAULT_DOCSTRING_OPTIONAL_FUNCTION_DECORATORS (tuple[str, ...]): Function decorators whose definitions may omit
         docstrings.
     DEFAULT_DOCSTRING_PROPERTY_DECORATORS (tuple[str, ...]): Function decorators whose definitions should be treated as
@@ -80,9 +82,17 @@ DEFAULT_REQUIRE_EXPLICIT = (
     "PDF613",
     "PDF615",
 )
-DEFAULT_DOCSTRING_FORBIDDEN_FUNCTION_DECORATORS = ("overload", "typing.overload", "typing_extensions.overload")
-DEFAULT_DOCSTRING_OPTIONAL_FUNCTION_DECORATORS = ("override", "typing.override", "typing_extensions.override")
-DEFAULT_DOCSTRING_PROPERTY_DECORATORS = ("property", "builtins.property", "enum.property", "functools.cached_property", "abc.abstractproperty", "types.DynamicClassAttribute")
+DEFAULT_DOCSTRING_FORBIDDEN_FUNCTION_DECORATORS = ("typing.overload", "typing_extensions.overload")
+DEFAULT_DOCSTRING_CLASS_ATTRIBUTE_NO_TYPE_BASE_CLASSES = (
+    "enum.Enum",
+    "enum.IntEnum",
+    "enum.StrEnum",
+    "enum.Flag",
+    "enum.IntFlag",
+    "enum.ReprEnum",
+)
+DEFAULT_DOCSTRING_OPTIONAL_FUNCTION_DECORATORS = ("typing.override", "typing_extensions.override")
+DEFAULT_DOCSTRING_PROPERTY_DECORATORS = ("builtins.property", "enum.property", "functools.cached_property", "abc.abstractproperty", "types.DynamicClassAttribute")
 PARALLELISM_CONSTRAINT_MESSAGE = "must be 0, a fractional value greater than 0 and less than 1, or a whole number greater than or equal to 1"
 _validate_non_negative_float = settings_core.validate_float(min_value=0)
 
@@ -191,6 +201,8 @@ class CheckSettings:
             public API definitions.
         docstring_require_init_attribute_documentation (bool): Whether class missing-attribute checks require `self.*`
             attributes assigned in `__init__`.
+        docstring_class_attribute_no_type_base_classes (StringList): Direct class base names whose class attribute
+            docstring entries should not include types for PDF713.
         docstring_forbidden_function_decorators (StringList): Exact function decorator names whose definitions should
             not have docstrings.
         docstring_optional_function_decorators (StringList): Exact function decorator names whose definitions may omit
@@ -256,6 +268,7 @@ class CheckSettings:
     docstring_missing_documentation: DocstringMissingDocumentation = DocstringMissingDocumentation.HAS_SECTION
     docstring_missing_documentation_public_only: bool = True
     docstring_require_init_attribute_documentation: bool = False
+    docstring_class_attribute_no_type_base_classes: StringList = DEFAULT_DOCSTRING_CLASS_ATTRIBUTE_NO_TYPE_BASE_CLASSES
     docstring_forbidden_function_decorators: StringList = DEFAULT_DOCSTRING_FORBIDDEN_FUNCTION_DECORATORS
     docstring_optional_function_decorators: StringList = DEFAULT_DOCSTRING_OPTIONAL_FUNCTION_DECORATORS
     docstring_property_decorators: StringList = DEFAULT_DOCSTRING_PROPERTY_DECORATORS
@@ -338,6 +351,8 @@ class CheckSettingsOverrides(TypedDict, total=False):
             public API definitions.
         docstring_require_init_attribute_documentation (bool): Whether class missing-attribute checks require `self.*`
             attributes assigned in `__init__`.
+        docstring_class_attribute_no_type_base_classes (StringList): Direct class base names whose class attribute
+            docstring entries should not include types for PDF713.
         docstring_forbidden_function_decorators (StringList): Exact function decorator names whose definitions should
             not have docstrings.
         docstring_optional_function_decorators (StringList): Exact function decorator names whose definitions may omit
@@ -403,6 +418,7 @@ class CheckSettingsOverrides(TypedDict, total=False):
     docstring_missing_documentation: DocstringMissingDocumentation
     docstring_missing_documentation_public_only: bool
     docstring_require_init_attribute_documentation: bool
+    docstring_class_attribute_no_type_base_classes: StringList
     docstring_forbidden_function_decorators: StringList
     docstring_optional_function_decorators: StringList
     docstring_property_decorators: StringList
@@ -724,34 +740,44 @@ SETTINGS_SCHEMA = SettingsSchema(
             documentation="Whether class missing-attribute documentation rules require supported `self.*` attributes assigned in `__init__`; extraneous class-attribute documentation checks always treat those attributes as present.",
         ),
         SettingDefinition(
+            field="docstring_class_attribute_no_type_base_classes",
+            value_type=StringList,
+            group=SettingsGroup.DOCSTRING_FORMATTING,
+            help="Direct class base names whose attribute docstring entries should not include types.",
+            validator=settings_core.validate_string_list,
+            cli={"metavar": "BASE"},
+            documentation="Direct class base names whose class attribute docstring entries should not include types for PDF713. Dotted names also match direct import aliases resolved statically by LibCST; unqualified names are syntactic-only, and transitive inheritance is not resolved.",
+            example='docstring-class-attribute-no-type-base-classes = ["enum.Enum"]',
+        ),
+        SettingDefinition(
             field="docstring_forbidden_function_decorators",
             value_type=StringList,
             group=SettingsGroup.DOCSTRING_FORMATTING,
-            help="Exact function decorator names whose definitions should not have docstrings.",
+            help="Function decorator names whose definitions should not have docstrings.",
             validator=settings_core.validate_non_empty_string_list,
             cli={"metavar": "DECORATOR"},
-            documentation="Exact function decorator names whose definitions should not have docstrings. Calls are unwrapped before matching, so `@typing.overload()` matches `typing.overload`; import aliases and project-qualified names require explicit configuration.",
-            example='docstring-forbidden-function-decorators = ["overload", "typing.overload", "typing_extensions.overload"]',
+            documentation="Function decorator names whose definitions should not have docstrings. Calls are unwrapped before matching, and dotted names also match import aliases resolved statically by LibCST; unqualified names are syntactic-only.",
+            example='docstring-forbidden-function-decorators = ["typing.overload", "typing_extensions.overload"]',
         ),
         SettingDefinition(
             field="docstring_optional_function_decorators",
             value_type=StringList,
             group=SettingsGroup.DOCSTRING_FORMATTING,
-            help="Exact function decorator names whose definitions may omit docstrings.",
+            help="Function decorator names whose definitions may omit docstrings.",
             validator=settings_core.validate_non_empty_string_list,
             cli={"metavar": "DECORATOR"},
-            documentation="Exact function decorator names whose definitions may omit docstrings. Calls are unwrapped before matching, so `@typing.override()` matches `typing.override`; import aliases and project-qualified names require explicit configuration.",
-            example='docstring-optional-function-decorators = ["override", "typing.override", "typing_extensions.override"]',
+            documentation="Function decorator names whose definitions may omit docstrings. Calls are unwrapped before matching, and dotted names also match import aliases resolved statically by LibCST; unqualified names are syntactic-only.",
+            example='docstring-optional-function-decorators = ["typing.override", "typing_extensions.override"]',
         ),
         SettingDefinition(
             field="docstring_property_decorators",
             value_type=StringList,
             group=SettingsGroup.DOCSTRING_FORMATTING,
-            help="Exact function decorator names whose definitions should be treated as properties.",
+            help="Function decorator names whose definitions should be treated as properties.",
             validator=settings_core.validate_non_empty_string_list,
             cli={"metavar": "DECORATOR"},
-            documentation="Exact function decorator names whose definitions should be treated as properties for property-specific summary checks. Calls are unwrapped before matching, so `@functools.cached_property()` matches `functools.cached_property`; import aliases and project-qualified names require explicit configuration.",
-            example='docstring-property-decorators = ["property", "functools.cached_property", "project.Property"]',
+            documentation="Function decorator names whose definitions should be treated as properties for property-specific summary checks. Calls are unwrapped before matching, and dotted names also match import aliases and builtins resolved statically by LibCST; unqualified names are syntactic-only.",
+            example='docstring-property-decorators = ["builtins.property", "functools.cached_property", "project.Property"]',
         ),
         SettingDefinition(
             field="docstring_parse_list_items",

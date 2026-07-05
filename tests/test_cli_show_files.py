@@ -17,6 +17,7 @@ import pydocformatter.cli.check as check_command
 import pydocformatter.cli.main as pydocfmt_cli
 import pydocformatter.cli.settings_check as settings_check
 import pydocformatter.file_selection as file_selection
+import pydocformatter.rules.collection as rule_collection
 import pydocformatter.rules_selection as rules_selection
 import pydocformatter.settings as settings_core
 from pydocformatter.cli.settings_check import CheckSettings
@@ -1003,6 +1004,8 @@ class TestCLIShowFiles(unittest.TestCase):
         self.assertIn("respect-gitignore = false", output)
 
     def test_pydocfmt_check_show_rules_applies_conventions_and_manual_reenablements(self) -> None:
+        known_rule_codes = frozenset(rule_class.meta.code.tag for rule_class in rule_collection.RULE_COLLECTION.rules)
+
         def show_convention_rules(*args: str) -> tuple[int, tuple[str, ...], str]:
             stdout = StringIO()
             argv = ["pydocfmt", "--isolated", "check", "--show-rules", *args]
@@ -1012,36 +1015,46 @@ class TestCLIShowFiles(unittest.TestCase):
             ):
                 exit_code = pydocfmt_cli.main()
             output = stdout.getvalue()
-            rules = tuple(
-                line.split(maxsplit=1)[0].removesuffix("*")
-                for line in output.splitlines()
-                if line.startswith(("PDF106", "PDF107", "PDF108", "PDF109", "PDF201", "PDF204", "PDF205", "PDF206", "PDF207", "PDF208", "PDF209", "PDF210", "PDF211"))
-            )
-            return exit_code, rules, output
+            rules: list[str] = []
+            for line in output.splitlines():
+                fields = line.split(maxsplit=1)
+                if fields:
+                    rule_code = fields[0].removesuffix("*")
+                    if rule_code in known_rule_codes:
+                        rules.append(rule_code)
+            return exit_code, tuple(rules), output
 
-        broad_expectations = {
-            "none": (0, ("PDF106", "PDF109", "PDF201", "PDF204", "PDF208", "PDF211")),
-            "google": (0, ("PDF106", "PDF109", "PDF201", "PDF204", "PDF208", "PDF211")),
-            "numpy": (0, ("PDF109", "PDF201", "PDF204", "PDF208", "PDF211")),
-            "rest": (0, ("PDF106", "PDF109", "PDF201", "PDF204", "PDF208", "PDF211")),
-            "pep257": (0, ("PDF109", "PDF201", "PDF204", "PDF208", "PDF211")),
-        }
-        for convention, (expected_exit_code, expected_rules) in broad_expectations.items():
+        def assert_show_rules(args: tuple[str, ...], settings: CheckSettings) -> None:
+            exit_code, rules, output = show_convention_rules(*args)
+            selection = rules_selection.select_rules(settings)
+            expected_exit_code = 1 if selection.errors else 0
+
+            self.assertEqual(exit_code, expected_exit_code)
+            self.assertEqual(rules, tuple(rule.rule.code.tag for rule in selection.rules))
+            for error in selection.errors:
+                self.assertIn(error, output)
+            if not selection.errors:
+                self.assertNotIn("ERROR:", output)
+
+        broad_conventions = ("none", "google", "numpy", "rest", "pep257")
+        for convention in broad_conventions:
             with self.subTest(variation="broad", convention=convention):
-                exit_code, rules, output = show_convention_rules("--docstring-convention", convention)
-                self.assertEqual((exit_code, rules), (expected_exit_code, expected_rules))
-                self.assertNotIn("has been disabled", output)
+                assert_show_rules(("--docstring-convention", convention), CheckSettings(docstring_convention=settings_check.DocstringConvention(convention)))
 
-        for convention in broad_expectations:
+        for convention in broad_conventions:
             with self.subTest(variation="exact-extend-select", convention=convention):
-                exit_code, rules, output = show_convention_rules("--docstring-convention", convention, "--extend-select", "PDF106,PDF107,PDF108,PDF109")
-                self.assertEqual((exit_code, rules, output.count("has been disabled")), (1, ("PDF106", "PDF108", "PDF201", "PDF204", "PDF208", "PDF211"), 2))
+                assert_show_rules(
+                    ("--docstring-convention", convention, "--extend-select", "PDF106,PDF107,PDF108,PDF109"),
+                    CheckSettings(docstring_convention=settings_check.DocstringConvention(convention), extend_select=("PDF106", "PDF107", "PDF108", "PDF109")),
+                )
 
-        self.assertEqual(show_convention_rules("--docstring-convention", "google", "--extend-select", "PDF10")[:2], (0, ("PDF106", "PDF109", "PDF201", "PDF204", "PDF208", "PDF211")))
-        self.assertEqual(show_convention_rules("--docstring-convention", "numpy", "--extend-select", "PDF10")[:2], (0, ("PDF109", "PDF201", "PDF204", "PDF208", "PDF211")))
-        self.assertEqual(show_convention_rules("--docstring-convention", "google", "--select", "PDF107")[:2], (0, ("PDF107",)))
-        exit_code, rules, output = show_convention_rules("--docstring-convention", "google", "--extend-select", "PDF107,PDF108", "--ignore", "PDF107")
-        self.assertEqual((exit_code, rules, output.count("has been disabled")), (1, ("PDF106", "PDF108", "PDF201", "PDF204", "PDF208", "PDF211"), 1))
+        assert_show_rules(("--docstring-convention", "google", "--extend-select", "PDF10"), CheckSettings(docstring_convention=settings_check.DocstringConvention.GOOGLE, extend_select=("PDF10",)))
+        assert_show_rules(("--docstring-convention", "numpy", "--extend-select", "PDF10"), CheckSettings(docstring_convention=settings_check.DocstringConvention.NUMPY, extend_select=("PDF10",)))
+        assert_show_rules(("--docstring-convention", "google", "--select", "PDF107"), CheckSettings(docstring_convention=settings_check.DocstringConvention.GOOGLE, select=("PDF107",)))
+        assert_show_rules(
+            ("--docstring-convention", "google", "--extend-select", "PDF107,PDF108", "--ignore", "PDF107"),
+            CheckSettings(docstring_convention=settings_check.DocstringConvention.GOOGLE, extend_select=("PDF107", "PDF108"), ignore=("PDF107",)),
+        )
 
     def test_pydocfmt_check_config_file_prints_resolved_settings(self) -> None:
         with tempfile.TemporaryDirectory() as td:

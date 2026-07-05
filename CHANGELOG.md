@@ -38,6 +38,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added opt-in `PDF518` through `PDF525` to enforce owner-docstring or attached-docstring placement policies for public and private class and module attribute documentation.
   - Added `PDF600` through `PDF615` to report missing package, module, class, nested class, function, method, dunder method, and `__init__` docstrings across public and opt-in private variants.
   - Added `PDF616` to report docstrings on functions decorated with configured no-docstring decorators, including standard overload decorators by default.
+  - Added `PDF700` through `PDF719` to check parsed owning-docstring entry descriptions, docstring type presence policies, and conservative annotation/type mismatches for parameters, returns, yields, class attributes, and module attributes.
   - Added `PDF306` and `PDF307` to report parameter and attribute documentation that only restates the documented name with generic filler.
   - Added `PDF308` through `PDF310` to normalize punctuation and safe first-word capitalization for parsed docstring entry descriptions.
   - Added signature-backed `PDF306` detection for variadic parameter descriptions such as `*args: Positional arguments.` and `**kwargs: Keyword arguments.`.
@@ -78,10 +79,11 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added `indent-style` and `indent-width` for generated docstring section indentation, with Ruff-style defaults of `"space"` and `4`.
   - Added `url-aware-wrapping`, enabled by default, for URL-aware comment and docstring line balancing without splitting URL tokens.
   - Added `docstring-blank-line-style` with `"blank"` and `"aligned"` modes for PDF103 blank-line whitespace normalization.
+  - Added `docstring-class-attribute-no-type-base-classes` to invert PDF713 for direct enum-like class bases, with import-aware matching for dotted configured names.
   - Added `docstring-blank-line-after-last-section` to control whether PDF200 and PDF201 keep one blank line after the final recognized Google or NumPy docstring section.
   - Added `docstring-require-init-attribute-documentation` to control whether class missing-attribute documentation checks require supported `self.*` assignments from `__init__`.
-  - Added `docstring-forbidden-function-decorators` and `docstring-optional-function-decorators` to configure exact function decorators that forbid docstrings or make them optional.
-  - Added `docstring-property-decorators` to configure exact function decorators that make property-specific summary rules treat functions as properties.
+  - Added `docstring-forbidden-function-decorators` and `docstring-optional-function-decorators` to configure function decorators that forbid docstrings or make them optional, with import-aware matching for dotted configured names.
+  - Added `docstring-property-decorators` to configure function decorators that make property-specific summary rules treat functions as properties, with import-aware matching for dotted configured names.
   - Added `comment-trailing-extraction-syntax-aware`, enabled by default, to keep overlong trailing comments inline in syntax-sensitive positions.
   - Added `comment-trailing-extraction-content-aware`, enabled by default, to keep overlong trailing comments inline when enabled standalone comment structure/code detectors or the operator heuristic make extraction unsafe.
   - Added `comment-format-task-markers`, enabled by default, to reflow recognized task-marker comments such as `TODO:`, `FIXME:`, and `HACK:` with hanging indentation.
@@ -231,6 +233,10 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 - **Docstring formatting:**
   - Fixed configured decorator matching so dynamic call receivers such as `@typing().overload` are not treated as exact static decorator names.
   - Fixed attached attribute docstring checks to avoid duplicate findings for repeated assignment target names and to report private attached attribute docstrings in source order.
+  - Fixed `PDF7xx` typed entry checks to evaluate every name in parsed NumPy multi-name parameter and attribute entries.
+  - Fixed import-aware decorator and typed-entry matching to avoid local-shadow false positives, pair reST variadic parameter value/type fields, and evaluate repeated reST typed entries in source order.
+  - Fixed `PDF7xx` typed reST checks to validate inline and paired type fields independently and report type-specific diagnostics on the field that supplies the type.
+  - Fixed `PDF7xx` typed mismatch checks to compare safe import aliases consistently, recognize quoted yield container aliases, and report type diagnostics in source order.
 
 - **CLI:**
   - Fixed `parallelism` worker resolution to cap Windows process pools at the platform-supported maximum.

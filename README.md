@@ -102,6 +102,7 @@ If no files or directories are specified, `pydocfmt check` checks the current di
 - `--docstring-missing-documentation {has-section,non-summary-docstrings,all-docstrings}`: When missing-documentation rules report missing documentation (default: has-section)
 - `--docstring-missing-documentation-public-only`, `--no-docstring-missing-documentation-public-only`: Toggle limiting broad missing-documentation checks to public API definitions (default: enabled)
 - `--docstring-require-init-attribute-documentation`, `--no-docstring-require-init-attribute-documentation`: Toggle requiring supported `self.*` attributes assigned in `__init__` for class missing-attribute documentation checks (default: disabled)
+- `--docstring-class-attribute-no-type-base-classes BASE`: Direct class base names whose class attribute docstring entries should not include types for PDF713
 - `--docstring-parse-list-items`, `--no-docstring-parse-list-items`: Toggle parsing docstring list items (default: enabled)
 - `--docstring-parse-headings`, `--no-docstring-parse-headings`: Toggle parsing docstring headings (default: enabled)
 - `--docstring-parse-doctests`, `--no-docstring-parse-doctests`: Toggle parsing and protecting doctest regions (default: enabled)

@@ -326,6 +326,7 @@ class TestSettings(unittest.TestCase):
                 "docstring_missing_documentation",
                 "docstring_missing_documentation_public_only",
                 "docstring_require_init_attribute_documentation",
+                "docstring_class_attribute_no_type_base_classes",
                 "docstring_forbidden_function_decorators",
                 "docstring_optional_function_decorators",
                 "docstring_property_decorators",
@@ -1091,7 +1092,7 @@ class TestSettings(unittest.TestCase):
             global_values=pydocformatter_global_args.GlobalArgs(
                 isolated=True,
                 config_options=(
-                    'docstring-convention = "google"\ndocstring-blank-line-style = "aligned"\ndocstring-blank-line-after-last-section = true\ndocstring-missing-documentation = "all-docstrings"\ndocstring-missing-documentation-public-only = false\ndocstring-require-init-attribute-documentation = true\ndocstring-forbidden-function-decorators = ["project.overload"]\ndocstring-optional-function-decorators = ["project.override"]\ndocstring-property-decorators = ["project.Property"]\ndocstring-parse-tables = false',
+                    'docstring-convention = "google"\ndocstring-blank-line-style = "aligned"\ndocstring-blank-line-after-last-section = true\ndocstring-missing-documentation = "all-docstrings"\ndocstring-missing-documentation-public-only = false\ndocstring-require-init-attribute-documentation = true\ndocstring-class-attribute-no-type-base-classes = ["enum.Enum"]\ndocstring-forbidden-function-decorators = ["project.overload"]\ndocstring-optional-function-decorators = ["project.override"]\ndocstring-property-decorators = ["project.Property"]\ndocstring-parse-tables = false',
                 ),
             )
         )
@@ -1104,6 +1105,7 @@ class TestSettings(unittest.TestCase):
                 docstring_missing_documentation="non-summary-docstrings",
                 docstring_missing_documentation_public_only=True,
                 docstring_require_init_attribute_documentation=False,
+                docstring_class_attribute_no_type_base_classes=("Flag,enum.Flag",),
                 docstring_forbidden_function_decorators=("typing.overload,overload",),
                 docstring_optional_function_decorators=("typing.override,override",),
                 docstring_property_decorators=("property,project.Property",),
@@ -1116,6 +1118,7 @@ class TestSettings(unittest.TestCase):
         self.assertEqual(configured.docstring_missing_documentation, pydocformatter_settings.DocstringMissingDocumentation.ALL_DOCSTRINGS)
         self.assertFalse(configured.docstring_missing_documentation_public_only)
         self.assertTrue(configured.docstring_require_init_attribute_documentation)
+        self.assertEqual(configured.docstring_class_attribute_no_type_base_classes, ("enum.Enum",))
         self.assertEqual(configured.docstring_forbidden_function_decorators, ("project.overload",))
         self.assertEqual(configured.docstring_optional_function_decorators, ("project.override",))
         self.assertEqual(configured.docstring_property_decorators, ("project.Property",))
@@ -1126,6 +1129,7 @@ class TestSettings(unittest.TestCase):
         self.assertEqual(overridden.docstring_missing_documentation, pydocformatter_settings.DocstringMissingDocumentation.NON_SUMMARY_DOCSTRINGS)
         self.assertTrue(overridden.docstring_missing_documentation_public_only)
         self.assertFalse(overridden.docstring_require_init_attribute_documentation)
+        self.assertEqual(overridden.docstring_class_attribute_no_type_base_classes, ("Flag", "enum.Flag"))
         self.assertEqual(overridden.docstring_forbidden_function_decorators, ("typing.overload", "overload"))
         self.assertEqual(overridden.docstring_optional_function_decorators, ("typing.override", "override"))
         self.assertEqual(overridden.docstring_property_decorators, ("property", "project.Property"))
@@ -1136,11 +1140,13 @@ class TestSettings(unittest.TestCase):
                 "docstring_forbidden_function_decorators": (),
                 "docstring_optional_function_decorators": (),
                 "docstring_property_decorators": (),
+                "docstring_class_attribute_no_type_base_classes": (),
             }
         )
         self.assertEqual(empty_decorator_config.docstring_forbidden_function_decorators, ())
         self.assertEqual(empty_decorator_config.docstring_optional_function_decorators, ())
         self.assertEqual(empty_decorator_config.docstring_property_decorators, ())
+        self.assertEqual(empty_decorator_config.docstring_class_attribute_no_type_base_classes, ())
 
         config = pydocformatter_settings.SETTINGS_SCHEMA.load(
             field_overrides={

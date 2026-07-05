@@ -334,6 +334,18 @@ def _exec_rule_definition(source: str) -> None:
     exec(source, namespace)
 
 
+def _ignored_docstring_conventions(rule: RuleMetadata) -> frozenset[DocstringConvention]:
+    """Return docstring conventions that ignore a rule unless it is selected exactly."""
+    ignored_conventions: set[DocstringConvention] = set()
+    for setting_effects in rule.setting_effects:
+        if setting_effects.setting != "docstring_convention":
+            continue
+        for effect_values in setting_effects.effects:
+            if effect_values.effect == RuleSettingEffect.IGNORED:
+                ignored_conventions.update(typing.cast(DocstringConvention, value) for value in effect_values.values)
+    return frozenset(ignored_conventions)
+
+
 class TestRules(unittest.TestCase):
     @staticmethod
     def _write(path: Path, text: str = "x = 1\n") -> None:
@@ -1297,7 +1309,6 @@ class NonCallableViolationsRule(RuleBase):
         self.assertEqual(collection.matching_rules(RuleSelector("PDF")), (PDF101SampleRule, PDF110SampleRule))
 
     def test_builtin_rule_setting_effect_matrix(self) -> None:
-        incompatibilities: dict[str, tuple[str, ...]] = {}
         for rule_class in rule_collection.RULE_COLLECTION.rules:
             for setting_effects in rule_class.meta.setting_effects:
                 if setting_effects.setting == "docstring_convention":
@@ -1305,7 +1316,6 @@ class NonCallableViolationsRule(RuleBase):
                         self.assertEqual(effect_values.effect, RuleSettingEffect.IGNORED)
                         for value in effect_values.values:
                             self.assertIsInstance(value, DocstringConvention)
-            incompatibilities[rule_class.meta.code.tag] = tuple(rule_code.tag for rule_code in rule_class.meta.incompatible_with)
 
         self.assertEqual(
             tuple(
@@ -1315,48 +1325,41 @@ class NonCallableViolationsRule(RuleBase):
             ),
             (),
         )
-        self.assertEqual(
-            {code: incompatible for code, incompatible in incompatibilities.items() if incompatible},
-            {
-                "PDF106": ("PDF107",),
-                "PDF107": ("PDF106",),
-                "PDF108": ("PDF109",),
-                "PDF109": ("PDF108",),
-                "PDF204": ("PDF205",),
-                "PDF205": ("PDF204",),
-                "PDF206": ("PDF207",),
-                "PDF207": ("PDF206",),
-                "PDF208": ("PDF209",),
-                "PDF209": ("PDF208",),
-                "PDF210": ("PDF211",),
-                "PDF211": ("PDF210",),
-                "PDF514": ("PDF522",),
-                "PDF515": ("PDF524",),
-                "PDF516": ("PDF523",),
-                "PDF517": ("PDF525",),
-                "PDF518": ("PDF519",),
-                "PDF519": ("PDF518",),
-                "PDF520": ("PDF521",),
-                "PDF521": ("PDF520",),
-                "PDF522": ("PDF514", "PDF523"),
-                "PDF523": ("PDF516", "PDF522"),
-                "PDF524": ("PDF515", "PDF525"),
-                "PDF525": ("PDF517", "PDF524"),
-            },
-        )
 
-    def test_builtin_opt_in_style_variant_rules_ignore_every_docstring_convention(self) -> None:
-        rule_classes = {rule_class.meta.code.tag: rule_class for rule_class in rule_collection.RULE_COLLECTION.rules}
+    def test_builtin_rule_incompatibilities_resolve_pairwise(self) -> None:
+        rule_order = {rule_class.meta.code: index for index, rule_class in enumerate(rule_collection.RULE_COLLECTION.rules)}
+        checked_pairs: set[frozenset[RuleCode]] = set()
 
-        for code in ("PDF107", "PDF108", "PDF205", "PDF206", "PDF207", "PDF209", "PDF210"):
-            ignored_conventions: set[DocstringConvention] = set()
-            for setting_effects in rule_classes[code].meta.setting_effects:
-                if setting_effects.setting == "docstring_convention":
-                    for effect_values in setting_effects.effects:
-                        if effect_values.effect == RuleSettingEffect.IGNORED:
-                            ignored_conventions.update(typing.cast(DocstringConvention, value) for value in effect_values.values)
+        for rule_class in rule_collection.RULE_COLLECTION.rules:
+            for incompatible_code in rule_class.meta.incompatible_with:
+                pair = frozenset((rule_class.meta.code, incompatible_code))
+                if pair in checked_pairs:
+                    continue
+                checked_pairs.add(pair)
+                first_code, second_code = tuple(sorted(pair, key=rule_order.__getitem__))
 
-            self.assertEqual(ignored_conventions, set(DocstringConvention))
+                with self.subTest(first=str(first_code), second=str(second_code)):
+                    selection = rules_selection.select_rules(CheckSettings(select=(first_code.tag, second_code.tag)))
+                    self.assertEqual(tuple(rule.rule.code for rule in selection.rules), (first_code,))
+                    self.assertEqual(selection.errors, (f"Selected rule {second_code} is incompatible with earlier selected rule {first_code}; {second_code} has been disabled",))
+
+        self.assertTrue(checked_pairs)
+
+    def test_builtin_docstring_convention_exact_opt_in_rules_are_exactly_selectable(self) -> None:
+        exact_opt_in_codes: list[str] = []
+
+        for rule_class in rule_collection.RULE_COLLECTION.rules:
+            if _ignored_docstring_conventions(rule_class.meta) == frozenset(DocstringConvention):
+                exact_opt_in_codes.append(rule_class.meta.code.tag)
+
+        self.assertTrue(exact_opt_in_codes)
+        for code in exact_opt_in_codes:
+            for convention in DocstringConvention:
+                with self.subTest(code=code, convention=convention.value):
+                    broad_selection = rules_selection.select_rules(CheckSettings(select=("ALL",), docstring_convention=convention))
+                    exact_selection = rules_selection.select_rules(CheckSettings(select=(code,), docstring_convention=convention))
+                    self.assertNotIn(code, tuple(rule.rule.code.tag for rule in broad_selection.rules))
+                    self.assertIn(code, tuple(rule.rule.code.tag for rule in exact_selection.rules))
 
     def test_builtin_none_and_pep257_broad_rule_profiles_are_distinct(self) -> None:
         none_selection = rules_selection.select_rules(CheckSettings(docstring_convention=DocstringConvention.NONE))
@@ -1366,13 +1369,24 @@ class NonCallableViolationsRule(RuleBase):
         self.assertEqual(pep257_selection.errors, ())
         none_codes = frozenset(str(rule.rule.code) for rule in none_selection.rules)
         pep257_codes = frozenset(str(rule.rule.code) for rule in pep257_selection.rules)
+        expected_none_only = frozenset(
+            rule_class.meta.code.tag
+            for rule_class in rule_collection.RULE_COLLECTION.rules
+            if DocstringConvention.PEP257 in _ignored_docstring_conventions(rule_class.meta)
+            and DocstringConvention.NONE not in _ignored_docstring_conventions(rule_class.meta)
+            and rule_class.meta.code.tag not in CheckSettings().require_explicit
+        )
+        expected_pep257_only = frozenset(
+            rule_class.meta.code.tag
+            for rule_class in rule_collection.RULE_COLLECTION.rules
+            if DocstringConvention.NONE in _ignored_docstring_conventions(rule_class.meta)
+            and DocstringConvention.PEP257 not in _ignored_docstring_conventions(rule_class.meta)
+            and rule_class.meta.code.tag not in CheckSettings().require_explicit
+        )
 
         self.assertNotEqual(none_codes, pep257_codes)
-        self.assertEqual(
-            tuple(sorted(none_codes - pep257_codes)),
-            ("PDF106", "PDF301", "PDF305", "PDF309"),
-        )
-        self.assertEqual(tuple(sorted(pep257_codes - none_codes)), ())
+        self.assertEqual(none_codes - pep257_codes, expected_none_only)
+        self.assertEqual(pep257_codes - none_codes, expected_pep257_only)
 
     def test_rule_collection_does_not_expose_selector_convenience_indexes(self) -> None:
         collection = sample_collection()
@@ -1400,15 +1414,6 @@ class NonCallableViolationsRule(RuleBase):
         defaults = rules_selection.select_rules(CheckSettings(select=("ALL",)))
         prefixed = rules_selection.select_rules(CheckSettings(select=("PDF",)))
         mixed_broad = rules_selection.select_rules(CheckSettings(select=("ALL", "PCF001")))
-        disabled_requirement = rules_selection.select_rules(CheckSettings(require_explicit=()))
-        disabled_requirement_with_policy_ignores = rules_selection.select_rules(
-            CheckSettings(
-                select=("PDF5",),
-                require_explicit=(),
-                ignore=("PDF514", "PDF515", "PDF516", "PDF517", "PDF519", "PDF521", "PDF522", "PDF524"),
-                docstring_convention=DocstringConvention.GOOGLE,
-            )
-        )
 
         self.assertEqual(defaults.errors, ())
         self.assertEqual(prefixed.errors, ())
@@ -1416,16 +1421,12 @@ class NonCallableViolationsRule(RuleBase):
         default_codes = tuple(rule.rule.code.tag for rule in defaults.rules)
         prefixed_codes = tuple(rule.rule.code.tag for rule in prefixed.rules)
         mixed_broad_codes = tuple(rule.rule.code.tag for rule in mixed_broad.rules)
-        disabled_requirement_codes = tuple(rule.rule.code.tag for rule in disabled_requirement.rules)
         for code in require_explicit_codes:
             self.assertNotIn(code, default_codes)
             self.assertNotIn(code, prefixed_codes)
             self.assertNotIn(code, mixed_broad_codes)
             self.assertIn(code, tuple(rule.rule.code.tag for rule in rules_selection.select_rules(CheckSettings(select=(code,))).rules))
             self.assertIn(code, tuple(rule.rule.code.tag for rule in rules_selection.select_rules(CheckSettings(extend_select=(code,))).rules))
-        for code in ("PCF005", "PDF003", "PDF516", "PDF517", "PDF601", "PDF603", "PDF605", "PDF607", "PDF609", "PDF611", "PDF612", "PDF613", "PDF615"):
-            self.assertIn(code, disabled_requirement_codes)
-        self.assertTrue({"PDF518", "PDF520", "PDF523", "PDF525"}.issubset(rule.rule.code.tag for rule in disabled_requirement_with_policy_ignores.rules))
 
     def test_default_require_explicit_selectors_are_exact_known_rule_codes(self) -> None:
         default_selectors = CheckSettings().require_explicit

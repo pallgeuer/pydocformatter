@@ -31,8 +31,10 @@ def rule_findings(rule_class: type[RuleBase], context: RuleContext) -> tuple[Rul
     """Return findings from a rule's canonical violations.
 
     Args:
-        rule_class: Rule implementation to execute through the same validation path used by direct rule tests.
-        context: Prepared rule context containing parsed source and any category data required by the rule.
+        rule_class (type[RuleBase]): Rule implementation to execute through the same validation path used by direct rule
+            tests.
+        context (RuleContext): Prepared rule context containing parsed source and any category data required by the
+            rule.
 
     Returns:
         Public findings derived from the rule's validated violations.
@@ -44,8 +46,8 @@ def rule_fix_result(rule_class: type[RuleBase], context: RuleContext) -> DirectR
     """Apply unsuppressed source fixes from a rule's canonical violations.
 
     Args:
-        rule_class: Rule implementation whose fixable violations should be applied directly.
-        context: Prepared rule context for the source module under test.
+        rule_class (type[RuleBase]): Rule implementation whose fixable violations should be applied directly.
+        context (RuleContext): Prepared rule context for the source module under test.
 
     Returns:
         Parsed module after applying all available direct rule fixes, together with the findings that were fixed.
@@ -67,8 +69,8 @@ def validated_rule_violations(rule_class: type[RuleBase], context: RuleContext) 
     """Return violations after applying runner validation used by direct rule tests.
 
     Args:
-        rule_class: Rule implementation whose raw violations should be validated.
-        context: Prepared rule context used to call the rule's violations hook.
+        rule_class (type[RuleBase]): Rule implementation whose raw violations should be validated.
+        context (RuleContext): Prepared rule context used to call the rule's violations hook.
 
     Returns:
         Validated rule violations in the order produced by the rule implementation.

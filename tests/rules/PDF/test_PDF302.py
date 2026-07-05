@@ -128,6 +128,43 @@ def test_skips_property_accessor_decorators(decorator: str) -> None:
     assert not result.unfixed_findings
 
 
+def test_skips_import_alias_property_like_decorators() -> None:
+    source = 'from functools import cached_property as cp\nfrom project import Property as P\n\n\nclass Example:\n    @cp\n    def cached(self):\n        """Returns cached value."""\n\n    @P\n    def custom(self):\n        """Returns custom value."""\n'
+    result = format_source(source, settings=CheckSettings(select=("PDF302",), docstring_property_decorators=("builtins.property", "functools.cached_property", "project.Property")))
+
+    assert result.new_source == source
+    assert not result.unfixed_findings
+
+
+def test_skips_called_import_alias_property_like_decorators() -> None:
+    source = 'from functools import cached_property as cp\nfrom project import Property as P\n\n\nclass Example:\n    @cp()\n    def cached(self):\n        """Returns cached value."""\n\n    @P(read_only=True)\n    def custom(self):\n        """Returns custom value."""\n'
+    result = format_source(source, settings=CheckSettings(select=("PDF302",), docstring_property_decorators=("builtins.property", "functools.cached_property", "project.Property")))
+
+    assert result.new_source == source
+    assert not result.unfixed_findings
+
+
+def test_unqualified_property_decorator_configuration_is_syntactic_only() -> None:
+    source = 'from project import Property as P\n\n\nclass Example:\n    @P\n    def aliased(self):\n        """Returns aliased value."""\n\n    @Property\n    def syntactic(self):\n        """Returns syntactic value."""\n'
+    result = format_source(source, settings=CheckSettings(select=("PDF302",), docstring_property_decorators=("Property",)))
+
+    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((7,),)
+
+
+def test_shadowed_property_import_alias_is_not_treated_as_configured_property() -> None:
+    source = 'from functools import cached_property as cp\ncp = decorator\n\n\nclass Example:\n    @cp\n    def cached(self):\n        """Returns cached value."""\n'
+    result = format_source(source)
+
+    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((8,),)
+
+
+def test_shadowed_dotted_property_decorator_is_not_treated_as_configured_property() -> None:
+    source = 'class Builtins:\n    property = object()\n\nbuiltins = Builtins()\n\n\nclass Example:\n    @builtins.property\n    def value(self):\n        """Returns property value."""\n'
+    result = format_source(source)
+
+    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((10,),)
+
+
 def test_property_decorator_setting_replaces_exact_property_decorator_names() -> None:
     source = (
         'class Example:\n    @property\n    def value(self):\n        """Returns property value."""\n\n    @project.Property\n    def custom(self):\n        """Returns custom property value."""\n'

@@ -9,7 +9,7 @@ The first summary word is normalized by removing non-alphanumeric characters and
 
 PDF311 uses the parsed top-level summary block. It skips non-property functions, test functions named `runTest` or starting with `test`, empty docstrings, docstrings without a parsed summary, and parser-recognized structures such as sections, reST fields under the reST convention, headings, lists, doctests, code fences, block quotes, tables, directives, literal blocks, and verbatim blocks.
 
-Property-like functions are functions decorated by an exact name listed in `docstring-property-decorators`, direct calls to one of those exact names, or accessor decorators whose final dotted component is `getter`, `setter`, or `deleter`. The configured names are exact: `property` does not match `project.property`, and replacing the setting also replaces the built-in exact names. Accessor decorators remain property-like even when the configured exact-name list is empty.
+Property-like functions are functions decorated by a name listed in `docstring-property-decorators`, direct calls to one of those names, or accessor decorators whose final dotted component is `getter`, `setter`, or `deleter`. Dotted configured names also match import aliases and builtins resolved statically by LibCST; unqualified configured names are syntactic-only. Accessor decorators remain property-like even when the configured name list is empty.
 
 ## Why is this useful?
 Property docstrings usually read better as data descriptions than as function actions. For example, `The configured timeout.` describes the attribute-like value more directly than `Returns the configured timeout.`
@@ -67,7 +67,7 @@ PDF311: Line 4: Property docstring should not start with a verb ("'Returns'")
 PDF311: Line 8: Property docstring should not start with a verb ("Fetch")
 ```
 
-Configured property decorators are checked as exact names, and direct calls are unwrapped. Accessor decorators are always property-like:
+Configured property decorators unwrap direct calls and can match import aliases for dotted configured names. Accessor decorators are always property-like:
 
 ```pydocfmt-example
 [settings]
@@ -160,5 +160,5 @@ class Client:
 
 ## Options
 - `docstring-convention`: Controls whether convention-specific structures such as reStructuredText fields are recognized instead of treated as summary text.
-- `docstring-property-decorators`: Exact function decorator names that make PDF311 treat a function as property-like. Direct calls are unwrapped before matching, so `@functools.cached_property()` matches `functools.cached_property`. Property accessor decorators such as `value.getter`, `value.setter`, and `value.deleter` are always treated as property-like.
+- `docstring-property-decorators`: Function decorator names that make PDF311 treat a function as property-like. Calls are unwrapped before matching, dotted names also match import aliases and builtins resolved statically by LibCST, and unqualified names are syntactic-only. Property accessor decorators such as `value.getter`, `value.setter`, and `value.deleter` are always treated as property-like.
 - `docstring-parse-*`: Controls whether generic structures such as headings, lists, doctests, code fences, block quotes, tables, directives, and literal blocks are protected from summary-style checks.

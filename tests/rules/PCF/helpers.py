@@ -31,30 +31,31 @@ def format_pcf(
     """Format source with PCF rules and explicit comment settings.
 
     Args:
-        source: Python source text to format.
-        fix: Whether selected PCF fixes should be applied before returning remaining findings.
-        line_length: Target maximum line length used by comment wrapping rules.
-        line_ending: Line-ending mode used when fixes rewrite source text.
-        indent_width: Number of spaces represented by one indentation level for rewritten comments.
-        url_aware_wrapping: Whether wrapping should keep URL tokens intact.
-        comment_join_standalone_lines: Whether adjacent standalone comment lines may be joined before wrapping.
-        comment_format_list_items: Whether standalone comment list items should be recognized and formatted
+        source (str): Python source text to format.
+        fix (bool): Whether selected PCF fixes should be applied before returning remaining findings.
+        line_length (int): Target maximum line length used by comment wrapping rules.
+        line_ending (LineEnding): Line-ending mode used when fixes rewrite source text.
+        indent_width (int): Number of spaces represented by one indentation level for rewritten comments.
+        url_aware_wrapping (bool): Whether wrapping should keep URL tokens intact.
+        comment_join_standalone_lines (bool): Whether adjacent standalone comment lines may be joined before wrapping.
+        comment_format_list_items (bool): Whether standalone comment list items should be recognized and formatted
             structurally.
-        comment_format_task_markers: Whether task-marker prefixes should be preserved while formatting comments.
-        comment_preserve_headings: Whether heading-like standalone comments should remain structurally protected.
-        comment_preserve_doctests: Whether doctest prompts inside comments should remain structurally protected.
-        comment_preserve_code_fences: Whether fenced code blocks inside comments should remain structurally protected.
-        comment_format_block_quotes: Whether standalone comment block quotes should be recognized and formatted
+        comment_format_task_markers (bool): Whether task-marker prefixes should be preserved while formatting comments.
+        comment_preserve_headings (bool): Whether heading-like standalone comments should remain structurally protected.
+        comment_preserve_doctests (bool): Whether doctest prompts inside comments should remain structurally protected.
+        comment_preserve_code_fences (bool): Whether fenced code blocks inside comments should remain structurally
+            protected.
+        comment_format_block_quotes (bool): Whether standalone comment block quotes should be recognized and formatted
             structurally.
-        comment_preserve_tables: Whether table-like comment blocks should remain structurally protected.
-        comment_preserve_directives: Whether directive-like comment blocks should remain structurally protected.
-        comment_trailing_extraction_syntax_aware: Whether trailing-comment extraction should respect syntax-sensitive
-            positions.
-        comment_trailing_extraction_content_aware: Whether trailing-comment extraction should respect comment content
-            heuristics.
-        comment_detect_code: Whether standalone comments should be detected as disabled code.
-        comment_detect_statements: Whether standalone comments should be parsed as possible Python statements.
-        comment_detect_expressions: Whether standalone comments should be parsed as possible Python expressions.
+        comment_preserve_tables (bool): Whether table-like comment blocks should remain structurally protected.
+        comment_preserve_directives (bool): Whether directive-like comment blocks should remain structurally protected.
+        comment_trailing_extraction_syntax_aware (bool): Whether trailing-comment extraction should respect
+            syntax-sensitive positions.
+        comment_trailing_extraction_content_aware (bool): Whether trailing-comment extraction should respect comment
+            content heuristics.
+        comment_detect_code (bool): Whether standalone comments should be detected as disabled code.
+        comment_detect_statements (bool): Whether standalone comments should be parsed as possible Python statements.
+        comment_detect_expressions (bool): Whether standalone comments should be parsed as possible Python expressions.
 
     Returns:
         Formatting result containing rewritten source and any fixed or remaining findings.
@@ -87,9 +88,9 @@ def format_pcf_settings(source: str, *, settings: CheckSettings, fix: bool = Tru
     """Format source with caller-provided PCF check settings.
 
     Args:
-        source: Python source text to format.
-        settings: Check settings that select PCF rules and configure comment formatting behavior.
-        fix: Whether selected fixes should be applied before returning remaining findings.
+        source (str): Python source text to format.
+        settings (CheckSettings): Check settings that select PCF rules and configure comment formatting behavior.
+        fix (bool): Whether selected fixes should be applied before returning remaining findings.
 
     Returns:
         Formatting result produced with the caller-provided settings.

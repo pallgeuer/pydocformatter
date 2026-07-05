@@ -78,7 +78,7 @@ def is_public_module_path(path: str) -> bool:
     """Return whether a source path names a public module or package.
 
     Args:
-        path: Source path to classify as a Python module or package path.
+        path (str): Source path to classify as a Python module or package path.
 
     Returns:
         Whether no discovered module path component starts with an underscore.
