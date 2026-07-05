@@ -216,7 +216,7 @@ class RuleFinding:
 
     @property
     def message(self) -> str:
-        """Return the instance-specific or default rule message.
+        """Instance-specific or default rule message.
 
         Returns:
             str: Diagnostic text that should be displayed for this finding.
@@ -225,7 +225,7 @@ class RuleFinding:
 
     @property
     def fixable(self) -> bool:
-        """Return whether this specific finding can be automatically fixed.
+        """Whether this specific finding can be automatically fixed.
 
         Returns:
             bool: Whether this finding has an enabled source fix.
@@ -247,7 +247,7 @@ class RuleFinding:
 
     @property
     def grouping_key(self) -> RuleFinding.Key:
-        """Return the key used to merge findings that differ only by line numbers.
+        """Key used to merge findings that differ only by line numbers.
 
         Returns:
             RuleFinding.Key: Merge key that excludes line targets but preserves rule, message, and fixability.
@@ -256,7 +256,7 @@ class RuleFinding:
 
     @property
     def suppression_targets(self) -> tuple[tuple[int, ...], ...]:
-        """Return line-number targets that can suppress this finding.
+        """Line-number targets that can suppress this finding.
 
         Returns:
             tuple[tuple[int, ...], ...]: Primary and alternate one-based line groups accepted by suppression directives.

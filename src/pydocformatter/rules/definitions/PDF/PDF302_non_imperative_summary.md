@@ -15,7 +15,7 @@ PDF302 uses the parsed top-level summary block. It skips module and class docstr
 Imperative summaries are the conventional style for many Python APIs because they describe what calling the function does.
 
 ## Ruff compatibility
-This rule replaces Ruff's `D401`. Like Ruff, it is ignored by default for the Google convention and skips test and property functions. Unlike Ruff, pydocformatter does not expose `property-decorators` or `ignore-decorators` settings.
+This rule replaces Ruff's `D401`. Like Ruff, it is ignored by default for the Google convention and skips test and property functions. pydocformatter's `docstring-property-decorators` setting controls which exact decorators mark functions as property-like.
 
 ## Examples
 PDF302 reports non-imperative function summaries and leaves source unchanged:
@@ -83,6 +83,27 @@ class Value:
 PDF302: Line 14: Docstring summary first word 'Returns' is not imperative
 ```
 
+The `docstring-property-decorators` setting controls which exact decorator names make functions property-like. Replacing the setting can make a built-in `@property` method subject to PDF302 while skipping a project-specific property decorator:
+
+```pydocfmt-example
+[settings]
+docstring-property-decorators = ["project.Property"]
+
+[input]
+class Value:
+    @property
+    def current(self):
+        """Returns the current value."""
+
+    @project.Property
+    def custom(self):
+        """Returns the custom value."""
+
+[output=unchanged]
+[findings]
+PDF302: Line 4: Docstring summary first word 'Returns' is not imperative
+```
+
 Parser-recognized structures are protected. Disabling the matching parser setting can make the same text become a summary target:
 
 ```pydocfmt-example
@@ -102,4 +123,5 @@ PDF302: Line 2: Docstring summary first word 'Returns' is not imperative
 
 ## Options
 - `docstring-convention`: Ignores PDF302 for broad rule selections under the Google convention.
+- `docstring-property-decorators`: Exact function decorator names that make PDF302 skip a function as property-like. Property accessor decorators such as `value.getter`, `value.setter`, and `value.deleter` are always treated as property-like.
 - `docstring-parse-*`: Controls whether generic structures such as headings, lists, doctests, code fences, block quotes, tables, directives, and literal blocks are protected from summary-style checks.

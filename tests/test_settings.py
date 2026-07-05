@@ -327,6 +327,7 @@ class TestSettings(unittest.TestCase):
                 "docstring_require_init_attribute_documentation",
                 "docstring_forbidden_function_decorators",
                 "docstring_optional_function_decorators",
+                "docstring_property_decorators",
                 "docstring_parse_list_items",
                 "docstring_parse_headings",
                 "docstring_parse_doctests",
@@ -739,7 +740,7 @@ class TestSettings(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             (root / "pyproject.toml").write_text(
-                '[tool.pydocfmt.docstring]\nconvention = "google"\nblank-line-style = "aligned"\nblank-line-after-last-section = true\nparse-tables = false\n',
+                '[tool.pydocfmt.docstring]\nconvention = "google"\nblank-line-style = "aligned"\nblank-line-after-last-section = true\nproperty-decorators = ["project.Property"]\nparse-tables = false\n',
                 encoding="utf-8",
             )
             previous_cwd = os.getcwd()
@@ -752,6 +753,7 @@ class TestSettings(unittest.TestCase):
         self.assertEqual(config.docstring_convention, pydocformatter_settings.DocstringConvention.GOOGLE)
         self.assertEqual(config.docstring_blank_line_style, pydocformatter_settings.DocstringBlankLineStyle.ALIGNED)
         self.assertTrue(config.docstring_blank_line_after_last_section)
+        self.assertEqual(config.docstring_property_decorators, ("project.Property",))
         self.assertFalse(config.docstring_parse_tables)
 
     def test_nested_comment_table_settings_are_loaded_from_dedicated_config_file(self) -> None:
@@ -1078,7 +1080,7 @@ class TestSettings(unittest.TestCase):
             global_values=pydocformatter_global_args.GlobalArgs(
                 isolated=True,
                 config_options=(
-                    'docstring-convention = "google"\ndocstring-blank-line-style = "aligned"\ndocstring-blank-line-after-last-section = true\ndocstring-missing-documentation = "all-docstrings"\ndocstring-missing-documentation-public-only = false\ndocstring-require-init-attribute-documentation = true\ndocstring-forbidden-function-decorators = ["project.overload"]\ndocstring-optional-function-decorators = ["project.override"]\ndocstring-parse-tables = false',
+                    'docstring-convention = "google"\ndocstring-blank-line-style = "aligned"\ndocstring-blank-line-after-last-section = true\ndocstring-missing-documentation = "all-docstrings"\ndocstring-missing-documentation-public-only = false\ndocstring-require-init-attribute-documentation = true\ndocstring-forbidden-function-decorators = ["project.overload"]\ndocstring-optional-function-decorators = ["project.override"]\ndocstring-property-decorators = ["project.Property"]\ndocstring-parse-tables = false',
                 ),
             )
         )
@@ -1093,6 +1095,7 @@ class TestSettings(unittest.TestCase):
                 docstring_require_init_attribute_documentation=False,
                 docstring_forbidden_function_decorators=("typing.overload,overload",),
                 docstring_optional_function_decorators=("typing.override,override",),
+                docstring_property_decorators=("property,project.Property",),
                 docstring_parse_tables=False,
             ),
         )
@@ -1104,6 +1107,7 @@ class TestSettings(unittest.TestCase):
         self.assertTrue(configured.docstring_require_init_attribute_documentation)
         self.assertEqual(configured.docstring_forbidden_function_decorators, ("project.overload",))
         self.assertEqual(configured.docstring_optional_function_decorators, ("project.override",))
+        self.assertEqual(configured.docstring_property_decorators, ("project.Property",))
         self.assertFalse(configured.docstring_parse_tables)
         self.assertEqual(overridden.docstring_convention, pydocformatter_settings.DocstringConvention.NUMPY)
         self.assertEqual(overridden.docstring_blank_line_style, pydocformatter_settings.DocstringBlankLineStyle.BLANK)
@@ -1113,16 +1117,19 @@ class TestSettings(unittest.TestCase):
         self.assertFalse(overridden.docstring_require_init_attribute_documentation)
         self.assertEqual(overridden.docstring_forbidden_function_decorators, ("typing.overload", "overload"))
         self.assertEqual(overridden.docstring_optional_function_decorators, ("typing.override", "override"))
+        self.assertEqual(overridden.docstring_property_decorators, ("property", "project.Property"))
         self.assertFalse(overridden.docstring_parse_tables)
 
         empty_decorator_config = pydocformatter_settings.SETTINGS_SCHEMA.load(
             field_overrides={
                 "docstring_forbidden_function_decorators": (),
                 "docstring_optional_function_decorators": (),
+                "docstring_property_decorators": (),
             }
         )
         self.assertEqual(empty_decorator_config.docstring_forbidden_function_decorators, ())
         self.assertEqual(empty_decorator_config.docstring_optional_function_decorators, ())
+        self.assertEqual(empty_decorator_config.docstring_property_decorators, ())
 
         config = pydocformatter_settings.SETTINGS_SCHEMA.load(
             field_overrides={

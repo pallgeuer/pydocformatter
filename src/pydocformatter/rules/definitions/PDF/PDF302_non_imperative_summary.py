@@ -52,7 +52,12 @@ class PDF302NonImperativeSummary(RuleBase):
         violations: list[rule_violations.RuleViolation] = []
         for target in data.summary_line_targets:
             owner = target.docstring.owner
-            if not isinstance(owner, PDF_definition.DefinitionInfo) or owner.kind is not PDF_definition.DefinitionKind.FUNCTION or _is_test_function(owner) or _is_property_function(owner):
+            if (
+                not isinstance(owner, PDF_definition.DefinitionInfo)
+                or owner.kind is not PDF_definition.DefinitionKind.FUNCTION
+                or summary_style.is_test_function(owner)
+                or decorator_helpers.has_property_decorator(owner.decorators, settings=context.settings)
+            ):
                 continue
             word = summary_style.first_word_target(target)
             if word is None:
@@ -80,32 +85,6 @@ def _third_person_forms(word: str) -> tuple[str, ...]:
     return (f"{word}s",)
 
 
-def _is_test_function(definition: PDF_definition.DefinitionInfo) -> bool:
-    """Return whether a function docstring belongs to a test-style function."""
-    name = definition.name
-    return name == "runTest" or name.startswith("test")
-
-
-def _is_property_function(definition: PDF_definition.DefinitionInfo) -> bool:
-    """Return whether a function docstring belongs to a property-like function."""
-    return any((decorator_name := decorator_helpers.decorator_qualified_name(decorator.decorator)) is not None and _is_property_decorator_name(decorator_name) for decorator in definition.decorators)
-
-
-def _is_property_decorator_name(decorator_name: str) -> bool:
-    """Return whether a decorator name identifies a property-like decorator."""
-    parent, _, accessor = decorator_name.rpartition(".")
-    return decorator_name in _PROPERTY_DECORATORS or (bool(parent) and accessor in _PROPERTY_ACCESSOR_DECORATOR_NAMES)
-
-
-_PROPERTY_DECORATORS = {
-    "property",
-    "builtins.property",
-    "enum.property",
-    "functools.cached_property",
-    "abc.abstractproperty",
-    "types.DynamicClassAttribute",
-}
-_PROPERTY_ACCESSOR_DECORATOR_NAMES = {"getter", "setter", "deleter"}
 _IRREGULAR_THIRD_PERSON_FORMS = {
     "do": ("does",),
     "go": ("goes",),

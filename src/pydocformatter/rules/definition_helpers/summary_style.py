@@ -27,7 +27,7 @@ class SummaryWordTarget:
 
     @property
     def line(self) -> PDF_definition.DocstringValueLine:
-        """Return the logical line containing the word.
+        """Logical line containing the word.
 
         Returns:
             PDF_definition.DocstringValueLine: Parsed docstring value line that owns the target word.
@@ -36,7 +36,7 @@ class SummaryWordTarget:
 
     @property
     def docstring(self) -> PDF_definition.DocstringInfo:
-        """Return the docstring containing the word.
+        """Docstring containing the word.
 
         Returns:
             PDF_definition.DocstringInfo: Parsed docstring that owns the target word.
@@ -93,3 +93,16 @@ def is_function_docstring(docstring: PDF_definition.DocstringInfo) -> bool:
         bool: Whether the owner is a function definition.
     """
     return docstring.owner.kind is PDF_definition.DefinitionKind.FUNCTION
+
+
+def is_test_function(definition: PDF_definition.DefinitionInfo) -> bool:
+    """Return whether a function definition has a test-style name.
+
+    Args:
+        definition (PDF_definition.DefinitionInfo): Function definition to classify.
+
+    Returns:
+        bool: Whether the function name is `runTest` or starts with `test`.
+    """
+    name = definition.name
+    return name == "runTest" or name.startswith("test")

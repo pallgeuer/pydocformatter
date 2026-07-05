@@ -42,6 +42,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added tuple-unpacked module, class, and `__init__` instance attribute inventory support for `PDF508` through `PDF511`.
   - Added `PDF106` through `PDF109` to normalize multi-line docstring opening and closing quote placement.
   - Added `PDF110` and `PDF203` to collapse safe summary-only docstrings that fit on one line and report summaries that remain multi-line.
+  - Added `PDF311` to report property-like function summaries whose first normalized word is a known function-style verb.
   - Added PDF processing for module, class, and `__init__` instance attribute docstrings recognized by common documentation tools.
 
 - **CLI:**
@@ -78,6 +79,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added `docstring-blank-line-after-last-section` to control whether PDF200 and PDF201 keep one blank line after the final recognized Google or NumPy docstring section.
   - Added `docstring-require-init-attribute-documentation` to control whether class missing-attribute documentation checks require supported `self.*` assignments from `__init__`.
   - Added `docstring-forbidden-function-decorators` and `docstring-optional-function-decorators` to configure exact function decorators that forbid docstrings or make them optional.
+  - Added `docstring-property-decorators` to configure exact function decorators that make property-specific summary rules treat functions as properties.
   - Added `comment-trailing-extraction-syntax-aware`, enabled by default, to keep overlong trailing comments inline in syntax-sensitive positions.
   - Added `comment-trailing-extraction-content-aware`, enabled by default, to keep overlong trailing comments inline when enabled standalone comment structure/code detectors or the operator heuristic make extraction unsafe.
   - Added `comment-format-task-markers`, enabled by default, to reflow recognized task-marker comments such as `TODO:`, `FIXME:`, and `HACK:` with hanging indentation.

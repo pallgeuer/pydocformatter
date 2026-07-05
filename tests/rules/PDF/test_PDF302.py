@@ -128,6 +128,29 @@ def test_skips_property_accessor_decorators(decorator: str) -> None:
     assert not result.unfixed_findings
 
 
+def test_property_decorator_setting_replaces_exact_property_decorator_names() -> None:
+    source = (
+        'class Example:\n    @property\n    def value(self):\n        """Returns property value."""\n\n    @project.Property\n    def custom(self):\n        """Returns custom property value."""\n'
+    )
+    result = format_source(source, settings=CheckSettings(select=("PDF302",), docstring_property_decorators=("project.Property",)))
+
+    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((4,),)
+
+
+def test_empty_property_decorator_setting_keeps_accessors_but_does_not_skip_exact_decorators() -> None:
+    source = 'class Example:\n    @property\n    def value(self):\n        """Returns property value."""\n\n    @functools.cached_property()\n    def cached(self):\n        """Returns cached value."""\n\n    @value.getter\n    def value(self):\n        """Returns accessor value."""\n'
+    result = format_source(source, settings=CheckSettings(select=("PDF302",), docstring_property_decorators=()))
+
+    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((4,), (8,))
+
+
+def test_static_but_non_exact_property_decorator_names_do_not_suppress_findings() -> None:
+    source = 'class Example:\n    @project.property\n    def first(self):\n        """Returns first value."""\n\n    @project.property()\n    def second(self):\n        """Returns second value."""\n'
+    result = format_source(source)
+
+    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((4,), (8,))
+
+
 def test_complex_non_property_decorators_do_not_suppress_findings() -> None:
     source = 'class Example:\n    @decorators[0]\n    def first(self):\n        """Returns first value."""\n\n    @decorators[0].property\n    def second(self):\n        """Returns second value."""\n\n    @setter\n    def third(self):\n        """Returns third value."""\n'
     result = format_source(source)

@@ -29,7 +29,7 @@ class EntryDescriptionLineTarget:
 
     @property
     def line(self) -> PDF_definition.DocstringValueLine:
-        """Return the logical docstring line containing the fragment.
+        """Logical docstring line containing the fragment.
 
         Returns:
             Logical docstring value line that owns the source-mapped description fragment.

@@ -109,4 +109,5 @@ Docstring options control which convention-specific structures are parsed, which
 | `docstring-require-init-attribute-documentation` |       `false` | Include supported `self.*` attributes in class missing-attribute documentation checks.     |
 | `docstring-forbidden-function-decorators`        |          list | Report docstrings on functions decorated by exact configured no-docstring decorators.      |
 | `docstring-optional-function-decorators`         |          list | Allow functions decorated by exact configured decorators to omit docstrings.               |
+| `docstring-property-decorators`                  |          list | Treat functions decorated by exact configured decorators as properties.                    |
 | `require-explicit`                               |          list | Keep private PDF6xx rules and both dunder-method rules out of broad selectors by default.  |

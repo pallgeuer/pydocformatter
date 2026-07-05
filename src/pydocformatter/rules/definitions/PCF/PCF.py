@@ -95,7 +95,7 @@ class CommentInfo:
 
     @property
     def syntax_sensitive(self) -> bool:
-        """Return whether trailing-comment extraction needs syntax-sensitive protection.
+        """Whether trailing-comment extraction needs syntax-sensitive protection.
 
         Returns:
             bool: Whether moving this trailing comment could alter syntax around decorators, arguments, or compound
@@ -107,7 +107,7 @@ class CommentInfo:
 
     @property
     def raw_content(self) -> str:
-        """Return comment text after exactly one leading hash.
+        """Comment text after exactly one leading hash.
 
         Returns:
             str: Comment source with the syntactic `#` removed and all remaining marker/content text preserved.
@@ -116,7 +116,7 @@ class CommentInfo:
 
     @property
     def body(self) -> str:
-        """Return comment text after one optional conventional marker space.
+        """Comment text after one optional conventional marker space.
 
         Returns:
             str: Comment content used for prose and structure parsing.
@@ -126,7 +126,7 @@ class CommentInfo:
 
     @property
     def content(self) -> str:
-        """Return normalized comment content without surrounding whitespace.
+        """Normalized comment content without surrounding whitespace.
 
         Returns:
             str: Trimmed payload after the syntactic comment marker.
@@ -135,7 +135,7 @@ class CommentInfo:
 
     @property
     def is_empty(self) -> bool:
-        """Return whether the comment has no non-whitespace content.
+        """Whether the comment has no non-whitespace content.
 
         Returns:
             bool: Whether the comment payload is empty after whitespace trimming.
@@ -144,7 +144,7 @@ class CommentInfo:
 
     @property
     def is_hash_only(self) -> bool:
-        """Return whether the comment consists only of hashes and whitespace.
+        """Whether the comment consists only of hashes and whitespace.
 
         Returns:
             bool: Whether all characters are marker hashes or whitespace.

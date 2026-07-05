@@ -50,7 +50,7 @@ class CheckRunContext:
 
     @property
     def cwd_settings(self) -> CheckSettings:
-        """Return settings resolved for the current working directory.
+        """Settings resolved for the current working directory.
 
         Returns:
             CheckSettings: Settings profile data used for command-level options such as output format and parallelism.

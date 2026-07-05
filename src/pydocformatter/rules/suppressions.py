@@ -202,7 +202,7 @@ class _CommentInfo:
 
     @property
     def content(self) -> str:
-        """Return stripped comment content without the leading hash."""
+        """Stripped comment content without the leading hash."""
         return self.text.removeprefix("#").strip()
 
 
@@ -215,7 +215,7 @@ class _StringRange:
 
     @property
     def lines(self) -> frozenset[int]:
-        """Return all covered physical lines."""
+        """All covered physical lines."""
         return frozenset(range(self.start_line, self.end_line + 1))
 
 

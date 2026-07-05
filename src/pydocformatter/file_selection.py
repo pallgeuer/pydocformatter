@@ -91,7 +91,7 @@ class FileDecision:
 
     @property
     def message(self) -> str:
-        """Return the human-readable reason message for file-selection output.
+        """Human-readable reason message for file-selection output.
 
         Returns:
             str: Message corresponding to the decision reason.
