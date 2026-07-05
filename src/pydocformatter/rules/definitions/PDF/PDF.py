@@ -594,7 +594,7 @@ class PDFCategoryData:
                 if not isinstance(docstring_owner, AttributeInfo):
                     continue
                 owner_docstrings = mutable_index.setdefault(id(docstring_owner.parent), {})
-                for name in docstring_owner.targets:
+                for name in dict.fromkeys(docstring_owner.targets):
                     owner_docstrings.setdefault(name, []).append(docstring)
             docstrings_by_owner_id = MappingProxyType(
                 {owner_id: MappingProxyType({name: tuple(name_docstrings) for name, name_docstrings in owner_docstrings.items()}) for owner_id, owner_docstrings in mutable_index.items()}

@@ -15,6 +15,8 @@ from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase
 from pydocformatter.rules.models import FixAvailability
 
+_DEFAULT_OUTPUT_FORMAT = "text"
+
 
 class RuleSourceLocationMetadata(TypedDict):
     """JSON metadata for a rule source location.
@@ -98,8 +100,8 @@ def add_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) 
     parser.add_argument(
         "--output-format",
         choices=("text", "json"),
-        default="text",
-        help="Output format (default: text).",
+        default=_DEFAULT_OUTPUT_FORMAT,
+        help="Output format (default: %(default)s).",
     )
     global_args.add_global_arguments(parser, dest_prefix="command")
     parser.set_defaults(func=run)

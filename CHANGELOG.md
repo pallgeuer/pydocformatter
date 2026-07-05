@@ -34,6 +34,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added parser support for standalone colon-ended docstring lines so docstring reflow does not merge them with adjacent prose.
   - Added `PDF508` through `PDF511` to validate missing and extraneous class and module attribute documentation against an explicit attribute inventory.
   - Added `PDF512` and `PDF513` to report attached class and module attribute docstrings that duplicate owner docstring attribute documentation.
+  - Added `PDF514` through `PDF517` to report private class and module attributes documented in owner docstrings or by attached attribute docstrings.
   - Added `PDF600` through `PDF615` to report missing package, module, class, nested class, function, method, dunder method, and `__init__` docstrings across public and opt-in private variants.
   - Added `PDF616` to report docstrings on functions decorated with configured no-docstring decorators, including standard overload decorators by default.
   - Added `PDF306` and `PDF307` to report parameter and attribute documentation that only restates the documented name with generic filler.
@@ -153,6 +154,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 
 - **Documentation and settings:**
   - Updated the Ruff compatibility table with current pydocformatter-relevant Ruff rules and bidirectional replacement guidance for comment and docstring rules.
+  - Changed default-value documentation to avoid brittle repeated literals and added consistency checks for remaining generated or tabular default displays.
   - Renamed the rule list, rule suppression, and rule implementation documents to `docs/rule_list.md`, `docs/rule_suppressions.md`, and `docs/rule_implementation_spec.md`, and refocused the rule selection, file selection, and performance audit specs.
   - Renamed `PDF508` and `PDF510` user-facing rule names and diagnostics to refer to missing public class and module attribute documentation.
   - Changed the default `docstring-convention` from `none` to `pep257`, keeping `none` as the stricter no-convention profile for generic rules that can act without Google, NumPy, or reST parsing.
@@ -227,6 +229,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 
 - **Docstring formatting:**
   - Fixed configured decorator matching so dynamic call receivers such as `@typing().overload` are not treated as exact static decorator names.
+  - Fixed attached attribute docstring checks to avoid duplicate findings for repeated assignment target names and to report private attached attribute docstrings in source order.
 
 - **CLI:**
   - Fixed `parallelism` worker resolution to cap Windows process pools at the platform-supported maximum.

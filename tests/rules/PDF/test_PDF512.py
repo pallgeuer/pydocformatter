@@ -1,24 +1,14 @@
 import pydocformatter.formatter as formatter
-import pydocformatter.rules_selection as rules_selection
+import tests.rules.PDF.helpers as pdf_helpers
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention
 from pydocformatter.rules.definitions.PDF.PDF512_duplicate_class_attribute_documentation import PDF512DuplicateClassAttributeDocumentation
 
-
-def format_source(source: str, *, settings: CheckSettings | None = None) -> formatter.FormatterResult:
-    """Format source with PDF512 selected."""
-    resolved_settings = CheckSettings(select=("PDF512",), docstring_convention=DocstringConvention.GOOGLE) if settings is None else settings
-    return formatter.format_source(source, "example.py", settings=resolved_settings, rule_selection=rules_selection.select_rules(resolved_settings), fix=True)
+format_source = pdf_helpers.formatter_for("PDF512")
 
 
 def assert_pdf512_lines(source: str, expected: tuple[tuple[int, ...], ...], *, settings: CheckSettings | None = None) -> formatter.FormatterResult:
     """Assert PDF512 line findings for source."""
-    result = format_source(source, settings=settings)
-
-    assert result.new_source == source
-    assert not result.fixed_findings
-    assert tuple(finding.rule for finding in result.unfixed_findings) == (PDF512DuplicateClassAttributeDocumentation.meta,) * len(expected)
-    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == expected
-    return result
+    return pdf_helpers.assert_unfixed_lines(format_source, source, expected, meta=PDF512DuplicateClassAttributeDocumentation.meta, settings=settings)
 
 
 def test_reports_google_duplicate_class_attribute_documentation_on_attached_docstring() -> None:
@@ -68,6 +58,12 @@ def test_multi_target_class_docstring_reports_only_targets_also_documented_by_cl
     source = 'class Client:\n    """HTTP client.\n\n    Attributes:\n        primary (str): Primary endpoint.\n    """\n\n    primary = fallback = "https://example.com"\n    """Request endpoint values."""\n'
 
     assert_pdf512_lines(source, ((9,),))
+
+
+def test_repeated_assignment_target_class_docstring_duplicate_reports_once() -> None:
+    source = 'class Client:\n    """HTTP client.\n\n    Attributes:\n        _token: Internal token.\n    """\n    _token, _token = values\n    """Internal token."""\n'
+
+    assert_pdf512_lines(source, ((8,),))
 
 
 def test_tuple_unpacked_class_attribute_docstring_duplicates_each_documented_target() -> None:

@@ -31,6 +31,7 @@ from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetada
 from pydocformatter.rules_selection import RuleSelection
 
 _MAX_WINDOWS_PROCESS_POOL_WORKERS = 61
+_DEFAULT_INPUT_PATH = "."
 _ExecutorFactory = Callable[..., concurrent.futures.Executor]
 
 
@@ -255,7 +256,7 @@ def select_files(*, paths: list[str] | None, stdin_filename: str | None, resolve
         else:
             file_paths = paths
     else:
-        file_paths = ["."]
+        file_paths = [_DEFAULT_INPUT_PATH]
 
     if use_stdin and paths:
         errors.extend(f"Using standard input instead of input path: {path}" for path in paths if path != STDIN_VIRTUAL_FILE)

@@ -13,6 +13,7 @@ import pydocformatter.rules_selection as rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention
 from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
 from pydocformatter.rules.definitions.PDF.PDF import PDF
+from pydocformatter.rules.models import RuleMetadata
 
 
 class RuleFormatter(typing.Protocol):
@@ -56,6 +57,35 @@ def formatter_for(rule_code: str, *, convention: DocstringConvention = Docstring
         return formatter.format_source(source, "example.py", settings=resolved_settings, rule_selection=rules_selection.select_rules(resolved_settings), fix=fix)
 
     return format_source
+
+
+def assert_unfixed_lines(
+    format_source: RuleFormatter,
+    source: str,
+    expected: tuple[tuple[int, ...], ...],
+    *,
+    meta: RuleMetadata,
+    settings: CheckSettings | None = None,
+) -> formatter.FormatterResult:
+    """Assert unfixed findings for one diagnostic-only rule.
+
+    Args:
+        format_source: Formatter helper configured for the rule under test.
+        source: Python source text to format.
+        expected: Expected finding line-number targets.
+        meta: Rule metadata expected on every finding.
+        settings: Explicit settings overriding the formatter helper default.
+
+    Returns:
+        Formatter result produced by the configured rule.
+    """
+    result = format_source(source, settings=settings)
+
+    assert result.new_source == source
+    assert not result.fixed_findings
+    assert tuple(finding.rule for finding in result.unfixed_findings) == (meta,) * len(expected)
+    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == expected
+    return result
 
 
 def contexts_for(rule_code: str, *, convention: DocstringConvention = DocstringConvention.GOOGLE) -> RuleContextBuilder:

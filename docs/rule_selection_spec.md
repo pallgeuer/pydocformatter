@@ -147,7 +147,7 @@ Defaults:
 - `select = ["ALL"]`
 - `ignore = []`
 - `extend-select = []`
-- `require-explicit = ["PCF005", "PDF003", "PDF601", "PDF603", "PDF605", "PDF607", "PDF609", "PDF611", "PDF612", "PDF613", "PDF615"]`
+- `require-explicit` defaults to the exact rule-code selectors in the runtime `DEFAULT_REQUIRE_EXPLICIT` setting.
 
 Global enabled rules are resolved per rule:
 
@@ -161,7 +161,7 @@ Global enabled rules are resolved per rule:
 
 The output `rules` tuple preserves deterministic rule-code order after filtering.
 
-`require-explicit` is intended for opt-in rules that should remain available through exact selection without being enabled by broad selectors such as `ALL`, `PDF`, or `PCF`. For example, with the defaults, `select = ["ALL"]` does not enable `PCF005`, `PDF003`, private missing-owner-docstring rules, or dunder missing-owner-docstring rules, while exact `extend-select` entries enable them. Setting `require-explicit = []` lets broad selectors enable all selected rules.
+`require-explicit` is intended for rules that should remain available through exact selection without being enabled by broad selectors such as `ALL`, `PDF`, or `PCF`. For a rule matched by `require-explicit`, `select = ["ALL"]` does not enable it, while including the rule's exact code in `extend-select` enables it. Setting `require-explicit = []` lets broad selectors enable all selected rules.
 
 ## Rule Incompatibilities
 

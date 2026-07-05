@@ -110,7 +110,7 @@ pydocfmt intentionally uses Ruff-style file-selection settings where they map to
 Settings outside this list are not part of the Ruff compatibility surface. Per-file-ignore pattern bases follow the same source-base rules as file-selection patterns, but per-file ignores are specified in `docs/rule_selection_spec.md` because they affect rule selection after a file has already been selected.
 
 - **D1: pydocformatter include default.**
-  pydocformatter defaults to `["*.py", "*.pyi", "*.pyw"]`, because these are the file types it can process. This intentionally differs from Ruff's broader default include set.
+  pydocformatter defaults to the runtime `DEFAULT_INCLUDE` patterns, because these are the file types it can process. This intentionally differs from Ruff's broader default include set.
 - **D2: gitignore scope.**
   pydocformatter applies gitignore-style filtering through a git-based implementation. It does not add a separate Ruff-style `.ignore` file parser, only filters files below detected Git roots, and aborts file selection if gitignore checks fail.
 - **D3: show-files detail.**

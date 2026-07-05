@@ -16,6 +16,7 @@ from pydocformatter.cli import global_args, settings_check
 from pydocformatter.rules.codes import RuleCode
 
 _RULE_SELECTION_SETTING_KEYS = frozenset(definition.key for definition in settings_check.SETTINGS_SCHEMA.definitions if definition.group == settings_check.SettingsGroup.RULE_SELECTION)
+_REQUIRE_EXPLICIT_NOTICE = "Rule must by default be explicitly selected, unless it is removed from `require-explicit`."
 
 
 @dataclasses.dataclass(frozen=True)
@@ -125,6 +126,13 @@ def test_parse_rule_markdown_examples_preserves_nested_shorter_fences() -> None:
     )
 
     assert examples[0].input_source == "# ```python\n# value = 1\n# ```\n"
+
+
+def test_rule_markdown_require_explicit_notices_match_default_setting() -> None:
+    """Rules with the standard opt-in notice match the default require-explicit setting."""
+    noticed_codes = frozenset(rule_code for rule_code, rule_class in _rule_cases() if _REQUIRE_EXPLICIT_NOTICE in rule_documentation.load_rule_explanation(rule_class))
+
+    assert noticed_codes == frozenset(settings_check.DEFAULT_REQUIRE_EXPLICIT)
 
 
 def test_parse_rule_markdown_examples_rejects_reversed_finding_ranges() -> None:

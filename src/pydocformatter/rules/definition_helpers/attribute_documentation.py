@@ -338,3 +338,99 @@ def duplicate_attribute_violations(
                     )
                 )
     return tuple(violations)
+
+
+def _attached_attribute_docstring_name_pairs(data: PDF_definition.PDFCategoryData, owner: PDF_definition.DefinitionInfo) -> tuple[tuple[str, PDF_definition.DocstringInfo], ...]:
+    """Return attached attribute docstrings by source order and target order."""
+    pairs: list[tuple[str, PDF_definition.DocstringInfo]] = []
+    for docstring in data.docstrings:
+        docstring_owner = docstring.owner
+        if not isinstance(docstring_owner, PDF_definition.AttributeInfo):
+            continue
+        if docstring_owner.parent is not owner:
+            continue
+        for name in dict.fromkeys(docstring_owner.targets):
+            pairs.append((name, docstring))
+    return tuple(pairs)
+
+
+def private_owner_attribute_violations(
+    data: PDF_definition.PDFCategoryData,
+    *,
+    meta: rule_models.RuleMetadata,
+    owner_kind: PDF_definition.DefinitionKind,
+    owner_label: str,
+) -> tuple[rule_violations.RuleViolation, ...]:
+    """Return violations for private attributes documented in owner docstrings.
+
+    Args:
+        data (PDF_definition.PDFCategoryData): Prepared PDF definitions, attributes, and docstrings for the current
+            file.
+        meta (rule_models.RuleMetadata): Rule metadata to attach to diagnostics.
+        owner_kind (PDF_definition.DefinitionKind): Definition kind, module or class, whose owner docstrings should be
+            checked.
+        owner_label (str): Human-readable owner label used in diagnostic messages.
+
+    Returns:
+        tuple[rule_violations.RuleViolation, ...]: Private owner-docstring attribute documentation diagnostics.
+    """
+    violations: list[rule_violations.RuleViolation] = []
+    for definition in data.definitions:
+        if definition.kind is not owner_kind:
+            continue
+        docstring = data.docstring_for(definition)
+        if docstring is None:
+            continue
+        for attribute in documented_attributes(docstring):
+            if not is_private_attribute_name(attribute.name):
+                continue
+            violations.append(
+                rule_violations.diagnostic(
+                    meta,
+                    attribute.line_numbers,
+                    instance_message=f"{owner_label} docstring documents private attribute '{attribute.name}'",
+                )
+            )
+    return tuple(violations)
+
+
+def private_attached_attribute_violations(
+    data: PDF_definition.PDFCategoryData,
+    *,
+    meta: rule_models.RuleMetadata,
+    owner_kind: PDF_definition.DefinitionKind,
+    owner_label: str,
+    include_instance: bool,
+) -> tuple[rule_violations.RuleViolation, ...]:
+    """Return violations for attached docstrings on private attributes.
+
+    Args:
+        data (PDF_definition.PDFCategoryData): Prepared PDF definitions, attributes, and docstrings for the current
+            file.
+        meta (rule_models.RuleMetadata): Rule metadata to attach to diagnostics.
+        owner_kind (PDF_definition.DefinitionKind): Definition kind, module or class, whose attached docs should be
+            checked.
+        owner_label (str): Human-readable owner label used in diagnostic messages.
+        include_instance (bool): Whether attached `self.*` docstrings from `__init__` participate in checks.
+
+    Returns:
+        tuple[rule_violations.RuleViolation, ...]: Private attached-attribute documentation diagnostics.
+    """
+    violations: list[rule_violations.RuleViolation] = []
+    for definition in data.definitions:
+        if definition.kind is not owner_kind:
+            continue
+        for name, docstring in _attached_attribute_docstring_name_pairs(data, definition):
+            if not is_private_attribute_name(name):
+                continue
+            owner = docstring.owner
+            if isinstance(owner, PDF_definition.AttributeInfo) and owner.instance and not include_instance:
+                continue
+            violations.append(
+                rule_violations.diagnostic(
+                    meta,
+                    PDF_definition.docstring_physical_line_numbers(docstring),
+                    instance_message=f"Private {owner_label.lower()} attribute '{name}' should not have an attached docstring",
+                )
+            )
+    return tuple(violations)

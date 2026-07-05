@@ -14,6 +14,8 @@ import pydocformatter.settings as settings_core
 import pydocformatter.utils.argparser as argparser
 from pydocformatter.settings import MultiStringMap, PerFileSettingsMap, SettingDefinition, StringList
 
+_DEFAULT_OUTPUT_FORMAT = "text"
+
 
 class ConfigOptionMetadata(TypedDict):
     """JSON metadata for one configuration option.
@@ -55,8 +57,8 @@ def add_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) 
     parser.add_argument(
         "--output-format",
         choices=("text", "json"),
-        default="text",
-        help="Output format (default: text).",
+        default=_DEFAULT_OUTPUT_FORMAT,
+        help="Output format (default: %(default)s).",
     )
     global_args.add_global_arguments(parser, dest_prefix="command")
     parser.set_defaults(func=run)

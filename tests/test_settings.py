@@ -3,6 +3,7 @@ import dataclasses
 import enum
 import math
 import os
+import re
 import tempfile
 import typing
 import unittest
@@ -535,6 +536,16 @@ class TestSettings(unittest.TestCase):
         self.assertEqual(config.per_file_ignores, ())
         self.assertEqual(config.extend_per_file_ignores, ())
         self.assertEqual(config.per_file_settings, ())
+
+    def test_setting_documentation_default_mentions_match_resolved_defaults(self) -> None:
+        for definition in pydocformatter_settings.SETTINGS_SCHEMA.definitions:
+            default_match = re.search(r"defaults to (?P<default>[^.]+)\.", definition.documentation)
+            if default_match is None:
+                continue
+            config = CheckSettings()
+            expected_default = pydocformatter_settings_core.format_value(getattr(config, definition.field), definition.value_type)
+
+            self.assertEqual(default_match.group("default"), expected_default)
 
     def test_load_profile_tracks_field_source_priorities(self) -> None:
         with tempfile.TemporaryDirectory() as td:

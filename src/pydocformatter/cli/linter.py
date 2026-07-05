@@ -11,6 +11,8 @@ import pydocformatter.rules.collection as rule_collection
 import pydocformatter.utils.argparser as argparser
 from pydocformatter.rules.definition import RuleCategoryBase
 
+_DEFAULT_OUTPUT_FORMAT = "text"
+
 
 class CategoryMetadataOutput(TypedDict, total=False):
     """JSON metadata for one rule category in Ruff linter format.
@@ -45,8 +47,8 @@ def add_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) 
     parser.add_argument(
         "--output-format",
         choices=("text", "json"),
-        default="text",
-        help="Output format (default: text).",
+        default=_DEFAULT_OUTPUT_FORMAT,
+        help="Output format (default: %(default)s).",
     )
     global_args.add_global_arguments(parser, dest_prefix="command")
     parser.set_defaults(func=run)

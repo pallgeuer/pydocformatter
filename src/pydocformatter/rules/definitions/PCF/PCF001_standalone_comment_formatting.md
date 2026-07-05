@@ -204,24 +204,24 @@ Wrapping settings:
 - `line-length`: Maximum display width used when wrapping generated comment lines.
 - `line-ending`: Line ending used for generated comment lines.
 - `indent-width`: Tab display width used for wrapping calculations.
-- `url-aware-wrapping` defaults to `true`. When enabled, URL tokens remain unbroken while surrounding prose may be balanced across lines.
+- `url-aware-wrapping`: When enabled, URL tokens remain unbroken while surrounding prose may be balanced across lines.
 
 Structure settings:
 
-- `comment-join-standalone-lines` defaults to `false`. When enabled, adjacent ordinary prose lines are joined with one space. Preserved structures, list items, block quotes, and standalone colon-ended label lines remain formatting boundaries.
-- `comment-format-list-items` defaults to `true`. It recognizes `-`, `+`, `*`, `1.`, and `1)` markers, including marker indentation and more-indented continuation lines. Each item is reflowed independently with hanging indentation.
-- `comment-format-task-markers` defaults to `true`. It recognizes uppercase `TODO`, `FIXME`, `XXX`, `HACK`, `BUG`, `DEBUG`, `NOTE`, `OPTIMIZE`, and `REVIEW` markers followed by `:` and reflows their payloads with hanging indentation.
-- `comment-preserve-headings` defaults to `true`. It preserves ATX headings and paired Setext/reStructuredText adornment headings unchanged.
-- `comment-preserve-doctests` defaults to `true`. It preserves from the first line whose semantic text starts with `>>>` through the end of the physical run. An empty comment separator ends the run.
-- `comment-preserve-code-fences` defaults to `true`. It preserves regions opened by at least three backticks or tildes through a matching fence containing no trailing text. An unclosed fence protects the remainder of the run.
-- `comment-format-block-quotes` defaults to `true`. It joins and wraps consecutive quote lines with the same one-or-more-`>` prefix while retaining that prefix on every output line.
-- `comment-preserve-tables` defaults to `true`. It requires structural delimiter rows. It recognizes Markdown pipe-table delimiter rows, reStructuredText grid borders, and reStructuredText simple-table borders rather than treating every pipe as a table.
-- `comment-preserve-directives` defaults to `true`. It recognizes `.. name::`, preserves that line, and preserves following lines whose content is more indented. Formatting resumes at the next same-level ordinary line.
+- `comment-join-standalone-lines`: When enabled, adjacent ordinary prose lines are joined with one space. Preserved structures, list items, block quotes, and standalone colon-ended label lines remain formatting boundaries.
+- `comment-format-list-items`: Recognizes `-`, `+`, `*`, `1.`, and `1)` markers, including marker indentation and more-indented continuation lines. Each item is reflowed independently with hanging indentation.
+- `comment-format-task-markers`: Recognizes uppercase `TODO`, `FIXME`, `XXX`, `HACK`, `BUG`, `DEBUG`, `NOTE`, `OPTIMIZE`, and `REVIEW` markers followed by `:` and reflows their payloads with hanging indentation.
+- `comment-preserve-headings`: Preserves ATX headings and paired Setext/reStructuredText adornment headings unchanged.
+- `comment-preserve-doctests`: Preserves from the first line whose semantic text starts with `>>>` through the end of the physical run. An empty comment separator ends the run.
+- `comment-preserve-code-fences`: Preserves regions opened by at least three backticks or tildes through a matching fence containing no trailing text. An unclosed fence protects the remainder of the run.
+- `comment-format-block-quotes`: Joins and wraps consecutive quote lines with the same one-or-more-`>` prefix while retaining that prefix on every output line.
+- `comment-preserve-tables`: Requires structural delimiter rows. It recognizes Markdown pipe-table delimiter rows, reStructuredText grid borders, and reStructuredText simple-table borders rather than treating every pipe as a table.
+- `comment-preserve-directives`: Recognizes `.. name::`, preserves that line, and preserves following lines whose content is more indented. Formatting resumes at the next same-level ordinary line.
 
 Code-detection settings:
 
-- `comment-detect-code` defaults to `false`. When enabled, a run is protected when raw content starts with at least four spaces or semantic text starts with `if`, `for`, `while`, `def`, `class`, `try`, `except`, `print`, or `return`.
-- `comment-detect-statements` defaults to `true`. It parses individual lines and a dedented multiline candidate. It protects successful parses containing assignments, imports, control-flow statements, definitions, or other non-expression statements.
-- `comment-detect-expressions` defaults to `false`. It protects calls, attribute or subscript access, operators, comparisons, comprehensions, container displays, lambdas, and similar nontrivial expressions. Bare names and scalar constants are deliberately excluded.
+- `comment-detect-code`: When enabled, a run is protected when raw content starts with at least four spaces or semantic text starts with `if`, `for`, `while`, `def`, `class`, `try`, `except`, `print`, or `return`.
+- `comment-detect-statements`: Parses individual lines and a dedented multiline candidate. It protects successful parses containing assignments, imports, control-flow statements, definitions, or other non-expression statements.
+- `comment-detect-expressions`: Protects calls, attribute or subscript access, operators, comparisons, comprehensions, container displays, lambdas, and similar nontrivial expressions. Bare names and scalar constants are deliberately excluded.
 
 When list or block-quote formatting is enabled, those structural prefixes are removed before keyword or AST code detection. All positive code detections protect the whole physical run.

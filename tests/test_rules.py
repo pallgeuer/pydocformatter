@@ -1409,6 +1409,13 @@ class NonCallableViolationsRule(RuleBase):
             self.assertIn(code, extended_exact_codes)
             self.assertIn(code, disabled_requirement_codes)
 
+    def test_default_require_explicit_selectors_are_exact_known_rule_codes(self) -> None:
+        default_selectors = CheckSettings().require_explicit
+        known_rule_codes = frozenset(rule_class.meta.code.tag for rule_class in rule_collection.RULE_COLLECTION.rules)
+
+        self.assertEqual(tuple(selector for selector in default_selectors if not RuleCode.is_valid_tag(selector)), ())
+        self.assertEqual(tuple(selector for selector in default_selectors if selector not in known_rule_codes), ())
+
     def test_select_rules_reports_require_explicit_selector_errors(self) -> None:
         selection = rules_selection.select_rules(CheckSettings(require_explicit=("bad", "PDF999")))
 

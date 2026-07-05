@@ -91,23 +91,23 @@ PDF rules are grouped by contiguous hundred ranges so related rules stay close t
 ## Options
 Docstring options control which convention-specific structures are parsed, which generic structures are protected or reflowed, and how selected formatting and documentation checks behave.
 
-| Setting                                          |       Default | Effect                                                                                     |
-|--------------------------------------------------|--------------:|--------------------------------------------------------------------------------------------|
-| `docstring-convention`                           |      `pep257` | Parse Google sections, NumPy sections, or reStructuredText fields only when selected.      |
-| `docstring-parse-list-items`                     |        `true` | Parse list items as distinct structures for reflow and protection.                         |
-| `docstring-parse-headings`                       |        `true` | Parse Markdown and reStructuredText headings as protected structures.                      |
-| `docstring-parse-doctests`                       |        `true` | Parse doctest regions as protected structures.                                             |
-| `docstring-parse-code-fences`                    |        `true` | Parse fenced code blocks as protected structures.                                          |
-| `docstring-parse-block-quotes`                   |        `true` | Parse Markdown block quotes for prefix-preserving reflow.                                  |
-| `docstring-parse-tables`                         |        `true` | Parse Markdown and reStructuredText tables as protected structures.                        |
-| `docstring-parse-directives`                     |        `true` | Parse reStructuredText directives and their bodies as protected structures.                |
-| `docstring-parse-literal-blocks`                 |        `true` | Parse reStructuredText literal blocks as protected structures.                             |
-| `docstring-blank-line-style`                     |       `blank` | Choose whether inserted blank lines are blank or aligned to the docstring indentation.     |
-| `docstring-blank-line-after-last-section`        |       `false` | Keep one blank line after the final recognized Google or NumPy section when enabled.       |
-| `docstring-missing-documentation`                | `has-section` | Select which missing parameter, return, yield, exception, and attribute docs are reported. |
-| `docstring-missing-documentation-public-only`    |        `true` | Limit broad missing documentation checks to public API names when enabled.                 |
-| `docstring-require-init-attribute-documentation` |       `false` | Include supported `self.*` attributes in class missing-attribute documentation checks.     |
-| `docstring-forbidden-function-decorators`        |          list | Report docstrings on functions decorated by exact configured no-docstring decorators.      |
-| `docstring-optional-function-decorators`         |          list | Allow functions decorated by exact configured decorators to omit docstrings.               |
-| `docstring-property-decorators`                  |          list | Treat functions decorated by exact configured decorators as properties.                    |
-| `require-explicit`                               |          list | Keep private PDF6xx rules and both dunder-method rules out of broad selectors by default.  |
+| Setting                                          |       Default | Effect                                                                                        |
+|--------------------------------------------------|--------------:|-----------------------------------------------------------------------------------------------|
+| `docstring-convention`                           |      `pep257` | Parse Google sections, NumPy sections, or reStructuredText fields only when selected.         |
+| `docstring-parse-list-items`                     |        `true` | Parse list items as distinct structures for reflow and protection.                            |
+| `docstring-parse-headings`                       |        `true` | Parse Markdown and reStructuredText headings as protected structures.                         |
+| `docstring-parse-doctests`                       |        `true` | Parse doctest regions as protected structures.                                                |
+| `docstring-parse-code-fences`                    |        `true` | Parse fenced code blocks as protected structures.                                             |
+| `docstring-parse-block-quotes`                   |        `true` | Parse Markdown block quotes for prefix-preserving reflow.                                     |
+| `docstring-parse-tables`                         |        `true` | Parse Markdown and reStructuredText tables as protected structures.                           |
+| `docstring-parse-directives`                     |        `true` | Parse reStructuredText directives and their bodies as protected structures.                   |
+| `docstring-parse-literal-blocks`                 |        `true` | Parse reStructuredText literal blocks as protected structures.                                |
+| `docstring-blank-line-style`                     |       `blank` | Choose whether inserted blank lines are blank or aligned to the docstring indentation.        |
+| `docstring-blank-line-after-last-section`        |       `false` | Keep one blank line after the final recognized Google or NumPy section when enabled.          |
+| `docstring-missing-documentation`                | `has-section` | Select which missing parameter, return, yield, exception, and attribute docs are reported.    |
+| `docstring-missing-documentation-public-only`    |        `true` | Limit broad missing documentation checks to public API names when enabled.                    |
+| `docstring-require-init-attribute-documentation` |       `false` | Include supported `self.*` attributes in class missing-attribute documentation checks.        |
+| `docstring-forbidden-function-decorators`        |          list | Report docstrings on functions decorated by exact configured no-docstring decorators.         |
+| `docstring-optional-function-decorators`         |          list | Allow functions decorated by exact configured decorators to omit docstrings.                  |
+| `docstring-property-decorators`                  |          list | Treat functions decorated by exact configured decorators as properties.                       |
+| `require-explicit`                               |          list | Broad selectors skip noisy or policy-dependent checks unless the exact rule code is selected. |

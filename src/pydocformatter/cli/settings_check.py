@@ -57,7 +57,7 @@ DEFAULT_EXCLUDE = (
 DEFAULT_INCLUDE = ("*.py", "*.pyi", "*.pyw")
 DEFAULT_RULE_SELECT = (ALL_RULE_SELECTOR_TAG,)
 DEFAULT_RULE_FIXABLE = (ALL_RULE_SELECTOR_TAG,)
-DEFAULT_REQUIRE_EXPLICIT = ("PCF005", "PDF003", "PDF601", "PDF603", "PDF605", "PDF607", "PDF609", "PDF611", "PDF612", "PDF613", "PDF615")
+DEFAULT_REQUIRE_EXPLICIT = ("PCF005", "PDF003", "PDF516", "PDF517", "PDF601", "PDF603", "PDF605", "PDF607", "PDF609", "PDF611", "PDF612", "PDF613", "PDF615")
 DEFAULT_DOCSTRING_FORBIDDEN_FUNCTION_DECORATORS = ("overload", "typing.overload", "typing_extensions.overload")
 DEFAULT_DOCSTRING_OPTIONAL_FUNCTION_DECORATORS = ("override", "typing.override", "typing_extensions.override")
 DEFAULT_DOCSTRING_PROPERTY_DECORATORS = ("property", "builtins.property", "enum.property", "functools.cached_property", "abc.abstractproperty", "types.DynamicClassAttribute")
@@ -594,6 +594,11 @@ def _per_file_settings_pattern_matches(pattern: str, path: str, *, base_path: st
     return not matched if negated else matched
 
 
+def _setting_default_text(field: str, value_type: Any) -> str:
+    """Return the TOML-formatted default value for a settings field."""
+    return settings_core.format_value(getattr(CheckSettings(), field), value_type)
+
+
 SETTINGS_SCHEMA = SettingsSchema(
     settings_type=CheckSettings,
     overrides_type=CheckSettingsOverrides,
@@ -867,7 +872,7 @@ SETTINGS_SCHEMA = SettingsSchema(
             help="Comma-separated rule selector(s) to enable.",
             validator=settings_core.validate_non_empty_string_list,
             cli={"metavar": "RULE"},
-            documentation='Rule selectors to enable; defaults to ["ALL"].',
+            documentation=f"Rule selectors to enable; defaults to {_setting_default_text('select', StringList)}.",
         ),
         SettingDefinition(
             field="ignore",
@@ -894,7 +899,7 @@ SETTINGS_SCHEMA = SettingsSchema(
             help="Comma-separated rule selector(s) that require exact rule-code selection.",
             validator=settings_core.validate_non_empty_string_list,
             cli={"metavar": "RULE"},
-            documentation='Rule selectors that broad rule selectors do not enable unless an exact rule-code selector also participates; defaults to ["PCF005", "PDF003", "PDF601", "PDF603", "PDF605", "PDF607", "PDF609", "PDF611", "PDF612", "PDF613", "PDF615"].',
+            documentation=f"Rule selectors that broad rule selectors do not enable unless an exact rule-code selector also participates; defaults to {_setting_default_text('require_explicit', StringList)}.",
         ),
         SettingDefinition(
             field="per_file_ignores",
@@ -929,7 +934,7 @@ SETTINGS_SCHEMA = SettingsSchema(
             help="Comma-separated rule selector(s) eligible for automatic fixes.",
             validator=settings_core.validate_non_empty_string_list,
             cli={"metavar": "RULE"},
-            documentation='Rule selectors eligible for automatic fixes; defaults to ["ALL"].',
+            documentation=f"Rule selectors eligible for automatic fixes; defaults to {_setting_default_text('fixable', StringList)}.",
         ),
         SettingDefinition(
             field="unfixable",

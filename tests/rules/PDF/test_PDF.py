@@ -150,6 +150,16 @@ def test_prepare_collects_attribute_docstrings_and_owner_metadata() -> None:
     assert data._attached_attribute_docstrings_by_owner_id is not None
 
 
+def test_attached_attribute_docstrings_by_name_deduplicates_repeated_assignment_targets() -> None:
+    source = '_token, _token = values\n"""Token docs."""\n'
+    data = PDF.prepare(category_context(source))
+
+    attached_docstrings = data.attached_attribute_docstrings_by_name(data.definitions[0])
+
+    assert tuple(attached_docstrings) == ("_token",)
+    assert attached_docstrings["_token"] == (data.docstrings[0],)
+
+
 def test_prepare_collects_tuple_unpacked_attribute_docstrings_and_owner_metadata() -> None:
     source = 'module_primary, module_fallback = endpoints\n"""module tuple doc"""\n\n(module_nested, (module_inner, *module_rest)) = endpoints\n"""module nested tuple doc"""\n\n[module_list, module_other] = endpoints\n"""module list ignored"""\n\nclass Client:\n    class_primary, class_fallback = endpoints\n    """class tuple doc"""\n    class_supported, other.value = endpoints\n    """class mixed tuple doc"""\n    (class_nested, (class_inner, *class_rest)) = endpoints\n    """class nested tuple doc"""\n    [class_list, class_other] = endpoints\n    """class list ignored"""\n\n    def __init__(self):\n        self.instance_primary, _ = endpoints\n        """instance mixed tuple doc"""\n        (self.instance_nested, (self.instance_inner, *self.instance_rest)) = endpoints\n        """instance nested tuple doc"""\n        self.instance_supported, helper.value = endpoints\n        """instance object mixed tuple doc"""\n        [self.instance_list, self.instance_other] = endpoints\n        """instance list ignored"""\n'
     data = PDF.prepare(category_context(source))
