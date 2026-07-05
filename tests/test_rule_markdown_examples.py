@@ -64,7 +64,7 @@ def _prepared_rule_markdown_examples(rule_code: str, rule_class: type[object]) -
         selection = rules_selection.select_rules(settings)
         assert selection.errors == (), f"{rule_code} example {index}: unexpected rule selection errors: {selection.errors}"
 
-        path = f"{rule_code}_example_{index}.py"
+        path = example.path or f"{rule_code}_example_{index}.py"
         check_result = formatter.format_source(example.input_source, path, settings=settings, rule_selection=selection, fix=False)
         assert check_result.errors == (), f"{rule_code} example {index}: unexpected check errors: {check_result.errors}"
         prepared_examples.append(_PreparedRuleMarkdownExample(index=index, example=example, path=path, settings=settings, selection=selection, check_result=check_result))
@@ -292,6 +292,56 @@ value = "changed"
 
     assert examples[0].input_source == 'value = "kept"\n'
     assert examples[0].output_source == 'value = "changed"\n'
+
+
+def test_parse_rule_markdown_examples_preserves_bracketed_input_source_lines() -> None:
+    """Input-like bracketed source lines are not treated as invalid markers."""
+    examples = rule_documentation.parse_rule_markdown_examples(
+        """```pydocfmt-example
+[input]
+[input_map]
+value = "kept"
+
+[output=unchanged]
+```
+""",
+        rule_code="PDF000",
+    )
+
+    assert examples[0].input_source == '[input_map]\nvalue = "kept"\n'
+    assert examples[0].output_source == examples[0].input_source
+
+
+def test_parse_rule_markdown_examples_allows_input_paths() -> None:
+    """An input marker can carry a path for path-sensitive rules."""
+    examples = rule_documentation.parse_rule_markdown_examples(
+        """```pydocfmt-example
+[input=package/__init__.py]
+value = "kept"
+
+[output=unchanged]
+```
+""",
+        rule_code="PDF000",
+    )
+
+    assert examples[0].path == "package/__init__.py"
+
+
+def test_parse_rule_markdown_examples_rejects_invalid_input_paths() -> None:
+    """Input path markers must contain a non-empty display path without marker syntax."""
+    for marker in ("[input=]", "[input = package/module.py]", "[input=package].py]"):
+        with pytest.raises(rule_documentation.RuleMarkdownExampleParseError, match=r"invalid \[input=PATH\] marker"):
+            rule_documentation.parse_rule_markdown_examples(
+                f"""```pydocfmt-example
+{marker}
+value = "kept"
+
+[output=unchanged]
+```
+""",
+                rule_code="PDF000",
+            )
 
 
 def _validate_rule_selection_settings(rule_code: str, example_number: int, example: rule_documentation.RuleMarkdownExample) -> None:

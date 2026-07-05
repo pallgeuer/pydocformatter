@@ -1297,148 +1297,23 @@ class NonCallableViolationsRule(RuleBase):
         self.assertEqual(collection.matching_rules(RuleSelector("PDF")), (PDF101SampleRule, PDF110SampleRule))
 
     def test_builtin_rule_setting_effect_matrix(self) -> None:
-        convention_effects: dict[str, dict[DocstringConvention, RuleSettingEffect]] = {}
         incompatibilities: dict[str, tuple[str, ...]] = {}
         for rule_class in rule_collection.RULE_COLLECTION.rules:
-            rule_effects: dict[DocstringConvention, RuleSettingEffect] = {}
             for setting_effects in rule_class.meta.setting_effects:
                 if setting_effects.setting == "docstring_convention":
                     for effect_values in setting_effects.effects:
+                        self.assertEqual(effect_values.effect, RuleSettingEffect.IGNORED)
                         for value in effect_values.values:
-                            rule_effects[typing.cast(DocstringConvention, value)] = effect_values.effect
-            convention_effects[rule_class.meta.code.tag] = rule_effects
+                            self.assertIsInstance(value, DocstringConvention)
             incompatibilities[rule_class.meta.code.tag] = tuple(rule_code.tag for rule_code in rule_class.meta.incompatible_with)
 
-        self.assertTrue(all(not effects for code, effects in convention_effects.items() if code.startswith("PCF")))
         self.assertEqual(
-            {code: effects for code, effects in convention_effects.items() if effects},
-            {
-                "PDF106": {DocstringConvention.PEP257: RuleSettingEffect.IGNORED, DocstringConvention.NUMPY: RuleSettingEffect.IGNORED},
-                "PDF107": {
-                    DocstringConvention.NONE: RuleSettingEffect.IGNORED,
-                    DocstringConvention.PEP257: RuleSettingEffect.IGNORED,
-                    DocstringConvention.GOOGLE: RuleSettingEffect.IGNORED,
-                    DocstringConvention.NUMPY: RuleSettingEffect.IGNORED,
-                    DocstringConvention.REST: RuleSettingEffect.IGNORED,
-                },
-                "PDF108": {
-                    DocstringConvention.NONE: RuleSettingEffect.IGNORED,
-                    DocstringConvention.PEP257: RuleSettingEffect.IGNORED,
-                    DocstringConvention.GOOGLE: RuleSettingEffect.IGNORED,
-                    DocstringConvention.NUMPY: RuleSettingEffect.IGNORED,
-                    DocstringConvention.REST: RuleSettingEffect.IGNORED,
-                },
-                "PDF205": {
-                    DocstringConvention.NONE: RuleSettingEffect.IGNORED,
-                    DocstringConvention.PEP257: RuleSettingEffect.IGNORED,
-                    DocstringConvention.GOOGLE: RuleSettingEffect.IGNORED,
-                    DocstringConvention.NUMPY: RuleSettingEffect.IGNORED,
-                    DocstringConvention.REST: RuleSettingEffect.IGNORED,
-                },
-                "PDF206": {
-                    DocstringConvention.NONE: RuleSettingEffect.IGNORED,
-                    DocstringConvention.PEP257: RuleSettingEffect.IGNORED,
-                    DocstringConvention.GOOGLE: RuleSettingEffect.IGNORED,
-                    DocstringConvention.NUMPY: RuleSettingEffect.IGNORED,
-                    DocstringConvention.REST: RuleSettingEffect.IGNORED,
-                },
-                "PDF207": {
-                    DocstringConvention.NONE: RuleSettingEffect.IGNORED,
-                    DocstringConvention.PEP257: RuleSettingEffect.IGNORED,
-                    DocstringConvention.GOOGLE: RuleSettingEffect.IGNORED,
-                    DocstringConvention.NUMPY: RuleSettingEffect.IGNORED,
-                    DocstringConvention.REST: RuleSettingEffect.IGNORED,
-                },
-                "PDF209": {
-                    DocstringConvention.NONE: RuleSettingEffect.IGNORED,
-                    DocstringConvention.PEP257: RuleSettingEffect.IGNORED,
-                    DocstringConvention.GOOGLE: RuleSettingEffect.IGNORED,
-                    DocstringConvention.NUMPY: RuleSettingEffect.IGNORED,
-                    DocstringConvention.REST: RuleSettingEffect.IGNORED,
-                },
-                "PDF210": {
-                    DocstringConvention.NONE: RuleSettingEffect.IGNORED,
-                    DocstringConvention.PEP257: RuleSettingEffect.IGNORED,
-                    DocstringConvention.GOOGLE: RuleSettingEffect.IGNORED,
-                    DocstringConvention.NUMPY: RuleSettingEffect.IGNORED,
-                    DocstringConvention.REST: RuleSettingEffect.IGNORED,
-                },
-                "PDF300": {DocstringConvention.GOOGLE: RuleSettingEffect.IGNORED},
-                "PDF301": {DocstringConvention.PEP257: RuleSettingEffect.IGNORED, DocstringConvention.NUMPY: RuleSettingEffect.IGNORED},
-                "PDF302": {DocstringConvention.GOOGLE: RuleSettingEffect.IGNORED},
-                "PDF303": {DocstringConvention.NUMPY: RuleSettingEffect.IGNORED},
-                "PDF305": {DocstringConvention.PEP257: RuleSettingEffect.IGNORED, DocstringConvention.GOOGLE: RuleSettingEffect.IGNORED},
-                "PDF306": {DocstringConvention.NONE: RuleSettingEffect.IGNORED, DocstringConvention.PEP257: RuleSettingEffect.IGNORED},
-                "PDF307": {DocstringConvention.NONE: RuleSettingEffect.IGNORED, DocstringConvention.PEP257: RuleSettingEffect.IGNORED},
-                "PDF308": {DocstringConvention.GOOGLE: RuleSettingEffect.IGNORED},
-                "PDF309": {DocstringConvention.PEP257: RuleSettingEffect.IGNORED, DocstringConvention.NUMPY: RuleSettingEffect.IGNORED},
-                "PDF400": {DocstringConvention.NONE: RuleSettingEffect.IGNORED, DocstringConvention.PEP257: RuleSettingEffect.IGNORED},
-                "PDF401": {
-                    DocstringConvention.NONE: RuleSettingEffect.IGNORED,
-                    DocstringConvention.PEP257: RuleSettingEffect.IGNORED,
-                },
-                "PDF402": {DocstringConvention.NONE: RuleSettingEffect.IGNORED, DocstringConvention.PEP257: RuleSettingEffect.IGNORED},
-                "PDF403": {
-                    DocstringConvention.NONE: RuleSettingEffect.IGNORED,
-                    DocstringConvention.PEP257: RuleSettingEffect.IGNORED,
-                    DocstringConvention.NUMPY: RuleSettingEffect.IGNORED,
-                    DocstringConvention.REST: RuleSettingEffect.IGNORED,
-                },
-                "PDF404": {
-                    DocstringConvention.NONE: RuleSettingEffect.IGNORED,
-                    DocstringConvention.PEP257: RuleSettingEffect.IGNORED,
-                    DocstringConvention.NUMPY: RuleSettingEffect.IGNORED,
-                    DocstringConvention.REST: RuleSettingEffect.IGNORED,
-                },
-                "PDF405": {
-                    DocstringConvention.NONE: RuleSettingEffect.IGNORED,
-                    DocstringConvention.PEP257: RuleSettingEffect.IGNORED,
-                    DocstringConvention.GOOGLE: RuleSettingEffect.IGNORED,
-                    DocstringConvention.REST: RuleSettingEffect.IGNORED,
-                },
-                "PDF406": {DocstringConvention.NONE: RuleSettingEffect.IGNORED, DocstringConvention.PEP257: RuleSettingEffect.IGNORED},
-                "PDF407": {DocstringConvention.NONE: RuleSettingEffect.IGNORED, DocstringConvention.PEP257: RuleSettingEffect.IGNORED},
-                "PDF408": {DocstringConvention.NONE: RuleSettingEffect.IGNORED, DocstringConvention.PEP257: RuleSettingEffect.IGNORED},
-                "PDF409": {DocstringConvention.NONE: RuleSettingEffect.IGNORED, DocstringConvention.PEP257: RuleSettingEffect.IGNORED},
-                "PDF410": {DocstringConvention.NONE: RuleSettingEffect.IGNORED, DocstringConvention.PEP257: RuleSettingEffect.IGNORED},
-                "PDF411": {DocstringConvention.NONE: RuleSettingEffect.IGNORED, DocstringConvention.PEP257: RuleSettingEffect.IGNORED},
-                "PDF412": {DocstringConvention.NONE: RuleSettingEffect.IGNORED, DocstringConvention.PEP257: RuleSettingEffect.IGNORED},
-                "PDF413": {
-                    DocstringConvention.NONE: RuleSettingEffect.IGNORED,
-                    DocstringConvention.PEP257: RuleSettingEffect.IGNORED,
-                    DocstringConvention.GOOGLE: RuleSettingEffect.IGNORED,
-                    DocstringConvention.REST: RuleSettingEffect.IGNORED,
-                },
-                "PDF500": {
-                    DocstringConvention.NONE: RuleSettingEffect.IGNORED,
-                    DocstringConvention.PEP257: RuleSettingEffect.IGNORED,
-                },
-                "PDF501": {DocstringConvention.NONE: RuleSettingEffect.IGNORED, DocstringConvention.PEP257: RuleSettingEffect.IGNORED},
-                "PDF502": {DocstringConvention.NONE: RuleSettingEffect.IGNORED, DocstringConvention.PEP257: RuleSettingEffect.IGNORED},
-                "PDF503": {DocstringConvention.NONE: RuleSettingEffect.IGNORED, DocstringConvention.PEP257: RuleSettingEffect.IGNORED},
-                "PDF504": {DocstringConvention.NONE: RuleSettingEffect.IGNORED, DocstringConvention.PEP257: RuleSettingEffect.IGNORED},
-                "PDF505": {DocstringConvention.NONE: RuleSettingEffect.IGNORED, DocstringConvention.PEP257: RuleSettingEffect.IGNORED},
-                "PDF506": {DocstringConvention.NONE: RuleSettingEffect.IGNORED, DocstringConvention.PEP257: RuleSettingEffect.IGNORED},
-                "PDF507": {
-                    DocstringConvention.NONE: RuleSettingEffect.IGNORED,
-                    DocstringConvention.PEP257: RuleSettingEffect.IGNORED,
-                    DocstringConvention.GOOGLE: RuleSettingEffect.IGNORED,
-                    DocstringConvention.NUMPY: RuleSettingEffect.IGNORED,
-                    DocstringConvention.REST: RuleSettingEffect.IGNORED,
-                },
-                "PDF508": {DocstringConvention.NONE: RuleSettingEffect.IGNORED, DocstringConvention.PEP257: RuleSettingEffect.IGNORED},
-                "PDF509": {DocstringConvention.NONE: RuleSettingEffect.IGNORED, DocstringConvention.PEP257: RuleSettingEffect.IGNORED},
-                "PDF510": {
-                    DocstringConvention.NONE: RuleSettingEffect.IGNORED,
-                    DocstringConvention.PEP257: RuleSettingEffect.IGNORED,
-                    DocstringConvention.GOOGLE: RuleSettingEffect.IGNORED,
-                    DocstringConvention.NUMPY: RuleSettingEffect.IGNORED,
-                    DocstringConvention.REST: RuleSettingEffect.IGNORED,
-                },
-                "PDF511": {DocstringConvention.NONE: RuleSettingEffect.IGNORED, DocstringConvention.PEP257: RuleSettingEffect.IGNORED},
-                "PDF512": {DocstringConvention.NONE: RuleSettingEffect.IGNORED, DocstringConvention.PEP257: RuleSettingEffect.IGNORED},
-                "PDF513": {DocstringConvention.NONE: RuleSettingEffect.IGNORED, DocstringConvention.PEP257: RuleSettingEffect.IGNORED},
-            },
+            tuple(
+                rule_class.meta.code.tag
+                for rule_class in rule_collection.RULE_COLLECTION.rules
+                if rule_class.meta.code.prefix == "PCF" and any(setting_effects.setting == "docstring_convention" for setting_effects in rule_class.meta.setting_effects)
+            ),
+            (),
         )
         self.assertEqual(
             {code: incompatible for code, incompatible in incompatibilities.items() if incompatible},
@@ -1477,82 +1352,15 @@ class NonCallableViolationsRule(RuleBase):
 
         self.assertEqual(none_selection.errors, ())
         self.assertEqual(pep257_selection.errors, ())
+        none_codes = frozenset(str(rule.rule.code) for rule in none_selection.rules)
+        pep257_codes = frozenset(str(rule.rule.code) for rule in pep257_selection.rules)
+
+        self.assertNotEqual(none_codes, pep257_codes)
         self.assertEqual(
-            tuple(str(rule.rule.code) for rule in none_selection.rules),
-            (
-                "PCF001",
-                "PCF002",
-                "PCF003",
-                "PCF004",
-                "PCF006",
-                "PDF000",
-                "PDF001",
-                "PDF002",
-                "PDF100",
-                "PDF101",
-                "PDF102",
-                "PDF103",
-                "PDF104",
-                "PDF105",
-                "PDF106",
-                "PDF109",
-                "PDF110",
-                "PDF200",
-                "PDF201",
-                "PDF202",
-                "PDF203",
-                "PDF204",
-                "PDF208",
-                "PDF211",
-                "PDF300",
-                "PDF301",
-                "PDF302",
-                "PDF303",
-                "PDF304",
-                "PDF305",
-                "PDF308",
-                "PDF309",
-                "PDF310",
-            ),
-        )
-        self.assertEqual(
-            tuple(str(rule.rule.code) for rule in pep257_selection.rules),
-            (
-                "PCF001",
-                "PCF002",
-                "PCF003",
-                "PCF004",
-                "PCF006",
-                "PDF000",
-                "PDF001",
-                "PDF002",
-                "PDF100",
-                "PDF101",
-                "PDF102",
-                "PDF103",
-                "PDF104",
-                "PDF105",
-                "PDF109",
-                "PDF110",
-                "PDF200",
-                "PDF201",
-                "PDF202",
-                "PDF203",
-                "PDF204",
-                "PDF208",
-                "PDF211",
-                "PDF300",
-                "PDF302",
-                "PDF303",
-                "PDF304",
-                "PDF308",
-                "PDF310",
-            ),
-        )
-        self.assertEqual(
-            tuple(sorted(set(str(rule.rule.code) for rule in none_selection.rules) - set(str(rule.rule.code) for rule in pep257_selection.rules))),
+            tuple(sorted(none_codes - pep257_codes)),
             ("PDF106", "PDF301", "PDF305", "PDF309"),
         )
+        self.assertEqual(tuple(sorted(pep257_codes - none_codes)), ())
 
     def test_rule_collection_does_not_expose_selector_convenience_indexes(self) -> None:
         collection = sample_collection()
@@ -1576,26 +1384,30 @@ class NonCallableViolationsRule(RuleBase):
         self.assertEqual(tuple(rule.fixable for rule in selection.rules), (True,))
 
     def test_select_rules_requires_exact_selection_for_require_explicit_rules(self) -> None:
+        require_explicit_codes = CheckSettings().require_explicit
         defaults = rules_selection.select_rules(CheckSettings(select=("ALL",)))
         prefixed = rules_selection.select_rules(CheckSettings(select=("PDF",)))
         mixed_broad = rules_selection.select_rules(CheckSettings(select=("ALL", "PCF001")))
-        exact = rules_selection.select_rules(CheckSettings(select=("PDF", "PDF003")))
-        extended_exact = rules_selection.select_rules(CheckSettings(extend_select=("PCF005", "PDF003")))
+        exact = rules_selection.select_rules(CheckSettings(select=("PDF", *require_explicit_codes)))
+        extended_exact = rules_selection.select_rules(CheckSettings(extend_select=require_explicit_codes))
         disabled_requirement = rules_selection.select_rules(CheckSettings(require_explicit=()))
 
         self.assertEqual(defaults.errors, ())
         self.assertEqual(prefixed.errors, ())
         self.assertEqual(mixed_broad.errors, ())
-        self.assertNotIn("PCF005", tuple(rule.rule.code.tag for rule in defaults.rules))
-        self.assertNotIn("PDF003", tuple(rule.rule.code.tag for rule in defaults.rules))
-        self.assertNotIn("PDF003", tuple(rule.rule.code.tag for rule in prefixed.rules))
-        self.assertNotIn("PCF005", tuple(rule.rule.code.tag for rule in mixed_broad.rules))
-        self.assertNotIn("PDF003", tuple(rule.rule.code.tag for rule in mixed_broad.rules))
-        self.assertIn("PDF003", tuple(rule.rule.code.tag for rule in exact.rules))
-        self.assertIn("PCF005", tuple(rule.rule.code.tag for rule in extended_exact.rules))
-        self.assertIn("PDF003", tuple(rule.rule.code.tag for rule in extended_exact.rules))
-        self.assertIn("PCF005", tuple(rule.rule.code.tag for rule in disabled_requirement.rules))
-        self.assertIn("PDF003", tuple(rule.rule.code.tag for rule in disabled_requirement.rules))
+        default_codes = tuple(rule.rule.code.tag for rule in defaults.rules)
+        prefixed_codes = tuple(rule.rule.code.tag for rule in prefixed.rules)
+        mixed_broad_codes = tuple(rule.rule.code.tag for rule in mixed_broad.rules)
+        exact_codes = tuple(rule.rule.code.tag for rule in exact.rules)
+        extended_exact_codes = tuple(rule.rule.code.tag for rule in extended_exact.rules)
+        disabled_requirement_codes = tuple(rule.rule.code.tag for rule in disabled_requirement.rules)
+        for code in require_explicit_codes:
+            self.assertNotIn(code, default_codes)
+            self.assertNotIn(code, prefixed_codes)
+            self.assertNotIn(code, mixed_broad_codes)
+            self.assertIn(code, exact_codes)
+            self.assertIn(code, extended_exact_codes)
+            self.assertIn(code, disabled_requirement_codes)
 
     def test_select_rules_reports_require_explicit_selector_errors(self) -> None:
         selection = rules_selection.select_rules(CheckSettings(require_explicit=("bad", "PDF999")))

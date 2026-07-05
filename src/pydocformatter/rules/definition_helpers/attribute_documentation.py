@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import dataclasses
-import os
-import pathlib
 
 import pydocformatter.cli.settings_check as settings_check
 import pydocformatter.rules.definition_helpers.docstring_conventions as docstring_conventions
@@ -191,7 +189,7 @@ def is_public_attribute_owner(owner: PDF_definition.DefinitionInfo, *, context: 
         bool: Whether broad public-only missing-attribute checks should inspect this owner.
     """
     if owner.kind is PDF_definition.DefinitionKind.MODULE:
-        return _is_public_module_path(context.path)
+        return missing_documentation.is_public_module_path(context.path)
     return missing_documentation.is_public_definition(owner)
 
 
@@ -205,42 +203,6 @@ def is_private_attribute_name(name: str) -> bool:
         bool: Whether the name is underscore-prefixed and therefore not required by missing-attribute rules.
     """
     return name.startswith("_")
-
-
-def _is_public_module_path(path: str) -> bool:
-    """Return whether a source path names a public module or package."""
-    if os.path.exists(path):
-        return not any(part.startswith("_") for part in _existing_module_path_parts(path))
-    return not any(part.startswith("_") for part in _synthetic_module_path_parts(path))
-
-
-def _existing_module_path_parts(path: str) -> tuple[str, ...]:
-    """Return module path parts from an existing file's package suffix."""
-    pure_path = pathlib.PurePath(path)
-    parts: list[str] = []
-    stem = pure_path.stem
-    if stem != "__init__":
-        parts.append(stem)
-    parent = pathlib.Path(path).resolve().parent
-    while (parent / "__init__.py").exists():
-        parts.append(parent.name)
-        parent = parent.parent
-    return tuple(reversed(parts))
-
-
-def _synthetic_module_path_parts(path: str) -> tuple[str, ...]:
-    """Return module path parts from a non-existing display path."""
-    pure_path = pathlib.PurePath(path)
-    module_parts: list[str] = []
-    path_parts = tuple(part for part in pure_path.parts if part not in {"", ".", "..", pure_path.anchor})
-    for index, part in enumerate(path_parts):
-        if index == len(path_parts) - 1:
-            stem = pathlib.PurePath(part).stem
-            if stem != "__init__":
-                module_parts.append(stem)
-            continue
-        module_parts.append(part)
-    return tuple(module_parts)
 
 
 def missing_attribute_violations(

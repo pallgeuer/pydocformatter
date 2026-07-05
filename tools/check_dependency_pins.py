@@ -1,4 +1,19 @@
 #!/usr/bin/env python3
+"""Validate dependency pins against pre-commit hook revisions.
+
+Attributes:
+    ROOT (Path): Repository root used to locate checked configuration files.
+    PYPROJECT_PATH (Path): Repository `pyproject.toml` path that contains dependency groups.
+    PRECOMMIT_PATH (Path): Repository `.pre-commit-config.yaml` path that contains hook revisions.
+    GROUPS_TO_CHECK (tuple[str, ...]): Dependency group names that must contain exact concrete pins.
+    TOOL_PACKAGES (tuple[str, ...]): Dev dependency package names whose pins must match pre-commit hook revisions.
+    REPO_TO_PACKAGE (dict[str, str]): Mapping from pre-commit repository URLs to the package name whose pin should match
+        that repository's revision.
+    NAME_RE (re.Pattern[str]): Requirement-name pattern accepted by the exact-pin parser, including one extras block.
+    REPO_RE (re.Pattern[str]): YAML line pattern used to detect pre-commit repository entries.
+    REV_RE (re.Pattern[str]): YAML line pattern used to detect pre-commit revision entries.
+"""
+
 from __future__ import annotations
 
 import re

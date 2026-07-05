@@ -255,6 +255,7 @@ class _SourceCollector(cst.CSTVisitor):
         self._collect_string(node)
 
     def _collect_string(self, node: cst.CSTNode) -> None:
+        """Collect the physical source range for one string node."""
         code_range = self.positions[node]
         self.strings.append(_StringRange(start_line=code_range.start.line, end_line=code_range.end.line))
 
@@ -287,6 +288,7 @@ def suppression_index(module: cst.Module, *, positions: Mapping[cst.CSTNode, cst
 
 
 def _line_directives(comments: tuple[_CommentInfo, ...], *, strings: tuple[_StringRange, ...], collection: RuleCollection) -> tuple[SuppressionDirective, ...]:
+    """Return inline pydocfmt and noqa suppression directives."""
     directives: list[SuppressionDirective] = []
     for comment in comments:
         if not comment.standalone and (pydocfmt_match := directive_helpers.PYDOCFMT_BRACKET_RE.match(comment.content)) is not None and pydocfmt_match.group("action").lower() == "ignore":
@@ -309,6 +311,7 @@ def _line_directives(comments: tuple[_CommentInfo, ...], *, strings: tuple[_Stri
 
 
 def _pydocfmt_file_directives(comments: tuple[_CommentInfo, ...], *, source_line_count: int, collection: RuleCollection) -> tuple[SuppressionDirective, ...]:
+    """Return file-wide pydocfmt suppression directives."""
     directives: list[SuppressionDirective] = []
     coverage_lines = frozenset(range(1, source_line_count + 1))
     for comment in comments:
@@ -336,6 +339,7 @@ def _pydocfmt_local_directives(
     source_lines: tuple[str, ...],
     collection: RuleCollection,
 ) -> tuple[SuppressionDirective, ...]:
+    """Return local pydocfmt suppression directives attached to following source."""
     local_lines = {comment.line for comment in comments if comment.standalone and comment.pydocfmt_local}
     directives: list[SuppressionDirective] = []
     for block in _local_blocks(local_lines):
@@ -356,6 +360,7 @@ def _pydocfmt_local_directives(
 def _local_selector(
     text: str, *, target_line: int, strings: tuple[_StringRange, ...], comments_by_line: dict[int, tuple[_CommentInfo, ...]], source_lines: tuple[str, ...], collection: RuleCollection
 ) -> SuppressionSelector:
+    """Return one selector for a local suppression directive."""
     matched_codes, invalid_message = _matched_codes(text, include_invalid=True, collection=collection)
     if invalid_message is not None:
         return SuppressionSelector(text=text, matched_codes=frozenset(), coverage_lines=frozenset(), audit=True, invalid_message=invalid_message)
@@ -378,6 +383,7 @@ def _selectors(
     include_invalid: bool,
     audit_known_explicit: bool = False,
 ) -> tuple[SuppressionSelector, ...]:
+    """Return parsed selector entries for one suppression directive."""
     explicit = selectors_text is not None
     texts = (default_text,) if selectors_text is None else _selector_texts(selectors_text, include_empty=include_invalid)
     selectors: list[SuppressionSelector] = []
@@ -391,6 +397,7 @@ def _selectors(
 
 
 def _selector_texts(selectors_text: str, *, include_empty: bool) -> tuple[str, ...]:
+    """Return normalized selector text entries from a comma-separated list."""
     texts = tuple(text.strip().upper() for text in selectors_text.split(",") if text.strip())
     if texts:
         return texts
@@ -398,6 +405,7 @@ def _selector_texts(selectors_text: str, *, include_empty: bool) -> tuple[str, .
 
 
 def _matched_codes(text: str, *, include_invalid: bool, collection: RuleCollection) -> tuple[frozenset[RuleCode], str | None]:
+    """Return rule codes matched by a suppression selector."""
     if not RuleSelector.is_valid_tag(text):
         return frozenset(), f"Invalid pydocfmt suppression selector '{text}'" if include_invalid else None
     selector = RuleSelector(text)
@@ -408,6 +416,7 @@ def _matched_codes(text: str, *, include_invalid: bool, collection: RuleCollecti
 
 
 def _comments_by_line(comments: Iterable[_CommentInfo]) -> dict[int, tuple[_CommentInfo, ...]]:
+    """Return comments grouped by their physical source line."""
     grouped: dict[int, list[_CommentInfo]] = {}
     for comment in comments:
         grouped.setdefault(comment.line, []).append(comment)
@@ -415,6 +424,7 @@ def _comments_by_line(comments: Iterable[_CommentInfo]) -> dict[int, tuple[_Comm
 
 
 def _line_coverage(line: int, *, strings: tuple[_StringRange, ...]) -> frozenset[int]:
+    """Return source lines covered by a line-level suppression."""
     lines = {line}
     for string in strings:
         if string.end_line == line:
@@ -423,6 +433,7 @@ def _line_coverage(line: int, *, strings: tuple[_StringRange, ...]) -> frozenset
 
 
 def _opening_string_coverage(line: int, *, strings: tuple[_StringRange, ...]) -> frozenset[int]:
+    """Return string lines covered by a local suppression targeting an opening quote."""
     lines: set[int] = set()
     for string in strings:
         if string.start_line == line:
@@ -431,6 +442,7 @@ def _opening_string_coverage(line: int, *, strings: tuple[_StringRange, ...]) ->
 
 
 def _comment_target_coverage(line: int, *, comments_by_line: dict[int, tuple[_CommentInfo, ...]], source_lines: tuple[str, ...]) -> frozenset[int]:
+    """Return comment lines covered by a local suppression target."""
     line_comments = comments_by_line.get(line, ())
     target = next(iter(line_comments), None)
     if target is None:
@@ -452,26 +464,32 @@ def _comment_target_coverage(line: int, *, comments_by_line: dict[int, tuple[_Co
 
 
 def _continues_standalone_comment_run(first: _CommentInfo, candidate: _CommentInfo) -> bool:
+    """Return whether a comment continues a standalone comment block."""
     return candidate.indent == first.indent and _extends_standalone_comment_run(candidate)
 
 
 def _extends_standalone_comment_run(comment: _CommentInfo) -> bool:
+    """Return whether a comment can participate in a standalone comment block."""
     return comment.standalone and not _is_protected_comment(comment.text) and not _is_empty_or_hash_only(comment.text)
 
 
 def _is_empty_or_hash_only(text: str) -> bool:
+    """Return whether comment text has no content beyond marker characters."""
     return not text.strip("# \t\f")
 
 
 def _is_protected_comment(text: str) -> bool:
+    """Return whether comment text is reserved for another tool or directive."""
     return _TYPE_DIRECTIVE_RE.match(text) is not None or _TOOL_DIRECTIVE_RE.match(text) is not None
 
 
 def _has_conventional_comment_marker_spacing(text: str) -> bool:
+    """Return whether a comment marker uses conventional spacing."""
     return text == "#" or text.startswith(("# ", "#\t", "#\f"))
 
 
 def _local_blocks(local_lines: set[int]) -> tuple[tuple[int, ...], ...]:
+    """Return contiguous blocks of local pydocfmt suppression comment lines."""
     blocks: list[tuple[int, ...]] = []
     for line in sorted(local_lines):
         if blocks and line == blocks[-1][-1] + 1:
@@ -482,5 +500,6 @@ def _local_blocks(local_lines: set[int]) -> tuple[tuple[int, ...], ...]:
 
 
 def _is_pydocfmt_local_ignore(content: str) -> bool:
+    """Return whether comment content is a local pydocfmt ignore directive."""
     match = directive_helpers.PYDOCFMT_BRACKET_RE.match(content)
     return match is not None and match.group("action").lower() == "ignore"

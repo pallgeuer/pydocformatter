@@ -98,7 +98,11 @@ docstring-convention = "google"
 docstring-missing-documentation = "all-docstrings"
 comment-detect-code = true
 comment-detect-expressions = true
-extend-select = ["PCF005", "PDF003", "PDF300", "PDF302", "PDF305", "PDF510"]
+extend-select = ["PDF300", "PDF302", "PDF305", "PDF510"]
+require-explicit = []
+
+[tool.pydocfmt.per-file-ignores]
+"tests/**/test_*.py" = ["PDF6"]
 
 [tool.pydocfmt.per-file-settings]
 "tests/**/test_*.py" = { docstring-missing-documentation = "has-section" }

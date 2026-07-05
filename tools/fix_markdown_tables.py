@@ -22,18 +22,24 @@ SEPARATOR_CELL_RE = re.compile(r":?-{3,}:?")
 
 @dataclasses.dataclass(frozen=True)
 class _MarkdownLine:
+    """One Markdown line split into content and original line ending."""
+
     text: str
     ending: str
 
 
 @dataclasses.dataclass(frozen=True)
 class _Fence:
+    """Active fenced-code-block delimiter state."""
+
     marker: str
     width: int
 
 
 @dataclasses.dataclass(frozen=True)
 class _TableBlock:
+    """Contiguous Markdown pipe-table lines and their source range."""
+
     start: int
     end: int
     lines: tuple[str, ...]
@@ -41,12 +47,16 @@ class _TableBlock:
 
 @dataclasses.dataclass(frozen=True)
 class _TableRow:
+    """Parsed Markdown table row indentation and cell text."""
+
     indent: str
     cells: tuple[str, ...]
 
 
 @dataclasses.dataclass(frozen=True)
 class _FileTableStatus:
+    """Markdown table normalization result for one file."""
+
     normalized_text: str
     changed: bool
     remaining_failures: tuple[str, ...]

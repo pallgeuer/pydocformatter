@@ -36,6 +36,7 @@ class RuleMarkdownExample:
     """Structured rule Markdown example parsed from a ``pydocfmt-example`` block.
 
     Attributes:
+        path (str | None): Optional display path to use when executing the example.
         settings_text (str): TOML settings snippet declared for the example.
         input_source (str): Python source passed to pydocformatter.
         output_source (str): Expected fixed source, or the input source for unchanged examples.
@@ -43,6 +44,7 @@ class RuleMarkdownExample:
             and message.
     """
 
+    path: str | None
     settings_text: str
     input_source: str
     output_source: str
@@ -147,17 +149,21 @@ def _parse_example_block(body: str, *, rule_code: str, example_number: int) -> R
     order: list[str] = []
     current_name: str | None = None
     current_lines: list[str] = []
+    input_path: str | None = None
 
     for line in body.splitlines(keepends=True):
-        marker = _section_marker(line)
-        if marker is None:
+        section_marker = _section_marker(line, rule_code=rule_code, example_number=example_number)
+        if section_marker is None:
             if current_name is not None:
                 current_lines.append(line)
             continue
+        marker, marker_path = section_marker
         if current_name is not None:
             sections[current_name] = _section_body(current_lines)
         if marker in sections or marker in order:
             raise RuleMarkdownExampleParseError(f"{rule_code} example {example_number}: duplicate [{marker}] section")
+        if marker_path is not None:
+            input_path = marker_path
         current_name = marker
         current_lines = []
         order.append(marker)
@@ -179,10 +185,10 @@ def _parse_example_block(body: str, *, rule_code: str, example_number: int) -> R
         if output_source == input_source:
             raise RuleMarkdownExampleParseError(f"{rule_code} example {example_number}: use [output=unchanged] when output is identical to input")
     findings = _parse_findings(sections.get("findings", ""), rule_code=rule_code, example_number=example_number)
-    return RuleMarkdownExample(settings_text=settings_text, input_source=input_source, output_source=output_source, findings=findings)
+    return RuleMarkdownExample(path=input_path, settings_text=settings_text, input_source=input_source, output_source=output_source, findings=findings)
 
 
-def _section_marker(line: str) -> str | None:
+def _section_marker(line: str, *, rule_code: str, example_number: int) -> tuple[str, str | None] | None:
     """Return the structured example section name for a marker line."""
     marker = line.removesuffix("\n")
     if marker.endswith("\r"):
@@ -190,8 +196,17 @@ def _section_marker(line: str) -> str | None:
     if not marker.startswith("[") or not marker.endswith("]"):
         return None
     name = marker[1:-1]
+    if name.startswith("input="):
+        path = name.removeprefix("input=")
+        if not path or "]" in path:
+            raise RuleMarkdownExampleParseError(f"{rule_code} example {example_number}: invalid [input=PATH] marker")
+        return ("input", path)
+    if name == "input":
+        return ("input", None)
+    if name.startswith(("input ", "input\t")):
+        raise RuleMarkdownExampleParseError(f"{rule_code} example {example_number}: invalid [input=PATH] marker")
     if name in _SECTION_MARKERS:
-        return name
+        return (name, None)
     return None
 
 

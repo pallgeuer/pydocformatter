@@ -482,7 +482,7 @@ class TestCLIShowFiles(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             target = root / "a.py"
-            target.write_text("x = 1\n", encoding="utf-8")
+            target.write_text('"""Module."""\n\nx = 1\n', encoding="utf-8")
             called_settings: list[str] = []
 
             def fake_format(path: str, *, file: object = None, settings: CheckSettings, rule_selection: RuleSelection, fix: bool, write: bool) -> FormatterResult:
@@ -1440,7 +1440,7 @@ class TestCLIShowFiles(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             target = root / "a.py"
-            target.write_text('def foo():\n    """Do something."""\n    pass\n', encoding="utf-8")
+            target.write_text('"""Module."""\n\n\ndef foo():\n    """Do something."""\n    pass\n', encoding="utf-8")
             stdout = StringIO()
             argv = ["pydocfmt", "check", str(target)]
 
@@ -1684,7 +1684,7 @@ class TestCLIShowFiles(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             target = root / "a.py"
-            target.write_text("x = 1\n", encoding="utf-8")
+            target.write_text('"""Module."""\n\nx = 1\n', encoding="utf-8")
             stdout = StringIO()
 
             def fake_format(path: str, *, file: TextIO | None = None, settings: CheckSettings, rule_selection: RuleSelection, fix: bool, write: bool) -> FormatterResult:
@@ -1707,7 +1707,7 @@ class TestCLIShowFiles(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             target = root / "a.py"
-            target.write_text("x = 1\n", encoding="utf-8")
+            target.write_text('"""Module."""\n\nx = 1\n', encoding="utf-8")
             stdout = StringIO()
 
             argv = ["pydocfmt", "check", "--diff", str(target)]
@@ -1754,7 +1754,7 @@ class TestCLIShowFiles(unittest.TestCase):
             root = Path(td)
             target = root / "a.py"
             output_file = root / "reports" / "errors.txt"
-            target.write_text("x = 1\n", encoding="utf-8")
+            target.write_text('"""Module."""\n\nx = 1\n', encoding="utf-8")
             stdout = StringIO()
 
             argv = ["pydocfmt", "check", "--diff", "--output-file", str(output_file), str(target)]
@@ -2010,7 +2010,7 @@ class TestCLIShowFiles(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             target = root / "a.py"
-            target.write_text('def foo():\n    """Do something."""\n    pass\n', encoding="utf-8")
+            target.write_text('"""Module."""\n\n\ndef foo():\n    """Do something."""\n    pass\n', encoding="utf-8")
             output_file = root / "reports" / "errors.txt"
             stdout = StringIO()
             argv = ["pydocfmt", "check", str(target), "--output-file", str(output_file)]

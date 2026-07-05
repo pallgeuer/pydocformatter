@@ -466,7 +466,7 @@ class TestFormatterResults(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             target = root / "a.py"
-            target.write_text("x = 1\n", encoding="utf-8")
+            target.write_text('"""Module."""\n\nx = 1\n', encoding="utf-8")
             previous_cwd = os.getcwd()
             os.chdir(root)
             try:
@@ -475,11 +475,11 @@ class TestFormatterResults(unittest.TestCase):
                 os.chdir(previous_cwd)
 
             self.assertEqual(result.path, "a.py")
-            self.assertEqual(result.old_source, "x = 1\n")
-            self.assertEqual(result.new_source, "x = 1\n")
+            self.assertEqual(result.old_source, '"""Module."""\n\nx = 1\n')
+            self.assertEqual(result.new_source, '"""Module."""\n\nx = 1\n')
             self.assertFalse(result.modified)
             self.assertEqual(result.unfixed_findings, ())
-            self.assertEqual(target.read_text(encoding="utf-8"), "x = 1\n")
+            self.assertEqual(target.read_text(encoding="utf-8"), '"""Module."""\n\nx = 1\n')
 
     def test_rule_source_formatter_seeds_initial_check_context_without_module_code(self) -> None:
         observed_contexts: list[tuple[str, tuple[str, ...], source_text.LineBounds | None]] = []

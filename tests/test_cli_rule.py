@@ -5,6 +5,7 @@ import unittest.mock
 from io import StringIO
 
 import pydocformatter.cli.main as pydocfmt_cli
+import pydocformatter.rules.collection as rule_collection
 
 
 class TestCLIRule(unittest.TestCase):
@@ -85,9 +86,10 @@ class TestCLIRule(unittest.TestCase):
             exit_code = pydocfmt_cli.main()
 
         output = json.loads(stdout.getvalue())
+        expected_codes = tuple(str(rule_class.meta.code) for rule_class in rule_collection.RULE_COLLECTION.rules)
+
         self.assertEqual(exit_code, 0)
-        self.assertEqual(output[0]["code"], "PCF001")
-        self.assertEqual(output[-1]["code"], "PDF513")
+        self.assertEqual(tuple(rule["code"] for rule in output), expected_codes)
 
     def test_pydocfmt_rule_rejects_missing_rule(self) -> None:
         stdout = StringIO()

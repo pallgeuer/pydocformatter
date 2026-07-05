@@ -279,7 +279,7 @@ def test_pdf102_and_pdf413_cover_distinct_d406_shapes_together() -> None:
 
 def test_all_pdf_rules_converge_malformed_numpy_colon_headers_without_reflowing_them() -> None:
     source = 'def related():\n    """Return related references.\n\n    See Also:\n    Other reference.\n    """\n\ndef value():\n    """Return the value.\n\n    Returns:"""\n'
-    settings = CheckSettings(select=("PDF",), docstring_convention=DocstringConvention.NUMPY)
+    settings = CheckSettings(select=("PDF",), ignore=("PDF602",), docstring_convention=DocstringConvention.NUMPY)
     result = format_source(source, settings=settings)
 
     assert (

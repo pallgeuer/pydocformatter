@@ -8,8 +8,12 @@ Attributes:
         `select` setting.
     DEFAULT_RULE_FIXABLE (tuple[str, ...]): Initial broad fixability selector used when users do not restrict automatic
         fixes.
-    DEFAULT_REQUIRE_EXPLICIT (tuple[str, ...]): Rules that broad selectors skip so projects must opt into ASCII-only
-        comment and docstring checks deliberately.
+    DEFAULT_REQUIRE_EXPLICIT (tuple[str, ...]): Rules that broad selectors skip so projects must opt into certain checks
+        deliberately.
+    DEFAULT_DOCSTRING_FORBIDDEN_FUNCTION_DECORATORS (tuple[str, ...]): Function decorators whose definitions should not
+        have docstrings.
+    DEFAULT_DOCSTRING_OPTIONAL_FUNCTION_DECORATORS (tuple[str, ...]): Function decorators whose definitions may omit
+        docstrings.
     PARALLELISM_CONSTRAINT_MESSAGE (str): Shared validation text for the worker-count setting accepted by the check
         command.
     SETTINGS_SCHEMA (SettingsSchema[CheckSettings]): Complete `pydocfmt check` schema used for config loading, CLI
@@ -51,7 +55,9 @@ DEFAULT_EXCLUDE = (
 DEFAULT_INCLUDE = ("*.py", "*.pyi", "*.pyw")
 DEFAULT_RULE_SELECT = (ALL_RULE_SELECTOR_TAG,)
 DEFAULT_RULE_FIXABLE = (ALL_RULE_SELECTOR_TAG,)
-DEFAULT_REQUIRE_EXPLICIT = ("PCF005", "PDF003")
+DEFAULT_REQUIRE_EXPLICIT = ("PCF005", "PDF003", "PDF601", "PDF603", "PDF605", "PDF607", "PDF609", "PDF611", "PDF612", "PDF613", "PDF615")
+DEFAULT_DOCSTRING_FORBIDDEN_FUNCTION_DECORATORS = ("overload", "typing.overload", "typing_extensions.overload")
+DEFAULT_DOCSTRING_OPTIONAL_FUNCTION_DECORATORS = ("override", "typing.override", "typing_extensions.override")
 PARALLELISM_CONSTRAINT_MESSAGE = "must be 0, a fractional value greater than 0 and less than 1, or a whole number greater than or equal to 1"
 _validate_non_negative_float = settings_core.validate_float(min_value=0)
 
@@ -160,6 +166,10 @@ class CheckSettings:
             public API definitions.
         docstring_require_init_attribute_documentation (bool): Whether class missing-attribute checks require `self.*`
             attributes assigned in `__init__`.
+        docstring_forbidden_function_decorators (StringList): Exact function decorator names whose definitions should
+            not have docstrings.
+        docstring_optional_function_decorators (StringList): Exact function decorator names whose definitions may omit
+            docstrings.
         docstring_parse_list_items (bool): Whether list items are parsed as distinct docstring structures.
         docstring_parse_headings (bool): Whether Markdown and reStructuredText headings are parsed.
         docstring_parse_doctests (bool): Whether doctest regions are parsed and protected.
@@ -219,6 +229,8 @@ class CheckSettings:
     docstring_missing_documentation: DocstringMissingDocumentation = DocstringMissingDocumentation.HAS_SECTION
     docstring_missing_documentation_public_only: bool = True
     docstring_require_init_attribute_documentation: bool = False
+    docstring_forbidden_function_decorators: StringList = DEFAULT_DOCSTRING_FORBIDDEN_FUNCTION_DECORATORS
+    docstring_optional_function_decorators: StringList = DEFAULT_DOCSTRING_OPTIONAL_FUNCTION_DECORATORS
     docstring_parse_list_items: bool = True
     docstring_parse_headings: bool = True
     docstring_parse_doctests: bool = True
@@ -298,6 +310,10 @@ class CheckSettingsOverrides(TypedDict, total=False):
             public API definitions.
         docstring_require_init_attribute_documentation (bool): Whether class missing-attribute checks require `self.*`
             attributes assigned in `__init__`.
+        docstring_forbidden_function_decorators (StringList): Exact function decorator names whose definitions should
+            not have docstrings.
+        docstring_optional_function_decorators (StringList): Exact function decorator names whose definitions may omit
+            docstrings.
         docstring_parse_list_items (bool): Whether list items are parsed as distinct docstring structures.
         docstring_parse_headings (bool): Whether Markdown and reStructuredText headings are parsed.
         docstring_parse_doctests (bool): Whether doctest regions are parsed and protected.
@@ -357,6 +373,8 @@ class CheckSettingsOverrides(TypedDict, total=False):
     docstring_missing_documentation: DocstringMissingDocumentation
     docstring_missing_documentation_public_only: bool
     docstring_require_init_attribute_documentation: bool
+    docstring_forbidden_function_decorators: StringList
+    docstring_optional_function_decorators: StringList
     docstring_parse_list_items: bool
     docstring_parse_headings: bool
     docstring_parse_doctests: bool
@@ -670,6 +688,26 @@ SETTINGS_SCHEMA = SettingsSchema(
             documentation="Whether class missing-attribute documentation rules require supported `self.*` attributes assigned in `__init__`; extraneous class-attribute documentation checks always treat those attributes as present.",
         ),
         SettingDefinition(
+            field="docstring_forbidden_function_decorators",
+            value_type=StringList,
+            group=SettingsGroup.DOCSTRING_FORMATTING,
+            help="Exact function decorator names whose definitions should not have docstrings.",
+            validator=settings_core.validate_non_empty_string_list,
+            cli={"metavar": "DECORATOR"},
+            documentation="Exact function decorator names whose definitions should not have docstrings. Calls are unwrapped before matching, so `@typing.overload()` matches `typing.overload`; import aliases and project-qualified names require explicit configuration.",
+            example='docstring-forbidden-function-decorators = ["overload", "typing.overload", "typing_extensions.overload"]',
+        ),
+        SettingDefinition(
+            field="docstring_optional_function_decorators",
+            value_type=StringList,
+            group=SettingsGroup.DOCSTRING_FORMATTING,
+            help="Exact function decorator names whose definitions may omit docstrings.",
+            validator=settings_core.validate_non_empty_string_list,
+            cli={"metavar": "DECORATOR"},
+            documentation="Exact function decorator names whose definitions may omit docstrings. Calls are unwrapped before matching, so `@typing.override()` matches `typing.override`; import aliases and project-qualified names require explicit configuration.",
+            example='docstring-optional-function-decorators = ["override", "typing.override", "typing_extensions.override"]',
+        ),
+        SettingDefinition(
             field="docstring_parse_list_items",
             value_type=bool,
             group=SettingsGroup.DOCSTRING_FORMATTING,
@@ -837,7 +875,7 @@ SETTINGS_SCHEMA = SettingsSchema(
             help="Comma-separated rule selector(s) that require exact rule-code selection.",
             validator=settings_core.validate_non_empty_string_list,
             cli={"metavar": "RULE"},
-            documentation='Rule selectors that broad rule selectors do not enable unless an exact rule-code selector also participates; defaults to ["PCF005", "PDF003"].',
+            documentation='Rule selectors that broad rule selectors do not enable unless an exact rule-code selector also participates; defaults to ["PCF005", "PDF003", "PDF601", "PDF603", "PDF605", "PDF607", "PDF609", "PDF611", "PDF612", "PDF613", "PDF615"].',
         ),
         SettingDefinition(
             field="per_file_ignores",

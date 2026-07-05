@@ -68,7 +68,7 @@ class Client:
 Consistent docstring formatting improves readability and keeps documentation stable across automated formatting runs.
 
 ## Rules
-Rules in this category cover literal and quote normalization, source-level formatting, blank-line layout, first-line style, convention section style, and consistency between docstrings and signatures or attribute inventories. Reflow rules operate on the semantic regions prepared for the selected convention, while structural rules normalize spacing, section syntax, and documented parameters, return values, yields, exceptions, and attributes.
+Rules in this category cover literal and quote normalization, source-level formatting, blank-line layout, first-line style, convention section style, consistency between docstrings and signatures or attribute inventories, and missing owner docstrings. Reflow rules operate on the semantic regions prepared for the selected convention, while structural rules normalize spacing, section syntax, and documented parameters, return values, yields, exceptions, and attributes.
 
 Some PDF rules are ignored by broad selectors for every `docstring-convention` value. Because ignored setting effects are restored by exact rule-code selection, those rules are effectively opt-in by exact code even when they are not listed as `require-explicit` rules. The rule list shows this state as `Ignored` in every convention column; the `Explicit` column is reserved for rules controlled by `require-explicit`.
 
@@ -86,6 +86,7 @@ PDF rules are grouped by contiguous hundred ranges so related rules stay close t
 | `PDF3xx` | Summary and entry wording style  | Summary punctuation, imperative mood, signature duplication, capitalization, first-word wording, and generic parameter or attribute documentation.    |
 | `PDF4xx` | Section style                    | Section names, headers, underlines, section content, section order, and section punctuation.                                                          |
 | `PDF5xx` | Docstring/signature validation   | Parameter, return, yield, exception, and attribute documentation consistency.                                                                         |
+| `PDF6xx` | Owner docstring presence         | Package, module, class, nested class, function, method, dunder method, `__init__`, and decorator-driven function docstring presence.                  |
 
 ## Options
 Docstring options control which convention-specific structures are parsed, which generic structures are protected or reflowed, and how selected formatting and documentation checks behave.
@@ -106,3 +107,6 @@ Docstring options control which convention-specific structures are parsed, which
 | `docstring-missing-documentation`                | `has-section` | Select which missing parameter, return, yield, exception, and attribute docs are reported. |
 | `docstring-missing-documentation-public-only`    |        `true` | Limit broad missing documentation checks to public API names when enabled.                 |
 | `docstring-require-init-attribute-documentation` |       `false` | Include supported `self.*` attributes in class missing-attribute documentation checks.     |
+| `docstring-forbidden-function-decorators`        |          list | Report docstrings on functions decorated by exact configured no-docstring decorators.      |
+| `docstring-optional-function-decorators`         |          list | Allow functions decorated by exact configured decorators to omit docstrings.               |
+| `require-explicit`                               |          list | Keep private PDF6xx rules and both dunder-method rules out of broad selectors by default.  |

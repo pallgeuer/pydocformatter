@@ -325,6 +325,8 @@ class TestSettings(unittest.TestCase):
                 "docstring_missing_documentation",
                 "docstring_missing_documentation_public_only",
                 "docstring_require_init_attribute_documentation",
+                "docstring_forbidden_function_decorators",
+                "docstring_optional_function_decorators",
                 "docstring_parse_list_items",
                 "docstring_parse_headings",
                 "docstring_parse_doctests",
@@ -524,7 +526,7 @@ class TestSettings(unittest.TestCase):
         self.assertIs(config.output_format, OutputFormat.GROUPED)
         self.assertEqual(config.select, ("ALL",))
         self.assertEqual(config.extend_select, ())
-        self.assertEqual(config.require_explicit, ("PCF005", "PDF003"))
+        self.assertEqual(config.require_explicit, pydocformatter_settings.DEFAULT_REQUIRE_EXPLICIT)
         self.assertEqual(config.ignore, ())
         self.assertEqual(config.fixable, ("ALL",))
         self.assertEqual(config.extend_fixable, ())
@@ -994,6 +996,7 @@ class TestSettings(unittest.TestCase):
         )
 
         output = pydocformatter_settings.SETTINGS_SCHEMA.format(settings)
+        expected_require_explicit = ", ".join(f'"{selector}"' for selector in CheckSettings().require_explicit)
 
         self.assertIn("[tool.pydocfmt]\n", output)
         self.assertLess(output.index("output-format"), output.index("line-length"))
@@ -1001,7 +1004,7 @@ class TestSettings(unittest.TestCase):
         self.assertIn("parallelism = 0.0\n", output)
         self.assertIn('line-ending = "lf"\n', output)
         self.assertIn('select = ["PDF", "PCF"]\n', output)
-        self.assertIn('require-explicit = ["PCF005", "PDF003"]\n', output)
+        self.assertIn(f"require-explicit = [{expected_require_explicit}]\n", output)
         self.assertIn('per-file-ignores = {"tests/\\"quoted\\"/*.py" = ["PCF001"]}\n', output)
 
     def test_parallelism_setting_accepts_numbers(self) -> None:
@@ -1075,7 +1078,7 @@ class TestSettings(unittest.TestCase):
             global_values=pydocformatter_global_args.GlobalArgs(
                 isolated=True,
                 config_options=(
-                    'docstring-convention = "google"\ndocstring-blank-line-style = "aligned"\ndocstring-blank-line-after-last-section = true\ndocstring-missing-documentation = "all-docstrings"\ndocstring-missing-documentation-public-only = false\ndocstring-require-init-attribute-documentation = true\ndocstring-parse-tables = false',
+                    'docstring-convention = "google"\ndocstring-blank-line-style = "aligned"\ndocstring-blank-line-after-last-section = true\ndocstring-missing-documentation = "all-docstrings"\ndocstring-missing-documentation-public-only = false\ndocstring-require-init-attribute-documentation = true\ndocstring-forbidden-function-decorators = ["project.overload"]\ndocstring-optional-function-decorators = ["project.override"]\ndocstring-parse-tables = false',
                 ),
             )
         )
@@ -1088,6 +1091,8 @@ class TestSettings(unittest.TestCase):
                 docstring_missing_documentation="non-summary-docstrings",
                 docstring_missing_documentation_public_only=True,
                 docstring_require_init_attribute_documentation=False,
+                docstring_forbidden_function_decorators=("typing.overload,overload",),
+                docstring_optional_function_decorators=("typing.override,override",),
                 docstring_parse_tables=False,
             ),
         )
@@ -1097,6 +1102,8 @@ class TestSettings(unittest.TestCase):
         self.assertEqual(configured.docstring_missing_documentation, pydocformatter_settings.DocstringMissingDocumentation.ALL_DOCSTRINGS)
         self.assertFalse(configured.docstring_missing_documentation_public_only)
         self.assertTrue(configured.docstring_require_init_attribute_documentation)
+        self.assertEqual(configured.docstring_forbidden_function_decorators, ("project.overload",))
+        self.assertEqual(configured.docstring_optional_function_decorators, ("project.override",))
         self.assertFalse(configured.docstring_parse_tables)
         self.assertEqual(overridden.docstring_convention, pydocformatter_settings.DocstringConvention.NUMPY)
         self.assertEqual(overridden.docstring_blank_line_style, pydocformatter_settings.DocstringBlankLineStyle.BLANK)
@@ -1104,7 +1111,18 @@ class TestSettings(unittest.TestCase):
         self.assertEqual(overridden.docstring_missing_documentation, pydocformatter_settings.DocstringMissingDocumentation.NON_SUMMARY_DOCSTRINGS)
         self.assertTrue(overridden.docstring_missing_documentation_public_only)
         self.assertFalse(overridden.docstring_require_init_attribute_documentation)
+        self.assertEqual(overridden.docstring_forbidden_function_decorators, ("typing.overload", "overload"))
+        self.assertEqual(overridden.docstring_optional_function_decorators, ("typing.override", "override"))
         self.assertFalse(overridden.docstring_parse_tables)
+
+        empty_decorator_config = pydocformatter_settings.SETTINGS_SCHEMA.load(
+            field_overrides={
+                "docstring_forbidden_function_decorators": (),
+                "docstring_optional_function_decorators": (),
+            }
+        )
+        self.assertEqual(empty_decorator_config.docstring_forbidden_function_decorators, ())
+        self.assertEqual(empty_decorator_config.docstring_optional_function_decorators, ())
 
         config = pydocformatter_settings.SETTINGS_SCHEMA.load(
             field_overrides={

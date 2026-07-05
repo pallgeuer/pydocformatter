@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import os
+import pathlib
+
 import pydocformatter.cli.settings_check as settings_check
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 from pydocformatter.rules.definition import RuleContext
@@ -71,8 +74,51 @@ def is_public_definition(definition: PDF_definition.DefinitionInfo) -> bool:
     return True
 
 
+def is_public_module_path(path: str) -> bool:
+    """Return whether a source path names a public module or package.
+
+    Args:
+        path: Source path to classify as a Python module or package path.
+
+    Returns:
+        Whether no discovered module path component starts with an underscore.
+    """
+    if os.path.exists(path):
+        return not any(part.startswith("_") for part in _existing_module_path_parts(path))
+    return not any(part.startswith("_") for part in _synthetic_module_path_parts(path))
+
+
 def _is_private_name(name: str) -> bool:
     """Return whether a definition name is private for broad documentation checks."""
     if name in _PUBLIC_DUNDER_FUNCTIONS:
         return False
     return name.startswith("_")
+
+
+def _existing_module_path_parts(path: str) -> tuple[str, ...]:
+    """Return module path parts from an existing file's package suffix."""
+    pure_path = pathlib.PurePath(path)
+    parts: list[str] = []
+    stem = pure_path.stem
+    if stem != "__init__":
+        parts.append(stem)
+    parent = pathlib.Path(path).resolve().parent
+    while (parent / "__init__.py").exists() or (parent / "__init__.pyi").exists():
+        parts.append(parent.name)
+        parent = parent.parent
+    return tuple(reversed(parts))
+
+
+def _synthetic_module_path_parts(path: str) -> tuple[str, ...]:
+    """Return module path parts from a non-existing display path."""
+    pure_path = pathlib.PurePath(path)
+    module_parts: list[str] = []
+    path_parts = tuple(part for part in pure_path.parts if part not in {"", ".", "..", pure_path.anchor})
+    for index, part in enumerate(path_parts):
+        if index == len(path_parts) - 1:
+            stem = pathlib.PurePath(part).stem
+            if stem != "__init__":
+                module_parts.append(stem)
+            continue
+        module_parts.append(part)
+    return tuple(module_parts)

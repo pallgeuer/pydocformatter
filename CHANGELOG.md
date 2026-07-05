@@ -34,6 +34,8 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added parser support for standalone colon-ended docstring lines so docstring reflow does not merge them with adjacent prose.
   - Added `PDF508` through `PDF511` to validate missing and extraneous class and module attribute documentation against an explicit attribute inventory.
   - Added `PDF512` and `PDF513` to report attached class and module attribute docstrings that duplicate owner docstring attribute documentation.
+  - Added `PDF600` through `PDF615` to report missing package, module, class, nested class, function, method, dunder method, and `__init__` docstrings across public and opt-in private variants.
+  - Added `PDF616` to report docstrings on functions decorated with configured no-docstring decorators, including standard overload decorators by default.
   - Added `PDF306` and `PDF307` to report parameter and attribute documentation that only restates the documented name with generic filler.
   - Added `PDF308` through `PDF310` to normalize punctuation and safe first-word capitalization for parsed docstring entry descriptions.
   - Added signature-backed `PDF306` detection for variadic parameter descriptions such as `*args: Positional arguments.` and `**kwargs: Keyword arguments.`.
@@ -75,6 +77,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added `docstring-blank-line-style` with `"blank"` and `"aligned"` modes for PDF103 blank-line whitespace normalization.
   - Added `docstring-blank-line-after-last-section` to control whether PDF200 and PDF201 keep one blank line after the final recognized Google or NumPy docstring section.
   - Added `docstring-require-init-attribute-documentation` to control whether class missing-attribute documentation checks require supported `self.*` assignments from `__init__`.
+  - Added `docstring-forbidden-function-decorators` and `docstring-optional-function-decorators` to configure exact function decorators that forbid docstrings or make them optional.
   - Added `comment-trailing-extraction-syntax-aware`, enabled by default, to keep overlong trailing comments inline in syntax-sensitive positions.
   - Added `comment-trailing-extraction-content-aware`, enabled by default, to keep overlong trailing comments inline when enabled standalone comment structure/code detectors or the operator heuristic make extraction unsafe.
   - Added `comment-format-task-markers`, enabled by default, to reflow recognized task-marker comments such as `TODO:`, `FIXME:`, and `HACK:` with hanging indentation.
@@ -167,6 +170,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Changed Loupe reviewer launch planning to attach helper dependency failures directly to planned reviewer runs in one cached availability pass.
   - Changed pytest to treat warnings as errors by default.
   - Changed pytest to use pytest-xdist multiprocessing by default for local, pre-commit, and CI test runs.
+  - Reduced brittle test snapshots of built-in rule inventories while preserving coverage of rule ordering, opt-in selection behavior, and broad-profile differences.
   - Shared setup and initial check work across structured rule Markdown example assertions to reduce pytest runtime.
   - Cached rule-context source text and source lines per module state to reduce repeated LibCST source regeneration during checks.
   - Reused cached source lines and line bounds for rule-based source edits to avoid repeated line splitting.
@@ -215,6 +219,12 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Centralized quote-collision rendering for `PDF110` so one-line docstring collapse reuses the shared PDF escape and separator fallback behavior.
 
 ### Fixed
+
+- **Repository checks:**
+  - Added missing docstring summaries and documentation sections so repository `pydocfmt check` passes.
+
+- **Docstring formatting:**
+  - Fixed configured decorator matching so dynamic call receivers such as `@typing().overload` are not treated as exact static decorator names.
 
 - **CLI:**
   - Fixed `parallelism` worker resolution to cap Windows process pools at the platform-supported maximum.
