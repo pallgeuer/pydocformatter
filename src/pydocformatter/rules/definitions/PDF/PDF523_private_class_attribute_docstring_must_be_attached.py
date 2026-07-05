@@ -1,4 +1,4 @@
-"""PDF514 private-class-attribute-owner-documentation rule."""
+"""PDF523 private-class-attribute-docstring-must-be-attached rule."""
 
 from __future__ import annotations
 
@@ -14,17 +14,17 @@ from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMeta
 
 
 @rule_registration.register_rule_to(PDF)
-class PDF514PrivateClassAttributeOwnerDocumentation(RuleBase):
-    """Rule implementation for PDF514.
+class PDF523PrivateClassAttributeDocstringMustBeAttached(RuleBase):
+    """Rule implementation for PDF523.
 
     Attributes:
         meta (RuleMetadata): Static metadata used for registration, diagnostics, and rule selection.
     """
 
     meta = RuleMetadata(
-        code=RuleCode("PDF514"),
-        name="private-class-attribute-owner-documentation",
-        message="Class docstring documents a private attribute",
+        code=RuleCode("PDF523"),
+        name="private-class-attribute-docstring-must-be-attached",
+        message="Private class attribute must use attached docstring, not class docstring documentation",
         fix_availability=FixAvailability.NEVER,
         stable_since="1.0.0",
         setting_effects=(
@@ -33,7 +33,7 @@ class PDF514PrivateClassAttributeOwnerDocumentation(RuleBase):
                 effects=(RuleSettingEffectValues(effect=RuleSettingEffect.IGNORED, values=(DocstringConvention.NONE, DocstringConvention.PEP257)),),
             ),
         ),
-        incompatible_with=(),
+        incompatible_with=(RuleCode("PDF516"), RuleCode("PDF522")),
         check_kind=RuleCheckKind.STANDARD,
     )
 
@@ -48,4 +48,6 @@ class PDF514PrivateClassAttributeOwnerDocumentation(RuleBase):
             tuple[rule_violations.RuleViolation, ...]: Rule violations reported for the current source.
         """
         data = PDF.require_data(context)
-        return attribute_documentation.private_owner_attribute_violations(data, meta=cls.meta, owner_kind=PDF_definition.DefinitionKind.CLASS, owner_label="Class")
+        return attribute_documentation.attribute_docstring_must_be_attached_violations(
+            data, meta=cls.meta, owner_kind=PDF_definition.DefinitionKind.CLASS, owner_label="Class", public=False, include_instance=True
+        )

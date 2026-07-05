@@ -107,13 +107,13 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def tracked_markdown_paths() -> tuple[pathlib.Path, ...]:
-    """Return Git-tracked Markdown paths.
+    """Return present Git-tracked Markdown paths.
 
     Returns:
-        Absolute paths for Git-tracked Markdown files below the repository root.
+        Absolute paths for existing Git-tracked Markdown files below the repository root.
     """
     output = subprocess.check_output(("git", "ls-files", "*.md"), cwd=ROOT, text=True)
-    return tuple(ROOT / line for line in output.splitlines())
+    return tuple(path for line in output.splitlines() if (path := ROOT / line).exists())
 
 
 def normalize_markdown_tables_file(path: pathlib.Path, *, check: bool = False) -> bool:

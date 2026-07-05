@@ -1,4 +1,4 @@
-"""PDF516 private-class-attribute-docstring rule."""
+"""PDF518 public-class-attribute-docstring-must-be-owner rule."""
 
 from __future__ import annotations
 
@@ -13,27 +13,27 @@ from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMeta
 
 
 @rule_registration.register_rule_to(PDF)
-class PDF516PrivateClassAttributeDocstring(RuleBase):
-    """Rule implementation for PDF516.
+class PDF518PublicClassAttributeDocstringMustBeOwner(RuleBase):
+    """Rule implementation for PDF518.
 
     Attributes:
         meta (RuleMetadata): Static metadata used for registration, diagnostics, and rule selection.
     """
 
     meta = RuleMetadata(
-        code=RuleCode("PDF516"),
-        name="private-class-attribute-docstring",
-        message="Private class attribute should not have an attached docstring",
+        code=RuleCode("PDF518"),
+        name="public-class-attribute-docstring-must-be-owner",
+        message="Public class attribute must use class docstring documentation, not attached docstring",
         fix_availability=FixAvailability.NEVER,
         stable_since="1.0.0",
         setting_effects=(),
-        incompatible_with=(),
+        incompatible_with=(RuleCode("PDF519"),),
         check_kind=RuleCheckKind.STANDARD,
     )
 
     @classmethod
     def violations(cls, context: RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
-        """Return violations for attached docstrings on private class attributes.
+        """Return violations for attached docstrings on public class attributes.
 
         Args:
             context (RuleContext): Current file context with parsed module, settings, and prepared category data.
@@ -42,4 +42,6 @@ class PDF516PrivateClassAttributeDocstring(RuleBase):
             tuple[rule_violations.RuleViolation, ...]: Rule violations reported for the current source.
         """
         data = PDF.require_data(context)
-        return attribute_documentation.private_attached_attribute_violations(data, meta=cls.meta, owner_kind=PDF_definition.DefinitionKind.CLASS, owner_label="Class", include_instance=True)
+        return attribute_documentation.attribute_docstring_must_be_owner_violations(
+            data, meta=cls.meta, owner_kind=PDF_definition.DefinitionKind.CLASS, owner_label="Class", public=True, include_instance=True
+        )

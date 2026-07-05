@@ -99,6 +99,7 @@ docstring-missing-documentation = "all-docstrings"
 comment-detect-code = true
 comment-detect-expressions = true
 extend-select = ["PDF300", "PDF302", "PDF305", "PDF510"]
+ignore = ["PDF519", "PDF521", "PDF522", "PDF523", "PDF524", "PDF525"]
 require-explicit = []
 
 [tool.pydocfmt.per-file-ignores]

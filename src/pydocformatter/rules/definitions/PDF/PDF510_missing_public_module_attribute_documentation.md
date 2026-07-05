@@ -9,6 +9,8 @@ Checks that public module attributes are documented either in the module docstri
 
 The rule compares supported module-level assignments against names documented in Google `Attributes` sections, NumPy `Attributes` sections, reStructuredText `:ivar:`, `:cvar:`, `:var:`, and `:vartype:` fields, and adjacent attribute docstrings. Module assignments, annotated assignments, multi-target assignments, and tuple-unpacked assignment leaves are inventoried. Private module attributes are never required.
 
+PDF510 checks whether public module attributes have any recognized documentation. It does not care whether that documentation is in the module docstring or attached to the assignment; use PDF520 or PDF521 for a location policy, PDF511 for stale module docstring entries, and PDF513 for duplicated module attribute documentation.
+
 PDF510 is ignored by broad selectors for every docstring convention, so select `PDF510` exactly to opt into this module-level check. With the default public-only setting, files named like private modules or private packages are skipped.
 
 ## Why is this useful?

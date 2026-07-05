@@ -11,6 +11,8 @@ The rule compares names documented in Google `Attributes` sections, NumPy `Attri
 
 Findings are reported on the attached attribute docstring, not on the module docstring entry. This lets one duplicate be suppressed or removed without suppressing duplicate checks for the rest of the module docstring. If one attached docstring documents multiple targets, the rule reports one finding for each target that is also documented in the module docstring. If the module docstring repeats the same attribute entry, each repeated owner entry is reported against the attached docstring.
 
+PDF513 reports duplicate module attribute documentation but does not choose which location is preferred. Projects that enforce a strict location policy with PDF520 or PDF521 may not need PDF513, especially if the preferred location rule already makes the duplicate impossible.
+
 ## Why is this useful?
 Duplicated attribute documentation can drift when one copy is updated and the other is missed.
 

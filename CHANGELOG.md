@@ -35,6 +35,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added `PDF508` through `PDF511` to validate missing and extraneous class and module attribute documentation against an explicit attribute inventory.
   - Added `PDF512` and `PDF513` to report attached class and module attribute docstrings that duplicate owner docstring attribute documentation.
   - Added `PDF514` through `PDF517` to report private class and module attributes documented in owner docstrings or by attached attribute docstrings.
+  - Added opt-in `PDF518` through `PDF525` to enforce owner-docstring or attached-docstring placement policies for public and private class and module attribute documentation.
   - Added `PDF600` through `PDF615` to report missing package, module, class, nested class, function, method, dunder method, and `__init__` docstrings across public and opt-in private variants.
   - Added `PDF616` to report docstrings on functions decorated with configured no-docstring decorators, including standard overload decorators by default.
   - Added `PDF306` and `PDF307` to report parameter and attribute documentation that only restates the documented name with generic filler.

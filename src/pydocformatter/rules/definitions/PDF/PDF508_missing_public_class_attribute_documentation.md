@@ -11,6 +11,8 @@ The rule compares supported class attribute assignments against names documented
 
 By default, class-scope attributes are required and `self.*` assignments from `__init__` are accepted as existing attributes but are not required. Enable `docstring-require-init-attribute-documentation` to require supported `self.*` assignments too. Assignments inside methods other than `__init__`, list destructuring targets, unsupported tuple leaves, subscript targets, `cls.*`, and arbitrary object attributes are not class attribute inventory entries for this rule.
 
+PDF508 checks whether public class attributes have any recognized documentation. It does not care whether that documentation is in the class docstring or attached to the assignment; use PDF518 or PDF519 for a location policy, PDF509 for stale class docstring entries, and PDF512 for duplicated class attribute documentation.
+
 ## Why is this useful?
 Class attribute documentation can otherwise drift from the actual class surface.
 

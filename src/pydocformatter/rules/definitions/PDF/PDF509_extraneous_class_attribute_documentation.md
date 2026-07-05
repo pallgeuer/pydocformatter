@@ -11,6 +11,8 @@ The rule compares names documented in the class docstring against supported clas
 
 List destructuring targets, unsupported tuple leaves, subscript targets, `cls.*`, arbitrary object attributes, and attributes belonging to nested classes do not satisfy documentation on the containing class.
 
+PDF509 is an owner-docstring inventory check: it reports class docstring attribute entries for attributes that are not present. It does not report missing attributes, duplicate documentation, or a project's preferred documentation location; use PDF508, PDF512, or PDF518/PDF519 for those policies.
+
 ## Why is this useful?
 Stale attribute entries can mislead readers about the documented class surface.
 

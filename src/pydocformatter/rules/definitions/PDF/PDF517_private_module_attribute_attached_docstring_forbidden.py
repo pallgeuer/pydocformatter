@@ -1,4 +1,4 @@
-"""PDF517 private-module-attribute-docstring rule."""
+"""PDF517 private-module-attribute-attached-docstring-forbidden rule."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMeta
 
 
 @rule_registration.register_rule_to(PDF)
-class PDF517PrivateModuleAttributeDocstring(RuleBase):
+class PDF517PrivateModuleAttributeAttachedDocstringForbidden(RuleBase):
     """Rule implementation for PDF517.
 
     Attributes:
@@ -22,12 +22,12 @@ class PDF517PrivateModuleAttributeDocstring(RuleBase):
 
     meta = RuleMetadata(
         code=RuleCode("PDF517"),
-        name="private-module-attribute-docstring",
+        name="private-module-attribute-attached-docstring-forbidden",
         message="Private module attribute should not have an attached docstring",
         fix_availability=FixAvailability.NEVER,
         stable_since="1.0.0",
         setting_effects=(),
-        incompatible_with=(),
+        incompatible_with=(RuleCode("PDF525"),),
         check_kind=RuleCheckKind.STANDARD,
     )
 

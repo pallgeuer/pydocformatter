@@ -57,7 +57,29 @@ DEFAULT_EXCLUDE = (
 DEFAULT_INCLUDE = ("*.py", "*.pyi", "*.pyw")
 DEFAULT_RULE_SELECT = (ALL_RULE_SELECTOR_TAG,)
 DEFAULT_RULE_FIXABLE = (ALL_RULE_SELECTOR_TAG,)
-DEFAULT_REQUIRE_EXPLICIT = ("PCF005", "PDF003", "PDF516", "PDF517", "PDF601", "PDF603", "PDF605", "PDF607", "PDF609", "PDF611", "PDF612", "PDF613", "PDF615")
+DEFAULT_REQUIRE_EXPLICIT = (
+    "PCF005",
+    "PDF003",
+    "PDF516",
+    "PDF517",
+    "PDF518",
+    "PDF519",
+    "PDF520",
+    "PDF521",
+    "PDF522",
+    "PDF523",
+    "PDF524",
+    "PDF525",
+    "PDF601",
+    "PDF603",
+    "PDF605",
+    "PDF607",
+    "PDF609",
+    "PDF611",
+    "PDF612",
+    "PDF613",
+    "PDF615",
+)
 DEFAULT_DOCSTRING_FORBIDDEN_FUNCTION_DECORATORS = ("overload", "typing.overload", "typing_extensions.overload")
 DEFAULT_DOCSTRING_OPTIONAL_FUNCTION_DECORATORS = ("override", "typing.override", "typing_extensions.override")
 DEFAULT_DOCSTRING_PROPERTY_DECORATORS = ("property", "builtins.property", "enum.property", "functools.cached_property", "abc.abstractproperty", "types.DynamicClassAttribute")

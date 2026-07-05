@@ -1,14 +1,14 @@
 import pydocformatter.formatter as formatter
 import tests.rules.PDF.helpers as pdf_helpers
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention
-from pydocformatter.rules.definitions.PDF.PDF515_private_module_attribute_owner_documentation import PDF515PrivateModuleAttributeOwnerDocumentation
+from pydocformatter.rules.definitions.PDF.PDF515_private_module_attribute_owner_docstring_forbidden import PDF515PrivateModuleAttributeOwnerDocstringForbidden
 
 format_source = pdf_helpers.formatter_for("PDF515")
 
 
 def assert_pdf515_lines(source: str, expected: tuple[tuple[int, ...], ...], *, settings: CheckSettings | None = None) -> formatter.FormatterResult:
     """Assert PDF515 line findings for source."""
-    return pdf_helpers.assert_unfixed_lines(format_source, source, expected, meta=PDF515PrivateModuleAttributeOwnerDocumentation.meta, settings=settings)
+    return pdf_helpers.assert_unfixed_lines(format_source, source, expected, meta=PDF515PrivateModuleAttributeOwnerDocstringForbidden.meta, settings=settings)
 
 
 def test_reports_google_private_module_attribute_owner_documentation() -> None:
@@ -59,7 +59,7 @@ def test_broad_pdf5_selection_includes_module_private_owner_rule_under_parsed_co
     active = format_source(source, settings=CheckSettings(select=("PDF5",), docstring_convention=DocstringConvention.GOOGLE))
     inert = format_source(source, settings=CheckSettings(select=("PDF5",), docstring_convention=DocstringConvention.PEP257))
 
-    assert tuple(finding.rule for finding in active.unfixed_findings) == (PDF515PrivateModuleAttributeOwnerDocumentation.meta,)
+    assert tuple(finding.rule for finding in active.unfixed_findings) == (PDF515PrivateModuleAttributeOwnerDocstringForbidden.meta,)
     assert not inert.unfixed_findings
 
 

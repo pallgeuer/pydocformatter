@@ -1,4 +1,4 @@
-"""PDF515 private-module-attribute-owner-documentation rule."""
+"""PDF525 private-module-attribute-docstring-must-be-attached rule."""
 
 from __future__ import annotations
 
@@ -14,17 +14,17 @@ from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMeta
 
 
 @rule_registration.register_rule_to(PDF)
-class PDF515PrivateModuleAttributeOwnerDocumentation(RuleBase):
-    """Rule implementation for PDF515.
+class PDF525PrivateModuleAttributeDocstringMustBeAttached(RuleBase):
+    """Rule implementation for PDF525.
 
     Attributes:
         meta (RuleMetadata): Static metadata used for registration, diagnostics, and rule selection.
     """
 
     meta = RuleMetadata(
-        code=RuleCode("PDF515"),
-        name="private-module-attribute-owner-documentation",
-        message="Module docstring documents a private attribute",
+        code=RuleCode("PDF525"),
+        name="private-module-attribute-docstring-must-be-attached",
+        message="Private module attribute must use attached docstring, not module docstring documentation",
         fix_availability=FixAvailability.NEVER,
         stable_since="1.0.0",
         setting_effects=(
@@ -33,7 +33,7 @@ class PDF515PrivateModuleAttributeOwnerDocumentation(RuleBase):
                 effects=(RuleSettingEffectValues(effect=RuleSettingEffect.IGNORED, values=(DocstringConvention.NONE, DocstringConvention.PEP257)),),
             ),
         ),
-        incompatible_with=(),
+        incompatible_with=(RuleCode("PDF517"), RuleCode("PDF524")),
         check_kind=RuleCheckKind.STANDARD,
     )
 
@@ -48,4 +48,6 @@ class PDF515PrivateModuleAttributeOwnerDocumentation(RuleBase):
             tuple[rule_violations.RuleViolation, ...]: Rule violations reported for the current source.
         """
         data = PDF.require_data(context)
-        return attribute_documentation.private_owner_attribute_violations(data, meta=cls.meta, owner_kind=PDF_definition.DefinitionKind.MODULE, owner_label="Module")
+        return attribute_documentation.attribute_docstring_must_be_attached_violations(
+            data, meta=cls.meta, owner_kind=PDF_definition.DefinitionKind.MODULE, owner_label="Module", public=False, include_instance=False
+        )

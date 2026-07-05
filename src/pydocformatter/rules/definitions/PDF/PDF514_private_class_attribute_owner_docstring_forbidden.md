@@ -1,8 +1,10 @@
-# private-class-attribute-owner-documentation (PDF514)
+# private-class-attribute-owner-docstring-forbidden (PDF514)
 
 Fix is not available.
 
 Rule is ignored if `docstring-convention` is `none` or `pep257`.
+
+Rule is incompatible with `PDF522`.
 
 ## What it does
 Checks for private attributes documented in class docstring attribute documentation.
@@ -10,6 +12,8 @@ Checks for private attributes documented in class docstring attribute documentat
 PDF514 checks Google `Attributes` sections, NumPy `Attributes` sections, and reStructuredText `:ivar:`, `:cvar:`, `:var:`, and `:vartype:` fields when the matching convention is active. Attribute names beginning with `_` are private, including dunder-style names such as `__slots__`.
 
 The rule checks parsed primary class docstrings only. It does not require the private attribute to exist in the class inventory, and it reports repeated private entries independently. Nested class docstrings are checked as their own class docstrings. Module docstrings, function docstrings, and additional string literals after a primary class docstring are not class owner docstrings for this rule.
+
+PDF514 forbids private class attributes in class docstring attribute entries regardless of whether the attribute exists. If the project instead wants private class attributes documented as attached docstrings, use PDF523; if it wants private class attributes documented in owner docstrings, use PDF522 and do not enable PDF514.
 
 ## Why is this useful?
 Private attributes are implementation details and should usually stay out of owner docstrings that describe the public class API.

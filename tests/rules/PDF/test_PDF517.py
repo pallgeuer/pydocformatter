@@ -1,14 +1,14 @@
 import pydocformatter.formatter as formatter
 import tests.rules.PDF.helpers as pdf_helpers
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention
-from pydocformatter.rules.definitions.PDF.PDF517_private_module_attribute_docstring import PDF517PrivateModuleAttributeDocstring
+from pydocformatter.rules.definitions.PDF.PDF517_private_module_attribute_attached_docstring_forbidden import PDF517PrivateModuleAttributeAttachedDocstringForbidden
 
 format_source = pdf_helpers.formatter_for("PDF517")
 
 
 def assert_pdf517_lines(source: str, expected: tuple[tuple[int, ...], ...], *, settings: CheckSettings | None = None) -> formatter.FormatterResult:
     """Assert PDF517 line findings for source."""
-    return pdf_helpers.assert_unfixed_lines(format_source, source, expected, meta=PDF517PrivateModuleAttributeDocstring.meta, settings=settings)
+    return pdf_helpers.assert_unfixed_lines(format_source, source, expected, meta=PDF517PrivateModuleAttributeAttachedDocstringForbidden.meta, settings=settings)
 
 
 def test_reports_attached_private_module_attribute_docstring() -> None:
@@ -93,8 +93,8 @@ def test_default_broad_selection_does_not_enable_private_module_attribute_docstr
     disabled_requirement = format_source(source, settings=CheckSettings(select=("PDF5",), require_explicit=(), docstring_convention=DocstringConvention.GOOGLE))
 
     assert not broad.unfixed_findings
-    assert tuple(finding.rule for finding in exact.unfixed_findings) == (PDF517PrivateModuleAttributeDocstring.meta,)
-    assert tuple(finding.rule for finding in disabled_requirement.unfixed_findings) == (PDF517PrivateModuleAttributeDocstring.meta,)
+    assert tuple(finding.rule for finding in exact.unfixed_findings) == (PDF517PrivateModuleAttributeAttachedDocstringForbidden.meta,)
+    assert tuple(finding.rule for finding in disabled_requirement.unfixed_findings) == (PDF517PrivateModuleAttributeAttachedDocstringForbidden.meta,)
 
 
 def test_class_and_function_local_docstrings_are_ignored() -> None:

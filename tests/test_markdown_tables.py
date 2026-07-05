@@ -1,4 +1,5 @@
 import pathlib
+import subprocess
 
 import pytest
 
@@ -15,6 +16,16 @@ def test_markdown_tables_are_pycharm_style_aligned_and_minimal() -> None:
         failures.extend(markdown_tables.markdown_table_failures(path))
 
     assert not failures, f"Markdown table style failures. Run: {FIX_COMMAND}\n" + "\n".join(failures)
+
+
+def test_tracked_markdown_paths_ignores_missing_worktree_files(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Check that unstaged Markdown renames do not leave stale tracked paths."""
+    existing = tmp_path / "existing.md"
+    existing.write_text("# Existing\n", encoding="utf-8")
+    monkeypatch.setattr(markdown_tables, "ROOT", tmp_path)
+    monkeypatch.setattr(subprocess, "check_output", lambda *args, **kwargs: "existing.md\nmissing.md\n")
+
+    assert markdown_tables.tracked_markdown_paths() == (existing,)
 
 
 def test_table_failures_rejects_oversized_columns() -> None:

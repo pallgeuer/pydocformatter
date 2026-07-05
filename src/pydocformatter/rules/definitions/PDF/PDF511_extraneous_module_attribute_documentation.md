@@ -11,6 +11,8 @@ The rule compares names documented in the module docstring against supported mod
 
 Class attributes, list destructuring targets, unsupported tuple leaves, subscript targets, and arbitrary object attributes do not satisfy module-level attribute documentation.
 
+PDF511 is an owner-docstring inventory check: it reports module docstring attribute entries for attributes that are not present. It does not report missing attributes, duplicate documentation, or a project's preferred documentation location; use PDF510, PDF513, or PDF520/PDF521 for those policies.
+
 ## Why is this useful?
 Stale module attribute entries can mislead readers about available module state.
 

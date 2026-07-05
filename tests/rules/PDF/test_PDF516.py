@@ -1,14 +1,14 @@
 import pydocformatter.formatter as formatter
 import tests.rules.PDF.helpers as pdf_helpers
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention
-from pydocformatter.rules.definitions.PDF.PDF516_private_class_attribute_docstring import PDF516PrivateClassAttributeDocstring
+from pydocformatter.rules.definitions.PDF.PDF516_private_class_attribute_attached_docstring_forbidden import PDF516PrivateClassAttributeAttachedDocstringForbidden
 
 format_source = pdf_helpers.formatter_for("PDF516")
 
 
 def assert_pdf516_lines(source: str, expected: tuple[tuple[int, ...], ...], *, settings: CheckSettings | None = None) -> formatter.FormatterResult:
     """Assert PDF516 line findings for source."""
-    return pdf_helpers.assert_unfixed_lines(format_source, source, expected, meta=PDF516PrivateClassAttributeDocstring.meta, settings=settings)
+    return pdf_helpers.assert_unfixed_lines(format_source, source, expected, meta=PDF516PrivateClassAttributeAttachedDocstringForbidden.meta, settings=settings)
 
 
 def test_reports_attached_private_class_attribute_docstring() -> None:
@@ -99,8 +99,8 @@ def test_default_broad_selection_does_not_enable_private_class_attribute_docstri
     disabled_requirement = format_source(source, settings=CheckSettings(select=("PDF5",), require_explicit=(), docstring_convention=DocstringConvention.GOOGLE))
 
     assert not broad.unfixed_findings
-    assert tuple(finding.rule for finding in exact.unfixed_findings) == (PDF516PrivateClassAttributeDocstring.meta,)
-    assert tuple(finding.rule for finding in disabled_requirement.unfixed_findings) == (PDF516PrivateClassAttributeDocstring.meta,)
+    assert tuple(finding.rule for finding in exact.unfixed_findings) == (PDF516PrivateClassAttributeAttachedDocstringForbidden.meta,)
+    assert tuple(finding.rule for finding in disabled_requirement.unfixed_findings) == (PDF516PrivateClassAttributeAttachedDocstringForbidden.meta,)
 
 
 def test_module_nested_class_and_function_local_docstrings_are_ignored() -> None:

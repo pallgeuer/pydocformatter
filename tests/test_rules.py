@@ -1330,6 +1330,18 @@ class NonCallableViolationsRule(RuleBase):
                 "PDF209": ("PDF208",),
                 "PDF210": ("PDF211",),
                 "PDF211": ("PDF210",),
+                "PDF514": ("PDF522",),
+                "PDF515": ("PDF524",),
+                "PDF516": ("PDF523",),
+                "PDF517": ("PDF525",),
+                "PDF518": ("PDF519",),
+                "PDF519": ("PDF518",),
+                "PDF520": ("PDF521",),
+                "PDF521": ("PDF520",),
+                "PDF522": ("PDF514", "PDF523"),
+                "PDF523": ("PDF516", "PDF522"),
+                "PDF524": ("PDF515", "PDF525"),
+                "PDF525": ("PDF517", "PDF524"),
             },
         )
 
@@ -1388,9 +1400,15 @@ class NonCallableViolationsRule(RuleBase):
         defaults = rules_selection.select_rules(CheckSettings(select=("ALL",)))
         prefixed = rules_selection.select_rules(CheckSettings(select=("PDF",)))
         mixed_broad = rules_selection.select_rules(CheckSettings(select=("ALL", "PCF001")))
-        exact = rules_selection.select_rules(CheckSettings(select=("PDF", *require_explicit_codes)))
-        extended_exact = rules_selection.select_rules(CheckSettings(extend_select=require_explicit_codes))
         disabled_requirement = rules_selection.select_rules(CheckSettings(require_explicit=()))
+        disabled_requirement_with_policy_ignores = rules_selection.select_rules(
+            CheckSettings(
+                select=("PDF5",),
+                require_explicit=(),
+                ignore=("PDF514", "PDF515", "PDF516", "PDF517", "PDF519", "PDF521", "PDF522", "PDF524"),
+                docstring_convention=DocstringConvention.GOOGLE,
+            )
+        )
 
         self.assertEqual(defaults.errors, ())
         self.assertEqual(prefixed.errors, ())
@@ -1398,16 +1416,16 @@ class NonCallableViolationsRule(RuleBase):
         default_codes = tuple(rule.rule.code.tag for rule in defaults.rules)
         prefixed_codes = tuple(rule.rule.code.tag for rule in prefixed.rules)
         mixed_broad_codes = tuple(rule.rule.code.tag for rule in mixed_broad.rules)
-        exact_codes = tuple(rule.rule.code.tag for rule in exact.rules)
-        extended_exact_codes = tuple(rule.rule.code.tag for rule in extended_exact.rules)
         disabled_requirement_codes = tuple(rule.rule.code.tag for rule in disabled_requirement.rules)
         for code in require_explicit_codes:
             self.assertNotIn(code, default_codes)
             self.assertNotIn(code, prefixed_codes)
             self.assertNotIn(code, mixed_broad_codes)
-            self.assertIn(code, exact_codes)
-            self.assertIn(code, extended_exact_codes)
+            self.assertIn(code, tuple(rule.rule.code.tag for rule in rules_selection.select_rules(CheckSettings(select=(code,))).rules))
+            self.assertIn(code, tuple(rule.rule.code.tag for rule in rules_selection.select_rules(CheckSettings(extend_select=(code,))).rules))
+        for code in ("PCF005", "PDF003", "PDF516", "PDF517", "PDF601", "PDF603", "PDF605", "PDF607", "PDF609", "PDF611", "PDF612", "PDF613", "PDF615"):
             self.assertIn(code, disabled_requirement_codes)
+        self.assertTrue({"PDF518", "PDF520", "PDF523", "PDF525"}.issubset(rule.rule.code.tag for rule in disabled_requirement_with_policy_ignores.rules))
 
     def test_default_require_explicit_selectors_are_exact_known_rule_codes(self) -> None:
         default_selectors = CheckSettings().require_explicit

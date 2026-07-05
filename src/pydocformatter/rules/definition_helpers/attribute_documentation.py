@@ -434,3 +434,94 @@ def private_attached_attribute_violations(
                 )
             )
     return tuple(violations)
+
+
+def attribute_docstring_must_be_owner_violations(
+    data: PDF_definition.PDFCategoryData,
+    *,
+    meta: rule_models.RuleMetadata,
+    owner_kind: PDF_definition.DefinitionKind,
+    owner_label: str,
+    public: bool,
+    include_instance: bool,
+) -> tuple[rule_violations.RuleViolation, ...]:
+    """Return violations for attached attribute docstrings that should be owner documentation.
+
+    Args:
+        data (PDF_definition.PDFCategoryData): Prepared PDF definitions, attributes, and docstrings for the current
+            file.
+        meta (rule_models.RuleMetadata): Rule metadata to attach to diagnostics.
+        owner_kind (PDF_definition.DefinitionKind): Definition kind, module or class, whose attached docs should be
+            checked.
+        owner_label (str): Human-readable owner label used in diagnostic messages.
+        public (bool): Whether public attributes are reported instead of private attributes.
+        include_instance (bool): Whether attached `self.*` docstrings from `__init__` participate in checks.
+
+    Returns:
+        tuple[rule_violations.RuleViolation, ...]: Placement diagnostics for attached attribute docstrings.
+    """
+    violations: list[rule_violations.RuleViolation] = []
+    privacy_label = "Public" if public else "Private"
+    for definition in data.definitions:
+        if definition.kind is not owner_kind:
+            continue
+        for name, docstring in _attached_attribute_docstring_name_pairs(data, definition):
+            if is_private_attribute_name(name) is public:
+                continue
+            owner = docstring.owner
+            if isinstance(owner, PDF_definition.AttributeInfo) and owner.instance and not include_instance:
+                continue
+            violations.append(
+                rule_violations.diagnostic(
+                    meta,
+                    PDF_definition.docstring_physical_line_numbers(docstring),
+                    instance_message=f"{privacy_label} {owner_label.lower()} attribute '{name}' must use {owner_label.lower()} docstring documentation, not attached docstring",
+                )
+            )
+    return tuple(violations)
+
+
+def attribute_docstring_must_be_attached_violations(
+    data: PDF_definition.PDFCategoryData,
+    *,
+    meta: rule_models.RuleMetadata,
+    owner_kind: PDF_definition.DefinitionKind,
+    owner_label: str,
+    public: bool,
+    include_instance: bool,
+) -> tuple[rule_violations.RuleViolation, ...]:
+    """Return violations for owner attribute documentation that should be attached docstrings.
+
+    Args:
+        data (PDF_definition.PDFCategoryData): Prepared PDF definitions, attributes, and docstrings for the current
+            file.
+        meta (rule_models.RuleMetadata): Rule metadata to attach to diagnostics.
+        owner_kind (PDF_definition.DefinitionKind): Definition kind, module or class, whose owner docstring should be
+            checked.
+        owner_label (str): Human-readable owner label used in diagnostic messages.
+        public (bool): Whether public attributes are reported instead of private attributes.
+        include_instance (bool): Whether supported `self.*` assignments from `__init__` count as class inventory.
+
+    Returns:
+        tuple[rule_violations.RuleViolation, ...]: Placement diagnostics for owner docstring attribute documentation.
+    """
+    violations: list[rule_violations.RuleViolation] = []
+    privacy_label = "Public" if public else "Private"
+    for definition in data.definitions:
+        if definition.kind is not owner_kind:
+            continue
+        docstring = data.docstring_for(definition)
+        if docstring is None:
+            continue
+        inventory_names = {attribute.name for attribute in inventory_attributes(data, definition, include_instance=include_instance)}
+        for attribute in documented_attributes(docstring):
+            if attribute.name not in inventory_names or is_private_attribute_name(attribute.name) is public:
+                continue
+            violations.append(
+                rule_violations.diagnostic(
+                    meta,
+                    attribute.line_numbers,
+                    instance_message=f"{privacy_label} {owner_label.lower()} attribute '{attribute.name}' must use attached docstring, not {owner_label.lower()} docstring documentation",
+                )
+            )
+    return tuple(violations)
