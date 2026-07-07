@@ -114,11 +114,20 @@ def _class_attribute_required_type_violations(context: RuleContext, meta: RuleMe
     """Return class-attribute required-type violations with enum-like inversion."""
     del subject
     normal_targets = typed_documentation.class_attribute_targets(context)
-    enum_targets = tuple(
-        target
-        for target in normal_targets
-        if target.owner is not None and typed_documentation.enum_like_class(target.owner, context.settings.docstring_class_attribute_no_type_base_classes, context=context)
-    )
+    enum_like_owner_by_id: dict[int, bool] = {}
+
+    def target_owner_is_enum_like(target: typed_models.TypedDocumentationTarget) -> bool:
+        owner = target.owner
+        if owner is None:
+            return False
+        owner_id = id(owner)
+        enum_like = enum_like_owner_by_id.get(owner_id)
+        if enum_like is None:
+            enum_like = typed_documentation.enum_like_class(owner, context.settings.docstring_class_attribute_no_type_base_classes, context=context)
+            enum_like_owner_by_id[owner_id] = enum_like
+        return enum_like
+
+    enum_targets = tuple(target for target in normal_targets if target_owner_is_enum_like(target))
     enum_entries = {id(target.entry) for target in enum_targets}
     violations: list[rule_violations.RuleViolation] = []
     violations.extend(typed_documentation.required_type_violations(tuple(target for target in normal_targets if id(target.entry) not in enum_entries), meta=meta, label=label))

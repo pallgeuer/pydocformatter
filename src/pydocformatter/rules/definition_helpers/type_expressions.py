@@ -10,7 +10,9 @@ import ast
 
 import libcst as cst
 
-TypeAliasMap = dict[str, str]
+import pydocformatter.rules.definition_helpers.module_bindings as module_bindings
+
+TypeAliasMap = module_bindings.TypeAliasMap
 
 
 def module_type_aliases(module: cst.Module) -> TypeAliasMap:
@@ -22,20 +24,7 @@ def module_type_aliases(module: cst.Module) -> TypeAliasMap:
     Returns:
         TypeAliasMap: Mapping from unshadowed source names to absolute qualified import names.
     """
-    aliases: TypeAliasMap = {}
-    shadowed_names: set[str] = set()
-    for statement in module.body:
-        if isinstance(statement, cst.SimpleStatementLine) and all(isinstance(small_statement, cst.Import | cst.ImportFrom) for small_statement in statement.body):
-            for small_statement in statement.body:
-                if isinstance(small_statement, cst.Import):
-                    _record_import_aliases(small_statement, aliases)
-                elif isinstance(small_statement, cst.ImportFrom):
-                    _record_import_from_aliases(small_statement, aliases)
-            continue
-        shadowed_names.update(_top_level_bound_names(statement))
-    for name in shadowed_names:
-        aliases.pop(name, None)
-    return aliases
+    return module_bindings.module_type_aliases(module)
 
 
 def parse_type_like_expr(text: str, *, aliases: TypeAliasMap | None = None) -> ast.Expression | None:
@@ -154,62 +143,6 @@ def is_type_like_node(node: ast.AST, *, allow_sequence: bool) -> bool:
     return False
 
 
-def _record_import_aliases(statement: cst.Import, aliases: TypeAliasMap) -> None:
-    """Record aliases introduced by an absolute import statement."""
-    for alias in statement.names:
-        qualified_name = _cst_qualified_name(alias.name)
-        if qualified_name is None:
-            continue
-        asname = _asname_value(alias.asname)
-        binding = asname or qualified_name.split(".", maxsplit=1)[0]
-        aliases[binding] = qualified_name if asname is not None else binding
-
-
-def _record_import_from_aliases(statement: cst.ImportFrom, aliases: TypeAliasMap) -> None:
-    """Record aliases introduced by an absolute from-import statement."""
-    if statement.relative:
-        return
-    if statement.module is None or isinstance(statement.names, cst.ImportStar):
-        return
-    module_name = _cst_qualified_name(statement.module)
-    if module_name is None:
-        return
-    for alias in statement.names:
-        imported_name = _cst_qualified_name(alias.name)
-        if imported_name is None:
-            continue
-        binding = _asname_value(alias.asname) or imported_name.split(".", maxsplit=1)[0]
-        aliases[binding] = f"{module_name}.{imported_name}"
-
-
-def _top_level_bound_names(statement: cst.BaseStatement) -> set[str]:
-    """Return names rebound by a top-level non-import statement."""
-    if isinstance(statement, cst.FunctionDef | cst.ClassDef):
-        return {statement.name.value}
-    if isinstance(statement, cst.SimpleStatementLine):
-        names: set[str] = set()
-        for small_statement in statement.body:
-            if isinstance(small_statement, cst.Assign):
-                for target in small_statement.targets:
-                    names.update(_target_bound_names(target.target))
-            elif isinstance(small_statement, cst.AnnAssign | cst.AugAssign):
-                names.update(_target_bound_names(small_statement.target))
-        return names
-    return set()
-
-
-def _target_bound_names(target: cst.BaseExpression) -> set[str]:
-    """Return names bound by a simple assignment target."""
-    if isinstance(target, cst.Name):
-        return {target.value}
-    if isinstance(target, cst.Tuple | cst.List):
-        names: set[str] = set()
-        for element in target.elements:
-            names.update(_target_bound_names(element.value))
-        return names
-    return set()
-
-
 def _normalize_type_aliases(node: ast.expr, aliases: TypeAliasMap) -> ast.expr:
     """Return a copy of a parsed type expression with safe aliases expanded."""
     if isinstance(node, ast.Name):
@@ -239,22 +172,3 @@ def _alias_node(qualified_name: str | None) -> ast.expr | None:
         return None
     parsed = ast.parse(qualified_name, mode="eval")
     return parsed.body
-
-
-def _asname_value(asname: cst.AsName | None) -> str | None:
-    """Return a simple import alias binding name."""
-    if asname is None or not isinstance(asname.name, cst.Name):
-        return None
-    return asname.name.value
-
-
-def _cst_qualified_name(expression: cst.BaseExpression) -> str | None:
-    """Return a dotted name for static CST name and attribute expressions."""
-    if isinstance(expression, cst.Name):
-        return expression.value
-    if isinstance(expression, cst.Attribute):
-        parent = _cst_qualified_name(expression.value)
-        if parent is None:
-            return None
-        return f"{parent}.{expression.attr.value}"
-    return None

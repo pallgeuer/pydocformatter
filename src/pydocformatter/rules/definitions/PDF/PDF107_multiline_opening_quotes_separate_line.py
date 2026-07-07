@@ -4,6 +4,9 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+import libcst as cst
+
+import pydocformatter.rules.definition_helpers.string_literals as string_literals
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 import pydocformatter.rules.edits as rule_edits
 import pydocformatter.rules.registration as rule_registration
@@ -80,4 +83,43 @@ def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo, *, co
         *(PDF_definition.DocstringOutputLine(original=line, source=None, value=None) for line in docstring.structure.lines[1:]),
     )
     line_numbers = PDF_definition.docstring_value_line_numbers((first_line,))
-    return PDF_definition.planned_simple_docstring_output_change(docstring, context=context, output_lines=output_lines, line_numbers=line_numbers)
+    return _planned_fast_body_change(docstring, context=context, output_lines=output_lines, line_numbers=line_numbers) or PDF_definition.planned_simple_docstring_output_change(
+        docstring, context=context, output_lines=output_lines, line_numbers=line_numbers
+    )
+
+
+def _planned_fast_body_change(
+    docstring: PDF_definition.DocstringInfo,
+    *,
+    context: RuleContext,
+    output_lines: tuple[PDF_definition.DocstringOutputLine, ...],
+    line_numbers: tuple[int, ...],
+) -> rule_edits.PlannedSourceChange | None:
+    """Return a validated replacement without decomposing the whole literal into value fragments."""
+    if not isinstance(docstring.node, cst.SimpleString):
+        return None
+    body_source = string_literals.simple_string_body_source(docstring.node)
+    if body_source is None:
+        return None
+    first_line_source, rest_source = _split_first_body_line(body_source)
+    if first_line_source is None:
+        return None
+    moved_text = first_line_source.lstrip(" \t")
+    moved_source = f"{PDF_definition.docstring_canonical_margin(docstring, context=context, source_lines=context.source_lines)}{moved_text}"
+    replacement_body = f"{context.line_ending}{moved_source}{context.line_ending}{rest_source}"
+    expected_value = PDF_definition.docstring_output_expected_value(output_lines, preserve_trailing_newline=PDF_definition.docstring_value_ends_with_newline(docstring))
+    rendered = PDF_definition.render_docstring_output_with_separator_fallback(docstring, body_source=replacement_body, expected_value=expected_value, separator_fallback=None)
+    if rendered is None or rendered == docstring.source:
+        return None
+    return rule_edits.PlannedSourceChange(edit=rule_edits.SourceEdit(range=docstring.range, replacement=rendered), line_numbers=line_numbers, suppression_line_numbers=())
+
+
+def _split_first_body_line(body_source: str) -> tuple[str | None, str]:
+    """Return the first physical body line and remaining source after its line ending."""
+    for index, char in enumerate(body_source):
+        if char == "\r":
+            end = index + 2 if index + 1 < len(body_source) and body_source[index + 1] == "\n" else index + 1
+            return body_source[:index], body_source[end:]
+        if char == "\n":
+            return body_source[:index], body_source[index + 1 :]
+    return None, ""

@@ -78,12 +78,13 @@ def _docstring_violation(docstring: PDF_definition.DocstringInfo, *, context: Ru
         return None
     if not docstring.structure.reflow_regions or not _has_safe_source_mapping(docstring):
         return None
-    fragments = string_literals.value_fragments_for_simple_string(docstring.node, line_ending=context.line_ending)
+    source_is_value = _source_body_is_value(docstring)
+    fragments = None if source_is_value else string_literals.value_fragments_for_simple_string(docstring.node, line_ending=context.line_ending)
 
     fallback_prefix = _fallback_line_prefix(context.source_lines, docstring=docstring, context=context)
     replacements: list[_RegionReplacement] = []
     for region in docstring.structure.reflow_regions:
-        replacement = _replacement_for_region(docstring, region, context=context, fallback_prefix=fallback_prefix, fragments=fragments)
+        replacement = _replacement_for_region(docstring, region, context=context, fallback_prefix=fallback_prefix, fragments=fragments, source_is_value=source_is_value)
         if replacement is None:
             continue
         current = docstring.value[replacement.start_offset : replacement.end_offset]
@@ -96,7 +97,7 @@ def _docstring_violation(docstring: PDF_definition.DocstringInfo, *, context: Ru
     for replacement in reversed(replacements):
         value = f"{value[: replacement.start_offset]}{replacement.value_text}{value[replacement.end_offset:]}"
     line_numbers = tuple(sorted({line_number for replacement in replacements for line_number in replacement.line_numbers}))
-    change = _planned_change_from_replacements(docstring, replacements, fragments=fragments, value=value) if fragments is not None else None
+    change = _planned_change_from_replacements(docstring, replacements, fragments=fragments, value=value, source_is_value=source_is_value) if fragments is not None or source_is_value else None
     return rule_violations.violation_for_optional_planned_source_change(PDF101DocstringReflow.meta, change, line_numbers=line_numbers)
 
 
@@ -107,6 +108,7 @@ def _replacement_for_region(
     context: RuleContext,
     fallback_prefix: str,
     fragments: tuple[string_literals.StringValueFragment, ...] | None,
+    source_is_value: bool,
 ) -> _RegionReplacement | None:
     """Return generated evaluated-value text for one reflow region."""
     source_line_numbers = _source_line_numbers_for_region(docstring, region)
@@ -129,6 +131,7 @@ def _replacement_for_region(
             subsequent_indent=region.subsequent_indent,
             tab_width=context.settings.indent_width,
             fragments=fragments,
+            source_is_value=source_is_value,
             url_aware=context.settings.url_aware_wrapping,
         )
         if not wrapped:
@@ -151,6 +154,7 @@ def _replacement_for_region(
         subsequent_indent=region.subsequent_indent,
         tab_width=context.settings.indent_width,
         fragments=fragments,
+        source_is_value=source_is_value,
         url_aware=context.settings.url_aware_wrapping,
     )
     if not wrapped:
@@ -213,9 +217,22 @@ def _wrapped_region_lines(
     subsequent_indent: str,
     tab_width: int,
     fragments: tuple[string_literals.StringValueFragment, ...] | None,
+    source_is_value: bool,
     url_aware: bool,
 ) -> tuple[string_literals.WrappedSourceLine, ...]:
     """Return normalized wrapped region lines."""
+    if source_is_value:
+        return string_literals.wrap_source_words(
+            _source_words_for_region_value(region),
+            width=max(1, min(initial_width, subsequent_width)),
+            initial_indent=initial_indent,
+            subsequent_indent=subsequent_indent,
+            tab_width=tab_width,
+            initial_width=initial_width,
+            subsequent_width=subsequent_width,
+            final_suffix_width=final_suffix_width,
+            url_aware=url_aware,
+        )
     if fragments is None:
         return string_literals.wrap_source_words(
             tuple(
@@ -257,6 +274,11 @@ def _source_words_for_region(region: PDF_definition.ReflowRegion, *, fragments: 
     return tuple(words)
 
 
+def _source_words_for_region_value(region: PDF_definition.ReflowRegion) -> tuple[string_literals.SourceWord, ...]:
+    """Return source-aware words when value text is also source text."""
+    return tuple(string_literals.SourceWord(value=word, source=word) for line in region.lines for word in line.text.split())
+
+
 def _render_region_replacement(
     docstring: PDF_definition.DocstringInfo,
     region: PDF_definition.ReflowRegion,
@@ -282,8 +304,9 @@ def _planned_change_from_replacements(
     docstring: PDF_definition.DocstringInfo,
     replacements: list[_RegionReplacement],
     *,
-    fragments: tuple[string_literals.StringValueFragment, ...],
+    fragments: tuple[string_literals.StringValueFragment, ...] | None,
     value: str,
+    source_is_value: bool,
 ) -> rule_edits.PlannedSourceChange | None:
     """Return a source edit after applying source-preserving replacements."""
     if not isinstance(docstring.node, cst.SimpleString):
@@ -291,10 +314,12 @@ def _planned_change_from_replacements(
     source_chunks: list[str] = []
     cursor = 0
     for replacement in sorted(replacements, key=lambda item: item.start_offset):
-        source_chunks.append(string_literals.source_for_value_slice(fragments, cursor, replacement.start_offset))
+        source_chunks.append(
+            docstring.value[cursor : replacement.start_offset] if source_is_value else string_literals.source_for_value_slice(_require_fragments(fragments), cursor, replacement.start_offset)
+        )
         source_chunks.append(replacement.source_text)
         cursor = replacement.end_offset
-    source_chunks.append(string_literals.source_for_value_slice(fragments, cursor, len(fragments)))
+    source_chunks.append(docstring.value[cursor:] if source_is_value else string_literals.source_for_value_slice(_require_fragments(fragments), cursor, len(_require_fragments(fragments))))
     rendered = string_literals.render_simple_string_from_body_source(docstring.node.prefix, docstring.node.quote, "".join(source_chunks), expected_value=value)
     if rendered is None or rendered == docstring.source:
         return None
@@ -308,6 +333,21 @@ def _planned_change_from_replacements(
 def _has_safe_source_mapping(docstring: PDF_definition.DocstringInfo) -> bool:
     """Return whether evaluated lines can be rewritten as literal body text."""
     return all(line.source_line_number is not None for line in docstring.structure.lines)
+
+
+def _source_body_is_value(docstring: PDF_definition.DocstringInfo) -> bool:
+    """Return whether the simple-string body source exactly matches its evaluated value."""
+    if not isinstance(docstring.node, cst.SimpleString):
+        return False
+    body_source = string_literals.simple_string_body_source(docstring.node)
+    return body_source == docstring.value and ("r" in docstring.node.prefix.lower() or "\\" not in body_source)
+
+
+def _require_fragments(fragments: tuple[string_literals.StringValueFragment, ...] | None) -> tuple[string_literals.StringValueFragment, ...]:
+    """Return source fragments after narrowing an optional value."""
+    if fragments is None:
+        raise AssertionError("Expected source fragments for non-direct docstring source")
+    return fragments
 
 
 def _line_base_prefix(docstring: PDF_definition.DocstringInfo, line_index: int, *, first_generated_line: bool, fallback_prefix: str) -> str:

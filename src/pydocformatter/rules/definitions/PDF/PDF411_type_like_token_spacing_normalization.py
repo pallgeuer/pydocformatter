@@ -107,7 +107,7 @@ def _results(context: RuleContext, *, rule: RuleMetadata) -> tuple[rule_violatio
             section_edits.replace_value_line_span(value_lines, line_replacement.line, replacement, line_replacement.text)
         if not replacements and not unfixable_line_numbers:
             continue
-        change = section_edits.planned_replacement_change(docstring, context=context, replacements=tuple(replacements), value_lines=value_lines)
+        change = section_edits.planned_replacement_changes(docstring, context=context, replacements=tuple(replacements), value_lines=value_lines)
         results.extend(
             section_edits.replacement_results(
                 rule,

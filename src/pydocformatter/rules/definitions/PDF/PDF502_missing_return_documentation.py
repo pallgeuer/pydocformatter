@@ -53,12 +53,11 @@ class PDF502MissingReturnDocumentation(RuleBase):
             return ()
         violations: list[rule_violations.RuleViolation] = []
         for definition, docstring, facts in value_documentation.documented_function_facts(context):
+            if not facts.meaningful_returns or facts.any_yields:
+                continue
             return_targets = value_documentation.value_documentation_targets(docstring, PDF_definition.DocstringEntryKind.RETURN)
-            if (
-                not facts.meaningful_returns
-                or facts.any_yields
-                or any(target.has_content for target in return_targets)
-                or not missing_documentation.should_check_missing_documentation(definition, docstring, context=context, has_relevant_documentation=bool(return_targets))
+            if any(target.has_content for target in return_targets) or not missing_documentation.should_check_missing_documentation(
+                definition, docstring, context=context, has_relevant_documentation=bool(return_targets)
             ):
                 continue
             violations.append(rule_violations.diagnostic(cls.meta, facts.meaningful_returns[0].line_numbers, suppression_line_numbers=(PDF_definition.docstring_physical_line_numbers(docstring),)))

@@ -1,12 +1,20 @@
-"""Docstring section edit result helpers."""
+"""Docstring section edit result helpers.
+
+Attributes:
+    SectionReplacementChange (TypeAlias): One source change or a grouped set of source changes backing a section
+        replacement diagnostic.
+"""
 
 from __future__ import annotations
 
+import pydocformatter.rules.definition_helpers.source_text as source_text
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 import pydocformatter.rules.edits as rule_edits
 import pydocformatter.rules.violations as rule_violations
 from pydocformatter.rules.definition import RuleContext
 from pydocformatter.rules.models import RuleMetadata
+
+SectionReplacementChange = rule_edits.PlannedSourceChange | tuple[rule_edits.PlannedSourceChange, ...]
 
 
 def result(rule: RuleMetadata, line_numbers: tuple[int, ...] | list[int], *, change: rule_edits.PlannedSourceChange | None, instance_message: str | None = None) -> rule_violations.RuleViolation:
@@ -29,7 +37,7 @@ def replacement_results(
     *,
     replacement_line_numbers: list[int],
     unfixable_line_numbers: list[int],
-    change: rule_edits.PlannedSourceChange | None,
+    change: SectionReplacementChange | None,
     replacement_messages: list[str],
     unfixable_messages: list[str],
 ) -> tuple[rule_violations.RuleViolation, ...]:
@@ -39,7 +47,7 @@ def replacement_results(
         rule (RuleMetadata): Rule metadata to attach to all violations.
         replacement_line_numbers (list[int]): Lines covered by replacements that can share one source change.
         unfixable_line_numbers (list[int]): Lines where replacement spans could not be mapped safely.
-        change (rule_edits.PlannedSourceChange | None): Combined source replacement for fixable section edits.
+        change (SectionReplacementChange | None): Source replacement or replacements for fixable section edits.
         replacement_messages (list[str]): Instance messages for fixable replacement lines.
         unfixable_messages (list[str]): Instance messages for diagnostic-only lines.
 
@@ -58,7 +66,7 @@ def replacement_results(
                 instance_message=combined_instance_message(replacement_messages + unfixable_messages),
             ),
         )
-    results = [result(rule, change.line_numbers, change=change, instance_message=combined_instance_message(replacement_messages))]
+    results = [_result_for_replacement_change(rule, change, instance_message=combined_instance_message(replacement_messages))]
     if unfixable_line_numbers:
         results.append(result(rule, unfixable_line_numbers, change=None, instance_message=combined_instance_message(unfixable_messages)))
     return tuple(results)
@@ -76,6 +84,13 @@ def combined_instance_message(messages: list[str]) -> str | None:
     if not messages:
         return None
     return "; ".join(dict.fromkeys(messages))
+
+
+def _result_for_replacement_change(rule: RuleMetadata, change: SectionReplacementChange, *, instance_message: str | None) -> rule_violations.RuleViolation:
+    """Return one violation for a single or grouped section replacement change."""
+    if isinstance(change, tuple):
+        return rule_violations.violation_for_grouped_planned_source_changes(rule, change, instance_message=instance_message)
+    return result(rule, change.line_numbers, change=change, instance_message=instance_message)
 
 
 def line_numbers(docstring: PDF_definition.DocstringInfo, line: PDF_definition.DocstringValueLine) -> tuple[int, ...]:
@@ -193,6 +208,96 @@ def planned_replacement_change(
     if not replacements or not PDF_definition.is_safely_mapped_simple_docstring(docstring):
         return None
     return PDF_definition.planned_simple_docstring_source_change(docstring, context=context, replacements=replacements, value_lines=value_lines)
+
+
+def planned_replacement_changes(
+    docstring: PDF_definition.DocstringInfo,
+    *,
+    context: RuleContext,
+    replacements: tuple[rule_edits.PlannedTextReplacement, ...],
+    value_lines: list[str],
+) -> SectionReplacementChange | None:
+    """Return direct section source replacements with a whole-docstring fallback.
+
+    Args:
+        docstring (PDF_definition.DocstringInfo): Parsed docstring whose section text should be replaced.
+        context (RuleContext): Current file context used to build source edits.
+        replacements (tuple[rule_edits.PlannedTextReplacement, ...]): Text replacements that determine diagnostic lines.
+        value_lines (list[str]): Updated raw value lines for the fallback replacement docstring body.
+
+    Returns:
+        SectionReplacementChange | None: Direct source replacements, one whole-docstring replacement, or None when the
+            docstring cannot be mapped safely.
+    """
+    direct_changes = _direct_replacement_changes(docstring, context=context, replacements=replacements)
+    if direct_changes is not None:
+        return direct_changes
+    return planned_replacement_change(docstring, context=context, replacements=replacements, value_lines=value_lines)
+
+
+def _direct_replacement_changes(
+    docstring: PDF_definition.DocstringInfo,
+    *,
+    context: RuleContext,
+    replacements: tuple[rule_edits.PlannedTextReplacement, ...],
+) -> tuple[rule_edits.PlannedSourceChange, ...] | None:
+    """Return line-local source replacements when every replacement maps directly."""
+    if not replacements:
+        return None
+    line_bounds = PDF_definition.line_bounds_for_context(context)
+    source_map = PDF_definition.simple_docstring_source_map(docstring, line_bounds=line_bounds)
+    if source_map is None:
+        return None
+    changes: list[rule_edits.PlannedSourceChange] = []
+    previous_line = 0
+    previous_end_column = -1
+    for replacement in replacements:
+        change = _direct_replacement_change(docstring, replacement=replacement, source_map=source_map, line_bounds=line_bounds)
+        if change is None:
+            return None
+        start = change.edit.range.start
+        end = change.edit.range.end
+        if start.line < previous_line or (start.line == previous_line and start.column < previous_end_column):
+            return None
+        previous_line = end.line
+        previous_end_column = end.column
+        changes.append(change)
+    return tuple(changes)
+
+
+def _direct_replacement_change(
+    docstring: PDF_definition.DocstringInfo,
+    *,
+    replacement: rule_edits.PlannedTextReplacement,
+    source_map: PDF_definition.SimpleDocstringSourceMap,
+    line_bounds: source_text.LineBounds,
+) -> rule_edits.PlannedSourceChange | None:
+    """Return one line-local section edit when source spelling matches raw value text."""
+    line = _line_for_replacement(docstring, replacement)
+    if line is None or line.source_line_number is None:
+        return None
+    raw_start_column = replacement.start_offset - line.start_offset
+    raw_end_column = replacement.end_offset - line.start_offset
+    if replacement.start_offset < 0 or replacement.end_offset < replacement.start_offset or replacement.end_offset >= len(source_map.source_offsets):
+        return None
+    if not PDF_definition.simple_docstring_replacement_is_source_safe(docstring, replacement.text):
+        return None
+    expected_source = line.raw_text[raw_start_column:raw_end_column]
+    if source_map.source_slice(start_offset=replacement.start_offset, end_offset=replacement.end_offset) != expected_source:
+        return None
+    return rule_edits.PlannedSourceChange(
+        edit=rule_edits.SourceEdit(
+            range=source_map.source_range(start_offset=replacement.start_offset, end_offset=replacement.end_offset, line_bounds=line_bounds),
+            replacement=replacement.text,
+        ),
+        line_numbers=replacement.line_numbers,
+        suppression_line_numbers=(),
+    )
+
+
+def _line_for_replacement(docstring: PDF_definition.DocstringInfo, replacement: rule_edits.PlannedTextReplacement) -> PDF_definition.DocstringValueLine | None:
+    """Return the docstring value line fully covered by one replacement."""
+    return next((line for line in docstring.structure.lines if line.start_offset <= replacement.start_offset <= replacement.end_offset <= line.end_offset), None)
 
 
 def planned_output_change(

@@ -54,6 +54,53 @@ class EntryDescriptionWordTarget:
     end_offset: int
 
 
+class _SourceSafeReplacementPlanner:
+    """Plan source-local docstring replacements whose spelling equals their runtime value."""
+
+    def __init__(self, context: RuleContext) -> None:
+        """Store shared context and initialize a per-pass docstring source-map cache."""
+        self.context = context
+        self.line_bounds = PDF_definition.line_bounds_for_context(context)
+        data = PDF_definition.PDF.require_data(context)
+        self._maps = data._entry_description_source_maps
+
+    def planned_replacement(
+        self,
+        target: EntryDescriptionLineTarget,
+        *,
+        start_offset: int,
+        end_offset: int,
+        replacement: str,
+        expected_source: str | None,
+    ) -> rule_edits.PlannedSourceChange | None:
+        """Return a direct source replacement for a source-safe evaluated replacement."""
+        if not PDF_definition.simple_docstring_replacement_is_source_safe(target.docstring, replacement):
+            return None
+        source_map = self._source_map(target.docstring)
+        if source_map is None or start_offset < 0 or end_offset < start_offset or end_offset >= len(source_map.source_offsets):
+            return None
+        if expected_source is not None and source_map.source_slice(start_offset=start_offset, end_offset=end_offset) != expected_source:
+            return None
+        line_numbers = line_numbers_for_offsets(target, start_offset=start_offset, end_offset=end_offset)
+        return rule_edits.PlannedSourceChange(
+            edit=rule_edits.SourceEdit(
+                range=source_map.source_range(start_offset=start_offset, end_offset=end_offset, line_bounds=self.line_bounds),
+                replacement=replacement,
+            ),
+            line_numbers=line_numbers,
+            suppression_line_numbers=(),
+        )
+
+    def _source_map(self, docstring: PDF_definition.DocstringInfo) -> PDF_definition.SimpleDocstringSourceMap | None:
+        """Return cached source offsets for a simple docstring."""
+        key = id(docstring)
+        if key in self._maps:
+            return self._maps[key]
+        source_map = PDF_definition.simple_docstring_source_map(docstring, line_bounds=self.line_bounds)
+        self._maps[key] = source_map
+        return source_map
+
+
 def first_line_targets(context: RuleContext) -> tuple[EntryDescriptionLineTarget, ...]:
     """Return first non-empty parsed entry description fragments.
 
@@ -89,7 +136,8 @@ def punctuation_violations(context: RuleContext, *, rule: RuleMetadata, policy: 
     Returns:
         Entry-description punctuation violations for eligible entries.
     """
-    return tuple(result for target in terminal_line_targets(context) if (result := _punctuation_violation(target, context=context, rule=rule, policy=policy)) is not None)
+    planner = _SourceSafeReplacementPlanner(context)
+    return tuple(result for target in terminal_line_targets(context) if (result := _punctuation_violation(target, context=context, rule=rule, policy=policy, planner=planner)) is not None)
 
 
 def capitalization_violations(context: RuleContext, *, rule: RuleMetadata) -> tuple[rule_violations.RuleViolation, ...]:
@@ -103,12 +151,13 @@ def capitalization_violations(context: RuleContext, *, rule: RuleMetadata) -> tu
         Entry-description first-word capitalization violations for eligible entries.
     """
     violations: list[rule_violations.RuleViolation] = []
+    planner = _SourceSafeReplacementPlanner(context)
     for target in first_line_targets(context):
         word = first_word_target(target)
         if word is None or not first_word_capitalization.should_capitalize(word.word):
             continue
         replacement = f"{word.word[0].upper()}{word.word[1:]}"
-        change = _planned_replacement(word.target, start_offset=word.start_offset, end_offset=word.end_offset, replacement=replacement, context=context)
+        change = _planned_replacement(word.target, start_offset=word.start_offset, end_offset=word.end_offset, replacement=replacement, context=context, planner=planner)
         violations.append(
             rule_violations.violation_for_optional_planned_source_change(
                 rule, change, line_numbers=line_numbers(word.target), instance_message=f"Docstring entry description first word '{word.word}' should be capitalized"
@@ -144,6 +193,26 @@ def line_numbers(target: EntryDescriptionLineTarget) -> tuple[int, ...]:
     return PDF_definition.docstring_line_numbers(target.docstring, target.line)
 
 
+def line_numbers_for_offsets(target: EntryDescriptionLineTarget, *, start_offset: int, end_offset: int) -> tuple[int, ...]:
+    """Return source lines covered by an evaluated-offset replacement.
+
+    Args:
+        target (EntryDescriptionLineTarget): Entry description fragment whose owning docstring supplies logical
+            source-line mappings.
+        start_offset (int): Evaluated docstring value offset where the replacement starts.
+        end_offset (int): Evaluated docstring value offset immediately after the replacement target.
+
+    Returns:
+        Concrete one-based source lines occupied by the replacement span, falling back to the target fragment line.
+    """
+    if start_offset == end_offset:
+        return line_numbers(target)
+    lines = tuple(line for line in target.docstring.structure.lines if line.source_line_number is not None and line.start_offset <= start_offset and end_offset <= line.end_offset)
+    if lines:
+        return PDF_definition.docstring_value_line_numbers(lines)
+    return line_numbers(target)
+
+
 def _description_targets(context: RuleContext, *, first: bool) -> tuple[EntryDescriptionLineTarget, ...]:
     """Return parsed entry description targets in source order."""
     data = PDF_definition.PDF.require_data(context)
@@ -173,6 +242,7 @@ def _punctuation_violation(
     context: RuleContext,
     rule: RuleMetadata,
     policy: terminal_punctuation.TerminalPunctuationPolicy,
+    planner: _SourceSafeReplacementPlanner,
 ) -> rule_violations.RuleViolation | None:
     """Return one entry-description punctuation violation."""
     return terminal_punctuation.violation(
@@ -180,7 +250,7 @@ def _punctuation_violation(
         policy=policy,
         rule=rule,
         line_numbers=line_numbers(target),
-        planned_change=lambda: _planned_replacement(target, start_offset=target.fragment.end_offset, end_offset=target.fragment.end_offset, replacement=".", context=context),
+        planned_change=lambda: _planned_replacement(target, start_offset=target.fragment.end_offset, end_offset=target.fragment.end_offset, replacement=".", context=context, planner=planner),
     )
 
 
@@ -191,6 +261,7 @@ def _planned_replacement(
     end_offset: int,
     replacement: str,
     context: RuleContext,
+    planner: _SourceSafeReplacementPlanner,
 ) -> rule_edits.PlannedSourceChange | None:
     """Return a safe source change for one entry description fragment replacement."""
     docstring = target.docstring
@@ -200,6 +271,9 @@ def _planned_replacement(
     fragment_start = start_offset - target.fragment.start_offset
     fragment_end = end_offset - target.fragment.start_offset
     expected_source = target.fragment.text[fragment_start:fragment_end] if start_offset != end_offset else None
+    direct_change = planner.planned_replacement(target, start_offset=start_offset, end_offset=end_offset, replacement=replacement, expected_source=expected_source)
+    if direct_change is not None:
+        return direct_change
     line_start = start_offset - line.start_offset
     line_end = end_offset - line.start_offset
     value_lines = [structure_line.raw_text for structure_line in docstring.structure.lines]

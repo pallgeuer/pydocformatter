@@ -1,9 +1,13 @@
+from collections.abc import Mapping
+
 import libcst as cst
 import libcst.metadata as cst_metadata
 import pytest
 
 import pydocformatter.formatter as formatter
+import pydocformatter.rules.definition_helpers.module_bindings as module_bindings
 import pydocformatter.rules.definition_helpers.source_text as source_text
+import pydocformatter.rules.definition_helpers.static_names as static_names
 import pydocformatter.rules_selection as rules_selection
 import tests.rule_helpers as rule_helpers
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention
@@ -144,6 +148,22 @@ def test_skips_called_import_alias_property_like_decorators() -> None:
     assert not result.unfixed_findings
 
 
+def test_later_property_import_alias_rebinding_does_not_affect_prior_decorator() -> None:
+    source = 'from functools import cached_property as cp\n\nclass Example:\n    @cp\n    def cached(self):\n        """Returns cached value."""\n\ncp = decorator\n'
+    result = format_source(source)
+
+    assert result.new_source == source
+    assert not result.unfixed_findings
+
+
+def test_import_after_local_assignment_matches_later_property_decorator() -> None:
+    source = 'functools = object()\nimport functools\n\nclass Example:\n    @functools.cached_property\n    def cached(self):\n        """Returns cached value."""\n'
+    result = format_source(source)
+
+    assert result.new_source == source
+    assert not result.unfixed_findings
+
+
 def test_unqualified_property_decorator_configuration_is_syntactic_only() -> None:
     source = 'from project import Property as P\n\n\nclass Example:\n    @P\n    def aliased(self):\n        """Returns aliased value."""\n\n    @Property\n    def syntactic(self):\n        """Returns syntactic value."""\n'
     result = format_source(source, settings=CheckSettings(select=("PDF302",), docstring_property_decorators=("Property",)))
@@ -158,11 +178,42 @@ def test_shadowed_property_import_alias_is_not_treated_as_configured_property() 
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((8,),)
 
 
+def test_class_local_shadowed_property_import_alias_is_not_treated_as_configured_property() -> None:
+    source = 'from functools import cached_property as cp\n\nclass Example:\n    cp = decorator\n\n    @cp\n    def cached(self):\n        """Returns cached value."""\n'
+    result = format_source(source)
+
+    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((8,),)
+
+
 def test_shadowed_dotted_property_decorator_is_not_treated_as_configured_property() -> None:
     source = 'class Builtins:\n    property = object()\n\nbuiltins = Builtins()\n\n\nclass Example:\n    @builtins.property\n    def value(self):\n        """Returns property value."""\n'
     result = format_source(source)
 
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((10,),)
+
+
+def test_static_name_bindings_are_cached_on_prepared_pdf_data(monkeypatch: pytest.MonkeyPatch) -> None:
+    category, context = contexts('from functools import cached_property as cp\n\nclass Example:\n    @cp\n    def cached(self):\n        """Returns cached value."""\n')
+    class_node = category.module.body[1]
+    assert isinstance(class_node, cst.ClassDef)
+    function_node = class_node.body.body[0]
+    assert isinstance(function_node, cst.FunctionDef)
+    calls = 0
+    original = module_bindings.collect_top_level_bindings
+
+    def counted_collect_top_level_bindings(module: cst.Module, *, positions: Mapping[cst.CSTNode, cst_metadata.CodeRange] | None = None) -> module_bindings.ModuleBindings:
+        nonlocal calls
+        calls += 1
+        return original(module, positions=positions)
+
+    monkeypatch.setattr(module_bindings, "collect_top_level_bindings", counted_collect_top_level_bindings)
+    data = PDF.require_data(context)
+
+    assert data._module_bindings is None
+    assert static_names.configured_expression_name(function_node.decorators[0].decorator, ("functools.cached_property",), context=context) == "cp"
+    assert static_names.configured_expression_name(function_node.decorators[0].decorator, ("functools.cached_property",), context=context) == "cp"
+    assert calls == 1
+    assert data._module_bindings is not None
 
 
 def test_property_decorator_setting_replaces_exact_property_decorator_names() -> None:

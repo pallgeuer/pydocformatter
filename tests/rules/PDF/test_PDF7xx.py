@@ -189,6 +189,12 @@ def test_module_type_aliases_are_cached_across_typed_mismatch_rules(monkeypatch:
     assert calls == 1
 
 
+def test_module_type_aliases_treat_top_level_compound_bindings_as_shadowing() -> None:
+    source = "from typing import Iterator, Mapping, Sequence\nfor Iterator in []:\n    pass\nwith manager as Mapping:\n    pass\ntry:\n    pass\nexcept Exception as Sequence:\n    pass\n"
+
+    assert type_expressions.module_type_aliases(cst.parse_module(source)) == {}
+
+
 def test_shadowed_import_alias_type_expressions_remain_conservative() -> None:
     source = (
         'from typing import Iterator\nIterator = object\n\n\ndef function(value: Iterator[int]):\n    """Process values.\n\n    Args:\n        value (typing.Iterator[int]): Input value.\n    """\n'
@@ -302,6 +308,22 @@ def test_shadowed_enum_import_alias_is_not_treated_as_imported_enum_base() -> No
     assert tuple(finding.message for finding in result.unfixed_findings) == ("Class attribute 'RED' docstring entry is missing a type",)
 
 
+def test_later_enum_import_alias_rebinding_does_not_affect_prior_base() -> None:
+    source = 'import enum as e\n\n\nclass Color(e.Enum):\n    """Color.\n\n    Attributes:\n        RED (int): Red value.\n    """\n\n    RED = 1\n\n\ne = object\n'
+    result = check(source, select=("PDF713",))
+
+    assert codes(result) == ("PDF713",)
+    assert tuple(finding.message for finding in result.unfixed_findings) == ("Class attribute 'RED' docstring entry should not include a type",)
+
+
+def test_guarded_enum_import_alias_matches_enum_like_base() -> None:
+    source = 'if enabled:\n    import enum as e\n\n\nclass Color(e.Enum):\n    """Color.\n\n    Attributes:\n        RED (int): Red value.\n    """\n\n    RED = 1\n'
+    result = check(source, select=("PDF713",))
+
+    assert codes(result) == ("PDF713",)
+    assert tuple(finding.message for finding in result.unfixed_findings) == ("Class attribute 'RED' docstring entry should not include a type",)
+
+
 def test_shadowed_dotted_enum_base_is_not_treated_as_imported_enum_base() -> None:
     source = 'class E:\n    Enum = object\n\nenum = E()\n\n\nclass Color(enum.Enum):\n    """Color.\n\n    Attributes:\n        RED: Red value.\n    """\n\n    RED = 1\n'
     result = check(source, select=("PDF713",))
@@ -315,6 +337,22 @@ def test_local_yield_container_name_is_not_treated_as_recognized_typing_containe
     result = check(source, select=("PDF711",))
 
     assert codes(result) == ()
+
+
+def test_later_yield_container_import_alias_rebinding_does_not_affect_prior_annotation() -> None:
+    source = 'from typing import Iterator\n\n\ndef function() -> Iterator[int]:\n    """Yield values.\n\n    Yields:\n        str: Value.\n    """\n    yield 1\n\n\nIterator = object\n'
+    result = check(source, select=("PDF711",))
+
+    assert codes(result) == ("PDF711",)
+    assert tuple(finding.message for finding in result.unfixed_findings) == ("Function yield 'yield' docstring type does not match the annotation",)
+
+
+def test_guarded_yield_container_import_alias_matches_annotation_container() -> None:
+    source = 'if enabled:\n    from typing import Iterator\n\n\ndef function() -> Iterator[int]:\n    """Yield values.\n\n    Yields:\n        str: Value.\n    """\n    yield 1\n'
+    result = check(source, select=("PDF711",))
+
+    assert codes(result) == ("PDF711",)
+    assert tuple(finding.message for finding in result.unfixed_findings) == ("Function yield 'yield' docstring type does not match the annotation",)
 
 
 def test_attached_attribute_docstrings_are_not_checked_by_pdf7xx() -> None:

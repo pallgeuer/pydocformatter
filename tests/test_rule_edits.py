@@ -43,6 +43,35 @@ class TestSourceEdits(unittest.TestCase):
         self.assertEqual(tuple(violation.finding for violation in violations), (RuleFinding(rule=rule, line_numbers=(1,), suppression_line_numbers=((2,),), instance_fixable=None),))
         self.assertEqual(violations[0].fix.planned_changes() if violations[0].fix is not None else (), changes)
 
+    def test_grouped_planned_source_changes_create_one_violation(self) -> None:
+        rule = RuleMetadata(
+            code=RuleCode("PDF999"),
+            name="test-rule",
+            message="Test message",
+            fix_availability=FixAvailability.ALWAYS,
+            stable_since="1.0.0",
+            setting_effects=(),
+            incompatible_with=(),
+            check_kind=RuleCheckKind.STANDARD,
+        )
+        changes = (
+            rule_edits.PlannedSourceChange(
+                edit=rule_edits.SourceEdit(cst_metadata.CodeRange(start=cst_metadata.CodePosition(1, 0), end=cst_metadata.CodePosition(1, 1)), "x"),
+                line_numbers=(1,),
+                suppression_line_numbers=((10,),),
+            ),
+            rule_edits.PlannedSourceChange(
+                edit=rule_edits.SourceEdit(cst_metadata.CodeRange(start=cst_metadata.CodePosition(2, 0), end=cst_metadata.CodePosition(2, 1)), "y"),
+                line_numbers=(2,),
+                suppression_line_numbers=((20,),),
+            ),
+        )
+
+        violation = rule_violations.violation_for_grouped_planned_source_changes(rule, changes)
+
+        self.assertEqual(violation.finding, RuleFinding(rule=rule, line_numbers=(1, 2), suppression_line_numbers=((10,), (20,)), instance_fixable=None))
+        self.assertEqual(violation.fix.planned_changes() if violation.fix is not None else (), changes)
+
     def test_sometimes_fixable_planned_source_changes_infer_fixable_instance(self) -> None:
         rule = RuleMetadata(
             code=RuleCode("PDF999"),

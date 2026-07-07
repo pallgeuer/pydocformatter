@@ -52,19 +52,15 @@ class PDF302NonImperativeSummary(RuleBase):
         violations: list[rule_violations.RuleViolation] = []
         for target in data.summary_line_targets:
             owner = target.docstring.owner
-            if (
-                not isinstance(owner, PDF_definition.DefinitionInfo)
-                or owner.kind is not PDF_definition.DefinitionKind.FUNCTION
-                or summary_style.is_test_function(owner)
-                or decorator_helpers.has_property_decorator(owner.decorators, context=context, settings=context.settings)
-            ):
+            if not isinstance(owner, PDF_definition.DefinitionInfo) or owner.kind is not PDF_definition.DefinitionKind.FUNCTION or summary_style.is_test_function(owner):
                 continue
             word = summary_style.first_word_target(target)
             if word is None:
                 continue
             normalized = summary_style.normalize_word(word.word)
-            if normalized and _is_non_imperative(normalized):
-                violations.append(rule_violations.diagnostic(cls.meta, summary_style.line_numbers(word), instance_message=f"Docstring summary first word '{word.word}' is not imperative"))
+            if not normalized or not _is_non_imperative(normalized) or decorator_helpers.has_property_decorator(owner.decorators, context=context, settings=context.settings):
+                continue
+            violations.append(rule_violations.diagnostic(cls.meta, summary_style.line_numbers(word), instance_message=f"Docstring summary first word '{word.word}' is not imperative"))
         return tuple(violations)
 
 

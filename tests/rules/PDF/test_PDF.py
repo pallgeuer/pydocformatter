@@ -22,7 +22,6 @@ from pydocformatter.rules.definitions.PDF.PDF import (
     DocstringKind,
     DocstringStructure,
     DocstringTextFragment,
-    FunctionFacts,
     escaped_closing_quote_body_source,
     simple_docstring_body_source_candidates,
 )
@@ -212,38 +211,26 @@ def test_prepare_ignores_attribute_like_strings_after_blank_or_comment_lines() -
     assert tuple(docstring.value for docstring in attribute_docstrings) == ("module valid doc", "class valid doc", "instance valid doc")
 
 
-def test_documented_function_facts_are_lazy_cached(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_documented_function_facts_reuse_prepared_function_facts() -> None:
     source = 'class Base:\n    @abstractmethod\n    def abstract(self):\n        """Abstract."""\n        return 1\n\n\ndef concrete():\n    """Concrete."""\n    return 2\n\n\ndef stub():\n    """Stub."""\n    pass\n\n\ndef undocumented():\n    return 3\n'
     context = category_context(source)
-    calls: list[str] = []
-    original_function_facts = value_documentation._function_facts
-
-    def counting_function_facts(definition: DefinitionInfo, *, context: RuleCategoryContext) -> FunctionFacts:
-        calls.append(definition.qualified_name)
-        return original_function_facts(definition, context=context)
-
-    monkeypatch.setattr(value_documentation, "_function_facts", counting_function_facts)
 
     data = PDF.prepare(context)
     context_with_data = rule_context(context, data)
+    function_definitions = tuple(definition for definition in data.definitions if definition.kind is DefinitionKind.FUNCTION)
 
+    assert len(data.function_facts_by_definition_id) == len(function_definitions) == 4
     assert data._documented_function_facts is None
-    assert calls == []
     facts = value_documentation.documented_function_facts(context_with_data)
     assert tuple(definition.qualified_name for definition, _, _ in facts) == ("concrete",)
-    assert calls == ["concrete"]
+    assert facts[0][2] is data.function_facts_by_definition_id[id(facts[0][0])]
     assert value_documentation.documented_function_facts(context_with_data) is facts
     assert data._documented_function_facts is facts
-    assert calls == ["concrete"]
 
 
-def test_unrelated_pdf_rule_selection_does_not_collect_documented_function_facts(monkeypatch: pytest.MonkeyPatch) -> None:
-    def fail_function_facts(definition: DefinitionInfo, *, context: RuleCategoryContext) -> FunctionFacts:
-        del definition, context
-        pytest.fail("PDF value-documentation facts should not be collected for PDF001")
-
-    monkeypatch.setattr(value_documentation, "_function_facts", fail_function_facts)
-
+def test_value_documentation_has_no_body_walk_fallback() -> None:
+    assert not hasattr(value_documentation, "_function_facts")
+    assert not hasattr(value_documentation, "_FunctionBodyVisitor")
     settings = CheckSettings(select=("PDF001",))
     result = formatter.format_source(
         'def documented():\n    """Documented."""\n    return 1\n',

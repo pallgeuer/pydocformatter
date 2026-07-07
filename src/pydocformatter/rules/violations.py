@@ -13,11 +13,16 @@ from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetada
 class RuleSourceFix:
     """Source-edit plan for one fixable rule violation."""
 
-    _change: rule_edits.PlannedSourceChange = dataclasses.field(repr=False)
+    _changes: tuple[rule_edits.PlannedSourceChange, ...] = dataclasses.field(repr=False)
 
     def __post_init__(self) -> None:
-        """Validate the source change backing this fix."""
-        _validate_planned_change(self._change)
+        """Validate the source changes backing this fix."""
+        if not isinstance(self._changes, tuple):
+            raise TypeError("Rule source fix planned changes must be a tuple of PlannedSourceChange instances")
+        if not self._changes:
+            raise ValueError("Rule source fix planned changes must not be empty")
+        for change in self._changes:
+            _validate_planned_change(change)
 
     @classmethod
     def from_change(cls, change: rule_edits.PlannedSourceChange) -> RuleSourceFix:
@@ -29,15 +34,27 @@ class RuleSourceFix:
         Returns:
             RuleSourceFix: Fix wrapper that can provide planned changes to the rule runner.
         """
-        return cls(change)
+        return cls((change,))
+
+    @classmethod
+    def from_changes(cls, changes: tuple[rule_edits.PlannedSourceChange, ...]) -> RuleSourceFix:
+        """Return a source fix backed by already-planned source changes.
+
+        Args:
+            changes (tuple[rule_edits.PlannedSourceChange, ...]): Validated source replacements to expose as one fix.
+
+        Returns:
+            RuleSourceFix: Fix wrapper that can provide planned changes to the rule runner.
+        """
+        return cls(changes)
 
     def planned_changes(self) -> tuple[rule_edits.PlannedSourceChange, ...]:
         """Return planned source changes for this fix.
 
         Returns:
-            tuple[rule_edits.PlannedSourceChange, ...]: Single replacement associated with this fix.
+            tuple[rule_edits.PlannedSourceChange, ...]: Replacements associated with this fix.
         """
-        return (self._change,)
+        return self._changes
 
 
 @dataclasses.dataclass(frozen=True)
@@ -80,6 +97,31 @@ def violation_for_planned_source_change(
     """
     finding = _finding_for_planned_source_change(rule, change, instance_message=instance_message)
     return RuleViolation(finding=finding, fix=RuleSourceFix.from_change(change))
+
+
+def violation_for_grouped_planned_source_changes(
+    rule: RuleMetadata,
+    changes: tuple[rule_edits.PlannedSourceChange, ...],
+    *,
+    instance_message: str | None = None,
+) -> RuleViolation:
+    """Return one violation backed by multiple planned source changes.
+
+    Args:
+        rule (RuleMetadata): Rule metadata attached to the finding.
+        changes (tuple[rule_edits.PlannedSourceChange, ...]): Source replacements represented by one diagnostic.
+        instance_message (str | None): Optional message overriding the rule default for this violation.
+
+    Returns:
+        RuleViolation: Fixable violation whose finding targets are the combined change targets.
+
+    Raises:
+        ValueError: If no changes are supplied.
+    """
+    if not changes:
+        raise ValueError("Grouped planned-source-change violations must specify at least one change")
+    finding = _finding_for_planned_source_changes(rule, changes, instance_message=instance_message)
+    return RuleViolation(finding=finding, fix=RuleSourceFix.from_changes(changes))
 
 
 def violation_for_optional_planned_source_change(
@@ -153,6 +195,22 @@ def _finding_for_planned_source_change(
         rule=rule,
         line_numbers=change.line_numbers,
         suppression_line_numbers=change.suppression_line_numbers,
+        instance_message=instance_message,
+        instance_fixable=_fixable_instance_fixability(rule),
+    )
+
+
+def _finding_for_planned_source_changes(
+    rule: RuleMetadata,
+    changes: tuple[rule_edits.PlannedSourceChange, ...],
+    *,
+    instance_message: str | None = None,
+) -> RuleFinding:
+    """Return a finding using combined planned-change targets."""
+    return RuleFinding(
+        rule=rule,
+        line_numbers=tuple(line_number for change in changes for line_number in change.line_numbers),
+        suppression_line_numbers=tuple(target for change in changes for target in change.suppression_line_numbers),
         instance_message=instance_message,
         instance_fixable=_fixable_instance_fixability(rule),
     )

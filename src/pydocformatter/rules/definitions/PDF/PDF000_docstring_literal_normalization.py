@@ -97,6 +97,8 @@ def _rendered_concatenated_docstring(docstring: PDF_definition.DocstringInfo, *,
 
 def _rendered_simple_docstring(node: cst.SimpleString, *, expected_value: str, line_ending: str, escape_non_ascii: bool) -> str | None:
     """Return normalized source for a simple docstring."""
+    if _simple_docstring_source_is_already_normal(node, line_ending=line_ending):
+        return None
     fragments = string_literals.value_fragments_for_simple_string(node, line_ending=line_ending)
     if fragments is None:
         return None
@@ -112,6 +114,32 @@ def _rendered_simple_docstring(node: cst.SimpleString, *, expected_value: str, l
     if rendered is not None:
         return rendered
     return string_literals.render_value_as_simple_string(expected_value, line_ending=line_ending, escape_non_ascii=escape_non_ascii)
+
+
+def _simple_docstring_source_is_already_normal(node: cst.SimpleString, *, line_ending: str) -> bool:
+    """Return whether PDF000 can skip source-aware decomposition for a simple string."""
+    if _normalized_simple_docstring_prefix(node) != node.prefix:
+        return False
+    body = string_literals.simple_string_body_source(node)
+    return body is not None and "\\" not in body and not _has_non_normal_line_ending(body, line_ending=line_ending)
+
+
+def _has_non_normal_line_ending(source: str, *, line_ending: str) -> bool:
+    """Return whether source contains a physical line ending other than the target spelling."""
+    index = 0
+    while index < len(source):
+        char = source[index]
+        if char == "\r":
+            ending = "\r\n" if index + 1 < len(source) and source[index + 1] == "\n" else "\r"
+            if ending != line_ending:
+                return True
+            index += len(ending)
+            continue
+        if char == "\n":
+            if line_ending != "\n":
+                return True
+        index += 1
+    return False
 
 
 def _normalized_simple_docstring_prefix(node: cst.SimpleString) -> str:

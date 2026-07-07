@@ -46,19 +46,15 @@ class PDF311PropertyDocstringStartsWithVerb(RuleBase):
         violations: list[rule_violations.RuleViolation] = []
         for target in data.summary_line_targets:
             owner = target.docstring.owner
-            if (
-                not isinstance(owner, PDF_definition.DefinitionInfo)
-                or owner.kind is not PDF_definition.DefinitionKind.FUNCTION
-                or summary_style.is_test_function(owner)
-                or not decorator_helpers.has_property_decorator(owner.decorators, context=context, settings=context.settings)
-            ):
+            if not isinstance(owner, PDF_definition.DefinitionInfo) or owner.kind is not PDF_definition.DefinitionKind.FUNCTION or summary_style.is_test_function(owner):
                 continue
             word = summary_style.first_word_target(target)
             if word is None:
                 continue
             normalized = summary_style.normalize_word(word.word)
-            if normalized in _DISALLOWED_VERBS:
-                violations.append(rule_violations.diagnostic(cls.meta, summary_style.line_numbers(word), instance_message=f'Property docstring should not start with a verb ("{word.word}")'))
+            if normalized not in _DISALLOWED_VERBS or not decorator_helpers.has_property_decorator(owner.decorators, context=context, settings=context.settings):
+                continue
+            violations.append(rule_violations.diagnostic(cls.meta, summary_style.line_numbers(word), instance_message=f'Property docstring should not start with a verb ("{word.word}")'))
         return tuple(violations)
 
 

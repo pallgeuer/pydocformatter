@@ -22,6 +22,8 @@ import libcst.metadata as cst_metadata
 import pydocformatter.cli.settings_check as settings_check
 import pydocformatter.rules.definition_helpers.colon_boundaries as colon_boundaries
 import pydocformatter.rules.definition_helpers.docstring_sections as docstring_sections
+import pydocformatter.rules.definition_helpers.exception_names as exception_names
+import pydocformatter.rules.definition_helpers.module_bindings as module_bindings
 import pydocformatter.rules.definition_helpers.source_text as source_text
 import pydocformatter.rules.definition_helpers.string_literals as string_literals
 import pydocformatter.rules.definition_helpers.text_layout as text_layout
@@ -328,6 +330,62 @@ class DocstringOutputSeparatorFallback(enum.Enum):
 
 
 @dataclasses.dataclass(frozen=True)
+class SimpleDocstringSourceMap:
+    """Evaluated-to-source offsets for one simple docstring.
+
+    Attributes:
+        body_start (int): Absolute source offset where the literal body starts after prefix and opening quotes.
+        source_offsets (tuple[int, ...]): Source-body offsets for each evaluated-value offset, including the final end
+            offset.
+        body_source (str): Literal body source between the opening and closing delimiters.
+    """
+
+    body_start: int
+    source_offsets: tuple[int, ...]
+    body_source: str
+
+    def source_offset(self, value_offset: int) -> int:
+        """Return the source-body offset matching an evaluated-value offset.
+
+        Args:
+            value_offset (int): Evaluated docstring value offset to map.
+
+        Returns:
+            int: Source-body offset corresponding to the evaluated value offset.
+        """
+        return self.source_offsets[value_offset]
+
+    def source_slice(self, *, start_offset: int, end_offset: int) -> str:
+        """Return source spelling for one evaluated-value slice.
+
+        Args:
+            start_offset (int): Evaluated docstring value offset where the slice starts.
+            end_offset (int): Evaluated docstring value offset immediately after the slice.
+
+        Returns:
+            str: Literal source spelling for the evaluated value slice.
+        """
+        return self.body_source[self.source_offset(start_offset) : self.source_offset(end_offset)]
+
+    def source_range(self, *, start_offset: int, end_offset: int, line_bounds: source_text.LineBounds) -> cst_metadata.CodeRange:
+        """Return a source range for one evaluated-value slice.
+
+        Args:
+            start_offset (int): Evaluated docstring value offset where the range starts.
+            end_offset (int): Evaluated docstring value offset immediately after the range.
+            line_bounds (source_text.LineBounds): Absolute source offsets for the current source lines.
+
+        Returns:
+            cst_metadata.CodeRange: Concrete source range that covers the evaluated value slice.
+        """
+        source_start = self.body_start + self.source_offset(start_offset)
+        source_end = self.body_start + self.source_offset(end_offset)
+        start_position = _position_for_offset(source_start, line_bounds=line_bounds)
+        end_position = start_position if source_start == source_end else _position_for_offset(source_end, line_bounds=line_bounds)
+        return cst_metadata.CodeRange(start=start_position, end=end_position)
+
+
+@dataclasses.dataclass(frozen=True)
 class DocstringStructure:
     """Convention-aware semantic structure prepared for one docstring.
 
@@ -531,6 +589,8 @@ class PDFCategoryData:
             apply owner-specific policy.
         summary_terminal_line_targets (tuple[SummaryLineTarget, ...]): Summary lines eligible for terminal-punctuation
             checks.
+        function_facts_by_definition_id (Mapping[int, FunctionFacts]): Return, yield, and raise facts indexed by owning
+            function definition identity.
     """
 
     definitions: tuple[DefinitionInfo, ...]
@@ -538,6 +598,7 @@ class PDFCategoryData:
     docstrings: tuple[DocstringInfo, ...]
     summary_line_targets: tuple[SummaryLineTarget, ...]
     summary_terminal_line_targets: tuple[SummaryLineTarget, ...]
+    function_facts_by_definition_id: Mapping[int, FunctionFacts]
     _docstrings_by_owner_id: dict[int, DocstringInfo] | None = dataclasses.field(default=None, init=False, repr=False, compare=False)
     _attributes_by_owner_id: Mapping[int, tuple[AttributeInfo, ...]] | None = dataclasses.field(default=None, init=False, repr=False, compare=False)
     _attached_attribute_docstrings_by_owner_id: Mapping[int, Mapping[str, tuple[DocstringInfo, ...]]] | None = dataclasses.field(default=None, init=False, repr=False, compare=False)
@@ -545,7 +606,9 @@ class PDFCategoryData:
     _typed_documentation_targets: dict[typed_documentation_models.TypedDocumentationSubject, tuple[typed_documentation_models.TypedDocumentationTarget, ...]] | None = dataclasses.field(
         default=None, init=False, repr=False, compare=False
     )
+    _module_bindings: module_bindings.ModuleBindings | None = dataclasses.field(default=None, init=False, repr=False, compare=False)
     _type_aliases: type_expressions.TypeAliasMap | None = dataclasses.field(default=None, init=False, repr=False, compare=False)
+    _entry_description_source_maps: dict[int, SimpleDocstringSourceMap | None] = dataclasses.field(default_factory=dict, init=False, repr=False, compare=False)
 
     def docstring_for(self, definition: DefinitionInfo) -> DocstringInfo | None:
         """Return the docstring owned by a definition, if one exists.
@@ -628,6 +691,29 @@ class _AttributeTarget:
     line_numbers: tuple[int, ...]
 
 
+@dataclasses.dataclass
+class _MutableFunctionFacts:
+    """Mutable function-body facts collected during the definition traversal."""
+
+    meaningful_returns: list[StatementTarget] = dataclasses.field(default_factory=list)
+    explicit_none_returns: list[StatementTarget] = dataclasses.field(default_factory=list)
+    any_yields: list[StatementTarget] = dataclasses.field(default_factory=list)
+    meaningful_yields: list[StatementTarget] = dataclasses.field(default_factory=list)
+    explicit_none_yields: list[StatementTarget] = dataclasses.field(default_factory=list)
+    raised_exceptions: list[RaisedException] = dataclasses.field(default_factory=list)
+
+    def frozen(self) -> FunctionFacts:
+        """Return immutable function facts for rule consumption."""
+        return FunctionFacts(
+            meaningful_returns=tuple(self.meaningful_returns),
+            explicit_none_returns=tuple(self.explicit_none_returns),
+            any_yields=tuple(self.any_yields),
+            meaningful_yields=tuple(self.meaningful_yields),
+            explicit_none_yields=tuple(self.explicit_none_yields),
+            raised_exceptions=tuple(self.raised_exceptions),
+        )
+
+
 class _DefinitionCollector(cst.CSTVisitor):
     """Collect documentable definitions and their existing docstrings."""
 
@@ -638,6 +724,9 @@ class _DefinitionCollector(cst.CSTVisitor):
         self.source_lines = context.source_lines
         self.definitions: list[DefinitionInfo] = []
         self.docstrings: list[DocstringInfo] = []
+        self.function_facts_by_definition_id: dict[int, FunctionFacts] = {}
+        self.function_fact_stack: list[_MutableFunctionFacts] = []
+        self.lambda_depth = 0
         self.stack: list[DefinitionInfo] = []
 
         module_definition = DefinitionInfo(
@@ -696,11 +785,63 @@ class _DefinitionCollector(cst.CSTVisitor):
         self.definitions.append(definition)
         self.stack.append(definition)
         self._collect_docstring(definition)
+        self.function_fact_stack.append(_MutableFunctionFacts())
 
     def leave_FunctionDef(self, original_node: cst.FunctionDef) -> None:
         """Restore the enclosing definition after visiting a function."""
         del original_node
-        self.stack.pop()
+        definition = self.stack.pop()
+        self.function_facts_by_definition_id[id(definition)] = self.function_fact_stack.pop().frozen()
+
+    def visit_Lambda(self, node: cst.Lambda) -> None:
+        """Track lambda scope while collecting function facts."""
+        del node
+        self.lambda_depth += 1
+
+    def leave_Lambda(self, original_node: cst.Lambda) -> None:
+        """Restore the enclosing scope after visiting a lambda."""
+        del original_node
+        self.lambda_depth -= 1
+
+    def visit_Return(self, node: cst.Return) -> None:
+        """Record a top-level return statement for the current function."""
+        facts = self._current_function_facts()
+        if facts is None or node.value is None:
+            return
+        target = StatementTarget(line_numbers=_node_line_numbers(node, context=self.context))
+        if _is_none_expression(node.value):
+            facts.explicit_none_returns.append(target)
+        else:
+            facts.meaningful_returns.append(target)
+
+    def visit_Yield(self, node: cst.Yield) -> None:
+        """Record a top-level yield expression for the current function."""
+        facts = self._current_function_facts()
+        if facts is None:
+            return
+        target = StatementTarget(line_numbers=_node_line_numbers(node, context=self.context))
+        facts.any_yields.append(target)
+        if node.value is None:
+            return
+        if isinstance(node.value, cst.From) or not _is_none_expression(node.value):
+            facts.meaningful_yields.append(target)
+        else:
+            facts.explicit_none_yields.append(target)
+
+    def visit_Raise(self, node: cst.Raise) -> None:
+        """Record a top-level direct raise statement for the current function."""
+        facts = self._current_function_facts()
+        if facts is None:
+            return
+        name = exception_names.exception_name(node.exc)
+        if name is not None:
+            facts.raised_exceptions.append(RaisedException(name=name, line_numbers=_node_line_numbers(node, context=self.context)))
+
+    def _current_function_facts(self) -> _MutableFunctionFacts | None:
+        """Return the current function fact builder, if statement facts should be collected."""
+        if self.lambda_depth or self.stack[-1].kind is not DefinitionKind.FUNCTION:
+            return None
+        return self.function_fact_stack[-1]
 
     def _collect_docstring(self, owner: DefinitionInfo) -> None:
         """Collect an owner's first string expression when it is a docstring."""
@@ -859,6 +1000,7 @@ class PDF(RuleCategoryBase):
             docstrings=docstrings,
             summary_line_targets=summary_first_line_targets(docstrings),
             summary_terminal_line_targets=summary_terminal_line_targets(docstrings),
+            function_facts_by_definition_id=MappingProxyType(collector.function_facts_by_definition_id),
         )
 
     @classmethod
@@ -1926,6 +2068,7 @@ def planned_simple_docstring_source_change(
     context: RuleContext,
     replacements: tuple[rule_edits.PlannedTextReplacement, ...],
     value_lines: list[str],
+    fragments: tuple[string_literals.StringValueFragment, ...] | None = None,
 ) -> rule_edits.PlannedSourceChange | None:
     """Return one whole-literal replacement from evaluated-value replacements.
 
@@ -1936,13 +2079,15 @@ def planned_simple_docstring_source_change(
             changed slices and affected source lines.
         value_lines (list[str]): Complete logical value lines after all replacements, used to verify that the rendered
             literal still evaluates correctly.
+        fragments (tuple[string_literals.StringValueFragment, ...] | None): Optional precomputed fragment mapping for
+            callers that already needed source slices while planning replacements.
 
     Returns:
         Planned replacement for the whole string literal, or None when rendering would be unsafe or unchanged.
     """
     if not replacements:
         return None
-    fragments = docstring_value_fragments(docstring, line_ending=context.line_ending)
+    fragments = docstring_value_fragments(docstring, line_ending=context.line_ending) if fragments is None else fragments
     if fragments is None or not isinstance(docstring.node, cst.SimpleString):
         return None
     value = join_docstring_value_lines(docstring, value_lines)
@@ -1983,28 +2128,21 @@ def planned_simple_docstring_text_change(
     Returns:
         Planned replacement for the mapped source slice, or None when the source mapping is unsafe.
     """
-    if not is_safely_mapped_simple_docstring(docstring) or not isinstance(docstring.node, cst.SimpleString):
+    line_bounds = line_bounds_for_context(context)
+    source_map = simple_docstring_source_map(docstring, line_bounds=line_bounds)
+    if source_map is None or replacement.start_offset < 0 or replacement.end_offset < replacement.start_offset or replacement.end_offset >= len(source_map.source_offsets):
         return None
-    body_source = string_literals.simple_string_body_source(docstring.node)
-    if body_source is None or _has_mixed_physical_line_endings(body_source):
+    if expected_source is not None and source_map.source_slice(start_offset=replacement.start_offset, end_offset=replacement.end_offset) != expected_source:
         return None
-    fragments = string_literals.value_fragments_for_simple_string(docstring.node, line_ending=_docstring_source_line_ending(docstring))
-    if fragments is None or replacement.start_offset < 0 or replacement.end_offset < replacement.start_offset or replacement.end_offset > len(fragments):
+    replacement_body = f"{source_map.body_source[: source_map.source_offset(replacement.start_offset)]}{replacement.text}{source_map.body_source[source_map.source_offset(replacement.end_offset) :]}"
+    if (
+        not isinstance(docstring.node, cst.SimpleString)
+        or string_literals.render_simple_string_from_body_source(docstring.node.prefix, docstring.node.quote, replacement_body, expected_value=expected_value) is None
+    ):
         return None
-    if expected_source is not None and string_literals.source_for_value_slice(fragments, replacement.start_offset, replacement.end_offset) != expected_source:
-        return None
-    body_source_start = _source_body_offset(fragments, replacement.start_offset)
-    body_source_end = _source_body_offset(fragments, replacement.end_offset)
-    replacement_body = f"{body_source[:body_source_start]}{replacement.text}{body_source[body_source_end:]}"
-    if string_literals.render_simple_string_from_body_source(docstring.node.prefix, docstring.node.quote, replacement_body, expected_value=expected_value) is None:
-        return None
-    line_bounds = context.line_bounds if context.line_bounds is not None else source_text.line_bounds_from_lines(context.source_lines)
-    body_start = _offset_for_position(docstring.range.start, line_bounds=line_bounds) + len(docstring.node.prefix) + len(docstring.node.quote)
-    source_start = body_start + body_source_start
-    source_end = body_start + body_source_end
     return rule_edits.PlannedSourceChange(
         edit=rule_edits.SourceEdit(
-            range=cst_metadata.CodeRange(start=_position_for_offset(source_start, line_bounds=line_bounds), end=_position_for_offset(source_end, line_bounds=line_bounds)),
+            range=source_map.source_range(start_offset=replacement.start_offset, end_offset=replacement.end_offset, line_bounds=line_bounds),
             replacement=replacement.text,
         ),
         line_numbers=replacement.line_numbers,
@@ -2012,9 +2150,77 @@ def planned_simple_docstring_text_change(
     )
 
 
-def _docstring_source_line_ending(docstring: DocstringInfo) -> str:
-    """Return the first physical line ending in a docstring source literal."""
-    return line_endings.detect_line_ending(docstring.source)
+def line_bounds_for_context(context: RuleContext) -> source_text.LineBounds:
+    """Return cached or derived source line bounds for a rule context.
+
+    Args:
+        context (RuleContext): Current source context whose lines should be mapped to absolute offsets.
+
+    Returns:
+        source_text.LineBounds: Absolute source offset bounds for each physical source line.
+    """
+    return context.line_bounds if context.line_bounds is not None else source_text.line_bounds_from_lines(context.source_lines)
+
+
+def simple_docstring_source_map(docstring: DocstringInfo, *, line_bounds: source_text.LineBounds) -> SimpleDocstringSourceMap | None:
+    """Return evaluated-to-source body offsets for a source-mapped simple docstring.
+
+    Args:
+        docstring (DocstringInfo): Simple docstring whose literal body should be mapped.
+        line_bounds (source_text.LineBounds): Absolute source offsets for the current source lines.
+
+    Returns:
+        SimpleDocstringSourceMap | None: Source map for safe simple docstrings, or None when mapping is unsafe.
+    """
+    if not is_safely_mapped_simple_docstring(docstring) or not isinstance(docstring.node, cst.SimpleString):
+        return None
+    body_source = string_literals.simple_string_body_source(docstring.node)
+    if body_source is None or _has_mixed_physical_line_endings(body_source):
+        return None
+    source_offsets = _simple_string_source_offsets(docstring, body_source=body_source)
+    if source_offsets is None:
+        return None
+    body_start = _offset_for_position(docstring.range.start, line_bounds=line_bounds) + len(docstring.node.prefix) + len(docstring.node.quote)
+    return SimpleDocstringSourceMap(body_start=body_start, source_offsets=source_offsets, body_source=body_source)
+
+
+def simple_docstring_replacement_is_source_safe(docstring: DocstringInfo, replacement: str) -> bool:
+    """Return whether replacement source spelling is identical to its evaluated value.
+
+    Args:
+        docstring (DocstringInfo): Simple docstring whose quote delimiter constrains replacement spelling.
+        replacement (str): Replacement text to insert into the literal source body.
+
+    Returns:
+        bool: Whether the replacement can be inserted as source text without changing its evaluated value.
+    """
+    if not isinstance(docstring.node, cst.SimpleString) or not replacement.isascii() or "\\" in replacement or "\r" in replacement or "\n" in replacement:
+        return False
+    return docstring.node.quote not in replacement
+
+
+def _simple_string_source_offsets(docstring: DocstringInfo, *, body_source: str) -> tuple[int, ...] | None:
+    """Return source-body offsets for each evaluated offset in a simple string body."""
+    if "\\" in body_source:
+        fragments = docstring_value_fragments(docstring, line_ending=line_endings.detect_line_ending(docstring.source))
+        if fragments is None:
+            return None
+        source_offsets = [0]
+        for fragment in fragments:
+            source_offsets.append(source_offsets[-1] + len(fragment.source))
+        return tuple(source_offsets)
+    source_offsets = [0]
+    index = 0
+    while index < len(body_source):
+        if body_source[index] == "\r":
+            if index + 1 < len(body_source) and body_source[index + 1] == "\n":
+                index += 2
+            else:
+                index += 1
+        else:
+            index += 1
+        source_offsets.append(index)
+    return tuple(source_offsets)
 
 
 def _has_mixed_physical_line_endings(source: str) -> bool:
@@ -2040,11 +2246,6 @@ def _has_mixed_physical_line_endings(source: str) -> bool:
     return False
 
 
-def _source_body_offset(fragments: tuple[string_literals.StringValueFragment, ...], value_offset: int) -> int:
-    """Return source body offset corresponding to an evaluated-value offset."""
-    return sum(len(fragment.source) for fragment in fragments[:value_offset])
-
-
 def _offset_for_position(position: cst_metadata.CodePosition, *, line_bounds: source_text.LineBounds) -> int:
     """Return absolute source offset for a LibCST position."""
     line_start, _ = line_bounds[position.line - 1]
@@ -2053,9 +2254,17 @@ def _offset_for_position(position: cst_metadata.CodePosition, *, line_bounds: so
 
 def _position_for_offset(offset: int, *, line_bounds: source_text.LineBounds) -> cst_metadata.CodePosition:
     """Return a LibCST position for an absolute source offset."""
-    for line_number, (line_start, line_end) in enumerate(line_bounds, start=1):
-        if line_start <= offset <= line_end:
-            return cst_metadata.CodePosition(line=line_number, column=offset - line_start)
+    low = 0
+    high = len(line_bounds)
+    while low < high:
+        middle = (low + high) // 2
+        line_start, line_end = line_bounds[middle]
+        if offset < line_start:
+            high = middle
+        elif offset > line_end:
+            low = middle + 1
+        else:
+            return cst_metadata.CodePosition(line=middle + 1, column=offset - line_start)
     line_number = len(line_bounds)
     return cst_metadata.CodePosition(line=line_number, column=max(0, offset - line_bounds[-1][0]))
 
@@ -2292,6 +2501,21 @@ def _render_output_with_separator_fallback(
     return _render_output_body_source(docstring, body_source=body_source, expected_value=expected_value)
 
 
+def render_docstring_output_with_separator_fallback(docstring: DocstringInfo, *, body_source: str, expected_value: str, separator_fallback: DocstringOutputSeparatorFallback | None) -> str | None:
+    """Render output source, applying a configured separator fallback strategy.
+
+    Args:
+        docstring (DocstringInfo): Simple-string docstring whose original literal spelling should be reused.
+        body_source (str): Desired literal body source.
+        expected_value (str): Evaluated value expected from the rendered output.
+        separator_fallback (DocstringOutputSeparatorFallback | None): Optional boundary separator strategy.
+
+    Returns:
+        str | None: Full rendered literal source, or None when the output cannot be represented safely.
+    """
+    return _render_output_with_separator_fallback(docstring, body_source=body_source, expected_value=expected_value, separator_fallback=separator_fallback)
+
+
 def render_simple_docstring_body_with_separator_fallbacks(docstring: DocstringInfo, *, body_source: str, expected_value: str) -> str | None:
     """Render output source after trying value-preserving quote escapes and separator fallbacks.
 
@@ -2493,6 +2717,19 @@ def _output_expected_value(output_lines: tuple[DocstringOutputLine, ...], *, pre
     return "".join(chunks)
 
 
+def docstring_output_expected_value(output_lines: tuple[DocstringOutputLine, ...], *, preserve_trailing_newline: bool) -> str:
+    """Return replacement evaluated value from output lines.
+
+    Args:
+        output_lines (tuple[DocstringOutputLine, ...]): Render-ready line descriptors for the replacement body.
+        preserve_trailing_newline (bool): Whether the output value should end with a final newline.
+
+    Returns:
+        str: Evaluated docstring value expected after rendering the output lines.
+    """
+    return _output_expected_value(output_lines, preserve_trailing_newline=preserve_trailing_newline)
+
+
 def join_docstring_value_lines(docstring: DocstringInfo, lines: list[str]) -> str:
     """Join replacement logical lines with the original evaluated newline spellings.
 
@@ -2670,8 +2907,18 @@ def _target_attribute(target: cst.BaseAssignTargetExpression, owner: DefinitionI
 
 def _target_line_numbers(target: cst.CSTNode, *, context: RuleCategoryContext) -> tuple[int, ...]:
     """Return the source line for an attribute target."""
-    position = context.positions.get(target)
+    return _node_line_numbers(target, context=context)
+
+
+def _node_line_numbers(node: cst.CSTNode, *, context: RuleCategoryContext) -> tuple[int, ...]:
+    """Return the one-based start line for a CST node with a safe fallback."""
+    position = context.positions.get(node)
     return (1,) if position is None else (position.start.line,)
+
+
+def _is_none_expression(expression: cst.BaseExpression) -> bool:
+    """Return whether an expression is the literal `None` name."""
+    return isinstance(expression, cst.Name) and expression.value == "None"
 
 
 def _first_expression(body: cst.Module | cst.BaseSuite) -> tuple[cst.Expr, cst.SimpleStatementLine | cst.SimpleStatementSuite] | None:

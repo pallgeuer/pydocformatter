@@ -7,9 +7,10 @@ import dataclasses
 import libcst as cst
 
 import pydocformatter.rules.definition_helpers.decorators as decorator_helpers
+import pydocformatter.rules.definition_helpers.exception_names as exception_names
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
-from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
-from pydocformatter.rules.definitions.PDF.PDF import DocumentedFunctionFact, FunctionFacts, RaisedException, StatementTarget
+from pydocformatter.rules.definition import RuleContext
+from pydocformatter.rules.definitions.PDF.PDF import DocumentedFunctionFact
 
 
 @dataclasses.dataclass(frozen=True)
@@ -44,13 +45,13 @@ def documented_function_facts(context: RuleContext) -> tuple[DocumentedFunctionF
     cached_facts = data._documented_function_facts
     if cached_facts is not None:
         return cached_facts
-    facts = _collect_documented_function_facts(data, context=context)
+    facts = _collect_documented_function_facts(data)
     # Keep prepared data frozen externally while memoizing this expensive derived fact tuple.
     object.__setattr__(data, "_documented_function_facts", facts)
     return facts
 
 
-def _collect_documented_function_facts(data: PDF_definition.PDFCategoryData, *, context: RuleCategoryContext) -> tuple[DocumentedFunctionFact, ...]:
+def _collect_documented_function_facts(data: PDF_definition.PDFCategoryData) -> tuple[DocumentedFunctionFact, ...]:
     """Collect documented non-stub function facts for prepared PDF data."""
     facts: list[DocumentedFunctionFact] = []
     for definition in data.definitions:
@@ -59,7 +60,7 @@ def _collect_documented_function_facts(data: PDF_definition.PDFCategoryData, *, 
         docstring = data.docstring_for(definition)
         if docstring is None or _is_abstract(definition) or _is_stub_function(definition, docstring):
             continue
-        facts.append((definition, docstring, _function_facts(definition, context=context)))
+        facts.append((definition, docstring, data.function_facts_by_definition_id[id(definition)]))
     return tuple(facts)
 
 
@@ -158,77 +159,6 @@ def _entry_has_content(entry: PDF_definition.DocstringEntry) -> bool:
     return bool(entry.names or entry.type_text or entry.description)
 
 
-def _function_facts(definition: PDF_definition.DefinitionInfo, *, context: RuleCategoryContext) -> FunctionFacts:
-    """Return return, yield, and raise facts collected from a function body."""
-    visitor = _FunctionBodyVisitor(context)
-    definition.body.visit(visitor)
-    return FunctionFacts(
-        meaningful_returns=tuple(visitor.meaningful_returns),
-        explicit_none_returns=tuple(visitor.explicit_none_returns),
-        any_yields=tuple(visitor.any_yields),
-        meaningful_yields=tuple(visitor.meaningful_yields),
-        explicit_none_yields=tuple(visitor.explicit_none_yields),
-        raised_exceptions=tuple(visitor.raised_exceptions),
-    )
-
-
-class _FunctionBodyVisitor(cst.CSTVisitor):
-    """Collect top-level function behavior while skipping nested scopes."""
-
-    def __init__(self, context: RuleCategoryContext) -> None:
-        """Initialize empty behavior collections for one function body."""
-        super().__init__()
-        self.context = context
-        self.meaningful_returns: list[StatementTarget] = []
-        self.explicit_none_returns: list[StatementTarget] = []
-        self.any_yields: list[StatementTarget] = []
-        self.meaningful_yields: list[StatementTarget] = []
-        self.explicit_none_yields: list[StatementTarget] = []
-        self.raised_exceptions: list[RaisedException] = []
-
-    def visit_FunctionDef(self, node: cst.FunctionDef) -> bool:
-        """Skip nested function bodies."""
-        del node
-        return False
-
-    def visit_ClassDef(self, node: cst.ClassDef) -> bool:
-        """Skip nested class bodies."""
-        del node
-        return False
-
-    def visit_Lambda(self, node: cst.Lambda) -> bool:
-        """Skip lambda bodies."""
-        del node
-        return False
-
-    def visit_Return(self, node: cst.Return) -> None:
-        """Record meaningful return statements."""
-        if node.value is None:
-            return
-        target = StatementTarget(line_numbers=_node_line_numbers(node, context=self.context))
-        if _is_none_expression(node.value):
-            self.explicit_none_returns.append(target)
-        else:
-            self.meaningful_returns.append(target)
-
-    def visit_Yield(self, node: cst.Yield) -> None:
-        """Record yield expressions."""
-        target = StatementTarget(line_numbers=_node_line_numbers(node, context=self.context))
-        self.any_yields.append(target)
-        if node.value is None:
-            return
-        if isinstance(node.value, cst.From) or not _is_none_expression(node.value):
-            self.meaningful_yields.append(target)
-        else:
-            self.explicit_none_yields.append(target)
-
-    def visit_Raise(self, node: cst.Raise) -> None:
-        """Record directly raised exception names."""
-        name = _exception_name(node.exc)
-        if name is not None:
-            self.raised_exceptions.append(RaisedException(name=name, line_numbers=_node_line_numbers(node, context=self.context)))
-
-
 def _is_abstract(definition: PDF_definition.DefinitionInfo) -> bool:
     """Return whether a function definition is decorated as abstract."""
     return any((name := decorator_helpers.decorator_qualified_name(decorator.decorator)) is not None and name.rpartition(".")[2] in _ABSTRACT_DECORATOR_NAMES for decorator in definition.decorators)
@@ -262,48 +192,8 @@ def _is_stub_statement(statement: cst.BaseStatement | cst.BaseSmallStatement) ->
         return True
     if isinstance(statement, cst.Expr) and isinstance(statement.value, cst.Ellipsis):
         return True
-    exception_name = _exception_name(statement.exc) if isinstance(statement, cst.Raise) else None
+    exception_name = exception_names.exception_name(statement.exc) if isinstance(statement, cst.Raise) else None
     return exception_name is not None and exception_name.rpartition(".")[2] == "NotImplementedError"
-
-
-def _is_none_expression(expression: cst.BaseExpression) -> bool:
-    """Return whether an expression is the literal `None` name."""
-    return isinstance(expression, cst.Name) and expression.value == "None"
-
-
-def _exception_name(expression: cst.BaseExpression | None) -> str | None:
-    """Return a statically comparable raised exception name, if one is present."""
-    if expression is None:
-        return None
-    if isinstance(expression, cst.Call):
-        return _exception_name(expression.func)
-    if isinstance(expression, cst.Name):
-        return expression.value if _looks_like_exception_name(expression.value) else None
-    if isinstance(expression, cst.Attribute):
-        parent = _exception_name_parent(expression.value)
-        if parent is None:
-            return expression.attr.value if _looks_like_exception_name(expression.attr.value) else None
-        return f"{parent}.{expression.attr.value}" if _looks_like_exception_name(expression.attr.value) else None
-    return None
-
-
-def _looks_like_exception_name(name: str) -> bool:
-    """Return whether a name follows the direct exception-name heuristic."""
-    # Static-only heuristic: direct capitalized names are comparable, while dynamic/lowercase aliases are intentionally
-    # ignored.
-    return bool(name) and name[0].isupper()
-
-
-def _exception_name_parent(expression: cst.BaseExpression) -> str | None:
-    """Return the dotted parent prefix for a raised exception attribute expression."""
-    if isinstance(expression, cst.Name):
-        return expression.value
-    if isinstance(expression, cst.Attribute):
-        parent = _exception_name_parent(expression.value)
-        if parent is None:
-            return None
-        return f"{parent}.{expression.attr.value}"
-    return None
 
 
 def exception_names_match(raised_name: str, documented_name: str) -> bool:
@@ -319,11 +209,3 @@ def exception_names_match(raised_name: str, documented_name: str) -> bool:
     if "." in raised_name and "." in documented_name:
         return raised_name == documented_name
     return raised_name.rpartition(".")[2] == documented_name.rpartition(".")[2]
-
-
-def _node_line_numbers(node: cst.CSTNode, *, context: RuleCategoryContext) -> tuple[int, ...]:
-    """Return the one-based start line for a CST node with a safe fallback."""
-    position = context.positions.get(node)
-    if position is None:
-        return (1,)
-    return (position.start.line,)

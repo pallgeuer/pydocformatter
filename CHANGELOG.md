@@ -178,11 +178,15 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Changed pytest to treat warnings as errors by default.
   - Changed pytest to use pytest-xdist multiprocessing by default for local, pre-commit, and CI test runs.
   - Reduced brittle test snapshots of built-in rule inventories while preserving coverage of rule ordering, opt-in selection behavior, and broad-profile differences.
+  - Collected return, yield, and raise facts during PDF preparation so PDF50x value-documentation rules reuse the existing definition traversal instead of walking documented function bodies again.
   - Shared setup and initial check work across structured rule Markdown example assertions to reduce pytest runtime.
   - Cached rule-context source text and source lines per module state to reduce repeated LibCST source regeneration during checks.
   - Reused cached source lines and line bounds for rule-based source edits to avoid repeated line splitting.
   - Skipped fix-mode LibCST source comparison for same-module no-op fixes.
   - Shared LibCST position metadata across selected rule categories for each module state.
+  - Deferred expensive decorator and enum-base metadata checks in selected PDF rules to reduce check runtime without changing diagnostics.
+  - Skipped LibCST qualified-name metadata resolution for configured decorator and enum-base names that cannot match syntactically or through a relevant import alias.
+  - Resolved configured decorator, enum-base, and yield-container names from cached top-level bindings before falling back to LibCST qualified-name metadata.
   - Lazily cached PDF value-documentation facts to avoid repeated return, yield, and raise body walks across PDF502 through PDF507 without adding work for unrelated PDF rule selections.
   - Resolved PCF parent metadata lazily so selections such as `PCF001` avoid syntax-parent work needed only by trailing-comment extraction.
   - Skipped fix passes when an initial clean check proves there are no effectively fixable findings.
@@ -231,6 +235,8 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added missing docstring summaries and documentation sections so repository `pydocfmt check` passes.
 
 - **Docstring formatting:**
+  - Fixed import-aware configured decorator, enum-base, and yield-container matching to use source-position-aware top-level bindings so later rebindings do not affect earlier uses and later imports override earlier local assignments.
+  - Fixed configured decorator, enum-base, and yield-container matching for guarded and function-local imports while avoiding false matches from local shadowing, mismatched canonical module aliases, and top-level `for`/`with`/`except` binders.
   - Fixed configured decorator matching so dynamic call receivers such as `@typing().overload` are not treated as exact static decorator names.
   - Fixed attached attribute docstring checks to avoid duplicate findings for repeated assignment target names and to report private attached attribute docstrings in source order.
   - Fixed `PDF7xx` typed entry checks to evaluate every name in parsed NumPy multi-name parameter and attribute entries.
@@ -245,7 +251,14 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Fixed `PCF001` standalone-line joining to avoid merging colon-ended label comments, including lowercase and numeric labels, with adjacent prose, while still allowing lowercase multi-word colon continuations to complete unfinished preceding prose.
 
 - **Rule performance:**
+  - Shared top-level binding collection between configured-name matching and type-expression alias normalization, and shared simple-docstring source maps across direct docstring text-edit planners.
+  - Moved configured-name binding caching onto prepared PDF rule data instead of process-global state, and reused the shared simple-docstring source map for section direct edits.
+  - Fixed configured-name binding caching to avoid retaining LibCST metadata wrappers, removed duplicate PDF411 direct-edit planning, and removed the obsolete value-documentation body-walk fallback.
+  - Fixed PDF000, PDF100, and PDF107 to avoid unnecessary simple-string fragment reconstruction for already-normal literals, repeated indentation rewrites, and source-safe opening-quote moves.
   - Fixed PCF004 previous-comment boundary checks, PDF411 repeated type-like normalization, and PDF501 TypedDict key lookup to avoid repeated or unnecessary rule-local work.
+  - Fixed PDF308, PDF309, and PDF310 entry-description checks to avoid repeated whole-docstring fix validation for source-safe punctuation and capitalization edits.
+  - Fixed PDF101 and PDF411 to avoid repeated source-fragment reconstruction for common source-safe docstring edits.
+  - Fixed PDF401 and PDF409 to use direct source edits for safely mapped section and entry replacements, and fixed PCF004 to classify syntax-sensitive trailing comments during comment collection instead of resolving parent metadata during the rule check.
 
 - **Docstring formatting:**
   - Fixed `PDF101` docstring reflow to avoid merging lowercase and numeric colon-ended label lines with preceding prose.
@@ -256,6 +269,9 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 
 - **Developer workflow:**
   - Fixed the Markdown table normalizer to report non-fixable validation failures, normalize to header-row indentation while preserving existing line endings, handle escaped pipes, preserve indented code blocks, and follow stricter fenced-code parsing.
+
+- **Rule internals:**
+  - Consolidated raised-exception name parsing used by PDF preparation and value-documentation stub detection into one helper.
   - Fixed Loupe reviewer elapsed-time accounting to start individual reviewer timers at process launch.
   - Fixed Loupe reviewer timeout cleanup to let collector threads own subprocess completion while the main thread only signals timed-out process groups.
   - Fixed Loupe reviewer timeout handling to avoid blocking on detached child processes that inherit reviewer output handles.

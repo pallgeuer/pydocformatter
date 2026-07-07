@@ -106,6 +106,27 @@ def test_reports_called_import_alias_property_decorators() -> None:
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((8,), (12,))
 
 
+def test_class_local_shadowed_import_alias_property_decorator_is_not_treated_as_configured_property() -> None:
+    source = 'from functools import cached_property as cp\n\nclass Example:\n    cp = decorator\n\n    @cp\n    def cached(self):\n        """Returns cached value."""\n'
+    result = format_source(source)
+
+    assert not result.unfixed_findings
+
+
+def test_later_property_import_alias_rebinding_does_not_affect_prior_decorator() -> None:
+    source = 'from functools import cached_property as cp\n\nclass Example:\n    @cp\n    def cached(self):\n        """Returns cached value."""\n\ncp = decorator\n'
+    result = format_source(source)
+
+    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((6,),)
+
+
+def test_import_after_local_assignment_matches_later_property_decorator() -> None:
+    source = 'functools = object()\nimport functools\n\nclass Example:\n    @functools.cached_property\n    def cached(self):\n        """Returns cached value."""\n'
+    result = format_source(source)
+
+    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((7,),)
+
+
 def test_shadowed_dotted_property_decorator_is_not_treated_as_configured_property() -> None:
     source = 'class Builtins:\n    property = object()\n\nbuiltins = Builtins()\n\n\nclass Example:\n    @builtins.property\n    def value(self):\n        """Returns property value."""\n'
     result = format_source(source)

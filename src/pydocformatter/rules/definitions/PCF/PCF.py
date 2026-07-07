@@ -55,21 +55,6 @@ class CommentKind(enum.Enum):
     TOOL_DIRECTIVE = "tool-directive"
 
 
-class _SyntaxSensitivity:
-    """Lazy parent metadata resolver for trailing-comment extraction safety."""
-
-    def __init__(self, metadata_wrapper: cst_metadata.MetadataWrapper) -> None:
-        """Store a metadata wrapper and defer parent-map resolution until needed."""
-        self._metadata_wrapper = metadata_wrapper
-        self._parents: Mapping[cst.CSTNode, cst.CSTNode] | None = None
-
-    def is_sensitive(self, node: cst.Comment) -> bool:
-        """Return whether extracting a trailing comment would weaken syntax association."""
-        if self._parents is None:
-            self._parents = self._metadata_wrapper.resolve(cst_metadata.ParentNodeProvider)
-        return _is_syntax_sensitive_trailing_position(node, parents=self._parents)
-
-
 @dataclasses.dataclass(frozen=True)
 class CommentInfo:
     """Lossless source information for one Python comment.
@@ -82,6 +67,8 @@ class CommentInfo:
         indent (str): Leading whitespace before a standalone comment marker.
         line_prefix (str): Source text before the comment on its physical line.
         text (str): Exact comment token text, including the leading hash.
+        syntax_sensitive (bool): Whether moving this trailing comment could alter syntax around decorators, arguments,
+            continuations, or compound headers.
     """
 
     node: cst.Comment
@@ -91,19 +78,7 @@ class CommentInfo:
     indent: str
     line_prefix: str
     text: str
-    _syntax_sensitivity: _SyntaxSensitivity | None = dataclasses.field(repr=False, compare=False)
-
-    @property
-    def syntax_sensitive(self) -> bool:
-        """Whether trailing-comment extraction needs syntax-sensitive protection.
-
-        Returns:
-            bool: Whether moving this trailing comment could alter syntax around decorators, arguments, or compound
-                headers.
-        """
-        if self.placement != CommentPlacement.TRAILING or self._syntax_sensitivity is None:
-            return False
-        return self._syntax_sensitivity.is_sensitive(self.node)
+    syntax_sensitive: bool = False
 
     @property
     def raw_content(self) -> str:
@@ -196,17 +171,36 @@ class PCFCategoryData:
         return source_text.source_for_range(code_range, source_lines=self.source_lines)
 
 
+@dataclasses.dataclass(frozen=True)
+class _CollectedComment:
+    """Comment node and syntax-sensitivity facts collected during traversal."""
+
+    node: cst.Comment
+    syntax_sensitive: bool
+
+
 class _CommentCollector(cst.CSTVisitor):
     """Collect comments from a LibCST module."""
 
     def __init__(self) -> None:
         """Initialize an empty comment collection."""
         super().__init__()
-        self.comments: list[cst.Comment] = []
+        self.comments: list[_CollectedComment] = []
+        self._stack: list[cst.CSTNode] = []
+
+    def on_visit(self, node: cst.CSTNode) -> bool:
+        """Track ancestors while visiting all nodes."""
+        self._stack.append(node)
+        return super().on_visit(node)
+
+    def on_leave(self, original_node: cst.CSTNode) -> None:
+        """Restore the ancestor stack after a node is visited."""
+        super().on_leave(original_node)
+        self._stack.pop()
 
     def visit_Comment(self, node: cst.Comment) -> None:
         """Collect one comment node."""
-        self.comments.append(node)
+        self.comments.append(_CollectedComment(node=node, syntax_sensitive=_is_syntax_sensitive_trailing_position(self._stack)))
 
 
 @rule_registration.register_rule_category
@@ -243,12 +237,11 @@ class PCF(RuleCategoryBase):
             )
         collector = _CommentCollector()
         context.module.visit(collector)
-        syntax_sensitivity = _SyntaxSensitivity(context.metadata_wrapper)
         source_lines_with_endings = context.source_lines
         source_lines = [line.rstrip("\r\n") for line in source_lines_with_endings]
         comments = tuple(
             sorted(
-                (_comment_info(node, positions=context.positions, source_lines=source_lines, syntax_sensitivity=syntax_sensitivity) for node in collector.comments),
+                (_comment_info(comment.node, positions=context.positions, source_lines=source_lines, syntax_sensitive=comment.syntax_sensitive) for comment in collector.comments),
                 key=lambda comment: (comment.range.start.line, comment.range.start.column),
             )
         )
@@ -348,7 +341,7 @@ def planned_full_line_change(
     )
 
 
-def _comment_info(node: cst.Comment, *, positions: Mapping[cst.CSTNode, cst_metadata.CodeRange], source_lines: list[str], syntax_sensitivity: _SyntaxSensitivity) -> CommentInfo:
+def _comment_info(node: cst.Comment, *, positions: Mapping[cst.CSTNode, cst_metadata.CodeRange], source_lines: list[str], syntax_sensitive: bool) -> CommentInfo:
     """Build source information for one comment node."""
     code_range = positions[node]
     source_line = source_lines[code_range.start.line - 1]
@@ -363,7 +356,7 @@ def _comment_info(node: cst.Comment, *, positions: Mapping[cst.CSTNode, cst_meta
         indent=indent,
         line_prefix=line_prefix,
         text=node.value,
-        _syntax_sensitivity=syntax_sensitivity,
+        syntax_sensitive=syntax_sensitive if placement == CommentPlacement.TRAILING else False,
     )
 
 
@@ -381,17 +374,19 @@ def _comment_kind(text: str, *, line: int, source_lines: list[str]) -> CommentKi
     return CommentKind.REGULAR
 
 
-def _is_syntax_sensitive_trailing_position(node: cst.Comment, *, parents: Mapping[cst.CSTNode, cst.CSTNode]) -> bool:
+def _is_syntax_sensitive_trailing_position(stack: list[cst.CSTNode]) -> bool:
     """Return whether extracting a trailing comment would weaken syntax association."""
-    current: cst.CSTNode = node
-    while current in parents:
-        parent = parents[current]
+    if not stack:
+        return False
+    current = stack[-1]
+    for parent_index in range(len(stack) - 2, -1, -1):
+        parent = stack[parent_index]
         if isinstance(parent, cst.Decorator | cst.Arg | cst.ParenthesizedWhitespace):
             return True
         if isinstance(parent, cst.Match) and isinstance(current, cst.TrailingWhitespace):
             return True
         if isinstance(parent, cst.IndentedBlock | cst.SimpleStatementSuite) and isinstance(current, cst.TrailingWhitespace):
-            return parents.get(parent) is not None
+            return parent_index > 0
         current = parent
     return False
 

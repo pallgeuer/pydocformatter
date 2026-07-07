@@ -181,8 +181,68 @@ def test_shadowed_import_alias_decorator_does_not_match_qualified_configuration(
     assert_findings(source, expected=())
 
 
+def test_guarded_import_alias_decorator_matches_qualified_configuration() -> None:
+    source = 'if enabled:\n    from typing import overload as ov\n\n@ov\ndef parse(value: int):\n    """Parse int."""\n    pass\n'
+
+    assert_findings(source, expected=(("PDF616", (6,), "Function decorated with '@ov' should not have a docstring"),))
+
+
+def test_function_local_import_alias_decorator_matches_qualified_configuration() -> None:
+    source = 'def outer():\n    from typing import overload as ov\n\n    @ov\n    def parse(value: int):\n        """Parse int."""\n        pass\n'
+
+    assert_findings(source, expected=(("PDF616", (6,), "Function decorated with '@ov' should not have a docstring"),))
+
+
+def test_function_local_shadowed_import_alias_decorator_does_not_match_qualified_configuration() -> None:
+    source = 'from typing import overload as ov\n\n\ndef outer():\n    ov = decorator\n\n    @ov\n    def parse(value: int):\n        """Parse int."""\n        pass\n'
+
+    assert_findings(source, expected=())
+
+
+def test_later_import_alias_rebinding_does_not_affect_prior_forbidden_decorator() -> None:
+    source = 'from typing import overload as ov\n\n@ov\ndef parse(value: int):\n    """Parse int."""\n    pass\n\nov = decorator\n'
+
+    assert_findings(source, expected=(("PDF616", (5,), "Function decorated with '@ov' should not have a docstring"),))
+
+
+def test_import_after_local_assignment_matches_later_forbidden_decorator() -> None:
+    source = 'ov = decorator\nfrom typing import overload as ov\n\n@ov\ndef parse(value: int):\n    """Parse int."""\n    pass\n'
+
+    assert_findings(source, expected=(("PDF616", (6,), "Function decorated with '@ov' should not have a docstring"),))
+
+
 def test_shadowed_dotted_decorator_does_not_match_qualified_configuration() -> None:
     source = 'class Typing:\n    overload = object()\n\ntyping = Typing()\n\n@typing.overload\ndef parse(value: int):\n    """Parse int."""\n    pass\n'
+
+    assert_findings(source, expected=())
+
+
+def test_imported_dotted_decorator_root_must_resolve_to_configured_module() -> None:
+    source = 'import types as typing\n\n@typing.overload\ndef parse(value: int):\n    """Parse int."""\n    pass\n'
+
+    assert_findings(source, expected=())
+
+
+def test_function_local_imported_dotted_decorator_root_must_resolve_to_configured_module() -> None:
+    source = 'def outer():\n    import types as typing\n\n    @typing.overload\n    def parse(value: int):\n        """Parse int."""\n        pass\n'
+
+    assert_findings(source, expected=())
+
+
+def test_top_level_for_binding_dotted_decorator_root_does_not_match_qualified_configuration() -> None:
+    source = 'for typing in []:\n    pass\n\n@typing.overload\ndef parse(value: int):\n    """Parse int."""\n    pass\n'
+
+    assert_findings(source, expected=())
+
+
+def test_top_level_with_binding_dotted_decorator_root_does_not_match_qualified_configuration() -> None:
+    source = 'with manager as typing:\n    pass\n\n@typing.overload\ndef parse(value: int):\n    """Parse int."""\n    pass\n'
+
+    assert_findings(source, expected=())
+
+
+def test_top_level_except_binding_dotted_decorator_root_does_not_match_qualified_configuration() -> None:
+    source = 'try:\n    pass\nexcept Exception as typing:\n    pass\n\n@typing.overload\ndef parse(value: int):\n    """Parse int."""\n    pass\n'
 
     assert_findings(source, expected=())
 
