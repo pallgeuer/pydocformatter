@@ -2,7 +2,8 @@
 
 import pydocformatter.formatter as formatter
 import pydocformatter.rules_selection as rules_selection
-from pydocformatter.cli.settings_check import CheckSettings, LineEnding
+from pydocformatter.cli.settings_check import CheckSettings, CommentTaskMarkerMode, LineEnding
+from pydocformatter.settings import StringList
 
 
 def format_pcf(
@@ -15,7 +16,8 @@ def format_pcf(
     url_aware_wrapping: bool = True,
     comment_join_standalone_lines: bool = False,
     comment_format_list_items: bool = True,
-    comment_format_task_markers: bool = True,
+    comment_task_marker_mode: CommentTaskMarkerMode = CommentTaskMarkerMode.NO_WRAP,
+    comment_task_markers: StringList = CheckSettings().comment_task_markers,
     comment_preserve_headings: bool = True,
     comment_preserve_doctests: bool = True,
     comment_preserve_code_fences: bool = True,
@@ -40,7 +42,8 @@ def format_pcf(
         comment_join_standalone_lines (bool): Whether adjacent standalone comment lines may be joined before wrapping.
         comment_format_list_items (bool): Whether standalone comment list items should be recognized and formatted
             structurally.
-        comment_format_task_markers (bool): Whether task-marker prefixes should be preserved while formatting comments.
+        comment_task_marker_mode (CommentTaskMarkerMode): How recognized task-marker comments should be treated.
+        comment_task_markers (StringList): Exact uppercase task-marker labels recognized before a colon.
         comment_preserve_headings (bool): Whether heading-like standalone comments should remain structurally protected.
         comment_preserve_doctests (bool): Whether doctest prompts inside comments should remain structurally protected.
         comment_preserve_code_fences (bool): Whether fenced code blocks inside comments should remain structurally
@@ -68,7 +71,8 @@ def format_pcf(
         url_aware_wrapping=url_aware_wrapping,
         comment_join_standalone_lines=comment_join_standalone_lines,
         comment_format_list_items=comment_format_list_items,
-        comment_format_task_markers=comment_format_task_markers,
+        comment_task_marker_mode=comment_task_marker_mode,
+        comment_task_markers=comment_task_markers,
         comment_preserve_headings=comment_preserve_headings,
         comment_preserve_doctests=comment_preserve_doctests,
         comment_preserve_code_fences=comment_preserve_code_fences,

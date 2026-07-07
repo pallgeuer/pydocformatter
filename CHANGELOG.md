@@ -86,7 +86,8 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added `docstring-property-decorators` to configure function decorators that make property-specific summary rules treat functions as properties, with import-aware matching for dotted configured names.
   - Added `comment-trailing-extraction-syntax-aware`, enabled by default, to keep overlong trailing comments inline in syntax-sensitive positions.
   - Added `comment-trailing-extraction-content-aware`, enabled by default, to keep overlong trailing comments inline when enabled standalone comment structure/code detectors or the operator heuristic make extraction unsafe.
-  - Added `comment-format-task-markers`, enabled by default, to reflow recognized task-marker comments such as `TODO:`, `FIXME:`, and `HACK:` with hanging indentation.
+  - Added `comment-task-marker-mode` with `none`, `no-wrap`, and `hanging` modes, defaulting to `no-wrap` for recognized task-marker comments such as `TODO:`, `FIXME:`, and `HACK:`.
+  - Added `comment-task-markers` to configure the exact uppercase labels recognized as comment task markers.
   - Added TOML-only `per-file-settings` for file-pattern-specific formatter behavior overrides that do not affect file selection or rule selection.
   - Added Ruff-style rule settings under `[tool.pydocfmt]`: `select`, `ignore`, `extend-select`, `per-file-ignores`, `extend-per-file-ignores`, `fixable`, `unfixable`, and `extend-fixable`.
   - Added `respect-gitignore` for formatter configuration, defaulting to `true`.
@@ -249,6 +250,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 
 - **Comment formatting:**
   - Fixed `PCF001` standalone-line joining to avoid merging colon-ended label comments, including lowercase and numeric labels, with adjacent prose, while still allowing lowercase multi-word colon continuations to complete unfinished preceding prose.
+  - Fixed task-marker comment matching to reuse compiled marker patterns and share no-wrap normalization between default task-marker handling and code-like hanging task-marker payloads.
 
 - **Rule performance:**
   - Shared top-level binding collection between configured-name matching and type-expression alias normalization, and shared simple-docstring source maps across direct docstring text-edit planners.

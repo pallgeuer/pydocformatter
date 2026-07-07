@@ -9,7 +9,7 @@ When `comment-trailing-extraction-syntax-aware` is enabled, overlong comments in
 
 When `comment-trailing-extraction-content-aware` is enabled, overlong comments remain inline if their content would be unsafe to reinterpret as standalone comment text. The unsafe-content check respects the existing standalone comment settings: list-like text is unsafe when `comment-format-list-items` is enabled, table-like text is unsafe when `comment-preserve-tables` is enabled, and the same pattern applies to enabled headings, doctests, code fences, block quotes, directives, and code-detection settings. Disabling one detector only removes that detector from the safety check; if the same text also matches another enabled detector, it still remains inline. Within this content-aware check, leading symbolic operator-like tokens such as `-`, `*`, `>`, `|`, `+`, comparison operators, and arrows are always unsafe, even when a matching structure setting is disabled. Ordinary prose that starts with words such as `and`, `or`, or `not` can still extract.
 
-When `comment-format-task-markers` is enabled, extracted task-marker comments use the same hanging continuation indentation as standalone task markers. Content-aware code detection checks the task-marker payload rather than the full `TODO:`-style prefix, so annotation-like marker text such as `TODO: fix_parser` is not mistaken for Python code.
+When `comment-task-marker-mode` is `no-wrap` or `hanging`, extracted task-marker comments use the same task-marker treatment as standalone task markers. Content-aware code detection checks the task-marker payload rather than the full `TODO:`-style prefix, so annotation-like marker text such as `TODO: fix_parser` is not mistaken for Python code.
 
 When a moved block would directly follow an existing same-indent standalone comment, a blank line keeps the independently authored comments separate. The rule generates the complete canonical block itself and therefore works when PCF001 is disabled.
 
@@ -37,12 +37,26 @@ value = compute()  # This trailing comment has enough words that it must move ab
 value = compute()
 ```
 
-An overlong task-marker trailing comment extracts with task-marker hanging indentation:
+An overlong task-marker trailing comment extracts without wrapping its task-marker payload by default:
 
 ```pydocfmt-example
 [settings]
 line-length = 30
-comment-detect-statements = false
+
+[input]
+value = compute()  # TODO: alpha beta gamma delta epsilon zeta eta theta
+
+[output]
+# TODO: alpha beta gamma delta epsilon zeta eta theta
+value = compute()
+```
+
+Set `comment-task-marker-mode` to `hanging` to extract and reflow task-marker payloads with marker-width hanging indentation:
+
+```pydocfmt-example
+[settings]
+line-length = 30
+comment-task-marker-mode = "hanging"
 
 [input]
 value = compute()  # TODO: alpha beta gamma delta epsilon zeta eta theta
@@ -50,6 +64,22 @@ value = compute()  # TODO: alpha beta gamma delta epsilon zeta eta theta
 [output]
 # TODO: alpha beta gamma delta
 #       epsilon zeta eta theta
+value = compute()
+```
+
+Set `comment-task-marker-mode` to `none` to extract the same text as an ordinary standalone comment instead of using task-marker-specific continuation indentation:
+
+```pydocfmt-example
+[settings]
+line-length = 30
+comment-task-marker-mode = "none"
+
+[input]
+value = compute()  # TODO: alpha beta gamma delta epsilon zeta eta theta
+
+[output]
+# TODO: alpha beta gamma delta
+# epsilon zeta eta theta
 value = compute()
 ```
 
@@ -188,7 +218,8 @@ Extraction safety settings:
 Content-safety detector settings:
 
 - `comment-format-list-items`: When enabled, list-like trailing content is unsafe to extract; leading `-`, `*`, and related operator-like tokens remain unsafe even when list formatting is disabled.
-- `comment-format-task-markers`: When enabled, task-marker trailing comments extract with hanging indentation unless their marker payload matches an enabled code detector.
+- `comment-task-marker-mode`: Controls recognized task-marker trailing comments with `none`, `no-wrap`, or `hanging`; marker payloads that match an enabled code detector remain inline.
+- `comment-task-markers`: Configures exact uppercase task marker labels recognized before `:`.
 - `comment-preserve-headings`: When enabled, ATX headings and heading-adornment lines are unsafe to extract. Text that also looks like a table remains unsafe while table preservation is enabled.
 - `comment-preserve-doctests`: When enabled, trailing content starting with `>>>` is unsafe to extract.
 - `comment-preserve-code-fences`: When enabled, trailing content starting with a Markdown code fence is unsafe to extract.

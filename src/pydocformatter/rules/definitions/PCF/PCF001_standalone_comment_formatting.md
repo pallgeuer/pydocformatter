@@ -11,7 +11,7 @@ PCF001 operates on physical runs of consecutive, same-indent, regular, non-empty
 
 Within a run, PCF001 first identifies enabled preserved structures, then applies enabled code detectors to the remaining semantic text, and finally formats the remaining list items, block quotes, paragraphs, or physical lines. Lines inside an explicitly preserved structure are excluded from code detection, so code in a fenced or directive region does not prevent adjacent prose from formatting. If any code detector matches another non-preserved line or multiline candidate, the entire physical standalone run remains unchanged.
 
-When `comment-format-task-markers` is enabled, recognized task markers such as `TODO:`, `FIXME:`, and `HACK:` are formatted as independent units with hanging continuation indentation. Existing continuation lines are reflowed with the marker line only when they have the same base indentation and exactly enough spaces after the comment marker to align with the task-marker payload. Code-like task-marker payloads are normalized but not wrapped according to the enabled code-detection settings.
+When `comment-task-marker-mode` is `no-wrap`, recognized task markers such as `TODO:`, `FIXME:`, and `HACK:` are formatted as independent units but are not wrapped. When it is `hanging`, recognized task-marker units use hanging continuation indentation. Existing continuation lines belong to the same unit only when they have the same base indentation and exactly enough spaces after the comment marker to align with the task-marker payload. Code-like task-marker payloads in `hanging` mode are normalized but not wrapped according to the enabled code-detection settings. Set `comment-task-marker-mode` to `none` for no task-marker-specific handling.
 
 When indentation leaves no positive wrapping width, PCF001 still canonicalizes spacing but keeps the content on one line. It preserves the source's final-newline state and untouched mixed line endings. When `url-aware-wrapping` is enabled, URL tokens remain unbroken but surrounding prose may use less greedy line breaks.
 
@@ -125,12 +125,25 @@ line-length = 34
 # > its prefix.
 ```
 
-Task-marker comments use marker-width hanging indentation so continuation lines remain visually associated with the marker:
+Task-marker comments use `no-wrap` mode by default. The marker spacing is normalized, but the payload is not wrapped even when it exceeds `line-length`:
 
 ```pydocfmt-example
 [settings]
 line-length = 30
-comment-detect-statements = false
+
+[input]
+#TODO: alpha beta gamma delta epsilon zeta eta theta
+
+[output]
+# TODO: alpha beta gamma delta epsilon zeta eta theta
+```
+
+Set `comment-task-marker-mode` to `hanging` to reflow task-marker payloads with marker-width hanging indentation so continuation lines remain visually associated with the marker:
+
+```pydocfmt-example
+[settings]
+line-length = 30
+comment-task-marker-mode = "hanging"
 
 [input]
 #TODO: alpha beta gamma delta epsilon zeta eta theta
@@ -138,6 +151,21 @@ comment-detect-statements = false
 [output]
 # TODO: alpha beta gamma delta
 #       epsilon zeta eta theta
+```
+
+Set `comment-task-marker-mode` to `none` to treat task markers as ordinary comment text, so wrapping uses ordinary continuation indentation:
+
+```pydocfmt-example
+[settings]
+line-length = 30
+comment-task-marker-mode = "none"
+
+[input]
+#TODO: alpha beta gamma delta epsilon zeta eta theta
+
+[output]
+# TODO: alpha beta gamma delta
+# epsilon zeta eta theta
 ```
 
 Preserved regions stay unchanged while adjacent prose still formats:
@@ -210,7 +238,8 @@ Structure settings:
 
 - `comment-join-standalone-lines`: When enabled, adjacent ordinary prose lines are joined with one space. Preserved structures, list items, block quotes, and standalone colon-ended label lines remain formatting boundaries.
 - `comment-format-list-items`: Recognizes `-`, `+`, `*`, `1.`, and `1)` markers, including marker indentation and more-indented continuation lines. Each item is reflowed independently with hanging indentation.
-- `comment-format-task-markers`: Recognizes uppercase `TODO`, `FIXME`, `XXX`, `HACK`, `BUG`, `DEBUG`, `NOTE`, `OPTIMIZE`, and `REVIEW` markers followed by `:` and reflows their payloads with hanging indentation.
+- `comment-task-marker-mode`: Controls recognized task markers with `none`, `no-wrap`, or `hanging`. The default `no-wrap` normalizes recognized task-marker units without wrapping them; `hanging` reflows their payloads with hanging indentation.
+- `comment-task-markers`: Configures exact uppercase task marker labels recognized before `:`. The default markers are `TODO`, `FIXME`, `XXX`, `HACK`, `BUG`, `DEBUG`, `NOTE`, `OPTIMIZE`, and `REVIEW`.
 - `comment-preserve-headings`: Preserves ATX headings and paired Setext/reStructuredText adornment headings unchanged.
 - `comment-preserve-doctests`: Preserves from the first line whose semantic text starts with `>>>` through the end of the physical run. An empty comment separator ends the run.
 - `comment-preserve-code-fences`: Preserves regions opened by at least three backticks or tildes through a matching fence containing no trailing text. An unclosed fence protects the remainder of the run.

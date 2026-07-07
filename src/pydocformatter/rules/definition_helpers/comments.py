@@ -7,9 +7,6 @@ Attributes:
         prose.
     BLOCK_QUOTE_RE (re.Pattern[str]): Markdown block-quote parser that keeps nested quote prefixes attached to wrapped
         output lines.
-    TASK_MARKERS (tuple[str, ...]): Uppercase task labels that receive hanging-indent formatting instead of ordinary
-        paragraph wrapping.
-    TASK_MARKER_RE (re.Pattern[str]): Task-comment parser that separates the recognized marker from the prose payload.
     ATX_HEADING_RE (re.Pattern[str]): Markdown ATX heading detector used to keep standalone heading comments unchanged.
     HEADING_ADORNMENT_RE (re.Pattern[str]): Setext and reStructuredText adornment detector for preserving underlined or
         overlined headings.
@@ -29,18 +26,17 @@ from __future__ import annotations
 
 import ast
 import dataclasses
+import functools
 import re
 import textwrap
 
 import pydocformatter.rules.definition_helpers.text_layout as text_layout
 import pydocformatter.rules.definitions.PCF.PCF as PCF_definition
-from pydocformatter.cli.settings_check import CheckSettings
+from pydocformatter.cli.settings_check import CheckSettings, CommentTaskMarkerMode
 
 DISABLED_CODE_RE = re.compile(r"\s*(?:if|for|while|def|class|try|except|print|return)\b")
 LIST_RE = re.compile(r"^(?P<indent>[ \t]*)(?P<marker>(?:[-+*]|\d+[.)]))[ \t]+(?P<text>\S.*)$")
 BLOCK_QUOTE_RE = re.compile(r"^(?P<prefix>(?:>[ \t]*)+)(?P<text>.*)$")
-TASK_MARKERS = ("TODO", "FIXME", "XXX", "HACK", "BUG", "DEBUG", "NOTE", "OPTIMIZE", "REVIEW")
-TASK_MARKER_RE = re.compile(rf"^(?P<marker>(?:{'|'.join(TASK_MARKERS)})):[ \t]*(?P<text>.*)$")
 ATX_HEADING_RE = re.compile(r"^#{1,6}(?:[ \t]+|$)")
 HEADING_ADORNMENT_RE = re.compile(r"^(?P<char>[=\-~`^\"'*+#:._])(?P=char){2,}[ \t]*$")
 FENCE_RE = re.compile(r"^[ \t]*(?P<fence>`{3,}|~{3,})")
@@ -192,7 +188,7 @@ def run_contains_code(run: PCF_definition.StandaloneCommentRun, *, preserved: se
         bool: Whether enabled detectors classify any unpreserved candidate line or multiline segment as code-like.
     """
     lines = code_detection_lines(run, settings=settings)
-    ignored = task_marker_unit_indices(run, preserved=preserved) if ignore_task_markers and settings.comment_format_task_markers else set()
+    ignored = task_marker_unit_indices(run, preserved=preserved, settings=settings) if ignore_task_markers and task_markers_enabled(settings) else set()
     candidates = tuple(lines[index] for index in range(len(lines)) if index not in preserved and index not in ignored and lines[index].strip())
     if any(_text_matches_disabled_code_heuristic(line, settings=settings) for line in candidates):
         return True
@@ -320,16 +316,38 @@ def is_nontrivial_expression(text: str) -> bool:
     )
 
 
-def task_marker_match(body: str) -> TaskMarkerMatch | None:
+def task_markers_enabled(settings: CheckSettings) -> bool:
+    """Return whether configured task marker recognition is enabled.
+
+    Args:
+        settings (CheckSettings): Comment settings defining task marker mode and labels.
+
+    Returns:
+        bool: Whether task marker matching should run.
+    """
+    return settings.comment_task_marker_mode != CommentTaskMarkerMode.NONE and bool(settings.comment_task_markers)
+
+
+@functools.cache
+def _task_marker_re(markers: tuple[str, ...]) -> re.Pattern[str]:
+    """Return the cached task-marker parser for one marker tuple."""
+    marker_pattern = "|".join(re.escape(marker) for marker in markers)
+    return re.compile(rf"^(?P<marker>(?:{marker_pattern})):[ \t]*(?P<text>.*)$")
+
+
+def task_marker_match(body: str, *, settings: CheckSettings) -> TaskMarkerMatch | None:
     """Return a recognized task-marker match for comment body text.
 
     Args:
         body (str): Comment body text without the syntactic comment marker.
+        settings (CheckSettings): Settings defining recognized task marker labels and treatment.
 
     Returns:
         TaskMarkerMatch | None: Parsed task marker and payload, or None when the body is not a supported marker.
     """
-    match = TASK_MARKER_RE.match(body.rstrip())
+    if not task_markers_enabled(settings):
+        return None
+    match = _task_marker_re(settings.comment_task_markers).match(body.rstrip())
     if match is None:
         return None
     return TaskMarkerMatch(marker=match.group("marker"), text=match.group("text").strip())
@@ -355,12 +373,13 @@ def task_marker_continuation_text(body: str, *, marker: str) -> str | None:
     return text.strip() if text else ""
 
 
-def task_marker_unit_indices(run: PCF_definition.StandaloneCommentRun, *, preserved: set[int]) -> set[int]:
+def task_marker_unit_indices(run: PCF_definition.StandaloneCommentRun, *, preserved: set[int], settings: CheckSettings) -> set[int]:
     """Return indices belonging to recognized task-marker units.
 
     Args:
         run (PCF_definition.StandaloneCommentRun): Consecutive standalone comments to scan.
         preserved (set[int]): Structure-protected indices that cannot belong to task-marker units.
+        settings (CheckSettings): Settings defining recognized task marker labels and treatment.
 
     Returns:
         set[int]: Zero-based indices covered by task-marker heads and exact hanging continuation lines.
@@ -371,7 +390,7 @@ def task_marker_unit_indices(run: PCF_definition.StandaloneCommentRun, *, preser
         if index in preserved:
             index += 1
             continue
-        match = task_marker_match(run.comments[index].body.rstrip())
+        match = task_marker_match(run.comments[index].body.rstrip(), settings=settings)
         if match is None:
             index += 1
             continue
@@ -412,6 +431,14 @@ def task_marker_texts_are_code_like(texts: tuple[str, ...], *, settings: CheckSe
     return any(task_marker_body_is_code_like(text, settings=settings) for text in texts)
 
 
+def _normalize_task_marker_lines(marker: str, texts: tuple[str, ...]) -> tuple[str, ...]:
+    """Return task-marker lines normalized without prose wrapping."""
+    prefix = f"{marker}: "
+    lines = [prefix.rstrip() if not texts or not texts[0].strip() else prefix + texts[0].strip()]
+    lines.extend(" " * len(prefix) + text.strip() if text.strip() else "" for text in texts[1:])
+    return tuple(lines)
+
+
 def format_task_marker_lines(marker: str, texts: tuple[str, ...], *, indent: str, settings: CheckSettings) -> tuple[str, ...]:
     """Return task-marker comment content lines with hanging indentation.
 
@@ -425,13 +452,13 @@ def format_task_marker_lines(marker: str, texts: tuple[str, ...], *, indent: str
         tuple[str, ...]: Comment body lines after task-marker formatting.
     """
     prefix = f"{marker}: "
+    if settings.comment_task_marker_mode == CommentTaskMarkerMode.NO_WRAP:
+        return _normalize_task_marker_lines(marker, texts)
     body = " ".join(text for text in texts if text).strip()
     if not body:
         return (marker + ":",)
     if task_marker_texts_are_code_like(texts, settings=settings):
-        lines = [prefix.rstrip() if not texts[0].strip() else prefix + texts[0].strip()]
-        lines.extend(" " * len(prefix) + text.strip() for text in texts[1:] if text.strip())
-        return tuple(lines)
+        return _normalize_task_marker_lines(marker, texts)
     width = PCF_definition.available_comment_width(indent, line_length=settings.line_length, tab_width=settings.indent_width)
     return text_layout.wrap_text(body, width=width, initial_indent=prefix, subsequent_indent=" " * len(prefix), tab_width=settings.indent_width, url_aware=settings.url_aware_wrapping)
 
@@ -450,7 +477,7 @@ def trailing_content_is_unsafe(content: str, *, settings: CheckSettings) -> bool
     body = raw_body.strip()
     if not body:
         return False
-    if settings.comment_format_task_markers and (task_marker := task_marker_match(body)) is not None:
+    if (task_marker := task_marker_match(body, settings=settings)) is not None:
         # Treat the marker payload as a task annotation, not as standalone list or operator-like content.
         return task_marker_body_is_code_like(task_marker.text, settings=settings)
     if OPERATOR_LIKE_RE.match(body) is not None:

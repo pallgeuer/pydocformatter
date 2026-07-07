@@ -82,7 +82,7 @@ def _extracted_replacement(
         line_length=context.settings.line_length,
         tab_width=context.settings.indent_width,
     )
-    task_marker = comment_helpers.task_marker_match(comment.body.strip()) if context.settings.comment_format_task_markers else None
+    task_marker = comment_helpers.task_marker_match(comment.body.strip(), settings=context.settings)
     if task_marker is not None:
         wrapped = comment_helpers.format_task_marker_lines(task_marker.marker, (task_marker.text,), indent=comment.indent, settings=context.settings)
     else:

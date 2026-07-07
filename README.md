@@ -115,7 +115,8 @@ If no files or directories are specified, `pydocfmt check` checks the current di
 **Comment formatting:**
 - `--comment-join-standalone-lines`, `--no-comment-join-standalone-lines`: Toggle joining standalone prose lines before wrapping (default: disabled)
 - `--comment-format-list-items`, `--no-comment-format-list-items`: Toggle list-item detection and hanging-indented reflow (default: enabled)
-- `--comment-format-task-markers`, `--no-comment-format-task-markers`: Toggle task-marker detection and hanging-indented reflow (default: enabled)
+- `--comment-task-marker-mode {none,no-wrap,hanging}`: Treatment for recognized task-marker comments (default: no-wrap)
+- `--comment-task-markers MARKER`: Task marker labels recognized before a colon
 - `--comment-preserve-headings`, `--no-comment-preserve-headings`: Toggle preserving Markdown and reStructuredText headings (default: enabled)
 - `--comment-preserve-doctests`, `--no-comment-preserve-doctests`: Toggle preserving standalone doctest regions (default: enabled)
 - `--comment-preserve-code-fences`, `--no-comment-preserve-code-fences`: Toggle preserving fenced code regions (default: enabled)
@@ -264,7 +265,8 @@ parse-literal-blocks = true
 [tool.pydocfmt.comment]
 join-standalone-lines = false
 format-list-items = true
-format-task-markers = true
+task-marker-mode = "no-wrap"
+task-markers = ["TODO", "FIXME", "XXX", "HACK", "BUG", "DEBUG", "NOTE", "OPTIMIZE", "REVIEW"]
 preserve-headings = true
 preserve-doctests = true
 preserve-code-fences = true

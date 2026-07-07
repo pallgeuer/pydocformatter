@@ -18,6 +18,7 @@ Attributes:
         docstrings.
     DEFAULT_DOCSTRING_PROPERTY_DECORATORS (tuple[str, ...]): Function decorators whose definitions should be treated as
         properties.
+    DEFAULT_COMMENT_TASK_MARKERS (tuple[str, ...]): Task marker labels recognized by default in comments.
     PARALLELISM_CONSTRAINT_MESSAGE (str): Shared validation text for the worker-count setting accepted by the check
         command.
     SETTINGS_SCHEMA (SettingsSchema[CheckSettings]): Complete `pydocfmt check` schema used for config loading, CLI
@@ -26,6 +27,7 @@ Attributes:
 
 import dataclasses
 import enum
+import re
 from typing import Any, TypedDict, cast
 
 import pydocformatter.settings as settings_core
@@ -93,7 +95,9 @@ DEFAULT_DOCSTRING_CLASS_ATTRIBUTE_NO_TYPE_BASE_CLASSES = (
 )
 DEFAULT_DOCSTRING_OPTIONAL_FUNCTION_DECORATORS = ("typing.override", "typing_extensions.override")
 DEFAULT_DOCSTRING_PROPERTY_DECORATORS = ("builtins.property", "enum.property", "functools.cached_property", "abc.abstractproperty", "types.DynamicClassAttribute")
+DEFAULT_COMMENT_TASK_MARKERS = ("TODO", "FIXME", "XXX", "HACK", "BUG", "DEBUG", "NOTE", "OPTIMIZE", "REVIEW")
 PARALLELISM_CONSTRAINT_MESSAGE = "must be 0, a fractional value greater than 0 and less than 1, or a whole number greater than or equal to 1"
+_TASK_MARKER_RE = re.compile(r"^[A-Z][A-Z0-9_-]*$")
 _validate_non_negative_float = settings_core.validate_float(min_value=0)
 
 
@@ -169,6 +173,20 @@ class DocstringMissingDocumentation(enum.StrEnum):
     ALL_DOCSTRINGS = "all-docstrings"
 
 
+class CommentTaskMarkerMode(enum.StrEnum):
+    """Treatment modes for recognized comment task markers.
+
+    Attributes:
+        NONE: Treat task markers like ordinary comment text.
+        NO_WRAP: Normalize recognized task marker units without wrapping their payloads.
+        HANGING: Reflow recognized task marker units with hanging continuation indentation.
+    """
+
+    NONE = "none"
+    NO_WRAP = "no-wrap"
+    HANGING = "hanging"
+
+
 class OutputFormat(enum.StrEnum):
     """Output formats for rule findings.
 
@@ -220,8 +238,8 @@ class CheckSettings:
         comment_join_standalone_lines (bool): Whether consecutive standalone prose comment lines are joined before
             wrapping.
         comment_format_list_items (bool): Whether standalone comment list items are detected and reflowed.
-        comment_format_task_markers (bool): Whether task-marker comments are detected and reflowed with hanging
-            indentation.
+        comment_task_marker_mode (CommentTaskMarkerMode): How recognized task-marker comments are treated.
+        comment_task_markers (StringList): Exact uppercase task-marker labels recognized before a colon.
         comment_preserve_headings (bool): Whether detected Markdown and reStructuredText comment headings are preserved.
         comment_preserve_doctests (bool): Whether standalone doctest comment regions are preserved.
         comment_preserve_code_fences (bool): Whether fenced code regions in standalone comments are preserved.
@@ -282,7 +300,8 @@ class CheckSettings:
     docstring_parse_literal_blocks: bool = True
     comment_join_standalone_lines: bool = False
     comment_format_list_items: bool = True
-    comment_format_task_markers: bool = True
+    comment_task_marker_mode: CommentTaskMarkerMode = CommentTaskMarkerMode.NO_WRAP
+    comment_task_markers: StringList = DEFAULT_COMMENT_TASK_MARKERS
     comment_preserve_headings: bool = True
     comment_preserve_doctests: bool = True
     comment_preserve_code_fences: bool = True
@@ -370,8 +389,8 @@ class CheckSettingsOverrides(TypedDict, total=False):
         comment_join_standalone_lines (bool): Whether consecutive standalone prose comment lines are joined before
             wrapping.
         comment_format_list_items (bool): Whether standalone comment list items are detected and reflowed.
-        comment_format_task_markers (bool): Whether task-marker comments are detected and reflowed with hanging
-            indentation.
+        comment_task_marker_mode (CommentTaskMarkerMode): How recognized task-marker comments are treated.
+        comment_task_markers (StringList): Exact uppercase task-marker labels recognized before a colon.
         comment_preserve_headings (bool): Whether detected Markdown and reStructuredText comment headings are preserved.
         comment_preserve_doctests (bool): Whether standalone doctest comment regions are preserved.
         comment_preserve_code_fences (bool): Whether fenced code regions in standalone comments are preserved.
@@ -432,7 +451,8 @@ class CheckSettingsOverrides(TypedDict, total=False):
     docstring_parse_literal_blocks: bool
     comment_join_standalone_lines: bool
     comment_format_list_items: bool
-    comment_format_task_markers: bool
+    comment_task_marker_mode: CommentTaskMarkerMode
+    comment_task_markers: StringList
     comment_preserve_headings: bool
     comment_preserve_doctests: bool
     comment_preserve_code_fences: bool
@@ -501,6 +521,36 @@ def validate_parallelism(value: object, context: str) -> float:
     if parallelism > 1 and not parallelism.is_integer():
         raise settings_core.SettingsError(f"{context} {PARALLELISM_CONSTRAINT_MESSAGE}")
     return parallelism
+
+
+def validate_comment_task_markers(value: object, context: str) -> StringList:
+    """Validate configured comment task marker labels.
+
+    Args:
+        value (object): Raw marker-list value from configuration or the CLI.
+        context (str): User-facing setting label included in validation errors.
+
+    Returns:
+        StringList: Validated marker labels in configured order.
+
+    Raises:
+        settings_core.SettingsError: If the value is not a string list, contains duplicate labels, or contains labels
+            outside the allowed uppercase marker syntax.
+    """
+    markers = settings_core.validate_string_list(value, context)
+    seen: set[str] = set()
+    duplicates: set[str] = set()
+    for marker in markers:
+        if marker in seen:
+            duplicates.add(marker)
+        seen.add(marker)
+    sorted_duplicates = sorted(duplicates)
+    if sorted_duplicates:
+        raise settings_core.SettingsError(f"{context} must not contain duplicate markers: {', '.join(sorted_duplicates)}")
+    invalid = [marker for marker in markers if _TASK_MARKER_RE.fullmatch(marker) is None]
+    if invalid:
+        raise settings_core.SettingsError(f"{context} entries must match [A-Z][A-Z0-9_-]*: {', '.join(invalid)}")
+    return markers
 
 
 def validate_per_file_settings(value: object, context: str) -> PerFileSettingsMap:
@@ -840,10 +890,21 @@ SETTINGS_SCHEMA = SettingsSchema(
             help="Detect and reflow standalone comment list items with hanging indentation.",
         ),
         SettingDefinition(
-            field="comment_format_task_markers",
-            value_type=bool,
+            field="comment_task_marker_mode",
+            value_type=CommentTaskMarkerMode,
             group=SettingsGroup.COMMENT_FORMATTING,
-            help="Detect and reflow task-marker comments with hanging indentation.",
+            help="Treatment for recognized task-marker comments.",
+            documentation='Treatment for recognized task-marker comments; one of "none", "no-wrap", or "hanging".',
+        ),
+        SettingDefinition(
+            field="comment_task_markers",
+            value_type=StringList,
+            group=SettingsGroup.COMMENT_FORMATTING,
+            help="Task marker labels recognized before a colon.",
+            validator=validate_comment_task_markers,
+            cli={"metavar": "MARKER"},
+            documentation=f"Exact uppercase task marker labels recognized before a colon; defaults to {_setting_default_text('comment_task_markers', StringList)}. Use an empty list to disable recognition.",
+            example='comment-task-markers = ["TODO", "FIXME", "BUG"]',
         ),
         SettingDefinition(
             field="comment_preserve_headings",

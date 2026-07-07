@@ -26,21 +26,22 @@ PCF rules currently occupy one contiguous range because the category covers comm
 | `PCF0xx` | Comment formatting | Standalone and trailing comment formatting rules. |
 
 ## Options
-Standalone paragraph joining remains disabled by default, so ordinary prose comments are formatted one physical line at a time. List items, task markers, and block quotes are formatted by default, fenced code is preserved, and Python statements are protected from prose formatting.
+Standalone paragraph joining remains disabled by default, so ordinary prose comments are formatted one physical line at a time. List items and block quotes are formatted by default, task markers are normalized without wrapping by default, fenced code is preserved, and Python statements are protected from prose formatting.
 
-| Setting                                     | Default | Effect                                                                                                                                            |
-|---------------------------------------------|--------:|---------------------------------------------------------------------------------------------------------------------------------------------------|
-| `comment-join-standalone-lines`             | `false` | Join consecutive ordinary prose lines into paragraphs before wrapping.                                                                            |
-| `comment-format-list-items`                 |  `true` | Detect ordered and unordered list items and reflow them with hanging indentation.                                                                 |
-| `comment-format-task-markers`               |  `true` | Detect recognized task markers and reflow them with hanging indentation.                                                                          |
-| `comment-preserve-headings`                 |  `true` | Preserve detected Markdown and reStructuredText headings unchanged.                                                                               |
-| `comment-preserve-doctests`                 |  `true` | Preserve a doctest region from its first `>>>` prompt to the physical-run boundary.                                                               |
-| `comment-preserve-code-fences`              |  `true` | Preserve backtick- or tilde-fenced code regions closed by a fence without trailing text.                                                          |
-| `comment-format-block-quotes`               |  `true` | Detect Markdown block quotes and reflow text while retaining quote prefixes.                                                                      |
-| `comment-preserve-tables`                   |  `true` | Preserve structurally detected Markdown pipe tables and reStructuredText grid or simple tables.                                                   |
-| `comment-preserve-directives`               |  `true` | Preserve reStructuredText directives and their more-indented option/content lines.                                                                |
-| `comment-trailing-extraction-syntax-aware`  |  `true` | Keep overlong trailing comments inline in decorators, compound headers, arguments, and continuation contexts.                                     |
-| `comment-trailing-extraction-content-aware` |  `true` | Keep overlong trailing comments inline when enabled standalone comment structure/code detectors or the operator heuristic make extraction unsafe. |
-| `comment-detect-code`                       | `false` | Protect a whole run when the indentation or leading-keyword heuristic detects disabled code.                                                      |
-| `comment-detect-statements`                 |  `true` | Protect a whole run when individual or multiline text parses as Python containing a non-expression statement.                                     |
-| `comment-detect-expressions`                | `false` | Protect a whole run when text parses as a nontrivial Python expression.                                                                           |
+| Setting                                     |   Default | Effect                                                                                                                                            |
+|---------------------------------------------|----------:|---------------------------------------------------------------------------------------------------------------------------------------------------|
+| `comment-join-standalone-lines`             |   `false` | Join consecutive ordinary prose lines into paragraphs before wrapping.                                                                            |
+| `comment-format-list-items`                 |    `true` | Detect ordered and unordered list items and reflow them with hanging indentation.                                                                 |
+| `comment-task-marker-mode`                  | `no-wrap` | Control recognized task markers with `none`, `no-wrap`, or `hanging`.                                                                             |
+| `comment-task-markers`                      |      list | Exact uppercase task marker labels recognized before `:`.                                                                                         |
+| `comment-preserve-headings`                 |    `true` | Preserve detected Markdown and reStructuredText headings unchanged.                                                                               |
+| `comment-preserve-doctests`                 |    `true` | Preserve a doctest region from its first `>>>` prompt to the physical-run boundary.                                                               |
+| `comment-preserve-code-fences`              |    `true` | Preserve backtick- or tilde-fenced code regions closed by a fence without trailing text.                                                          |
+| `comment-format-block-quotes`               |    `true` | Detect Markdown block quotes and reflow text while retaining quote prefixes.                                                                      |
+| `comment-preserve-tables`                   |    `true` | Preserve structurally detected Markdown pipe tables and reStructuredText grid or simple tables.                                                   |
+| `comment-preserve-directives`               |    `true` | Preserve reStructuredText directives and their more-indented option/content lines.                                                                |
+| `comment-trailing-extraction-syntax-aware`  |    `true` | Keep overlong trailing comments inline in decorators, compound headers, arguments, and continuation contexts.                                     |
+| `comment-trailing-extraction-content-aware` |    `true` | Keep overlong trailing comments inline when enabled standalone comment structure/code detectors or the operator heuristic make extraction unsafe. |
+| `comment-detect-code`                       |   `false` | Protect a whole run when the indentation or leading-keyword heuristic detects disabled code.                                                      |
+| `comment-detect-statements`                 |    `true` | Protect a whole run when individual or multiline text parses as Python containing a non-expression statement.                                     |
+| `comment-detect-expressions`                |   `false` | Protect a whole run when text parses as a nontrivial Python expression.                                                                           |

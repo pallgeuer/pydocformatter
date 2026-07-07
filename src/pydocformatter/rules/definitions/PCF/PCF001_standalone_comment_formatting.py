@@ -64,7 +64,7 @@ def _planned_changes(context: RuleContext) -> tuple[rule_edits.PlannedSourceChan
             if index in preserved:
                 index += 1
                 continue
-            task_marker_match = comment_helpers.task_marker_match(run.comments[index].body.rstrip()) if context.settings.comment_format_task_markers else None
+            task_marker_match = comment_helpers.task_marker_match(run.comments[index].body.rstrip(), settings=context.settings)
             list_match = comment_helpers.LIST_RE.match(run.comments[index].body.rstrip()) if context.settings.comment_format_list_items else None
             quote_match = comment_helpers.BLOCK_QUOTE_RE.match(run.comments[index].body.rstrip()) if context.settings.comment_format_block_quotes else None
             if task_marker_match is not None:
@@ -149,7 +149,7 @@ def _format_list_item(
     end = index + 1
     while end < len(run.comments) and end not in preserved:
         body = run.comments[end].body.rstrip()
-        if settings.comment_format_task_markers and comment_helpers.task_marker_match(body) is not None:
+        if comment_helpers.task_marker_match(body, settings=settings) is not None:
             break
         if comment_helpers.LIST_RE.match(body) is not None or comment_helpers.BLOCK_QUOTE_RE.match(body) is not None:
             break
@@ -199,7 +199,7 @@ def _ordinary_paragraph_end(run: PCF_definition.StandaloneCommentRun, index: int
     end = index + 1
     while end < len(run.comments) and end not in preserved:
         body = run.comments[end].body.rstrip()
-        if settings.comment_format_task_markers and comment_helpers.task_marker_match(body) is not None:
+        if comment_helpers.task_marker_match(body, settings=settings) is not None:
             break
         if settings.comment_format_list_items and comment_helpers.LIST_RE.match(body) is not None:
             break
