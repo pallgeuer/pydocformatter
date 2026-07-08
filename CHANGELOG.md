@@ -66,6 +66,9 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Added `pydocfmt rule` to explain individual rules or all rules in Ruff-style text or JSON output.
   - Added `pydocfmt linter` to list rule-prefix linters in Ruff-style text or JSON output.
 
+- **Packaging:**
+  - Added build artifact selection rules to keep rule documentation templates source-only while excluding CI and agent configuration from source distributions.
+
 - **Configuration:**
   - Added `rest` as the convention value for semantic reStructuredText/Sphinx field parsing.
   - Added generic rule-selection effects driven by resolved setting values, with exact-selector restoration for ignored rules and unconditional removal for disabled rules.
@@ -168,11 +171,19 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
   - Renamed PCF003 from `directive-normalization` to `comment-directive-normalization`, keeping the `PCF003` rule code while clarifying that the rule owns recognized directive marker and payload normalization from `#` onward.
 
 - **Developer workflow:**
+  - Renamed the published fixing pre-commit hook to `pydocfmt-fix`, retained `pydocfmt-check`, and documented examples for both published and local uv hook styles.
+  - Harmonized default tool discovery so Ruff, pydocfmt, and ty use project-root defaults with explicit gitignore-respecting configuration.
+  - Updated Ruff to 0.15.20 and adjusted check-command output error handling for the current preview lint rules.
+  - Replaced Black, isort, and mypy with Ruff and ty for project formatting, linting, import sorting, and type checking, while keeping pydocfmt responsible for comment and docstring formatting.
+  - Moved packaging from setuptools to hatchling, with the package version read from `src/pydocformatter/_version.py` and project license metadata updated to `GPL-3.0-or-later`.
   - Changed the Loupe review skill to orchestrate parallel Claude Code and Codex CLI review passes with a timeout-bounded helper script and verified final review synthesis.
   - Changed the Loupe reviewer runner to require explicit review scope text, report global and reviewer-specific elapsed times separately, and expose extensible reviewer definitions.
   - Changed the Loupe review workflow to snapshot temporary diff and reviewer-output artifacts, use a 30000-token capture budget, and recover truncated reviewer output from the runner's `--output` artifact instead of rerunning reviewers.
   - Changed the Loupe review workflow to require full small-diff artifact contents in chat instead of guessed preview ranges.
   - Changed the Loupe review workflow to clean successful temporary artifact directories by deleting only known artifact files before removing the empty directory.
+  - Moved dependency-pin validation into pytest and removed the dedicated dependency-pin pre-commit hook.
+  - Updated pytest to 9.1.1.
+  - Updated ty to 0.0.57.
   - Changed the Loupe final review format to keep one continuous finding number sequence across all reviewer sections.
   - Changed Loupe reviewer definitions to declare optional required executables instead of deriving launch requirements from reviewer display names.
   - Changed Loupe reviewer launch planning to attach helper dependency failures directly to planned reviewer runs in one cached availability pass.

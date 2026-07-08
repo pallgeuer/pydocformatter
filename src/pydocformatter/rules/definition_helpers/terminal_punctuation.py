@@ -1,13 +1,21 @@
 """Terminal punctuation violation helpers."""
 
+# Future imports
 from __future__ import annotations
 
+# Standard library imports
 import dataclasses
 from collections.abc import Callable
+from typing import TYPE_CHECKING
 
-import pydocformatter.rules.edits as rule_edits
+# First-party imports
 import pydocformatter.rules.violations as rule_violations
-from pydocformatter.rules.models import RuleMetadata
+
+
+if TYPE_CHECKING:
+    # First-party imports
+    import pydocformatter.rules.edits as rule_edits
+    from pydocformatter.rules.models import RuleMetadata
 
 
 @dataclasses.dataclass(frozen=True)
@@ -24,12 +32,7 @@ class TerminalPunctuationPolicy:
 
 
 def violation(
-    *,
-    text: str,
-    policy: TerminalPunctuationPolicy,
-    rule: RuleMetadata,
-    line_numbers: tuple[int, ...],
-    planned_change: Callable[[], rule_edits.PlannedSourceChange | None],
+    *, text: str, policy: TerminalPunctuationPolicy, rule: RuleMetadata, line_numbers: tuple[int, ...], planned_change: Callable[[], rule_edits.PlannedSourceChange | None]
 ) -> rule_violations.RuleViolation | None:
     """Return one terminal-punctuation violation.
 
@@ -45,7 +48,7 @@ def violation(
         Terminal-punctuation violation, or None when the target text already complies.
     """
     trimmed = text.rstrip(" \t")
-    if not trimmed or trimmed.endswith("\\") or trimmed.endswith(tuple(policy.valid_endings)):
+    if not trimmed or trimmed.endswith(("\\", *policy.valid_endings)):
         return None
     change = None if trimmed.endswith(tuple(policy.nonfixable_endings)) else planned_change()
     return rule_violations.violation_for_optional_planned_source_change(rule, change, line_numbers=line_numbers)

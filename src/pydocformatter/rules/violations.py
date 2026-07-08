@@ -1,12 +1,21 @@
 """Internal rule violation and source-fix records."""
 
+# Future imports
 from __future__ import annotations
 
+# Standard library imports
 import dataclasses
+from typing import TYPE_CHECKING
 
+# First-party imports
 import pydocformatter.rules.edits as rule_edits
-import pydocformatter.rules.line_targets as line_targets
-from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetadata
+from pydocformatter.rules import line_targets
+from pydocformatter.rules.models import FixAvailability, RuleFinding
+
+
+if TYPE_CHECKING:
+    # First-party imports
+    from pydocformatter.rules.models import RuleMetadata
 
 
 @dataclasses.dataclass(frozen=True)
@@ -79,12 +88,7 @@ class RuleViolation:
             raise ValueError("Rule violation fix must be present if and only if the finding is fixable")
 
 
-def violation_for_planned_source_change(
-    rule: RuleMetadata,
-    change: rule_edits.PlannedSourceChange,
-    *,
-    instance_message: str | None = None,
-) -> RuleViolation:
+def violation_for_planned_source_change(rule: RuleMetadata, change: rule_edits.PlannedSourceChange, *, instance_message: str | None = None) -> RuleViolation:
     """Return one violation backed by one planned source change.
 
     Args:
@@ -99,12 +103,7 @@ def violation_for_planned_source_change(
     return RuleViolation(finding=finding, fix=RuleSourceFix.from_change(change))
 
 
-def violation_for_grouped_planned_source_changes(
-    rule: RuleMetadata,
-    changes: tuple[rule_edits.PlannedSourceChange, ...],
-    *,
-    instance_message: str | None = None,
-) -> RuleViolation:
+def violation_for_grouped_planned_source_changes(rule: RuleMetadata, changes: tuple[rule_edits.PlannedSourceChange, ...], *, instance_message: str | None = None) -> RuleViolation:
     """Return one violation backed by multiple planned source changes.
 
     Args:
@@ -165,12 +164,7 @@ def violation_for_optional_planned_source_change(
     return violation_for_planned_source_change(rule, change, instance_message=instance_message)
 
 
-def violations_for_planned_source_changes(
-    rule: RuleMetadata,
-    changes: tuple[rule_edits.PlannedSourceChange, ...],
-    *,
-    instance_message: str | None = None,
-) -> tuple[RuleViolation, ...]:
+def violations_for_planned_source_changes(rule: RuleMetadata, changes: tuple[rule_edits.PlannedSourceChange, ...], *, instance_message: str | None = None) -> tuple[RuleViolation, ...]:
     """Return one planned-source-backed violation for each source change.
 
     Args:
@@ -184,28 +178,14 @@ def violations_for_planned_source_changes(
     return tuple(violation_for_planned_source_change(rule, change, instance_message=instance_message) for change in changes)
 
 
-def _finding_for_planned_source_change(
-    rule: RuleMetadata,
-    change: rule_edits.PlannedSourceChange,
-    *,
-    instance_message: str | None = None,
-) -> RuleFinding:
+def _finding_for_planned_source_change(rule: RuleMetadata, change: rule_edits.PlannedSourceChange, *, instance_message: str | None = None) -> RuleFinding:
     """Return a finding using one planned change's reported line targets."""
     return RuleFinding(
-        rule=rule,
-        line_numbers=change.line_numbers,
-        suppression_line_numbers=change.suppression_line_numbers,
-        instance_message=instance_message,
-        instance_fixable=_fixable_instance_fixability(rule),
+        rule=rule, line_numbers=change.line_numbers, suppression_line_numbers=change.suppression_line_numbers, instance_message=instance_message, instance_fixable=_fixable_instance_fixability(rule)
     )
 
 
-def _finding_for_planned_source_changes(
-    rule: RuleMetadata,
-    changes: tuple[rule_edits.PlannedSourceChange, ...],
-    *,
-    instance_message: str | None = None,
-) -> RuleFinding:
+def _finding_for_planned_source_changes(rule: RuleMetadata, changes: tuple[rule_edits.PlannedSourceChange, ...], *, instance_message: str | None = None) -> RuleFinding:
     """Return a finding using combined planned-change targets."""
     return RuleFinding(
         rule=rule,

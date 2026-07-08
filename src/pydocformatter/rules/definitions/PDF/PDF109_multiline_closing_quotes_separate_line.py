@@ -1,17 +1,26 @@
 """PDF109 multiline-closing-quotes-separate-line rule."""
 
+# Future imports
 from __future__ import annotations
 
+# Standard library imports
 from collections.abc import Sequence
+from typing import TYPE_CHECKING
 
-import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
-import pydocformatter.rules.edits as rule_edits
-import pydocformatter.rules.registration as rule_registration
+# First-party imports
 import pydocformatter.rules.violations as rule_violations
+import pydocformatter.rules.registration as rule_registration
+import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 from pydocformatter.rules.codes import RuleCode
-from pydocformatter.rules.definition import RuleBase, RuleContext
+from pydocformatter.rules.definition import RuleBase
 from pydocformatter.rules.definitions.PDF.PDF import PDF
 from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata
+
+
+if TYPE_CHECKING:
+    # First-party imports
+    import pydocformatter.rules.edits as rule_edits
+    from pydocformatter.rules.definition import RuleContext
 
 
 @rule_registration.register_rule_to(PDF)

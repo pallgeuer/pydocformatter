@@ -1,10 +1,13 @@
+# Third-party imports
 import pytest
 
-import pydocformatter.rules_selection as rules_selection
-import tests.rule_helpers as rule_helpers
+# First-party imports
 import tests.rules.PDF.helpers as pdf_helpers
+from pydocformatter import rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention
 from pydocformatter.rules.definitions.PDF.PDF306_parameter_documentation_too_generic import PDF306ParameterDocumentationTooGeneric
+from tests import rule_helpers
+
 
 contexts = pdf_helpers.contexts_for("PDF306")
 format_source = pdf_helpers.formatter_for("PDF306")
@@ -12,7 +15,7 @@ format_source = pdf_helpers.formatter_for("PDF306")
 
 @pytest.mark.parametrize(
     ("description", "parameter"),
-    (
+    [
         ("timeout", "timeout"),
         ("The timeout.", "timeout"),
         ("The timeout value.", "timeout"),
@@ -29,7 +32,7 @@ format_source = pdf_helpers.formatter_for("PDF306")
         ("API2 token value", "api2_token"),
         ("args value", "*args"),
         ("kwargs parameter", "**kwargs"),
-    ),
+    ],
 )
 def test_reports_google_parameter_documentation_that_only_restates_parameter_name(description: str, parameter: str) -> None:
     source = f'def connect({parameter.lstrip("*")}):\n    """Connect.\n\n    Args:\n        {parameter}: {description}\n    """\n'
@@ -62,10 +65,7 @@ def test_reports_rest_parameter_field_aliases() -> None:
     assert result.new_source == source
     assert not result.fixed_findings
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((4,), (5,))
-    assert tuple(finding.message for finding in result.unfixed_findings) == (
-        "Parameter 'timeout' documentation is too generic",
-        "Parameter 'token' documentation is too generic",
-    )
+    assert tuple(finding.message for finding in result.unfixed_findings) == ("Parameter 'timeout' documentation is too generic", "Parameter 'token' documentation is too generic")
 
 
 def test_reports_google_variadic_argument_phrases_for_signature_backed_parameters() -> None:
@@ -75,10 +75,7 @@ def test_reports_google_variadic_argument_phrases_for_signature_backed_parameter
     assert result.new_source == source
     assert not result.fixed_findings
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((5,), (6,))
-    assert tuple(finding.message for finding in result.unfixed_findings) == (
-        "Parameter 'values' documentation is too generic",
-        "Parameter '**options' documentation is too generic",
-    )
+    assert tuple(finding.message for finding in result.unfixed_findings) == ("Parameter 'values' documentation is too generic", "Parameter '**options' documentation is too generic")
 
 
 def test_reports_numpy_variadic_argument_phrases() -> None:
@@ -88,10 +85,7 @@ def test_reports_numpy_variadic_argument_phrases() -> None:
     assert result.new_source == source
     assert not result.fixed_findings
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((6,), (8,))
-    assert tuple(finding.message for finding in result.unfixed_findings) == (
-        "Parameter 'args' documentation is too generic",
-        "Parameter 'kwargs' documentation is too generic",
-    )
+    assert tuple(finding.message for finding in result.unfixed_findings) == ("Parameter 'args' documentation is too generic", "Parameter 'kwargs' documentation is too generic")
 
 
 def test_reports_rest_variadic_argument_phrases() -> None:
@@ -101,10 +95,7 @@ def test_reports_rest_variadic_argument_phrases() -> None:
     assert result.new_source == source
     assert not result.fixed_findings
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((4,), (5,))
-    assert tuple(finding.message for finding in result.unfixed_findings) == (
-        "Parameter '*args' documentation is too generic",
-        "Parameter '**kwargs' documentation is too generic",
-    )
+    assert tuple(finding.message for finding in result.unfixed_findings) == ("Parameter '*args' documentation is too generic", "Parameter '**kwargs' documentation is too generic")
 
 
 def test_reports_bare_arguments_for_positional_and_keyword_variadic_parameters() -> None:
@@ -114,10 +105,7 @@ def test_reports_bare_arguments_for_positional_and_keyword_variadic_parameters()
     assert result.new_source == source
     assert not result.fixed_findings
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((5,), (6,))
-    assert tuple(finding.message for finding in result.unfixed_findings) == (
-        "Parameter 'args' documentation is too generic",
-        "Parameter 'kwargs' documentation is too generic",
-    )
+    assert tuple(finding.message for finding in result.unfixed_findings) == ("Parameter 'args' documentation is too generic", "Parameter 'kwargs' documentation is too generic")
 
 
 def test_reports_variadic_argument_phrases_for_unpack_kwargs_entry() -> None:
@@ -156,10 +144,7 @@ def test_reports_only_generic_parameters_in_mixed_google_docstring() -> None:
     assert result.new_source == source
     assert not result.fixed_findings
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((5,), (7,))
-    assert tuple(finding.message for finding in result.unfixed_findings) == (
-        "Parameter 'timeout' documentation is too generic",
-        "Parameter 'base_url' documentation is too generic",
-    )
+    assert tuple(finding.message for finding in result.unfixed_findings) == ("Parameter 'timeout' documentation is too generic", "Parameter 'base_url' documentation is too generic")
 
 
 def test_suppresses_only_the_targeted_parameter_entry() -> None:
@@ -184,13 +169,7 @@ def test_preserves_crlf_source_when_reporting_generic_parameter_documentation() 
 
 @pytest.mark.parametrize(
     "description",
-    (
-        "Request timeout in seconds.",
-        "Maximum number of retry attempts.",
-        "URL used for outgoing API requests.",
-        "Whether retries are enabled.",
-        "Value read from the client configuration.",
-    ),
+    ["Request timeout in seconds.", "Maximum number of retry attempts.", "URL used for outgoing API requests.", "Whether retries are enabled.", "Value read from the client configuration."],
 )
 def test_skips_parameter_documentation_with_extra_meaning(description: str) -> None:
     source = f'def connect(timeout):\n    """Connect.\n\n    Args:\n        timeout: {description}\n    """\n'

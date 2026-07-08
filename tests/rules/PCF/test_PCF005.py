@@ -1,8 +1,19 @@
-import pydocformatter.formatter as formatter
-import pydocformatter.rules_selection as rules_selection
+# Future imports
+from __future__ import annotations
+
+# Standard library imports
+from typing import TYPE_CHECKING
+
+# First-party imports
 import tests.rules.PCF.helpers as pcf_helpers
+from pydocformatter import rules_selection
 from pydocformatter.cli.settings_check import CheckSettings
 from pydocformatter.rules.definitions.PCF.PCF005_comment_ascii_only import PCF005CommentAsciiOnly
+
+
+if TYPE_CHECKING:
+    # First-party imports
+    from pydocformatter import formatter
 
 
 def format_pcf005(source: str, *, fix: bool = True) -> formatter.FormatterResult:

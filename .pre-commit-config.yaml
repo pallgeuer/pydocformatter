@@ -1,46 +1,49 @@
 repos:
-  - repo: https://github.com/psf/black
-    rev: 26.3.1
-    hooks:
-      - id: black
-        name: black (formatter)
-        language_version: python3
-        exclude: ^(build|dist|\.git|__pycache__|\.egg|doc|version)/
-
-  - repo: https://github.com/PyCQA/isort
-    rev: 8.0.1
-    hooks:
-      - id: isort
-        name: isort (formatter)
-        language_version: python3
-        exclude: ^(build|dist|\.git|__pycache__|\.egg|doc|version)/
-
   - repo: local
     hooks:
-      - id: pydocfmt
-        name: pydocfmt (formatter)
-        entry: uv run pydocfmt check --fix
+      - id: ruff-check
+        name: ruff (linter)
+        entry: uv run ruff check --fix --force-exclude
+        language: system
+        types_or: [python, pyi]
+      - id: pydocfmt-fix
+        name: pydocfmt (fix)
+        entry: uv run pydocfmt check --fix --force-exclude
         language: system
         types: [python]
-      - id: mypy
-        name: mypy (type checker)
-        entry: uv run mypy
+      - id: ruff-format
+        name: ruff (formatter)
+        entry: uv run ruff format
+        language: system
+        types_or: [python, pyi, markdown]
+      - id: ty
+        name: ty (type checker)
+        entry: uv run ty check
         language: system
         pass_filenames: false
       - id: pytest
-        name: pytest (parallel test suite)
+        name: pytest (test suite)
         entry: uv run pytest
         language: system
         pass_filenames: false
-      - id: dependency-pin-check
-        name: dependency pin/version consistency check
-        entry: uv run python tools/check_dependency_pins.py
-        language: system
-        pass_filenames: false
 
-  # Example of how external users would use pydocformatter hooks:
+  # Example of how external users would use the published pydocformatter hooks (choose one of the two hooks):
   # - repo: https://github.com/pallgeuer/pydocformatter
   #   rev: v1.0.0
   #   hooks:
-  #     - id: pydocfmt
-  #       args: [--line-length=88]
+  #     - id: pydocfmt-fix
+  #     - id: pydocfmt-check
+  #
+  # Example of how external users would use pydocformatter from a uv-managed project environment where pydocformatter is installed (choose one of the two hooks):
+  # - repo: local
+  #   hooks:
+  #     - id: pydocfmt-fix
+  #       name: pydocfmt (fix)
+  #       entry: uv run pydocfmt check --fix --force-exclude
+  #       language: system
+  #       types: [python]
+  #     - id: pydocfmt-check
+  #       name: pydocfmt (check)
+  #       entry: uv run pydocfmt check --force-exclude
+  #       language: system
+  #       types: [python]

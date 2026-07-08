@@ -5,19 +5,23 @@ Attributes:
         a filesystem path.
 """
 
+# Future imports
 from __future__ import annotations
 
-import dataclasses
+# Standard library imports
 import os
 import subprocess
+import dataclasses
 from collections import defaultdict
 from collections.abc import Mapping
-from enum import Enum
+from enum import StrEnum
 
+# First-party imports
 import pydocformatter.settings as settings_core
-import pydocformatter.utils.misc as misc
 from pydocformatter.cli.settings_check import CheckSettings
+from pydocformatter.utils import misc
 from pydocformatter.utils.globs import BaseRelativeGlobMatcher
+
 
 STDIN_VIRTUAL_FILE = "-"
 
@@ -26,7 +30,7 @@ class FileSelectionError(ValueError):
     """Raised when file-selection settings cannot be applied."""
 
 
-class DecisionReason(str, Enum):
+class DecisionReason(StrEnum):
     """Stable reason codes for file-selection decisions.
 
     Attributes:
@@ -149,13 +153,8 @@ class _PatternMatcher:
 
     @classmethod
     def compile(
-        cls,
-        profile: settings_core.SettingsProfile[CheckSettings],
-        fields: tuple[str, ...],
-        *,
-        match_parent_segments_for_bare: bool,
-        match_descendants_for_slash: bool = False,
-    ) -> "_PatternMatcher":
+        cls, profile: settings_core.SettingsProfile[CheckSettings], fields: tuple[str, ...], *, match_parent_segments_for_bare: bool, match_descendants_for_slash: bool = False
+    ) -> _PatternMatcher:
         """Compile path-pattern fields from a settings profile."""
         groups: list[BaseRelativeGlobMatcher] = []
         for field in fields:
@@ -164,10 +163,7 @@ class _PatternMatcher:
                 continue
             groups.append(
                 BaseRelativeGlobMatcher.compile(
-                    patterns,
-                    base_path=profile.base_for_field(field),
-                    match_parent_segments_for_bare=match_parent_segments_for_bare,
-                    match_descendants_for_slash=match_descendants_for_slash,
+                    patterns, base_path=profile.base_for_field(field), match_parent_segments_for_bare=match_parent_segments_for_bare, match_descendants_for_slash=match_descendants_for_slash
                 )
             )
         return cls(tuple(groups))
@@ -195,17 +191,8 @@ class _SelectionContext:
         validate_include_patterns(profile.settings.include_patterns)
         validate_exclude_patterns(profile.settings.exclude_patterns)
         matchers = (
-            _PatternMatcher.compile(
-                profile,
-                ("include", "extend_include"),
-                match_parent_segments_for_bare=False,
-            ),
-            _PatternMatcher.compile(
-                profile,
-                ("exclude", "extend_exclude"),
-                match_parent_segments_for_bare=True,
-                match_descendants_for_slash=True,
-            ),
+            _PatternMatcher.compile(profile, ("include", "extend_include"), match_parent_segments_for_bare=False),
+            _PatternMatcher.compile(profile, ("exclude", "extend_exclude"), match_parent_segments_for_bare=True, match_descendants_for_slash=True),
         )
         self.matcher_cache[profile_id] = matchers
         return matchers
@@ -230,17 +217,7 @@ def select_files(paths: list[str], resolver: settings_core.SettingsResolver[Chec
         SelectionResult: Accepted paths plus file-selection decisions for accepted and rejected paths.
     """
     context = _selection_context(resolver)
-    evaluated = tuple(
-        (
-            collected
-            if isinstance(collected, FileDecision)
-            else _evaluate_candidate(
-                collected,
-                context,
-            )
-        )
-        for collected in _collect_candidates(paths, context)
-    )
+    evaluated = tuple((collected if isinstance(collected, FileDecision) else _evaluate_candidate(collected, context)) for collected in _collect_candidates(paths, context))
 
     return _selection_result_with_gitignore(evaluated)
 
@@ -259,25 +236,9 @@ def select_virtual_file(path: str, resolver: settings_core.SettingsResolver[Chec
     context = _selection_context(resolver)
     profile = context.resolver.profile_for_path(None if path == STDIN_VIRTUAL_FILE else path)
     if path == STDIN_VIRTUAL_FILE:
-        return _selection_result(
-            (
-                FileDecision(
-                    path=STDIN_VIRTUAL_FILE,
-                    accepted=True,
-                    reason=DecisionReason.INCLUDED,
-                    explicit=True,
-                    profile=profile,
-                    respect_gitignore=False,
-                ),
-            )
-        )
+        return _selection_result((FileDecision(path=STDIN_VIRTUAL_FILE, accepted=True, reason=DecisionReason.INCLUDED, explicit=True, profile=profile, respect_gitignore=False),))
 
-    evaluated = (
-        _evaluate_candidate(
-            _Candidate(path=path, explicit=True, profile=profile, respect_gitignore=False),
-            context,
-        ),
-    )
+    evaluated = (_evaluate_candidate(_Candidate(path=path, explicit=True, profile=profile, respect_gitignore=False), context),)
 
     return _selection_result_with_gitignore(evaluated)
 
@@ -370,25 +331,13 @@ def _force_excluded_explicit_directory(path: str, profile: settings_core.Setting
     """Return whether force-exclude rejects an explicit directory path."""
     if not profile.settings.force_exclude:
         return False
-    matcher = BaseRelativeGlobMatcher.compile(
-        profile.settings.exclude_patterns,
-        base_path=os.getcwd(),
-        match_parent_segments_for_bare=True,
-        match_descendants_for_slash=True,
-    )
+    matcher = BaseRelativeGlobMatcher.compile(profile.settings.exclude_patterns, base_path=os.getcwd(), match_parent_segments_for_bare=True, match_descendants_for_slash=True)
     return matcher.matches(path)
 
 
 def _excluded_directory_decision(path: str, *, explicit: bool, profile: settings_core.SettingsProfile[CheckSettings]) -> FileDecision:
     """Return a rejection decision for an excluded directory path."""
-    return FileDecision(
-        path=path,
-        accepted=False,
-        reason=DecisionReason.EXCLUDED,
-        explicit=explicit,
-        profile=profile,
-        respect_gitignore=True,
-    )
+    return FileDecision(path=path, accepted=False, reason=DecisionReason.EXCLUDED, explicit=explicit, profile=profile, respect_gitignore=True)
 
 
 def _evaluate_candidate(candidate: _Candidate, context: _SelectionContext) -> FileDecision:
@@ -397,49 +346,14 @@ def _evaluate_candidate(candidate: _Candidate, context: _SelectionContext) -> Fi
 
     if candidate.explicit:
         if candidate.profile.settings.force_exclude and exclude_matcher.matches(candidate.path):
-            return FileDecision(
-                path=candidate.path,
-                accepted=False,
-                reason=DecisionReason.EXCLUDED,
-                explicit=True,
-                profile=candidate.profile,
-                respect_gitignore=candidate.respect_gitignore,
-            )
-        return FileDecision(
-            path=candidate.path,
-            accepted=True,
-            reason=DecisionReason.EXPLICIT_INCLUDED,
-            explicit=True,
-            profile=candidate.profile,
-            respect_gitignore=candidate.respect_gitignore,
-        )
+            return FileDecision(path=candidate.path, accepted=False, reason=DecisionReason.EXCLUDED, explicit=True, profile=candidate.profile, respect_gitignore=candidate.respect_gitignore)
+        return FileDecision(path=candidate.path, accepted=True, reason=DecisionReason.EXPLICIT_INCLUDED, explicit=True, profile=candidate.profile, respect_gitignore=candidate.respect_gitignore)
 
     if not include_matcher.matches(candidate.path):
-        return FileDecision(
-            path=candidate.path,
-            accepted=False,
-            reason=DecisionReason.NOT_INCLUDED,
-            explicit=False,
-            profile=candidate.profile,
-            respect_gitignore=candidate.respect_gitignore,
-        )
+        return FileDecision(path=candidate.path, accepted=False, reason=DecisionReason.NOT_INCLUDED, explicit=False, profile=candidate.profile, respect_gitignore=candidate.respect_gitignore)
     if exclude_matcher.matches(candidate.path):
-        return FileDecision(
-            path=candidate.path,
-            accepted=False,
-            reason=DecisionReason.EXCLUDED,
-            explicit=False,
-            profile=candidate.profile,
-            respect_gitignore=candidate.respect_gitignore,
-        )
-    return FileDecision(
-        path=candidate.path,
-        accepted=True,
-        reason=DecisionReason.INCLUDED,
-        explicit=False,
-        profile=candidate.profile,
-        respect_gitignore=candidate.respect_gitignore,
-    )
+        return FileDecision(path=candidate.path, accepted=False, reason=DecisionReason.EXCLUDED, explicit=False, profile=candidate.profile, respect_gitignore=candidate.respect_gitignore)
+    return FileDecision(path=candidate.path, accepted=True, reason=DecisionReason.INCLUDED, explicit=False, profile=candidate.profile, respect_gitignore=candidate.respect_gitignore)
 
 
 def _apply_gitignore_decision(decision: FileDecision, gitignored_paths: set[str]) -> FileDecision:
@@ -450,25 +364,14 @@ def _apply_gitignore_decision(decision: FileDecision, gitignored_paths: set[str]
         return decision
     if os.path.realpath(decision.path) not in gitignored_paths:
         return decision
-    return FileDecision(
-        path=decision.path,
-        accepted=False,
-        reason=DecisionReason.GITIGNORED,
-        explicit=decision.explicit,
-        profile=decision.profile,
-        respect_gitignore=decision.respect_gitignore,
-    )
+    return FileDecision(path=decision.path, accepted=False, reason=DecisionReason.GITIGNORED, explicit=decision.explicit, profile=decision.profile, respect_gitignore=decision.respect_gitignore)
 
 
 def _selection_result(decisions: tuple[FileDecision, ...]) -> SelectionResult:
     """Build a selection result from the ordered file-decision stream."""
     decisions = _deduplicated_decisions(decisions)
     selected_files = tuple(SelectedFile(path=decision.path, profile=decision.profile) for decision in decisions if decision.accepted and decision.profile is not None)
-    return SelectionResult(
-        accepted_paths=tuple(selected_file.path for selected_file in selected_files),
-        decisions=decisions,
-        selected_files=selected_files,
-    )
+    return SelectionResult(accepted_paths=tuple(selected_file.path for selected_file in selected_files), decisions=decisions, selected_files=selected_files)
 
 
 def _deduplicated_decisions(decisions: tuple[FileDecision, ...]) -> tuple[FileDecision, ...]:
@@ -506,14 +409,7 @@ def _deduplicated_decisions(decisions: tuple[FileDecision, ...]) -> tuple[FileDe
 
 def _duplicate_decision(decision: FileDecision) -> FileDecision:
     """Return a duplicate-path rejection decision."""
-    return FileDecision(
-        path=decision.path,
-        accepted=False,
-        reason=DecisionReason.DUPLICATE,
-        explicit=decision.explicit,
-        profile=decision.profile,
-        respect_gitignore=decision.respect_gitignore,
-    )
+    return FileDecision(path=decision.path, accepted=False, reason=DecisionReason.DUPLICATE, explicit=decision.explicit, profile=decision.profile, respect_gitignore=decision.respect_gitignore)
 
 
 def path_identity_key(path: str) -> str | None:
@@ -545,12 +441,7 @@ def _display_path_score(path: str) -> tuple[int, int, int, str]:
     """Return a sortable score where lower means a clearer display path."""
     normalized_path = os.path.normpath(path)
     segments = tuple(segment for segment in normalized_path.split(os.sep) if segment)
-    return (
-        segments.count(".."),
-        len(segments),
-        len(normalized_path),
-        normalized_path,
-    )
+    return (segments.count(".."), len(segments), len(normalized_path), normalized_path)
 
 
 def _accepted_paths_by_git_root(decisions: tuple[FileDecision, ...]) -> dict[str, list[str]]:
@@ -596,17 +487,9 @@ def _query_git_ignored_paths(git_root: str, relative_paths: list[str]) -> tuple[
     if not unique_relative_paths:
         return set(), None
 
-    stdin_bytes = ("\0".join(unique_relative_paths) + "\0").encode(
-        "utf-8",
-        errors="surrogateescape",
-    )
+    stdin_bytes = ("\0".join(unique_relative_paths) + "\0").encode("utf-8", errors="surrogateescape")
     try:
-        process = subprocess.run(
-            ["git", "-C", git_root, "check-ignore", "--stdin", "--no-index", "-z"],
-            input=stdin_bytes,
-            capture_output=True,
-            check=False,
-        )
+        process = subprocess.run(["git", "-C", git_root, "check-ignore", "--stdin", "--no-index", "-z"], input=stdin_bytes, capture_output=True, check=False)  # noqa: S603
     except OSError as error:
         return set(), str(error)
 

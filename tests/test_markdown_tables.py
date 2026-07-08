@@ -1,9 +1,11 @@
+# Standard library imports
 import pathlib
 import subprocess
 
+# Third-party imports
 import pytest
-
 import tools.fix_markdown_tables as markdown_tables
+
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 FIX_COMMAND = "uv run python tools/fix_markdown_tables.py"
@@ -23,18 +25,19 @@ def test_tracked_markdown_paths_ignores_missing_worktree_files(tmp_path: pathlib
     existing = tmp_path / "existing.md"
     existing.write_text("# Existing\n", encoding="utf-8")
     monkeypatch.setattr(markdown_tables, "ROOT", tmp_path)
-    monkeypatch.setattr(subprocess, "check_output", lambda *args, **kwargs: "existing.md\nmissing.md\n")
+
+    def fake_check_output(*_args: object, **_kwargs: object) -> str:
+        del _args, _kwargs
+        return "existing.md\nmissing.md\n"
+
+    monkeypatch.setattr(subprocess, "check_output", fake_check_output)
 
     assert markdown_tables.tracked_markdown_paths() == (existing,)
 
 
 def test_table_failures_rejects_oversized_columns() -> None:
     """Check that table columns cannot be wider than their stripped content requires."""
-    table_lines = [
-        "| Name  | Value |",
-        "|-------|-------|",
-        "| one   | two   |",
-    ]
+    table_lines = ["| Name  | Value |", "|-------|-------|", "| one   | two   |"]
 
     failures = markdown_tables.table_failures(ROOT / "example.md", 0, table_lines)
 
@@ -47,223 +50,92 @@ def test_table_failures_rejects_oversized_columns() -> None:
 
 def test_table_failures_accepts_minimal_pycharm_style_table() -> None:
     """Check that minimally sized PyCharm-style tables are accepted."""
-    table_lines = [
-        "| Name | Value |",
-        "|------|-------|",
-        "| one  | two   |",
-    ]
+    table_lines = ["| Name | Value |", "|------|-------|", "| one  | two   |"]
 
     assert markdown_tables.table_failures(ROOT / "example.md", 0, table_lines) == []
 
 
 def test_table_failures_preserves_separator_alignment_markers() -> None:
     """Check that separator rows stay unpadded and keep their alignment style."""
-    table_lines = [
-        "| Default | Left | Center | Right |",
-        "|---------|:-----|:------:|------:|",
-        "| a       | b    |   c    |     d |",
-    ]
+    table_lines = ["| Default | Left | Center | Right |", "|---------|:-----|:------:|------:|", "| a       | b    |   c    |     d |"]
 
     assert markdown_tables.table_failures(ROOT / "example.md", 0, table_lines) == []
 
 
 def test_normalize_markdown_tables_text_rewrites_tables_and_preserves_fences() -> None:
     """Check that the helper rewrites tables outside fences only."""
-    source = "\n".join(
-        [
-            "| Name  | Value |",
-            "|-------|-------|",
-            "| one   | two   |",
-            "",
-            "```",
-            "| Name  | Value |",
-            "|-------|-------|",
-            "```",
-            "",
-        ]
-    )
+    source = "| Name  | Value |\n|-------|-------|\n| one   | two   |\n\n```\n| Name  | Value |\n|-------|-------|\n```\n"
 
-    assert markdown_tables.normalize_markdown_tables_text(source) == "\n".join(
-        [
-            "| Name | Value |",
-            "|------|-------|",
-            "| one  | two   |",
-            "",
-            "```",
-            "| Name  | Value |",
-            "|-------|-------|",
-            "```",
-            "",
-        ]
-    )
+    assert markdown_tables.normalize_markdown_tables_text(source) == "| Name | Value |\n|------|-------|\n| one  | two   |\n\n```\n| Name  | Value |\n|-------|-------|\n```\n"
 
 
 def test_normalize_markdown_tables_text_preserves_table_indentation() -> None:
     """Check that table normalization uses the header row indentation."""
-    source = "\n".join(
-        [
-            "  | Name  | Value |",
-            "|-------|-------|",
-            "    | one   | two   |",
-            "",
-        ]
-    )
+    source = "  | Name  | Value |\n|-------|-------|\n    | one   | two   |\n"
 
-    assert markdown_tables.normalize_markdown_tables_text(source) == "\n".join(
-        [
-            "  | Name | Value |",
-            "  |------|-------|",
-            "  | one  | two   |",
-            "",
-        ]
-    )
+    assert markdown_tables.normalize_markdown_tables_text(source) == "  | Name | Value |\n  |------|-------|\n  | one  | two   |\n"
 
 
-@pytest.mark.parametrize("indent", ("    ", "\t"))
+@pytest.mark.parametrize("indent", ["    ", "\t"])
 def test_normalize_markdown_tables_text_preserves_indented_code_blocks(indent: str) -> None:
     """Check that indented code blocks that look like tables are not rewritten."""
-    source = "\n".join(
-        [
-            f"{indent}| Name  | Value |",
-            f"{indent}|-------|-------|",
-            f"{indent}| one   | two   |",
-            "",
-        ]
-    )
+    source = "\n".join([f"{indent}| Name  | Value |", f"{indent}|-------|-------|", f"{indent}| one   | two   |", ""])
 
     assert markdown_tables.normalize_markdown_tables_text(source) == source
 
 
 def test_normalize_markdown_tables_text_removes_mixed_indentation_when_header_is_unindented() -> None:
     """Check that mixed table indentation normalizes to the header row indentation."""
-    source = "\n".join(
-        [
-            "| Name  | Value |",
-            "  |-------|-------|",
-            "    | one   | two   |",
-            "",
-        ]
-    )
+    source = "| Name  | Value |\n  |-------|-------|\n    | one   | two   |\n"
 
-    assert markdown_tables.normalize_markdown_tables_text(source) == "\n".join(
-        [
-            "| Name | Value |",
-            "|------|-------|",
-            "| one  | two   |",
-            "",
-        ]
-    )
+    assert markdown_tables.normalize_markdown_tables_text(source) == "| Name | Value |\n|------|-------|\n| one  | two   |\n"
 
 
 def test_normalize_markdown_tables_text_treats_four_space_code_as_non_fence() -> None:
     """Check that indented code lines do not suppress later real tables."""
-    source = "\n".join(
-        [
-            "    ```",
-            "| Name  | Value |",
-            "|-------|-------|",
-            "| one   | two   |",
-            "",
-        ]
-    )
+    source = "    ```\n| Name  | Value |\n|-------|-------|\n| one   | two   |\n"
 
-    assert markdown_tables.normalize_markdown_tables_text(source) == "\n".join(
-        [
-            "    ```",
-            "| Name | Value |",
-            "|------|-------|",
-            "| one  | two   |",
-            "",
-        ]
-    )
+    assert markdown_tables.normalize_markdown_tables_text(source) == "    ```\n| Name | Value |\n|------|-------|\n| one  | two   |\n"
 
 
 def test_normalize_markdown_tables_text_rejects_invalid_closing_fence() -> None:
     """Check that invalid closing fences keep table-like fenced content untouched."""
-    source = "\n".join(
-        [
-            "```",
-            "``` not a close",
-            "| Name  | Value |",
-            "|-------|-------|",
-            "| one   | two   |",
-            "```",
-            "",
-        ]
-    )
+    source = "```\n``` not a close\n| Name  | Value |\n|-------|-------|\n| one   | two   |\n```\n"
 
     assert markdown_tables.normalize_markdown_tables_text(source) == source
 
 
 def test_normalize_markdown_tables_text_rejects_invalid_backtick_opening_fence() -> None:
     """Check that backticks in backtick-fence info strings do not suppress tables."""
-    source = "\n".join(
-        [
-            "``` info `",
-            "| Name  | Value |",
-            "|-------|-------|",
-            "| one   | two   |",
-            "```",
-            "",
-        ]
-    )
+    source = "``` info `\n| Name  | Value |\n|-------|-------|\n| one   | two   |\n```\n"
 
-    assert markdown_tables.normalize_markdown_tables_text(source) == "\n".join(
-        [
-            "``` info `",
-            "| Name | Value |",
-            "|------|-------|",
-            "| one  | two   |",
-            "```",
-            "",
-        ]
-    )
+    assert markdown_tables.normalize_markdown_tables_text(source) == "``` info `\n| Name | Value |\n|------|-------|\n| one  | two   |\n```\n"
 
 
 def test_normalize_markdown_tables_text_allows_backticks_in_tilde_fence_info() -> None:
     """Check that tilde-fence info strings may contain backticks."""
-    source = "\n".join(
-        [
-            "~~~ info `",
-            "| Name  | Value |",
-            "|-------|-------|",
-            "~~~",
-            "",
-        ]
-    )
+    source = "~~~ info `\n| Name  | Value |\n|-------|-------|\n~~~\n"
 
     assert markdown_tables.normalize_markdown_tables_text(source) == source
 
 
 def test_table_failures_accepts_escaped_pipes_in_cell_content() -> None:
     """Check that escaped Markdown pipes do not create extra table cells."""
-    table_lines = [
-        "| A    | B |",
-        "|------|---|",
-        "| x\\|y | z |",
-    ]
+    table_lines = ["| A    | B |", "|------|---|", "| x\\|y | z |"]
 
     assert markdown_tables.table_failures(ROOT / "example.md", 0, table_lines) == []
 
 
 def test_table_failures_accepts_inline_code_pipes_in_cell_content() -> None:
     """Check that Markdown pipes inside inline code do not create extra table cells."""
-    table_lines = [
-        "| A       | B |",
-        "|---------|---|",
-        "| `x | y` | z |",
-    ]
+    table_lines = ["| A       | B |", "|---------|---|", "| `x | y` | z |"]
 
     assert markdown_tables.table_failures(ROOT / "example.md", 0, table_lines) == []
 
 
 def test_table_failures_accepts_unmatched_backtick_pipes_as_cell_boundaries() -> None:
     """Check that unmatched backticks do not hide real table cell boundaries."""
-    table_lines = [
-        "| A  | B |",
-        "|----|---|",
-        "| `x | y |",
-    ]
+    table_lines = ["| A  | B |", "|----|---|", "| `x | y |"]
 
     assert markdown_tables.table_failures(ROOT / "example.md", 0, table_lines) == []
 

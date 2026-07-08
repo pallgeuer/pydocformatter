@@ -1,15 +1,16 @@
+# Third-party imports
 import libcst as cst
-import libcst.metadata as cst_metadata
 import pytest
+import libcst.metadata as cst_metadata
 
-import pydocformatter.formatter as formatter
-import pydocformatter.rules.definition_helpers.source_text as source_text
-import pydocformatter.rules_selection as rules_selection
-import tests.rule_helpers as rule_helpers
+# First-party imports
+from pydocformatter import formatter, rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention
 from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
+from pydocformatter.rules.definition_helpers import source_text
 from pydocformatter.rules.definitions.PDF.PDF import PDF
 from pydocformatter.rules.definitions.PDF.PDF303_signature_like_summary import PDF303SignatureLikeSummary
+from tests import rule_helpers
 
 
 def contexts(source: str, *, settings: CheckSettings | None = None) -> tuple[RuleCategoryContext, RuleContext]:
@@ -47,7 +48,7 @@ def format_source(source: str, *, settings: CheckSettings | None = None, fix: bo
     return formatter.format_source(source, "example.py", settings=resolved_settings, rule_selection=rules_selection.select_rules(resolved_settings), fix=fix)
 
 
-@pytest.mark.parametrize("summary", ("function(value) -> str", "Return; function(value)", "Return, function(value)", "Return\tfunction(value)"))
+@pytest.mark.parametrize("summary", ["function(value) -> str", "Return; function(value)", "Return, function(value)", "Return\tfunction(value)"])
 def test_reports_function_signature_summaries(summary: str) -> None:
     source = f'def function(value):\n    """{summary}"""\n'
     result = format_source(source)
@@ -58,7 +59,7 @@ def test_reports_function_signature_summaries(summary: str) -> None:
     assert not result.unfixed_findings[0].fixable
 
 
-@pytest.mark.parametrize("summary", ("__call__(value)", "Return function()", "Return function(value, *, option=True)"))
+@pytest.mark.parametrize("summary", ["__call__(value)", "Return function()", "Return function(value, *, option=True)"])
 def test_reports_dunder_empty_and_keyword_signature_shapes(summary: str) -> None:
     source = f'def __call__(value):\n    """{summary}"""\n' if summary.startswith("__call__") else f'def function(value, *, option=True):\n    """{summary}"""\n'
     result = format_source(source)
@@ -66,7 +67,7 @@ def test_reports_dunder_empty_and_keyword_signature_shapes(summary: str) -> None
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((2,),)
 
 
-@pytest.mark.parametrize("summary", ("myfunction(value)", "module.function(value)", "function (value)", "Return value."))
+@pytest.mark.parametrize("summary", ["myfunction(value)", "module.function(value)", "function (value)", "Return value."])
 def test_does_not_report_non_signature_summaries(summary: str) -> None:
     source = f'def function(value):\n    """{summary}"""\n'
     result = format_source(source)
@@ -74,7 +75,7 @@ def test_does_not_report_non_signature_summaries(summary: str) -> None:
     assert not result.unfixed_findings
 
 
-@pytest.mark.parametrize("summary", ("FUNCTION(value)", "Return:function(value)", "Return=function(value)"))
+@pytest.mark.parametrize("summary", ["FUNCTION(value)", "Return:function(value)", "Return=function(value)"])
 def test_does_not_report_case_mismatches_or_unsupported_signature_boundaries(summary: str) -> None:
     source = f'def function(value):\n    """{summary}"""\n'
     result = format_source(source)

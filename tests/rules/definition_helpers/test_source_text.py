@@ -1,6 +1,8 @@
+# Third-party imports
 import libcst.metadata as cst_metadata
 
-import pydocformatter.rules.definition_helpers.source_text as source_text
+# First-party imports
+from pydocformatter.rules.definition_helpers import source_text
 
 
 def test_source_lines_preserve_python_line_endings() -> None:

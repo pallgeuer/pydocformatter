@@ -1,10 +1,12 @@
+# Standard library imports
 import typing
 
+# Third-party imports
 import pytest
 
-import pydocformatter.formatter as formatter
-import pydocformatter.rules_selection as rules_selection
+# First-party imports
 import tests.rules.PCF.helpers as pcf_helpers
+from pydocformatter import formatter, rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, CommentTaskMarkerMode, LineEnding
 
 
@@ -88,7 +90,7 @@ def test_empty_trailing_comment_remains_inline_even_when_code_is_overlong() -> N
 
 @pytest.mark.parametrize(
     "directive",
-    (
+    [
         "# type: ignore[assignment]",
         "# type: ignore[ty:invalid-argument-type]",
         "# ty: ignore[invalid-argument-type]",
@@ -105,7 +107,7 @@ def test_empty_trailing_comment_remains_inline_even_when_code_is_overlong() -> N
         "# @formatter:on",
         "# nosec reason",
         "# pragma: no cover",
-    ),
+    ],
 )
 def test_protected_directives_are_not_extracted_by_pcf004(directive: str) -> None:
     source = f"very_long_variable_name = compute_expensive_value()  {directive}\n"
@@ -219,11 +221,7 @@ def test_pcf_rule_selection_keeps_actions_separate() -> None:
     directive = formatter.format_source(source, "example.py", settings=directive_settings, rule_selection=rules_selection.select_rules(directive_settings), fix=True)
     extraction = formatter.format_source(source, "example.py", settings=extraction_settings, rule_selection=rules_selection.select_rules(extraction_settings), fix=True)
     spacing_extraction_directive = formatter.format_source(
-        source,
-        "example.py",
-        settings=spacing_extraction_directive_settings,
-        rule_selection=rules_selection.select_rules(spacing_extraction_directive_settings),
-        fix=True,
+        source, "example.py", settings=spacing_extraction_directive_settings, rule_selection=rules_selection.select_rules(spacing_extraction_directive_settings), fix=True
     )
 
     assert standalone.new_source == "# bad standalone spacing\nregular = compute()#ordinary trailing words that need moving\nignored = compute()#noqa\n"
@@ -235,7 +233,7 @@ def test_pcf_rule_selection_keeps_actions_separate() -> None:
 
 @pytest.mark.parametrize(
     "source",
-    (
+    [
         "values = [\n    item,  # explanation long enough to move above this item\n]\n",
         "call(\n    value,  # explanation long enough to move above this argument\n)\n",
         "if enabled:  # explanation long enough to move above the header\n    pass\n",
@@ -243,7 +241,7 @@ def test_pcf_rule_selection_keeps_actions_separate() -> None:
         "if enabled:\n    pass\nelse:  # explanation long enough to move above the else header\n    pass\n",
         "@decorator  # explanation long enough to move above the decorator\ndef function():\n    pass\n",
         "value = (\n    first +  # explanation long enough to move above this continuation\n    second\n)\n",
-    ),
+    ],
 )
 def test_overlong_trailing_comments_stay_inline_in_sensitive_syntax_positions_by_default(source: str) -> None:
     assert pcf_helpers.format_pcf(source, line_length=32).new_source == source
@@ -251,14 +249,14 @@ def test_overlong_trailing_comments_stay_inline_in_sensitive_syntax_positions_by
 
 @pytest.mark.parametrize(
     "source",
-    (
+    [
         "class Example:  # explanation long enough to move above the class header\n    pass\n",
         "def function():  # explanation long enough to move above the function header\n    pass\n",
         "with context:  # explanation long enough to move above the with header\n    pass\n",
         "try:  # explanation long enough to move above the try header\n    pass\nexcept Error:  # explanation long enough to move above the except header\n    pass\nfinally:  # explanation long enough to move above the finally header\n    pass\n",
         "try:  # explanation long enough to move above the try star header\n    pass\nexcept* Error:  # explanation long enough to move above except star\n    pass\n",
         "match value:  # explanation long enough to move above the match header\n    case 1:  # explanation long enough to move above the case header\n        pass\n",
-    ),
+    ],
 )
 def test_syntax_aware_extraction_covers_compound_statement_headers(source: str) -> None:
     assert pcf_helpers.format_pcf(source, line_length=32).new_source == source
@@ -272,23 +270,11 @@ def test_syntax_aware_extraction_does_not_protect_ordinary_trailing_comments_ins
 
 @pytest.mark.parametrize(
     ("source", "expected"),
-    (
-        (
-            "values = [\n    item,  # explanation long enough to move above this item\n]\n",
-            "values = [\n    # explanation long enough to\n    # move above this item\n    item,\n]\n",
-        ),
-        (
-            "call(\n    value,  # explanation long enough to move above this argument\n)\n",
-            "call(\n    # explanation long enough to\n    # move above this argument\n    value,\n)\n",
-        ),
-        (
-            "if enabled:  # explanation long enough to move above the header\n    pass\n",
-            "# explanation long enough to\n# move above the header\nif enabled:\n    pass\n",
-        ),
-        (
-            "if enabled: pass  # explanation long enough to move above one line suite\n",
-            "# explanation long enough to\n# move above one line suite\nif enabled: pass\n",
-        ),
+    [
+        ("values = [\n    item,  # explanation long enough to move above this item\n]\n", "values = [\n    # explanation long enough to\n    # move above this item\n    item,\n]\n"),
+        ("call(\n    value,  # explanation long enough to move above this argument\n)\n", "call(\n    # explanation long enough to\n    # move above this argument\n    value,\n)\n"),
+        ("if enabled:  # explanation long enough to move above the header\n    pass\n", "# explanation long enough to\n# move above the header\nif enabled:\n    pass\n"),
+        ("if enabled: pass  # explanation long enough to move above one line suite\n", "# explanation long enough to\n# move above one line suite\nif enabled: pass\n"),
         (
             "if enabled:\n    pass\nelse:  # explanation long enough to move above the else header\n    pass\n",
             "if enabled:\n    pass\n# explanation long enough to\n# move above the else header\nelse:\n    pass\n",
@@ -305,7 +291,7 @@ def test_syntax_aware_extraction_does_not_protect_ordinary_trailing_comments_ins
             "try:  # explanation long enough to move above the try star header\n    pass\nexcept* Error:  # explanation long enough to move above except star\n    pass\n",
             "# explanation long enough to\n# move above the try star header\ntry:\n    pass\n# explanation long enough to\n# move above except star\nexcept* Error:\n    pass\n",
         ),
-    ),
+    ],
 )
 def test_overlong_trailing_comments_can_move_from_sensitive_syntax_positions_when_syntax_awareness_is_disabled(source: str, expected: str) -> None:
     result = pcf_helpers.format_pcf(source, line_length=32, comment_trailing_extraction_syntax_aware=False)
@@ -314,7 +300,7 @@ def test_overlong_trailing_comments_can_move_from_sensitive_syntax_positions_whe
 
 @pytest.mark.parametrize(
     "comment",
-    (
+    [
         "- alpha beta gamma delta epsilon",
         "* alpha beta gamma delta epsilon",
         "> alpha beta gamma delta epsilon",
@@ -326,50 +312,38 @@ def test_overlong_trailing_comments_can_move_from_sensitive_syntax_positions_whe
         "!= alpha beta gamma delta epsilon",
         "-> alpha beta gamma delta epsilon",
         "=> alpha beta gamma delta epsilon",
-    ),
+    ],
 )
 def test_operator_like_trailing_comments_stay_inline_regardless_of_structure_settings(comment: str) -> None:
     source = f"value = compute()  # {comment}\n"
-    result = pcf_helpers.format_pcf(
-        source,
-        line_length=24,
-        comment_format_list_items=False,
-        comment_format_block_quotes=False,
-        comment_preserve_tables=False,
-    )
+    result = pcf_helpers.format_pcf(source, line_length=24, comment_format_list_items=False, comment_format_block_quotes=False, comment_preserve_tables=False)
     assert result.new_source == source
 
 
 @pytest.mark.parametrize(
     ("comment", "expected"),
-    (
+    [
         ("and alpha beta gamma delta epsilon", "# and alpha beta gamma\n# delta epsilon\nvalue = compute()\n"),
         ("or alpha beta gamma delta epsilon", "# or alpha beta gamma\n# delta epsilon\nvalue = compute()\n"),
         ("not alpha beta gamma delta epsilon", "# not alpha beta gamma\n# delta epsilon\nvalue = compute()\n"),
-    ),
+    ],
 )
 def test_boolean_operator_words_starting_ordinary_prose_do_not_block_extraction(comment: str, expected: str) -> None:
     source = f"value = compute()  # {comment}\n"
-    result = pcf_helpers.format_pcf(
-        source,
-        line_length=24,
-        comment_format_list_items=False,
-        comment_format_block_quotes=False,
-        comment_preserve_tables=False,
-    )
+    result = pcf_helpers.format_pcf(source, line_length=24, comment_format_list_items=False, comment_format_block_quotes=False, comment_preserve_tables=False)
     assert result.new_source == expected
 
 
 @pytest.mark.parametrize(
     "comment",
-    (
+    [
         "notebook alpha beta gamma delta epsilon",
         "orphan alpha beta gamma delta epsilon",
         "android alpha beta gamma delta epsilon",
         "value->attribute alpha beta gamma delta epsilon",
         "a+b alpha beta gamma delta epsilon",
         "value|default alpha beta gamma delta epsilon",
-    ),
+    ],
 )
 def test_operator_like_safety_does_not_block_embedded_operator_words_or_tokens(comment: str) -> None:
     source = f"value = compute()  # {comment}\n"
@@ -381,7 +355,7 @@ def test_operator_like_safety_does_not_block_embedded_operator_words_or_tokens(c
 
 @pytest.mark.parametrize(
     ("source", "kwargs"),
-    (
+    [
         ("value = compute()  # 1. alpha beta gamma delta epsilon\n", {"comment_format_list_items": True}),
         ("value = compute()  # # alpha beta gamma delta epsilon\n", {"comment_preserve_headings": True}),
         ("value = compute()  # ----\n", {"comment_preserve_headings": True}),
@@ -393,10 +367,10 @@ def test_operator_like_safety_does_not_block_embedded_operator_words_or_tokens(c
         ("value = compute()  # return alpha beta gamma delta epsilon\n", {"comment_detect_code": True}),
         ("value = compute()  # value = compute()\n", {"comment_detect_statements": True}),
         ("value = compute()  # package.function(value)\n", {"comment_detect_expressions": True}),
-    ),
+    ],
 )
 def test_enabled_standalone_detectors_make_matching_trailing_content_unsafe(source: str, kwargs: dict[str, bool]) -> None:
-    result = pcf_helpers.format_pcf(source, line_length=24, **typing.cast(typing.Any, kwargs))
+    result = pcf_helpers.format_pcf(source, line_length=24, **typing.cast("typing.Any", kwargs))
     assert result.new_source == source
 
 
@@ -409,7 +383,7 @@ def test_content_detection_keeps_indented_disabled_code_inline_when_spacing_is_u
 
 @pytest.mark.parametrize(
     ("source", "kwargs", "expected"),
-    (
+    [
         ("value = compute()  # 1. alpha beta gamma delta epsilon\n", {"comment_format_list_items": False}, "# 1. alpha beta gamma\n# delta epsilon\nvalue = compute()\n"),
         ("value = compute()  # # alpha beta gamma delta epsilon\n", {"comment_preserve_headings": False}, "# # alpha beta gamma\n# delta epsilon\nvalue = compute()\n"),
         ("long_variable_name = compute()  # ----\n", {"comment_preserve_headings": False, "comment_preserve_tables": False}, "# ----\nlong_variable_name = compute()\n"),
@@ -425,23 +399,17 @@ def test_content_detection_keeps_indented_disabled_code_inline_when_spacing_is_u
         ("value = compute()  # return alpha beta gamma delta epsilon\n", {"comment_detect_code": False}, "# return alpha beta\n# gamma delta epsilon\nvalue = compute()\n"),
         ("value = compute()  # value = compute()\n", {"comment_detect_statements": False}, "# value = compute()\nvalue = compute()\n"),
         ("value = compute()  # package.function(value)\n", {"comment_detect_expressions": False}, "# package.function(value)\nvalue = compute()\n"),
-    ),
+    ],
 )
 def test_disabled_standalone_detectors_allow_matching_trailing_content_to_extract(source: str, kwargs: dict[str, bool], expected: str) -> None:
-    result = pcf_helpers.format_pcf(source, line_length=24, **typing.cast(typing.Any, kwargs))
+    result = pcf_helpers.format_pcf(source, line_length=24, **typing.cast("typing.Any", kwargs))
     assert result.new_source == expected
 
 
-@pytest.mark.parametrize(
-    "kwargs",
-    (
-        {"comment_preserve_headings": False},
-        {"comment_preserve_tables": False},
-    ),
-)
+@pytest.mark.parametrize("kwargs", [{"comment_preserve_headings": False}, {"comment_preserve_tables": False}])
 def test_overlapping_content_detectors_must_all_allow_extraction(kwargs: dict[str, bool]) -> None:
     source = "long_variable_name = compute()  # ----\n"
-    result = pcf_helpers.format_pcf(source, line_length=24, **typing.cast(typing.Any, kwargs))
+    result = pcf_helpers.format_pcf(source, line_length=24, **typing.cast("typing.Any", kwargs))
     assert result.new_source == source
 
 
@@ -513,20 +481,14 @@ def test_extracted_trailing_comment_stays_separate_from_joined_standalone_paragr
 
 @pytest.mark.parametrize(
     ("source", "expected"),
-    (
+    [
         (
             "# Existing outer note.\nif enabled:\n    value = compute()  # Extracted explanation has enough words to require moving.\n",
             "# Existing outer note.\nif enabled:\n    # Extracted explanation has\n    # enough words to require\n    # moving.\n    value = compute()\n",
         ),
-        (
-            "#\nvalue = compute()  # Extracted explanation has enough words to require moving.\n",
-            "#\n# Extracted explanation has enough\n# words to require moving.\nvalue = compute()\n",
-        ),
-        (
-            "# noqa\nvalue = compute()  # Extracted explanation has enough words to require moving.\n",
-            "# noqa\n# Extracted explanation has enough\n# words to require moving.\nvalue = compute()\n",
-        ),
-    ),
+        ("#\nvalue = compute()  # Extracted explanation has enough words to require moving.\n", "#\n# Extracted explanation has enough\n# words to require moving.\nvalue = compute()\n"),
+        ("# noqa\nvalue = compute()  # Extracted explanation has enough words to require moving.\n", "# noqa\n# Extracted explanation has enough\n# words to require moving.\nvalue = compute()\n"),
+    ],
 )
 def test_extraction_boundary_blank_is_only_inserted_after_same_indent_regular_standalone_comments(source: str, expected: str) -> None:
     result = pcf_helpers.format_pcf(source, line_length=34)

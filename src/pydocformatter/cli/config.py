@@ -1,18 +1,28 @@
 """`pydocfmt config` command."""
 
+# Future imports
 from __future__ import annotations
 
-import argparse
+# Standard library imports
+import sys
 import enum
 import json
-import sys
-from typing import Any, TypedDict
+from typing import TYPE_CHECKING, Any, TypedDict
 
-import pydocformatter.cli.global_args as global_args
-import pydocformatter.cli.settings_check as settings_check
+# First-party imports
 import pydocformatter.settings as settings_core
-import pydocformatter.utils.argparser as argparser
-from pydocformatter.settings import MultiStringMap, PerFileSettingsMap, SettingDefinition, StringList
+from pydocformatter.cli import global_args, settings_check
+from pydocformatter.settings import MultiStringMap, PerFileSettingsMap, StringList
+from pydocformatter.utils import argparser
+
+
+if TYPE_CHECKING:
+    # Standard library imports
+    import argparse
+
+    # First-party imports
+    from pydocformatter.settings import SettingDefinition
+
 
 _DEFAULT_OUTPUT_FORMAT = "text"
 
@@ -42,24 +52,9 @@ def add_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) 
     Returns:
         argparse.ArgumentParser: Configured `config` subcommand parser.
     """
-    parser = argparser.create_subparser(
-        subparsers,
-        name="config",
-        description="List or describe the available configuration options.",
-        help="List or describe the available configuration options",
-    )
-    parser.add_argument(
-        "option",
-        nargs="?",
-        metavar="OPTION",
-        help="Config key to show.",
-    )
-    parser.add_argument(
-        "--output-format",
-        choices=("text", "json"),
-        default=_DEFAULT_OUTPUT_FORMAT,
-        help="Output format (default: %(default)s).",
-    )
+    parser = argparser.create_subparser(subparsers, name="config", description="List or describe the available configuration options.", help="List or describe the available configuration options")
+    parser.add_argument("option", nargs="?", metavar="OPTION", help="Config key to show.")
+    parser.add_argument("--output-format", choices=("text", "json"), default=_DEFAULT_OUTPUT_FORMAT, help="Output format (default: %(default)s).")
     global_args.add_global_arguments(parser, dest_prefix="command")
     parser.set_defaults(func=run)
     return parser
@@ -88,12 +83,11 @@ def run(args: argparse.Namespace) -> int:
         else:
             output = metadata_for_definition(definitions_by_key[args.option], settings)
         print(json.dumps(output, indent=2))
+    elif args.option is None:
+        for definition in toml_definitions:
+            print(definition.key)
     else:
-        if args.option is None:
-            for definition in toml_definitions:
-                print(definition.key)
-        else:
-            print(format_definition(definitions_by_key[args.option], settings), end="")
+        print(format_definition(definitions_by_key[args.option], settings), end="")
 
     return 0
 
@@ -109,13 +103,7 @@ def metadata_for_definition(definition: SettingDefinition[Any], settings: settin
         ConfigOptionMetadata: JSON-serializable metadata for the setting.
     """
     default = settings_core.format_value(getattr(settings, definition.field), definition.value_type)
-    metadata = ConfigOptionMetadata(
-        doc=definition.documentation,
-        default=default,
-        value_type=value_type_name(definition.value_type),
-        example=definition.example or f"{definition.key} = {default}",
-    )
-    return metadata
+    return ConfigOptionMetadata(doc=definition.documentation, default=default, value_type=value_type_name(definition.value_type), example=definition.example or f"{definition.key} = {default}")
 
 
 def format_definition(definition: SettingDefinition[Any], settings: settings_check.CheckSettings) -> str:
@@ -129,17 +117,7 @@ def format_definition(definition: SettingDefinition[Any], settings: settings_che
         str: Text block describing the configuration option.
     """
     metadata = metadata_for_definition(definition, settings)
-    lines = [
-        metadata["doc"].rstrip(),
-        "",
-        f"Default value: {metadata['default']}",
-        f"Type: {metadata['value_type']}",
-        "Example usage:",
-        "```toml",
-        metadata["example"],
-        "```",
-        "",
-    ]
+    lines = [metadata["doc"].rstrip(), "", f"Default value: {metadata['default']}", f"Type: {metadata['value_type']}", "Example usage:", "```toml", metadata["example"], "```", ""]
     return "\n".join(lines)
 
 
@@ -154,19 +132,18 @@ def value_type_name(value_type: object) -> str:
     """
     if value_type is bool:
         return "bool"
-    elif value_type is int:
+    if value_type is int:
         return "int"
-    elif value_type is float:
+    if value_type is float:
         return "float"
-    elif value_type is str:
+    if value_type is str:
         return "str"
-    elif value_type == StringList:
+    if value_type == StringList:
         return "list[str]"
-    elif value_type == MultiStringMap:
+    if value_type == MultiStringMap:
         return "dict[str, list[str]]"
-    elif value_type == PerFileSettingsMap:
+    if value_type == PerFileSettingsMap:
         return "dict[str, dict[str, value]]"
-    elif isinstance(value_type, type) and issubclass(value_type, enum.StrEnum):
+    if isinstance(value_type, type) and issubclass(value_type, enum.StrEnum):
         return " | ".join(json.dumps(member.value) for member in value_type)
-    else:
-        return str(value_type)
+    return str(value_type)

@@ -1,19 +1,29 @@
 """PDF200 too-many-blank-lines rule."""
 
+# Future imports
 from __future__ import annotations
 
+# Standard library imports
 from collections.abc import Sequence
+from typing import TYPE_CHECKING
 
+# Third-party imports
 import libcst as cst
 
-import pydocformatter.cli.settings_check as settings_check
-import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
-import pydocformatter.rules.edits as rule_edits
-import pydocformatter.rules.registration as rule_registration
+# First-party imports
 import pydocformatter.rules.violations as rule_violations
+import pydocformatter.rules.registration as rule_registration
+import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
+from pydocformatter.cli import settings_check
 from pydocformatter.rules.codes import RuleCode
-from pydocformatter.rules.definition import RuleBase, RuleContext
+from pydocformatter.rules.definition import RuleBase
 from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata
+
+
+if TYPE_CHECKING:
+    # First-party imports
+    import pydocformatter.rules.edits as rule_edits
+    from pydocformatter.rules.definition import RuleContext
 
 
 @rule_registration.register_rule_to(PDF_definition.PDF)
@@ -88,10 +98,7 @@ def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo, *, co
 
 
 def _retained_line_indexes(
-    blocks: tuple[PDF_definition.DocstringBlock, ...],
-    *,
-    convention: settings_check.DocstringConvention,
-    parent_kind: PDF_definition.DocstringBlockKind | None = None,
+    blocks: tuple[PDF_definition.DocstringBlock, ...], *, convention: settings_check.DocstringConvention, parent_kind: PDF_definition.DocstringBlockKind | None = None
 ) -> tuple[int, ...] | None:
     """Return retained logical lines, or None if a blank-only range becomes empty."""
     if not blocks:
@@ -154,15 +161,10 @@ def _should_drop_blank_separator(
     return False
 
 
-def _keeps_blank_separator_after_section(
-    block: PDF_definition.DocstringBlock,
-    next_block: PDF_definition.DocstringBlock | None,
-    *,
-    convention: settings_check.DocstringConvention,
-) -> bool:
+def _keeps_blank_separator_after_section(block: PDF_definition.DocstringBlock, next_block: PDF_definition.DocstringBlock | None, *, convention: settings_check.DocstringConvention) -> bool:
     """Return whether a section trailing blank separates it from another section."""
     return (
-        convention in (settings_check.DocstringConvention.GOOGLE, settings_check.DocstringConvention.NUMPY)
+        convention in {settings_check.DocstringConvention.GOOGLE, settings_check.DocstringConvention.NUMPY}
         and block.kind is PDF_definition.DocstringBlockKind.SECTION
         and next_block is not None
         and next_block.kind is PDF_definition.DocstringBlockKind.SECTION
@@ -199,13 +201,7 @@ def _with_configured_final_section_blank(docstring: PDF_definition.DocstringInfo
     return *retained_lines, final_spacing.trailing_blank_line
 
 
-def _with_closing_quote_prefix_line(
-    docstring: PDF_definition.DocstringInfo,
-    retained_lines: tuple[int, ...],
-    *,
-    canonical_margin: str,
-    keep_final_section_blank: bool,
-) -> tuple[int, ...]:
+def _with_closing_quote_prefix_line(docstring: PDF_definition.DocstringInfo, retained_lines: tuple[int, ...], *, canonical_margin: str, keep_final_section_blank: bool) -> tuple[int, ...]:
     """Preserve a final same-line closing-quote prefix after content."""
     if not retained_lines:
         return retained_lines

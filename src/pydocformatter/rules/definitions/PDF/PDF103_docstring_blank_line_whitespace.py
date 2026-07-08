@@ -1,18 +1,27 @@
 """PDF103 docstring-blank-line-whitespace rule."""
 
+# Future imports
 from __future__ import annotations
 
+# Standard library imports
 from collections.abc import Sequence
+from typing import TYPE_CHECKING
 
-import pydocformatter.cli.settings_check as settings_check
-import pydocformatter.rules.definition_helpers.text_layout as text_layout
-import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
-import pydocformatter.rules.edits as rule_edits
-import pydocformatter.rules.registration as rule_registration
+# First-party imports
 import pydocformatter.rules.violations as rule_violations
+import pydocformatter.rules.registration as rule_registration
+import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
+from pydocformatter.cli import settings_check
 from pydocformatter.rules.codes import RuleCode
-from pydocformatter.rules.definition import RuleBase, RuleContext
+from pydocformatter.rules.definition import RuleBase
+from pydocformatter.rules.definition_helpers import text_layout
 from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata
+
+
+if TYPE_CHECKING:
+    # First-party imports
+    import pydocformatter.rules.edits as rule_edits
+    from pydocformatter.rules.definition import RuleContext
 
 
 @rule_registration.register_rule_to(PDF_definition.PDF)
@@ -63,13 +72,7 @@ def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo, *, co
     return PDF_definition.planned_simple_docstring_line_change(docstring, context=context, raw_line_targets=targets)
 
 
-def _line_target(
-    docstring: PDF_definition.DocstringInfo,
-    line: PDF_definition.DocstringValueLine,
-    *,
-    canonical_margin: str,
-    context: RuleContext,
-) -> str | None:
+def _line_target(docstring: PDF_definition.DocstringInfo, line: PDF_definition.DocstringValueLine, *, canonical_margin: str, context: RuleContext) -> str | None:
     """Return the target raw text for one blank line, if it should change."""
     if docstring.value == "":
         return None

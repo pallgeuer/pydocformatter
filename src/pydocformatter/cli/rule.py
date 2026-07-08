@@ -1,19 +1,29 @@
 """`pydocfmt rule` command."""
 
+# Future imports
 from __future__ import annotations
 
-import argparse
-import json
+# Standard library imports
 import sys
-from typing import TypedDict
+import json
+from typing import TYPE_CHECKING, TypedDict
 
-import pydocformatter.cli.global_args as global_args
+# First-party imports
 import pydocformatter.rules.collection as rule_collection
 import pydocformatter.rules.documentation as rule_documentation
-import pydocformatter.utils.argparser as argparser
+from pydocformatter.cli import global_args
 from pydocformatter.rules.codes import RuleCode
-from pydocformatter.rules.definition import RuleBase
-from pydocformatter.rules.models import FixAvailability
+from pydocformatter.utils import argparser
+
+
+if TYPE_CHECKING:
+    # Standard library imports
+    import argparse
+
+    # First-party imports
+    from pydocformatter.rules.definition import RuleBase
+    from pydocformatter.rules.models import FixAvailability
+
 
 _DEFAULT_OUTPUT_FORMAT = "text"
 
@@ -80,29 +90,10 @@ def add_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) 
     Returns:
         argparse.ArgumentParser: Configured `rule` subcommand parser.
     """
-    parser = argparser.create_subparser(
-        subparsers,
-        name="rule",
-        description="Explain a rule or all rules.",
-        help="Explain a rule or all rules",
-    )
-    parser.add_argument(
-        "rule",
-        nargs="?",
-        metavar="RULE",
-        help="Rule to explain.",
-    )
-    parser.add_argument(
-        "--all",
-        action="store_true",
-        help="Explain all rules.",
-    )
-    parser.add_argument(
-        "--output-format",
-        choices=("text", "json"),
-        default=_DEFAULT_OUTPUT_FORMAT,
-        help="Output format (default: %(default)s).",
-    )
+    parser = argparser.create_subparser(subparsers, name="rule", description="Explain a rule or all rules.", help="Explain a rule or all rules")
+    parser.add_argument("rule", nargs="?", metavar="RULE", help="Rule to explain.")
+    parser.add_argument("--all", action="store_true", help="Explain all rules.")
+    parser.add_argument("--output-format", choices=("text", "json"), default=_DEFAULT_OUTPUT_FORMAT, help="Output format (default: %(default)s).")
     global_args.add_global_arguments(parser, dest_prefix="command")
     parser.set_defaults(func=run)
     return parser
@@ -136,10 +127,7 @@ def run(args: argparse.Namespace) -> int:
 
     if args.output_format == "json":
         output: RuleMetadataOutput | list[RuleMetadataOutput]
-        if args.all:
-            output = [rule_json(rule_class) for rule_class in rules]
-        else:
-            output = rule_json(rules[0])
+        output = [rule_json(rule_class) for rule_class in rules] if args.all else rule_json(rules[0])
         print(json.dumps(output, indent=2))
     else:
         print("\n\n".join(format_rule_text(rule_class).rstrip() for rule_class in rules))
@@ -166,10 +154,7 @@ def rule_json(rule_class: type[RuleBase]) -> RuleMetadataOutput:
     rule = rule_class.meta
     source_location = rule_documentation.rule_source_location(rule_class)
     source_location_json: RuleSourceLocationMetadata | None
-    if source_location is None:
-        source_location_json = None
-    else:
-        source_location_json = RuleSourceLocationMetadata(file=source_location.file, line=source_location.line)
+    source_location_json = None if source_location is None else RuleSourceLocationMetadata(file=source_location.file, line=source_location.line)
     return RuleMetadataOutput(
         name=rule.name,
         code=rule.code.tag,

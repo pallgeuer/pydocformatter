@@ -1,16 +1,26 @@
 """PDF309 entry-description-terminal-punctuation rule."""
 
+# Future imports
 from __future__ import annotations
 
-import pydocformatter.rules.definition_helpers.entry_description_style as entry_description_style
-import pydocformatter.rules.definition_helpers.terminal_punctuation as terminal_punctuation
+# Standard library imports
+from typing import TYPE_CHECKING
+
+# First-party imports
 import pydocformatter.rules.registration as rule_registration
-import pydocformatter.rules.violations as rule_violations
 from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.codes import RuleCode
-from pydocformatter.rules.definition import RuleBase, RuleContext
+from pydocformatter.rules.definition import RuleBase
+from pydocformatter.rules.definition_helpers import entry_description_style, terminal_punctuation
 from pydocformatter.rules.definitions.PDF.PDF import PDF
 from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
+
+
+if TYPE_CHECKING:
+    # First-party imports
+    import pydocformatter.rules.violations as rule_violations
+    from pydocformatter.rules.definition import RuleContext
+
 
 _POLICY = terminal_punctuation.TerminalPunctuationPolicy(valid_endings=".?!\u2026", nonfixable_endings=",:;")
 
@@ -30,10 +40,7 @@ class PDF309EntryDescriptionTerminalPunctuation(RuleBase):
         fix_availability=FixAvailability.SOMETIMES,
         stable_since="1.0.0",
         setting_effects=(
-            RuleSettingEffects(
-                setting="docstring_convention",
-                effects=(RuleSettingEffectValues(effect=RuleSettingEffect.IGNORED, values=(DocstringConvention.NUMPY, DocstringConvention.PEP257)),),
-            ),
+            RuleSettingEffects(setting="docstring_convention", effects=(RuleSettingEffectValues(effect=RuleSettingEffect.IGNORED, values=(DocstringConvention.NUMPY, DocstringConvention.PEP257)),)),
         ),
         incompatible_with=(),
         check_kind=RuleCheckKind.STANDARD,

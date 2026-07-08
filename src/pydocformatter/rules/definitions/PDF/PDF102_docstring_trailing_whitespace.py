@@ -1,15 +1,25 @@
 """PDF102 docstring-trailing-whitespace rule."""
 
+# Future imports
 from __future__ import annotations
 
-import pydocformatter.rules.definition_helpers.text_layout as text_layout
-import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
-import pydocformatter.rules.edits as rule_edits
-import pydocformatter.rules.registration as rule_registration
+# Standard library imports
+from typing import TYPE_CHECKING
+
+# First-party imports
 import pydocformatter.rules.violations as rule_violations
+import pydocformatter.rules.registration as rule_registration
+import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 from pydocformatter.rules.codes import RuleCode
-from pydocformatter.rules.definition import RuleBase, RuleContext
+from pydocformatter.rules.definition import RuleBase
+from pydocformatter.rules.definition_helpers import text_layout
 from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata
+
+
+if TYPE_CHECKING:
+    # First-party imports
+    import pydocformatter.rules.edits as rule_edits
+    from pydocformatter.rules.definition import RuleContext
 
 
 @rule_registration.register_rule_to(PDF_definition.PDF)

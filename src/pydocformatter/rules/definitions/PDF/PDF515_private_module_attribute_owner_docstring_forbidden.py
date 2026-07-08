@@ -1,16 +1,26 @@
 """PDF515 private-module-attribute-owner-docstring-forbidden rule."""
 
+# Future imports
 from __future__ import annotations
 
-import pydocformatter.rules.definition_helpers.attribute_documentation as attribute_documentation
-import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
+# Standard library imports
+from typing import TYPE_CHECKING
+
+# First-party imports
 import pydocformatter.rules.registration as rule_registration
-import pydocformatter.rules.violations as rule_violations
+import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.codes import RuleCode
-from pydocformatter.rules.definition import RuleBase, RuleContext
+from pydocformatter.rules.definition import RuleBase
+from pydocformatter.rules.definition_helpers import attribute_documentation
 from pydocformatter.rules.definitions.PDF.PDF import PDF
 from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
+
+
+if TYPE_CHECKING:
+    # First-party imports
+    import pydocformatter.rules.violations as rule_violations
+    from pydocformatter.rules.definition import RuleContext
 
 
 @rule_registration.register_rule_to(PDF)
@@ -28,10 +38,7 @@ class PDF515PrivateModuleAttributeOwnerDocstringForbidden(RuleBase):
         fix_availability=FixAvailability.NEVER,
         stable_since="1.0.0",
         setting_effects=(
-            RuleSettingEffects(
-                setting="docstring_convention",
-                effects=(RuleSettingEffectValues(effect=RuleSettingEffect.IGNORED, values=(DocstringConvention.NONE, DocstringConvention.PEP257)),),
-            ),
+            RuleSettingEffects(setting="docstring_convention", effects=(RuleSettingEffectValues(effect=RuleSettingEffect.IGNORED, values=(DocstringConvention.NONE, DocstringConvention.PEP257)),)),
         ),
         incompatible_with=(RuleCode("PDF524"),),
         check_kind=RuleCheckKind.STANDARD,

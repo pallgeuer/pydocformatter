@@ -1,7 +1,17 @@
-import pytest
+# Future imports
+from __future__ import annotations
 
-import pydocformatter.rules.definition_helpers.text_layout as text_layout
+# Standard library imports
+from typing import TYPE_CHECKING
+
+# First-party imports
 from pydocformatter.cli.settings_check import CheckSettings, IndentStyle
+from pydocformatter.rules.definition_helpers import text_layout
+
+
+if TYPE_CHECKING:
+    # Third-party imports
+    import pytest
 
 
 def test_display_width_expands_tabs_to_configured_width() -> None:

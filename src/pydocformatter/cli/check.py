@@ -1,34 +1,40 @@
 """`pydocfmt check` command."""
 
+# Future imports
 from __future__ import annotations
 
-import argparse
-import concurrent.futures
-import contextlib
-import dataclasses
-import difflib
-import itertools
-import math
+# Standard library imports
 import os
 import sys
+import math
+import difflib
 import tomllib
+import argparse
+import itertools
+import contextlib
+import dataclasses
+import concurrent.futures
 from collections import defaultdict
 from collections.abc import Callable, Iterable, Iterator
-from typing import TextIO
+from typing import TYPE_CHECKING, TextIO
 
-import pydocformatter.cli.global_args as global_args
-import pydocformatter.cli.settings_check as settings_check
-import pydocformatter.file_selection as file_selection
-import pydocformatter.formatter as formatter
-import pydocformatter.rules_selection as rules_selection
+# First-party imports
 import pydocformatter.settings as settings_core
-import pydocformatter.utils.argparser as argparser
-import pydocformatter.utils.misc as misc
+from pydocformatter import file_selection, formatter, rules_selection
+from pydocformatter.cli import global_args, settings_check
 from pydocformatter.cli.settings_check import SETTINGS_SCHEMA, CheckSettings, OutputFormat
-from pydocformatter.file_selection import STDIN_VIRTUAL_FILE, FileDecision, FileSelectionError, SelectionResult
-from pydocformatter.formatter import FormatterResult
-from pydocformatter.rules.models import FixAvailability, RuleFinding, RuleMetadata
+from pydocformatter.file_selection import STDIN_VIRTUAL_FILE, FileSelectionError
+from pydocformatter.rules.models import FixAvailability
 from pydocformatter.rules_selection import RuleSelection
+from pydocformatter.utils import argparser, misc
+
+
+if TYPE_CHECKING:
+    # First-party imports
+    from pydocformatter.file_selection import FileDecision, SelectionResult
+    from pydocformatter.formatter import FormatterResult
+    from pydocformatter.rules.models import RuleFinding, RuleMetadata
+
 
 _MAX_WINDOWS_PROCESS_POOL_WORKERS = 61
 _DEFAULT_INPUT_PATH = "."
@@ -92,10 +98,7 @@ def add_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) 
         argparse.ArgumentParser: Configured `check` subcommand parser.
     """
     parser = argparser.create_subparser(
-        subparsers,
-        name="check",
-        description="Check and optionally fix Python docstrings and comments.",
-        help="Check and optionally fix Python docstrings and comments",
+        subparsers, name="check", description="Check and optionally fix Python docstrings and comments.", help="Check and optionally fix Python docstrings and comments"
     )
     add_arguments(parser, CheckSettings())
     parser.set_defaults(func=run)
@@ -109,69 +112,24 @@ def add_arguments(parser: argparse.ArgumentParser, settings: CheckSettings) -> N
         parser (argparse.ArgumentParser): Parser that should receive check-command arguments.
         settings (CheckSettings): Settings object supplying current defaults for help text.
     """
-    parser.add_argument(
-        "files",
-        nargs="*",
-        default=None,
-        metavar="PATH",
-        help="Python files or directories to check, or '-' to read from stdin (default: current directory).",
-    )
+    parser.add_argument("files", nargs="*", default=None, metavar="PATH", help="Python files or directories to check, or '-' to read from stdin (default: current directory).")
 
+    parser.add_argument("--fix", action=argparse.BooleanOptionalAction, default=False, help="Apply fixes instead of only checking for needed changes.")
     parser.add_argument(
-        "--fix",
-        action=argparse.BooleanOptionalAction,
-        default=False,
-        help="Apply fixes instead of only checking for needed changes.",
+        "--diff", action="store_true", help="Avoid writing any fixed files back; instead, output a diff for each changed file to stdout, and exit 0 if there are no diffs. Implies fix-only."
     )
-    parser.add_argument(
-        "--diff",
-        action="store_true",
-        help="Avoid writing any fixed files back; instead, output a diff for each changed file to stdout, and exit 0 if there are no diffs. Implies fix-only.",
-    )
-    parser.add_argument(
-        "--show-settings",
-        action="store_true",
-        help="Show resolved settings without checking or fixing files.",
-    )
-    parser.add_argument(
-        "--show-rules",
-        action="store_true",
-        help="Show the active rules without checking or fixing files.",
-    )
-    parser.add_argument(
-        "--show-files",
-        action="store_true",
-        help="Show file-selection decisions without checking or fixing files.",
-    )
-    parser.add_argument(
-        "-o",
-        "--output-file",
-        default=None,
-        metavar="FILE",
-        help="Specify file to write output to (default: stdout).",
-    )
+    parser.add_argument("--show-settings", action="store_true", help="Show resolved settings without checking or fixing files.")
+    parser.add_argument("--show-rules", action="store_true", help="Show the active rules without checking or fixing files.")
+    parser.add_argument("--show-files", action="store_true", help="Show file-selection decisions without checking or fixing files.")
+    parser.add_argument("-o", "--output-file", default=None, metavar="FILE", help="Specify file to write output to (default: stdout).")
 
     SETTINGS_SCHEMA.add_arguments(parser, settings)
 
     miscellaneous = parser.add_argument_group("Miscellaneous")
-    miscellaneous.add_argument(
-        "--stdin-filename",
-        default=None,
-        metavar="FILENAME",
-        help="The name of the file when passing it through stdin.",
-    )
+    miscellaneous.add_argument("--stdin-filename", default=None, metavar="FILENAME", help="The name of the file when passing it through stdin.")
     exit_options = miscellaneous.add_mutually_exclusive_group()
-    exit_options.add_argument(
-        "-e",
-        "--exit-zero",
-        action="store_true",
-        help='Exit with status code "0", even upon detecting formatting violations.',
-    )
-    exit_options.add_argument(
-        "--exit-non-zero-on-fix",
-        action="store_true",
-        help="Exit with a non-zero status code if any files were modified via fix, even if no formatting violations remain.",
-    )
+    exit_options.add_argument("-e", "--exit-zero", action="store_true", help='Exit with status code "0", even upon detecting formatting violations.')
+    exit_options.add_argument("--exit-non-zero-on-fix", action="store_true", help="Exit with a non-zero status code if any files were modified via fix, even if no formatting violations remain.")
 
     global_args.add_global_arguments(parser, dest_prefix="command")
 
@@ -197,37 +155,49 @@ def run(args: argparse.Namespace) -> int:
         return 2
     settings = settings_context.cwd_settings
 
-    try:
-        if args.show_settings:
+    if args.show_settings:
+        try:
             with output_stream(args.output_file) as output:
                 print_settings(settings, output=output)
-            return 0
+        except OutputError as error:
+            return _output_error_status(error)
+        return 0
 
-        elif args.show_rules:
-            selected_rules = rules_selection.select_rules(settings, profile=settings_context.cwd_profile)
+    if args.show_rules:
+        selected_rules = rules_selection.select_rules(settings, profile=settings_context.cwd_profile)
+        try:
             with output_stream(args.output_file) as output:
                 print_rules(selected_rules, output=output)
-            return 1 if selected_rules.errors else 0
+        except OutputError as error:
+            return _output_error_status(error)
+        return 1 if selected_rules.errors else 0
 
-        elif args.show_files:
-            try:
-                files, errors, use_stdin = select_files(paths=args.files, stdin_filename=args.stdin_filename, resolver=settings_context.resolver)
-            except FileSelectionError as error:
-                print(f"pydocfmt check: File selection error: {error}", file=sys.stderr)
-                return 2
-            except settings_core.SettingsError as error:
-                print(f"pydocfmt check: Configuration error: {error}", file=sys.stderr)
-                return 2
+    if args.show_files:
+        try:
+            files, errors = select_files(paths=args.files, stdin_filename=args.stdin_filename, resolver=settings_context.resolver)[:2]
+        except FileSelectionError as error:
+            print(f"pydocfmt check: File selection error: {error}", file=sys.stderr)
+            return 2
+        except settings_core.SettingsError as error:
+            print(f"pydocfmt check: Configuration error: {error}", file=sys.stderr)
+            return 2
+        try:
             with output_stream(args.output_file) as output:
                 print_file_selection_decisions(errors, files.decisions, output=output)
-            return 1 if errors else 0
+        except OutputError as error:
+            return _output_error_status(error)
+        return 1 if errors else 0
 
-        else:
-            return check_files(args=args, settings_context=settings_context)
-
+    try:
+        return check_files(args=args, settings_context=settings_context)
     except OutputError as error:
-        print(f"pydocfmt check: Output error: {error}", file=sys.stderr)
-        return 2
+        return _output_error_status(error)
+
+
+def _output_error_status(error: OutputError) -> int:
+    """Print an output error and return the corresponding check status."""
+    print(f"pydocfmt check: Output error: {error}", file=sys.stderr)
+    return 2
 
 
 def select_files(*, paths: list[str] | None, stdin_filename: str | None, resolver: settings_core.SettingsResolver[CheckSettings]) -> tuple[SelectionResult, list[str], bool]:
@@ -261,10 +231,7 @@ def select_files(*, paths: list[str] | None, stdin_filename: str | None, resolve
     if use_stdin and paths:
         errors.extend(f"Using standard input instead of input path: {path}" for path in paths if path != STDIN_VIRTUAL_FILE)
 
-    if use_stdin:
-        files = file_selection.select_virtual_file(file_paths[0], resolver)
-    else:
-        files = file_selection.select_files(file_paths, resolver)
+    files = file_selection.select_virtual_file(file_paths[0], resolver) if use_stdin else file_selection.select_files(file_paths, resolver)
 
     return files, errors, use_stdin
 
@@ -307,17 +274,11 @@ def check_files(*, args: argparse.Namespace, settings_context: CheckRunContext) 
         rule_selections[profile_key] = selected_rules
         errors.extend(selected_rules.errors)
 
-    if use_stdin:
-        if len(files.accepted_paths) > 1:
-            raise AssertionError(f"Expect at most one accepted path when using stdin: {files.accepted_paths}")
+    if use_stdin and len(files.accepted_paths) > 1:
+        raise AssertionError(f"Expect at most one accepted path when using stdin: {files.accepted_paths}")
 
     results = format_selected_files(
-        files.selected_files,
-        rule_selections=rule_selections,
-        use_stdin=use_stdin,
-        fix=args.fix or args.diff,
-        write=not args.diff,
-        parallelism=settings_context.cwd_settings.parallelism,
+        files.selected_files, rule_selections=rule_selections, use_stdin=use_stdin, fix=args.fix or args.diff, write=not args.diff, parallelism=settings_context.cwd_settings.parallelism
     )
 
     if use_stdin and args.fix and not args.diff and results:
@@ -338,14 +299,14 @@ def check_files(*, args: argparse.Namespace, settings_context: CheckRunContext) 
 
     if args.exit_zero:
         return 0
-    elif args.diff and any(result.modified for result in results):
+    if (
+        (args.diff and any(result.modified for result in results))
+        or errors
+        or any(result.errors or result.unfixed_findings for result in results)
+        or (args.fix and args.exit_non_zero_on_fix and any(result.modified for result in results))
+    ):
         return 1
-    elif errors or any(result.errors or result.unfixed_findings for result in results):
-        return 1
-    elif args.fix and args.exit_non_zero_on_fix and any(result.modified for result in results):
-        return 1
-    else:
-        return 0
+    return 0
 
 
 @contextlib.contextmanager
@@ -368,15 +329,13 @@ def output_stream(output_file: str | None) -> Iterator[TextIO | None]:
     parent = os.path.dirname(output_file)
     try:
         if parent:
-            try:
+            with contextlib.suppress(FileExistsError):
                 os.mkdir(parent)
-            except FileExistsError:
-                pass
-        file = open(output_file, "w", encoding="utf-8", newline="")
+        output = open(output_file, "w", encoding="utf-8", newline="")  # noqa: SIM115
     except OSError as error:
         raise OutputError(str(error)) from error
-    with file:
-        yield file
+    with output:
+        yield output
 
 
 def resolve_parallelism(parallelism: float) -> int:
@@ -405,18 +364,10 @@ def _process_pool_worker_count(parallelism: float, selected_file_count: int) -> 
     return workers
 
 
-def _format_selected_file_worker(
-    request: _SelectedFileFormatRequest,
-) -> FormatterResult:
+def _format_selected_file_worker(request: _SelectedFileFormatRequest) -> FormatterResult:
     """Format one disk-backed selected file."""
     selected_file = request.selected_file
-    return formatter.format_file(
-        selected_file.path,
-        settings=request.settings,
-        rule_selection=request.rule_selection,
-        fix=request.fix,
-        write=request.write,
-    )
+    return formatter.format_file(selected_file.path, settings=request.settings, rule_selection=request.rule_selection, fix=request.fix, write=request.write)
 
 
 def format_selected_files(
@@ -455,16 +406,7 @@ def format_selected_files(
         selected_file = selected_files[0]
         effective_profile = settings_check.effective_profile_for_path(selected_file.profile, selected_file.path)
         rule_selection = rule_selections[selected_file.profile.key()]
-        return [
-            formatter.format_file(
-                selected_file.path,
-                file=sys.stdin,
-                settings=effective_profile.settings,
-                rule_selection=rule_selection,
-                fix=fix,
-                write=write,
-            )
-        ]
+        return [formatter.format_file(selected_file.path, file=sys.stdin, settings=effective_profile.settings, rule_selection=rule_selection, fix=fix, write=write)]
 
     workers = _process_pool_worker_count(parallelism, len(selected_files))
     requests = tuple(
@@ -482,13 +424,7 @@ def format_selected_files(
 
     ordered_results: list[FormatterResult | None] = [None] * len(selected_files)
     with executor_factory(max_workers=workers) as executor:
-        futures = {
-            executor.submit(
-                _format_selected_file_worker,
-                request,
-            ): index
-            for index, request in enumerate(requests)
-        }
+        futures = {executor.submit(_format_selected_file_worker, request): index for index, request in enumerate(requests)}
         for future in concurrent.futures.as_completed(futures):
             ordered_results[futures[future]] = future.result()
 
@@ -609,13 +545,7 @@ def print_diff_results(results: list[FormatterResult], *, output: TextIO | None)
     for result in results:
         if not result.modified or result.old_source is None or result.new_source is None:
             continue
-        lines = difflib.unified_diff(
-            result.old_source.splitlines(keepends=True),
-            result.new_source.splitlines(keepends=True),
-            fromfile=result.path,
-            tofile=result.path,
-            lineterm="",
-        )
+        lines = difflib.unified_diff(result.old_source.splitlines(keepends=True), result.new_source.splitlines(keepends=True), fromfile=result.path, tofile=result.path, lineterm="")
         if output is None and lines and not printed_sep:
             print()
             printed_sep = True

@@ -1,16 +1,17 @@
+# Third-party imports
 import libcst as cst
-import libcst.metadata as cst_metadata
 import pytest
+import libcst.metadata as cst_metadata
 
-import pydocformatter.formatter as formatter
-import pydocformatter.rules.definition_helpers.source_text as source_text
-import pydocformatter.rules_selection as rules_selection
-import tests.rule_helpers as rule_helpers
+# First-party imports
+from pydocformatter import formatter, rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention, LineEnding
 from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
+from pydocformatter.rules.definition_helpers import source_text
 from pydocformatter.rules.definitions.PDF.PDF import PDF
 from pydocformatter.rules.definitions.PDF.PDF101_docstring_reflow import PDF101DocstringReflow
 from pydocformatter.rules.definitions.PDF.PDF110_one_line_docstring import PDF110OneLineDocstring
+from tests import rule_helpers
 
 
 def contexts(source: str, *, settings: CheckSettings | None = None) -> tuple[RuleCategoryContext, RuleContext]:
@@ -181,12 +182,12 @@ def test_disabled_structure_parsing_can_make_structural_line_collapsible() -> No
 
 @pytest.mark.parametrize(
     ("settings", "content", "expected"),
-    (
+    [
         (CheckSettings(select=("PDF110",), docstring_parse_headings=False), "# Heading", 'def function():\n    """# Heading"""\n'),
         (CheckSettings(select=("PDF110",), docstring_parse_directives=False), ".. note:: Title", 'def function():\n    """.. note:: Title"""\n'),
         (CheckSettings(select=("PDF110",), docstring_parse_block_quotes=False), "> quote", 'def function():\n    """> quote"""\n'),
         (CheckSettings(select=("PDF110",), docstring_parse_doctests=False, docstring_parse_block_quotes=False), ">>> call()", 'def function():\n    """>>> call()"""\n'),
-    ),
+    ],
 )
 def test_disabled_single_line_structure_parsing_can_make_structure_collapsible(settings: CheckSettings, content: str, expected: str) -> None:
     source = f'def function():\n    """\n    {content}\n    """\n'

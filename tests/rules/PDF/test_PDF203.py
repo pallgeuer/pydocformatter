@@ -1,17 +1,18 @@
+# Third-party imports
 import libcst as cst
-import libcst.metadata as cst_metadata
 import pytest
+import libcst.metadata as cst_metadata
 
-import pydocformatter.formatter as formatter
-import pydocformatter.rules.definition_helpers.source_text as source_text
-import pydocformatter.rules_selection as rules_selection
-import tests.rule_helpers as rule_helpers
+# First-party imports
+from pydocformatter import formatter, rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention
 from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
+from pydocformatter.rules.definition_helpers import source_text
 from pydocformatter.rules.definitions.PDF.PDF import PDF
 from pydocformatter.rules.definitions.PDF.PDF101_docstring_reflow import PDF101DocstringReflow
 from pydocformatter.rules.definitions.PDF.PDF201_missing_blank_line import PDF201MissingBlankLine
 from pydocformatter.rules.definitions.PDF.PDF203_summary_too_long import PDF203SummaryTooLong
+from tests import rule_helpers
 
 
 def contexts(source: str, *, settings: CheckSettings | None = None) -> tuple[RuleCategoryContext, RuleContext]:
@@ -146,14 +147,14 @@ def test_disabled_code_fence_parsing_can_make_fence_text_reportable() -> None:
 
 @pytest.mark.parametrize(
     ("settings", "content", "expected_lines"),
-    (
+    [
         (CheckSettings(select=("PDF203",), docstring_parse_headings=False), "# Heading\n    Continuation.", (2, 3)),
         (CheckSettings(select=("PDF203",), docstring_parse_directives=False), ".. note:: Title\n    Continuation.", (2, 3)),
         (CheckSettings(select=("PDF203",), docstring_parse_list_items=False), "- item\n    Continuation.", (2, 3)),
         (CheckSettings(select=("PDF203",), docstring_parse_block_quotes=False), "> quote\n    > continuation", (2, 3)),
         (CheckSettings(select=("PDF203",), docstring_parse_tables=False), "| A | B |\n    | --- | --- |\n    | 1 | 2 |", (2, 3, 4)),
         (CheckSettings(select=("PDF203",), docstring_parse_doctests=False, docstring_parse_block_quotes=False), ">>> call()\n    result", (2, 3)),
-    ),
+    ],
 )
 def test_disabled_structure_parsing_can_make_first_block_reportable(settings: CheckSettings, content: str, expected_lines: tuple[int, ...]) -> None:
     source = f'def function():\n    """{content}\n    """\n'

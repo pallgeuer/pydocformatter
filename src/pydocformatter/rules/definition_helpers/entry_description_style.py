@@ -1,18 +1,24 @@
 """Entry-description style targets and fixes."""
 
+# Future imports
 from __future__ import annotations
 
-import dataclasses
+# Standard library imports
 import re
+import dataclasses
+from typing import TYPE_CHECKING
 
-import pydocformatter.rules.definition_helpers.docstring_sections as docstring_sections
-import pydocformatter.rules.definition_helpers.first_word_capitalization as first_word_capitalization
-import pydocformatter.rules.definition_helpers.terminal_punctuation as terminal_punctuation
-import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
+# First-party imports
 import pydocformatter.rules.edits as rule_edits
 import pydocformatter.rules.violations as rule_violations
-from pydocformatter.rules.definition import RuleContext
-from pydocformatter.rules.models import RuleMetadata
+import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
+from pydocformatter.rules.definition_helpers import docstring_sections, first_word_capitalization, terminal_punctuation
+
+
+if TYPE_CHECKING:
+    # First-party imports
+    from pydocformatter.rules.definition import RuleContext
+    from pydocformatter.rules.models import RuleMetadata
 
 
 @dataclasses.dataclass(frozen=True)
@@ -64,15 +70,7 @@ class _SourceSafeReplacementPlanner:
         data = PDF_definition.PDF.require_data(context)
         self._maps = data._entry_description_source_maps
 
-    def planned_replacement(
-        self,
-        target: EntryDescriptionLineTarget,
-        *,
-        start_offset: int,
-        end_offset: int,
-        replacement: str,
-        expected_source: str | None,
-    ) -> rule_edits.PlannedSourceChange | None:
+    def planned_replacement(self, target: EntryDescriptionLineTarget, *, start_offset: int, end_offset: int, replacement: str, expected_source: str | None) -> rule_edits.PlannedSourceChange | None:
         """Return a direct source replacement for a source-safe evaluated replacement."""
         if not PDF_definition.simple_docstring_replacement_is_source_safe(target.docstring, replacement):
             return None
@@ -83,10 +81,7 @@ class _SourceSafeReplacementPlanner:
             return None
         line_numbers = line_numbers_for_offsets(target, start_offset=start_offset, end_offset=end_offset)
         return rule_edits.PlannedSourceChange(
-            edit=rule_edits.SourceEdit(
-                range=source_map.source_range(start_offset=start_offset, end_offset=end_offset, line_bounds=self.line_bounds),
-                replacement=replacement,
-            ),
+            edit=rule_edits.SourceEdit(range=source_map.source_range(start_offset=start_offset, end_offset=end_offset, line_bounds=self.line_bounds), replacement=replacement),
             line_numbers=line_numbers,
             suppression_line_numbers=(),
         )
@@ -237,12 +232,7 @@ def _should_check_entry(entry: PDF_definition.DocstringEntry) -> bool:
 
 
 def _punctuation_violation(
-    target: EntryDescriptionLineTarget,
-    *,
-    context: RuleContext,
-    rule: RuleMetadata,
-    policy: terminal_punctuation.TerminalPunctuationPolicy,
-    planner: _SourceSafeReplacementPlanner,
+    target: EntryDescriptionLineTarget, *, context: RuleContext, rule: RuleMetadata, policy: terminal_punctuation.TerminalPunctuationPolicy, planner: _SourceSafeReplacementPlanner
 ) -> rule_violations.RuleViolation | None:
     """Return one entry-description punctuation violation."""
     return terminal_punctuation.violation(
@@ -255,13 +245,7 @@ def _punctuation_violation(
 
 
 def _planned_replacement(
-    target: EntryDescriptionLineTarget,
-    *,
-    start_offset: int,
-    end_offset: int,
-    replacement: str,
-    context: RuleContext,
-    planner: _SourceSafeReplacementPlanner,
+    target: EntryDescriptionLineTarget, *, start_offset: int, end_offset: int, replacement: str, context: RuleContext, planner: _SourceSafeReplacementPlanner
 ) -> rule_edits.PlannedSourceChange | None:
     """Return a safe source change for one entry description fragment replacement."""
     docstring = target.docstring
@@ -278,16 +262,7 @@ def _planned_replacement(
     line_end = end_offset - line.start_offset
     value_lines = [structure_line.raw_text for structure_line in docstring.structure.lines]
     value_lines[line.index] = f"{line.raw_text[:line_start]}{replacement}{line.raw_text[line_end:]}"
-    replacement_edit = rule_edits.PlannedTextReplacement(
-        start_offset=start_offset,
-        end_offset=end_offset,
-        text=replacement,
-        line_numbers=line_numbers(target),
-    )
+    replacement_edit = rule_edits.PlannedTextReplacement(start_offset=start_offset, end_offset=end_offset, text=replacement, line_numbers=line_numbers(target))
     return PDF_definition.planned_simple_docstring_text_change(
-        docstring,
-        context=context,
-        replacement=replacement_edit,
-        expected_value=PDF_definition.join_docstring_value_lines(docstring, value_lines),
-        expected_source=expected_source,
+        docstring, context=context, replacement=replacement_edit, expected_value=PDF_definition.join_docstring_value_lines(docstring, value_lines), expected_source=expected_source
     )

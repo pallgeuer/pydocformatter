@@ -41,22 +41,22 @@ Please provide a clear list of changes made:
 
 ```bash
 # Add the commands you used to test your changes. Pytest uses project-default xdist multiprocessing.
+# uv run ruff check
+# uv run pydocfmt check
+# uv run ruff format --check
+# uv run ty check
 # uv run pytest -q
-# uv run pytest -n 0 -q  # serial debugging or focused-run speed
-# uv run black --check .
-# uv run isort --check .
-# uv run pydocfmt --check
-# uv run mypy
+# uv run pytest -n 0 -q  # <-- For serial debugging or focused-run speed
 # uv run pre-commit run --all-files
 ```
 
 ## Formatting and Style
 
 - [ ] Code follows the project's style guidelines
-- [ ] `black` formatting applied
-- [ ] `isort` import sorting applied
-- [ ] `pydocfmt` docstring and comment formatting applied
-- [ ] `mypy` type checks pass
+- [ ] `ruff` lint checks pass
+- [ ] `pydocfmt` docstring and comment checks pass
+- [ ] `ruff` formatting applied
+- [ ] `ty` type checks pass
 - [ ] Pre-commit hooks pass
 
 ## Documentation

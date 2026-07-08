@@ -5,11 +5,18 @@ Attributes:
         back to slices.
 """
 
+# Future imports
 from __future__ import annotations
 
+# Standard library imports
 from collections.abc import Sequence
+from typing import TYPE_CHECKING
 
-import libcst.metadata as cst_metadata
+
+if TYPE_CHECKING:
+    # Third-party imports
+    import libcst.metadata as cst_metadata
+
 
 LineBounds = tuple[tuple[int, int], ...]
 

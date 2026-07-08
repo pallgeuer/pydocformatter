@@ -1,11 +1,20 @@
 """Function decorator policy helpers."""
 
+# Future imports
 from __future__ import annotations
 
-import pydocformatter.cli.settings_check as settings_check
-import pydocformatter.rules.definition_helpers.static_names as static_names
+# Standard library imports
+from typing import TYPE_CHECKING
+
+# First-party imports
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
-from pydocformatter.rules.definition import RuleContext
+from pydocformatter.rules.definition_helpers import static_names
+
+
+if TYPE_CHECKING:
+    # First-party imports
+    from pydocformatter.cli import settings_check
+    from pydocformatter.rules.definition import RuleContext
 
 
 def matched_function_decorator(definition: PDF_definition.DefinitionInfo, decorator_names: tuple[str, ...], *, context: RuleContext) -> str | None:

@@ -1,7 +1,19 @@
-import pydocformatter.formatter as formatter
+# Future imports
+from __future__ import annotations
+
+# Standard library imports
+from typing import TYPE_CHECKING
+
+# First-party imports
 import tests.rules.PDF.helpers as pdf_helpers
-from pydocformatter.cli.settings_check import CheckSettings
 from pydocformatter.rules.definitions.PDF.PDF522_private_class_attribute_docstring_must_be_owner import PDF522PrivateClassAttributeDocstringMustBeOwner
+
+
+if TYPE_CHECKING:
+    # First-party imports
+    from pydocformatter import formatter
+    from pydocformatter.cli.settings_check import CheckSettings
+
 
 format_source = pdf_helpers.formatter_for("PDF522")
 

@@ -4,20 +4,28 @@ Attributes:
     MissingOwnerDocumentationEntity (TypeAlias): Supported owner kinds for missing docstring policies.
 """
 
+# Future imports
 from __future__ import annotations
 
-import dataclasses
-import pathlib
+# Standard library imports
 import typing
+import pathlib
+import dataclasses
 
+# Third-party imports
 import libcst as cst
 
-import pydocformatter.rules.definition_helpers.function_decorators as function_decorators
-import pydocformatter.rules.definition_helpers.missing_documentation as missing_documentation
-import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
-import pydocformatter.rules.models as rule_models
+# First-party imports
 import pydocformatter.rules.violations as rule_violations
-from pydocformatter.rules.definition import RuleContext
+import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
+from pydocformatter.rules.definition_helpers import function_decorators, missing_documentation
+
+
+if typing.TYPE_CHECKING:
+    # First-party imports
+    import pydocformatter.rules.models as rule_models
+    from pydocformatter.rules.definition import RuleContext
+
 
 MissingOwnerDocumentationEntity = typing.Literal["package", "module", "class", "nested-class", "function", "method", "dunder-method", "init"]
 

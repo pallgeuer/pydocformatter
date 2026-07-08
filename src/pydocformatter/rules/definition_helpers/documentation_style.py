@@ -1,12 +1,20 @@
 """Documentation wording style helpers."""
 
+# Future imports
 from __future__ import annotations
 
-import dataclasses
+# Standard library imports
 import re
+import dataclasses
+from typing import TYPE_CHECKING
 
+# First-party imports
 import pydocformatter.rules.violations as rule_violations
-from pydocformatter.rules.models import RuleMetadata
+
+
+if TYPE_CHECKING:
+    # First-party imports
+    from pydocformatter.rules.models import RuleMetadata
 
 
 @dataclasses.dataclass(frozen=True)
@@ -81,12 +89,7 @@ def is_too_generic(name: str, description: str, *, policy: DocumentedValueStyleP
 
 def _generic_sequences(name_tokens: tuple[str, ...], *, nouns: frozenset[str]) -> frozenset[tuple[str, ...]]:
     """Return exact token sequences considered generic for a documented name."""
-    sequences: set[tuple[str, ...]] = {
-        name_tokens,
-        ("the", *name_tokens),
-        ("value", "of", *name_tokens),
-        ("the", "value", "of", *name_tokens),
-    }
+    sequences: set[tuple[str, ...]] = {name_tokens, ("the", *name_tokens), ("value", "of", *name_tokens), ("the", "value", "of", *name_tokens)}
     for noun in nouns:
         sequences.add((*name_tokens, noun))
         sequences.add(("the", *name_tokens, noun))

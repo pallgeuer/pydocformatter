@@ -3,7 +3,7 @@
 [![CI](https://github.com/pallgeuer/pydocformatter/actions/workflows/unit-tests.yml/badge.svg)](https://github.com/pallgeuer/pydocformatter/actions)
 [![CI](https://github.com/pallgeuer/pydocformatter/actions/workflows/pre-commit-checks.yml/badge.svg)](https://github.com/pallgeuer/pydocformatter/actions)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/release/python-3110/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: GPL-3.0-or-later](https://img.shields.io/badge/License-GPL--3.0--or--later-blue.svg)](https://www.gnu.org/licenses/gpl-3.0.html)
 
 **pydocformatter** provides a Ruff-style Python formatter, `pydocfmt`, for formatting docstrings and comments. It is designed to be maximally compatible with [Ruff](https://docs.astral.sh/ruff/).
 
@@ -325,38 +325,40 @@ def calculate_mean(numbers):
 
 ### Pre-commit
 
-Add pydocformatter to your `.pre-commit-config.yaml`:
+External projects can use the published pydocformatter hooks. Choose either the fixing hook or the read-only check hook:
 
 ```yaml
 repos:
   - repo: https://github.com/pallgeuer/pydocformatter
     rev: v1.0.0
     hooks:
-      - id: pydocfmt
-        args: [--line-length=88]
+      - id: pydocfmt-fix
+      # - id: pydocfmt-check
 ```
 
 **Available hooks:**
-- `pydocfmt`: Format docstrings and comments (modifies files)
+- `pydocfmt-fix`: Format and check docstrings and comments (modifies files)
 - `pydocfmt-check`: Check docstring and comment formatting (read-only)
 
-**Common configurations:**
+Projects that manage pydocformatter through their own uv environment can instead use local system hooks. Choose one hook:
 
 ```yaml
-# Basic usage
-- id: pydocfmt
-
-# Custom line length
-- id: pydocfmt
-  args: [--line-length=100]
-
-# Check only (for CI)
-- id: pydocfmt-check
-
-# With file exclusions
-- id: pydocfmt
-  args: [--exclude, tests]
+repos:
+  - repo: local
+    hooks:
+      - id: pydocfmt-fix
+        name: pydocfmt (fix)
+        entry: uv run pydocfmt check --fix --force-exclude
+        language: system
+        types: [python]
+      # - id: pydocfmt-check
+      #   name: pydocfmt (check)
+      #   entry: uv run pydocfmt check --force-exclude
+      #   language: system
+      #   types: [python]
 ```
+
+Prefer using a Python project's `pyproject.toml` to statically configure `pydocfmt`, as opposed to requiring certain arguments to be passed to every invocation in order for it to do the right thing.
 
 ---
 
@@ -377,7 +379,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the GNU General Public License v3.0 or later - see the [LICENSE.md](LICENSE.md) file for details.
 
 ---
 

@@ -40,7 +40,7 @@ class Client:
     """Class attribute docstring."""
 
     def __init__(self, enabled):
-        self.instance_value = 1; """Same-line instance attribute docstring."""
+        self.instance_value = 1; """Same-line instance attribute docstring."""  # fmt: skip
         self.instance_primary, _ = values
         """Tuple-unpacked instance attribute docstring."""
         if enabled:

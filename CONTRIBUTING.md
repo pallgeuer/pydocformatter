@@ -68,7 +68,7 @@ uv run pre-commit run --all-files
 
 **Dependency pinning note:**
 - All dependencies in `dependency-groups.test` and `dependency-groups.dev` in `pyproject.toml` must use exact pins (`name==version`).
-- The `black`, `isort`, and `mypy` versions in `dependency-groups.dev` must exactly match the corresponding `rev` values in `.pre-commit-config.yaml` (ignoring an optional `v` prefix).
+- The `pre-commit`, `ruff`, and `ty` dependencies in `dependency-groups.dev` must stay pinned because local hooks run them from the locked project environment.
 
 ### 4. Verify Installation
 
@@ -159,6 +159,7 @@ uv run pytest -n 0 -q
 ```python
 from pydocformatter.your_module import your_function  # noqa
 
+
 def test_normal_case() -> None:
     """Test the normal expected behavior."""
     input_data = "test input"
@@ -175,34 +176,34 @@ def test_edge_case() -> None:
 
 ## Code Style
 
-We use several tools to maintain code quality:
+We use several tools to maintain code quality (also via automated pre-commit checks):
 
 ### Automated Formatting
-- **Black:** Code formatting
-- **isort:** Import sorting
+- **Ruff:** Code formatting
 - **pydocfmt:** Docstring and comment formatting (our own tool)
 
 ### Code Quality
-- **MyPy:** Type checking
-- **Pre-commit:** Automated checks
+- **Ruff:** Code linting
+- **pydocfmt:** Docstring and comment checking (our own tool)
+- **ty:** Type checking
 
 ### Running Style Checks
 
 ```bash
-# Format code
-uv run black .
-uv run isort .
+# Lint and format code
+uv run ruff check --fix
 uv run pydocfmt check --fix
+uv run ruff format
 
-# Check formatting without changes
-uv run black --check .
-uv run isort --check .
+# Check linter and formatter findings without making changes
+uv run ruff check
 uv run pydocfmt check
+uv run ruff format --check
 
 # Type checking
-uv run mypy
+uv run ty check
 
-# Run the full local hook suite
+# Run the full local hook suite (includes the above)
 uv run pre-commit run --all-files
 ```
 

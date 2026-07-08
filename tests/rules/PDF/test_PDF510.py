@@ -1,9 +1,11 @@
+# Standard library imports
 import pathlib
 
+# Third-party imports
 import pytest
 
-import pydocformatter.formatter as formatter
-import pydocformatter.rules_selection as rules_selection
+# First-party imports
+from pydocformatter import formatter, rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention, DocstringMissingDocumentation
 from pydocformatter.rules.definitions.PDF.PDF510_missing_public_module_attribute_documentation import PDF510MissingPublicModuleAttributeDocumentation
 
@@ -107,10 +109,7 @@ def test_private_module_path_is_skipped_by_public_only_but_checked_when_disabled
     assert_pdf510_lines(source, ((8,),), path="package/public.py")
     assert_pdf510_lines(source, (), path="_package/__init__.py")
     assert_pdf510_lines(
-        source,
-        ((8,),),
-        settings=CheckSettings(select=("PDF510",), docstring_convention=DocstringConvention.GOOGLE, docstring_missing_documentation_public_only=False),
-        path="_internal.py",
+        source, ((8,),), settings=CheckSettings(select=("PDF510",), docstring_convention=DocstringConvention.GOOGLE, docstring_missing_documentation_public_only=False), path="_internal.py"
     )
 
 
@@ -158,9 +157,7 @@ def test_all_docstrings_policy_reports_summary_only_public_module_docstring() ->
 
     assert_pdf510_lines(source, (), settings=CheckSettings(select=("PDF510",), docstring_convention=DocstringConvention.GOOGLE))
     assert_pdf510_lines(
-        source,
-        ((3,),),
-        settings=CheckSettings(select=("PDF510",), docstring_convention=DocstringConvention.GOOGLE, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS),
+        source, ((3,),), settings=CheckSettings(select=("PDF510",), docstring_convention=DocstringConvention.GOOGLE, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS)
     )
 
 
@@ -169,16 +166,8 @@ def test_inert_conventions_do_not_report_broad_module_missing_policies() -> None
     body = '"""Client defaults.\n\nUsed by the transport layer.\n"""\n\ntimeout: float\n'
 
     for convention in (DocstringConvention.NONE, DocstringConvention.PEP257):
-        assert_pdf510_lines(
-            summary,
-            (),
-            settings=CheckSettings(select=("PDF510",), docstring_convention=convention, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS),
-        )
-        assert_pdf510_lines(
-            body,
-            (),
-            settings=CheckSettings(select=("PDF510",), docstring_convention=convention, docstring_missing_documentation=DocstringMissingDocumentation.NON_SUMMARY_DOCSTRINGS),
-        )
+        assert_pdf510_lines(summary, (), settings=CheckSettings(select=("PDF510",), docstring_convention=convention, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS))
+        assert_pdf510_lines(body, (), settings=CheckSettings(select=("PDF510",), docstring_convention=convention, docstring_missing_documentation=DocstringMissingDocumentation.NON_SUMMARY_DOCSTRINGS))
 
 
 def test_multi_target_assignment_reports_only_undocumented_targets_on_shared_line() -> None:

@@ -1,7 +1,9 @@
+# Third-party imports
 import pytest
 
-import pydocformatter.rules.definition_helpers.comments as comment_helpers
+# First-party imports
 import tests.rules.PCF.helpers as pcf_helpers
+import pydocformatter.rules.definition_helpers.comments as comment_helpers
 from pydocformatter.cli.settings_check import CheckSettings, CommentTaskMarkerMode, LineEnding
 
 
@@ -120,13 +122,13 @@ def test_ordered_nested_list_item_consumes_more_indented_continuation_lines() ->
 
 @pytest.mark.parametrize(
     ("source", "settings"),
-    (
+    [
         ("## Heading\n# ordinary prose\n", CheckSettings(select=("PCF",), line_length=20, comment_preserve_headings=True)),
         ("# >>> value = function()\n# expected output\n", CheckSettings(select=("PCF",), line_length=20, comment_preserve_doctests=True)),
         ("# ```python\n# value = function()\n# ```\n", CheckSettings(select=("PCF",), line_length=20, comment_preserve_code_fences=True)),
         ("# Name | Value\n# ---- | -----\n# one  | two\n", CheckSettings(select=("PCF",), line_length=20, comment_preserve_tables=True)),
         ("# .. note::\n#    preserved directive body\n# ordinary prose\n", CheckSettings(select=("PCF",), line_length=20, comment_preserve_directives=True)),
-    ),
+    ],
 )
 def test_enabled_structure_detectors_preserve_recognized_regions(source: str, settings: CheckSettings) -> None:
     result = pcf_helpers.format_pcf_settings(source, settings=settings)
@@ -144,13 +146,13 @@ def test_preserved_structure_code_does_not_prevent_adjacent_prose_formatting() -
 
 @pytest.mark.parametrize(
     ("source", "expected"),
-    (
+    [
         ("# ## Preserved heading\n# prose after heading with enough words to wrap\n", "# ## Preserved heading\n# prose after heading\n# with enough words to\n# wrap\n"),
         (
             "# Name | Value\n# ---- | -----\n# one  | two\n# prose after table with enough words to wrap\n",
             "# Name | Value\n# ---- | -----\n# one  | two\n# prose after table with\n# enough words to wrap\n",
         ),
-    ),
+    ],
 )
 def test_comments_after_preserved_standalone_structures_resume_formatting(source: str, expected: str) -> None:
     assert pcf_helpers.format_pcf(source, line_length=24, comment_detect_statements=False).new_source == expected
@@ -174,16 +176,13 @@ def test_disabled_code_detection_protects_the_whole_physical_run() -> None:
 
 @pytest.mark.parametrize(
     ("source", "settings"),
-    (
-        (
-            "# value = compute()\n# prose that would otherwise wrap onto another line\n",
-            CheckSettings(select=("PCF",), line_length=30, comment_detect_code=False, comment_detect_statements=True),
-        ),
+    [
+        ("# value = compute()\n# prose that would otherwise wrap onto another line\n", CheckSettings(select=("PCF",), line_length=30, comment_detect_code=False, comment_detect_statements=True)),
         (
             "# package.function(value)\n# prose that would otherwise wrap onto another line\n",
             CheckSettings(select=("PCF",), line_length=30, comment_detect_code=False, comment_detect_expressions=True),
         ),
-    ),
+    ],
 )
 def test_enabled_ast_code_detection_protects_the_whole_run(source: str, settings: CheckSettings) -> None:
     disabled = pcf_helpers.format_pcf(source, line_length=30, comment_detect_code=False, comment_detect_statements=False, comment_detect_expressions=False)
@@ -203,14 +202,14 @@ def test_comment_edits_preserve_untouched_mixed_endings_and_use_configured_gener
 
 @pytest.mark.parametrize(
     ("source", "line_length", "expected"),
-    (
+    [
         ("#bad spacing   \n", 80, "# bad spacing\n"),
         ("#    excessive leading and trailing spacing    \n", 80, "# excessive leading and trailing spacing\n"),
         ("    #indented comment", 80, "    # indented comment"),
         ("# supercalifragilisticexpialidocious", 12, "# supercalifragilisticexpialidocious"),
         ("# alpha-beta-gamma-delta", 12, "# alpha-beta-gamma-delta"),
         ("#\n#   \n##\n###   \n", 12, "#\n#   \n##\n###   \n"),
-    ),
+    ],
 )
 def test_standalone_spacing_long_tokens_hash_boundaries_and_eof_are_stable(source: str, line_length: int, expected: str) -> None:
     assert pcf_helpers.format_pcf(source, line_length=line_length).new_source == expected
@@ -244,13 +243,13 @@ def test_ty_file_level_directive_is_not_joined_with_standalone_prose() -> None:
 
 @pytest.mark.parametrize(
     ("marker", "expected"),
-    (
+    [
         ("-", "# - alpha beta gamma\n#   delta epsilon\n"),
         ("+", "# + alpha beta gamma\n#   delta epsilon\n"),
         ("*", "# * alpha beta gamma\n#   delta epsilon\n"),
         ("1.", "# 1. alpha beta\n#    gamma delta\n#    epsilon\n"),
         ("27)", "# 27) alpha beta\n#     gamma delta\n#     epsilon\n"),
-    ),
+    ],
 )
 def test_all_supported_list_markers_use_hanging_indentation(marker: str, expected: str) -> None:
     source = f"# {marker} alpha beta gamma delta epsilon\n"
@@ -288,7 +287,7 @@ def test_block_quote_formatting_can_be_disabled_and_then_uses_plain_wrapping() -
     assert result.new_source == "# > alpha beta\n# gamma delta\n"
 
 
-@pytest.mark.parametrize("marker", ("TODO", "FIXME", "XXX", "HACK", "BUG", "DEBUG", "NOTE", "OPTIMIZE", "REVIEW"))
+@pytest.mark.parametrize("marker", ["TODO", "FIXME", "XXX", "HACK", "BUG", "DEBUG", "NOTE", "OPTIMIZE", "REVIEW"])
 def test_task_marker_comments_use_hanging_indentation(marker: str) -> None:
     source = f"#{marker}: alpha beta gamma delta epsilon zeta eta theta iota kappa lambda\n"
     result = pcf_helpers.format_pcf(source, line_length=28, comment_task_marker_mode=CommentTaskMarkerMode.HANGING, comment_detect_statements=False)
@@ -375,15 +374,7 @@ def test_task_marker_expression_like_payload_follows_expression_detection_settin
     assert expression_aware.new_source == '# TODO: very_long(code="line", that="should_not_wrap")\n'
 
 
-@pytest.mark.parametrize(
-    "source",
-    (
-        "# # ATX heading\n",
-        "# ###### Deep heading\n",
-        "# Heading text\n# ------------\n",
-        "# ============\n# Heading text\n# ============\n",
-    ),
-)
+@pytest.mark.parametrize("source", ["# # ATX heading\n", "# ###### Deep heading\n", "# Heading text\n# ------------\n", "# ============\n# Heading text\n# ============\n"])
 def test_heading_variants_are_preserved(source: str) -> None:
     assert pcf_helpers.format_pcf(source, line_length=8, comment_preserve_headings=True).new_source == source
 
@@ -404,17 +395,17 @@ def test_doctest_preservation_starts_at_first_prompt_and_ends_at_run_boundary() 
 
 @pytest.mark.parametrize(
     ("source", "expected"),
-    (
+    [
         ("# ```python\n# code()\n# ````\n# prose after fence is long\n", "# ```python\n# code()\n# ````\n# prose after fence\n# is long\n"),
         ("# ~~~~\n# code()\n# ```\n# still fenced\n", "# ~~~~\n# code()\n# ```\n# still fenced\n"),
         ("# ```\n# unclosed code()\n# remains protected\n", "# ```\n# unclosed code()\n# remains protected\n"),
-    ),
+    ],
 )
 def test_fence_matching_handles_longer_closers_mismatched_markers_and_unclosed_fences(source: str, expected: str) -> None:
     assert pcf_helpers.format_pcf(source, line_length=20, comment_detect_statements=False).new_source == expected
 
 
-@pytest.mark.parametrize("fence", ("```", "~~~"))
+@pytest.mark.parametrize("fence", ["```", "~~~"])
 def test_fence_like_lines_with_trailing_text_do_not_close_preserved_regions(fence: str) -> None:
     source = f"# {fence}python\n# {fence}not-a-close\n# alpha beta gamma delta epsilon\n# {fence}\n"
     result = pcf_helpers.format_pcf(source, line_length=18, comment_preserve_code_fences=True, comment_preserve_headings=False, comment_detect_statements=False)
@@ -453,20 +444,20 @@ def test_directive_preservation_can_be_disabled() -> None:
 
 
 @pytest.mark.parametrize(
-    "code", ("if enabled:", "for item in items:", "while ready:", "def function():", "class Example:", "try:", "except ValueError:", "print(value)", "return value", "    indented_code()")
+    "code", ["if enabled:", "for item in items:", "while ready:", "def function():", "class Example:", "try:", "except ValueError:", "print(value)", "return value", "    indented_code()"]
 )
 def test_disabled_code_heuristic_recognizes_all_documented_forms(code: str) -> None:
     source = f"# {code}\n# prose that otherwise needs wrapping\n"
     assert pcf_helpers.format_pcf(source, line_length=24, comment_detect_code=True, comment_detect_statements=False).new_source == source
 
 
-@pytest.mark.parametrize("prose", ("different behavior is useful", "format values carefully", "classification matters", "printer output is useful", "returning values is useful"))
+@pytest.mark.parametrize("prose", ["different behavior is useful", "format values carefully", "classification matters", "printer output is useful", "returning values is useful"])
 def test_disabled_code_heuristic_requires_keyword_boundaries(prose: str) -> None:
     source = f"# {prose}\n"
     assert pcf_helpers.format_pcf(source, line_length=20, comment_detect_code=True, comment_detect_statements=False).new_source != source
 
 
-@pytest.mark.parametrize("statement", ("value = compute()", "import package", "from package import name", "for item in items:\n#     value = process(item)", "def function():\n#     return value"))
+@pytest.mark.parametrize("statement", ["value = compute()", "import package", "from package import name", "for item in items:\n#     value = process(item)", "def function():\n#     return value"])
 def test_statement_detection_recognizes_single_and_multiline_python(statement: str) -> None:
     source = f"# {statement}\n# prose that otherwise wraps\n"
     assert pcf_helpers.format_pcf(source, line_length=20, comment_detect_statements=True).new_source == source
@@ -478,14 +469,14 @@ def test_statement_detection_parses_a_multiline_candidate_when_individual_lines_
 
 
 @pytest.mark.parametrize(
-    "expression", ("package.function(value)", "value.attribute", "values[index]", "left + right", "left < right", "[item for item in values]", "{'key': value}", "lambda value: value")
+    "expression", ["package.function(value)", "value.attribute", "values[index]", "left + right", "left < right", "[item for item in values]", "{'key': value}", "lambda value: value"]
 )
 def test_expression_detection_recognizes_nontrivial_expressions(expression: str) -> None:
     source = f"# {expression}\n# prose that otherwise wraps\n"
     assert pcf_helpers.format_pcf(source, line_length=20, comment_detect_statements=False, comment_detect_expressions=True).new_source == source
 
 
-@pytest.mark.parametrize("expression", ("name", "123", "'text'", "None", "True"))
+@pytest.mark.parametrize("expression", ["name", "123", "'text'", "None", "True"])
 def test_expression_detection_excludes_bare_names_and_scalar_constants(expression: str) -> None:
     source = f"# {expression}\n# prose that otherwise requires wrapping\n"
     assert pcf_helpers.format_pcf(source, line_length=20, comment_detect_statements=False, comment_detect_expressions=True).new_source != source
@@ -614,26 +605,16 @@ def test_url_aware_wrapping_applies_to_standalone_block_quotes() -> None:
 
 @pytest.mark.parametrize(
     ("source", "line_length", "join_lines", "indent_width"),
-    (
+    [
         (
             "# first prose line with words\n# second prose line with words\n# - list item with continuation words\n#   more continuation words\n# > quote line with words\n# > another quote line\n",
             24,
             True,
             4,
         ),
-        (
-            "# ```python\n# value = compute()\n# ```\n# ordinary prose after fence that wraps\n",
-            22,
-            False,
-            4,
-        ),
-        (
-            "if enabled:\n\t# \t- alpha beta gamma delta\n\tpass\n",
-            20,
-            False,
-            4,
-        ),
-    ),
+        ("# ```python\n# value = compute()\n# ```\n# ordinary prose after fence that wraps\n", 22, False, 4),
+        ("if enabled:\n\t# \t- alpha beta gamma delta\n\tpass\n", 20, False, 4),
+    ],
 )
 def test_complex_standalone_formatting_is_idempotent(source: str, line_length: int, join_lines: bool, indent_width: int) -> None:
     first = pcf_helpers.format_pcf(source, line_length=line_length, comment_join_standalone_lines=join_lines, indent_width=indent_width)

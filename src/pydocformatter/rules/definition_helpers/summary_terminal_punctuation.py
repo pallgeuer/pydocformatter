@@ -1,13 +1,22 @@
 """Summary punctuation violation helpers."""
 
+# Future imports
 from __future__ import annotations
 
-import pydocformatter.rules.definition_helpers.terminal_punctuation as terminal_punctuation
-import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
+# Standard library imports
+from typing import TYPE_CHECKING
+
+# First-party imports
 import pydocformatter.rules.edits as rule_edits
-import pydocformatter.rules.violations as rule_violations
-from pydocformatter.rules.definition import RuleContext
-from pydocformatter.rules.models import RuleMetadata
+import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
+from pydocformatter.rules.definition_helpers import terminal_punctuation
+
+
+if TYPE_CHECKING:
+    # First-party imports
+    import pydocformatter.rules.violations as rule_violations
+    from pydocformatter.rules.definition import RuleContext
+    from pydocformatter.rules.models import RuleMetadata
 
 
 def results(context: RuleContext, *, rule: RuleMetadata, policy: terminal_punctuation.TerminalPunctuationPolicy) -> tuple[rule_violations.RuleViolation, ...]:
@@ -26,11 +35,7 @@ def results(context: RuleContext, *, rule: RuleMetadata, policy: terminal_punctu
 
 
 def result_for_target(
-    target: PDF_definition.SummaryLineTarget,
-    *,
-    context: RuleContext,
-    rule: RuleMetadata,
-    policy: terminal_punctuation.TerminalPunctuationPolicy,
+    target: PDF_definition.SummaryLineTarget, *, context: RuleContext, rule: RuleMetadata, policy: terminal_punctuation.TerminalPunctuationPolicy
 ) -> rule_violations.RuleViolation | None:
     """Return one summary-punctuation violation for a summary target.
 
@@ -47,11 +52,7 @@ def result_for_target(
     return terminal_punctuation.violation(text=target.line.text, policy=policy, rule=rule, line_numbers=line_numbers, planned_change=lambda: _planned_change(target, context=context))
 
 
-def _planned_change(
-    target: PDF_definition.SummaryLineTarget,
-    *,
-    context: RuleContext,
-) -> rule_edits.PlannedSourceChange | None:
+def _planned_change(target: PDF_definition.SummaryLineTarget, *, context: RuleContext) -> rule_edits.PlannedSourceChange | None:
     """Return a safe insertion of a period at the end of a trimmed target line."""
     docstring = target.docstring
     line = target.line
@@ -61,9 +62,6 @@ def _planned_change(
     value_lines = [line.raw_text for line in docstring.structure.lines]
     value_lines[line.index] = f"{line.raw_text[: insertion_offset - line.start_offset]}.{line.raw_text[insertion_offset - line.start_offset :]}"
     replacement = rule_edits.PlannedTextReplacement(
-        start_offset=insertion_offset,
-        end_offset=insertion_offset,
-        text=".",
-        line_numbers=PDF_definition.docstring_line_numbers(target.docstring, target.line),
+        start_offset=insertion_offset, end_offset=insertion_offset, text=".", line_numbers=PDF_definition.docstring_line_numbers(target.docstring, target.line)
     )
     return PDF_definition.planned_simple_docstring_source_change(docstring, context=context, replacements=(replacement,), value_lines=value_lines)

@@ -1,21 +1,31 @@
 """PDF107 multiline-opening-quotes-separate-line rule."""
 
+# Future imports
 from __future__ import annotations
 
+# Standard library imports
 from collections.abc import Sequence
+from typing import TYPE_CHECKING
 
+# Third-party imports
 import libcst as cst
 
-import pydocformatter.rules.definition_helpers.string_literals as string_literals
-import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
+# First-party imports
 import pydocformatter.rules.edits as rule_edits
-import pydocformatter.rules.registration as rule_registration
 import pydocformatter.rules.violations as rule_violations
+import pydocformatter.rules.registration as rule_registration
+import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.codes import RuleCode
-from pydocformatter.rules.definition import RuleBase, RuleContext
+from pydocformatter.rules.definition import RuleBase
+from pydocformatter.rules.definition_helpers import string_literals
 from pydocformatter.rules.definitions.PDF.PDF import PDF
 from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
+
+
+if TYPE_CHECKING:
+    # First-party imports
+    from pydocformatter.rules.definition import RuleContext
 
 
 @rule_registration.register_rule_to(PDF)
@@ -37,8 +47,7 @@ class PDF107MultilineOpeningQuotesSeparateLine(RuleBase):
                 setting="docstring_convention",
                 effects=(
                     RuleSettingEffectValues(
-                        effect=RuleSettingEffect.IGNORED,
-                        values=(DocstringConvention.NONE, DocstringConvention.PEP257, DocstringConvention.GOOGLE, DocstringConvention.NUMPY, DocstringConvention.REST),
+                        effect=RuleSettingEffect.IGNORED, values=(DocstringConvention.NONE, DocstringConvention.PEP257, DocstringConvention.GOOGLE, DocstringConvention.NUMPY, DocstringConvention.REST)
                     ),
                 ),
             ),
@@ -89,11 +98,7 @@ def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo, *, co
 
 
 def _planned_fast_body_change(
-    docstring: PDF_definition.DocstringInfo,
-    *,
-    context: RuleContext,
-    output_lines: tuple[PDF_definition.DocstringOutputLine, ...],
-    line_numbers: tuple[int, ...],
+    docstring: PDF_definition.DocstringInfo, *, context: RuleContext, output_lines: tuple[PDF_definition.DocstringOutputLine, ...], line_numbers: tuple[int, ...]
 ) -> rule_edits.PlannedSourceChange | None:
     """Return a validated replacement without decomposing the whole literal into value fragments."""
     if not isinstance(docstring.node, cst.SimpleString):

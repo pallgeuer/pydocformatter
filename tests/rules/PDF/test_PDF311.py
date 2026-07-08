@@ -1,12 +1,14 @@
+# Third-party imports
 import pytest
 
-import pydocformatter.formatter as formatter
-import pydocformatter.rules_selection as rules_selection
-import tests.rule_helpers as rule_helpers
+# First-party imports
 import tests.rules.PDF.helpers as pdf_helpers
+from pydocformatter import formatter, rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention
 from pydocformatter.rules.definitions.PDF.PDF302_non_imperative_summary import PDF302NonImperativeSummary
 from pydocformatter.rules.definitions.PDF.PDF311_property_docstring_starts_with_verb import PDF311PropertyDocstringStartsWithVerb
+from tests import rule_helpers
+
 
 contexts = pdf_helpers.contexts_for("PDF311")
 format_source = pdf_helpers.formatter_for("PDF311")
@@ -14,7 +16,7 @@ format_source = pdf_helpers.formatter_for("PDF311")
 
 @pytest.mark.parametrize(
     "summary",
-    (
+    [
         "Return the value.",
         "Returns the value.",
         "Get the value.",
@@ -25,7 +27,7 @@ format_source = pdf_helpers.formatter_for("PDF311")
         "Fetches the value.",
         "Retrieve the value.",
         "Retrieves the value.",
-    ),
+    ],
 )
 def test_reports_property_docstrings_that_start_with_disallowed_verbs(summary: str) -> None:
     source = f'class Example:\n    @property\n    def value(self):\n        """{summary}"""\n'
@@ -34,12 +36,12 @@ def test_reports_property_docstrings_that_start_with_disallowed_verbs(summary: s
     assert result.new_source == source
     assert not result.fixed_findings
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((4,),)
-    assert tuple(finding.message for finding in result.unfixed_findings) == (f'Property docstring should not start with a verb ("{summary.split()[0]}")',)
+    assert tuple(finding.message for finding in result.unfixed_findings) == (f'Property docstring should not start with a verb ("{summary.split(maxsplit=1)[0]}")',)
     assert not result.unfixed_findings[0].fixable
     assert PDF311PropertyDocstringStartsWithVerb.meta.name == "property-docstring-starts-with-verb"
 
 
-@pytest.mark.parametrize("summary", ("return the value.", "RETURN the value.", '"Returns" the value.', "(returns) the value.", "Returns: the value."))
+@pytest.mark.parametrize("summary", ["return the value.", "RETURN the value.", '"Returns" the value.', "(returns) the value.", "Returns: the value."])
 def test_verb_detection_is_case_insensitive_after_normalization(summary: str) -> None:
     source = f'class Example:\n    @property\n    def value(self):\n        """{summary}"""\n'
     result = format_source(source)
@@ -47,7 +49,7 @@ def test_verb_detection_is_case_insensitive_after_normalization(summary: str) ->
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((4,),)
 
 
-@pytest.mark.parametrize("summary", ("The value.", "Computed value.", "Use the value.", "Getter value.", "ReturnValue object."))
+@pytest.mark.parametrize("summary", ["The value.", "Computed value.", "Use the value.", "Getter value.", "ReturnValue object."])
 def test_accepts_property_docstrings_with_other_first_words(summary: str) -> None:
     source = f'class Example:\n    @property\n    def value(self):\n        """{summary}"""\n'
     result = format_source(source)
@@ -66,7 +68,7 @@ def test_applies_only_to_property_functions_and_skips_tests() -> None:
 
 @pytest.mark.parametrize(
     "decorator",
-    (
+    [
         "property",
         "builtins.property",
         "enum.property",
@@ -75,7 +77,7 @@ def test_applies_only_to_property_functions_and_skips_tests() -> None:
         "abc.abstractproperty",
         "types.DynamicClassAttribute",
         "types.DynamicClassAttribute()",
-    ),
+    ],
 )
 def test_reports_default_property_decorators(decorator: str) -> None:
     source = f'class Example:\n    @{decorator}\n    def value(self):\n        """Returns property value."""\n'
@@ -84,7 +86,7 @@ def test_reports_default_property_decorators(decorator: str) -> None:
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((4,),)
 
 
-@pytest.mark.parametrize("decorator", ("value.getter", "value.setter", "value.deleter"))
+@pytest.mark.parametrize("decorator", ["value.getter", "value.setter", "value.deleter"])
 def test_reports_property_accessor_decorators(decorator: str) -> None:
     source = f'class Example:\n    @{decorator}\n    def value(self):\n        """Returns property accessor value."""\n'
     result = format_source(source)
@@ -218,10 +220,7 @@ def test_combined_pdf302_and_pdf311_selection_keeps_property_and_method_findings
     settings = CheckSettings(select=("PDF302", "PDF311"))
     result = formatter.format_source(source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
 
-    assert {(finding.rule, finding.line_numbers) for finding in result.unfixed_findings} == {
-        (PDF302NonImperativeSummary.meta, (7,)),
-        (PDF311PropertyDocstringStartsWithVerb.meta, (4,)),
-    }
+    assert {(finding.rule, finding.line_numbers) for finding in result.unfixed_findings} == {(PDF302NonImperativeSummary.meta, (7,)), (PDF311PropertyDocstringStartsWithVerb.meta, (4,))}
 
 
 def test_check_and_fix_false_findings_agree() -> None:

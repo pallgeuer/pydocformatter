@@ -1,18 +1,22 @@
 """Display-width and balanced wrapping helpers."""
 
+# Future imports
 from __future__ import annotations
 
-import dataclasses
+# Standard library imports
 import re
 import textwrap
+import dataclasses
 
-import pydocformatter.cli.settings_check as settings_check
+# First-party imports
+from pydocformatter.cli import settings_check
+
 
 _BALANCED_WRAP_MAX_CANDIDATES = 250_000
 _BALANCED_WRAP_MAX_WORDS = 10_000
 _URL_TOKEN_RE = re.compile(r"(?i)^(?:[a-z][a-z0-9+.-]*://|www\.)\S+$")
-_URL_TOKEN_LEADING_PUNCTUATION = "([<{\"'"
-_URL_TOKEN_TRAILING_PUNCTUATION = ".,;:!?)]}>\"'"
+_URL_LEADING_PUNCTUATION = "([<{\"'"
+_URL_TRAILING_PUNCTUATION = ".,;:!?)]}>\"'"
 
 
 @dataclasses.dataclass(frozen=True)
@@ -47,15 +51,10 @@ class _WrapScore:
     break_score: int
 
     @classmethod
-    def from_line(cls, line_score: _LineScore, remainder: "_WrapScore | None") -> "_WrapScore":
+    def from_line(cls, line_score: _LineScore, remainder: _WrapScore | None) -> _WrapScore:
         """Return the total score after prepending one line."""
         if remainder is None:
-            return cls(
-                line_count=1,
-                url_only_count=line_score.url_only_count,
-                slack_penalty=line_score.slack_penalty,
-                break_score=line_score.break_score,
-            )
+            return cls(line_count=1, url_only_count=line_score.url_only_count, slack_penalty=line_score.slack_penalty, break_score=line_score.break_score)
         return cls(
             line_count=1 + remainder.line_count,
             url_only_count=line_score.url_only_count + remainder.url_only_count,
@@ -64,7 +63,7 @@ class _WrapScore:
         )
 
 
-class _UseGreedyWrap(Exception):
+class _UseGreedyWrapError(Exception):
     """Signal that balanced wrapping exceeded its bounded search budget."""
 
 
@@ -160,7 +159,7 @@ def is_url_token(text: str) -> bool:
     Returns:
         bool: Whether the token should be kept intact by URL-aware wrapping.
     """
-    candidate = text.lstrip(_URL_TOKEN_LEADING_PUNCTUATION).rstrip(_URL_TOKEN_TRAILING_PUNCTUATION)
+    candidate = text.lstrip(_URL_LEADING_PUNCTUATION).rstrip(_URL_TRAILING_PUNCTUATION)
     return _URL_TOKEN_RE.match(candidate) is not None
 
 
@@ -182,23 +181,9 @@ def wrap_text(text: str, *, width: int, initial_indent: str = "", subsequent_ind
         return (f"{initial_indent}{text}",)
     words = tuple(text.split())
     if url_aware and any(is_url_token(word) for word in words):
-        spans = balanced_word_spans(
-            words,
-            width_words=words,
-            width=width,
-            initial_indent=initial_indent,
-            subsequent_indent=subsequent_indent,
-            tab_width=tab_width,
-        )
+        spans = balanced_word_spans(words, width_words=words, width=width, initial_indent=initial_indent, subsequent_indent=subsequent_indent, tab_width=tab_width)
         return tuple(_render_words(words[span.start : span.end], indent=initial_indent if index == 0 else subsequent_indent) for index, span in enumerate(spans))
-    wrapped = textwrap.wrap(
-        text,
-        width=width,
-        initial_indent=initial_indent,
-        subsequent_indent=subsequent_indent,
-        break_long_words=False,
-        break_on_hyphens=False,
-    )
+    wrapped = textwrap.wrap(text, width=width, initial_indent=initial_indent, subsequent_indent=subsequent_indent, break_long_words=False, break_on_hyphens=False)
     return tuple(wrapped) or (initial_indent.rstrip(),)
 
 
@@ -275,20 +260,11 @@ def balanced_word_spans(
             single_word = end == start + 1
             candidate_count += 1
             if candidate_count > _BALANCED_WRAP_MAX_CANDIDATES:
-                raise _UseGreedyWrap
+                raise _UseGreedyWrapError
             if single_word or (limit > 0 and column <= limit):
                 span = WordSpan(start, end)
                 slack = max(limit - column, 0)
-                candidates.append(
-                    (
-                        span,
-                        _LineScore(
-                            url_only_count=int(single_word and url_words[start]),
-                            slack_penalty=0 if final_line else slack * slack,
-                            break_score=-end,
-                        ),
-                    )
-                )
+                candidates.append((span, _LineScore(url_only_count=int(single_word and url_words[start]), slack_penalty=0 if final_line else slack * slack, break_score=-end)))
             elif final_suffix_width >= 0:
                 # Once a prefix overflows, longer prefixes cannot fit under nonnegative suffix reservation.
                 break
@@ -305,7 +281,8 @@ def balanced_word_spans(
             if chosen_score is None or score < chosen_score:
                 chosen_score = score
                 chosen_end = span.end
-        assert chosen_score is not None and chosen_end is not None
+        if chosen_score is None or chosen_end is None:
+            raise _UseGreedyWrapError
         return chosen_score, chosen_end
 
     try:
@@ -314,7 +291,7 @@ def balanced_word_spans(
         for start in range(len(words) - 1, -1, -1):
             suffix_scores[start], suffix_ends[start] = choose_best(start, first_line=False, suffix_scores=suffix_scores)
         _, first_end = choose_best(0, first_line=True, suffix_scores=suffix_scores)
-    except _UseGreedyWrap:
+    except _UseGreedyWrapError:
         return _greedy_word_spans(
             words,
             width_words=width_words,
@@ -331,7 +308,18 @@ def balanced_word_spans(
     start = first_end
     while start < len(words):
         end = suffix_ends[start]
-        assert end is not None
+        if end is None:
+            return _greedy_word_spans(
+                words,
+                width_words=width_words,
+                width=width,
+                initial_indent=initial_indent,
+                subsequent_indent=subsequent_indent,
+                tab_width=tab_width,
+                initial_width=initial_width,
+                subsequent_width=subsequent_width,
+                final_suffix_width=final_suffix_width,
+            )
         spans.append(WordSpan(start, end))
         start = end
     return tuple(spans)

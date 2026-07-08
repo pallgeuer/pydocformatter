@@ -1,13 +1,14 @@
 """Shared data models for PDF7xx typed-entry documentation rules."""
 
+# Future imports
 from __future__ import annotations
 
-import dataclasses
+# Standard library imports
 import enum
-import typing
+import dataclasses
 
-if typing.TYPE_CHECKING:
-    import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
+# First-party imports
+import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 
 
 class TypedDocumentationSubject(enum.Enum):

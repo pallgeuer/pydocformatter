@@ -1,15 +1,17 @@
 """Shared helpers for docstring statement spacing rule tests."""
 
+# Future imports
 from __future__ import annotations
 
+# Third-party imports
 import libcst as cst
 import libcst.metadata as cst_metadata
 
-import pydocformatter.formatter as formatter
-import pydocformatter.rules.definition_helpers.source_text as source_text
-import pydocformatter.rules_selection as rules_selection
+# First-party imports
+from pydocformatter import formatter, rules_selection
 from pydocformatter.cli.settings_check import CheckSettings
 from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
+from pydocformatter.rules.definition_helpers import source_text
 from pydocformatter.rules.definitions.PDF.PDF import PDF
 
 

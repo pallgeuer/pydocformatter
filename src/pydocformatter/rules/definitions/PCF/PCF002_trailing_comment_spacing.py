@@ -1,14 +1,24 @@
 """PCF002 trailing-comment-spacing rule."""
 
+# Future imports
 from __future__ import annotations
 
-import pydocformatter.rules.definitions.PCF.PCF as PCF_definition
-import pydocformatter.rules.edits as rule_edits
-import pydocformatter.rules.registration as rule_registration
+# Standard library imports
+from typing import TYPE_CHECKING
+
+# First-party imports
 import pydocformatter.rules.violations as rule_violations
+import pydocformatter.rules.registration as rule_registration
+import pydocformatter.rules.definitions.PCF.PCF as PCF_definition
 from pydocformatter.rules.codes import RuleCode
-from pydocformatter.rules.definition import RuleBase, RuleContext
+from pydocformatter.rules.definition import RuleBase
 from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata
+
+
+if TYPE_CHECKING:
+    # First-party imports
+    import pydocformatter.rules.edits as rule_edits
+    from pydocformatter.rules.definition import RuleContext
 
 
 @rule_registration.register_rule_to(PCF_definition.PCF)
@@ -48,7 +58,7 @@ def _planned_changes(context: RuleContext) -> tuple[rule_edits.PlannedSourceChan
     data = PCF_definition.PCF.require_data(context)
     changes: list[rule_edits.PlannedSourceChange] = []
     for comment in data.trailing_comments:
-        if comment.kind not in (PCF_definition.CommentKind.REGULAR, PCF_definition.CommentKind.TYPE_DIRECTIVE, PCF_definition.CommentKind.TOOL_DIRECTIVE):
+        if comment.kind not in {PCF_definition.CommentKind.REGULAR, PCF_definition.CommentKind.TYPE_DIRECTIVE, PCF_definition.CommentKind.TOOL_DIRECTIVE}:
             continue
         code = comment.line_prefix.rstrip(" \t\f")
         if comment.kind == PCF_definition.CommentKind.REGULAR:

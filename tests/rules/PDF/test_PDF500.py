@@ -1,5 +1,5 @@
-import pydocformatter.formatter as formatter
-import pydocformatter.rules_selection as rules_selection
+# First-party imports
+from pydocformatter import formatter, rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention, DocstringMissingDocumentation
 from pydocformatter.rules.definitions.PDF.PDF500_missing_parameter_documentation import PDF500MissingParameterDocumentation
 
@@ -131,11 +131,7 @@ def test_none_and_pep257_conventions_keep_missing_parameter_documentation_inert(
     source = 'def function(first, second):\n    """Summary.\n\n    :param first: First.\n    """\n'
 
     for convention in (DocstringConvention.NONE, DocstringConvention.PEP257):
-        assert_pdf500_lines(
-            source,
-            (),
-            settings=CheckSettings(select=("PDF500",), docstring_convention=convention, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS),
-        )
+        assert_pdf500_lines(source, (), settings=CheckSettings(select=("PDF500",), docstring_convention=convention, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS))
 
 
 def test_rest_fields_do_not_satisfy_google_parameter_documentation() -> None:
@@ -179,9 +175,7 @@ def test_all_docstrings_policy_reports_summary_only_and_empty_public_docstrings(
     source = 'def summary_only(first):\n    """Summary."""\n\n\ndef empty(second):\n    """"""\n'
 
     assert_pdf500_lines(
-        source,
-        ((1,), (5,)),
-        settings=CheckSettings(select=("PDF500",), docstring_convention=DocstringConvention.GOOGLE, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS),
+        source, ((1,), (5,)), settings=CheckSettings(select=("PDF500",), docstring_convention=DocstringConvention.GOOGLE, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS)
     )
 
 
@@ -189,9 +183,7 @@ def test_all_docstrings_policy_public_only_ignores_private_summary_only_docstrin
     source = 'def _summary_only(first):\n    """Summary."""\n\n\ndef __repr__(self, second):\n    """Summary."""\n'
 
     assert_pdf500_lines(
-        source,
-        (),
-        settings=CheckSettings(select=("PDF500",), docstring_convention=DocstringConvention.GOOGLE, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS),
+        source, (), settings=CheckSettings(select=("PDF500",), docstring_convention=DocstringConvention.GOOGLE, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS)
     )
 
 
@@ -199,9 +191,7 @@ def test_public_only_broad_policy_does_not_report_private_docstrings_without_sec
     source = 'def _function(first):\n    """Summary.\n\n    More detail.\n    """\n'
 
     assert_pdf500_lines(
-        source,
-        (),
-        settings=CheckSettings(select=("PDF500",), docstring_convention=DocstringConvention.GOOGLE, docstring_missing_documentation=DocstringMissingDocumentation.NON_SUMMARY_DOCSTRINGS),
+        source, (), settings=CheckSettings(select=("PDF500",), docstring_convention=DocstringConvention.GOOGLE, docstring_missing_documentation=DocstringMissingDocumentation.NON_SUMMARY_DOCSTRINGS)
     )
 
 
@@ -209,9 +199,7 @@ def test_public_only_broad_policy_does_not_report_private_methods_in_public_clas
     source = 'class Container:\n    def _method(self, first):\n        """Summary.\n\n        More detail.\n        """\n'
 
     assert_pdf500_lines(
-        source,
-        (),
-        settings=CheckSettings(select=("PDF500",), docstring_convention=DocstringConvention.GOOGLE, docstring_missing_documentation=DocstringMissingDocumentation.NON_SUMMARY_DOCSTRINGS),
+        source, (), settings=CheckSettings(select=("PDF500",), docstring_convention=DocstringConvention.GOOGLE, docstring_missing_documentation=DocstringMissingDocumentation.NON_SUMMARY_DOCSTRINGS)
     )
 
 
@@ -219,9 +207,7 @@ def test_public_only_broad_policy_still_reports_private_docstrings_with_sections
     source = 'def _function(first, second):\n    """Summary.\n\n    Args:\n        first: First.\n    """\n'
 
     assert_pdf500_lines(
-        source,
-        ((1,),),
-        settings=CheckSettings(select=("PDF500",), docstring_convention=DocstringConvention.GOOGLE, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS),
+        source, ((1,),), settings=CheckSettings(select=("PDF500",), docstring_convention=DocstringConvention.GOOGLE, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS)
     )
 
 
@@ -244,9 +230,7 @@ def test_nested_inside_private_definition_is_private_for_broad_policy() -> None:
     source = 'class _Container:\n    def method(self, first):\n        """Summary.\n\n        More detail.\n        """\n\n\ndef _outer():\n    def inner(second):\n        """Summary.\n\n        More detail.\n        """\n'
 
     assert_pdf500_lines(
-        source,
-        (),
-        settings=CheckSettings(select=("PDF500",), docstring_convention=DocstringConvention.GOOGLE, docstring_missing_documentation=DocstringMissingDocumentation.NON_SUMMARY_DOCSTRINGS),
+        source, (), settings=CheckSettings(select=("PDF500",), docstring_convention=DocstringConvention.GOOGLE, docstring_missing_documentation=DocstringMissingDocumentation.NON_SUMMARY_DOCSTRINGS)
     )
 
 
@@ -264,9 +248,7 @@ def test_protocol_dunders_are_private_for_broad_policy() -> None:
     source = 'class Comparable:\n    def __exit__(self, exc_type, exc, traceback):\n        """Summary.\n\n        More detail.\n        """\n\n    def __repr__(self):\n        """Summary.\n\n        More detail.\n        """\n\n    def __add__(self, other):\n        """Summary.\n\n        More detail.\n        """\n'
 
     assert_pdf500_lines(
-        source,
-        (),
-        settings=CheckSettings(select=("PDF500",), docstring_convention=DocstringConvention.GOOGLE, docstring_missing_documentation=DocstringMissingDocumentation.NON_SUMMARY_DOCSTRINGS),
+        source, (), settings=CheckSettings(select=("PDF500",), docstring_convention=DocstringConvention.GOOGLE, docstring_missing_documentation=DocstringMissingDocumentation.NON_SUMMARY_DOCSTRINGS)
     )
 
 

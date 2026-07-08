@@ -1,7 +1,8 @@
+# Standard library imports
 import pathlib
 
-import pydocformatter.formatter as formatter
-import pydocformatter.rules_selection as rules_selection
+# First-party imports
+from pydocformatter import formatter, rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, DocstringMissingDocumentation
 
 
@@ -178,9 +179,7 @@ def test_decorated_definitions_report_definition_line_and_ignore_decorator_line_
     source = '"""Module."""\n\n@decorator  # pydocfmt: ignore[PDF604]\nclass Client:\n    pass\n\nclass Container:\n    """Container."""\n\n    @decorator  # pydocfmt: ignore[PDF610]\n    def method(self):\n        pass\n'
 
     assert_findings(
-        source,
-        select=("PDF604", "PDF610"),
-        expected=(("PDF604", (4,), "Public class 'Client' is missing docstring"), ("PDF610", (11,), "Public method 'Container.method' is missing docstring")),
+        source, select=("PDF604", "PDF610"), expected=(("PDF604", (4,), "Public class 'Client' is missing docstring"), ("PDF610", (11,), "Public method 'Container.method' is missing docstring"))
     )
 
 
@@ -224,10 +223,7 @@ def test_configured_optional_function_decorators_are_exact_names() -> None:
         source,
         select=("PDF608", "PDF610"),
         settings=settings,
-        expected=(
-            ("PDF608", (8,), "Public function 'unconfigured' is missing docstring"),
-            ("PDF610", (19,), "Public method 'Client.unconfigured' is missing docstring"),
-        ),
+        expected=(("PDF608", (8,), "Public function 'unconfigured' is missing docstring"), ("PDF610", (19,), "Public method 'Client.unconfigured' is missing docstring")),
     )
 
 
@@ -289,11 +285,7 @@ def test_broad_selection_includes_public_non_dunder_rules_only() -> None:
 
 def test_missing_documentation_settings_do_not_change_owner_public_private_split() -> None:
     source = '"""Module."""\n\nclass _Client:\n    pass\n'
-    settings = CheckSettings(
-        select=("PDF604", "PDF605"),
-        docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS,
-        docstring_missing_documentation_public_only=False,
-    )
+    settings = CheckSettings(select=("PDF604", "PDF605"), docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS, docstring_missing_documentation_public_only=False)
     result = formatter.format_source(source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
 
     assert tuple((finding.rule.code.tag, finding.line_numbers, finding.message) for finding in result.unfixed_findings) == (("PDF605", (3,), "Private class '_Client' is missing docstring"),)

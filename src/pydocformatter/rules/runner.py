@@ -7,26 +7,37 @@ Attributes:
         text.
 """
 
+# Future imports
 from __future__ import annotations
 
+# Standard library imports
 import collections
 import dataclasses
 from collections.abc import Mapping
+from typing import TYPE_CHECKING
 
+# Third-party imports
 import libcst as cst
 import libcst.metadata as cst_metadata
 
-import pydocformatter.rules.definition_helpers.source_text as source_text
+# First-party imports
 import pydocformatter.rules.edits as rule_edits
-import pydocformatter.rules.line_targets as line_targets
-import pydocformatter.rules.suppressions as suppressions
 import pydocformatter.rules.violations as rule_violations
-from pydocformatter.cli.settings_check import CheckSettings
-from pydocformatter.rules.codes import RuleCode
-from pydocformatter.rules.collection import RuleCollection
-from pydocformatter.rules.definition import RuleBase, RuleCategoryBase, RuleCategoryContext, RuleContext
-from pydocformatter.rules.models import RuleCheckKind, RuleFinding, RuleMetadata
-from pydocformatter.rules_selection import RuleSelection, SelectedRule
+from pydocformatter.rules import line_targets, suppressions
+from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
+from pydocformatter.rules.definition_helpers import source_text
+from pydocformatter.rules.models import RuleCheckKind, RuleFinding
+
+
+if TYPE_CHECKING:
+    # First-party imports
+    from pydocformatter.cli.settings_check import CheckSettings
+    from pydocformatter.rules.codes import RuleCode
+    from pydocformatter.rules.collection import RuleCollection
+    from pydocformatter.rules.definition import RuleBase, RuleCategoryBase
+    from pydocformatter.rules.models import RuleMetadata
+    from pydocformatter.rules_selection import RuleSelection, SelectedRule
+
 
 MAX_FIX_ITERATIONS = 20
 UTF8_BOM = "\ufeff"
@@ -80,16 +91,7 @@ class _ModuleSourceSeed:
     source: str
 
 
-def run_rules(
-    module: cst.Module,
-    *,
-    path: str,
-    settings: CheckSettings,
-    line_ending: str,
-    rule_selection: RuleSelection,
-    fix: bool,
-    source: str | None = None,
-) -> RuleRunResult:
+def run_rules(module: cst.Module, *, path: str, settings: CheckSettings, line_ending: str, rule_selection: RuleSelection, fix: bool, source: str | None = None) -> RuleRunResult:
     """Run selected rule fixes and checks against one parsed module.
 
     Args:
@@ -129,24 +131,11 @@ def run_rules(
         precheck_errors: list[str] = []
         precheck_findings = run_check_pass(module, precheck_errors)
         if not precheck_errors and not any(finding.fixable for finding in precheck_findings):
-            return RuleRunResult(
-                module=module,
-                fixed_findings=(),
-                unfixed_findings=precheck_findings,
-                source_changed=False,
-                errors=(),
-            )
+            return RuleRunResult(module=module, fixed_findings=(), unfixed_findings=precheck_findings, source_changed=False, errors=())
 
-        for iteration in range(1, MAX_FIX_ITERATIONS + 1):
+        for _ in range(1, MAX_FIX_ITERATIONS + 1):
             module, iteration_findings, changed = _run_fix_pass(
-                module,
-                path=path,
-                settings=settings,
-                line_ending=line_ending,
-                rule_selection=rule_selection,
-                selected_rule_by_code=selected_rule_by_code,
-                errors=errors,
-                source_seed=source_seed,
+                module, path=path, settings=settings, line_ending=line_ending, rule_selection=rule_selection, selected_rule_by_code=selected_rule_by_code, errors=errors, source_seed=source_seed
             )
             fixed_findings.extend(iteration_findings)
             last_iteration_findings = iteration_findings
@@ -161,13 +150,7 @@ def run_rules(
     if reached_iteration_limit and any(finding.fixable for finding in unfixed_findings):
         errors.append(_fix_iteration_limit_error(path, last_iteration_findings=last_iteration_findings, unfixed_findings=unfixed_findings))
 
-    return RuleRunResult(
-        module=module,
-        fixed_findings=tuple(fixed_findings),
-        unfixed_findings=unfixed_findings,
-        source_changed=source_changed,
-        errors=tuple(errors),
-    )
+    return RuleRunResult(module=module, fixed_findings=tuple(fixed_findings), unfixed_findings=unfixed_findings, source_changed=source_changed, errors=tuple(errors))
 
 
 def _run_fix_pass(
@@ -389,45 +372,36 @@ def _rule_context(prepared_category: _PreparedCategory) -> RuleContext:
     )
 
 
-def _validated_rule_violations(
-    rule_class: type[RuleBase],
-    violations: object,
-    *,
-    path: str,
-    operation: str,
-    source_line_count: int,
-    errors: list[str],
-) -> tuple[rule_violations.RuleViolation, ...]:
+def _validated_rule_violations(rule_class: type[RuleBase], violations: object, *, path: str, operation: str, source_line_count: int, errors: list[str]) -> tuple[rule_violations.RuleViolation, ...]:
     """Validate violations returned by a rule hook or synthesized by the runner."""
     if not isinstance(violations, tuple):
         errors.append(f"{path}: {rule_class.meta.code} {operation} returned non-tuple violations")
         return ()
-    if not all(isinstance(violation, rule_violations.RuleViolation) and violation.finding.rule == rule_class.meta for violation in violations):
-        errors.append(f"{path}: {rule_class.meta.code} {operation} returned a violation for a different rule or an invalid violation")
-        return ()
+    validated_violations: list[rule_violations.RuleViolation] = []
+    for violation in violations:
+        if not isinstance(violation, rule_violations.RuleViolation) or violation.finding.rule != rule_class.meta:
+            errors.append(f"{path}: {rule_class.meta.code} {operation} returned a violation for a different rule or an invalid violation")
+            return ()
+        validated_violations.append(violation)
+    validated = tuple(validated_violations)
     try:
-        finding_fixabilities = tuple(violation.finding.fixable for violation in violations)
+        finding_fixabilities = tuple(violation.finding.fixable for violation in validated)
     except ValueError as error:
         errors.append(f"{path}: {rule_class.meta.code} {operation} returned a finding with unresolved fixability: {error}")
         return ()
     # Rule hooks can only hit this by bypassing RuleViolation construction; keep the runner boundary hardened.
-    if not all((violation.fix is not None) == fixable for violation, fixable in zip(violations, finding_fixabilities, strict=True)):
+    if not all((violation.fix is not None) == fixable for violation, fixable in zip(validated, finding_fixabilities, strict=True)):
         errors.append(f"{path}: {rule_class.meta.code} {operation} returned a violation whose fix does not match finding fixability")
         return ()
-    invalid_findings = tuple(violation.finding for violation in violations if _finding_has_line_outside_source(violation.finding, source_line_count=source_line_count))
+    invalid_findings = tuple(violation.finding for violation in validated if _finding_has_line_outside_source(violation.finding, source_line_count=source_line_count))
     if invalid_findings:
         errors.append(f"{path}: {rule_class.meta.code} {operation} returned a finding outside the source line range")
         return ()
-    return violations
+    return validated
 
 
 def _planned_source_changes_for_violations(
-    rule_class: type[RuleBase],
-    violations: tuple[rule_violations.RuleViolation, ...],
-    *,
-    path: str,
-    source_line_count: int,
-    errors: list[str],
+    rule_class: type[RuleBase], violations: tuple[rule_violations.RuleViolation, ...], *, path: str, source_line_count: int, errors: list[str]
 ) -> tuple[rule_edits.PlannedSourceChange, ...] | None:
     """Build and validate source changes for unsuppressed fixable violations."""
     planned_changes: list[rule_edits.PlannedSourceChange] = []
@@ -447,12 +421,7 @@ def _planned_source_changes_for_violations(
     return tuple(planned_changes)
 
 
-def _violation_fix_changes_are_valid(
-    violation: rule_violations.RuleViolation,
-    changes: tuple[rule_edits.PlannedSourceChange, ...],
-    *,
-    source_line_count: int,
-) -> bool:
+def _violation_fix_changes_are_valid(violation: rule_violations.RuleViolation, changes: tuple[rule_edits.PlannedSourceChange, ...], *, source_line_count: int) -> bool:
     """Return whether one violation's planned changes match its finding targets."""
     if not changes:
         return False
@@ -503,8 +472,5 @@ def _fix_iteration_limit_error(path: str, *, last_iteration_findings: tuple[Rule
     details: dict[RuleMetadata, set[int]] = collections.defaultdict(set)
     for finding in likely_findings:
         details[finding.rule].update(finding.line_numbers)
-    if details:
-        likely_rules = ", ".join(f"{rule.code} lines {', '.join(map(str, sorted(lines))) or 'unknown'}" for rule, lines in sorted(details.items()))
-    else:
-        likely_rules = "unknown"
+    likely_rules = ", ".join(f"{rule.code} lines {', '.join(map(str, sorted(lines))) or 'unknown'}" for rule, lines in sorted(details.items())) if details else "unknown"
     return f"{path}: Automatic fixes did not converge after {MAX_FIX_ITERATIONS} iterations; likely rules and lines: {likely_rules}"

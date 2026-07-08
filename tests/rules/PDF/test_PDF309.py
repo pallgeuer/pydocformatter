@@ -1,9 +1,11 @@
-import pydocformatter.rules_selection as rules_selection
-import tests.rule_helpers as rule_helpers
+# First-party imports
 import tests.rules.PDF.helpers as pdf_helpers
+from pydocformatter import rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention, LineEnding
 from pydocformatter.rules.definitions.PDF.PDF308_entry_description_trailing_period import PDF308EntryDescriptionTrailingPeriod
 from pydocformatter.rules.definitions.PDF.PDF309_entry_description_terminal_punctuation import PDF309EntryDescriptionTerminalPunctuation
+from tests import rule_helpers
+
 
 contexts = pdf_helpers.contexts_for("PDF309")
 format_source = pdf_helpers.formatter_for("PDF309")

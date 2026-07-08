@@ -5,10 +5,13 @@ Attributes:
         concrete rule code.
 """
 
+# Future imports
 from __future__ import annotations
 
-import dataclasses
+# Standard library imports
 import re
+import dataclasses
+
 
 _RULE_CODE_RE = re.compile(r"^([A-Z]+)([0-9]+)$")
 _RULE_SELECTOR_RE = re.compile(r"^([A-Z]+)([0-9]*)$")

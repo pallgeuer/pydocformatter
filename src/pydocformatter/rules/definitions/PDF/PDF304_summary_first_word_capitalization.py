@@ -1,17 +1,26 @@
 """PDF304 summary-first-word-capitalization rule."""
 
+# Future imports
 from __future__ import annotations
 
-import pydocformatter.rules.definition_helpers.first_word_capitalization as first_word_capitalization
-import pydocformatter.rules.definition_helpers.summary_style as summary_style
-import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
+# Standard library imports
+from typing import TYPE_CHECKING
+
+# First-party imports
 import pydocformatter.rules.edits as rule_edits
-import pydocformatter.rules.registration as rule_registration
 import pydocformatter.rules.violations as rule_violations
+import pydocformatter.rules.registration as rule_registration
+import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 from pydocformatter.rules.codes import RuleCode
-from pydocformatter.rules.definition import RuleBase, RuleContext
+from pydocformatter.rules.definition import RuleBase
+from pydocformatter.rules.definition_helpers import first_word_capitalization, summary_style
 from pydocformatter.rules.definitions.PDF.PDF import PDF
 from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata
+
+
+if TYPE_CHECKING:
+    # First-party imports
+    from pydocformatter.rules.definition import RuleContext
 
 
 @rule_registration.register_rule_to(PDF)

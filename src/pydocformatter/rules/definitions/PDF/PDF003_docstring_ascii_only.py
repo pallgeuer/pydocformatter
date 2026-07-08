@@ -1,19 +1,29 @@
 """PDF003 docstring-ascii-only rule."""
 
+# Future imports
 from __future__ import annotations
 
+# Standard library imports
+from typing import TYPE_CHECKING
+
+# Third-party imports
 import libcst as cst
 
-import pydocformatter.rules.definition_helpers.source_text as source_text
-import pydocformatter.rules.definition_helpers.string_literals as string_literals
+# First-party imports
+import pydocformatter.rules.edits as rule_edits
+import pydocformatter.rules.violations as rule_violations
+import pydocformatter.rules.registration as rule_registration
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 import pydocformatter.rules.definitions.PDF.PDF002_docstring_backslash_raw_prefix as PDF002
-import pydocformatter.rules.edits as rule_edits
-import pydocformatter.rules.registration as rule_registration
-import pydocformatter.rules.violations as rule_violations
 from pydocformatter.rules.codes import RuleCode
-from pydocformatter.rules.definition import RuleBase, RuleContext
+from pydocformatter.rules.definition import RuleBase
+from pydocformatter.rules.definition_helpers import source_text, string_literals
 from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata
+
+
+if TYPE_CHECKING:
+    # First-party imports
+    from pydocformatter.rules.definition import RuleContext
 
 
 @rule_registration.register_rule_to(PDF_definition.PDF)
@@ -70,11 +80,7 @@ def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo, *, co
     rendered = _rendered_docstring(docstring, line_ending=context.line_ending)
     if rendered is None or rendered == docstring.source:
         return None
-    return rule_edits.PlannedSourceChange(
-        edit=rule_edits.SourceEdit(range=docstring.range, replacement=rendered),
-        line_numbers=_line_numbers(docstring),
-        suppression_line_numbers=(),
-    )
+    return rule_edits.PlannedSourceChange(edit=rule_edits.SourceEdit(range=docstring.range, replacement=rendered), line_numbers=_line_numbers(docstring), suppression_line_numbers=())
 
 
 def _rendered_docstring(docstring: PDF_definition.DocstringInfo, *, line_ending: str) -> str | None:

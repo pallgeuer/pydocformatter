@@ -1,5 +1,5 @@
-import pydocformatter.formatter as formatter
-import pydocformatter.rules_selection as rules_selection
+# First-party imports
+from pydocformatter import formatter, rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention
 from pydocformatter.rules.definitions.PDF.PDF406_empty_section import PDF406EmptySection
 
@@ -18,10 +18,7 @@ def test_reports_empty_google_sections_without_fixing() -> None:
     assert not result.fixed_findings
     assert tuple(finding.rule for finding in result.unfixed_findings) == (PDF406EmptySection.meta, PDF406EmptySection.meta)
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((4,), (6,))
-    assert tuple(finding.message for finding in result.unfixed_findings) == (
-        "Docstring section 'Args' should not be empty",
-        "Docstring section 'Returns' should not be empty",
-    )
+    assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring section 'Args' should not be empty", "Docstring section 'Returns' should not be empty")
 
 
 def test_reports_adjacent_header_only_google_sections() -> None:
@@ -77,10 +74,7 @@ def test_reports_empty_rest_fields() -> None:
     assert not result.fixed_findings
     assert tuple(finding.rule for finding in result.unfixed_findings) == (PDF406EmptySection.meta, PDF406EmptySection.meta)
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((4,), (5,))
-    assert tuple(finding.message for finding in result.unfixed_findings) == (
-        "Docstring field ':param value:' should not be empty",
-        "Docstring field ':rtype:' should not be empty",
-    )
+    assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring field ':param value:' should not be empty", "Docstring field ':rtype:' should not be empty")
 
 
 def test_accepts_rest_fields_with_only_continuation_body_content() -> None:

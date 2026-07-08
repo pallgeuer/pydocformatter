@@ -1,22 +1,30 @@
 """PDF413 section-name-superfluous-colon rule."""
 
+# Future imports
 from __future__ import annotations
 
-import dataclasses
+# Standard library imports
 import re
+import dataclasses
+from typing import TYPE_CHECKING
 
-import pydocformatter.rules.definition_helpers.docstring_conventions as docstring_conventions
-import pydocformatter.rules.definition_helpers.docstring_sections as docstring_sections
-import pydocformatter.rules.definition_helpers.section_edits as section_edits
-import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
+# First-party imports
 import pydocformatter.rules.edits as rule_edits
 import pydocformatter.rules.registration as rule_registration
-import pydocformatter.rules.violations as rule_violations
+import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.codes import RuleCode
-from pydocformatter.rules.definition import RuleBase, RuleContext
+from pydocformatter.rules.definition import RuleBase
+from pydocformatter.rules.definition_helpers import docstring_conventions, docstring_sections, section_edits
 from pydocformatter.rules.definitions.PDF.PDF import PDF
 from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
+
+
+if TYPE_CHECKING:
+    # First-party imports
+    import pydocformatter.rules.violations as rule_violations
+    from pydocformatter.rules.definition import RuleContext
+
 
 _NUMPY_COLON_SECTION_RE = re.compile(r"^[ \t]*(?P<name>[A-Za-z][A-Za-z ]*?):[ \t]*$")
 
@@ -62,8 +70,7 @@ class PDF413SectionNameSuperfluousColon(RuleBase):
         stable_since="1.0.0",
         setting_effects=(
             RuleSettingEffects(
-                setting="docstring_convention",
-                effects=(RuleSettingEffectValues(effect=RuleSettingEffect.IGNORED, values=docstring_conventions.ignored_conventions_except(DocstringConvention.NUMPY)),),
+                setting="docstring_convention", effects=(RuleSettingEffectValues(effect=RuleSettingEffect.IGNORED, values=docstring_conventions.ignored_conventions_except(DocstringConvention.NUMPY)),)
             ),
         ),
         incompatible_with=(),
@@ -129,12 +136,7 @@ def _targets(docstring: PDF_definition.DocstringInfo) -> tuple[_Target, ...]:
     return tuple(sorted(targets, key=lambda target: target.line.index))
 
 
-def _unparsed_targets(
-    docstring: PDF_definition.DocstringInfo,
-    blocks: tuple[PDF_definition.DocstringBlock, ...],
-    *,
-    handled_indexes: set[int],
-) -> tuple[_Target, ...]:
+def _unparsed_targets(docstring: PDF_definition.DocstringInfo, blocks: tuple[PDF_definition.DocstringBlock, ...], *, handled_indexes: set[int]) -> tuple[_Target, ...]:
     """Return unparsed NumPy section-name colon targets inside explicit colon-header blocks."""
     targets: list[_Target] = []
     for block in blocks:
@@ -154,12 +156,7 @@ def _is_unparsed_section_boundary(docstring: PDF_definition.DocstringInfo, line:
     return not docstring.structure.lines[line.index - 1].text.strip()
 
 
-def _planned_target(
-    docstring: PDF_definition.DocstringInfo,
-    target: _Target,
-    *,
-    value_lines: list[str],
-) -> tuple[_FixableTarget | None, _UnfixableTarget | None]:
+def _planned_target(docstring: PDF_definition.DocstringInfo, target: _Target, *, value_lines: list[str]) -> tuple[_FixableTarget | None, _UnfixableTarget | None]:
     """Return a planned replacement or diagnostic for one NumPy section-name colon."""
     if not _is_superfluous_colon_suffix(_section_suffix(target.line.text, target.name)):
         return None, None

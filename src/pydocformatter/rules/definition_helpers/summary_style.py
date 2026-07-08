@@ -1,10 +1,13 @@
 """Summary word targeting helpers."""
 
+# Future imports
 from __future__ import annotations
 
-import dataclasses
+# Standard library imports
 import re
+import dataclasses
 
+# First-party imports
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 from pydocformatter.rules.definitions.PDF.PDF import SummaryLineTarget
 

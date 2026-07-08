@@ -1,14 +1,24 @@
 """PDF211 blank-line-after-class-docstring rule."""
 
+# Future imports
 from __future__ import annotations
 
-import pydocformatter.rules.definition_helpers.docstring_statement_spacing as docstring_statement_spacing
-import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
-import pydocformatter.rules.registration as rule_registration
+# Standard library imports
+from typing import TYPE_CHECKING
+
+# First-party imports
 import pydocformatter.rules.violations as rule_violations
+import pydocformatter.rules.registration as rule_registration
+import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 from pydocformatter.rules.codes import RuleCode
-from pydocformatter.rules.definition import RuleBase, RuleContext
+from pydocformatter.rules.definition import RuleBase
+from pydocformatter.rules.definition_helpers import docstring_statement_spacing
 from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata
+
+
+if TYPE_CHECKING:
+    # First-party imports
+    from pydocformatter.rules.definition import RuleContext
 
 
 @rule_registration.register_rule_to(PDF_definition.PDF)
@@ -41,9 +51,6 @@ class PDF211BlankLineAfterClassDocstring(RuleBase):
             tuple[rule_violations.RuleViolation, ...]: Rule violations reported for the current source.
         """
         changes = docstring_statement_spacing.planned_changes(
-            context,
-            owner_kind=PDF_definition.DefinitionKind.CLASS,
-            position=docstring_statement_spacing.DocstringStatementSpacingPosition.AFTER,
-            desired_blank_lines=1,
+            context, owner_kind=PDF_definition.DefinitionKind.CLASS, position=docstring_statement_spacing.DocstringStatementSpacingPosition.AFTER, desired_blank_lines=1
         )
         return rule_violations.violations_for_planned_source_changes(cls.meta, changes)

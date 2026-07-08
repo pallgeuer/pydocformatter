@@ -4,19 +4,28 @@ Attributes:
     UTF8_BOM (str): Unicode byte order mark stripped from decoded UTF-8 source before LibCST parsing and rule execution.
 """
 
+# Future imports
 from __future__ import annotations
 
+# Standard library imports
+import typing
 import collections
 import dataclasses
-import typing
 
+# Third-party imports
 import libcst as cst
 
-import pydocformatter.rules.line_endings as line_endings
+# First-party imports
 import pydocformatter.rules.runner as rule_runner
-from pydocformatter.cli.settings_check import CheckSettings
+from pydocformatter.rules import line_endings
 from pydocformatter.rules.models import RuleFinding, RuleMetadata
-from pydocformatter.rules_selection import RuleSelection
+
+
+if typing.TYPE_CHECKING:
+    # First-party imports
+    from pydocformatter.cli.settings_check import CheckSettings
+    from pydocformatter.rules_selection import RuleSelection
+
 
 UTF8_BOM = "\ufeff"
 
@@ -114,13 +123,7 @@ def format_source(source: str, path: str, *, settings: CheckSettings, rule_selec
         module = cst.parse_module(source)
     except Exception as error:
         return FormatterResult(
-            path=path,
-            old_source=source,
-            new_source=source,
-            modified=False,
-            fixed_findings=collections.Counter(),
-            unfixed_findings=(),
-            errors=(f"Failed to parse {path} with LibCST: {error}",),
+            path=path, old_source=source, new_source=source, modified=False, fixed_findings=collections.Counter(), unfixed_findings=(), errors=(f"Failed to parse {path} with LibCST: {error}",)
         )
 
     line_ending = line_endings.resolve_line_ending(source, line_ending=settings.line_ending)
@@ -141,11 +144,5 @@ def format_source(source: str, path: str, *, settings: CheckSettings, rule_selec
         new_source = source
 
     return FormatterResult(
-        path=path,
-        old_source=source,
-        new_source=new_source,
-        modified=(new_source != source),
-        fixed_findings=fixed_findings,
-        unfixed_findings=run_result.unfixed_findings,
-        errors=tuple(errors),
+        path=path, old_source=source, new_source=new_source, modified=(new_source != source), fixed_findings=fixed_findings, unfixed_findings=run_result.unfixed_findings, errors=tuple(errors)
     )

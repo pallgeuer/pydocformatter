@@ -1,16 +1,16 @@
-- id: pydocfmt
-  name: pydocfmt
-  description: 'Format Python docstrings and comments with pydocfmt'
-  entry: pydocfmt check --fix
+- id: pydocfmt-check
+  name: pydocfmt (check)
+  description: 'Check Python docstrings and comments with pydocfmt'
+  entry: pydocfmt check
   language: python
   types: [python]
   minimum_pre_commit_version: '0.15.0'
   additional_dependencies: []
 
-- id: pydocfmt-check
-  name: pydocfmt (check only)
-  description: 'Check Python docstring and comment formatting with pydocfmt'
-  entry: pydocfmt check
+- id: pydocfmt-fix
+  name: pydocfmt (fix)
+  description: 'Format and check Python docstrings and comments with pydocfmt'
+  entry: pydocfmt check --fix
   language: python
   types: [python]
   minimum_pre_commit_version: '0.15.0'

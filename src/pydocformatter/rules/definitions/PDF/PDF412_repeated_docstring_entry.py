@@ -1,20 +1,26 @@
 """PDF412 repeated-docstring-entry rule."""
 
+# Future imports
 from __future__ import annotations
 
+# Standard library imports
 import dataclasses
+from typing import TYPE_CHECKING
 
-import pydocformatter.rules.definition_helpers.docstring_conventions as docstring_conventions
-import pydocformatter.rules.definition_helpers.parameter_documentation as parameter_documentation
-import pydocformatter.rules.definition_helpers.rest_fields as rest_fields
-import pydocformatter.rules.definition_helpers.section_edits as section_edits
-import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
-import pydocformatter.rules.registration as rule_registration
+# First-party imports
 import pydocformatter.rules.violations as rule_violations
+import pydocformatter.rules.registration as rule_registration
+import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.codes import RuleCode
-from pydocformatter.rules.definition import RuleBase, RuleContext
+from pydocformatter.rules.definition import RuleBase
+from pydocformatter.rules.definition_helpers import docstring_conventions, parameter_documentation, rest_fields, section_edits
 from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
+
+
+if TYPE_CHECKING:
+    # First-party imports
+    from pydocformatter.rules.definition import RuleContext
 
 
 @rule_registration.register_rule_to(PDF_definition.PDF)
@@ -95,7 +101,7 @@ def _entry_keys(entry: PDF_definition.DocstringEntry) -> tuple[EntryKey, ...]:
         return tuple(
             EntryKey(("parameter", parameter_documentation.parameter_comparison_name(name)), parameter_documentation.parameter_comparison_name(name), "parameter") for name in entry.names if name
         )
-    if entry.kind in (PDF_definition.DocstringEntryKind.ATTRIBUTE, PDF_definition.DocstringEntryKind.METHOD, PDF_definition.DocstringEntryKind.EXCEPTION):
+    if entry.kind in {PDF_definition.DocstringEntryKind.ATTRIBUTE, PDF_definition.DocstringEntryKind.METHOD, PDF_definition.DocstringEntryKind.EXCEPTION}:
         return tuple(EntryKey((entry.kind.value, name), name, entry.kind.value) for name in entry.names if name)
     if entry.kind is PDF_definition.DocstringEntryKind.FIELD:
         return tuple(EntryKey(("field", name), name, "field") for name in entry.names if name)

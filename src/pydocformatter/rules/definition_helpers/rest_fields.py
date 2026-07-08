@@ -7,31 +7,25 @@ Attributes:
         or exception field term.
 """
 
+# Future imports
 from __future__ import annotations
 
+# Standard library imports
 import dataclasses
+from typing import TYPE_CHECKING
 
-import pydocformatter.rules.definition_helpers.docstring_sections as docstring_sections
-import pydocformatter.rules.definition_helpers.parameter_documentation as parameter_documentation
-import pydocformatter.rules.definition_helpers.section_edits as section_edits
+# First-party imports
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
-import pydocformatter.rules.edits as rule_edits
+from pydocformatter.rules.definition_helpers import docstring_sections, parameter_documentation, section_edits
 
-PLURAL_FIELD_NAMES = {
-    "raise": "raises",
-    "returns": "return",
-    "yields": "yield",
-}
-TERM_FIELD_NAMES = {
-    "arg": "param",
-    "argument": "param",
-    "except": "raises",
-    "exception": "raises",
-    "key": "param",
-    "keyword": "param",
-    "kwarg": "param",
-    "parameter": "param",
-}
+
+if TYPE_CHECKING:
+    # First-party imports
+    import pydocformatter.rules.edits as rule_edits
+
+
+PLURAL_FIELD_NAMES = {"raise": "raises", "returns": "return", "yields": "yield"}
+TERM_FIELD_NAMES = {"arg": "param", "argument": "param", "except": "raises", "exception": "raises", "key": "param", "keyword": "param", "kwarg": "param", "parameter": "param"}
 
 
 @dataclasses.dataclass(frozen=True)
@@ -88,7 +82,7 @@ def order_rank(entry: PDF_definition.DocstringEntry) -> int | None:
     """
     if entry.kind is PDF_definition.DocstringEntryKind.PARAMETER:
         return 0
-    if entry.kind in (PDF_definition.DocstringEntryKind.RETURN, PDF_definition.DocstringEntryKind.YIELD):
+    if entry.kind in {PDF_definition.DocstringEntryKind.RETURN, PDF_definition.DocstringEntryKind.YIELD}:
         return 1
     if entry.kind is PDF_definition.DocstringEntryKind.EXCEPTION:
         return 2

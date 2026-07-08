@@ -1,19 +1,30 @@
 """PDF201 missing-blank-line rule."""
 
+# Future imports
 from __future__ import annotations
 
+# Standard library imports
+import itertools
 from collections.abc import Sequence
+from typing import TYPE_CHECKING
 
+# Third-party imports
 import libcst as cst
 
-import pydocformatter.cli.settings_check as settings_check
-import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
-import pydocformatter.rules.edits as rule_edits
-import pydocformatter.rules.registration as rule_registration
+# First-party imports
 import pydocformatter.rules.violations as rule_violations
+import pydocformatter.rules.registration as rule_registration
+import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
+from pydocformatter.cli import settings_check
 from pydocformatter.rules.codes import RuleCode
-from pydocformatter.rules.definition import RuleBase, RuleContext
+from pydocformatter.rules.definition import RuleBase
 from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata
+
+
+if TYPE_CHECKING:
+    # First-party imports
+    import pydocformatter.rules.edits as rule_edits
+    from pydocformatter.rules.definition import RuleContext
 
 
 @rule_registration.register_rule_to(PDF_definition.PDF)
@@ -67,26 +78,15 @@ def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo, *, co
         return None
     canonical_margin = PDF_definition.docstring_canonical_margin(docstring, context=context, source_lines=source_lines)
     blank_source = _blank_line_source(context, canonical_margin=canonical_margin)
-    output_lines, line_numbers = _output_lines_and_line_numbers(
-        docstring,
-        insert_before=insert_before,
-        insert_after=insert_after,
-        blank_source=blank_source,
-        canonical_margin=canonical_margin,
-    )
-    return PDF_definition.planned_simple_docstring_output_change(
-        docstring,
-        context=context,
-        output_lines=output_lines,
-        line_numbers=tuple(dict.fromkeys(line_numbers)),
-    )
+    output_lines, line_numbers = _output_lines_and_line_numbers(docstring, insert_before=insert_before, insert_after=insert_after, blank_source=blank_source, canonical_margin=canonical_margin)
+    return PDF_definition.planned_simple_docstring_output_change(docstring, context=context, output_lines=output_lines, line_numbers=tuple(dict.fromkeys(line_numbers)))
 
 
 def _insertions_before_lines(docstring: PDF_definition.DocstringInfo) -> frozenset[int]:
     """Return logical line indexes before which a blank line should be inserted."""
     indexes: set[int] = set()
     blocks = docstring.structure.blocks
-    for previous_block, block in zip(blocks, blocks[1:]):
+    for previous_block, block in itertools.pairwise(blocks):
         if previous_block.kind is PDF_definition.DocstringBlockKind.BLANK or block.kind is PDF_definition.DocstringBlockKind.BLANK:
             continue
         if _previous_logical_line_is_blank(docstring, block.start_line):
@@ -112,9 +112,7 @@ def _needs_blank_before_block(previous_block: PDF_definition.DocstringBlock, blo
     """Return whether adjacent top-level blocks require a blank separator."""
     if block.kind is PDF_definition.DocstringBlockKind.SECTION:
         return True
-    if previous_block.kind is PDF_definition.DocstringBlockKind.SUMMARY and previous_block.end_line - previous_block.start_line == 1 and _is_recognized_structure(block):
-        return True
-    return False
+    return bool(previous_block.kind is PDF_definition.DocstringBlockKind.SUMMARY and previous_block.end_line - previous_block.start_line == 1 and _is_recognized_structure(block))
 
 
 def _previous_logical_line_is_blank(docstring: PDF_definition.DocstringInfo, line_index: int) -> bool:
@@ -148,12 +146,7 @@ def _blank_line_source(context: RuleContext, *, canonical_margin: str) -> str:
 
 
 def _output_lines_and_line_numbers(
-    docstring: PDF_definition.DocstringInfo,
-    *,
-    insert_before: frozenset[int],
-    insert_after: frozenset[int],
-    blank_source: str,
-    canonical_margin: str,
+    docstring: PDF_definition.DocstringInfo, *, insert_before: frozenset[int], insert_after: frozenset[int], blank_source: str, canonical_margin: str
 ) -> tuple[tuple[PDF_definition.DocstringOutputLine, ...], tuple[int, ...]]:
     """Return replacement logical lines and changed source line numbers."""
     lines: list[PDF_definition.DocstringOutputLine] = []

@@ -30,20 +30,25 @@ Attributes:
         CLI and config loading.
 """
 
+# Future imports
 from __future__ import annotations
 
-import argparse
-import dataclasses
+# Standard library imports
+import os
 import enum
 import json
 import math
-import os
 import tomllib
+import argparse
+import itertools
+import dataclasses
 from collections.abc import Callable, Iterable, Mapping
 from types import GenericAlias
 from typing import Any, Generic, TypeAlias, TypedDict, TypeVar, cast
 
+# First-party imports
 from pydocformatter.cli.global_args import GlobalArgs
+
 
 SettingsT = TypeVar("SettingsT")
 SettingsKeyT = TypeVar("SettingsKeyT")
@@ -56,7 +61,7 @@ PerFileSettingsMap: TypeAlias = tuple[tuple[str, tuple[tuple[str, object], ...]]
 SettingValidator: TypeAlias = Callable[[Any, str], SettingValueT]
 SettingCLIAction: TypeAlias = str | type[argparse.Action]
 SettingCLIChoices: TypeAlias = Iterable[Any]
-SettingCLIType: TypeAlias = Callable[[str], Any] | argparse.FileType | str
+SettingCLIType: TypeAlias = Callable[[str], Any] | str
 SettingCLIMetavar: TypeAlias = str | tuple[str, ...]
 SettingsOverridesType: TypeAlias = type[Any] | GenericAlias
 
@@ -265,7 +270,7 @@ class SettingDefinition(Generic[SettingValueT]):
         field: str,
         value_type: type[SettingValueT] | GenericAlias,
         group: enum.StrEnum,
-        help: str,
+        help: str,  # noqa: A002
         key: str = "",
         available_in_cli: bool = True,
         available_in_toml: bool = True,
@@ -294,7 +299,7 @@ class SettingDefinition(Generic[SettingValueT]):
             TypeError: If no default validator exists for `value_type` and no validator is supplied.
         """
         resolved_key = key or field.replace("_", "-")
-        resolved_validator = cast(SettingValidator[SettingValueT], _default_validator_for_type(value_type)) if validator is None else validator
+        resolved_validator = cast("SettingValidator[SettingValueT]", _default_validator_for_type(value_type)) if validator is None else validator
         resolved_documentation = documentation or help
         resolved_example = example or ""
 
@@ -303,9 +308,9 @@ class SettingDefinition(Generic[SettingValueT]):
             if cli is None:
                 cli_options: SettingCLIOptions = {}
             elif isinstance(cli, SettingCLIDefinition):
-                cli_options = cast(SettingCLIOptions, {field.name: getattr(cli, field.name) for field in dataclasses.fields(cli)})
+                cli_options = cast("SettingCLIOptions", {field.name: getattr(cli, field.name) for field in dataclasses.fields(cli)})
             else:
-                cli_options = cast(SettingCLIOptions, dict(cli))
+                cli_options = cast("SettingCLIOptions", dict(cli))
 
             flags = cli_options.get("flags", ()) or (f"--{resolved_key}",)
             action = cli_options.get("action")
@@ -331,19 +336,11 @@ class SettingDefinition(Generic[SettingValueT]):
                 if "value_kind" not in cli_options:
                     value_kind = SettingCLIValueKind.TOML_MAP
             if _is_str_enum_type(value_type) and choices is None:
-                choices = tuple(member.value for member in cast(type[enum.StrEnum], value_type))
+                choices = tuple(member.value for member in cast("type[enum.StrEnum]", value_type))
 
             show_default = cli_options.get("show_default", value_kind == SettingCLIValueKind.RAW)
 
-            resolved_cli = SettingCLIDefinition(
-                flags=flags,
-                action=action,
-                choices=choices,
-                type=cli_type,
-                metavar=metavar,
-                value_kind=value_kind,
-                show_default=show_default,
-            )
+            resolved_cli = SettingCLIDefinition(flags=flags, action=action, choices=choices, type=cli_type, metavar=metavar, value_kind=value_kind, show_default=show_default)
         else:
             resolved_cli = None
 
@@ -443,12 +440,7 @@ class SettingsSchema(Generic[SettingsT]):
         Returns:
             SettingsResolver[SettingsT]: Resolver that caches settings profiles by containing directory.
         """
-        return SettingsResolver(
-            schema=self,
-            global_values=GlobalArgs() if global_values is None else global_values,
-            args=args,
-            field_overrides=field_overrides,
-        )
+        return SettingsResolver(schema=self, global_values=GlobalArgs() if global_values is None else global_values, args=args, field_overrides=field_overrides)
 
     def load_profile(
         self, *, global_values: GlobalArgs | None = None, args: argparse.Namespace | None = None, field_overrides: Mapping[str, Any] | None = None, path: str | None = None
@@ -496,12 +488,7 @@ class SettingsSchema(Generic[SettingsT]):
                 auto_path = _auto_discovered_pyproject_path_for_path(path, table_path=self.table_path)
                 if auto_path is not None:
                     profile = _apply_toml_file_profile(
-                        self,
-                        profile,
-                        path=auto_path,
-                        required=False,
-                        source_base=os.path.dirname(os.path.abspath(auto_path)),
-                        source_priority=CONFIG_FILE_SOURCE_PRIORITY,
+                        self, profile, path=auto_path, required=False, source_base=os.path.dirname(os.path.abspath(auto_path)), source_priority=CONFIG_FILE_SOURCE_PRIORITY
                     )
             for option in path_options:
                 profile = _apply_toml_file_profile(self, profile, path=option, required=True, source_base=cwd_base, source_priority=CONFIG_FILE_SOURCE_PRIORITY)
@@ -561,11 +548,7 @@ class SettingsSchema(Generic[SettingsT]):
                     if definition.available_in_cli:
                         if definition.cli is None:
                             raise AssertionError(f"Setting definition for {definition.field!r} has no CLI metadata")
-                        kwargs: dict[str, Any] = {
-                            "default": None,
-                            "dest": definition.field,
-                            "help": _format_cli_help(definition, settings),
-                        }
+                        kwargs: dict[str, Any] = {"default": None, "dest": definition.field, "help": _format_cli_help(definition, settings)}
                         if definition.cli.action is not None:
                             kwargs["action"] = definition.cli.action
                         if definition.cli.choices is not None:
@@ -627,15 +610,14 @@ def _format_cli_help(definition: SettingDefinition[Any], settings: Any) -> str:
     """Return argparse help text for one setting definition."""
     if definition.cli is None or not definition.cli.show_default:
         return definition.help
+    value = getattr(settings, definition.field)
+    if isinstance(value, bool):
+        default = "enabled" if value else "disabled"
+    elif isinstance(value, enum.StrEnum):
+        default = value.value
     else:
-        value = getattr(settings, definition.field)
-        if isinstance(value, bool):
-            default = "enabled" if value else "disabled"
-        elif isinstance(value, enum.StrEnum):
-            default = value.value
-        else:
-            default = str(value)
-        return f"{definition.help.rstrip('.!?')} (default: {default})."
+        default = str(value)
+    return f"{definition.help.rstrip('.!?')} (default: {default})."
 
 
 def _format_string(value: Any) -> str:
@@ -656,20 +638,19 @@ def format_value(value: Any, value_type: type[Any] | GenericAlias) -> str:
     value_type_: object = value_type
     if value_type_ is bool:
         return str(value).lower()
-    elif value_type_ is str:
+    if value_type_ is str:
         return _format_string(value)
-    elif value_type_ is float:
+    if value_type_ is float:
         return repr(value)
-    elif _is_str_enum_type(value_type_):
+    if _is_str_enum_type(value_type_):
         return _format_string(value.value)
-    elif value_type_ == StringList:
+    if value_type_ == StringList:
         return _format_string_list(value)
-    elif value_type_ == MultiStringMap:
+    if value_type_ == MultiStringMap:
         return _format_multi_string_map(value)
-    elif value_type_ == PerFileSettingsMap:
+    if value_type_ == PerFileSettingsMap:
         return _format_per_file_settings_map(value)
-    else:
-        return str(value)
+    return str(value)
 
 
 def _format_string_list(values: tuple[Any, ...]) -> str:
@@ -677,50 +658,41 @@ def _format_string_list(values: tuple[Any, ...]) -> str:
     return "[" + ", ".join(_format_string(value.value if isinstance(value, enum.StrEnum) else value) for value in values) + "]"
 
 
+def _format_inline_table(value: Any, entry_formatter: Callable[[Any, Any], str]) -> str:
+    """Format mapping or iterable pairs as a TOML inline table."""
+    items = tuple(value.items()) if isinstance(value, Mapping) else tuple(value)
+    entries = list(itertools.starmap(entry_formatter, items))
+    return "{" + ", ".join(entries) + "}"
+
+
 def _format_multi_string_map(value: Any) -> str:
     """Format a string-keyed multi-string mapping as a TOML inline table."""
-    if isinstance(value, Mapping):
-        items = tuple(value.items())
-    else:
-        items = tuple(value)
-    entries = [f"{_format_string(pattern)} = {_format_string_list(selectors)}" for pattern, selectors in items]
-    return "{" + ", ".join(entries) + "}"
+    return _format_inline_table(value, lambda pattern, selectors: f"{_format_string(pattern)} = {_format_string_list(selectors)}")
 
 
 def _format_per_file_settings_map(value: Any) -> str:
     """Format a per-file settings mapping as a TOML inline table."""
-    if isinstance(value, Mapping):
-        items = tuple(value.items())
-    else:
-        items = tuple(value)
-    entries = [f"{_format_string(pattern)} = {_format_flat_settings_map(updates)}" for pattern, updates in items]
-    return "{" + ", ".join(entries) + "}"
+    return _format_inline_table(value, lambda pattern, updates: f"{_format_string(pattern)} = {_format_flat_settings_map(updates)}")
 
 
 def _format_flat_settings_map(value: Any) -> str:
     """Format a flat setting-keyed override mapping as a TOML inline table."""
-    if isinstance(value, Mapping):
-        items = tuple(value.items())
-    else:
-        items = tuple(value)
-    entries = [f"{key} = {_format_resolved_setting_value(setting_value)}" for key, setting_value in items]
-    return "{" + ", ".join(entries) + "}"
+    return _format_inline_table(value, lambda key, setting_value: f"{key} = {_format_resolved_setting_value(setting_value)}")
 
 
 def _format_resolved_setting_value(value: Any) -> str:
     """Format one already validated setting value as TOML."""
     if isinstance(value, bool):
         return str(value).lower()
-    elif isinstance(value, enum.StrEnum):
+    if isinstance(value, enum.StrEnum):
         return _format_string(value.value)
-    elif isinstance(value, str):
+    if isinstance(value, str):
         return _format_string(value)
-    elif isinstance(value, float):
+    if isinstance(value, float):
         return repr(value)
-    elif isinstance(value, tuple):
+    if isinstance(value, tuple):
         return _format_string_list(value)
-    else:
-        return str(value)
+    return str(value)
 
 
 def validate_bool(value: Any, context: str) -> bool:
@@ -919,18 +891,17 @@ def _default_validator_for_type(setting_type: type[SettingValueT] | GenericAlias
     """Return the default validator for a setting type."""
     if setting_type is bool:
         return validate_bool
-    elif setting_type is int:
+    if setting_type is int:
         return validate_int()
-    elif setting_type is float:
+    if setting_type is float:
         return validate_float()
-    elif _is_str_enum_type(setting_type):
-        return validate_str_enum(cast(type[enum.StrEnum], setting_type))
-    elif setting_type == StringList:
+    if _is_str_enum_type(setting_type):
+        return validate_str_enum(cast("type[enum.StrEnum]", setting_type))
+    if setting_type == StringList:
         return validate_string_list
-    elif setting_type == MultiStringMap:
+    if setting_type == MultiStringMap:
         return validate_multi_string_map
-    else:
-        raise TypeError(f"No default validator for setting type: {setting_type!r}")
+    raise TypeError(f"No default validator for setting type: {setting_type!r}")
 
 
 def _is_str_enum_type(setting_type: Any) -> bool:
@@ -941,19 +912,16 @@ def _is_str_enum_type(setting_type: Any) -> bool:
 def _load_toml_file(path: str, *, required: bool) -> dict[str, Any] | None:
     """Load a TOML file, returning None if an optional file is absent."""
     try:
-        file = open(path, "rb")
+        with open(path, "rb") as config_file:
+            config = tomllib.load(config_file)
     except FileNotFoundError as error:
         if required:
             raise SettingsError(f"Configuration file not found: {path}") from error
         return None
     except OSError as error:
         raise SettingsError(f"Failed to read configuration file {path}: {error}") from error
-
-    with file:
-        try:
-            config = tomllib.load(file)
-        except tomllib.TOMLDecodeError as error:
-            raise SettingsError(f"Failed to decode {path}: {error}") from error
+    except tomllib.TOMLDecodeError as error:
+        raise SettingsError(f"Failed to decode {path}: {error}") from error
 
     if not isinstance(config, dict):
         raise SettingsError(f"{path}: Must contain a TOML table")
@@ -1003,7 +971,7 @@ def _toml_section_at_table_path(config: dict[str, Any], *, path: str, table_path
 
     if not isinstance(section, dict):
         raise SettingsError(f"{path}: The [{'.'.join(table_path)}] section must be a table")
-    return cast(dict[str, Any], section)
+    return cast("dict[str, Any]", section)
 
 
 def _apply_toml_file_profile(
@@ -1031,7 +999,7 @@ def _apply_toml_section_profile(
 ) -> SettingsProfile[SettingsT]:
     """Apply one TOML configuration section to a settings profile."""
     section = _flatten_prefixed_toml_setting_tables(section, prefixes=("docstring", "comment"), context=context)
-    schema_toml_keys = set(definition.key for definition in schema.definitions if definition.available_in_toml)
+    schema_toml_keys = {definition.key for definition in schema.definitions if definition.available_in_toml}
     unknown_keys = [key for key in section if key not in schema_toml_keys]
     if unknown_keys:
         unknown_keys.sort()
@@ -1080,7 +1048,7 @@ def _apply_field_values_profile(
 ) -> SettingsProfile[SettingsT]:
     """Validate raw field values and return an updated settings profile."""
     updates = _validated_field_updates(schema, values=values, context=context, key_based=key_based)
-    settings = cast(SettingsT, dataclasses.replace(cast(Any, profile.settings), **updates))
+    settings = cast("SettingsT", dataclasses.replace(cast("Any", profile.settings), **updates))
     field_bases = dict(profile.field_bases)
     field_priorities = dict(profile.field_priorities)
     absolute_source_base = os.path.abspath(source_base)

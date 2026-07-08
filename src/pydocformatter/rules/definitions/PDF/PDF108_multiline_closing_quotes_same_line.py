@@ -1,16 +1,26 @@
 """PDF108 multiline-closing-quotes-same-line rule."""
 
+# Future imports
 from __future__ import annotations
 
-import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
-import pydocformatter.rules.edits as rule_edits
-import pydocformatter.rules.registration as rule_registration
+# Standard library imports
+from typing import TYPE_CHECKING
+
+# First-party imports
 import pydocformatter.rules.violations as rule_violations
+import pydocformatter.rules.registration as rule_registration
+import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.codes import RuleCode
-from pydocformatter.rules.definition import RuleBase, RuleContext
+from pydocformatter.rules.definition import RuleBase
 from pydocformatter.rules.definitions.PDF.PDF import PDF
 from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
+
+
+if TYPE_CHECKING:
+    # First-party imports
+    import pydocformatter.rules.edits as rule_edits
+    from pydocformatter.rules.definition import RuleContext
 
 
 @rule_registration.register_rule_to(PDF)
@@ -32,8 +42,7 @@ class PDF108MultilineClosingQuotesSameLine(RuleBase):
                 setting="docstring_convention",
                 effects=(
                     RuleSettingEffectValues(
-                        effect=RuleSettingEffect.IGNORED,
-                        values=(DocstringConvention.NONE, DocstringConvention.PEP257, DocstringConvention.GOOGLE, DocstringConvention.NUMPY, DocstringConvention.REST),
+                        effect=RuleSettingEffect.IGNORED, values=(DocstringConvention.NONE, DocstringConvention.PEP257, DocstringConvention.GOOGLE, DocstringConvention.NUMPY, DocstringConvention.REST)
                     ),
                 ),
             ),
@@ -74,10 +83,5 @@ def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo, *, co
     output_lines = tuple(PDF_definition.DocstringOutputLine(original=line, source=None, value=None) for line in docstring.structure.lines[: last_content + 1])
     line_numbers = PDF_definition.docstring_value_line_numbers(docstring.structure.lines[last_content:])
     return PDF_definition.planned_simple_docstring_output_change(
-        docstring,
-        context=context,
-        output_lines=output_lines,
-        line_numbers=line_numbers,
-        preserve_trailing_newline=False,
-        separator_fallback=PDF_definition.DocstringOutputSeparatorFallback.CLOSING,
+        docstring, context=context, output_lines=output_lines, line_numbers=line_numbers, preserve_trailing_newline=False, separator_fallback=PDF_definition.DocstringOutputSeparatorFallback.CLOSING
     )

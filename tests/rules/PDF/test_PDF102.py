@@ -1,16 +1,17 @@
+# Third-party imports
 import libcst as cst
 import libcst.metadata as cst_metadata
 
-import pydocformatter.formatter as formatter
-import pydocformatter.rules.definition_helpers.source_text as source_text
-import pydocformatter.rules_selection as rules_selection
-import tests.rule_helpers as rule_helpers
+# First-party imports
+from pydocformatter import formatter, rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, LineEnding
 from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
+from pydocformatter.rules.definition_helpers import source_text
 from pydocformatter.rules.definitions.PDF.PDF import PDF
 from pydocformatter.rules.definitions.PDF.PDF100_docstring_indentation import PDF100DocstringIndentation
 from pydocformatter.rules.definitions.PDF.PDF102_docstring_trailing_whitespace import PDF102DocstringTrailingWhitespace
 from pydocformatter.rules.definitions.PDF.PDF103_docstring_blank_line_whitespace import PDF103DocstringBlankLineWhitespace
+from tests import rule_helpers
 
 
 def contexts(source: str, *, settings: CheckSettings | None = None) -> tuple[RuleCategoryContext, RuleContext]:

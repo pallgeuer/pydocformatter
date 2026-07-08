@@ -1,7 +1,9 @@
 """Static exception-name extraction helpers."""
 
+# Future imports
 from __future__ import annotations
 
+# Third-party imports
 import libcst as cst
 
 

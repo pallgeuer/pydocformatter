@@ -1,10 +1,12 @@
 """Gitignore-style glob matching helpers."""
 
+# Future imports
 from __future__ import annotations
 
-import dataclasses
-import fnmatch
+# Standard library imports
 import os
+import fnmatch
+import dataclasses
 
 
 @dataclasses.dataclass(frozen=True)
@@ -32,19 +34,9 @@ class CompiledGlobPattern:
         Returns:
             CompiledGlobPattern: Compiled pattern with cached segment metadata.
         """
-        return cls(
-            pattern=pattern,
-            segments=tuple(segment for segment in pattern.split("/") if segment),
-            has_slash="/" in pattern,
-        )
+        return cls(pattern=pattern, segments=tuple(segment for segment in pattern.split("/") if segment), has_slash="/" in pattern)
 
-    def matches(
-        self,
-        normalized_path: str,
-        *,
-        match_parent_segments_for_bare: bool,
-        match_descendants_for_slash: bool,
-    ) -> bool:
+    def matches(self, normalized_path: str, *, match_parent_segments_for_bare: bool, match_descendants_for_slash: bool) -> bool:
         """Return whether this pattern matches a normalized POSIX-style path.
 
         Args:
@@ -68,13 +60,7 @@ class CompiledGlobPattern:
                 return any(fnmatch.fnmatchcase(segment, self.pattern) for segment in path_segments[:-1])
             return False
 
-        return _match_segment_glob(
-            path_segments,
-            self.segments,
-            0,
-            0,
-            allow_descendants=match_descendants_for_slash,
-        )
+        return _match_segment_glob(path_segments, self.segments, 0, 0, allow_descendants=match_descendants_for_slash)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -92,13 +78,7 @@ class GlobPatternSet:
     match_descendants_for_slash: bool = False
 
     @classmethod
-    def compile(
-        cls,
-        patterns: tuple[str, ...],
-        *,
-        match_parent_segments_for_bare: bool,
-        match_descendants_for_slash: bool = False,
-    ) -> GlobPatternSet:
+    def compile(cls, patterns: tuple[str, ...], *, match_parent_segments_for_bare: bool, match_descendants_for_slash: bool = False) -> GlobPatternSet:
         """Compile glob patterns with the requested match semantics.
 
         Args:
@@ -125,11 +105,7 @@ class GlobPatternSet:
             bool: True if at least one compiled pattern matches the path.
         """
         return any(
-            pattern.matches(
-                normalized_path,
-                match_parent_segments_for_bare=self.match_parent_segments_for_bare,
-                match_descendants_for_slash=self.match_descendants_for_slash,
-            )
+            pattern.matches(normalized_path, match_parent_segments_for_bare=self.match_parent_segments_for_bare, match_descendants_for_slash=self.match_descendants_for_slash)
             for pattern in self.patterns
         )
 
@@ -147,14 +123,7 @@ class BaseRelativeGlobMatcher:
     matcher: GlobPatternSet
 
     @classmethod
-    def compile(
-        cls,
-        patterns: tuple[str, ...],
-        *,
-        base_path: str,
-        match_parent_segments_for_bare: bool,
-        match_descendants_for_slash: bool = False,
-    ) -> BaseRelativeGlobMatcher:
+    def compile(cls, patterns: tuple[str, ...], *, base_path: str, match_parent_segments_for_bare: bool, match_descendants_for_slash: bool = False) -> BaseRelativeGlobMatcher:
         """Compile a base-relative glob matcher.
 
         Args:
@@ -167,12 +136,7 @@ class BaseRelativeGlobMatcher:
             BaseRelativeGlobMatcher: Compiled matcher that normalizes filesystem paths against `base_path`.
         """
         return cls(
-            base_path=base_path,
-            matcher=GlobPatternSet.compile(
-                patterns,
-                match_parent_segments_for_bare=match_parent_segments_for_bare,
-                match_descendants_for_slash=match_descendants_for_slash,
-            ),
+            base_path=base_path, matcher=GlobPatternSet.compile(patterns, match_parent_segments_for_bare=match_parent_segments_for_bare, match_descendants_for_slash=match_descendants_for_slash)
         )
 
     def matches(self, path: str) -> bool:
@@ -200,46 +164,21 @@ def base_relative_posix_path(path: str, base_path: str) -> str:
     return os.path.relpath(os.path.abspath(path), os.path.abspath(base_path)).replace(os.sep, "/")
 
 
-def _match_segment_glob(
-    path_segments: tuple[str, ...],
-    pattern_segments: tuple[str, ...],
-    path_index: int,
-    pattern_index: int,
-    *,
-    allow_descendants: bool = False,
-) -> bool:
+def _match_segment_glob(path_segments: tuple[str, ...], pattern_segments: tuple[str, ...], path_index: int, pattern_index: int, *, allow_descendants: bool = False) -> bool:
     """Recursively match path segments against glob segments with ** support."""
     if pattern_index == len(pattern_segments):
         return allow_descendants or path_index == len(path_segments)
 
     current_pattern = pattern_segments[pattern_index]
     if current_pattern == "**":
-        if _match_segment_glob(
-            path_segments,
-            pattern_segments,
-            path_index,
-            pattern_index + 1,
-            allow_descendants=allow_descendants,
-        ):
+        if _match_segment_glob(path_segments, pattern_segments, path_index, pattern_index + 1, allow_descendants=allow_descendants):
             return True
         if path_index < len(path_segments):
-            return _match_segment_glob(
-                path_segments,
-                pattern_segments,
-                path_index + 1,
-                pattern_index,
-                allow_descendants=allow_descendants,
-            )
+            return _match_segment_glob(path_segments, pattern_segments, path_index + 1, pattern_index, allow_descendants=allow_descendants)
         return False
 
     if path_index >= len(path_segments):
         return False
     if not fnmatch.fnmatchcase(path_segments[path_index], current_pattern):
         return False
-    return _match_segment_glob(
-        path_segments,
-        pattern_segments,
-        path_index + 1,
-        pattern_index + 1,
-        allow_descendants=allow_descendants,
-    )
+    return _match_segment_glob(path_segments, pattern_segments, path_index + 1, pattern_index + 1, allow_descendants=allow_descendants)

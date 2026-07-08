@@ -1,10 +1,13 @@
+# Third-party imports
 import pytest
 
-import pydocformatter.rules_selection as rules_selection
-import tests.rule_helpers as rule_helpers
+# First-party imports
 import tests.rules.PDF.helpers as pdf_helpers
+from pydocformatter import rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention
 from pydocformatter.rules.definitions.PDF.PDF307_attribute_documentation_too_generic import PDF307AttributeDocumentationTooGeneric
+from tests import rule_helpers
+
 
 contexts = pdf_helpers.contexts_for("PDF307")
 format_source = pdf_helpers.formatter_for("PDF307")
@@ -12,7 +15,7 @@ format_source = pdf_helpers.formatter_for("PDF307")
 
 @pytest.mark.parametrize(
     ("description", "attribute"),
-    (
+    [
         ("timeout", "timeout"),
         ("The timeout.", "timeout"),
         ("The timeout value.", "timeout"),
@@ -27,7 +30,7 @@ format_source = pdf_helpers.formatter_for("PDF307")
         ("max_retries value", "max_retries"),
         ("max retries value", "max_retries"),
         ("API2 token value", "api2_token"),
-    ),
+    ],
 )
 def test_reports_attached_attribute_docstrings_that_only_restate_attribute_name(description: str, attribute: str) -> None:
     source = f'{attribute} = 1\n"""{description}"""\n'
@@ -74,10 +77,7 @@ def test_reports_rest_attribute_field_aliases() -> None:
     assert result.new_source == source
     assert not result.fixed_findings
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((3,), (4,))
-    assert tuple(finding.message for finding in result.unfixed_findings) == (
-        "Attribute 'timeout' documentation is too generic",
-        "Attribute 'token' documentation is too generic",
-    )
+    assert tuple(finding.message for finding in result.unfixed_findings) == ("Attribute 'timeout' documentation is too generic", "Attribute 'token' documentation is too generic")
 
 
 def test_reports_module_owner_docstring_attribute_entries() -> None:
@@ -107,10 +107,7 @@ def test_reports_only_generic_attributes_in_mixed_owner_docstring() -> None:
     assert result.new_source == source
     assert not result.fixed_findings
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((5,), (7,))
-    assert tuple(finding.message for finding in result.unfixed_findings) == (
-        "Attribute 'timeout' documentation is too generic",
-        "Attribute 'base_url' documentation is too generic",
-    )
+    assert tuple(finding.message for finding in result.unfixed_findings) == ("Attribute 'timeout' documentation is too generic", "Attribute 'base_url' documentation is too generic")
 
 
 def test_reports_same_line_and_annotated_attached_attribute_docstrings() -> None:
@@ -120,10 +117,7 @@ def test_reports_same_line_and_annotated_attached_attribute_docstrings() -> None
     assert result.new_source == source
     assert not result.fixed_findings
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((3,), (6,))
-    assert tuple(finding.message for finding in result.unfixed_findings) == (
-        "Attribute 'timeout' documentation is too generic",
-        "Attribute 'retries' documentation is too generic",
-    )
+    assert tuple(finding.message for finding in result.unfixed_findings) == ("Attribute 'timeout' documentation is too generic", "Attribute 'retries' documentation is too generic")
 
 
 def test_reports_mixed_tuple_assignments_with_one_supported_attached_attribute_target() -> None:
@@ -147,10 +141,7 @@ def test_suppresses_only_the_targeted_attribute_entry_or_attached_docstring() ->
     assert result.new_source == source
     assert not result.fixed_findings
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((6,), (13,))
-    assert tuple(finding.message for finding in result.unfixed_findings) == (
-        "Attribute 'retries' documentation is too generic",
-        "Attribute 'class_retries' documentation is too generic",
-    )
+    assert tuple(finding.message for finding in result.unfixed_findings) == ("Attribute 'retries' documentation is too generic", "Attribute 'class_retries' documentation is too generic")
 
 
 def test_preserves_crlf_source_when_reporting_generic_attribute_documentation() -> None:
@@ -165,13 +156,7 @@ def test_preserves_crlf_source_when_reporting_generic_attribute_documentation() 
 
 @pytest.mark.parametrize(
     "description",
-    (
-        "Request timeout in seconds.",
-        "Maximum number of retry attempts.",
-        "URL used for outgoing API requests.",
-        "Whether retries are enabled.",
-        "Value read from the client configuration.",
-    ),
+    ["Request timeout in seconds.", "Maximum number of retry attempts.", "URL used for outgoing API requests.", "Whether retries are enabled.", "Value read from the client configuration."],
 )
 def test_skips_attribute_documentation_with_extra_meaning(description: str) -> None:
     source = f'timeout = 30\n"""{description}"""\n'

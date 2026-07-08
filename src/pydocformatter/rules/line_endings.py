@@ -1,9 +1,12 @@
 """Line-ending detection and rendering."""
 
+# Future imports
 from __future__ import annotations
 
+# Standard library imports
 import os
 
+# First-party imports
 from pydocformatter.cli.settings_check import LineEnding
 
 
@@ -22,14 +25,13 @@ def resolve_line_ending(source: str, *, line_ending: LineEnding) -> str:
     """
     if line_ending == LineEnding.AUTO:
         return detect_line_ending(source)
-    elif line_ending == LineEnding.LF:
+    if line_ending == LineEnding.LF:
         return "\n"
-    elif line_ending == LineEnding.CR_LF:
+    if line_ending == LineEnding.CR_LF:
         return "\r\n"
-    elif line_ending == LineEnding.NATIVE:
+    if line_ending == LineEnding.NATIVE:
         return os.linesep
-    else:
-        raise ValueError(f"Unexpected line ending specification: {line_ending}")
+    raise ValueError(f"Unexpected line ending specification: {line_ending}")
 
 
 def detect_line_ending(source: str) -> str:

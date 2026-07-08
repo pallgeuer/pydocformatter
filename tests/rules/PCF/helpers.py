@@ -1,12 +1,22 @@
 """Helpers for exercising PCF comment-formatting rules in tests."""
 
-import pydocformatter.formatter as formatter
-import pydocformatter.rules_selection as rules_selection
-from pydocformatter.cli.settings_check import CheckSettings, CommentTaskMarkerMode, LineEnding
-from pydocformatter.settings import StringList
+# Future imports
+from __future__ import annotations
+
+# Standard library imports
+from typing import TYPE_CHECKING
+
+# First-party imports
+from pydocformatter import formatter, rules_selection
+from pydocformatter.cli.settings_check import DEFAULT_COMMENT_TASK_MARKERS, CheckSettings, CommentTaskMarkerMode, LineEnding
 
 
-def format_pcf(
+if TYPE_CHECKING:
+    # First-party imports
+    from pydocformatter.settings import StringList
+
+
+def format_pcf(  # noqa: PLR0913
     source: str,
     *,
     fix: bool = True,
@@ -17,7 +27,7 @@ def format_pcf(
     comment_join_standalone_lines: bool = False,
     comment_format_list_items: bool = True,
     comment_task_marker_mode: CommentTaskMarkerMode = CommentTaskMarkerMode.NO_WRAP,
-    comment_task_markers: StringList = CheckSettings().comment_task_markers,
+    comment_task_markers: StringList = DEFAULT_COMMENT_TASK_MARKERS,
     comment_preserve_headings: bool = True,
     comment_preserve_doctests: bool = True,
     comment_preserve_code_fences: bool = True,

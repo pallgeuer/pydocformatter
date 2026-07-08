@@ -5,15 +5,24 @@ Attributes:
     TypeAliasMap (TypeAlias): Unshadowed source names mapped to absolute import-qualified names for type comparison.
 """
 
+# Future imports
 from __future__ import annotations
 
+# Standard library imports
+import enum
 import bisect
 import dataclasses
-import enum
 from collections.abc import Mapping
+from typing import TYPE_CHECKING
 
+# Third-party imports
 import libcst as cst
-import libcst.metadata as cst_metadata
+
+
+if TYPE_CHECKING:
+    # Third-party imports
+    import libcst.metadata as cst_metadata
+
 
 BindingKey = tuple[int, int]
 TypeAliasMap = dict[str, str]

@@ -1,12 +1,15 @@
+# Third-party imports
 import pytest
 
-import pydocformatter.rules_selection as rules_selection
-import tests.rule_helpers as rule_helpers
+# First-party imports
 import tests.rules.PDF.helpers as pdf_helpers
+from pydocformatter import rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention, LineEnding
 from pydocformatter.rules.definitions.PDF.PDF308_entry_description_trailing_period import PDF308EntryDescriptionTrailingPeriod
 from pydocformatter.rules.definitions.PDF.PDF309_entry_description_terminal_punctuation import PDF309EntryDescriptionTerminalPunctuation
 from pydocformatter.rules.definitions.PDF.PDF310_entry_description_first_word_capitalization import PDF310EntryDescriptionFirstWordCapitalization
+from tests import rule_helpers
+
 
 contexts = pdf_helpers.contexts_for("PDF310")
 format_source = pdf_helpers.formatter_for("PDF310")
@@ -60,14 +63,7 @@ def test_capitalizes_method_and_attribute_entry_descriptions() -> None:
     assert result.fixed_findings[PDF310EntryDescriptionFirstWordCapitalization.meta] == 2
 
 
-@pytest.mark.parametrize(
-    ("description", "expected"),
-    (
-        ("don't retry.", "Don't retry."),
-        ("retry? when needed.", "Retry? when needed."),
-        ("retry... when needed.", "Retry... when needed."),
-    ),
-)
+@pytest.mark.parametrize(("description", "expected"), [("don't retry.", "Don't retry."), ("retry? when needed.", "Retry? when needed."), ("retry... when needed.", "Retry... when needed.")])
 def test_capitalizes_safe_words_with_internal_apostrophes_or_terminal_punctuation(description: str, expected: str) -> None:
     source = f'def connect(timeout):\n    """Connect.\n\n    Args:\n        timeout: {description}\n    """\n'
     result = format_source(source)
@@ -78,7 +74,7 @@ def test_capitalizes_safe_words_with_internal_apostrophes_or_terminal_punctuatio
 
 
 @pytest.mark.parametrize(
-    "description", ("Already capitalized.", "URL value.", "123 value.", "return_value.", '"return" value.', "return-value.", "iOS device.", "iPhone device.", "eBay item.", "macOS device.")
+    "description", ["Already capitalized.", "URL value.", "123 value.", "return_value.", '"return" value.', "return-value.", "iOS device.", "iPhone device.", "eBay item.", "macOS device."]
 )
 def test_skips_words_without_safe_ascii_capitalization(description: str) -> None:
     source = f'def connect(timeout):\n    """Connect.\n\n    Args:\n        timeout: {description}\n    """\n'
@@ -154,10 +150,10 @@ def test_combined_entry_description_style_rules_converge() -> None:
 
 @pytest.mark.parametrize(
     "source",
-    (
+    [
         'def connect(timeout):\r\n    """Connect.\r\n\n    Args:\n        timeout: timeout in seconds\n    """\n',
         'def connect(timeout):\n    """Connect.\n\r\n    Args:\r\n        timeout: timeout in seconds\r\n    """\r\n',
-    ),
+    ],
 )
 def test_combined_entry_description_style_rules_do_not_fix_mixed_physical_line_endings(source: str) -> None:
     settings = CheckSettings(select=("PDF308", "PDF309", "PDF310"), docstring_convention=DocstringConvention.GOOGLE)

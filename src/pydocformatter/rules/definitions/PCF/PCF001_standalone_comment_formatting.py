@@ -1,22 +1,33 @@
 """PCF001 standalone-comment-formatting rule."""
 
+# Future imports
 from __future__ import annotations
 
-import re
+# Standard library imports
+from typing import TYPE_CHECKING
 
+# Third-party imports
 import libcst.metadata as cst_metadata
 
-import pydocformatter.rules.definition_helpers.colon_boundaries as colon_boundaries
-import pydocformatter.rules.definition_helpers.comments as comment_helpers
-import pydocformatter.rules.definition_helpers.text_layout as text_layout
-import pydocformatter.rules.definitions.PCF.PCF as PCF_definition
+# First-party imports
 import pydocformatter.rules.edits as rule_edits
-import pydocformatter.rules.registration as rule_registration
 import pydocformatter.rules.violations as rule_violations
-from pydocformatter.cli.settings_check import CheckSettings
+import pydocformatter.rules.registration as rule_registration
+import pydocformatter.rules.definitions.PCF.PCF as PCF_definition
+import pydocformatter.rules.definition_helpers.comments as comment_helpers
 from pydocformatter.rules.codes import RuleCode
-from pydocformatter.rules.definition import RuleBase, RuleContext
+from pydocformatter.rules.definition import RuleBase
+from pydocformatter.rules.definition_helpers import colon_boundaries, text_layout
 from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata
+
+
+if TYPE_CHECKING:
+    # Standard library imports
+    import re
+
+    # First-party imports
+    from pydocformatter.cli.settings_check import CheckSettings
+    from pydocformatter.rules.definition import RuleContext
 
 
 @rule_registration.register_rule_to(PCF_definition.PCF)
@@ -88,12 +99,7 @@ def _planned_changes(context: RuleContext) -> tuple[rule_edits.PlannedSourceChan
 
 
 def _change_for_unit(
-    data: PCF_definition.PCFCategoryData,
-    comments: tuple[PCF_definition.CommentInfo, ...],
-    *,
-    output_lines: tuple[str, ...],
-    indent: str,
-    line_ending: str,
+    data: PCF_definition.PCFCategoryData, comments: tuple[PCF_definition.CommentInfo, ...], *, output_lines: tuple[str, ...], indent: str, line_ending: str
 ) -> rule_edits.PlannedSourceChange | None:
     """Build a planned replacement when generated unit source differs."""
     code_range = cst_metadata.CodeRange(start=comments[0].range.start, end=comments[-1].range.end)
@@ -103,9 +109,7 @@ def _change_for_unit(
     if data.source_for(code_range) == replacement:
         return None
     return rule_edits.PlannedSourceChange(
-        edit=rule_edits.SourceEdit(range=code_range, replacement=replacement),
-        line_numbers=tuple(comment.range.start.line for comment in comments),
-        suppression_line_numbers=(),
+        edit=rule_edits.SourceEdit(range=code_range, replacement=replacement), line_numbers=tuple(comment.range.start.line for comment in comments), suppression_line_numbers=()
     )
 
 
@@ -115,14 +119,7 @@ def _wrap_plain(content: str, *, indent: str, settings: CheckSettings) -> tuple[
     return text_layout.wrap_text(content, width=width, tab_width=settings.indent_width, url_aware=settings.url_aware_wrapping)
 
 
-def _format_task_marker(
-    run: PCF_definition.StandaloneCommentRun,
-    index: int,
-    *,
-    match: comment_helpers.TaskMarkerMatch,
-    preserved: set[int],
-    settings: CheckSettings,
-) -> tuple[int, tuple[str, ...]]:
+def _format_task_marker(run: PCF_definition.StandaloneCommentRun, index: int, *, match: comment_helpers.TaskMarkerMatch, preserved: set[int], settings: CheckSettings) -> tuple[int, tuple[str, ...]]:
     """Return the extent and hanging-indented output of one task marker."""
     texts = [match.text]
     end = index + 1
@@ -135,14 +132,7 @@ def _format_task_marker(
     return end, comment_helpers.format_task_marker_lines(match.marker, tuple(texts), indent=run.indent, settings=settings)
 
 
-def _format_list_item(
-    run: PCF_definition.StandaloneCommentRun,
-    index: int,
-    *,
-    match: re.Match[str],
-    preserved: set[int],
-    settings: CheckSettings,
-) -> tuple[int, tuple[str, ...]]:
+def _format_list_item(run: PCF_definition.StandaloneCommentRun, index: int, *, match: re.Match[str], preserved: set[int], settings: CheckSettings) -> tuple[int, tuple[str, ...]]:
     """Return the extent and hanging-indented output of one list item."""
     prefix = _expanded_structure_prefix(f"{match.group('indent')}{match.group('marker')} ", indent=run.indent, tab_width=settings.indent_width)
     texts = [match.group("text").strip()]
@@ -163,14 +153,7 @@ def _format_list_item(
     return end, lines
 
 
-def _format_block_quote(
-    run: PCF_definition.StandaloneCommentRun,
-    index: int,
-    *,
-    match: re.Match[str],
-    preserved: set[int],
-    settings: CheckSettings,
-) -> tuple[int, tuple[str, ...]]:
+def _format_block_quote(run: PCF_definition.StandaloneCommentRun, index: int, *, match: re.Match[str], preserved: set[int], settings: CheckSettings) -> tuple[int, tuple[str, ...]]:
     """Return the extent and prefix-preserving output of one block quote."""
     prefix = _expanded_structure_prefix(match.group("prefix"), indent=run.indent, tab_width=settings.indent_width)
     texts = [match.group("text").strip()]

@@ -1,8 +1,20 @@
-import pydocformatter.formatter as formatter
-import pydocformatter.rules_selection as rules_selection
+# Future imports
+from __future__ import annotations
+
+# Standard library imports
+from typing import TYPE_CHECKING
+
+# First-party imports
 import tests.rules.PDF.helpers as pdf_helpers
+from pydocformatter import rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention
 from pydocformatter.rules.definitions.PDF.PDF518_public_class_attribute_docstring_must_be_owner import PDF518PublicClassAttributeDocstringMustBeOwner
+
+
+if TYPE_CHECKING:
+    # First-party imports
+    from pydocformatter import formatter
+
 
 format_source = pdf_helpers.formatter_for("PDF518")
 

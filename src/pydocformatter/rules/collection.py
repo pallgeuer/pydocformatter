@@ -5,21 +5,32 @@ Attributes:
         import time.
 """
 
+# Future imports
 from __future__ import annotations
 
-import dataclasses
-import importlib
-import importlib.resources
+# Standard library imports
 import inspect
 import pkgutil
+import importlib
+import dataclasses
+import importlib.resources
+from collections.abc import Iterable
 from types import ModuleType
-from typing import Iterable, TypeVar
+from typing import TYPE_CHECKING, TypeVar
 
+# First-party imports
 import pydocformatter.rules.definitions as rule_definitions
 import pydocformatter.rules.registration as rule_registration
-from pydocformatter.rules.codes import RuleCode, RuleSelector
+from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase, RuleCategoryBase
-from pydocformatter.rules.registration import RuleError, RuleRegistry
+from pydocformatter.rules.registration import RuleError
+
+
+if TYPE_CHECKING:
+    # First-party imports
+    from pydocformatter.rules.codes import RuleSelector
+    from pydocformatter.rules.registration import RuleRegistry
+
 
 _BaseT = TypeVar("_BaseT")
 

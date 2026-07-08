@@ -1,7 +1,19 @@
-import pydocformatter.formatter as formatter
+# Future imports
+from __future__ import annotations
+
+# Standard library imports
+from typing import TYPE_CHECKING
+
+# First-party imports
 import tests.rules.PDF.helpers as pdf_helpers
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention
 from pydocformatter.rules.definitions.PDF.PDF516_private_class_attribute_attached_docstring_forbidden import PDF516PrivateClassAttributeAttachedDocstringForbidden
+
+
+if TYPE_CHECKING:
+    # First-party imports
+    from pydocformatter import formatter
+
 
 format_source = pdf_helpers.formatter_for("PDF516")
 

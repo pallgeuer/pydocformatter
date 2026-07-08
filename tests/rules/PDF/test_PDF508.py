@@ -1,5 +1,5 @@
-import pydocformatter.formatter as formatter
-import pydocformatter.rules_selection as rules_selection
+# First-party imports
+from pydocformatter import formatter, rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention, DocstringMissingDocumentation
 from pydocformatter.rules.definitions.PDF.PDF508_missing_public_class_attribute_documentation import PDF508MissingPublicClassAttributeDocumentation
 
@@ -99,9 +99,7 @@ def test_all_docstrings_policy_reports_summary_only_public_class_docstring() -> 
 
     assert_pdf508_lines(source, (), settings=CheckSettings(select=("PDF508",), docstring_convention=DocstringConvention.GOOGLE))
     assert_pdf508_lines(
-        source,
-        ((4,),),
-        settings=CheckSettings(select=("PDF508",), docstring_convention=DocstringConvention.GOOGLE, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS),
+        source, ((4,),), settings=CheckSettings(select=("PDF508",), docstring_convention=DocstringConvention.GOOGLE, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS)
     )
 
 
@@ -110,16 +108,8 @@ def test_inert_conventions_do_not_report_broad_class_missing_policies() -> None:
     body = 'class Client:\n    """HTTP client.\n\n    Used by the transport layer.\n    """\n\n    timeout: float\n'
 
     for convention in (DocstringConvention.NONE, DocstringConvention.PEP257):
-        assert_pdf508_lines(
-            summary,
-            (),
-            settings=CheckSettings(select=("PDF508",), docstring_convention=convention, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS),
-        )
-        assert_pdf508_lines(
-            body,
-            (),
-            settings=CheckSettings(select=("PDF508",), docstring_convention=convention, docstring_missing_documentation=DocstringMissingDocumentation.NON_SUMMARY_DOCSTRINGS),
-        )
+        assert_pdf508_lines(summary, (), settings=CheckSettings(select=("PDF508",), docstring_convention=convention, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS))
+        assert_pdf508_lines(body, (), settings=CheckSettings(select=("PDF508",), docstring_convention=convention, docstring_missing_documentation=DocstringMissingDocumentation.NON_SUMMARY_DOCSTRINGS))
 
 
 def test_repeated_assignment_reports_first_missing_attribute_line_once() -> None:
@@ -157,11 +147,7 @@ def test_tuple_unpacked_init_attribute_mixed_with_discard_is_required_when_enabl
         'class Client:\n    """HTTP client.\n\n    Attributes:\n        timeout (float): Request timeout.\n    """\n\n    timeout: float\n\n    def __init__(self):\n        self.retries, _ = values\n'
     )
 
-    assert_pdf508_lines(
-        source,
-        ((11,),),
-        settings=CheckSettings(select=("PDF508",), docstring_convention=DocstringConvention.GOOGLE, docstring_require_init_attribute_documentation=True),
-    )
+    assert_pdf508_lines(source, ((11,),), settings=CheckSettings(select=("PDF508",), docstring_convention=DocstringConvention.GOOGLE, docstring_require_init_attribute_documentation=True))
 
 
 def test_non_summary_policy_reports_body_only_class_docstring() -> None:

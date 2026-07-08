@@ -13,7 +13,8 @@
 - Never run uv with a custom/temporary cache dir (e.g. UV_CACHE_DIR or --cache-dir); if cache-related uv failures occur then abort and notify the user.
 - The venv has no pip; use `uv pip`, `uv tree`, or similar.
 - Use pytest for running tests. Pytest uses pytest-xdist multiprocessing by default; pass `-n 0` for serial debugging or focused runs where worker startup is slower.
-- Use mypy for type checking, black/isort (NOT ruff) to format code, and `pydocfmt check --fix` to format docstrings/comments.
+- Use ty for type checking, Ruff for code formatting/linting, and `pydocfmt check --fix` to format docstrings/comments.
+- Do not run pydocfmt on Markdown files; it only parses Python source and will fail on Markdown.
 
 ## Workflows
 

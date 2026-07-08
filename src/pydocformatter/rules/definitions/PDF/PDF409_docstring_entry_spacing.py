@@ -1,17 +1,26 @@
 """PDF409 docstring-entry-spacing rule."""
 
+# Future imports
 from __future__ import annotations
 
-import pydocformatter.rules.definition_helpers.docstring_conventions as docstring_conventions
-import pydocformatter.rules.definition_helpers.section_edits as section_edits
-import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
-import pydocformatter.rules.edits as rule_edits
+# Standard library imports
+from typing import TYPE_CHECKING
+
+# First-party imports
 import pydocformatter.rules.registration as rule_registration
-import pydocformatter.rules.violations as rule_violations
+import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.codes import RuleCode
-from pydocformatter.rules.definition import RuleBase, RuleContext
+from pydocformatter.rules.definition import RuleBase
+from pydocformatter.rules.definition_helpers import docstring_conventions, section_edits
 from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
+
+
+if TYPE_CHECKING:
+    # First-party imports
+    import pydocformatter.rules.edits as rule_edits
+    import pydocformatter.rules.violations as rule_violations
+    from pydocformatter.rules.definition import RuleContext
 
 
 @rule_registration.register_rule_to(PDF_definition.PDF)
@@ -111,7 +120,7 @@ def _canonical_entry_line(convention: DocstringConvention, text: str, entry: PDF
 def _canonical_google_entry_line(text: str, entry: PDF_definition.DocstringEntry) -> str | None:
     """Return the canonical Google entry line for spacing normalization."""
     match = PDF_definition._GOOGLE_ENTRY_RE.match(text)
-    if match is None and entry.kind in (PDF_definition.DocstringEntryKind.RETURN, PDF_definition.DocstringEntryKind.YIELD, PDF_definition.DocstringEntryKind.EXCEPTION):
+    if match is None and entry.kind in {PDF_definition.DocstringEntryKind.RETURN, PDF_definition.DocstringEntryKind.YIELD, PDF_definition.DocstringEntryKind.EXCEPTION}:
         match = PDF_definition._GENERIC_ENTRY_RE.match(text)
     if match is None:
         return None
@@ -121,12 +130,12 @@ def _canonical_google_entry_line(text: str, entry: PDF_definition.DocstringEntry
     description = match.group("description").strip()
     if description == ":" and text.rstrip().endswith("::"):
         return None
-    return f'{match.group("indent")}{head}:{f" {description}" if description else ""}'
+    return f"{match.group('indent')}{head}:{f' {description}' if description else ''}"
 
 
 def _google_entry_head(entry: PDF_definition.DocstringEntry, *, original_name: str, original_type: str | None) -> str | None:
     """Return the canonical Google entry head before the description colon."""
-    if entry.kind in (PDF_definition.DocstringEntryKind.RETURN, PDF_definition.DocstringEntryKind.YIELD) and not entry.names:
+    if entry.kind in {PDF_definition.DocstringEntryKind.RETURN, PDF_definition.DocstringEntryKind.YIELD} and not entry.names:
         return entry.type_text.strip() if entry.type_text else None
     if entry.kind is PDF_definition.DocstringEntryKind.EXCEPTION:
         if original_type:
@@ -144,11 +153,11 @@ def _canonical_numpy_entry_line(text: str, entry: PDF_definition.DocstringEntry)
     """Return the canonical NumPy entry line for spacing normalization."""
     if entry.kind is PDF_definition.DocstringEntryKind.EXCEPTION and (exception_match := PDF_definition._NUMPY_EXCEPTION_ENTRY_RE.match(text)) is not None:
         description = exception_match.group("description").strip()
-        return f'{exception_match.group("indent")}{exception_match.group("name").strip()}:{f" {description}" if description else ""}'
+        return f"{exception_match.group('indent')}{exception_match.group('name').strip()}:{f' {description}' if description else ''}"
     match = PDF_definition._NUMPY_ENTRY_RE.match(text)
     if match is None:
         return None
-    return f'{match.group("indent")}{", ".join(entry.names)} : {entry.type_text.strip() if entry.type_text else match.group("type").strip()}'
+    return f"{match.group('indent')}{', '.join(entry.names)} : {entry.type_text.strip() if entry.type_text else match.group('type').strip()}"
 
 
 def _canonical_rest_entry_line(text: str, entry: PDF_definition.DocstringEntry) -> str | None:
@@ -158,7 +167,7 @@ def _canonical_rest_entry_line(text: str, entry: PDF_definition.DocstringEntry) 
         return None
     argument = _canonical_rest_argument(entry)
     description = match.group("description").strip()
-    return f'{match.group("indent")}:{match.group("field")}{f" {argument}" if argument else ""}:{f" {description}" if description else ""}'
+    return f"{match.group('indent')}:{match.group('field')}{f' {argument}' if argument else ''}:{f' {description}' if description else ''}"
 
 
 def _canonical_rest_argument(entry: PDF_definition.DocstringEntry) -> str | None:

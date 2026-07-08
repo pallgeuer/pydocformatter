@@ -1,8 +1,9 @@
+# Third-party imports
 import pytest
 
-import pydocformatter.formatter as formatter
-import pydocformatter.rules_selection as rules_selection
+# First-party imports
 import tests.rules.PCF.helpers as pcf_helpers
+from pydocformatter import formatter, rules_selection
 from pydocformatter.cli.settings_check import CheckSettings
 
 
@@ -14,12 +15,12 @@ def test_trailing_comment_spacing_and_empty_comment_are_canonicalized() -> None:
 
 @pytest.mark.parametrize(
     ("source", "expected"),
-    (
+    [
         ("if enabled:\n    value = compute()#comment\n", "if enabled:\n    value = compute()  # comment\n"),
         ("if enabled:\n    value = compute() \t\f #  comment   \n", "if enabled:\n    value = compute()  # comment\n"),
         ("value = compute()  ### heading-like content\n", "value = compute()  # ## heading-like content\n"),
         ("value = compute()#", "value = compute()  #"),
-    ),
+    ],
 )
 def test_trailing_comment_normalization_covers_missing_spacing_whitespace_and_additional_hashes(source: str, expected: str) -> None:
     assert pcf_helpers.format_pcf(source).new_source == expected
@@ -55,7 +56,7 @@ def test_protected_trailing_comments_strip_terminal_whitespace() -> None:
 
 @pytest.mark.parametrize(
     ("directive", "expected_gap"),
-    (
+    [
         ("# type: ignore", "  "),
         ("# TYPE : ignore", "  "),
         ("# noqa", " "),
@@ -69,7 +70,7 @@ def test_protected_trailing_comments_strip_terminal_whitespace() -> None:
         ("# fmt: off", "  "),
         ("# isort: skip", "  "),
         ("# pragma: no cover", "  "),
-    ),
+    ],
 )
 def test_all_protected_trailing_directive_families_preserve_payload_after_hash(directive: str, expected_gap: str) -> None:
     source = f"value = compute() {directive}\n"
@@ -80,11 +81,11 @@ def test_all_protected_trailing_directive_families_preserve_payload_after_hash(d
 
 @pytest.mark.parametrize(
     ("source", "expected"),
-    (
+    [
         ("value = compute()#noqa\n", "value = compute()  #noqa\n"),
         ("value = compute() #   nosec reason\n", "value = compute()  #   nosec reason\n"),
         ("value = compute() # TYPE : ignore[x]\n", "value = compute()  # TYPE : ignore[x]\n"),
-    ),
+    ],
 )
 def test_directives_keep_hash_payload_when_spacing_selected_alone(source: str, expected: str) -> None:
     settings = CheckSettings(select=("PCF002",))

@@ -102,4 +102,4 @@ uv run pytest tests/rules/<PREFIX>/test_<CODE>.py
 uv run pytest tests/test_rules.py tests/test_formatting_rules_doc.py tests/test_rule_markdown_examples.py
 ```
 
-Broader changes additionally run the relevant category tests, settings tests, CLI tests, full pytest suite, `uv run mypy`, `uv run black --check .`, `uv run isort --check .`, and `uv run pydocfmt check` as appropriate. Pytest uses project-default multiprocessing through pytest-xdist; pass `-n 0` for serial debugging or focused runs where worker startup is slower.
+Broader changes additionally run the relevant category tests, settings tests, CLI tests, full pytest suite, `uv run ruff check`, `uv run pydocfmt check`, `uv run ruff format --check`, and `uv run ty check` as appropriate. Pytest uses project-default multiprocessing through pytest-xdist; pass `-n 0` for serial debugging or focused runs where worker startup is slower.

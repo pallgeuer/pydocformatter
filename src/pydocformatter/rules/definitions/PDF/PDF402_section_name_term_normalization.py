@@ -1,18 +1,25 @@
 """PDF402 section-name-term-normalization rule."""
 
+# Future imports
 from __future__ import annotations
 
-import pydocformatter.rules.definition_helpers.docstring_conventions as docstring_conventions
-import pydocformatter.rules.definition_helpers.docstring_sections as docstring_sections
-import pydocformatter.rules.definition_helpers.rest_fields as rest_fields
-import pydocformatter.rules.definition_helpers.section_name_replacements as section_name_replacements
+# Standard library imports
+from typing import TYPE_CHECKING
+
+# First-party imports
 import pydocformatter.rules.registration as rule_registration
-import pydocformatter.rules.violations as rule_violations
 from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.codes import RuleCode
-from pydocformatter.rules.definition import RuleBase, RuleContext
+from pydocformatter.rules.definition import RuleBase
+from pydocformatter.rules.definition_helpers import docstring_conventions, docstring_sections, rest_fields, section_name_replacements
 from pydocformatter.rules.definitions.PDF.PDF import PDF
 from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
+
+
+if TYPE_CHECKING:
+    # First-party imports
+    import pydocformatter.rules.violations as rule_violations
+    from pydocformatter.rules.definition import RuleContext
 
 
 @rule_registration.register_rule_to(PDF)

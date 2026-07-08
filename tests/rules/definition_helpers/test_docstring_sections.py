@@ -1,5 +1,6 @@
-import pydocformatter.rules.definition_helpers.docstring_sections as docstring_sections
+# First-party imports
 from pydocformatter.cli.settings_check import DocstringConvention
+from pydocformatter.rules.definition_helpers import docstring_sections
 
 
 def test_convention_parses_sections_only_for_named_section_conventions() -> None:

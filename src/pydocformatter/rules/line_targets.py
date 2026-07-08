@@ -1,5 +1,6 @@
 """Validation for rule diagnostic line targets."""
 
+# Future imports
 from __future__ import annotations
 
 

@@ -1,16 +1,26 @@
 """PCF004 trailing-comment-extraction rule."""
 
+# Future imports
 from __future__ import annotations
 
-import pydocformatter.rules.definition_helpers.comments as comment_helpers
-import pydocformatter.rules.definition_helpers.text_layout as text_layout
-import pydocformatter.rules.definitions.PCF.PCF as PCF_definition
-import pydocformatter.rules.edits as rule_edits
-import pydocformatter.rules.registration as rule_registration
+# Standard library imports
+from typing import TYPE_CHECKING
+
+# First-party imports
 import pydocformatter.rules.violations as rule_violations
+import pydocformatter.rules.registration as rule_registration
+import pydocformatter.rules.definitions.PCF.PCF as PCF_definition
+import pydocformatter.rules.definition_helpers.comments as comment_helpers
 from pydocformatter.rules.codes import RuleCode
-from pydocformatter.rules.definition import RuleBase, RuleContext
+from pydocformatter.rules.definition import RuleBase
+from pydocformatter.rules.definition_helpers import text_layout
 from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata
+
+
+if TYPE_CHECKING:
+    # First-party imports
+    import pydocformatter.rules.edits as rule_edits
+    from pydocformatter.rules.definition import RuleContext
 
 
 @rule_registration.register_rule_to(PCF_definition.PCF)
@@ -61,27 +71,16 @@ def _planned_changes(context: RuleContext) -> tuple[rule_edits.PlannedSourceChan
             continue
         if context.settings.comment_trailing_extraction_content_aware and comment_helpers.trailing_content_is_unsafe(comment.body, settings=context.settings):
             continue
-        replacement = _extracted_replacement(data, comment, code=code, context=context, comments_by_line=comments_by_line)
+        replacement = _extracted_replacement(comment, code=code, context=context, comments_by_line=comments_by_line)
         change = PCF_definition.planned_full_line_change(data, comment, replacement)
         if change is not None:
             changes.append(change)
     return tuple(changes)
 
 
-def _extracted_replacement(
-    data: PCF_definition.PCFCategoryData,
-    comment: PCF_definition.CommentInfo,
-    *,
-    code: str,
-    context: RuleContext,
-    comments_by_line: dict[int, PCF_definition.CommentInfo],
-) -> str:
+def _extracted_replacement(comment: PCF_definition.CommentInfo, *, code: str, context: RuleContext, comments_by_line: dict[int, PCF_definition.CommentInfo]) -> str:
     """Return the full-line replacement for one extracted trailing comment."""
-    width = PCF_definition.available_comment_width(
-        comment.indent,
-        line_length=context.settings.line_length,
-        tab_width=context.settings.indent_width,
-    )
+    width = PCF_definition.available_comment_width(comment.indent, line_length=context.settings.line_length, tab_width=context.settings.indent_width)
     task_marker = comment_helpers.task_marker_match(comment.body.strip(), settings=context.settings)
     if task_marker is not None:
         wrapped = comment_helpers.format_task_marker_lines(task_marker.marker, (task_marker.text,), indent=comment.indent, settings=context.settings)

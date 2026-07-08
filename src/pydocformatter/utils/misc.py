@@ -1,17 +1,20 @@
 """Small descriptors and reflection helpers."""
 
+# Future imports
 from __future__ import annotations
 
-import functools
-import operator
+# Standard library imports
 import os
+import operator
+import functools
 from collections.abc import Callable
 from typing import Any, Generic, TypeVar, cast, overload
+
 
 _R_co = TypeVar("_R_co", covariant=True)
 
 
-class classproperty(Generic[_R_co]):
+class classproperty(Generic[_R_co]):  # noqa: N801
     """A descriptor that computes a read-only value from the owning class.
 
     Instance assignment/deletion is blocked. Class-level assignment/deletion can still replace/remove the descriptor
@@ -32,7 +35,7 @@ class classproperty(Generic[_R_co]):
                 computed property value.
         """
         self.fget = fget
-        functools.update_wrapper(cast(Callable[..., Any], self), fget)
+        functools.update_wrapper(cast("Callable[..., Any]", self), fget)
         self.__isabstractmethod__ = getattr(fget, "__isabstractmethod__", False)
 
     @overload
@@ -135,10 +138,9 @@ def _is_valid_git_marker(path: str) -> bool:
     """Return whether a .git path looks like a worktree marker."""
     if os.path.isfile(path):
         return True
-    elif not os.path.isdir(path):
+    if not os.path.isdir(path):
         return False
-    else:
-        return os.path.exists(os.path.join(path, "HEAD"))
+    return os.path.exists(os.path.join(path, "HEAD"))
 
 
 def format_line_ranges(line_numbers: list[int]) -> str:

@@ -1,15 +1,24 @@
 """Source spacing helpers for docstring statement blank-line rules."""
 
+# Future imports
 from __future__ import annotations
 
+# Standard library imports
 import enum
+from typing import TYPE_CHECKING
 
+# Third-party imports
 import libcst as cst
 import libcst.metadata as cst_metadata
 
-import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
+# First-party imports
 import pydocformatter.rules.edits as rule_edits
-from pydocformatter.rules.definition import RuleContext
+import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
+
+
+if TYPE_CHECKING:
+    # First-party imports
+    from pydocformatter.rules.definition import RuleContext
 
 
 class DocstringStatementSpacingPosition(enum.Enum):
@@ -52,12 +61,7 @@ def planned_changes(
 
 
 def planned_change_for_docstring(
-    docstring: PDF_definition.DocstringInfo,
-    *,
-    context: RuleContext,
-    owner_kind: PDF_definition.DefinitionKind,
-    position: DocstringStatementSpacingPosition,
-    desired_blank_lines: int,
+    docstring: PDF_definition.DocstringInfo, *, context: RuleContext, owner_kind: PDF_definition.DefinitionKind, position: DocstringStatementSpacingPosition, desired_blank_lines: int
 ) -> rule_edits.PlannedSourceChange | None:
     """Return a blank-run source replacement for one docstring statement.
 
@@ -86,9 +90,7 @@ def planned_change_for_docstring(
     if actual_blank_lines == desired_blank_lines:
         return None
     return rule_edits.PlannedSourceChange(
-        edit=rule_edits.SourceEdit(range=edit_range, replacement=context.line_ending * desired_blank_lines),
-        line_numbers=(docstring.range.start.line,),
-        suppression_line_numbers=(),
+        edit=rule_edits.SourceEdit(range=edit_range, replacement=context.line_ending * desired_blank_lines), line_numbers=(docstring.range.start.line,), suppression_line_numbers=()
     )
 
 

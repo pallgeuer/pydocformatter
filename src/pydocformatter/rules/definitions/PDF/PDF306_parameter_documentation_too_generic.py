@@ -1,19 +1,27 @@
 """PDF306 parameter-documentation-too-generic rule."""
 
+# Future imports
 from __future__ import annotations
 
-import pydocformatter.rules.definition_helpers.docstring_conventions as docstring_conventions
-import pydocformatter.rules.definition_helpers.docstring_sections as docstring_sections
-import pydocformatter.rules.definition_helpers.documentation_style as documentation_style
-import pydocformatter.rules.definition_helpers.parameter_documentation as parameter_documentation
-import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
+# Standard library imports
+from typing import TYPE_CHECKING
+
+# First-party imports
 import pydocformatter.rules.registration as rule_registration
-import pydocformatter.rules.violations as rule_violations
+import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.codes import RuleCode
-from pydocformatter.rules.definition import RuleBase, RuleContext
+from pydocformatter.rules.definition import RuleBase
+from pydocformatter.rules.definition_helpers import docstring_conventions, docstring_sections, documentation_style, parameter_documentation
 from pydocformatter.rules.definitions.PDF.PDF import PDF
 from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
+
+
+if TYPE_CHECKING:
+    # First-party imports
+    import pydocformatter.rules.violations as rule_violations
+    from pydocformatter.rules.definition import RuleContext
+
 
 _VARIADIC_SEQUENCE_MODIFIERS = ("extra", "additional")
 
@@ -31,32 +39,28 @@ def _variadic_generic_sequences(base_sequences: tuple[tuple[str, ...], ...]) -> 
 
 
 _POLICY = documentation_style.DocumentedValueStylePolicy(nouns=frozenset(("argument", "parameter", "value")), message_subject="parameter")
-_POSITIONAL_VARIADIC_GENERIC_SEQUENCES = _variadic_generic_sequences(
-    (
-        ("arg",),
-        ("args",),
-        ("argument",),
-        ("arguments",),
-        ("positional", "arg"),
-        ("positional", "args"),
-        ("positional", "argument"),
-        ("positional", "arguments"),
-    )
-)
-_KEYWORD_VARIADIC_GENERIC_SEQUENCES = _variadic_generic_sequences(
-    (
-        ("arg",),
-        ("args",),
-        ("argument",),
-        ("arguments",),
-        ("kwarg",),
-        ("kwargs",),
-        ("keyword", "arg"),
-        ("keyword", "args"),
-        ("keyword", "argument"),
-        ("keyword", "arguments"),
-    )
-)
+_POSITIONAL_VARIADIC_GENERIC_SEQUENCES = _variadic_generic_sequences((
+    ("arg",),
+    ("args",),
+    ("argument",),
+    ("arguments",),
+    ("positional", "arg"),
+    ("positional", "args"),
+    ("positional", "argument"),
+    ("positional", "arguments"),
+))
+_KEYWORD_VARIADIC_GENERIC_SEQUENCES = _variadic_generic_sequences((
+    ("arg",),
+    ("args",),
+    ("argument",),
+    ("arguments",),
+    ("kwarg",),
+    ("kwargs",),
+    ("keyword", "arg"),
+    ("keyword", "args"),
+    ("keyword", "argument"),
+    ("keyword", "arguments"),
+))
 
 
 @rule_registration.register_rule_to(PDF)

@@ -1,7 +1,8 @@
+# Third-party imports
 import pytest
 
-import pydocformatter.formatter as formatter
-import pydocformatter.rules_selection as rules_selection
+# First-party imports
+from pydocformatter import formatter, rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention
 from pydocformatter.rules.definitions.PDF.PDF507_extraneous_exception_documentation import PDF507ExtraneousExceptionDocumentation
 

@@ -1,13 +1,22 @@
 """Missing-documentation activation helpers."""
 
+# Future imports
 from __future__ import annotations
 
+# Standard library imports
 import os
 import pathlib
+from typing import TYPE_CHECKING
 
-import pydocformatter.cli.settings_check as settings_check
+# First-party imports
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
-from pydocformatter.rules.definition import RuleContext
+from pydocformatter.cli import settings_check
+
+
+if TYPE_CHECKING:
+    # First-party imports
+    from pydocformatter.rules.definition import RuleContext
+
 
 # Broad public-only PDF500/PDF502/PDF504/PDF506 checks treat only constructor/callable dunders as public; other protocol
 # dunders stay quiet unless they have explicit relevant docs.

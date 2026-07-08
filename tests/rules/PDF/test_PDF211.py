@@ -1,17 +1,19 @@
+# Third-party imports
 import pytest
 
-import tests.rule_helpers as rule_helpers
-import tests.rules.PDF.statement_spacing_helpers as statement_spacing_helpers
+# First-party imports
 from pydocformatter.rules.definitions.PDF.PDF211_blank_line_after_class_docstring import PDF211BlankLineAfterClassDocstring
+from tests import rule_helpers
+from tests.rules.PDF import statement_spacing_helpers
 
 
 @pytest.mark.parametrize(
     ("body", "expected_body"),
-    (
+    [
         ("    value = 1\n", "\n    value = 1\n"),
         ("    def close(self):\n        pass\n", "\n    def close(self):\n        pass\n"),
         ("    class Nested:\n        pass\n", "\n    class Nested:\n        pass\n"),
-    ),
+    ],
 )
 def test_inserts_blank_line_after_class_docstring_before_following_statement(body: str, expected_body: str) -> None:
     source = f'class Client:\n    """Docstring."""\n{body}'
@@ -19,6 +21,7 @@ def test_inserts_blank_line_after_class_docstring_before_following_statement(bod
 
     assert result.new_source == f'class Client:\n    """Docstring."""\n{expected_body}'
     assert result.fixed_findings[PDF211BlankLineAfterClassDocstring.meta] == 1
+    assert result.new_source is not None
     assert not statement_spacing_helpers.format_source(result.new_source, rule_code="PDF211").modified
 
 

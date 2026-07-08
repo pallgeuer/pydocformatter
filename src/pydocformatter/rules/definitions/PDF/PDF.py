@@ -7,33 +7,44 @@ Attributes:
         return/yield/raise inventory.
 """
 
+# Future imports
 from __future__ import annotations
 
-import dataclasses
-import enum
+# Standard library imports
 import re
+import enum
 import typing
+import dataclasses
 from collections.abc import Iterator, Mapping, Sequence
 from types import MappingProxyType
 
+# Third-party imports
 import libcst as cst
 import libcst.metadata as cst_metadata
 
-import pydocformatter.cli.settings_check as settings_check
-import pydocformatter.rules.definition_helpers.colon_boundaries as colon_boundaries
-import pydocformatter.rules.definition_helpers.docstring_sections as docstring_sections
-import pydocformatter.rules.definition_helpers.exception_names as exception_names
-import pydocformatter.rules.definition_helpers.module_bindings as module_bindings
-import pydocformatter.rules.definition_helpers.source_text as source_text
-import pydocformatter.rules.definition_helpers.string_literals as string_literals
-import pydocformatter.rules.definition_helpers.text_layout as text_layout
-import pydocformatter.rules.definition_helpers.type_expressions as type_expressions
-import pydocformatter.rules.definition_helpers.typed_documentation_models as typed_documentation_models
+# First-party imports
 import pydocformatter.rules.edits as rule_edits
-import pydocformatter.rules.line_endings as line_endings
 import pydocformatter.rules.registration as rule_registration
-from pydocformatter.rules.definition import RuleCategoryBase, RuleCategoryContext, RuleContext
+from pydocformatter.cli import settings_check
+from pydocformatter.rules import line_endings
+from pydocformatter.rules.definition import RuleCategoryBase
+from pydocformatter.rules.definition_helpers import (
+    colon_boundaries,
+    docstring_sections,
+    exception_names,
+    module_bindings,
+    source_text,
+    string_literals,
+    text_layout,
+    type_expressions,
+    typed_documentation_models,
+)
 from pydocformatter.rules.models import RuleCategoryMetadata
+
+
+if typing.TYPE_CHECKING:
+    # First-party imports
+    from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
 
 
 class DefinitionKind(enum.Enum):
@@ -668,9 +679,9 @@ class PDFCategoryData:
                 owner_docstrings = mutable_index.setdefault(id(docstring_owner.parent), {})
                 for name in dict.fromkeys(docstring_owner.targets):
                     owner_docstrings.setdefault(name, []).append(docstring)
-            docstrings_by_owner_id = MappingProxyType(
-                {owner_id: MappingProxyType({name: tuple(name_docstrings) for name, name_docstrings in owner_docstrings.items()}) for owner_id, owner_docstrings in mutable_index.items()}
-            )
+            docstrings_by_owner_id = MappingProxyType({
+                owner_id: MappingProxyType({name: tuple(name_docstrings) for name, name_docstrings in owner_docstrings.items()}) for owner_id, owner_docstrings in mutable_index.items()
+            })
             object.__setattr__(self, "_attached_attribute_docstrings_by_owner_id", docstrings_by_owner_id)
         return docstrings_by_owner_id.get(id(owner), MappingProxyType({}))
 
@@ -875,7 +886,7 @@ class _AttributeDocstringCollector:
         if isinstance(suite, cst.SimpleStatementSuite):
             self._scan_small_statements(suite.body, owner, suite, previous_assignment=None)
         else:
-            self._scan_statements(typing.cast(Sequence[cst.BaseStatement], suite.body), owner)
+            self._scan_statements(typing.cast("Sequence[cst.BaseStatement]", suite.body), owner)
 
     def _scan_statements(self, statements: Sequence[cst.BaseStatement], owner: DefinitionInfo) -> None:
         """Scan a sequence of compound or simple statements under an owner."""
@@ -889,12 +900,7 @@ class _AttributeDocstringCollector:
                 self._scan_compound_statement(statement, owner)
 
     def _scan_small_statements(
-        self,
-        statements: Sequence[cst.BaseSmallStatement],
-        owner: DefinitionInfo,
-        statement: cst.SimpleStatementLine | cst.SimpleStatementSuite,
-        *,
-        previous_assignment: AttributeInfo | None,
+        self, statements: Sequence[cst.BaseSmallStatement], owner: DefinitionInfo, statement: cst.SimpleStatementLine | cst.SimpleStatementSuite, *, previous_assignment: AttributeInfo | None
     ) -> AttributeInfo | None:
         """Scan semicolon-separated small statements and return a pending assignment."""
         pending_assignment = previous_assignment
@@ -908,12 +914,7 @@ class _AttributeDocstringCollector:
                 self._attributes.append(pending_assignment)
         return pending_assignment
 
-    def _collect_after_assignment(
-        self,
-        expression: cst.Expr,
-        statement: cst.SimpleStatementLine | cst.SimpleStatementSuite,
-        assignment: AttributeInfo | None,
-    ) -> None:
+    def _collect_after_assignment(self, expression: cst.Expr, statement: cst.SimpleStatementLine | cst.SimpleStatementSuite, assignment: AttributeInfo | None) -> None:
         """Collect a string expression immediately following an attribute assignment."""
         if assignment is None:
             return
@@ -965,18 +966,14 @@ class _AttributeDocstringCollector:
 
 
 @rule_registration.register_rule_category
-class PDF(RuleCategoryBase):
+class PDF(RuleCategoryBase[PDFCategoryData]):
     """Docstring formatting rule category.
 
     Attributes:
         meta (RuleMetadata): Static metadata used for registration, diagnostics, and rule selection.
     """
 
-    meta = RuleCategoryMetadata(
-        prefix="PDF",
-        name="pydocformatter docstring formatting",
-        url="https://github.com/pallgeuer/pydocformatter",
-    )
+    meta = RuleCategoryMetadata(prefix="PDF", name="pydocformatter docstring formatting", url="https://github.com/pallgeuer/pydocformatter")
 
     @classmethod
     def prepare(cls, context: RuleCategoryContext) -> PDFCategoryData:
@@ -1063,18 +1060,11 @@ def final_convention_section_spacing(docstring: DocstringInfo) -> FinalConventio
     if section is None:
         return None
     return FinalConventionSectionSpacing(
-        section=section,
-        final_content_line=_final_section_content_line(docstring, section),
-        trailing_blank_line=_final_section_trailing_blank_line(docstring, section),
+        section=section, final_content_line=_final_section_content_line(docstring, section), trailing_blank_line=_final_section_trailing_blank_line(docstring, section)
     )
 
 
-def docstring_line_source(
-    line: DocstringValueLine,
-    *,
-    fragments: tuple[string_literals.StringValueFragment, ...],
-    strip_docstring_margin: bool,
-) -> str:
+def docstring_line_source(line: DocstringValueLine, *, fragments: tuple[string_literals.StringValueFragment, ...], strip_docstring_margin: bool) -> str:
     """Return source spelling for a logical docstring line.
 
     Args:
@@ -1370,7 +1360,7 @@ class _DocstringParser:
                 index = protected_end
                 continue
             match = _GOOGLE_ENTRY_RE.match(self.lines[index].text)
-            if match is None and kind in (DocstringEntryKind.RETURN, DocstringEntryKind.YIELD, DocstringEntryKind.EXCEPTION):
+            if match is None and kind in {DocstringEntryKind.RETURN, DocstringEntryKind.YIELD, DocstringEntryKind.EXCEPTION}:
                 match = _GENERIC_ENTRY_RE.match(self.lines[index].text)
             if match is None:
                 none_entry = _google_none_value_entry(kind, self.lines[index].text, start=index)
@@ -1394,7 +1384,7 @@ class _DocstringParser:
             if names is None:
                 index = entry_end
                 continue
-            if kind in (DocstringEntryKind.RETURN, DocstringEntryKind.YIELD) and type_text is None:
+            if kind in {DocstringEntryKind.RETURN, DocstringEntryKind.YIELD} and type_text is None:
                 names = ()
                 type_text = name
             entry = DocstringEntry(
@@ -1408,7 +1398,7 @@ class _DocstringParser:
             )
             entries.append(entry)
             unit = text_layout.indent_unit(self.settings)
-            prefix = f'{unit}{self.lines[index].text[len(match.group("indent")) : match.start("description")]}'
+            prefix = f"{unit}{self.lines[index].text[len(match.group('indent')) : match.start('description')]}"
             if description_lines and not first_description and not prefix.endswith((" ", "\t")):
                 prefix = f"{prefix} "
             self._add_reflow(DocstringBlockKind.SECTION_ENTRY, index, entry_end, lines=tuple(description_fragments), initial_indent=prefix, subsequent_indent=unit * 2)
@@ -1439,13 +1429,7 @@ class _DocstringParser:
                     description_lines = [line.text for line in description_fragments]
                     entries.append(
                         DocstringEntry(
-                            kind=kind,
-                            names=names,
-                            type_text=None,
-                            description=" ".join(description_lines),
-                            description_lines=tuple(description_fragments),
-                            start_line=index,
-                            end_line=entry_end,
+                            kind=kind, names=names, type_text=None, description=" ".join(description_lines), description_lines=tuple(description_fragments), start_line=index, end_line=entry_end
                         )
                     )
                     if description_lines:
@@ -1489,7 +1473,7 @@ class _DocstringParser:
                     )
                 index = entry_end
                 continue
-            if kind in (DocstringEntryKind.RETURN, DocstringEntryKind.YIELD, DocstringEntryKind.EXCEPTION) and text.strip():
+            if kind in {DocstringEntryKind.RETURN, DocstringEntryKind.YIELD, DocstringEntryKind.EXCEPTION} and text.strip():
                 entry_end = self._entry_end(index, end, text_layout.leading_width(text))
                 description_fragments = list(self._stripped_reflow_lines(index + 1, entry_end, skip_empty=True))
                 description_lines = [line.text for line in description_fragments]
@@ -1531,16 +1515,13 @@ class _DocstringParser:
         field = match.group("field").lower()
         argument = (match.group("argument") or "").strip()
         first_description_line = self._reflow_line_from_text_span(start, match.start("description"), len(self.lines[start].text))
-        has_first_description = first_description_line is not None and bool(first_description_line.text)
         description_fragments: list[DocstringTextFragment] = []
         reflow_runs: list[ReflowRegionRun] = []
-        if has_first_description:
-            assert first_description_line is not None
+        if first_description_line is not None and first_description_line.text:
             description_fragments.append(first_description_line)
         continuation_runs = self._rest_field_description_reflow_runs(start + 1, block_end)
         description_fragments.extend(line for run in continuation_runs for line in run.lines)
-        if has_first_description:
-            assert first_description_line is not None
+        if first_description_line is not None and first_description_line.text:
             if continuation_runs and continuation_runs[0].start_line == start + 1:
                 first_run = continuation_runs[0]
                 reflow_runs.append(ReflowRegionRun(start_line=start, end_line=first_run.end_line, lines=(first_description_line, *first_run.lines)))
@@ -1570,20 +1551,13 @@ class _DocstringParser:
         self.entries.append(entry)
         prefix = self.lines[start].text[: match.start("description")]
         subsequent_indent = " " * len(prefix.expandtabs(self.settings.indent_width))
-        if reflow_runs and reflow_runs[0].start_line == start and not has_first_description and not prefix.endswith((" ", "\t")):
+        if reflow_runs and reflow_runs[0].start_line == start and (first_description_line is None or not first_description_line.text) and not prefix.endswith((" ", "\t")):
             prefix = f"{prefix} "
             subsequent_indent = " " * len(prefix.expandtabs(self.settings.indent_width))
-        for index, run in enumerate(reflow_runs):
+        for run in reflow_runs:
             run_indent = prefix if run.start_line == start else self.lines[run.start_line].text_indent
             run_subsequent_indent = subsequent_indent if run.start_line == start else run_indent
-            self._add_reflow(
-                DocstringBlockKind.REST_FIELD,
-                run.start_line,
-                run.end_line,
-                lines=run.lines,
-                initial_indent=run_indent,
-                subsequent_indent=run_subsequent_indent,
-            )
+            self._add_reflow(DocstringBlockKind.REST_FIELD, run.start_line, run.end_line, lines=run.lines, initial_indent=run_indent, subsequent_indent=run_subsequent_indent)
         return DocstringBlock(DocstringBlockKind.REST_FIELD, start, block_end, entry=entry), block_end
 
     def _rest_field_description_reflow_runs(self, start: int, end: int) -> tuple[ReflowRegionRun, ...]:
@@ -1614,7 +1588,7 @@ class _DocstringParser:
     def _parse_list_item(self, start: int, end: int, match: re.Match[str]) -> tuple[DocstringBlock, int]:
         """Parse a Markdown-style list item and register its reflow region."""
         block_end = self._list_item_end(start, end, match)
-        prefix = f'{match.group("indent")}{match.group("marker")} '
+        prefix = f"{match.group('indent')}{match.group('marker')} "
         first_line = self._reflow_line_from_text_span(start, match.start("text"), len(self.lines[start].text))
         lines = (() if first_line is None else (first_line,)) + self._stripped_reflow_lines(start + 1, block_end)
         self._add_reflow(DocstringBlockKind.LIST_ITEM, start, block_end, lines=tuple(lines), initial_indent=prefix, subsequent_indent=" " * len(prefix.expandtabs(self.settings.indent_width)))
@@ -1622,7 +1596,7 @@ class _DocstringParser:
 
     def _parse_block_quote(self, start: int, end: int, match: re.Match[str]) -> tuple[DocstringBlock, int]:
         """Parse a block quote run and register its reflow region."""
-        prefix = f'{match.group("indent")}{match.group("quote")}'
+        prefix = f"{match.group('indent')}{match.group('quote')}"
         block_end = self._block_quote_end(start, end, prefix)
         texts = tuple(line for line in (self._reflow_line_from_text_span(line, len(prefix), len(self.lines[line].text)) for line in range(start, block_end)) if line is not None)
         self._add_reflow(DocstringBlockKind.BLOCK_QUOTE, start, block_end, lines=tuple(texts), initial_indent=prefix, subsequent_indent=prefix)
@@ -1710,7 +1684,7 @@ class _DocstringParser:
         if self.settings.docstring_parse_list_items and (list_match := _LIST_RE.match(text)) is not None:
             return self._list_item_end(index, end, list_match)
         if self.settings.docstring_parse_block_quotes and (quote_match := _BLOCK_QUOTE_RE.match(text)) is not None:
-            prefix = f'{quote_match.group("indent")}{quote_match.group("quote")}'
+            prefix = f"{quote_match.group('indent')}{quote_match.group('quote')}"
             return self._block_quote_end(index, end, prefix)
         return None
 
@@ -1730,7 +1704,7 @@ class _DocstringParser:
         block_end = start + 1
         while block_end < end:
             next_match = _BLOCK_QUOTE_RE.match(self.lines[block_end].text)
-            if next_match is None or f'{next_match.group("indent")}{next_match.group("quote")}' != prefix:
+            if next_match is None or f"{next_match.group('indent')}{next_match.group('quote')}" != prefix:
                 break
             block_end += 1
         return block_end
@@ -1936,7 +1910,7 @@ def _strip_exception_code_span(text: str) -> str:
 
 def _google_none_value_entry(kind: DocstringEntryKind, text: str, *, start: int) -> DocstringEntry | None:
     """Return a Google return/yield entry for bare None spellings."""
-    if kind not in (DocstringEntryKind.RETURN, DocstringEntryKind.YIELD) or not text[:1].isspace() or text.strip() not in {"None", "None."}:
+    if kind not in {DocstringEntryKind.RETURN, DocstringEntryKind.YIELD} or not text[:1].isspace() or text.strip() not in {"None", "None."}:
         return None
     return DocstringEntry(kind=kind, names=(), type_text="None", description="", description_lines=(), start_line=start, end_line=start + 1)
 
@@ -2021,12 +1995,7 @@ def docstring_canonical_margin(docstring: DocstringInfo, *, context: RuleContext
     return prefix if prefix.strip() == "" else line_indent
 
 
-def planned_simple_docstring_line_change(
-    docstring: DocstringInfo,
-    *,
-    context: RuleContext,
-    raw_line_targets: tuple[str | None, ...],
-) -> rule_edits.PlannedSourceChange | None:
+def planned_simple_docstring_line_change(docstring: DocstringInfo, *, context: RuleContext, raw_line_targets: tuple[str | None, ...]) -> rule_edits.PlannedSourceChange | None:
     """Return one whole-literal replacement for changed raw evaluated lines.
 
     Args:
@@ -2044,21 +2013,14 @@ def planned_simple_docstring_line_change(
     if len(raw_line_targets) != len(docstring.structure.lines):
         raise ValueError("Raw line targets must match the docstring line count")
     replacements: list[rule_edits.PlannedTextReplacement] = []
-    for line, target in zip(docstring.structure.lines, raw_line_targets):
+    for line, target in zip(docstring.structure.lines, raw_line_targets, strict=True):
         line_number = line.source_line_number
         if target is not None and line_number is not None and line.raw_text != target:
-            replacements.append(
-                rule_edits.PlannedTextReplacement(
-                    start_offset=line.start_offset,
-                    end_offset=line.end_offset,
-                    text=target,
-                    line_numbers=(line_number,),
-                )
-            )
+            replacements.append(rule_edits.PlannedTextReplacement(start_offset=line.start_offset, end_offset=line.end_offset, text=target, line_numbers=(line_number,)))
     if not replacements:
         return None
     # Safe simple docstrings map evaluated line text back to source body text modulo newline spelling.
-    value_lines = [target if target is not None else line.raw_text for line, target in zip(docstring.structure.lines, raw_line_targets)]
+    value_lines = [target if target is not None else line.raw_text for line, target in zip(docstring.structure.lines, raw_line_targets, strict=True)]
     return planned_simple_docstring_source_change(docstring, context=context, replacements=tuple(replacements), value_lines=value_lines)
 
 
@@ -2094,8 +2056,7 @@ def planned_simple_docstring_source_change(
     source_chunks: list[str] = []
     cursor = 0
     for replacement in replacements:
-        source_chunks.append(string_literals.source_for_value_slice(fragments, cursor, replacement.start_offset))
-        source_chunks.append(replacement.text)
+        source_chunks.extend((string_literals.source_for_value_slice(fragments, cursor, replacement.start_offset), replacement.text))
         cursor = replacement.end_offset
     source_chunks.append(string_literals.source_for_value_slice(fragments, cursor, len(fragments)))
     rendered = string_literals.render_simple_string_from_body_source(docstring.node.prefix, docstring.node.quote, "".join(source_chunks), expected_value=value)
@@ -2109,12 +2070,7 @@ def planned_simple_docstring_source_change(
 
 
 def planned_simple_docstring_text_change(
-    docstring: DocstringInfo,
-    *,
-    context: RuleContext,
-    replacement: rule_edits.PlannedTextReplacement,
-    expected_value: str,
-    expected_source: str | None = None,
+    docstring: DocstringInfo, *, context: RuleContext, replacement: rule_edits.PlannedTextReplacement, expected_value: str, expected_source: str | None = None
 ) -> rule_edits.PlannedSourceChange | None:
     """Return one source-slice replacement from an evaluated-value replacement.
 
@@ -2141,10 +2097,7 @@ def planned_simple_docstring_text_change(
     ):
         return None
     return rule_edits.PlannedSourceChange(
-        edit=rule_edits.SourceEdit(
-            range=source_map.source_range(start_offset=replacement.start_offset, end_offset=replacement.end_offset, line_bounds=line_bounds),
-            replacement=replacement.text,
-        ),
+        edit=rule_edits.SourceEdit(range=source_map.source_range(start_offset=replacement.start_offset, end_offset=replacement.end_offset, line_bounds=line_bounds), replacement=replacement.text),
         line_numbers=replacement.line_numbers,
         suppression_line_numbers=(),
     )
@@ -2305,11 +2258,7 @@ def planned_simple_docstring_output_change(
     rendered = _render_output_with_separator_fallback(docstring, body_source=body_source, expected_value=expected_value, separator_fallback=separator_fallback)
     if rendered is None or rendered == docstring.source:
         return None
-    return rule_edits.PlannedSourceChange(
-        edit=rule_edits.SourceEdit(range=docstring.range, replacement=rendered),
-        line_numbers=line_numbers,
-        suppression_line_numbers=(),
-    )
+    return rule_edits.PlannedSourceChange(edit=rule_edits.SourceEdit(range=docstring.range, replacement=rendered), line_numbers=line_numbers, suppression_line_numbers=())
 
 
 def docstring_content_indexes(docstring: DocstringInfo) -> tuple[int, ...]:
@@ -2480,13 +2429,7 @@ def _render_output_body_source(docstring: DocstringInfo, *, body_source: str, ex
     return string_literals.render_simple_string_from_body_source(docstring.node.prefix, docstring.node.quote, body_source, expected_value=expected_value)
 
 
-def _render_output_with_separator_fallback(
-    docstring: DocstringInfo,
-    *,
-    body_source: str,
-    expected_value: str,
-    separator_fallback: DocstringOutputSeparatorFallback | None,
-) -> str | None:
+def _render_output_with_separator_fallback(docstring: DocstringInfo, *, body_source: str, expected_value: str, separator_fallback: DocstringOutputSeparatorFallback | None) -> str | None:
     """Render output source, applying separator fallback strategy when configured."""
     if separator_fallback is DocstringOutputSeparatorFallback.OPENING:
         return _opening_separator_rendered_output(docstring, body_source=body_source, expected_value=expected_value)
@@ -2675,13 +2618,7 @@ def _separator_fallback_output(body_source: str, expected_value: str, *, separat
     raise ValueError(f"Unsupported separator fallback: {separator_fallback!r}")
 
 
-def _output_body_source(
-    output_lines: tuple[DocstringOutputLine, ...],
-    *,
-    fragments: tuple[string_literals.StringValueFragment, ...],
-    line_ending: str,
-    preserve_trailing_newline: bool,
-) -> str:
+def _output_body_source(output_lines: tuple[DocstringOutputLine, ...], *, fragments: tuple[string_literals.StringValueFragment, ...], line_ending: str, preserve_trailing_newline: bool) -> str:
     """Return replacement literal body source from output lines."""
     chunks: list[str] = []
     for index, output_line in enumerate(output_lines):
@@ -2741,7 +2678,7 @@ def join_docstring_value_lines(docstring: DocstringInfo, lines: list[str]) -> st
         Full evaluated docstring value with caller-provided line text and original inter-line separators.
     """
     chunks: list[str] = []
-    for index, (line_info, line) in enumerate(zip(docstring.structure.lines, lines)):
+    for index, (line_info, line) in enumerate(zip(docstring.structure.lines, lines, strict=True)):
         chunks.append(line)
         if index + 1 < len(lines):
             chunks.append(docstring.value[line_info.end_offset : docstring.structure.lines[index + 1].start_offset])
@@ -2798,13 +2735,7 @@ def _docstring_sort_key(docstring: DocstringInfo) -> tuple[int, int]:
     return docstring.range.start.line, docstring.range.start.column
 
 
-def _docstring_info(
-    expression: cst.Expr,
-    statement: cst.SimpleStatementLine | cst.SimpleStatementSuite,
-    *,
-    owner: DocstringOwner,
-    context: RuleCategoryContext,
-) -> DocstringInfo | None:
+def _docstring_info(expression: cst.Expr, statement: cst.SimpleStatementLine | cst.SimpleStatementSuite, *, owner: DocstringOwner, context: RuleCategoryContext) -> DocstringInfo | None:
     """Return docstring metadata for a string expression."""
     node = expression.value
     if not isinstance(node, (cst.SimpleString, cst.ConcatenatedString)) or not isinstance(node.evaluated_value, str):
@@ -2829,12 +2760,7 @@ def _docstring_info(
             settings=context.settings,
             source_line_number=source_line_number,
             source_indent=(
-                _docstring_source_indent(
-                    statement,
-                    code_range=code_range,
-                    source_lines=context.source_lines,
-                    indent_width=context.settings.indent_width,
-                )
+                _docstring_source_indent(statement, code_range=code_range, source_lines=context.source_lines, indent_width=context.settings.indent_width)
                 if isinstance(node, cst.SimpleString)
                 else None
             ),
@@ -2890,7 +2816,7 @@ def _target_attributes(target: cst.BaseAssignTargetExpression, owner: Definition
     if isinstance(target, cst.Tuple):
         attributes: list[_AttributeTarget] = []
         for element in target.elements:
-            attributes.extend(_target_attributes(typing.cast(cst.BaseAssignTargetExpression, element.value), owner, context=context))
+            attributes.extend(_target_attributes(typing.cast("cst.BaseAssignTargetExpression", element.value), owner, context=context))
         return tuple(attributes)
     attribute_target = _target_attribute(target, owner, context=context)
     return (attribute_target,) if attribute_target is not None else ()

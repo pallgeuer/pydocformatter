@@ -4,18 +4,21 @@ Attributes:
     TypedDocumentationSubject (TypeAlias): Supported typed-entry target groups dispatched by PDF7xx rule modules.
 """
 
+# Future imports
 from __future__ import annotations
 
+# Standard library imports
 import typing
 
-import pydocformatter.rules.definition_helpers.docstring_conventions as docstring_conventions
-import pydocformatter.rules.definition_helpers.typed_documentation as typed_documentation
-import pydocformatter.rules.definition_helpers.typed_documentation_models as typed_models
+# First-party imports
 import pydocformatter.rules.violations as rule_violations
+import pydocformatter.rules.definition_helpers.typed_documentation_models as typed_models
 from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleContext
+from pydocformatter.rules.definition_helpers import docstring_conventions, typed_documentation
 from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
+
 
 TypedDocumentationSubject = typed_models.TypedDocumentationSubject
 _TargetCollector = typing.Callable[[RuleContext], tuple[typed_models.TypedDocumentationTarget, ...]]
@@ -31,12 +34,7 @@ _SUPPORTED_CONVENTION_EFFECT = (
         ),
     ),
 )
-_EXACT_OPT_IN_EFFECT = (
-    RuleSettingEffects(
-        setting="docstring_convention",
-        effects=(RuleSettingEffectValues(effect=RuleSettingEffect.IGNORED, values=tuple(DocstringConvention)),),
-    ),
-)
+_EXACT_OPT_IN_EFFECT = (RuleSettingEffects(setting="docstring_convention", effects=(RuleSettingEffectValues(effect=RuleSettingEffect.IGNORED, values=tuple(DocstringConvention)),)),)
 
 _TARGET_COLLECTORS: dict[TypedDocumentationSubject, _TargetCollector] = {
     TypedDocumentationSubject.PARAMETER: typed_documentation.parameter_targets,

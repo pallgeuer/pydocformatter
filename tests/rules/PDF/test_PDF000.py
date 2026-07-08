@@ -1,15 +1,16 @@
+# Third-party imports
 import libcst as cst
-import libcst.metadata as cst_metadata
 import pytest
+import libcst.metadata as cst_metadata
 
-import pydocformatter.formatter as formatter
-import pydocformatter.rules.definition_helpers.source_text as source_text
-import pydocformatter.rules_selection as rules_selection
-import tests.rule_helpers as rule_helpers
+# First-party imports
+from pydocformatter import formatter, rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, LineEnding
 from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
+from pydocformatter.rules.definition_helpers import source_text
 from pydocformatter.rules.definitions.PDF.PDF import PDF, DocstringKind
 from pydocformatter.rules.definitions.PDF.PDF000_docstring_literal_normalization import PDF000DocstringLiteralNormalization
+from tests import rule_helpers
 
 
 def contexts(source: str) -> tuple[RuleCategoryContext, RuleContext]:
@@ -75,7 +76,7 @@ def test_fix_literalizes_normal_whitespace_escapes_in_simple_docstring() -> None
     assert rule_helpers.rule_findings(PDF000DocstringLiteralNormalization, fixed_context) == ()
 
 
-@pytest.mark.parametrize("prefix", ("u", "U"))
+@pytest.mark.parametrize("prefix", ["u", "U"])
 def test_fix_removes_plain_unicode_prefix_from_simple_docstring(prefix: str) -> None:
     source = f'def function():\n    {prefix}"""simple doc"""\n'
 

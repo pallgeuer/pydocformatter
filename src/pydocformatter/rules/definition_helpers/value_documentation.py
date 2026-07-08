@@ -1,16 +1,25 @@
 """Return, yield, and exception documentation helpers."""
 
+# Future imports
 from __future__ import annotations
 
+# Standard library imports
 import dataclasses
+from typing import TYPE_CHECKING
 
+# Third-party imports
 import libcst as cst
 
-import pydocformatter.rules.definition_helpers.decorators as decorator_helpers
-import pydocformatter.rules.definition_helpers.exception_names as exception_names
+# First-party imports
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
-from pydocformatter.rules.definition import RuleContext
-from pydocformatter.rules.definitions.PDF.PDF import DocumentedFunctionFact
+import pydocformatter.rules.definition_helpers.decorators as decorator_helpers
+from pydocformatter.rules.definition_helpers import exception_names
+
+
+if TYPE_CHECKING:
+    # First-party imports
+    from pydocformatter.rules.definition import RuleContext
+    from pydocformatter.rules.definitions.PDF.PDF import DocumentedFunctionFact
 
 
 @dataclasses.dataclass(frozen=True)
@@ -82,14 +91,7 @@ def documented_entries(docstring: PDF_definition.DocstringInfo, kind: PDF_defini
             continue
         line = docstring.structure.lines[entry.start_line]
         names = entry.names or (None,)
-        for name in names:
-            entries.append(
-                DocumentedEntry(
-                    name=name,
-                    line_numbers=PDF_definition.docstring_line_numbers(docstring, line),
-                    has_content=_entry_has_content(entry),
-                )
-            )
+        entries.extend(DocumentedEntry(name=name, line_numbers=PDF_definition.docstring_line_numbers(docstring, line), has_content=_entry_has_content(entry)) for name in names)
     return tuple(entries)
 
 

@@ -3,14 +3,24 @@
 Attributes:
     DEFAULT_RULE_REGISTRY (RuleRegistry): Import-time registry populated by rule category decorators before the
         immutable rule collection is built.
+    CategoryClassT (TypeVar): Concrete rule category class type preserved by registration decorators.
+    RuleClassT (TypeVar): Concrete rule class type preserved by registration decorators.
 """
 
+# Future imports
 from __future__ import annotations
 
+# Standard library imports
 import dataclasses
-from typing import Callable
+from collections.abc import Callable
+from typing import Any, TypeVar
 
+# First-party imports
 from pydocformatter.rules.definition import RuleBase, RuleCategoryBase
+
+
+CategoryClassT = TypeVar("CategoryClassT", bound=type[RuleCategoryBase[Any]])
+RuleClassT = TypeVar("RuleClassT", bound=type[RuleBase])
 
 
 class RuleError(ValueError):
@@ -22,20 +32,20 @@ class RuleRegistry:
     """Registry of rule category classes.
 
     Attributes:
-        category_classes (set[type[RuleCategoryBase]]): Mutable set of category classes discovered by decorators before
-            rule collection.
+        category_classes (set[type[RuleCategoryBase[Any]]]): Mutable set of category classes discovered by decorators
+            before rule collection.
     """
 
-    category_classes: set[type[RuleCategoryBase]] = dataclasses.field(default_factory=set)
+    category_classes: set[type[RuleCategoryBase[Any]]] = dataclasses.field(default_factory=set)
 
-    def register(self, category_class: type[RuleCategoryBase]) -> type[RuleCategoryBase]:
+    def register(self, category_class: CategoryClassT) -> CategoryClassT:
         """Register a rule category class for collection.
 
         Args:
-            category_class (type[RuleCategoryBase]): Category class decorated during definitions-package import.
+            category_class (CategoryClassT): Category class decorated during definitions-package import.
 
         Returns:
-            type[RuleCategoryBase]: The same class so registration decorators are transparent.
+            CategoryClassT: The same class so registration decorators are transparent.
 
         Raises:
             RuleError: If the decorated object is not a rule category class.
@@ -49,50 +59,50 @@ class RuleRegistry:
 DEFAULT_RULE_REGISTRY = RuleRegistry()
 
 
-def register_rule_category(category_class: type[RuleCategoryBase]) -> type[RuleCategoryBase]:
+def register_rule_category(category_class: CategoryClassT) -> CategoryClassT:
     """Register a rule category class for collection.
 
     Args:
-        category_class (type[RuleCategoryBase]): Category class to register with the default registry.
+        category_class (CategoryClassT): Category class to register with the default registry.
 
     Returns:
-        type[RuleCategoryBase]: The same class so the decorator preserves class identity.
+        CategoryClassT: The same class so the decorator preserves class identity.
     """
     return DEFAULT_RULE_REGISTRY.register(category_class)
 
 
-def register_rule_category_to(registry: RuleRegistry) -> Callable[[type[RuleCategoryBase]], type[RuleCategoryBase]]:
+def register_rule_category_to(registry: RuleRegistry) -> Callable[[CategoryClassT], CategoryClassT]:
     """Return a category decorator that registers category classes to a registry.
 
     Args:
         registry (RuleRegistry): Registry that should receive decorated category classes.
 
     Returns:
-        Callable[[type[RuleCategoryBase]], type[RuleCategoryBase]]: Decorator bound to the supplied registry.
+        Callable[[CategoryClassT], CategoryClassT]: Decorator bound to the supplied registry.
     """
 
-    def decorator(category_class: type[RuleCategoryBase]) -> type[RuleCategoryBase]:
+    def decorator(category_class: CategoryClassT) -> CategoryClassT:
         """Register a category class to the bound registry.
 
         Args:
-            category_class (type[RuleCategoryBase]): Category class passed through the returned decorator.
+            category_class (CategoryClassT): Category class passed through the returned decorator.
 
         Returns:
-            type[RuleCategoryBase]: The same class so the decorator preserves class identity.
+            CategoryClassT: The same class so the decorator preserves class identity.
         """
         return registry.register(category_class)
 
     return decorator
 
 
-def register_rule_to(category: type[RuleCategoryBase]) -> Callable[[type[RuleBase]], type[RuleBase]]:
+def register_rule_to(category: type[RuleCategoryBase[Any]]) -> Callable[[RuleClassT], RuleClassT]:
     """Return a rule decorator that registers rule classes to a category.
 
     Args:
-        category (type[RuleCategoryBase]): Category class that owns the decorated rules.
+        category (type[RuleCategoryBase[Any]]): Category class that owns the decorated rules.
 
     Returns:
-        Callable[[type[RuleBase]], type[RuleBase]]: Decorator that stores rule classes on the category.
+        Callable[[RuleClassT], RuleClassT]: Decorator that stores rule classes on the category.
 
     Raises:
         RuleError: If `category` is not a rule category class.
@@ -100,14 +110,14 @@ def register_rule_to(category: type[RuleCategoryBase]) -> Callable[[type[RuleBas
     if not isinstance(category, type) or not issubclass(category, RuleCategoryBase):
         raise RuleError(f"Rule category must inherit RuleCategoryBase: {category!r}")
 
-    def decorator(rule_class: type[RuleBase]) -> type[RuleBase]:
+    def decorator(rule_class: RuleClassT) -> RuleClassT:
         """Register a rule class to the bound category.
 
         Args:
-            rule_class (type[RuleBase]): Rule class being registered to the bound category.
+            rule_class (RuleClassT): Rule class being registered to the bound category.
 
         Returns:
-            type[RuleBase]: The same class so the decorator preserves class identity.
+            RuleClassT: The same class so the decorator preserves class identity.
 
         Raises:
             RuleError: If the rule type, prefix, or category-local code uniqueness is invalid.

@@ -1,5 +1,5 @@
-import pydocformatter.formatter as formatter
-import pydocformatter.rules_selection as rules_selection
+# First-party imports
+from pydocformatter import formatter, rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention
 from pydocformatter.rules.definitions.PDF.PDF412_repeated_docstring_entry import PDF412RepeatedDocstringEntry
 
@@ -18,10 +18,7 @@ def test_reports_repeated_google_parameter_and_attribute_entries_without_fixing(
     assert not result.fixed_findings
     assert tuple(finding.rule for finding in result.unfixed_findings) == (PDF412RepeatedDocstringEntry.meta, PDF412RepeatedDocstringEntry.meta)
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((6,), (14,))
-    assert tuple(finding.message for finding in result.unfixed_findings) == (
-        "Docstring attribute entry 'value' repeats earlier entry",
-        "Docstring parameter entry 'arg' repeats earlier entry",
-    )
+    assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring attribute entry 'value' repeats earlier entry", "Docstring parameter entry 'arg' repeats earlier entry")
 
 
 def test_reports_google_parameter_repeats_across_distinct_sections() -> None:
@@ -98,10 +95,7 @@ def test_reports_numpy_repeated_names_in_comma_separated_entries() -> None:
     assert result.new_source == source
     assert not result.fixed_findings
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((8,), (10,))
-    assert tuple(finding.message for finding in result.unfixed_findings) == (
-        "Docstring parameter entry 'other' repeats earlier entry",
-        "Docstring parameter entry 'value' repeats earlier entry",
-    )
+    assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring parameter entry 'other' repeats earlier entry", "Docstring parameter entry 'value' repeats earlier entry")
 
 
 def test_reports_repeated_names_within_one_numpy_entry() -> None:

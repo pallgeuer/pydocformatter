@@ -1,9 +1,11 @@
 """PCF006 unused-suppression rule."""
 
+# Future imports
 from __future__ import annotations
 
-import pydocformatter.rules.definitions.PCF.PCF as PCF_definition
+# First-party imports
 import pydocformatter.rules.registration as rule_registration
+import pydocformatter.rules.definitions.PCF.PCF as PCF_definition
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase
 from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata

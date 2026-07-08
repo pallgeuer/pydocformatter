@@ -1,39 +1,41 @@
-import collections
-import contextlib
-import dataclasses
-import inspect
+# Standard library imports
 import os
-import tempfile
 import typing
+import inspect
+import tempfile
 import unittest
+import contextlib
+import collections
+import dataclasses
 import unittest.mock
 from io import StringIO
 from pathlib import Path
 
+# Third-party imports
 import libcst as cst
-import libcst.metadata as cst_metadata
 import pytest
+import libcst.metadata as cst_metadata
 
-import pydocformatter.cli.check as check_command
+# First-party imports
 import pydocformatter.cli.main as pydocfmt_cli
-import pydocformatter.cli.settings_check as settings_check
-import pydocformatter.file_selection as file_selection
-import pydocformatter.formatter as formatter
+import pydocformatter.cli.check as check_command
 import pydocformatter.rules.codes as rule_codes
-import pydocformatter.rules.collection as rule_collection
-import pydocformatter.rules.definition as rule_base
-import pydocformatter.rules.definition_helpers.source_text as source_text
 import pydocformatter.rules.edits as rule_edits
 import pydocformatter.rules.models as rule_models
-import pydocformatter.rules.registration as rule_registration
 import pydocformatter.rules.runner as rule_runner
+import pydocformatter.rules.collection as rule_collection
+import pydocformatter.rules.definition as rule_base
 import pydocformatter.rules.violations as rule_violations
-import pydocformatter.rules_selection as rules_selection
+import pydocformatter.rules.registration as rule_registration
+from pydocformatter import file_selection, formatter, rules_selection
+from pydocformatter.cli import settings_check
 from pydocformatter.cli.global_args import GlobalArgs
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention, DocstringMissingDocumentation, LineEnding
 from pydocformatter.formatter import FormatterResult
 from pydocformatter.rules.codes import RuleCode
+from pydocformatter.rules.definition_helpers import source_text
 from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleFinding, RuleMetadata
+
 
 PDF101_RULE = RuleMetadata(
     code=RuleCode("PDF101"),
@@ -133,22 +135,22 @@ class TestFormatterResults(unittest.TestCase):
     def test_formatter_result_field_order_has_no_defaults(self) -> None:
         fields = dataclasses.fields(FormatterResult)
 
-        self.assertEqual(tuple(field.name for field in fields), ("path", "old_source", "new_source", "modified", "fixed_findings", "unfixed_findings", "errors"))
-        self.assertTrue(all(field.default is dataclasses.MISSING for field in fields))
-        self.assertTrue(all(field.default_factory is dataclasses.MISSING for field in fields))
+        assert tuple(field.name for field in fields) == ("path", "old_source", "new_source", "modified", "fixed_findings", "unfixed_findings", "errors")
+        assert all(field.default is dataclasses.MISSING for field in fields)
+        assert all(field.default_factory is dataclasses.MISSING for field in fields)
 
     def test_rule_file_formatter_write_has_no_default(self) -> None:
         signature = inspect.signature(formatter.format_file)
 
-        self.assertIs(signature.parameters["write"].default, inspect.Parameter.empty)
+        assert signature.parameters["write"].default is inspect.Parameter.empty
 
     def test_rule_source_formatter_requires_precomputed_rule_selection(self) -> None:
         signature = inspect.signature(formatter.format_source)
 
-        self.assertIs(signature.parameters["rule_selection"].default, inspect.Parameter.empty)
+        assert signature.parameters["rule_selection"].default is inspect.Parameter.empty
 
     def test_max_fix_iterations_is_twenty(self) -> None:
-        self.assertEqual(rule_runner.MAX_FIX_ITERATIONS, 20)
+        assert rule_runner.MAX_FIX_ITERATIONS == 20
 
     def test_formatter_result_tracks_modified_and_findings_explicitly(self) -> None:
         clean = FormatterResult(path="a.py", old_source="", new_source="", modified=False, fixed_findings=collections.Counter(), unfixed_findings=(), errors=())
@@ -169,14 +171,14 @@ class TestFormatterResults(unittest.TestCase):
         )
         with_findings = FormatterResult(path="a.py", old_source="", new_source="", modified=False, fixed_findings=collections.Counter(), unfixed_findings=(finding,), errors=())
 
-        self.assertFalse(clean.modified)
-        self.assertEqual(clean.unfixed_findings, ())
-        self.assertEqual(clean.old_source, "")
-        self.assertEqual(clean.new_source, "")
-        self.assertEqual(clean.fixed_findings, collections.Counter())
-        self.assertTrue(modified.modified)
-        self.assertEqual(modified.fixed_findings, collections.Counter({PDF101_RULE: 1}))
-        self.assertEqual(with_findings.unfixed_findings, (finding,))
+        assert not clean.modified
+        assert clean.unfixed_findings == ()
+        assert clean.old_source == ""
+        assert clean.new_source == ""
+        assert clean.fixed_findings == collections.Counter()
+        assert modified.modified
+        assert modified.fixed_findings == collections.Counter({PDF101_RULE: 1})
+        assert with_findings.unfixed_findings == (finding,)
 
     def test_rule_finding_uses_rule_defaults_with_per_finding_overrides(self) -> None:
         rule = RuleMetadata(
@@ -191,17 +193,12 @@ class TestFormatterResults(unittest.TestCase):
         )
 
         default_finding = RuleFinding(rule=rule, line_numbers=(2,), instance_fixable=None)
-        overridden_finding = RuleFinding(
-            rule=rule,
-            line_numbers=(3,),
-            instance_message="Custom message",
-            instance_fixable=False,
-        )
+        overridden_finding = RuleFinding(rule=rule, line_numbers=(3,), instance_message="Custom message", instance_fixable=False)
 
-        self.assertEqual(default_finding.message, "Docstring chunk needs reflow")
-        self.assertTrue(default_finding.fixable)
-        self.assertEqual(overridden_finding.message, "Custom message")
-        self.assertFalse(overridden_finding.fixable)
+        assert default_finding.message == "Docstring chunk needs reflow"
+        assert default_finding.fixable
+        assert overridden_finding.message == "Custom message"
+        assert not overridden_finding.fixable
 
     def test_rule_metadata_and_finding_keys_are_sortable(self) -> None:
         later_rule = RuleMetadata(
@@ -215,12 +212,12 @@ class TestFormatterResults(unittest.TestCase):
             check_kind=RuleCheckKind.STANDARD,
         )
 
-        self.assertEqual(sorted((later_rule, PDF101_RULE)), [PDF101_RULE, later_rule])
-        self.assertTrue(dataclasses.is_dataclass(RuleFinding.Key))
-        self.assertEqual(
-            sorted((RuleFinding.Key(rule=later_rule, message="Later", fixable=True), RuleFinding.Key(rule=PDF101_RULE, message="Docstring chunk needs reflow", fixable=True))),
-            [RuleFinding.Key(rule=PDF101_RULE, message="Docstring chunk needs reflow", fixable=True), RuleFinding.Key(rule=later_rule, message="Later", fixable=True)],
-        )
+        assert sorted((later_rule, PDF101_RULE)) == [PDF101_RULE, later_rule]
+        assert dataclasses.is_dataclass(RuleFinding.Key)
+        assert sorted((RuleFinding.Key(rule=later_rule, message="Later", fixable=True), RuleFinding.Key(rule=PDF101_RULE, message="Docstring chunk needs reflow", fixable=True))) == [
+            RuleFinding.Key(rule=PDF101_RULE, message="Docstring chunk needs reflow", fixable=True),
+            RuleFinding.Key(rule=later_rule, message="Later", fixable=True),
+        ]
 
     def test_rule_finding_requires_instance_fixability_for_sometimes_fixable_rules(self) -> None:
         rule = RuleMetadata(
@@ -234,9 +231,9 @@ class TestFormatterResults(unittest.TestCase):
             check_kind=RuleCheckKind.STANDARD,
         )
 
-        self.assertTrue(RuleFinding(rule=rule, line_numbers=(2,), instance_fixable=True).fixable)
-        self.assertFalse(RuleFinding(rule=rule, line_numbers=(3,), instance_fixable=False).fixable)
-        with self.assertRaisesRegex(ValueError, "Findings for sometimes-fixable rules must specify instance_fixable"):
+        assert RuleFinding(rule=rule, line_numbers=(2,), instance_fixable=True).fixable
+        assert not RuleFinding(rule=rule, line_numbers=(3,), instance_fixable=False).fixable
+        with pytest.raises(ValueError, match="Findings for sometimes-fixable rules must specify instance_fixable"):
             _ = RuleFinding(rule=rule, line_numbers=(4,), instance_fixable=None).fixable
 
     def test_rule_finding_requires_instance_fixability_for_usually_fixable_rules(self) -> None:
@@ -251,9 +248,9 @@ class TestFormatterResults(unittest.TestCase):
             check_kind=RuleCheckKind.STANDARD,
         )
 
-        self.assertTrue(RuleFinding(rule=rule, line_numbers=(2,), instance_fixable=True).fixable)
-        self.assertFalse(RuleFinding(rule=rule, line_numbers=(3,), instance_fixable=False).fixable)
-        with self.assertRaisesRegex(ValueError, "Findings for usually-fixable rules must specify instance_fixable"):
+        assert RuleFinding(rule=rule, line_numbers=(2,), instance_fixable=True).fixable
+        assert not RuleFinding(rule=rule, line_numbers=(3,), instance_fixable=False).fixable
+        with pytest.raises(ValueError, match="Findings for usually-fixable rules must specify instance_fixable"):
             _ = RuleFinding(rule=rule, line_numbers=(4,), instance_fixable=None).fixable
 
     def test_grouped_output_merges_matching_findings_and_prints_summary(self) -> None:
@@ -275,16 +272,13 @@ class TestFormatterResults(unittest.TestCase):
         with contextlib.redirect_stdout(output):
             check_command.print_results_grouped([], [result], output=None)
 
-        self.assertEqual(
-            output.getvalue().splitlines(),
-            [
-                "a.py:",
-                "  PDF101* Docstring chunk needs reflow. Lines 2-3, 8",
-                "  PDF110 Docstring summary does not fit on one line. Line 5",
-                "",
-                "Found 3 rule check errors (2 fixable).",
-            ],
-        )
+        assert output.getvalue().splitlines() == [
+            "a.py:",
+            "  PDF101* Docstring chunk needs reflow. Lines 2-3, 8",
+            "  PDF110 Docstring summary does not fit on one line. Line 5",
+            "",
+            "Found 3 rule check errors (2 fixable).",
+        ]
 
     def test_grouped_output_keeps_different_instance_messages_separate(self) -> None:
         result = FormatterResult(
@@ -305,16 +299,7 @@ class TestFormatterResults(unittest.TestCase):
         with contextlib.redirect_stdout(output):
             check_command.print_results_grouped([], [result], output=None)
 
-        self.assertEqual(
-            output.getvalue().splitlines(),
-            [
-                "a.py:",
-                "  PDF101* First issue. Lines 2-3",
-                "  PDF101* Second issue. Line 2",
-                "",
-                "Found 3 rule check errors (3 fixable).",
-            ],
-        )
+        assert output.getvalue().splitlines() == ["a.py:", "  PDF101* First issue. Lines 2-3", "  PDF101* Second issue. Line 2", "", "Found 3 rule check errors (3 fixable)."]
 
     def test_grouped_output_prints_fixed_findings_before_unfixed_findings(self) -> None:
         result = FormatterResult(
@@ -331,17 +316,14 @@ class TestFormatterResults(unittest.TestCase):
         with contextlib.redirect_stdout(output):
             check_command.print_results_grouped([], [result], output=None)
 
-        self.assertEqual(
-            output.getvalue().splitlines(),
-            [
-                "a.py:",
-                "  PCF100* Comment needs formatting. Fixed 1 time.",
-                "  PDF101* Docstring chunk needs reflow. Fixed 50 times.",
-                "  PDF110 Docstring summary does not fit on one line. Line 5",
-                "",
-                "Fixed 51 rule check errors and left 1 more unfixed (0 fixable).",
-            ],
-        )
+        assert output.getvalue().splitlines() == [
+            "a.py:",
+            "  PCF100* Comment needs formatting. Fixed 1 time.",
+            "  PDF101* Docstring chunk needs reflow. Fixed 50 times.",
+            "  PDF110 Docstring summary does not fit on one line. Line 5",
+            "",
+            "Fixed 51 rule check errors and left 1 more unfixed (0 fixable).",
+        ]
 
     def test_grouped_output_reports_fixed_findings_for_clean_results(self) -> None:
         result = FormatterResult(path="a.py", old_source="", new_source="", modified=True, fixed_findings=collections.Counter({PDF101_RULE: 1}), unfixed_findings=(), errors=())
@@ -350,15 +332,7 @@ class TestFormatterResults(unittest.TestCase):
         with contextlib.redirect_stdout(output):
             check_command.print_results_grouped([], [result], output=None)
 
-        self.assertEqual(
-            output.getvalue().splitlines(),
-            [
-                "a.py:",
-                "  PDF101* Docstring chunk needs reflow. Fixed 1 time.",
-                "",
-                "Fixed 1 rule check error.",
-            ],
-        )
+        assert output.getvalue().splitlines() == ["a.py:", "  PDF101* Docstring chunk needs reflow. Fixed 1 time.", "", "Fixed 1 rule check error."]
 
     def test_grouped_output_prints_success_message_for_clean_results(self) -> None:
         output = StringIO()
@@ -367,7 +341,7 @@ class TestFormatterResults(unittest.TestCase):
                 [], [FormatterResult(path="a.py", old_source="", new_source="", modified=False, fixed_findings=collections.Counter(), unfixed_findings=(), errors=())], output=None
             )
 
-        self.assertEqual(output.getvalue(), "All checks passed!\n")
+        assert output.getvalue() == "All checks passed!\n"
 
     def test_grouped_output_prints_errors_without_success_message(self) -> None:
         result = FormatterResult(path="a.py", old_source=None, new_source=None, modified=False, fixed_findings=collections.Counter(), unfixed_findings=(), errors=("Failed to read file a.py",))
@@ -376,15 +350,7 @@ class TestFormatterResults(unittest.TestCase):
         with contextlib.redirect_stdout(output):
             check_command.print_results_grouped(["Using standard input instead of input path: b.py"], [result], output=None)
 
-        self.assertEqual(
-            output.getvalue().splitlines(),
-            [
-                "ERROR: Using standard input instead of input path: b.py",
-                "ERROR: Failed to read file a.py",
-                "",
-                "Found 2 operational errors.",
-            ],
-        )
+        assert output.getvalue().splitlines() == ["ERROR: Using standard input instead of input path: b.py", "ERROR: Failed to read file a.py", "", "Found 2 operational errors."]
 
     def test_grouped_output_summary_counts_findings_and_operational_errors(self) -> None:
         result = FormatterResult(
@@ -401,7 +367,7 @@ class TestFormatterResults(unittest.TestCase):
         with contextlib.redirect_stdout(output):
             check_command.print_results_grouped(["Using standard input instead of input path: b.py"], [result], output=None)
 
-        self.assertEqual(output.getvalue().splitlines()[-3:], ["", "Found 2 operational errors.", "Found 1 rule check error (1 fixable)."])
+        assert output.getvalue().splitlines()[-3:] == ["", "Found 2 operational errors.", "Found 1 rule check error (1 fixable)."]
 
     def test_diff_summary_reports_fixed_and_remaining_findings(self) -> None:
         result = FormatterResult(
@@ -418,7 +384,7 @@ class TestFormatterResults(unittest.TestCase):
         with contextlib.redirect_stdout(output):
             check_command.print_diff_summary([], [result], output=None)
 
-        self.assertEqual(output.getvalue(), "Would fix 2 rule check errors and leave 1 more unfixed (0 fixable).\n")
+        assert output.getvalue() == "Would fix 2 rule check errors and leave 1 more unfixed (0 fixable).\n"
 
     def test_diff_summary_reports_remaining_findings_without_fixes(self) -> None:
         result = FormatterResult(
@@ -435,7 +401,7 @@ class TestFormatterResults(unittest.TestCase):
         with contextlib.redirect_stdout(output):
             check_command.print_diff_summary([], [result], output=None)
 
-        self.assertEqual(output.getvalue(), "Would leave 2 rule check errors unfixed (1 fixable).\n")
+        assert output.getvalue() == "Would leave 2 rule check errors unfixed (1 fixable).\n"
 
     def test_diff_summary_reports_operational_errors_separately(self) -> None:
         result = FormatterResult(path="a.py", old_source=None, new_source=None, modified=False, fixed_findings=collections.Counter(), unfixed_findings=(), errors=("Failed to read file a.py",))
@@ -444,23 +410,14 @@ class TestFormatterResults(unittest.TestCase):
         with contextlib.redirect_stdout(output):
             check_command.print_diff_summary(["Using standard input instead of input path: b.py"], [result], output=None)
 
-        self.assertEqual(
-            output.getvalue().splitlines(),
-            [
-                "ERROR: Using standard input instead of input path: b.py",
-                "ERROR: Failed to read file a.py",
-                "",
-                "Found 2 operational errors.",
-            ],
-        )
+        assert output.getvalue().splitlines() == ["ERROR: Using standard input instead of input path: b.py", "ERROR: Failed to read file a.py", "", "Found 2 operational errors."]
 
     def test_output_stream_does_not_convert_body_os_errors(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             output_file = str(Path(td) / "errors.txt")
 
-            with self.assertRaisesRegex(OSError, "Body failed"):
-                with check_command.output_stream(output_file):
-                    raise OSError("Body failed")
+            with pytest.raises(OSError, match="Body failed"), check_command.output_stream(output_file):
+                raise OSError("Body failed")
 
     def test_rule_formatter_interface_is_noop_and_preserves_display_path(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -474,12 +431,12 @@ class TestFormatterResults(unittest.TestCase):
             finally:
                 os.chdir(previous_cwd)
 
-            self.assertEqual(result.path, "a.py")
-            self.assertEqual(result.old_source, '"""Module."""\n\nx = 1\n')
-            self.assertEqual(result.new_source, '"""Module."""\n\nx = 1\n')
-            self.assertFalse(result.modified)
-            self.assertEqual(result.unfixed_findings, ())
-            self.assertEqual(target.read_text(encoding="utf-8"), '"""Module."""\n\nx = 1\n')
+            assert result.path == "a.py"
+            assert result.old_source == '"""Module."""\n\nx = 1\n'
+            assert result.new_source == '"""Module."""\n\nx = 1\n'
+            assert not result.modified
+            assert result.unfixed_findings == ()
+            assert target.read_text(encoding="utf-8") == '"""Module."""\n\nx = 1\n'
 
     def test_rule_source_formatter_seeds_initial_check_context_without_module_code(self) -> None:
         observed_contexts: list[tuple[str, tuple[str, ...], source_text.LineBounds | None]] = []
@@ -512,7 +469,7 @@ class TestFormatterResults(unittest.TestCase):
 
             @classmethod
             def violations(cls, context: rule_base.RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
-                self.assertEqual(context.source, expected_context_source)
+                assert context.source == expected_context_source
                 return ()
 
         source = "\ufeffx = 1\r\ny = 2\r\n"
@@ -522,19 +479,19 @@ class TestFormatterResults(unittest.TestCase):
         with unittest.mock.patch.object(cst.Module, "code", new=property(_raise_code_access)):
             result = formatter.format_source(source, "a.py", settings=CheckSettings(), rule_selection=isolated_rule_selection(TST), fix=False)
 
-        self.assertEqual(result.new_source, source)
-        self.assertFalse(result.modified)
-        self.assertEqual(result.errors, ())
-        self.assertEqual(observed_contexts, [(expected_context_source, expected_lines, source_text.line_bounds_from_lines(expected_lines))])
+        assert result.new_source == source
+        assert not result.modified
+        assert result.errors == ()
+        assert observed_contexts == [(expected_context_source, expected_lines, source_text.line_bounds_from_lines(expected_lines))]
 
     def test_rule_source_formatter_aligns_bom_seed_with_libcst_positions(self) -> None:
         source = "\ufeffx = 1  #bad\n"
 
         result = formatter.format_source(source, "a.py", settings=CheckSettings(), rule_selection=default_rule_selection(), fix=True)
 
-        self.assertEqual(result.new_source, "\ufeffx = 1  # bad\n")
-        self.assertTrue(result.modified)
-        self.assertEqual(result.errors, ())
+        assert result.new_source == "\ufeffx = 1  # bad\n"
+        assert result.modified
+        assert result.errors == ()
 
     def test_rule_source_formatter_aligns_trailing_cr_seed_with_libcst_positions(self) -> None:
         observed_contexts: list[tuple[str, tuple[str, ...], source_text.LineBounds | None]] = []
@@ -573,10 +530,10 @@ class TestFormatterResults(unittest.TestCase):
         with unittest.mock.patch.object(cst.Module, "code", new=property(_raise_code_access)):
             result = formatter.format_source(source, "a.py", settings=CheckSettings(), rule_selection=isolated_rule_selection(TST), fix=False)
 
-        self.assertEqual(result.new_source, source)
-        self.assertFalse(result.modified)
-        self.assertEqual(result.errors, ())
-        self.assertEqual(observed_contexts, [(expected_context_source, expected_lines, source_text.line_bounds_from_lines(expected_lines))])
+        assert result.new_source == source
+        assert not result.modified
+        assert result.errors == ()
+        assert observed_contexts == [(expected_context_source, expected_lines, source_text.line_bounds_from_lines(expected_lines))]
 
     def test_rule_runner_recomputes_source_after_seeded_fix_replaces_module(self) -> None:
         original_code_property = inspect.getattr_static(cst.Module, "code")
@@ -637,12 +594,12 @@ class TestFormatterResults(unittest.TestCase):
         with unittest.mock.patch.object(cst.Module, "code", new=property(_count_code_access)):
             result = rule_runner.run_rules(module, path="a.py", settings=CheckSettings(), line_ending="\n", rule_selection=selection, fix=True, source="x = 1\n")
 
-        self.assertTrue(result.source_changed)
-        self.assertEqual(result.fixed_findings, (RuleFinding(rule=TST001InsertLeadingLine.meta, line_numbers=(1,), instance_fixable=None),))
-        self.assertEqual(result.errors, ())
-        self.assertTrue(observed_sources)
-        self.assertEqual(set(observed_sources), {"x = 1\n", "\nx = 1\n"})
-        self.assertTrue(any(accessed_module is result.module for accessed_module in code_accesses))
+        assert result.source_changed
+        assert result.fixed_findings == (RuleFinding(rule=TST001InsertLeadingLine.meta, line_numbers=(1,), instance_fixable=None),)
+        assert result.errors == ()
+        assert observed_sources
+        assert set(observed_sources) == {"x = 1\n", "\nx = 1\n"}
+        assert any(accessed_module is result.module for accessed_module in code_accesses)
 
     def test_rule_runner_skips_fix_hooks_when_precheck_has_no_fixable_findings(self) -> None:
         fix_calls: list[str] = []
@@ -687,12 +644,12 @@ class TestFormatterResults(unittest.TestCase):
         check_result = rule_runner.run_rules(module, path="a.py", settings=settings, line_ending="\n", rule_selection=selection, fix=False)
         fix_result = rule_runner.run_rules(module, path="a.py", settings=settings, line_ending="\n", rule_selection=selection, fix=True)
 
-        self.assertIs(fix_result.module, module)
-        self.assertFalse(fix_result.source_changed)
-        self.assertEqual(fix_result.fixed_findings, ())
-        self.assertEqual(fix_result.unfixed_findings, check_result.unfixed_findings)
-        self.assertEqual(fix_result.errors, ())
-        self.assertEqual(fix_calls, [])
+        assert fix_result.module is module
+        assert not fix_result.source_changed
+        assert fix_result.fixed_findings == ()
+        assert fix_result.unfixed_findings == check_result.unfixed_findings
+        assert fix_result.errors == ()
+        assert fix_calls == []
 
     def test_rule_source_formatter_precheck_uses_effective_fixability(self) -> None:
         fix_calls: list[str] = []
@@ -722,13 +679,13 @@ class TestFormatterResults(unittest.TestCase):
 
         result = formatter.format_source("x = 1\n", "a.py", settings=settings, rule_selection=selection, fix=True)
 
-        self.assertEqual(result.new_source, "x = 1\n")
-        self.assertFalse(result.modified)
-        self.assertEqual(result.fixed_findings, collections.Counter())
-        self.assertEqual(result.unfixed_findings, (RuleFinding(rule=TST001ConfiguredUnfixable.meta, line_numbers=(1,), instance_fixable=False),))
-        self.assertFalse(result.unfixed_findings[0].fixable)
-        self.assertEqual(result.errors, ())
-        self.assertEqual(fix_calls, [])
+        assert result.new_source == "x = 1\n"
+        assert not result.modified
+        assert result.fixed_findings == collections.Counter()
+        assert result.unfixed_findings == (RuleFinding(rule=TST001ConfiguredUnfixable.meta, line_numbers=(1,), instance_fixable=False),)
+        assert not result.unfixed_findings[0].fixable
+        assert result.errors == ()
+        assert fix_calls == []
 
     def test_rule_source_formatter_runs_fix_pass_when_precheck_finds_fixable_finding(self) -> None:
         fix_calls: list[str] = []
@@ -754,12 +711,12 @@ class TestFormatterResults(unittest.TestCase):
         settings = CheckSettings()
         result = formatter.format_source("x = 1\n", "a.py", settings=settings, rule_selection=isolated_rule_selection(TST), fix=True)
 
-        self.assertEqual(result.new_source, "\nx = 1\n")
-        self.assertTrue(result.modified)
-        self.assertEqual(result.fixed_findings, collections.Counter({TST001InsertLeadingLine.meta: 1}))
-        self.assertEqual(result.unfixed_findings, ())
-        self.assertEqual(result.errors, ())
-        self.assertEqual(fix_calls, [])
+        assert result.new_source == "\nx = 1\n"
+        assert result.modified
+        assert result.fixed_findings == collections.Counter({TST001InsertLeadingLine.meta: 1})
+        assert result.unfixed_findings == ()
+        assert result.errors == ()
+        assert fix_calls == []
 
     def test_rule_source_formatter_discards_precheck_errors_when_falling_back(self) -> None:
         fix_calls: list[str] = []
@@ -788,12 +745,12 @@ class TestFormatterResults(unittest.TestCase):
         settings = CheckSettings()
         result = formatter.format_source("x = 1\n", "a.py", settings=settings, rule_selection=isolated_rule_selection(TST), fix=True)
 
-        self.assertEqual(result.new_source, "x = 1\n")
-        self.assertFalse(result.modified)
-        self.assertEqual(result.fixed_findings, collections.Counter())
-        self.assertEqual(result.unfixed_findings, ())
-        self.assertEqual(result.errors, ("a.py: TST001 automatic fix failed: broken check", "a.py: TST001 check failed: broken check"))
-        self.assertEqual(fix_calls, [])
+        assert result.new_source == "x = 1\n"
+        assert not result.modified
+        assert result.fixed_findings == collections.Counter()
+        assert result.unfixed_findings == ()
+        assert result.errors == ("a.py: TST001 automatic fix failed: broken check", "a.py: TST001 check failed: broken check")
+        assert fix_calls == []
 
     def test_rule_fix_pass_same_module_noop_skips_source_comparison(self) -> None:
         code_accesses: list[cst.Module] = []
@@ -836,11 +793,11 @@ class TestFormatterResults(unittest.TestCase):
             module, path="a.py", settings=settings, line_ending="\n", rule_selection=selection, selected_rule_by_code=selected_rule_by_code, errors=errors
         )
 
-        self.assertIs(result_module, module)
-        self.assertEqual(findings, ())
-        self.assertFalse(changed)
-        self.assertEqual(errors, [])
-        self.assertEqual(code_accesses, [])
+        assert result_module is module
+        assert findings == ()
+        assert not changed
+        assert errors == []
+        assert code_accesses == []
 
     def test_rule_fix_pass_rejects_same_source_reported_fix(self) -> None:
         original_code_property = inspect.getattr_static(cst.Module, "code")
@@ -886,11 +843,11 @@ class TestFormatterResults(unittest.TestCase):
             module, path="a.py", settings=settings, line_ending="\n", rule_selection=selection, selected_rule_by_code=selected_rule_by_code, errors=errors
         )
 
-        self.assertIs(result_module, module)
-        self.assertEqual(findings, ())
-        self.assertFalse(changed)
-        self.assertEqual(errors, ["a.py: TST001 automatic fix must change source if and only if it reports fixed findings"])
-        self.assertGreaterEqual(len(code_accesses), 1)
+        assert result_module is module
+        assert findings == ()
+        assert not changed
+        assert errors == ["a.py: TST001 automatic fix must change source if and only if it reports fixed findings"]
+        assert len(code_accesses) >= 1
 
     def test_rule_fix_pass_does_not_apply_suppressed_violations(self) -> None:
         class TST(rule_base.RuleCategoryBase):
@@ -923,10 +880,10 @@ class TestFormatterResults(unittest.TestCase):
             module, path="a.py", settings=settings, line_ending="\n", rule_selection=selection, selected_rule_by_code=selected_rule_by_code, errors=errors
         )
 
-        self.assertIs(result_module, module)
-        self.assertEqual(findings, ())
-        self.assertFalse(changed)
-        self.assertEqual(errors, [])
+        assert result_module is module
+        assert findings == ()
+        assert not changed
+        assert errors == []
 
     def test_rule_check_pass_rejects_finding_outside_source(self) -> None:
         class TST(rule_base.RuleCategoryBase):
@@ -958,8 +915,8 @@ class TestFormatterResults(unittest.TestCase):
 
         findings = rule_runner._run_check_pass(module, path="a.py", settings=settings, line_ending="\n", rule_selection=selection, selected_rule_by_code=selected_rule_by_code, errors=errors)
 
-        self.assertEqual(findings, ())
-        self.assertEqual(errors, ["a.py: TST001 check returned a finding outside the source line range"])
+        assert findings == ()
+        assert errors == ["a.py: TST001 check returned a finding outside the source line range"]
 
     def test_rule_fix_pass_rejects_violation_fixability_mismatch(self) -> None:
         class TST(rule_base.RuleCategoryBase):
@@ -1011,16 +968,13 @@ class TestFormatterResults(unittest.TestCase):
             module, path="a.py", settings=settings, line_ending="\n", rule_selection=selection, selected_rule_by_code=selected_rule_by_code, errors=errors
         )
 
-        self.assertIs(result_module, module)
-        self.assertEqual(findings, ())
-        self.assertFalse(changed)
-        self.assertEqual(
-            errors,
-            [
-                "a.py: TST001 automatic fix returned a violation whose fix does not match finding fixability",
-                "a.py: TST002 automatic fix returned a violation whose fix does not match finding fixability",
-            ],
-        )
+        assert result_module is module
+        assert findings == ()
+        assert not changed
+        assert errors == [
+            "a.py: TST001 automatic fix returned a violation whose fix does not match finding fixability",
+            "a.py: TST002 automatic fix returned a violation whose fix does not match finding fixability",
+        ]
 
     def test_rule_fix_pass_rejects_mismatched_source_change_targets(self) -> None:
         class TST(rule_base.RuleCategoryBase):
@@ -1055,10 +1009,10 @@ class TestFormatterResults(unittest.TestCase):
             module, path="a.py", settings=settings, line_ending="\n", rule_selection=selection, selected_rule_by_code=selected_rule_by_code, errors=errors
         )
 
-        self.assertIs(result_module, module)
-        self.assertEqual(findings, ())
-        self.assertFalse(changed)
-        self.assertEqual(errors, ["a.py: TST001 automatic fix returned source changes whose line targets do not match the finding"])
+        assert result_module is module
+        assert findings == ()
+        assert not changed
+        assert errors == ["a.py: TST001 automatic fix returned source changes whose line targets do not match the finding"]
 
     def test_rule_check_pass_reuses_position_metadata_across_categories(self) -> None:
         observed_contexts: list[tuple[cst.Module, cst_metadata.MetadataWrapper, object, str, tuple[str, ...]]] = []
@@ -1125,16 +1079,16 @@ class TestFormatterResults(unittest.TestCase):
         with unittest.mock.patch.object(cst_metadata.MetadataWrapper, "resolve", autospec=True, side_effect=_count_position_resolve):
             findings = rule_runner._run_check_pass(module, path="a.py", settings=settings, line_ending="\n", rule_selection=selection, selected_rule_by_code=selected_rule_by_code, errors=errors)
 
-        self.assertEqual(findings, ())
-        self.assertEqual(errors, [])
-        self.assertEqual(resolved_modules, [module])
-        self.assertEqual(len(observed_contexts), 2)
-        self.assertIs(observed_contexts[0][0], module)
-        self.assertIs(observed_contexts[1][0], module)
-        self.assertIs(observed_contexts[0][1], observed_contexts[1][1])
-        self.assertIs(observed_contexts[0][2], observed_contexts[1][2])
-        self.assertEqual(observed_contexts[0][3], "x = 1\n")
-        self.assertIs(observed_contexts[0][4], observed_contexts[1][4])
+        assert findings == ()
+        assert errors == []
+        assert resolved_modules == [module]
+        assert len(observed_contexts) == 2
+        assert observed_contexts[0][0] is module
+        assert observed_contexts[1][0] is module
+        assert observed_contexts[0][1] is observed_contexts[1][1]
+        assert observed_contexts[0][2] is observed_contexts[1][2]
+        assert observed_contexts[0][3] == "x = 1\n"
+        assert observed_contexts[0][4] is observed_contexts[1][4]
 
     def test_rule_check_pass_reports_position_metadata_errors_as_category_preparation(self) -> None:
         def _raise_position_resolve(wrapper: cst_metadata.MetadataWrapper, provider: object) -> object:
@@ -1169,8 +1123,8 @@ class TestFormatterResults(unittest.TestCase):
         with unittest.mock.patch.object(cst_metadata.MetadataWrapper, "resolve", autospec=True, side_effect=_raise_position_resolve):
             findings = rule_runner._run_check_pass(module, path="a.py", settings=settings, line_ending="\n", rule_selection=selection, selected_rule_by_code=selected_rule_by_code, errors=errors)
 
-        self.assertEqual(findings, ())
-        self.assertEqual(errors, ["a.py: TST category preparation failed: position metadata failed"])
+        assert findings == ()
+        assert errors == ["a.py: TST category preparation failed: position metadata failed"]
 
     def test_rule_fix_pass_reuses_position_metadata_across_unchanged_categories(self) -> None:
         observed_contexts: list[tuple[cst_metadata.MetadataWrapper, object]] = []
@@ -1239,14 +1193,14 @@ class TestFormatterResults(unittest.TestCase):
                 module, path="a.py", settings=settings, line_ending="\n", rule_selection=selection, selected_rule_by_code=selected_rule_by_code, errors=errors
             )
 
-        self.assertIs(result_module, module)
-        self.assertEqual(findings, ())
-        self.assertFalse(changed)
-        self.assertEqual(errors, [])
-        self.assertEqual(resolved_modules, [module])
-        self.assertEqual(len(observed_contexts), 2)
-        self.assertIs(observed_contexts[0][0], observed_contexts[1][0])
-        self.assertIs(observed_contexts[0][1], observed_contexts[1][1])
+        assert result_module is module
+        assert findings == ()
+        assert not changed
+        assert errors == []
+        assert resolved_modules == [module]
+        assert len(observed_contexts) == 2
+        assert observed_contexts[0][0] is observed_contexts[1][0]
+        assert observed_contexts[0][1] is observed_contexts[1][1]
 
     def test_rule_fix_pass_reports_position_metadata_errors_as_category_preparation(self) -> None:
         def _raise_position_resolve(wrapper: cst_metadata.MetadataWrapper, provider: object) -> object:
@@ -1283,10 +1237,10 @@ class TestFormatterResults(unittest.TestCase):
                 module, path="a.py", settings=settings, line_ending="\n", rule_selection=selection, selected_rule_by_code=selected_rule_by_code, errors=errors
             )
 
-        self.assertIs(result_module, module)
-        self.assertEqual(findings, ())
-        self.assertFalse(changed)
-        self.assertEqual(errors, ["a.py: TST category preparation failed: position metadata failed"])
+        assert result_module is module
+        assert findings == ()
+        assert not changed
+        assert errors == ["a.py: TST category preparation failed: position metadata failed"]
 
     def test_rule_fix_pass_refreshes_position_metadata_after_changed_module(self) -> None:
         observed_sources: list[str] = []
@@ -1364,15 +1318,15 @@ class TestFormatterResults(unittest.TestCase):
                 module, path="a.py", settings=settings, line_ending="\n", rule_selection=selection, selected_rule_by_code=selected_rule_by_code, errors=errors
             )
 
-        self.assertEqual(result_module.code, "\nx = 1\n")
-        self.assertEqual(findings, (RuleFinding(rule=TST001InsertLeadingLine.meta, line_numbers=(1,), instance_fixable=None),))
-        self.assertTrue(changed)
-        self.assertEqual(errors, [])
-        self.assertEqual(len(resolved_modules), 2)
-        self.assertIs(resolved_modules[0], module)
-        self.assertIs(resolved_modules[1], result_module)
-        self.assertEqual(observed_sources, ["\nx = 1\n"])
-        self.assertEqual(observed_line_numbers, [(2,)])
+        assert result_module.code == "\nx = 1\n"
+        assert findings == (RuleFinding(rule=TST001InsertLeadingLine.meta, line_numbers=(1,), instance_fixable=None),)
+        assert changed
+        assert errors == []
+        assert len(resolved_modules) == 2
+        assert resolved_modules[0] is module
+        assert resolved_modules[1] is result_module
+        assert observed_sources == ["\nx = 1\n"]
+        assert observed_line_numbers == [(2,)]
 
     def test_rule_source_formatter_runs_fixes_to_convergence_and_checks_latest_positions(self) -> None:
         prepare_sources: list[str] = []
@@ -1434,11 +1388,11 @@ class TestFormatterResults(unittest.TestCase):
         settings = CheckSettings()
         result = formatter.format_source("x = 1\n", "a.py", settings=settings, rule_selection=isolated_rule_selection(TST), fix=True)
 
-        self.assertEqual(result.new_source, "\nx = 1\n")
-        self.assertEqual(result.fixed_findings, collections.Counter({TST001InsertLeadingLine.meta: 1}))
-        self.assertEqual(result.unfixed_findings, (RuleFinding(rule=TST002FindName.meta, line_numbers=(2,), instance_fixable=None),))
-        self.assertEqual(prepare_sources, ["x = 1\n", "x = 1\n", "\nx = 1\n", "\nx = 1\n", "\nx = 1\n"])
-        self.assertEqual(result.errors, ())
+        assert result.new_source == "\nx = 1\n"
+        assert result.fixed_findings == collections.Counter({TST001InsertLeadingLine.meta: 1})
+        assert result.unfixed_findings == (RuleFinding(rule=TST002FindName.meta, line_numbers=(2,), instance_fixable=None),)
+        assert prepare_sources == ["x = 1\n", "x = 1\n", "\nx = 1\n", "\nx = 1\n", "\nx = 1\n"]
+        assert result.errors == ()
 
     def test_rule_source_formatter_refreshes_and_reuses_category_data_after_a_fix(self) -> None:
         prepared_data: list[object] = []
@@ -1522,16 +1476,16 @@ class TestFormatterResults(unittest.TestCase):
         settings = CheckSettings()
         result = formatter.format_source("x = 1\n", "a.py", settings=settings, rule_selection=isolated_rule_selection(TST), fix=True)
 
-        self.assertEqual(result.new_source, "\nx = 1\n")
-        self.assertEqual(result.fixed_findings, collections.Counter({TST001InsertLeadingLine.meta: 1}))
-        self.assertEqual(observed_data[:2], [("x = 1\n", (1,))] * 2)
-        self.assertEqual(observed_data[2:], [("\nx = 1\n", (2,))] * len(observed_data[2:]))
-        self.assertIs(observed_data[0], observed_data[1])
-        self.assertIs(observed_data[2], observed_data[3])
-        self.assertIsNot(observed_data[0], observed_data[2])
-        self.assertEqual(prepared_data[:2], [("x = 1\n", (1,))] * 2)
-        self.assertEqual(prepared_data[2:], [("\nx = 1\n", (2,))] * len(prepared_data[2:]))
-        self.assertEqual(result.errors, ())
+        assert result.new_source == "\nx = 1\n"
+        assert result.fixed_findings == collections.Counter({TST001InsertLeadingLine.meta: 1})
+        assert observed_data[:2] == [("x = 1\n", (1,))] * 2
+        assert observed_data[2:] == [("\nx = 1\n", (2,))] * len(observed_data[2:])
+        assert observed_data[0] is observed_data[1]
+        assert observed_data[2] is observed_data[3]
+        assert observed_data[0] is not observed_data[2]
+        assert prepared_data[:2] == [("x = 1\n", (1,))] * 2
+        assert prepared_data[2:] == [("\nx = 1\n", (2,))] * len(prepared_data[2:])
+        assert result.errors == ()
 
     def test_rule_source_formatter_does_not_normalize_line_endings_without_a_fix(self) -> None:
         settings = CheckSettings(line_ending=LineEnding.CR_LF)
@@ -1539,8 +1493,8 @@ class TestFormatterResults(unittest.TestCase):
 
         result = formatter.format_source(source, "a.py", settings=settings, rule_selection=isolated_rule_selection(), fix=True)
 
-        self.assertEqual(result.new_source, source)
-        self.assertFalse(result.modified)
+        assert result.new_source == source
+        assert not result.modified
 
     def test_rule_source_formatter_preserves_untouched_line_endings_after_a_fix(self) -> None:
         class TST(rule_base.RuleCategoryBase):
@@ -1564,7 +1518,7 @@ class TestFormatterResults(unittest.TestCase):
         settings = CheckSettings(line_ending=LineEnding.CR_LF)
         result = formatter.format_source("x = 1\ny = 2\n", "a.py", settings=settings, rule_selection=isolated_rule_selection(TST), fix=True)
 
-        self.assertEqual(result.new_source, "\nx = 1\ny = 2\n")
+        assert result.new_source == "\nx = 1\ny = 2\n"
 
     def test_rule_source_formatter_preserves_utf8_bom_after_a_fix(self) -> None:
         class TST(rule_base.RuleCategoryBase):
@@ -1588,7 +1542,7 @@ class TestFormatterResults(unittest.TestCase):
         settings = CheckSettings()
         result = formatter.format_source("\ufeffx = 1\n", "a.py", settings=settings, rule_selection=isolated_rule_selection(TST), fix=True)
 
-        self.assertEqual(result.new_source, "\ufeff\nx = 1\n")
+        assert result.new_source == "\ufeff\nx = 1\n"
 
     def test_rule_source_formatter_applies_per_file_ignores(self) -> None:
         checks: list[str] = []
@@ -1618,8 +1572,8 @@ class TestFormatterResults(unittest.TestCase):
         selection = rules_selection.select_rules(settings, collection=rule_collection.RuleCollection((TST,)))
         result = formatter.format_source("x = 1\n", "skip.py", settings=settings, rule_selection=selection, fix=False)
 
-        self.assertEqual(checks, [])
-        self.assertEqual(result.unfixed_findings, ())
+        assert checks == []
+        assert result.unfixed_findings == ()
 
     def test_rule_source_formatter_reports_non_converging_fixes_and_keeps_latest_source(self) -> None:
         class TST(rule_base.RuleCategoryBase):
@@ -1652,12 +1606,12 @@ class TestFormatterResults(unittest.TestCase):
         with unittest.mock.patch.object(rule_runner, "MAX_FIX_ITERATIONS", 3):
             result = formatter.format_source("x = 1\n", "a.py", settings=settings, rule_selection=isolated_rule_selection(TST), fix=True)
 
-        self.assertEqual(result.new_source, "x = 2\n")
-        self.assertEqual(result.fixed_findings, collections.Counter({TST001Toggle.meta: 3}))
-        self.assertEqual(result.unfixed_findings, (RuleFinding(rule=TST001Toggle.meta, line_numbers=(1,), instance_fixable=None),))
-        self.assertEqual(len(result.errors), 1)
-        self.assertIn("did not converge after 3 iterations", result.errors[0])
-        self.assertIn("TST001 lines 1", result.errors[0])
+        assert result.new_source == "x = 2\n"
+        assert result.fixed_findings == collections.Counter({TST001Toggle.meta: 3})
+        assert result.unfixed_findings == (RuleFinding(rule=TST001Toggle.meta, line_numbers=(1,), instance_fixable=None),)
+        assert len(result.errors) == 1
+        assert "did not converge after 3 iterations" in result.errors[0]
+        assert "TST001 lines 1" in result.errors[0]
 
     def test_rule_source_formatter_accepts_convergence_on_final_fix_iteration(self) -> None:
         class TST(rule_base.RuleCategoryBase):
@@ -1692,21 +1646,21 @@ class TestFormatterResults(unittest.TestCase):
         with unittest.mock.patch.object(rule_runner, "MAX_FIX_ITERATIONS", 3):
             result = formatter.format_source("x = 1\n", "a.py", settings=settings, rule_selection=isolated_rule_selection(TST), fix=True)
 
-        self.assertEqual(result.new_source, "x = 4\n")
-        self.assertEqual(result.fixed_findings, collections.Counter({TST001IncrementToFour.meta: 3}))
-        self.assertEqual(result.unfixed_findings, ())
-        self.assertEqual(result.errors, ())
+        assert result.new_source == "x = 4\n"
+        assert result.fixed_findings == collections.Counter({TST001IncrementToFour.meta: 3})
+        assert result.unfixed_findings == ()
+        assert result.errors == ()
 
     def test_rule_source_formatter_reports_libcst_parse_errors(self) -> None:
         settings = CheckSettings()
 
         result = formatter.format_source("def broken(:\n", "broken.py", settings=settings, rule_selection=isolated_rule_selection(), fix=True)
 
-        self.assertEqual(result.old_source, "def broken(:\n")
-        self.assertEqual(result.new_source, "def broken(:\n")
-        self.assertFalse(result.modified)
-        self.assertEqual(len(result.errors), 1)
-        self.assertIn("Failed to parse broken.py with LibCST", result.errors[0])
+        assert result.old_source == "def broken(:\n"
+        assert result.new_source == "def broken(:\n"
+        assert not result.modified
+        assert len(result.errors) == 1
+        assert "Failed to parse broken.py with LibCST" in result.errors[0]
 
     def test_rule_file_formatter_delegates_to_source_formatter(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -1723,10 +1677,10 @@ class TestFormatterResults(unittest.TestCase):
             with unittest.mock.patch("pydocformatter.formatter.format_source", side_effect=fake_format_source):
                 result = formatter.format_file(str(target), settings=CheckSettings(), rule_selection=default_rule_selection(), fix=False, write=True)
 
-        self.assertEqual(called_args, [("x = 1\n", str(target), False)])
-        self.assertEqual(result.path, str(target))
-        self.assertEqual(result.new_source, "x = 1\n")
-        self.assertFalse(result.modified)
+        assert called_args == [("x = 1\n", str(target), False)]
+        assert result.path == str(target)
+        assert result.new_source == "x = 1\n"
+        assert not result.modified
 
     def test_rule_file_formatter_writes_modified_fix_result(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -1741,10 +1695,10 @@ class TestFormatterResults(unittest.TestCase):
             with unittest.mock.patch("pydocformatter.formatter.format_source", side_effect=fake_format_source):
                 result = formatter.format_file(str(target), settings=CheckSettings(), rule_selection=default_rule_selection(), fix=True, write=True)
 
-            self.assertEqual(result.new_source, "x = 2\n")
-            self.assertEqual(result.old_source, "x = 1\n")
-            self.assertTrue(result.modified)
-            self.assertEqual(target.read_text(encoding="utf-8"), "x = 2\n")
+            assert result.new_source == "x = 2\n"
+            assert result.old_source == "x = 1\n"
+            assert result.modified
+            assert target.read_text(encoding="utf-8") == "x = 2\n"
 
     def test_rule_file_formatter_can_skip_modified_fix_write(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -1759,21 +1713,21 @@ class TestFormatterResults(unittest.TestCase):
             with unittest.mock.patch("pydocformatter.formatter.format_source", side_effect=fake_format_source):
                 result = formatter.format_file(str(target), settings=CheckSettings(), rule_selection=default_rule_selection(), fix=True, write=False)
 
-            self.assertEqual(result.new_source, "x = 2\n")
-            self.assertEqual(result.old_source, "x = 1\n")
-            self.assertTrue(result.modified)
-            self.assertEqual(target.read_text(encoding="utf-8"), "x = 1\n")
+            assert result.new_source == "x = 2\n"
+            assert result.old_source == "x = 1\n"
+            assert result.modified
+            assert target.read_text(encoding="utf-8") == "x = 1\n"
 
     def test_rule_file_formatter_reports_file_io_errors(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             missing = str(Path(td) / "missing.py")
             result = formatter.format_file(missing, settings=CheckSettings(), rule_selection=default_rule_selection(), fix=False, write=True)
 
-        self.assertIsNone(result.new_source)
-        self.assertFalse(result.modified)
-        self.assertEqual(result.unfixed_findings, ())
-        self.assertEqual(len(result.errors), 1)
-        self.assertIn(f"Failed to read file {missing}", result.errors[0])
+        assert result.new_source is None
+        assert not result.modified
+        assert result.unfixed_findings == ()
+        assert len(result.errors) == 1
+        assert f"Failed to read file {missing}" in result.errors[0]
 
     def test_format_files_formats_each_received_path_without_deduplicating(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -1795,8 +1749,8 @@ class TestFormatterResults(unittest.TestCase):
             finally:
                 os.chdir(previous_cwd)
 
-        self.assertEqual(called_paths, ["a.py", str(target)])
-        self.assertEqual([result.path for result in results], ["a.py", str(target)])
+        assert called_paths == ["a.py", str(target)]
+        assert [result.path for result in results] == ["a.py", str(target)]
 
     def test_check_formatter_applies_per_file_settings_without_reselecting_rules(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -1804,18 +1758,11 @@ class TestFormatterResults(unittest.TestCase):
             target = root / "tests" / "test_example.py"
             target.parent.mkdir()
             target.write_text("x = 1\n", encoding="utf-8")
-            settings = CheckSettings(
-                line_length=88,
-                select=("PDF101",),
-                per_file_settings=(("tests/*.py", (("line-length", 100),)),),
-            )
+            settings = CheckSettings(line_length=88, select=("PDF101",), per_file_settings=(("tests/*.py", (("line-length", 100),)),))
             previous_cwd = os.getcwd()
             os.chdir(root)
             try:
-                profile = settings_check.SETTINGS_SCHEMA.load_profile(
-                    global_values=GlobalArgs(isolated=True),
-                    field_overrides=dataclasses.asdict(settings),
-                )
+                profile = settings_check.SETTINGS_SCHEMA.load_profile(global_values=GlobalArgs(isolated=True), field_overrides=dataclasses.asdict(settings))
             finally:
                 os.chdir(previous_cwd)
             selected_file = file_selection.SelectedFile(path=str(target), profile=profile)
@@ -1828,16 +1775,9 @@ class TestFormatterResults(unittest.TestCase):
                 return FormatterResult(path=str(target), old_source="", new_source="", modified=False, fixed_findings=collections.Counter(), unfixed_findings=(), errors=())
 
             with unittest.mock.patch("pydocformatter.formatter.format_file", side_effect=fake_format_file):
-                check_command.format_selected_files(
-                    (selected_file,),
-                    rule_selections={profile.key(): rule_selection},
-                    use_stdin=False,
-                    fix=False,
-                    write=False,
-                    parallelism=1,
-                )
+                check_command.format_selected_files((selected_file,), rule_selections={profile.key(): rule_selection}, use_stdin=False, fix=False, write=False, parallelism=1)
 
-        self.assertEqual(calls, [(100, rule_selection)])
+        assert calls == [(100, rule_selection)]
 
     @pytest.mark.isolated_cwd
     def test_check_exit_status_depends_on_remaining_findings_not_modified_results(self) -> None:
@@ -1851,13 +1791,10 @@ class TestFormatterResults(unittest.TestCase):
                 return FormatterResult(path=path, old_source="", new_source="", modified=True, fixed_findings=collections.Counter({PDF101_RULE: 1}), unfixed_findings=(), errors=())
 
             argv = ["pydocfmt", "check", str(target)]
-            with (
-                unittest.mock.patch("sys.argv", argv),
-                unittest.mock.patch("pydocformatter.formatter.format_file", side_effect=fake_format_file),
-            ):
+            with unittest.mock.patch("sys.argv", argv), unittest.mock.patch("pydocformatter.formatter.format_file", side_effect=fake_format_file):
                 exit_code = pydocfmt_cli.main()
 
-        self.assertEqual(exit_code, 0)
+        assert exit_code == 0
 
     @pytest.mark.isolated_cwd
     def test_exit_zero_suppresses_remaining_findings(self) -> None:
@@ -1890,14 +1827,10 @@ class TestFormatterResults(unittest.TestCase):
 
             argv = ["pydocfmt", "check", "--exit-zero", str(target)]
             stdout = StringIO()
-            with (
-                unittest.mock.patch("sys.argv", argv),
-                unittest.mock.patch("pydocformatter.formatter.format_file", side_effect=fake_format_file),
-                contextlib.redirect_stdout(stdout),
-            ):
+            with unittest.mock.patch("sys.argv", argv), unittest.mock.patch("pydocformatter.formatter.format_file", side_effect=fake_format_file), contextlib.redirect_stdout(stdout):
                 exit_code = pydocfmt_cli.main()
 
-        self.assertEqual(exit_code, 0)
+        assert exit_code == 0
 
     @pytest.mark.isolated_cwd
     def test_errors_affect_exit_status_without_findings(self) -> None:
@@ -1913,15 +1846,11 @@ class TestFormatterResults(unittest.TestCase):
             for extra_args, expected_exit_code in (([], 1), (["--exit-zero"], 0)):
                 argv = ["pydocfmt", "check", *extra_args, str(target)]
                 stdout = StringIO()
-                with (
-                    unittest.mock.patch("sys.argv", argv),
-                    unittest.mock.patch("pydocformatter.formatter.format_file", side_effect=fake_format_file),
-                    contextlib.redirect_stdout(stdout),
-                ):
+                with unittest.mock.patch("sys.argv", argv), unittest.mock.patch("pydocformatter.formatter.format_file", side_effect=fake_format_file), contextlib.redirect_stdout(stdout):
                     exit_code = pydocfmt_cli.main()
 
-                self.assertEqual(exit_code, expected_exit_code)
-                self.assertNotIn("All checks passed!", stdout.getvalue())
+                assert exit_code == expected_exit_code
+                assert "All checks passed!" not in stdout.getvalue()
 
     @pytest.mark.isolated_cwd
     def test_fix_mode_exits_nonzero_for_remaining_findings(self) -> None:
@@ -1954,14 +1883,10 @@ class TestFormatterResults(unittest.TestCase):
 
             argv = ["pydocfmt", "check", "--fix", str(target)]
             stdout = StringIO()
-            with (
-                unittest.mock.patch("sys.argv", argv),
-                unittest.mock.patch("pydocformatter.formatter.format_file", side_effect=fake_format_file),
-                contextlib.redirect_stdout(stdout),
-            ):
+            with unittest.mock.patch("sys.argv", argv), unittest.mock.patch("pydocformatter.formatter.format_file", side_effect=fake_format_file), contextlib.redirect_stdout(stdout):
                 exit_code = pydocfmt_cli.main()
 
-        self.assertEqual(exit_code, 1)
+        assert exit_code == 1
 
     @pytest.mark.isolated_cwd
     def test_exit_non_zero_on_fix_reports_modified_files(self) -> None:
@@ -1979,7 +1904,7 @@ class TestFormatterResults(unittest.TestCase):
                 with unittest.mock.patch("sys.argv", argv), unittest.mock.patch("pydocformatter.formatter.format_file", side_effect=fake_format_file):
                     exit_code = pydocfmt_cli.main()
 
-                self.assertEqual(exit_code, expected_exit_code)
+                assert exit_code == expected_exit_code
 
     def test_docstring_closing_quote_directive_suppresses_whole_docstring_check_and_fix(self) -> None:
         source = 'def function():\n    """This is a long summary that needs wrapping into more than one physical line."""  # pydocfmt: ignore[PDF101]\n'
@@ -1990,11 +1915,11 @@ class TestFormatterResults(unittest.TestCase):
         check_result = formatter.format_source(source, "a.py", settings=settings, rule_selection=selection, fix=False)
         fix_result = formatter.format_source(source, "a.py", settings=settings, rule_selection=selection, fix=True)
 
-        self.assertEqual(tuple(finding.rule.code.tag for finding in without_directive.unfixed_findings), ("PDF101",))
-        self.assertEqual(check_result.unfixed_findings, ())
-        self.assertEqual(fix_result.new_source, source)
-        self.assertFalse(fix_result.modified)
-        self.assertEqual(fix_result.fixed_findings, collections.Counter())
+        assert tuple(finding.rule.code.tag for finding in without_directive.unfixed_findings) == ("PDF101",)
+        assert check_result.unfixed_findings == ()
+        assert fix_result.new_source == source
+        assert not fix_result.modified
+        assert fix_result.fixed_findings == collections.Counter()
 
     def test_docstring_closing_quote_directive_suppresses_multiline_docstring_interior_findings(self) -> None:
         source = 'def function():\n    """This is a long summary that should be joined with the following line\n    because the paragraph is one reflowable docstring chunk.\n    """  # pydocfmt: ignore[PDF101]\n'
@@ -2004,24 +1929,24 @@ class TestFormatterResults(unittest.TestCase):
         without_directive = formatter.format_source(source.replace("  # pydocfmt: ignore[PDF101]", ""), "a.py", settings=settings, rule_selection=selection, fix=False)
         result = formatter.format_source(source, "a.py", settings=settings, rule_selection=selection, fix=True)
 
-        self.assertEqual(tuple(finding.rule.code.tag for finding in without_directive.unfixed_findings), ("PDF101",))
-        self.assertEqual(result.new_source, source)
-        self.assertFalse(result.modified)
-        self.assertEqual(result.unfixed_findings, ())
+        assert tuple(finding.rule.code.tag for finding in without_directive.unfixed_findings) == ("PDF101",)
+        assert result.new_source == source
+        assert not result.modified
+        assert result.unfixed_findings == ()
 
     def test_preceding_pydocfmt_directive_suppresses_immediately_following_docstring(self) -> None:
         source = 'def function():\n    # pydocfmt: ignore[PDF101]\n    """This is a long summary that needs wrapping into more than one physical line."""\n'
         settings = CheckSettings(select=("PDF101",), line_length=48)
         result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=False)
 
-        self.assertEqual(result.unfixed_findings, ())
+        assert result.unfixed_findings == ()
 
     def test_preceding_pydocfmt_directive_does_not_skip_blank_lines(self) -> None:
         source = 'def function():\n    # pydocfmt: ignore[PDF101]\n\n    """This is a long summary that needs wrapping into more than one physical line."""\n'
         settings = CheckSettings(select=("PDF101",), line_length=48)
         result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=False)
 
-        self.assertEqual(tuple(finding.rule.code.tag for finding in result.unfixed_findings), ("PDF101",))
+        assert tuple(finding.rule.code.tag for finding in result.unfixed_findings) == ("PDF101",)
 
     def test_preceding_pydocfmt_directive_suppresses_following_standalone_comment_run_check_and_fix(self) -> None:
         source = "# pydocfmt: ignore[PCF001]\n# This is a long comment that needs wrapping into more than one physical line.\n# This line belongs to the same comment run.\n"
@@ -2032,20 +1957,20 @@ class TestFormatterResults(unittest.TestCase):
         check_result = formatter.format_source(source, "a.py", settings=settings, rule_selection=selection, fix=False)
         fix_result = formatter.format_source(source, "a.py", settings=settings, rule_selection=selection, fix=True)
 
-        self.assertTrue(all(finding.rule.code.tag == "PCF001" for finding in without_directive.unfixed_findings))
-        self.assertTrue(without_directive.unfixed_findings)
-        self.assertEqual(check_result.unfixed_findings, ())
-        self.assertEqual(fix_result.new_source, source)
-        self.assertFalse(fix_result.modified)
+        assert all(finding.rule.code.tag == "PCF001" for finding in without_directive.unfixed_findings)
+        assert without_directive.unfixed_findings
+        assert check_result.unfixed_findings == ()
+        assert fix_result.new_source == source
+        assert not fix_result.modified
 
     def test_preceding_pydocfmt_directive_suppresses_following_trailing_comment(self) -> None:
         source = "# pydocfmt: ignore[PCF002]\nvalue = 1 # trailing\n"
         settings = CheckSettings(select=("PCF002",))
         result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
 
-        self.assertEqual(result.new_source, source)
-        self.assertFalse(result.modified)
-        self.assertEqual(result.unfixed_findings, ())
+        assert result.new_source == source
+        assert not result.modified
+        assert result.unfixed_findings == ()
 
     def test_local_all_selector_suppresses_following_docstring_or_comment_target(self) -> None:
         settings = CheckSettings(select=("PDF101", "PCF002", "PCF006"), line_length=48)
@@ -2056,10 +1981,10 @@ class TestFormatterResults(unittest.TestCase):
         docstring = formatter.format_source(docstring_source, "a.py", settings=settings, rule_selection=selection, fix=False)
         comment = formatter.format_source(comment_source, "a.py", settings=settings, rule_selection=selection, fix=True)
 
-        self.assertEqual(docstring.unfixed_findings, ())
-        self.assertEqual(comment.new_source, comment_source)
-        self.assertFalse(comment.modified)
-        self.assertEqual(comment.unfixed_findings, ())
+        assert docstring.unfixed_findings == ()
+        assert comment.new_source == comment_source
+        assert not comment.modified
+        assert comment.unfixed_findings == ()
 
     def test_bare_noqa_is_line_only_except_closing_docstring_line(self) -> None:
         line_only_source = '# noqa: PDF101\n"""This is a long module summary that needs wrapping into more than one physical line."""\n'
@@ -2070,26 +1995,26 @@ class TestFormatterResults(unittest.TestCase):
         line_only_result = formatter.format_source(line_only_source, "a.py", settings=settings, rule_selection=selection, fix=False)
         closing_result = formatter.format_source(closing_source, "a.py", settings=settings, rule_selection=selection, fix=False)
 
-        self.assertEqual(tuple(finding.rule.code.tag for finding in line_only_result.unfixed_findings), ("PDF101",))
-        self.assertEqual(closing_result.unfixed_findings, ())
+        assert tuple(finding.rule.code.tag for finding in line_only_result.unfixed_findings) == ("PDF101",)
+        assert closing_result.unfixed_findings == ()
 
     def test_bare_noqa_without_payload_suppresses_closing_docstring_line(self) -> None:
         source = '"""This is a long module summary that needs wrapping into more than one physical line."""  # noqa\n'
         settings = CheckSettings(select=("PDF101",), line_length=48)
         result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
 
-        self.assertEqual(result.new_source, source)
-        self.assertFalse(result.modified)
-        self.assertEqual(result.unfixed_findings, ())
+        assert result.new_source == source
+        assert not result.modified
+        assert result.unfixed_findings == ()
 
     def test_bare_noqa_suppresses_pcf_findings_without_blanket_pcf006_audit(self) -> None:
         source = "value = 1 # noqa\n"
         settings = CheckSettings(select=("PCF002", "PCF006"))
         result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
 
-        self.assertEqual(result.new_source, source)
-        self.assertFalse(result.modified)
-        self.assertEqual(result.unfixed_findings, ())
+        assert result.new_source == source
+        assert not result.modified
+        assert result.unfixed_findings == ()
 
     def test_bare_noqa_pydocformatter_selectors_suppress_and_are_audited(self) -> None:
         used_source = "value = 1 # noqa: PCF002\n"
@@ -2102,9 +2027,9 @@ class TestFormatterResults(unittest.TestCase):
         unused = formatter.format_source(unused_source, "a.py", settings=settings, rule_selection=selection, fix=False)
         foreign = formatter.format_source(foreign_source, "a.py", settings=settings, rule_selection=selection, fix=False)
 
-        self.assertEqual(used.unfixed_findings, ())
-        self.assertEqual(tuple((finding.rule.code.tag, finding.message) for finding in unused.unfixed_findings), (("PCF006", "Suppression selector 'PCF002' did not suppress any findings"),))
-        self.assertEqual(foreign.unfixed_findings, ())
+        assert used.unfixed_findings == ()
+        assert tuple((finding.rule.code.tag, finding.message) for finding in unused.unfixed_findings) == (("PCF006", "Suppression selector 'PCF002' did not suppress any findings"),)
+        assert foreign.unfixed_findings == ()
 
     def test_unused_suppression_reports_unused_and_invalid_pydocfmt_selectors(self) -> None:
         settings = CheckSettings(select=("PCF001", "PCF006"))
@@ -2113,22 +2038,22 @@ class TestFormatterResults(unittest.TestCase):
         unused = formatter.format_source("# pydocfmt: ignore[PCF001]\n# Short comment.\n", "a.py", settings=settings, rule_selection=selection, fix=False)
         invalid = formatter.format_source("# pydocfmt: ignore[not-a-rule]\n# Short comment.\n", "a.py", settings=settings, rule_selection=selection, fix=False)
 
-        self.assertEqual(tuple(finding.message for finding in unused.unfixed_findings), ("Suppression selector 'PCF001' did not suppress any findings",))
-        self.assertEqual(tuple(finding.message for finding in invalid.unfixed_findings), ("Invalid pydocfmt suppression selector 'NOT-A-RULE'",))
+        assert tuple(finding.message for finding in unused.unfixed_findings) == ("Suppression selector 'PCF001' did not suppress any findings",)
+        assert tuple(finding.message for finding in invalid.unfixed_findings) == ("Invalid pydocfmt suppression selector 'NOT-A-RULE'",)
 
     def test_unused_suppression_reports_partially_unused_selector_lists(self) -> None:
         source = "# pydocfmt: ignore[PCF001, PCF002]\n# This is a long comment that needs wrapping into more than one physical line.\n"
         settings = CheckSettings(select=("PCF001", "PCF002", "PCF006"), line_length=42)
         result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=False)
 
-        self.assertEqual(tuple((finding.rule.code.tag, finding.message) for finding in result.unfixed_findings), (("PCF006", "Suppression selector 'PCF002' did not suppress any findings"),))
+        assert tuple((finding.rule.code.tag, finding.message) for finding in result.unfixed_findings) == (("PCF006", "Suppression selector 'PCF002' did not suppress any findings"),)
 
     def test_unused_suppression_does_not_report_selectors_for_disabled_rules(self) -> None:
         source = '# pydocfmt: ignore[PDF101]\n"""This is a long module summary that needs wrapping into more than one physical line."""\n'
         settings = CheckSettings(select=("PCF006",), line_length=48)
         result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=False)
 
-        self.assertEqual(result.unfixed_findings, ())
+        assert result.unfixed_findings == ()
 
     def test_pydocfmt_directive_can_suppress_pcf006(self) -> None:
         settings = CheckSettings(select=("PCF006",))
@@ -2141,57 +2066,54 @@ class TestFormatterResults(unittest.TestCase):
 
         for source in sources:
             result = formatter.format_source(source, "a.py", settings=settings, rule_selection=selection, fix=False)
-            self.assertEqual(result.unfixed_findings, ())
+            assert result.unfixed_findings == ()
 
     def test_file_level_pydocfmt_directive_suppresses_findings_anywhere_in_file(self) -> None:
         source = 'def first():\n    """This is a long summary that needs wrapping into more than one physical line."""\n\n# pydocfmt: noqa: PDF101\n\ndef second():\n    """This is another long summary that needs wrapping into more than one physical line."""\n'
         settings = CheckSettings(select=("PDF101", "PCF006"), line_length=48)
         result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=False)
 
-        self.assertEqual(result.unfixed_findings, ())
+        assert result.unfixed_findings == ()
 
     def test_file_ignore_prefix_selector_suppresses_multiple_pdf_rules(self) -> None:
         source = '# pydocfmt: file-ignore[PDF]\ndef function():\n    """   This is a long summary that needs wrapping into more than one physical line."""\n'
         settings = CheckSettings(select=("PDF101", "PDF104", "PCF006"), line_length=48)
         result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=False)
 
-        self.assertEqual(result.unfixed_findings, ())
+        assert result.unfixed_findings == ()
 
     def test_file_level_blanket_pydocfmt_noqa_suppresses_mixed_pcf_and_pdf_findings(self) -> None:
         source = '# pydocfmt: noqa\ndef function():\n    """This is a long summary that needs wrapping into more than one physical line."""\n\nvalue = 1 # trailing\n'
         settings = CheckSettings(select=("PDF101", "PCF002", "PCF006"), line_length=48)
         result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
 
-        self.assertEqual(result.new_source, source)
-        self.assertFalse(result.modified)
-        self.assertEqual(result.unfixed_findings, ())
+        assert result.new_source == source
+        assert not result.modified
+        assert result.unfixed_findings == ()
 
     def test_adjacent_local_directives_stack_for_one_following_docstring(self) -> None:
         source = 'def function():\n    # pydocfmt: ignore[PDF101]\n    # pydocfmt: ignore[PDF104]\n    """   This is a long summary that needs wrapping into more than one physical line."""\n'
         settings = CheckSettings(select=("PDF101", "PDF104", "PCF006"), line_length=48)
         result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=False)
 
-        self.assertEqual(result.unfixed_findings, ())
+        assert result.unfixed_findings == ()
 
     def test_local_directive_wrong_target_type_is_unused_and_does_not_suppress_other_findings(self) -> None:
         source = '# pydocfmt: ignore[PCF001]\n"""This is a long module summary that needs wrapping into more than one physical line."""\n'
         settings = CheckSettings(select=("PCF001", "PDF101", "PCF006"), line_length=48)
         result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=False)
 
-        self.assertCountEqual(
-            tuple((finding.rule.code.tag, finding.message) for finding in result.unfixed_findings),
-            (
-                ("PCF006", "Suppression selector 'PCF001' did not suppress any findings"),
-                ("PDF101", "Docstring chunk needs reflow"),
-            ),
-        )
+        assert collections.Counter((finding.rule.code.tag, finding.message) for finding in result.unfixed_findings) == collections.Counter((
+            ("PCF006", "Suppression selector 'PCF001' did not suppress any findings"),
+            ("PDF101", "Docstring chunk needs reflow"),
+        ))
 
     def test_local_comment_directive_suppresses_only_first_contiguous_comment_run(self) -> None:
         source = "# pydocfmt: ignore[PCF001]\n# This is a long comment that needs wrapping into more than one physical line.\n\n# This is another long comment that needs wrapping into more than one physical line.\n"
         settings = CheckSettings(select=("PCF001", "PCF006"), line_length=42)
         result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=False)
 
-        self.assertEqual(tuple((finding.rule.code.tag, finding.line_numbers) for finding in result.unfixed_findings), (("PCF001", (4,)),))
+        assert tuple((finding.rule.code.tag, finding.line_numbers) for finding in result.unfixed_findings) == (("PCF001", (4,)),)
 
     def test_local_comment_directive_does_not_cross_indent_or_protected_boundaries(self) -> None:
         indented_source = "# pydocfmt: ignore[PCF001]\n# This is a long comment that needs wrapping into more than one physical line.\n    # This is another long comment that needs wrapping into more than one physical line.\n"
@@ -2202,119 +2124,91 @@ class TestFormatterResults(unittest.TestCase):
         indented = formatter.format_source(indented_source, "a.py", settings=settings, rule_selection=selection, fix=False)
         protected = formatter.format_source(protected_source, "a.py", settings=settings, rule_selection=selection, fix=False)
 
-        self.assertEqual(tuple((finding.rule.code.tag, finding.line_numbers) for finding in indented.unfixed_findings), (("PCF001", (3,)),))
-        self.assertEqual(tuple((finding.rule.code.tag, finding.line_numbers) for finding in protected.unfixed_findings), (("PCF001", (4,)),))
+        assert tuple((finding.rule.code.tag, finding.line_numbers) for finding in indented.unfixed_findings) == (("PCF001", (3,)),)
+        assert tuple((finding.rule.code.tag, finding.line_numbers) for finding in protected.unfixed_findings) == (("PCF001", (4,)),)
 
     def test_trailing_pydocfmt_ignore_suppresses_pcf_findings(self) -> None:
         source = "value = 1 # pydocfmt: ignore[PCF002]\n"
         settings = CheckSettings(select=("PCF002", "PCF006"))
         result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
 
-        self.assertEqual(result.new_source, source)
-        self.assertFalse(result.modified)
-        self.assertEqual(result.unfixed_findings, ())
+        assert result.new_source == source
+        assert not result.modified
+        assert result.unfixed_findings == ()
 
     def test_pydocfmt_directive_with_trailing_reason_still_suppresses(self) -> None:
         source = '# pydocfmt: ignore[PDF101] because generated\n"""This is a long module summary that needs wrapping into more than one physical line."""\n'
         settings = CheckSettings(select=("PDF101", "PCF006"), line_length=48)
         result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=False)
 
-        self.assertEqual(result.unfixed_findings, ())
+        assert result.unfixed_findings == ()
 
     def test_local_docstring_directive_suppresses_owner_diagnostics_reported_outside_docstring(self) -> None:
         cases = (
-            (
-                "PDF500",
-                'def function(first, second):\n    # pydocfmt: ignore[PDF500]\n    """Summary.\n\n    Args:\n        first: First.\n    """\n',
-            ),
-            (
-                "PDF502",
-                'def function():\n    # pydocfmt: ignore[PDF502]\n    """Return a value."""\n    return 1\n',
-            ),
-            (
-                "PDF504",
-                'def function():\n    # pydocfmt: ignore[PDF504]\n    """Generate values."""\n    yield 1\n',
-            ),
-            (
-                "PDF506",
-                'def function():\n    # pydocfmt: ignore[PDF506]\n    """Validate a value."""\n    raise ValueError("bad")\n',
-            ),
+            ("PDF500", 'def function(first, second):\n    # pydocfmt: ignore[PDF500]\n    """Summary.\n\n    Args:\n        first: First.\n    """\n'),
+            ("PDF502", 'def function():\n    # pydocfmt: ignore[PDF502]\n    """Return a value."""\n    return 1\n'),
+            ("PDF504", 'def function():\n    # pydocfmt: ignore[PDF504]\n    """Generate values."""\n    yield 1\n'),
+            ("PDF506", 'def function():\n    # pydocfmt: ignore[PDF506]\n    """Validate a value."""\n    raise ValueError("bad")\n'),
         )
 
         for rule_code, source in cases:
             settings = CheckSettings(select=(rule_code, "PCF006"), docstring_convention=DocstringConvention.GOOGLE, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS)
             result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=False)
             with self.subTest(rule_code=rule_code):
-                self.assertEqual(result.unfixed_findings, ())
+                assert result.unfixed_findings == ()
 
     def test_owner_docstring_suppression_preserves_report_lines_without_directive(self) -> None:
         cases = (
-            (
-                "PDF500",
-                'def function(first, second):\n    """Summary.\n\n    Args:\n        first: First.\n    """\n',
-                (1,),
-            ),
-            (
-                "PDF502",
-                'def function():\n    """Return a value."""\n    return 1\n',
-                (3,),
-            ),
-            (
-                "PDF504",
-                'def function():\n    """Generate values."""\n    yield 1\n',
-                (3,),
-            ),
-            (
-                "PDF506",
-                'def function():\n    """Validate a value."""\n    raise ValueError("bad")\n',
-                (3,),
-            ),
+            ("PDF500", 'def function(first, second):\n    """Summary.\n\n    Args:\n        first: First.\n    """\n', (1,)),
+            ("PDF502", 'def function():\n    """Return a value."""\n    return 1\n', (3,)),
+            ("PDF504", 'def function():\n    """Generate values."""\n    yield 1\n', (3,)),
+            ("PDF506", 'def function():\n    """Validate a value."""\n    raise ValueError("bad")\n', (3,)),
         )
 
         for rule_code, source, expected_lines in cases:
             settings = CheckSettings(select=(rule_code,), docstring_convention=DocstringConvention.GOOGLE, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS)
             result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=False)
             with self.subTest(rule_code=rule_code):
-                self.assertEqual(tuple((finding.rule.code.tag, finding.line_numbers) for finding in result.unfixed_findings), ((rule_code, expected_lines),))
+                assert tuple((finding.rule.code.tag, finding.line_numbers) for finding in result.unfixed_findings) == ((rule_code, expected_lines),)
 
     def test_report_line_directive_still_suppresses_owner_docstring_diagnostic(self) -> None:
         source = 'def function():\n    """Return a value."""\n    return 1  # pydocfmt: ignore[PDF502]\n'
         settings = CheckSettings(select=("PDF502", "PCF006"), docstring_convention=DocstringConvention.GOOGLE, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS)
         result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=False)
 
-        self.assertEqual(result.unfixed_findings, ())
+        assert result.unfixed_findings == ()
 
     def test_suppressed_and_unsuppressed_fixes_for_same_rule_are_filtered_independently(self) -> None:
         source = "# pydocfmt: ignore[PCF002]\nfirst = 1 # first\nsecond = 2 # second\n"
         settings = CheckSettings(select=("PCF002", "PCF006"))
         result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
 
-        self.assertEqual(result.new_source, "# pydocfmt: ignore[PCF002]\nfirst = 1 # first\nsecond = 2  # second\n")
-        self.assertEqual(result.fixed_findings, collections.Counter({next(rule.rule for rule in rules_selection.select_rules(settings).rules if rule.rule.code.tag == "PCF002"): 1}))
-        self.assertEqual(result.unfixed_findings, ())
+        assert result.new_source == "# pydocfmt: ignore[PCF002]\nfirst = 1 # first\nsecond = 2  # second\n"
+        assert result.fixed_findings == collections.Counter({next(rule.rule for rule in rules_selection.select_rules(settings).rules if rule.rule.code.tag == "PCF002"): 1})
+        assert result.unfixed_findings == ()
 
     def test_bare_noqa_with_foreign_codes_does_not_suppress_pydocfmt_findings(self) -> None:
         source = '"""This is a long module summary that needs wrapping into more than one physical line."""  # noqa: F401\n'
         settings = CheckSettings(select=("PDF101",))
         result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=False)
 
-        self.assertEqual(tuple(finding.rule.code.tag for finding in result.unfixed_findings), ("PDF101",))
+        assert tuple(finding.rule.code.tag for finding in result.unfixed_findings) == ("PDF101",)
 
     def test_bare_noqa_with_mixed_foreign_and_pydocfmt_codes_suppresses_pydocfmt_finding(self) -> None:
         source = '"""This is a long module summary that needs wrapping into more than one physical line."""  # noqa: F401, PDF101\n'
         settings = CheckSettings(select=("PDF101",), line_length=48)
         result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
 
-        self.assertEqual(result.new_source, source)
-        self.assertFalse(result.modified)
-        self.assertEqual(result.unfixed_findings, ())
+        assert result.new_source == source
+        assert not result.modified
+        assert result.unfixed_findings == ()
 
     def test_unsupported_pydocfmt_disable_enable_directives_do_not_suppress_findings(self) -> None:
         source = '# pydocfmt: disable[PDF101]\n"""This is a long module summary that needs wrapping into more than one physical line."""\n# pydocfmt: enable[PDF101]\n'
         settings = CheckSettings(select=("PDF101",), line_length=48)
         result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=False)
 
-        self.assertEqual(tuple(finding.rule.code.tag for finding in result.unfixed_findings), ("PDF101",))
+        assert tuple(finding.rule.code.tag for finding in result.unfixed_findings) == ("PDF101",)
 
     def test_unused_suppression_reports_unknown_valid_selector_and_empty_payload(self) -> None:
         settings = CheckSettings(select=("PCF006",))
@@ -2323,15 +2217,15 @@ class TestFormatterResults(unittest.TestCase):
         unknown = formatter.format_source("# pydocfmt: ignore[PDF999]\n# Short comment.\n", "a.py", settings=settings, rule_selection=selection, fix=False)
         empty = formatter.format_source("# pydocfmt: ignore[]\n# Short comment.\n", "a.py", settings=settings, rule_selection=selection, fix=False)
 
-        self.assertEqual(tuple(finding.message for finding in unknown.unfixed_findings), ("Unknown pydocfmt suppression selector 'PDF999'",))
-        self.assertEqual(tuple(finding.message for finding in empty.unfixed_findings), ("Invalid pydocfmt suppression selector ''",))
+        assert tuple(finding.message for finding in unknown.unfixed_findings) == ("Unknown pydocfmt suppression selector 'PDF999'",)
+        assert tuple(finding.message for finding in empty.unfixed_findings) == ("Invalid pydocfmt suppression selector ''",)
 
     def test_file_level_blanket_directive_suppresses_pcf006_unused_report(self) -> None:
         source = "# pydocfmt: noqa\nvalue = 1\n"
         settings = CheckSettings(select=("PCF001", "PCF006"))
         result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=False)
 
-        self.assertEqual(result.unfixed_findings, ())
+        assert result.unfixed_findings == ()
 
     def test_suppressed_and_unsuppressed_summary_fixes_are_filtered_independently(self) -> None:
         source = 'def first():\n    # pydocfmt: ignore[PDF300]\n    """return value"""\n\ndef second():\n    """return value"""\n'
@@ -2339,9 +2233,9 @@ class TestFormatterResults(unittest.TestCase):
         settings = CheckSettings(select=("PDF300", "PCF006"))
         result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
 
-        self.assertEqual(result.new_source, expected)
-        self.assertEqual({rule.code.tag: count for rule, count in result.fixed_findings.items()}, {"PDF300": 1})
-        self.assertEqual(result.unfixed_findings, ())
+        assert result.new_source == expected
+        assert {rule.code.tag: count for rule, count in result.fixed_findings.items()} == {"PDF300": 1}
+        assert result.unfixed_findings == ()
 
     def test_normalized_suppression_directive_still_suppresses_later_pdf_fix(self) -> None:
         source = 'def first():\n    # PYDOCFMT : ignore [ pdf300, ]  # reason\n    """return value"""\n\ndef second():\n    """return value"""\n'
@@ -2349,9 +2243,9 @@ class TestFormatterResults(unittest.TestCase):
         settings = CheckSettings(select=("PCF003", "PDF300", "PCF006"))
         result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
 
-        self.assertEqual(result.new_source, expected)
-        self.assertEqual({rule.code.tag: count for rule, count in result.fixed_findings.items()}, {"PCF003": 1, "PDF300": 1})
-        self.assertEqual(result.unfixed_findings, ())
+        assert result.new_source == expected
+        assert {rule.code.tag: count for rule, count in result.fixed_findings.items()} == {"PCF003": 1, "PDF300": 1}
+        assert result.unfixed_findings == ()
 
     def test_suppressed_and_unsuppressed_section_fixes_are_filtered_independently(self) -> None:
         source = 'def first(value):\n    # pydocfmt: ignore[PDF404]\n    """Summary.\n\n    Args\n        value: Description.\n    """\n\ndef second(value):\n    """Summary.\n\n    Args\n        value: Description.\n    """\n'
@@ -2359,9 +2253,9 @@ class TestFormatterResults(unittest.TestCase):
         settings = CheckSettings(select=("PDF404", "PCF006"), docstring_convention=DocstringConvention.GOOGLE)
         result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
 
-        self.assertEqual(result.new_source, expected)
-        self.assertEqual({rule.code.tag: count for rule, count in result.fixed_findings.items()}, {"PDF404": 1})
-        self.assertEqual(result.unfixed_findings, ())
+        assert result.new_source == expected
+        assert {rule.code.tag: count for rule, count in result.fixed_findings.items()} == {"PDF404": 1}
+        assert result.unfixed_findings == ()
 
     def test_suppressed_and_unsuppressed_pcf003_fixes_are_filtered_independently(self) -> None:
         source = "# pydocfmt: ignore[PCF003]\n#NOQA\n\n#RUFF : ignore [ F401 ]\n"
@@ -2369,6 +2263,6 @@ class TestFormatterResults(unittest.TestCase):
         settings = CheckSettings(select=("PCF003", "PCF006"))
         result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
 
-        self.assertEqual(result.new_source, expected)
-        self.assertEqual({rule.code.tag: count for rule, count in result.fixed_findings.items()}, {"PCF003": 1})
-        self.assertEqual(result.unfixed_findings, ())
+        assert result.new_source == expected
+        assert {rule.code.tag: count for rule, count in result.fixed_findings.items()} == {"PCF003": 1}
+        assert result.unfixed_findings == ()

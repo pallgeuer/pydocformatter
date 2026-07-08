@@ -1,14 +1,15 @@
+# Third-party imports
 import libcst as cst
 import libcst.metadata as cst_metadata
 
-import pydocformatter.formatter as formatter
-import pydocformatter.rules.definition_helpers.source_text as source_text
-import pydocformatter.rules_selection as rules_selection
-import tests.rule_helpers as rule_helpers
+# First-party imports
+from pydocformatter import formatter, rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention, IndentStyle, LineEnding
 from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
+from pydocformatter.rules.definition_helpers import source_text
 from pydocformatter.rules.definitions.PDF.PDF import PDF
 from pydocformatter.rules.definitions.PDF.PDF100_docstring_indentation import PDF100DocstringIndentation
+from tests import rule_helpers
 
 
 def contexts(source: str, *, settings: CheckSettings | None = None) -> tuple[RuleCategoryContext, RuleContext]:
@@ -218,20 +219,14 @@ def test_simple_statement_suite_uses_one_configured_indent_unit_after_line_inden
 
 def test_configured_tab_convention_indentation_preserves_base_docstring_tabs() -> None:
     source = 'class Example:\n\tdef method(self, value):\n\t\t"""Summary.\n\t\tArgs:\n\t\t    value: Description.\n\t\t        Continued.\n\t\t"""\n'
-    result = format_pdf002(
-        source,
-        settings=CheckSettings(select=("PDF100",), indent_style=IndentStyle.TAB, indent_width=4, docstring_convention=DocstringConvention.GOOGLE),
-    )
+    result = format_pdf002(source, settings=CheckSettings(select=("PDF100",), indent_style=IndentStyle.TAB, indent_width=4, docstring_convention=DocstringConvention.GOOGLE))
 
     assert result.new_source == 'class Example:\n\tdef method(self, value):\n\t\t"""Summary.\n\t\tArgs:\n\t\t\tvalue: Description.\n\t\t\t\tContinued.\n\t\t"""\n'
 
 
 def test_configured_tab_convention_indentation_can_extend_space_canonical_margin() -> None:
     source = 'class Example:\n    def method(self, value):\n        """Summary.\n\n          Args:\n              value: Description.\n                  Continued.\n        """\n'
-    result = format_pdf002(
-        source,
-        settings=CheckSettings(select=("PDF100",), indent_style=IndentStyle.TAB, indent_width=2, docstring_convention=DocstringConvention.GOOGLE),
-    )
+    result = format_pdf002(source, settings=CheckSettings(select=("PDF100",), indent_style=IndentStyle.TAB, indent_width=2, docstring_convention=DocstringConvention.GOOGLE))
 
     assert result.new_source == 'class Example:\n    def method(self, value):\n        """Summary.\n\n        Args:\n        \tvalue: Description.\n        \t\tContinued.\n        """\n'
 

@@ -1,8 +1,10 @@
-import pydocformatter.rules_selection as rules_selection
-import tests.rule_helpers as rule_helpers
+# First-party imports
 import tests.rules.PDF.helpers as pdf_helpers
+from pydocformatter import rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention, LineEnding
 from pydocformatter.rules.definitions.PDF.PDF308_entry_description_trailing_period import PDF308EntryDescriptionTrailingPeriod
+from tests import rule_helpers
+
 
 contexts = pdf_helpers.contexts_for("PDF308")
 format_source = pdf_helpers.formatter_for("PDF308")
@@ -40,10 +42,7 @@ def test_reports_but_does_not_fix_non_period_punctuation() -> None:
     assert result.new_source == source
     assert not result.fixed_findings
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((5,), (6,))
-    assert tuple(finding.message for finding in result.unfixed_findings) == (
-        "Docstring entry description should end with a period",
-        "Docstring entry description should end with a period",
-    )
+    assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring entry description should end with a period", "Docstring entry description should end with a period")
 
 
 def test_reports_but_does_not_fix_escaped_unicode_ellipsis() -> None:

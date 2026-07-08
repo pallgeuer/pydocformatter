@@ -1,19 +1,19 @@
+# Standard library imports
 from collections.abc import Mapping
 
+# Third-party imports
 import libcst as cst
-import libcst.metadata as cst_metadata
 import pytest
+import libcst.metadata as cst_metadata
 
-import pydocformatter.formatter as formatter
-import pydocformatter.rules.definition_helpers.module_bindings as module_bindings
-import pydocformatter.rules.definition_helpers.source_text as source_text
-import pydocformatter.rules.definition_helpers.static_names as static_names
-import pydocformatter.rules_selection as rules_selection
-import tests.rule_helpers as rule_helpers
+# First-party imports
+from pydocformatter import formatter, rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention
 from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
+from pydocformatter.rules.definition_helpers import module_bindings, source_text, static_names
 from pydocformatter.rules.definitions.PDF.PDF import PDF
 from pydocformatter.rules.definitions.PDF.PDF302_non_imperative_summary import PDF302NonImperativeSummary
+from tests import rule_helpers
 
 
 def contexts(source: str, *, settings: CheckSettings | None = None) -> tuple[RuleCategoryContext, RuleContext]:
@@ -51,7 +51,7 @@ def format_source(source: str, *, settings: CheckSettings | None = None, fix: bo
     return formatter.format_source(source, "example.py", settings=resolved_settings, rule_selection=rules_selection.select_rules(resolved_settings), fix=fix)
 
 
-@pytest.mark.parametrize("summary", ("Returns the value.", "Calculates the value.", "Does the work.", "Has the value.", "This returns the value."))
+@pytest.mark.parametrize("summary", ["Returns the value.", "Calculates the value.", "Does the work.", "Has the value.", "This returns the value."])
 def test_reports_non_imperative_function_summaries(summary: str) -> None:
     source = f'def function():\n    """{summary}"""\n'
     result = format_source(source)
@@ -59,11 +59,11 @@ def test_reports_non_imperative_function_summaries(summary: str) -> None:
     assert result.new_source == source
     assert not result.fixed_findings
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((2,),)
-    assert tuple(finding.message for finding in result.unfixed_findings) == (f"Docstring summary first word '{summary.split()[0]}' is not imperative",)
+    assert tuple(finding.message for finding in result.unfixed_findings) == (f"Docstring summary first word '{summary.split(maxsplit=1)[0]}' is not imperative",)
     assert not result.unfixed_findings[0].fixable
 
 
-@pytest.mark.parametrize("summary", ("returns the value.", "RETURNS the value.", "'returns' the value."))
+@pytest.mark.parametrize("summary", ["returns the value.", "RETURNS the value.", "'returns' the value."])
 def test_non_imperative_detection_is_case_insensitive_after_normalization(summary: str) -> None:
     source = f'def function():\n    """{summary}"""\n'
     result = format_source(source)
@@ -71,7 +71,7 @@ def test_non_imperative_detection_is_case_insensitive_after_normalization(summar
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((2,),)
 
 
-@pytest.mark.parametrize("summary", ("Return the value.", "Compute the value.", "Widget object."))
+@pytest.mark.parametrize("summary", ["Return the value.", "Compute the value.", "Widget object."])
 def test_accepts_imperative_or_unknown_function_summaries(summary: str) -> None:
     source = f'def function():\n    """{summary}"""\n'
     result = format_source(source)
@@ -80,7 +80,7 @@ def test_accepts_imperative_or_unknown_function_summaries(summary: str) -> None:
     assert not result.unfixed_findings
 
 
-@pytest.mark.parametrize("summary", ("Trys invalid form.", "Processs invalid form."))
+@pytest.mark.parametrize("summary", ["Trys invalid form.", "Processs invalid form."])
 def test_accepts_invalid_synthetic_third_person_forms(summary: str) -> None:
     source = f'def function():\n    """{summary}"""\n'
     result = format_source(source)
@@ -105,16 +105,7 @@ def test_ignores_attribute_docstrings() -> None:
     assert not result.unfixed_findings
 
 
-@pytest.mark.parametrize(
-    "decorator",
-    (
-        "builtins.property",
-        "enum.property",
-        "abc.abstractproperty",
-        "types.DynamicClassAttribute",
-        "types.DynamicClassAttribute()",
-    ),
-)
+@pytest.mark.parametrize("decorator", ["builtins.property", "enum.property", "abc.abstractproperty", "types.DynamicClassAttribute", "types.DynamicClassAttribute()"])
 def test_skips_qualified_property_like_decorators(decorator: str) -> None:
     source = f'class Example:\n    @{decorator}\n    def value(self):\n        """Returns property value."""\n'
     result = format_source(source)
@@ -123,7 +114,7 @@ def test_skips_qualified_property_like_decorators(decorator: str) -> None:
     assert not result.unfixed_findings
 
 
-@pytest.mark.parametrize("decorator", ("value.getter", "value.setter", "value.deleter"))
+@pytest.mark.parametrize("decorator", ["value.getter", "value.setter", "value.deleter"])
 def test_skips_property_accessor_decorators(decorator: str) -> None:
     source = f'class Example:\n    @{decorator}\n    def value(self):\n        """Returns property accessor value."""\n'
     result = format_source(source)
@@ -270,7 +261,7 @@ def test_skips_summary_without_a_whitespace_delimited_first_word() -> None:
     assert not result.unfixed_findings
 
 
-@pytest.mark.parametrize("summary", ('"Returns" the value.', "(Returns) the value.", "Returns: the value."))
+@pytest.mark.parametrize("summary", ['"Returns" the value.', "(Returns) the value.", "Returns: the value."])
 def test_normalizes_first_word_punctuation_before_mood_check(summary: str) -> None:
     source = f'def function():\n    """{summary}"""\n'
     result = format_source(source)

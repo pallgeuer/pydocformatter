@@ -5,14 +5,24 @@ Attributes:
         replacement diagnostic.
 """
 
+# Future imports
 from __future__ import annotations
 
-import pydocformatter.rules.definition_helpers.source_text as source_text
-import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
+# Standard library imports
+from typing import TYPE_CHECKING, cast
+
+# First-party imports
 import pydocformatter.rules.edits as rule_edits
 import pydocformatter.rules.violations as rule_violations
-from pydocformatter.rules.definition import RuleContext
-from pydocformatter.rules.models import RuleMetadata
+import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
+
+
+if TYPE_CHECKING:
+    # First-party imports
+    from pydocformatter.rules.definition import RuleContext
+    from pydocformatter.rules.definition_helpers import source_text
+    from pydocformatter.rules.models import RuleMetadata
+
 
 SectionReplacementChange = rule_edits.PlannedSourceChange | tuple[rule_edits.PlannedSourceChange, ...]
 
@@ -58,14 +68,7 @@ def replacement_results(
     if not replacement_line_numbers:
         return (result(rule, unfixable_line_numbers, change=None, instance_message=combined_instance_message(unfixable_messages)),)
     if change is None:
-        return (
-            result(
-                rule,
-                tuple(replacement_line_numbers) + tuple(unfixable_line_numbers),
-                change=None,
-                instance_message=combined_instance_message(replacement_messages + unfixable_messages),
-            ),
-        )
+        return (result(rule, tuple(replacement_line_numbers) + tuple(unfixable_line_numbers), change=None, instance_message=combined_instance_message(replacement_messages + unfixable_messages)),)
     results = [_result_for_replacement_change(rule, change, instance_message=combined_instance_message(replacement_messages))]
     if unfixable_line_numbers:
         results.append(result(rule, unfixable_line_numbers, change=None, instance_message=combined_instance_message(unfixable_messages)))
@@ -88,9 +91,9 @@ def combined_instance_message(messages: list[str]) -> str | None:
 
 def _result_for_replacement_change(rule: RuleMetadata, change: SectionReplacementChange, *, instance_message: str | None) -> rule_violations.RuleViolation:
     """Return one violation for a single or grouped section replacement change."""
-    if isinstance(change, tuple):
-        return rule_violations.violation_for_grouped_planned_source_changes(rule, change, instance_message=instance_message)
-    return result(rule, change.line_numbers, change=change, instance_message=instance_message)
+    if isinstance(change, rule_edits.PlannedSourceChange):
+        return result(rule, change.line_numbers, change=change, instance_message=instance_message)
+    return rule_violations.violation_for_grouped_planned_source_changes(rule, cast("tuple[rule_edits.PlannedSourceChange, ...]", change), instance_message=instance_message)
 
 
 def line_numbers(docstring: PDF_definition.DocstringInfo, line: PDF_definition.DocstringValueLine) -> tuple[int, ...]:
@@ -187,11 +190,7 @@ def replace_value_line_span(value_lines: list[str], line: PDF_definition.Docstri
 
 
 def planned_replacement_change(
-    docstring: PDF_definition.DocstringInfo,
-    *,
-    context: RuleContext,
-    replacements: tuple[rule_edits.PlannedTextReplacement, ...],
-    value_lines: list[str],
+    docstring: PDF_definition.DocstringInfo, *, context: RuleContext, replacements: tuple[rule_edits.PlannedTextReplacement, ...], value_lines: list[str]
 ) -> rule_edits.PlannedSourceChange | None:
     """Return a safe whole-docstring replacement for section text replacements.
 
@@ -211,11 +210,7 @@ def planned_replacement_change(
 
 
 def planned_replacement_changes(
-    docstring: PDF_definition.DocstringInfo,
-    *,
-    context: RuleContext,
-    replacements: tuple[rule_edits.PlannedTextReplacement, ...],
-    value_lines: list[str],
+    docstring: PDF_definition.DocstringInfo, *, context: RuleContext, replacements: tuple[rule_edits.PlannedTextReplacement, ...], value_lines: list[str]
 ) -> SectionReplacementChange | None:
     """Return direct section source replacements with a whole-docstring fallback.
 
@@ -236,10 +231,7 @@ def planned_replacement_changes(
 
 
 def _direct_replacement_changes(
-    docstring: PDF_definition.DocstringInfo,
-    *,
-    context: RuleContext,
-    replacements: tuple[rule_edits.PlannedTextReplacement, ...],
+    docstring: PDF_definition.DocstringInfo, *, context: RuleContext, replacements: tuple[rule_edits.PlannedTextReplacement, ...]
 ) -> tuple[rule_edits.PlannedSourceChange, ...] | None:
     """Return line-local source replacements when every replacement maps directly."""
     if not replacements:
@@ -266,11 +258,7 @@ def _direct_replacement_changes(
 
 
 def _direct_replacement_change(
-    docstring: PDF_definition.DocstringInfo,
-    *,
-    replacement: rule_edits.PlannedTextReplacement,
-    source_map: PDF_definition.SimpleDocstringSourceMap,
-    line_bounds: source_text.LineBounds,
+    docstring: PDF_definition.DocstringInfo, *, replacement: rule_edits.PlannedTextReplacement, source_map: PDF_definition.SimpleDocstringSourceMap, line_bounds: source_text.LineBounds
 ) -> rule_edits.PlannedSourceChange | None:
     """Return one line-local section edit when source spelling matches raw value text."""
     line = _line_for_replacement(docstring, replacement)
@@ -286,10 +274,7 @@ def _direct_replacement_change(
     if source_map.source_slice(start_offset=replacement.start_offset, end_offset=replacement.end_offset) != expected_source:
         return None
     return rule_edits.PlannedSourceChange(
-        edit=rule_edits.SourceEdit(
-            range=source_map.source_range(start_offset=replacement.start_offset, end_offset=replacement.end_offset, line_bounds=line_bounds),
-            replacement=replacement.text,
-        ),
+        edit=rule_edits.SourceEdit(range=source_map.source_range(start_offset=replacement.start_offset, end_offset=replacement.end_offset, line_bounds=line_bounds), replacement=replacement.text),
         line_numbers=replacement.line_numbers,
         suppression_line_numbers=(),
     )
@@ -301,11 +286,7 @@ def _line_for_replacement(docstring: PDF_definition.DocstringInfo, replacement: 
 
 
 def planned_output_change(
-    docstring: PDF_definition.DocstringInfo,
-    *,
-    context: RuleContext,
-    output_lines: tuple[PDF_definition.DocstringOutputLine, ...],
-    line_numbers: tuple[int, ...],
+    docstring: PDF_definition.DocstringInfo, *, context: RuleContext, output_lines: tuple[PDF_definition.DocstringOutputLine, ...], line_numbers: tuple[int, ...]
 ) -> rule_edits.PlannedSourceChange | None:
     """Return a safe whole-docstring replacement for section output lines.
 

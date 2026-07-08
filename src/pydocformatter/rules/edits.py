@@ -1,17 +1,24 @@
 """Source edit planning and application for rules."""
 
+# Future imports
 from __future__ import annotations
 
+# Standard library imports
+import operator
 import dataclasses
 from typing import TYPE_CHECKING
 
+# Third-party imports
 import libcst as cst
 import libcst.metadata as cst_metadata
 
-import pydocformatter.rules.definition_helpers.source_text as source_text
-import pydocformatter.rules.line_targets as line_targets
+# First-party imports
+from pydocformatter.rules import line_targets
+from pydocformatter.rules.definition_helpers import source_text
+
 
 if TYPE_CHECKING:
+    # First-party imports
     from pydocformatter.rules.definition import RuleCategoryContext
 
 
@@ -86,13 +93,7 @@ def apply_context_source_changes(context: RuleCategoryContext, changes: tuple[Pl
     return apply_source_edits(context.module, edits, source=context.source, line_bounds=context.line_bounds)
 
 
-def apply_source_edits(
-    module: cst.Module,
-    edits: tuple[SourceEdit, ...],
-    *,
-    source: str | None = None,
-    line_bounds: source_text.LineBounds | None = None,
-) -> cst.Module:
+def apply_source_edits(module: cst.Module, edits: tuple[SourceEdit, ...], *, source: str | None = None, line_bounds: source_text.LineBounds | None = None) -> cst.Module:
     """Apply non-overlapping source edits to a module and parse the result.
 
     Args:
@@ -115,7 +116,7 @@ def apply_source_edits(
     edit_source = module.code if source is None else source
     edit_line_bounds = source_text.line_bounds_from_lines(source_text.source_lines(edit_source)) if line_bounds is None else line_bounds
     indexed_edits = tuple((_range_offsets(edit.range, line_bounds=edit_line_bounds), edit) for edit in edits)
-    sorted_edits = tuple(sorted(indexed_edits, key=lambda item: item[0]))
+    sorted_edits = tuple(sorted(indexed_edits, key=operator.itemgetter(0)))
 
     previous_start = -1
     previous_end = -1
@@ -130,8 +131,7 @@ def apply_source_edits(
     chunks: list[str] = []
     cursor = 0
     for (start, end), edit in sorted_edits:
-        chunks.append(edit_source[cursor:start])
-        chunks.append(edit.replacement)
+        chunks.extend((edit_source[cursor:start], edit.replacement))
         cursor = end
     chunks.append(edit_source[cursor:])
     return cst.parse_module("".join(chunks), config=module.config_for_parsing)

@@ -1,5 +1,5 @@
-import pydocformatter.formatter as formatter
-import pydocformatter.rules_selection as rules_selection
+# First-party imports
+from pydocformatter import formatter, rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention, DocstringMissingDocumentation
 from pydocformatter.rules.definitions.PDF.PDF506_missing_exception_documentation import PDF506MissingExceptionDocumentation
 
@@ -145,11 +145,7 @@ def test_none_and_pep257_conventions_keep_missing_exception_documentation_inert(
     source = 'def function():\n    """Validate.\n\n    :raises ValueError: Bad value.\n    """\n    raise ValueError("bad")\n'
 
     for convention in (DocstringConvention.NONE, DocstringConvention.PEP257):
-        assert_pdf506_lines(
-            source,
-            (),
-            settings=CheckSettings(select=("PDF506",), docstring_convention=convention, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS),
-        )
+        assert_pdf506_lines(source, (), settings=CheckSettings(select=("PDF506",), docstring_convention=convention, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS))
 
 
 def test_simple_suite_raise_after_docstring_is_checked() -> None:

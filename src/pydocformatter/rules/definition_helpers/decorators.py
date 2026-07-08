@@ -1,12 +1,22 @@
 """Decorator name extraction helpers."""
 
+# Future imports
 from __future__ import annotations
 
+# Standard library imports
+from typing import TYPE_CHECKING
+
+# Third-party imports
 import libcst as cst
 
-import pydocformatter.rules.definition_helpers.static_names as static_names
-from pydocformatter.cli.settings_check import CheckSettings
-from pydocformatter.rules.definition import RuleCategoryContext
+# First-party imports
+from pydocformatter.rules.definition_helpers import static_names
+
+
+if TYPE_CHECKING:
+    # First-party imports
+    from pydocformatter.cli.settings_check import CheckSettings
+    from pydocformatter.rules.definition import RuleCategoryContext
 
 
 def decorator_qualified_name(expression: cst.BaseExpression) -> str | None:

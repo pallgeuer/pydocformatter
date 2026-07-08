@@ -1,10 +1,19 @@
-import pytest
+# Future imports
+from __future__ import annotations
 
-import pydocformatter.formatter as formatter
-import pydocformatter.rules.definition_helpers.parameter_documentation as parameter_documentation
-import pydocformatter.rules_selection as rules_selection
+# Standard library imports
+from typing import TYPE_CHECKING
+
+# First-party imports
+from pydocformatter import formatter, rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention
+from pydocformatter.rules.definition_helpers import parameter_documentation
 from pydocformatter.rules.definitions.PDF.PDF501_extraneous_parameter_documentation import PDF501ExtraneousParameterDocumentation
+
+
+if TYPE_CHECKING:
+    # Third-party imports
+    import pytest
 
 
 def format_source(source: str, *, settings: CheckSettings | None = None) -> formatter.FormatterResult:
@@ -31,6 +40,7 @@ def test_reports_google_documented_parameter_absent_from_signature() -> None:
 
 def test_does_not_scan_typed_dict_classes_without_unpacked_keyword_parameter(monkeypatch: pytest.MonkeyPatch) -> None:
     def fail_typed_dict_keys_by_name(module: object) -> dict[str, frozenset[str]]:
+        del module
         raise AssertionError("TypedDict keys should not be collected without unpacked keyword parameters")
 
     monkeypatch.setattr(parameter_documentation, "typed_dict_keys_by_name", fail_typed_dict_keys_by_name)
@@ -188,6 +198,7 @@ def test_scans_typed_dict_classes_once_when_unpacked_keyword_parameter_needs_key
 
     def counting_typed_dict_keys_by_name(module: object) -> dict[str, frozenset[str]]:
         nonlocal calls
+        del module
         calls += 1
         return {"Options": frozenset({"timeout"})}
 

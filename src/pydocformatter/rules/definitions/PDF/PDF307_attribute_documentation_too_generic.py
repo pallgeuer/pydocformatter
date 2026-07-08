@@ -1,18 +1,27 @@
 """PDF307 attribute-documentation-too-generic rule."""
 
+# Future imports
 from __future__ import annotations
 
-import pydocformatter.rules.definition_helpers.docstring_conventions as docstring_conventions
-import pydocformatter.rules.definition_helpers.docstring_sections as docstring_sections
-import pydocformatter.rules.definition_helpers.documentation_style as documentation_style
-import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
+# Standard library imports
+from typing import TYPE_CHECKING
+
+# First-party imports
 import pydocformatter.rules.registration as rule_registration
-import pydocformatter.rules.violations as rule_violations
+import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.codes import RuleCode
-from pydocformatter.rules.definition import RuleBase, RuleContext
+from pydocformatter.rules.definition import RuleBase
+from pydocformatter.rules.definition_helpers import docstring_conventions, docstring_sections, documentation_style
 from pydocformatter.rules.definitions.PDF.PDF import PDF
 from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
+
+
+if TYPE_CHECKING:
+    # First-party imports
+    import pydocformatter.rules.violations as rule_violations
+    from pydocformatter.rules.definition import RuleContext
+
 
 _POLICY = documentation_style.DocumentedValueStylePolicy(nouns=frozenset(("attribute", "field", "value")), message_subject="attribute")
 
@@ -67,7 +76,7 @@ class PDF307AttributeDocumentationTooGeneric(RuleBase):
 
 def _entry_targets(docstring: PDF_definition.DocstringInfo) -> tuple[documentation_style.DocumentedValueTarget, ...]:
     """Return parsed owner-docstring attribute-entry style targets."""
-    if not isinstance(docstring.owner, PDF_definition.DefinitionInfo) or docstring.owner.kind not in (PDF_definition.DefinitionKind.MODULE, PDF_definition.DefinitionKind.CLASS):
+    if not isinstance(docstring.owner, PDF_definition.DefinitionInfo) or docstring.owner.kind not in {PDF_definition.DefinitionKind.MODULE, PDF_definition.DefinitionKind.CLASS}:
         return ()
     targets: list[documentation_style.DocumentedValueTarget] = []
     for entry in docstring.structure.entries:

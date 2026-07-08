@@ -1,5 +1,6 @@
 """First-word capitalization safety checks."""
 
+# Future imports
 from __future__ import annotations
 
 

@@ -1,8 +1,9 @@
-import pydocformatter.rules_selection as rules_selection
-import tests.rule_helpers as rule_helpers
-import tests.rules.PDF.statement_spacing_helpers as statement_spacing_helpers
+# First-party imports
+from pydocformatter import rules_selection
 from pydocformatter.cli.settings_check import CheckSettings
 from pydocformatter.rules.definitions.PDF.PDF204_no_blank_line_before_function_docstring import PDF204NoBlankLineBeforeFunctionDocstring
+from tests import rule_helpers
+from tests.rules.PDF import statement_spacing_helpers
 
 
 def test_removes_blank_lines_before_function_docstring() -> None:

@@ -5,30 +5,38 @@ Attributes:
         selector was consumed.
 """
 
+# Future imports
 from __future__ import annotations
 
-import dataclasses
+# Standard library imports
 import re
+import dataclasses
 from collections.abc import Iterable, Mapping
 from typing import TYPE_CHECKING
 
+# Third-party imports
 import libcst as cst
-import libcst.metadata as cst_metadata
 
+# First-party imports
+import pydocformatter.rules.violations as rule_violations
 import pydocformatter.rules.definition_helpers.directives as directive_helpers
 from pydocformatter.rules.codes import ALL_RULE_SELECTOR_TAG, RuleCode, RuleSelector
-from pydocformatter.rules.collection import RuleCollection
-from pydocformatter.rules.models import RuleFinding, RuleMetadata
+from pydocformatter.rules.models import RuleFinding
+
 
 if TYPE_CHECKING:
-    import pydocformatter.rules.violations as rule_violations
+    # Third-party imports
+    import libcst.metadata as cst_metadata
+
+    # First-party imports
+    from pydocformatter.rules.collection import RuleCollection
+    from pydocformatter.rules.models import RuleMetadata
 
 SuppressionSelectorKey = tuple[int, int]
 
 _TYPE_DIRECTIVE_RE = re.compile(r"^#\s*type\s*:", re.IGNORECASE)
 _TOOL_DIRECTIVE_RE = re.compile(
-    r"^#\s*(?:noqa\b|nosec\b|nosemgrep\b|pydocfmt\b|pylint\b|pyright\b|mypy\b|ty\s*:|ruff\b|flake8\b|fmt\s*:|isort\s*:|pragma\b|noinspection\b|language\s*=|@formatter\s*:)",
-    re.IGNORECASE,
+    r"^#\s*(?:noqa\b|nosec\b|nosemgrep\b|pydocfmt\b|pylint\b|pyright\b|mypy\b|ty\s*:|ruff\b|flake8\b|fmt\s*:|isort\s*:|pragma\b|noinspection\b|language\s*=|@formatter\s*:)", re.IGNORECASE
 )
 
 
@@ -332,12 +340,7 @@ def _pydocfmt_file_directives(comments: tuple[_CommentInfo, ...], *, source_line
 
 
 def _pydocfmt_local_directives(
-    comments: tuple[_CommentInfo, ...],
-    *,
-    strings: tuple[_StringRange, ...],
-    comments_by_line: dict[int, tuple[_CommentInfo, ...]],
-    source_lines: tuple[str, ...],
-    collection: RuleCollection,
+    comments: tuple[_CommentInfo, ...], *, strings: tuple[_StringRange, ...], comments_by_line: dict[int, tuple[_CommentInfo, ...]], source_lines: tuple[str, ...], collection: RuleCollection
 ) -> tuple[SuppressionDirective, ...]:
     """Return local pydocfmt suppression directives attached to following source."""
     local_lines = {comment.line for comment in comments if comment.standalone and comment.pydocfmt_local}
@@ -374,14 +377,7 @@ def _local_selector(
 
 
 def _selectors(
-    selectors_text: str | None,
-    *,
-    default_text: str,
-    coverage_lines: frozenset[int],
-    collection: RuleCollection,
-    audit: bool,
-    include_invalid: bool,
-    audit_known_explicit: bool = False,
+    selectors_text: str | None, *, default_text: str, coverage_lines: frozenset[int], collection: RuleCollection, audit: bool, include_invalid: bool, audit_known_explicit: bool = False
 ) -> tuple[SuppressionSelector, ...]:
     """Return parsed selector entries for one suppression directive."""
     explicit = selectors_text is not None

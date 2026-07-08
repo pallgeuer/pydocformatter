@@ -1,19 +1,26 @@
 """Shared test helpers for PDF rules."""
 
+# Future imports
 from __future__ import annotations
 
+# Standard library imports
 import typing
 
+# Third-party imports
 import libcst as cst
 import libcst.metadata as cst_metadata
 
-import pydocformatter.formatter as formatter
-import pydocformatter.rules.definition_helpers.source_text as source_text
-import pydocformatter.rules_selection as rules_selection
+# First-party imports
+from pydocformatter import formatter, rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention
 from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
+from pydocformatter.rules.definition_helpers import source_text
 from pydocformatter.rules.definitions.PDF.PDF import PDF
-from pydocformatter.rules.models import RuleMetadata
+
+
+if typing.TYPE_CHECKING:
+    # First-party imports
+    from pydocformatter.rules.models import RuleMetadata
 
 
 class RuleFormatter(typing.Protocol):
@@ -61,14 +68,7 @@ def formatter_for(rule_code: str, *, convention: DocstringConvention = Docstring
     return format_source
 
 
-def assert_unfixed_lines(
-    format_source: RuleFormatter,
-    source: str,
-    expected: tuple[tuple[int, ...], ...],
-    *,
-    meta: RuleMetadata,
-    settings: CheckSettings | None = None,
-) -> formatter.FormatterResult:
+def assert_unfixed_lines(format_source: RuleFormatter, source: str, expected: tuple[tuple[int, ...], ...], *, meta: RuleMetadata, settings: CheckSettings | None = None) -> formatter.FormatterResult:
     """Assert unfixed findings for one diagnostic-only rule.
 
     Args:

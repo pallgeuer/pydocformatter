@@ -1,8 +1,9 @@
-import pydocformatter.formatter as formatter
-import pydocformatter.rules_selection as rules_selection
+# First-party imports
 import tests.rules.PDF.helpers as pdf_helpers
+from pydocformatter import formatter, rules_selection
 from pydocformatter.cli.settings_check import CheckSettings
 from pydocformatter.rules.definitions.PDF.PDF520_public_module_attribute_docstring_must_be_owner import PDF520PublicModuleAttributeDocstringMustBeOwner
+
 
 format_source = pdf_helpers.formatter_for("PDF520")
 

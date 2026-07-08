@@ -1,15 +1,25 @@
 """PDF616 forbidden-function-docstring rule."""
 
+# Future imports
 from __future__ import annotations
 
-import pydocformatter.rules.definition_helpers.function_decorators as function_decorators
-import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
-import pydocformatter.rules.registration as rule_registration
+# Standard library imports
+from typing import TYPE_CHECKING
+
+# First-party imports
 import pydocformatter.rules.violations as rule_violations
+import pydocformatter.rules.registration as rule_registration
+import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 from pydocformatter.rules.codes import RuleCode
-from pydocformatter.rules.definition import RuleBase, RuleContext
+from pydocformatter.rules.definition import RuleBase
+from pydocformatter.rules.definition_helpers import function_decorators
 from pydocformatter.rules.definitions.PDF.PDF import PDF
 from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata
+
+
+if TYPE_CHECKING:
+    # First-party imports
+    from pydocformatter.rules.definition import RuleContext
 
 
 @rule_registration.register_rule_to(PDF)
@@ -52,9 +62,7 @@ class PDF616ForbiddenFunctionDocstring(RuleBase):
                 continue
             violations.append(
                 rule_violations.diagnostic(
-                    cls.meta,
-                    PDF_definition.docstring_physical_line_numbers(docstring),
-                    instance_message=f"Function decorated with '@{decorator_name}' should not have a docstring",
+                    cls.meta, PDF_definition.docstring_physical_line_numbers(docstring), instance_message=f"Function decorated with '@{decorator_name}' should not have a docstring"
                 )
             )
         return tuple(violations)

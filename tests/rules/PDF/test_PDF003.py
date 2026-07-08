@@ -1,10 +1,12 @@
+# Third-party imports
 import pytest
 
-import pydocformatter.formatter as formatter
-import pydocformatter.rules_selection as rules_selection
+# First-party imports
+from pydocformatter import formatter, rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, LineEnding
 from pydocformatter.rules.definitions.PDF.PDF002_docstring_backslash_raw_prefix import PDF002DocstringBackslashRawPrefix
 from pydocformatter.rules.definitions.PDF.PDF003_docstring_ascii_only import PDF003DocstringAsciiOnly
+
 
 pytestmark = pytest.mark.filterwarnings("ignore:invalid escape sequence.*:DeprecationWarning")
 

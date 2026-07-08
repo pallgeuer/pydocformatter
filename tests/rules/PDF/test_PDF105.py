@@ -1,15 +1,17 @@
+# Third-party imports
 import libcst as cst
-import libcst.metadata as cst_metadata
 import pytest
+import libcst.metadata as cst_metadata
 
-import pydocformatter.formatter as formatter
-import pydocformatter.rules.definition_helpers.source_text as source_text
-import pydocformatter.rules_selection as rules_selection
-import tests.rule_helpers as rule_helpers
+# First-party imports
+import pydocformatter.rules.definitions.PDF.PDF105_closing_quotes_whitespace as PDF105_definition
+from pydocformatter import formatter, rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention, IndentStyle, LineEnding
 from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
+from pydocformatter.rules.definition_helpers import source_text
 from pydocformatter.rules.definitions.PDF.PDF import PDF
 from pydocformatter.rules.definitions.PDF.PDF105_closing_quotes_whitespace import PDF105ClosingQuotesWhitespace
+from tests import rule_helpers
 
 
 def contexts(source: str, *, settings: CheckSettings | None = None) -> tuple[RuleCategoryContext, RuleContext]:
@@ -63,6 +65,10 @@ def test_escapes_quote_collision_before_closing_quotes() -> None:
     assert result.new_source == 'def quote_one():\n    """Summary \\""""\n\ndef quote_two():\n    """Summary \\"\\""""\n\ndef backslash():\n    r"""Path \\ """\n'
     assert result.fixed_findings[PDF105ClosingQuotesWhitespace.meta] == 3
     assert not format_pdf006(result.new_source).modified
+
+
+def test_escaped_quote_collision_replacement_uses_character_prefix_not_path_prefix() -> None:
+    assert PDF105_definition._common_prefix_length('C:/pkg/module "', 'C:/pkg/module \\"') == len("C:/pkg/module ")
 
 
 def test_single_separator_quote_collision_is_escaped_when_possible() -> None:

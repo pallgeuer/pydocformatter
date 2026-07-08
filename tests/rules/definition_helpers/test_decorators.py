@@ -1,6 +1,8 @@
+# Third-party imports
 import libcst as cst
 
-import pydocformatter.rules.definition_helpers.decorators as decorators
+# First-party imports
+from pydocformatter.rules.definition_helpers import decorators
 
 
 def test_decorator_qualified_name_unwraps_calls_and_attributes() -> None:

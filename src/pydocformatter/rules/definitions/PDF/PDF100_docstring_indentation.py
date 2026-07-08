@@ -1,20 +1,28 @@
 """PDF100 docstring-indentation rule."""
 
+# Future imports
 from __future__ import annotations
 
+# Standard library imports
 import dataclasses
 from collections.abc import Sequence
+from typing import TYPE_CHECKING
 
-import pydocformatter.cli.settings_check as settings_check
-import pydocformatter.rules.definition_helpers.string_literals as string_literals
-import pydocformatter.rules.definition_helpers.text_layout as text_layout
-import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
+# First-party imports
 import pydocformatter.rules.edits as rule_edits
-import pydocformatter.rules.registration as rule_registration
 import pydocformatter.rules.violations as rule_violations
+import pydocformatter.rules.registration as rule_registration
+import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
+from pydocformatter.cli import settings_check
 from pydocformatter.rules.codes import RuleCode
-from pydocformatter.rules.definition import RuleBase, RuleContext
+from pydocformatter.rules.definition import RuleBase
+from pydocformatter.rules.definition_helpers import string_literals, text_layout
 from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata
+
+
+if TYPE_CHECKING:
+    # First-party imports
+    from pydocformatter.rules.definition import RuleContext
 
 
 @rule_registration.register_rule_to(PDF_definition.PDF)
@@ -132,13 +140,7 @@ def _has_indentation_content(raw_text: str) -> bool:
     return bool(content) and not content[:1].isspace()
 
 
-def _apply_convention_targets(
-    targets: list[_LineTarget | None],
-    docstring: PDF_definition.DocstringInfo,
-    *,
-    canonical_margin: str,
-    context: RuleContext,
-) -> set[int]:
+def _apply_convention_targets(targets: list[_LineTarget | None], docstring: PDF_definition.DocstringInfo, *, canonical_margin: str, context: RuleContext) -> set[int]:
     """Apply convention-aware indentation targets and return covered lines."""
     if docstring.structure.convention not in {settings_check.DocstringConvention.GOOGLE, settings_check.DocstringConvention.NUMPY}:
         return set()
@@ -182,7 +184,7 @@ def _apply_fixed_prefix_targets(targets: list[_LineTarget | None], docstring: PD
         line = docstring.structure.lines[index]
         if index == 0 or not _has_indentation_content(line.raw_text):
             continue
-        targets[index] = _LineTarget(f"{prefix}{line.raw_text[len(line.raw_indent):]}", text_layout.leading_width(line.raw_indent), prefix)
+        targets[index] = _LineTarget(f"{prefix}{line.raw_text[len(line.raw_indent) :]}", text_layout.leading_width(line.raw_indent), prefix)
 
 
 def _apply_common_margin_targets(targets: list[_LineTarget | None], docstring: PDF_definition.DocstringInfo, indexes: tuple[int, ...], prefix: str) -> None:
@@ -195,13 +197,7 @@ def _apply_common_margin_targets(targets: list[_LineTarget | None], docstring: P
         targets[index] = _LineTarget(f"{prefix}{text_layout.strip_indent(line.raw_text, common_width)}", common_width, prefix)
 
 
-def _source_for_target_line(
-    line: PDF_definition.DocstringValueLine,
-    target: _LineTarget,
-    *,
-    context: RuleContext,
-    fragments: tuple[string_literals.StringValueFragment, ...],
-) -> str:
+def _source_for_target_line(line: PDF_definition.DocstringValueLine, target: _LineTarget, *, context: RuleContext, fragments: tuple[string_literals.StringValueFragment, ...]) -> str:
     """Return source spelling for a target line while preserving suffix spelling."""
     if not text_layout.has_space_tab_content(line.raw_text):
         return target.raw_text

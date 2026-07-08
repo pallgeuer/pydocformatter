@@ -1,11 +1,22 @@
-import pathlib
-import re
-import unittest
+# Future imports
+from __future__ import annotations
 
+# Standard library imports
+import re
+import pathlib
+import unittest
+from typing import TYPE_CHECKING
+
+# First-party imports
 import pydocformatter.rules.collection as rule_collection
-import pydocformatter.rules.models as rule_models
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention
 from pydocformatter.rules.codes import RuleSelector
+
+
+if TYPE_CHECKING:
+    # First-party imports
+    import pydocformatter.rules.models as rule_models
+
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 FORMAT_RULES_PATH = ROOT / "docs" / "rule_list.md"
@@ -47,7 +58,7 @@ def _convention_effects(rule: rule_models.RuleMetadata) -> dict[DocstringConvent
         for effect_values in setting_effects.effects:
             for value in effect_values.values:
                 if not isinstance(value, DocstringConvention):
-                    raise AssertionError(f"{rule.code}: Unexpected docstring convention effect value {value!r}")
+                    raise TypeError(f"{rule.code}: Unexpected docstring convention effect value {value!r}")
                 effects[value] = effect_values.effect
     return effects
 
@@ -81,23 +92,23 @@ class TestFormattingRulesDoc(unittest.TestCase):
         row_by_code = {row["Code"]: row for row in rows}
         expected_codes = tuple(str(rule_class.meta.code) for rule_class in rule_collection.RULE_COLLECTION.rules)
 
-        self.assertEqual(tuple(row_by_code), expected_codes)
+        assert tuple(row_by_code) == expected_codes
         for rule_class in rule_collection.RULE_COLLECTION.rules:
             rule = rule_class.meta
             row = row_by_code[str(rule.code)]
-            self.assertEqual(row["Name"], rule.name)
-            self.assertEqual(row["Message"], rule.message)
-            self.assertEqual(row["Fixable"], rule.fix_availability.value)
-            self.assertEqual(row["Explicit"], _explicit_cell(rule))
-            self.assertEqual(row["Stable Since"], rule.stable_since)
+            assert row["Name"] == rule.name
+            assert row["Message"] == rule.message
+            assert row["Fixable"] == rule.fix_availability.value
+            assert row["Explicit"] == _explicit_cell(rule)
+            assert row["Stable Since"] == rule.stable_since
 
             if rule.code.prefix == "PDF":
-                self.assertEqual(row["None"], _convention_cell(rule, DocstringConvention.NONE))
-                self.assertEqual(row["PEP257"], _convention_cell(rule, DocstringConvention.PEP257))
-                self.assertEqual(row["Google"], _convention_cell(rule, DocstringConvention.GOOGLE))
-                self.assertEqual(row["NumPy"], _convention_cell(rule, DocstringConvention.NUMPY))
-                self.assertEqual(row["reST"], _convention_cell(rule, DocstringConvention.REST))
-                self.assertEqual(row["Conflicts"], _conflicts_cell(rule))
+                assert row["None"] == _convention_cell(rule, DocstringConvention.NONE)
+                assert row["PEP257"] == _convention_cell(rule, DocstringConvention.PEP257)
+                assert row["Google"] == _convention_cell(rule, DocstringConvention.GOOGLE)
+                assert row["NumPy"] == _convention_cell(rule, DocstringConvention.NUMPY)
+                assert row["reST"] == _convention_cell(rule, DocstringConvention.REST)
+                assert row["Conflicts"] == _conflicts_cell(rule)
 
     def test_rule_list_ruff_replacement_mappings_are_bidirectional(self) -> None:
         text = FORMAT_RULES_PATH.read_text(encoding="utf-8")
@@ -115,7 +126,7 @@ class TestFormattingRulesDoc(unittest.TestCase):
             if replacements:
                 replaced_by_ruff_rule[row["Code"]] = replacements
 
-        self.assertEqual(_sorted_mapping_values(disabled_by_ruff_rule), _sorted_mapping_values(replaced_by_ruff_rule))
+        assert _sorted_mapping_values(disabled_by_ruff_rule) == _sorted_mapping_values(replaced_by_ruff_rule)
 
     def test_rule_list_ruff_related_mappings_are_bidirectional(self) -> None:
         text = FORMAT_RULES_PATH.read_text(encoding="utf-8")
@@ -133,7 +144,7 @@ class TestFormattingRulesDoc(unittest.TestCase):
             if related_rules:
                 related_by_pydocformatter_rule[row["Code"]] = related_rules
 
-        self.assertEqual(_sorted_mapping_values(related_by_ruff_rule), _sorted_mapping_values(related_by_pydocformatter_rule))
+        assert _sorted_mapping_values(related_by_ruff_rule) == _sorted_mapping_values(related_by_pydocformatter_rule)
 
 
 def _sorted_mapping_values(mapping: dict[str, list[str]]) -> dict[str, list[str]]:

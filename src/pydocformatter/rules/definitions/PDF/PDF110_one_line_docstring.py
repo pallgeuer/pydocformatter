@@ -1,18 +1,27 @@
 """PDF110 one-line-docstring rule."""
 
+# Future imports
 from __future__ import annotations
 
+# Standard library imports
 from collections.abc import Sequence
+from typing import TYPE_CHECKING
 
-import pydocformatter.rules.definition_helpers.text_layout as text_layout
-import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
+# First-party imports
 import pydocformatter.rules.edits as rule_edits
-import pydocformatter.rules.registration as rule_registration
 import pydocformatter.rules.violations as rule_violations
+import pydocformatter.rules.registration as rule_registration
+import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 from pydocformatter.rules.codes import RuleCode
-from pydocformatter.rules.definition import RuleBase, RuleContext
+from pydocformatter.rules.definition import RuleBase
+from pydocformatter.rules.definition_helpers import text_layout
 from pydocformatter.rules.definitions.PDF.PDF import PDF
 from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata
+
+
+if TYPE_CHECKING:
+    # First-party imports
+    from pydocformatter.rules.definition import RuleContext
 
 
 @rule_registration.register_rule_to(PDF)
@@ -67,9 +76,7 @@ def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo, *, co
     if not _rendered_line_fits(docstring, rendered, context=context, source_lines=source_lines):
         return None
     return rule_edits.PlannedSourceChange(
-        edit=rule_edits.SourceEdit(range=docstring.range, replacement=rendered),
-        line_numbers=tuple(line.line_number for line in docstring.physical_lines),
-        suppression_line_numbers=(),
+        edit=rule_edits.SourceEdit(range=docstring.range, replacement=rendered), line_numbers=tuple(line.line_number for line in docstring.physical_lines), suppression_line_numbers=()
     )
 
 

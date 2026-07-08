@@ -1,0 +1,1 @@
+"""Rule test package."""

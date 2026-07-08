@@ -1,14 +1,15 @@
+# Third-party imports
 import pytest
 
-import pydocformatter.formatter as formatter
-import pydocformatter.rules_selection as rules_selection
+# First-party imports
 import tests.rules.PCF.helpers as pcf_helpers
+from pydocformatter import formatter, rules_selection
 from pydocformatter.cli.settings_check import CheckSettings
 
 
 @pytest.mark.parametrize(
     ("source", "expected"),
-    (
+    [
         ("value = compute()#noqa\n", "value = compute()  # noqa\n"),
         ("value = compute()#noqa   \n", "value = compute()  # noqa\n"),
         ("value = compute() #   nosec reason\n", "value = compute()  # nosec reason\n"),
@@ -21,7 +22,7 @@ from pydocformatter.cli.settings_check import CheckSettings
         ("value = compute()#language=SQL prefix=SELECT suffix=FROM table\n", "value = compute()  # language=SQL prefix=SELECT suffix=FROM table\n"),
         ("value = compute()#@formatter:off\n", "value = compute()  # @formatter:off\n"),
         ("value = compute() # pragma: no cover\n", "value = compute()  # pragma: no cover\n"),
-    ),
+    ],
 )
 def test_directive_normalization_normalizes_known_trailing_directives(source: str, expected: str) -> None:
     result = pcf_helpers.format_pcf(source, line_length=10)
@@ -36,7 +37,7 @@ def test_directive_normalization_preserves_payload_after_marker_space() -> None:
 
 @pytest.mark.parametrize(
     ("source", "expected"),
-    (
+    [
         ("#ruff: noqa\n", "# ruff: noqa\n"),
         ("#PYDOCFMT : noqa : pdf101,pcf001\n", "# pydocfmt: noqa: PDF101, PCF001\n"),
         ("#PYDOCFMT : file-ignore [ pdf101, pcf001, ]\n", "# pydocfmt: file-ignore[PDF101, PCF001]\n"),
@@ -54,7 +55,7 @@ def test_directive_normalization_preserves_payload_after_marker_space() -> None:
         ("# LANGUAGE = SQL prefix=SELECT suffix=FROM table\n", "# language=SQL prefix=SELECT suffix=FROM table\n"),
         ("# @formatter : OFF\n", "# @formatter:off\n"),
         ("# @formatter : ON\n", "# @formatter:on\n"),
-    ),
+    ],
 )
 def test_directive_normalization_normalizes_standalone_directives(source: str, expected: str) -> None:
     result = pcf_helpers.format_pcf(source)
@@ -63,7 +64,7 @@ def test_directive_normalization_normalizes_standalone_directives(source: str, e
 
 @pytest.mark.parametrize(
     ("source", "expected"),
-    (
+    [
         ("#noqa:\n", "# noqa:\n"),
         ("#noqa:   \n", "# noqa:\n"),
         ("#ruff: noqa:\n", "# ruff: noqa:\n"),
@@ -74,17 +75,18 @@ def test_directive_normalization_normalizes_standalone_directives(source: str, e
         ("value = compute()#TY : ignore\n", "value = compute()  # ty: ignore\n"),
         ("value = compute()#fmt:\n", "value = compute()  # fmt:\n"),
         ("#noqa:  # reason\n", "# noqa: # reason\n"),
-    ),
+    ],
 )
 def test_directive_normalization_does_not_add_trailing_space_for_empty_payloads(source: str, expected: str) -> None:
     result = pcf_helpers.format_pcf(source)
     assert result.new_source == expected
+    assert result.new_source is not None
     assert all(not line.endswith((" ", "\t", "\f")) for line in result.new_source.splitlines())
 
 
 @pytest.mark.parametrize(
     ("source", "expected"),
-    (
+    [
         ("value = compute()#TYPE : ignore[assignment,arg-type]\n", "value = compute()  # type: ignore[assignment, arg-type]\n"),
         ("value = compute()#TYPE : ignore[arg-type,ty:invalid-argument-type]\n", "value = compute()  # type: ignore[arg-type, ty:invalid-argument-type]\n"),
         ("value = compute()#TY : ignore[invalid-argument-type,unresolved-import]\n", "value = compute()  # ty: ignore[invalid-argument-type, unresolved-import]\n"),
@@ -99,7 +101,7 @@ def test_directive_normalization_does_not_add_trailing_space_for_empty_payloads(
         ("value = compute()#LANGUAGE = RegExp prefix=^ suffix=$\n", "value = compute()  # language=RegExp prefix=^ suffix=$\n"),
         ("value = compute()#@formatter : OFF\n", "value = compute()  # @formatter:off\n"),
         ("value = compute()#pylint:disable=missing-docstring,unused-argument\n", "value = compute()  # pylint: disable=missing-docstring, unused-argument\n"),
-    ),
+    ],
 )
 def test_directive_normalization_normalizes_safe_machine_readable_payloads(source: str, expected: str) -> None:
     result = pcf_helpers.format_pcf(source)

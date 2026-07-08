@@ -1,5 +1,5 @@
-import pydocformatter.formatter as formatter
-import pydocformatter.rules_selection as rules_selection
+# First-party imports
+from pydocformatter import formatter, rules_selection
 from pydocformatter.cli.settings_check import CheckSettings
 
 
@@ -54,10 +54,7 @@ def test_existing_forbidden_docstrings_remain_visible_to_other_rules() -> None:
         source,
         settings=settings,
         fix=False,
-        expected=(
-            ("PDF300", (3,), "Docstring summary should end with a period"),
-            ("PDF616", (3,), "Function decorated with '@typing.overload' should not have a docstring"),
-        ),
+        expected=(("PDF300", (3,), "Docstring summary should end with a period"), ("PDF616", (3,), "Function decorated with '@typing.overload' should not have a docstring")),
     )
 
     assert result.new_source == source
@@ -112,11 +109,7 @@ def test_broad_pdf_selection_includes_forbidden_function_docstrings() -> None:
 
 def test_optional_decorators_do_not_trigger_forbidden_docstring_rule() -> None:
     source = '@override\ndef parse(value: int):\n    """Parse int."""\n    pass\n\n@project.shared\ndef shared(value: int):\n    """Shared."""\n    pass\n'
-    settings = CheckSettings(
-        select=("PDF616",),
-        docstring_forbidden_function_decorators=("project.shared",),
-        docstring_optional_function_decorators=("override", "project.shared"),
-    )
+    settings = CheckSettings(select=("PDF616",), docstring_forbidden_function_decorators=("project.shared",), docstring_optional_function_decorators=("override", "project.shared"))
 
     assert_findings(source, settings=settings, expected=(("PDF616", (8,), "Function decorated with '@project.shared' should not have a docstring"),))
 

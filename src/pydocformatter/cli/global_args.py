@@ -1,7 +1,16 @@
 """Global pydocfmt command-line options."""
 
-import argparse
+# Future imports
+from __future__ import annotations
+
+# Standard library imports
 import dataclasses
+from typing import TYPE_CHECKING
+
+
+if TYPE_CHECKING:
+    # Standard library imports
+    import argparse
 
 
 @dataclasses.dataclass(frozen=True)
@@ -25,21 +34,8 @@ def add_global_arguments(parser: argparse.ArgumentParser, *, dest_prefix: str) -
         dest_prefix (str): Prefix used for argparse destination names so multiple parser levels can coexist.
     """
     global_options = parser.add_argument_group("Global options")
-    global_options.add_argument(
-        "--config",
-        action="append",
-        default=None,
-        dest=f"{dest_prefix}_config",
-        metavar="CONFIG",
-        help="Path to a TOML configuration file or TOML '<KEY> = <VALUE>' override.",
-    )
-    global_options.add_argument(
-        "--isolated",
-        action="store_true",
-        default=False,
-        dest=f"{dest_prefix}_isolated",
-        help="Ignore all configuration files.",
-    )
+    global_options.add_argument("--config", action="append", default=None, dest=f"{dest_prefix}_config", metavar="CONFIG", help="Path to a TOML configuration file or TOML '<KEY> = <VALUE>' override.")
+    global_options.add_argument("--isolated", action="store_true", default=False, dest=f"{dest_prefix}_isolated", help="Ignore all configuration files.")
 
 
 def global_values_from_arguments(args: argparse.Namespace, *, dest_prefixes: tuple[str, ...]) -> GlobalArgs:

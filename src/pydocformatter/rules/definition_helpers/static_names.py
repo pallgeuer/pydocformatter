@@ -1,16 +1,26 @@
 """Static expression-name matching helpers."""
 
+# Future imports
 from __future__ import annotations
 
+# Standard library imports
 import enum
 from collections.abc import Iterable
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
+# Third-party imports
 import libcst as cst
 import libcst.metadata as cst_metadata
 
-import pydocformatter.rules.definition_helpers.module_bindings as module_bindings
-from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
+# First-party imports
+from pydocformatter.rules.definition import RuleContext
+from pydocformatter.rules.definition_helpers import module_bindings
+
+
+if TYPE_CHECKING:
+    # First-party imports
+    from pydocformatter.rules.definition import RuleCategoryContext
+
 
 _ALIAS_MATCH_SOURCES = frozenset((cst_metadata.QualifiedNameSource.IMPORT, cst_metadata.QualifiedNameSource.BUILTIN))
 _CANONICAL_QUALIFIED_ROOTS = frozenset(("abc", "builtins", "collections", "enum", "functools", "types", "typing", "typing_extensions"))
@@ -98,10 +108,10 @@ def _qualified_names(expression: cst.BaseExpression, *, context: RuleCategoryCon
         return ()
     if callable(qualified_names):
         qualified_names = qualified_names()
-    return tuple(cast(Iterable[cst_metadata.QualifiedName], qualified_names))
+    return tuple(cast("Iterable[cst_metadata.QualifiedName]", qualified_names))
 
 
-def _metadata_match(qualified_names: tuple[cst_metadata.QualifiedName, ...], qualified_configured_names: frozenset[str]) -> "_StaticMatch":
+def _metadata_match(qualified_names: tuple[cst_metadata.QualifiedName, ...], qualified_configured_names: frozenset[str]) -> _StaticMatch:
     """Return a LibCST metadata match decision for qualified configured names."""
     if any(qualified_name.source in _ALIAS_MATCH_SOURCES and qualified_name.name in qualified_configured_names for qualified_name in qualified_names):
         return _StaticMatch.MATCH
@@ -118,7 +128,7 @@ def _is_explicit_noncanonical_exact_match(source_name: str, qualified_configured
     return source_name in qualified_configured_names and source_root not in _CANONICAL_QUALIFIED_ROOTS
 
 
-def _module_binding_match(expression: cst.BaseExpression, source_name: str, qualified_configured_names: frozenset[str], *, context: RuleCategoryContext) -> "_StaticMatch":
+def _module_binding_match(expression: cst.BaseExpression, source_name: str, qualified_configured_names: frozenset[str], *, context: RuleCategoryContext) -> _StaticMatch:
     """Return a conservative module-syntax match decision for a qualified configured name."""
     source_root = source_name.split(".", 1)[0]
     use_key = _expression_key(expression, context=context)
@@ -172,7 +182,8 @@ def _prepared_module_bindings(context: RuleCategoryContext) -> module_bindings.M
     """Return cached PDF category bindings when the context carries prepared PDF data."""
     if not isinstance(context, RuleContext):
         return None
-    import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
+    # First-party imports
+    import pydocformatter.rules.definitions.PDF.PDF as PDF_definition  # noqa: PLC0415
 
     try:
         data = PDF_definition.PDF.require_data(context)

@@ -1,16 +1,24 @@
 """Signature and documented parameter comparison helpers."""
 
+# Future imports
 from __future__ import annotations
 
+# Standard library imports
 import dataclasses
+from typing import TYPE_CHECKING
 
+# Third-party imports
 import libcst as cst
 
-import pydocformatter.rules.definition_helpers.decorators as decorator_helpers
-import pydocformatter.rules.definition_helpers.docstring_sections as docstring_sections
-import pydocformatter.rules.definition_helpers.missing_documentation as missing_documentation
+# First-party imports
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
-from pydocformatter.rules.definition import RuleContext
+import pydocformatter.rules.definition_helpers.decorators as decorator_helpers
+from pydocformatter.rules.definition_helpers import docstring_sections, missing_documentation
+
+
+if TYPE_CHECKING:
+    # First-party imports
+    from pydocformatter.rules.definition import RuleContext
 
 
 @dataclasses.dataclass(frozen=True)
@@ -119,14 +127,7 @@ def unpacked_keyword_parameters(parameters: tuple[SignatureParameter, ...]) -> t
     return tuple(parameter for parameter in parameters if parameter.unpacked and parameter.display_name.startswith("**"))
 
 
-def _signature_parameter(
-    parameter: cst.Param,
-    *,
-    parameters: cst.Parameters,
-    context: RuleContext,
-    implicit_receiver_name: str | None,
-    fallback_line: int,
-) -> SignatureParameter:
+def _signature_parameter(parameter: cst.Param, *, parameters: cst.Parameters, context: RuleContext, implicit_receiver_name: str | None, fallback_line: int) -> SignatureParameter:
     """Return normalized documentation metadata for one CST signature parameter."""
     unpack_annotation = _unpack_annotation(parameter.annotation)
     return SignatureParameter(
@@ -155,9 +156,7 @@ def documented_parameters(docstring: PDF_definition.DocstringInfo) -> tuple[Docu
             continue
         line = docstring.structure.lines[entry.start_line]
         line_numbers = PDF_definition.docstring_line_numbers(docstring, line)
-        for name in entry.names:
-            if name:
-                parameters.append(DocumentedParameter(name=name, comparison_name=parameter_comparison_name(name), line_numbers=line_numbers))
+        parameters.extend(DocumentedParameter(name=name, comparison_name=parameter_comparison_name(name), line_numbers=line_numbers) for name in entry.names if name)
     return tuple(parameters)
 
 
@@ -286,9 +285,7 @@ def _typed_dict_class_keys(node: cst.ClassDef) -> tuple[str, ...]:
     for statement in node.body.body:
         if not isinstance(statement, cst.SimpleStatementLine):
             continue
-        for small_statement in statement.body:
-            if isinstance(small_statement, cst.AnnAssign) and isinstance(small_statement.target, cst.Name):
-                keys.append(small_statement.target.value)
+        keys.extend(small_statement.target.value for small_statement in statement.body if isinstance(small_statement, cst.AnnAssign) and isinstance(small_statement.target, cst.Name))
     return tuple(keys)
 
 

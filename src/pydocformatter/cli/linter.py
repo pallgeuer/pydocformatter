@@ -1,15 +1,25 @@
 """`pydocfmt linter` command."""
 
+# Future imports
 from __future__ import annotations
 
-import argparse
+# Standard library imports
 import json
-from typing import TypedDict
+from typing import TYPE_CHECKING, TypedDict
 
-import pydocformatter.cli.global_args as global_args
+# First-party imports
 import pydocformatter.rules.collection as rule_collection
-import pydocformatter.utils.argparser as argparser
-from pydocformatter.rules.definition import RuleCategoryBase
+from pydocformatter.cli import global_args
+from pydocformatter.utils import argparser
+
+
+if TYPE_CHECKING:
+    # Standard library imports
+    import argparse
+
+    # First-party imports
+    from pydocformatter.rules.definition import RuleCategoryBase
+
 
 _DEFAULT_OUTPUT_FORMAT = "text"
 
@@ -39,17 +49,9 @@ def add_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) 
         argparse.ArgumentParser: Configured `linter` subcommand parser.
     """
     parser = argparser.create_subparser(
-        subparsers,
-        name="linter",
-        description="List all supported rule-prefix linters (rule categories).",
-        help="List all supported rule-prefix linters (rule categories)",
+        subparsers, name="linter", description="List all supported rule-prefix linters (rule categories).", help="List all supported rule-prefix linters (rule categories)"
     )
-    parser.add_argument(
-        "--output-format",
-        choices=("text", "json"),
-        default=_DEFAULT_OUTPUT_FORMAT,
-        help="Output format (default: %(default)s).",
-    )
+    parser.add_argument("--output-format", choices=("text", "json"), default=_DEFAULT_OUTPUT_FORMAT, help="Output format (default: %(default)s).")
     global_args.add_global_arguments(parser, dest_prefix="command")
     parser.set_defaults(func=run)
     return parser

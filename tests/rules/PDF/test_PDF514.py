@@ -1,7 +1,19 @@
-import pydocformatter.formatter as formatter
+# Future imports
+from __future__ import annotations
+
+# Standard library imports
+from typing import TYPE_CHECKING
+
+# First-party imports
 import tests.rules.PDF.helpers as pdf_helpers
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention
 from pydocformatter.rules.definitions.PDF.PDF514_private_class_attribute_owner_docstring_forbidden import PDF514PrivateClassAttributeOwnerDocstringForbidden
+
+
+if TYPE_CHECKING:
+    # First-party imports
+    from pydocformatter import formatter
+
 
 format_source = pdf_helpers.formatter_for("PDF514")
 
@@ -23,10 +35,7 @@ def test_reports_numpy_private_class_attribute_names_individually() -> None:
 
     result = assert_pdf514_lines(source, ((6,), (6,)), settings=CheckSettings(select=("PDF514",), docstring_convention=DocstringConvention.NUMPY))
 
-    assert tuple(finding.message for finding in result.unfixed_findings) == (
-        "Class docstring documents private attribute '_token'",
-        "Class docstring documents private attribute '_cache'",
-    )
+    assert tuple(finding.message for finding in result.unfixed_findings) == ("Class docstring documents private attribute '_token'", "Class docstring documents private attribute '_cache'")
 
 
 def test_reports_rest_private_class_attribute_entries() -> None:

@@ -1,6 +1,8 @@
+# Third-party imports
 import libcst as cst
 
-import pydocformatter.rules.definition_helpers.string_literals as string_literals
+# First-party imports
+from pydocformatter.rules.definition_helpers import string_literals
 
 
 def simple_string(source: str) -> cst.SimpleString:
@@ -214,15 +216,7 @@ def test_wrap_source_words_url_balancing_preserves_source_spelling() -> None:
 def test_wrap_source_words_url_balancing_respects_variable_widths_and_final_suffix() -> None:
     words = tuple(string_literals.SourceWord(value=word, source=word) for word in ("alpha", "beta", "https://example.com/path", "gamma"))
 
-    wrapped = string_literals.wrap_source_words(
-        words,
-        width=35,
-        initial_width=18,
-        subsequent_width=35,
-        final_suffix_width=6,
-        tab_width=4,
-        url_aware=True,
-    )
+    wrapped = string_literals.wrap_source_words(words, width=35, initial_width=18, subsequent_width=35, final_suffix_width=6, tab_width=4, url_aware=True)
 
     assert tuple(line.value for line in wrapped) == ("alpha", "beta https://example.com/path", "gamma")
     assert tuple(line.source for line in wrapped) == ("alpha", "beta https://example.com/path", "gamma")

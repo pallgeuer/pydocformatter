@@ -1,8 +1,11 @@
 """Colon-ended prose boundary helpers."""
 
+# Future imports
 from __future__ import annotations
 
+# Standard library imports
 import re
+
 
 _LABEL_LIKE_COLON_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_-]*:$")
 

@@ -1,0 +1,1 @@
+"""Rule definition helper tests."""

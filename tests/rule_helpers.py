@@ -1,16 +1,25 @@
 """Test adapters for direct rule API calls."""
 
+# Future imports
 from __future__ import annotations
 
+# Standard library imports
 import dataclasses
+from typing import TYPE_CHECKING
 
+# Third-party imports
 import libcst as cst
 
+# First-party imports
 import pydocformatter.rules.edits as rule_edits
 import pydocformatter.rules.runner as rule_runner
-import pydocformatter.rules.violations as rule_violations
-from pydocformatter.rules.definition import RuleBase, RuleContext
 from pydocformatter.rules.models import RuleFinding
+
+
+if TYPE_CHECKING:
+    # First-party imports
+    import pydocformatter.rules.violations as rule_violations
+    from pydocformatter.rules.definition import RuleBase, RuleContext
 
 
 @dataclasses.dataclass(frozen=True)

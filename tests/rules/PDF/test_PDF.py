@@ -1,30 +1,37 @@
-import dataclasses
+# Future imports
+from __future__ import annotations
+
+# Standard library imports
 import typing
+import itertools
+import dataclasses
 
+# Third-party imports
 import libcst as cst
-import libcst.metadata as cst_metadata
 import pytest
+import libcst.metadata as cst_metadata
 
-import pydocformatter.formatter as formatter
-import pydocformatter.rules.definition_helpers.source_text as source_text
-import pydocformatter.rules.definition_helpers.value_documentation as value_documentation
-import pydocformatter.rules_selection as rules_selection
+# First-party imports
+from pydocformatter import formatter, rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention
 from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
+from pydocformatter.rules.definition_helpers import source_text, value_documentation
 from pydocformatter.rules.definitions.PDF.PDF import (
     PDF,
     AttributeInfo,
     DefinitionInfo,
     DefinitionKind,
-    DocstringBlock,
     DocstringBlockKind,
     DocstringEntryKind,
     DocstringKind,
-    DocstringStructure,
-    DocstringTextFragment,
     escaped_closing_quote_body_source,
     simple_docstring_body_source_candidates,
 )
+
+
+if typing.TYPE_CHECKING:
+    # First-party imports
+    from pydocformatter.rules.definitions.PDF.PDF import DocstringBlock, DocstringStructure, DocstringTextFragment
 
 
 def reflow_texts(lines: tuple[DocstringTextFragment, ...]) -> tuple[str, ...]:
@@ -145,7 +152,7 @@ def test_prepare_collects_attribute_docstrings_and_owner_metadata() -> None:
     attached_docstrings = data.attached_attribute_docstrings_by_name(data.definitions[0])
     assert set(attached_docstrings) == {"module_plain", "module_annotated", "module_a", "module_b"}
     with pytest.raises(TypeError):
-        typing.cast(dict[str, tuple[object, ...]], attached_docstrings)["other"] = ()
+        typing.cast("dict[str, tuple[object, ...]]", attached_docstrings)["other"] = ()
     assert data._attached_attribute_docstrings_by_owner_id is not None
 
 
@@ -232,13 +239,7 @@ def test_value_documentation_has_no_body_walk_fallback() -> None:
     assert not hasattr(value_documentation, "_function_facts")
     assert not hasattr(value_documentation, "_FunctionBodyVisitor")
     settings = CheckSettings(select=("PDF001",))
-    result = formatter.format_source(
-        'def documented():\n    """Documented."""\n    return 1\n',
-        "example.py",
-        settings=settings,
-        rule_selection=rules_selection.select_rules(settings),
-        fix=False,
-    )
+    result = formatter.format_source('def documented():\n    """Documented."""\n    return 1\n', "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=False)
 
     assert result.errors == ()
 
@@ -316,7 +317,7 @@ def assert_block_partition(blocks: tuple[DocstringBlock, ...], start: int, end: 
     assert blocks
     assert blocks[0].start_line == start
     assert blocks[-1].end_line == end
-    assert all(left.end_line == right.start_line for left, right in zip(blocks, blocks[1:]))
+    assert all(left.end_line == right.start_line for left, right in itertools.pairwise(blocks))
     for block in blocks:
         assert block.start_line < block.end_line
         if block.children:
@@ -526,10 +527,7 @@ def test_colon_continuation_line_ends_current_reflow_region() -> None:
     value = "This sentence has been deliberately split\nover three physical lines and ends\nwith a colon:\nthe following two lines should be\nwrapped as their own paragraph."
     structure = structure_for(value)
 
-    assert tuple((block.kind, block.start_line, block.end_line) for block in structure.blocks) == (
-        (DocstringBlockKind.SUMMARY, 0, 3),
-        (DocstringBlockKind.PARAGRAPH, 3, 5),
-    )
+    assert tuple((block.kind, block.start_line, block.end_line) for block in structure.blocks) == ((DocstringBlockKind.SUMMARY, 0, 3), (DocstringBlockKind.PARAGRAPH, 3, 5))
     assert tuple((region.kind, reflow_texts(region.lines)) for region in structure.reflow_regions) == (
         (DocstringBlockKind.SUMMARY, ("This sentence has been deliberately split", "over three physical lines and ends", "with a colon:")),
         (DocstringBlockKind.PARAGRAPH, ("the following two lines should be", "wrapped as their own paragraph.")),
@@ -577,10 +575,7 @@ def test_colon_header_after_complete_sentence_stays_separate() -> None:
 def test_colon_header_first_content_line_is_not_summary() -> None:
     structure = structure_for("Accepted values:\npending, active, and disabled.")
 
-    assert tuple((block.kind, block.start_line, block.end_line) for block in structure.blocks) == (
-        (DocstringBlockKind.COLON_HEADER, 0, 1),
-        (DocstringBlockKind.PARAGRAPH, 1, 2),
-    )
+    assert tuple((block.kind, block.start_line, block.end_line) for block in structure.blocks) == ((DocstringBlockKind.COLON_HEADER, 0, 1), (DocstringBlockKind.PARAGRAPH, 1, 2))
     assert tuple(region.kind for region in structure.reflow_regions) == (DocstringBlockKind.PARAGRAPH,)
 
 
@@ -610,7 +605,7 @@ def test_a_leading_protected_block_prevents_a_later_paragraph_becoming_summary()
     assert top_level_blocks("```\ncode\n```\nLater prose.") == ((DocstringBlockKind.CODE_FENCE, 0, 3), (DocstringBlockKind.PARAGRAPH, 3, 4))
 
 
-@pytest.mark.parametrize("header", ("Arg:", "Args:", "ARGS:", "Argument:", "Arguments", "Keyword Argument:", "Keyword Arguments:", "Other Arg:", "Other Args:", "wARnS:"))
+@pytest.mark.parametrize("header", ["Arg:", "Args:", "ARGS:", "Argument:", "Arguments", "Keyword Argument:", "Keyword Arguments:", "Other Arg:", "Other Args:", "wARnS:"])
 def test_google_section_header_spellings_are_case_insensitive_and_preserved(header: str) -> None:
     structure = structure_for(f"Summary.\n\n{header}\n    value: Description.", settings=CheckSettings(docstring_convention=DocstringConvention.GOOGLE))
     assert tuple(section.name for section in structure.sections) == (header.removesuffix(":"),)
@@ -628,7 +623,7 @@ def test_adjacent_empty_google_sections_have_nonoverlapping_header_only_blocks()
 
 @pytest.mark.parametrize(
     "name",
-    (
+    [
         "Args",
         "Arg",
         "Argument",
@@ -670,7 +665,7 @@ def test_adjacent_empty_google_sections_have_nonoverlapping_header_only_blocks()
         "Warns",
         "Yield",
         "Yields",
-    ),
+    ],
 )
 def test_all_google_section_names_are_recognized(name: str) -> None:
     structure = structure_for(f"{name}:\n    Content.", settings=CheckSettings(docstring_convention=DocstringConvention.GOOGLE))
@@ -695,7 +690,7 @@ def test_google_parameter_entries_support_mild_spacing_around_type_and_colon() -
 
 @pytest.mark.parametrize(
     ("section", "entry_text", "expected_kind", "expected_names", "expected_type"),
-    (
+    [
         ("Returns", "str: Result.", DocstringEntryKind.RETURN, (), "str"),
         ("Return", "str: Result.", DocstringEntryKind.RETURN, (), "str"),
         ("Yields", "tuple[int, int]: Pair.", DocstringEntryKind.YIELD, (), "tuple[int, int]"),
@@ -711,7 +706,7 @@ def test_google_parameter_entries_support_mild_spacing_around_type_and_colon() -
         ("Method", "run: Execute it.", DocstringEntryKind.METHOD, ("run",), None),
         ("Notes", "topic: General note.", DocstringEntryKind.FIELD, ("topic",), None),
         ("Note", "topic: General note.", DocstringEntryKind.FIELD, ("topic",), None),
-    ),
+    ],
 )
 def test_google_section_names_determine_entry_semantics(section: str, entry_text: str, expected_kind: DocstringEntryKind, expected_names: tuple[str, ...], expected_type: str | None) -> None:
     structure = structure_for(f"{section}:\n    {entry_text}", settings=CheckSettings(docstring_convention=DocstringConvention.GOOGLE))
@@ -721,7 +716,7 @@ def test_google_section_names_determine_entry_semantics(section: str, entry_text
 
 @pytest.mark.parametrize(
     ("section", "entry_text", "expected_kind"),
-    (("Returns", "None", DocstringEntryKind.RETURN), ("Returns", "None.", DocstringEntryKind.RETURN), ("Yields", "None", DocstringEntryKind.YIELD), ("Yields", "None.", DocstringEntryKind.YIELD)),
+    [("Returns", "None", DocstringEntryKind.RETURN), ("Returns", "None.", DocstringEntryKind.RETURN), ("Yields", "None", DocstringEntryKind.YIELD), ("Yields", "None.", DocstringEntryKind.YIELD)],
 )
 def test_google_return_and_yield_sections_parse_bare_none_as_empty_typed_entry(section: str, entry_text: str, expected_kind: DocstringEntryKind) -> None:
     structure = structure_for(f"{section}:\n    {entry_text}", settings=CheckSettings(docstring_convention=DocstringConvention.GOOGLE))
@@ -731,19 +726,15 @@ def test_google_return_and_yield_sections_parse_bare_none_as_empty_typed_entry(s
 
 @pytest.mark.parametrize(
     ("section", "entry_text", "expected_kind", "expected_names", "expected_type"),
-    (
+    [
         ("Returns", "Mapping[ str, Sequence[int  ]]: Result.", DocstringEntryKind.RETURN, (), "Mapping[ str, Sequence[int  ]]"),
         ("Yields", "Iterator[tuple[str, int | None]]: Item.", DocstringEntryKind.YIELD, (), "Iterator[tuple[str, int | None]]"),
         ("Raises", "mypkg.errors.CustomError: Bad value.", DocstringEntryKind.EXCEPTION, ("mypkg.errors.CustomError",), None),
         ("Raises", "ValueError | TypeError: Bad value.", DocstringEntryKind.EXCEPTION, ("ValueError", "TypeError"), None),
-    ),
+    ],
 )
 def test_google_return_yield_and_raise_entries_preserve_generic_looking_type_text(
-    section: str,
-    entry_text: str,
-    expected_kind: DocstringEntryKind,
-    expected_names: tuple[str, ...],
-    expected_type: str | None,
+    section: str, entry_text: str, expected_kind: DocstringEntryKind, expected_names: tuple[str, ...], expected_type: str | None
 ) -> None:
     structure = structure_for(f"{section}:\n    {entry_text}", settings=CheckSettings(docstring_convention=DocstringConvention.GOOGLE))
     entry = structure.entries[0]
@@ -763,7 +754,7 @@ def test_google_malformed_exception_entry_skips_continuation_before_later_entry(
     )
 
 
-@pytest.mark.parametrize(("section", "entry_text"), (("Returns", "str."), ("Yields", "Iterator[int]."), ("Raises", "None.")))
+@pytest.mark.parametrize(("section", "entry_text"), [("Returns", "str."), ("Yields", "Iterator[int]."), ("Raises", "None.")])
 def test_google_bare_none_entry_special_case_does_not_apply_to_other_content(section: str, entry_text: str) -> None:
     structure = structure_for(f"{section}:\n    {entry_text}", settings=CheckSettings(docstring_convention=DocstringConvention.GOOGLE))
     assert structure.entries == ()
@@ -823,10 +814,7 @@ def test_indented_google_section_headers_are_recognized_as_malformed_sections() 
 def test_nested_protected_blocks_are_not_folded_into_google_entry_descriptions() -> None:
     value = "Args:\n    value: Description.\n        - First choice.\n        - Second choice.\n        ```text\n        value: code, not prose\n        ```\n    other: Other description."
     structure = structure_for(value, settings=CheckSettings(docstring_convention=DocstringConvention.GOOGLE))
-    assert tuple((entry.names, entry.description, entry.start_line, entry.end_line) for entry in structure.entries) == (
-        (("value",), "Description.", 1, 2),
-        (("other",), "Other description.", 7, 8),
-    )
+    assert tuple((entry.names, entry.description, entry.start_line, entry.end_line) for entry in structure.entries) == ((("value",), "Description.", 1, 2), (("other",), "Other description.", 7, 8))
     assert tuple((child.kind, child.start_line, child.end_line) for child in structure.blocks[0].children) == (
         (DocstringBlockKind.SECTION_HEADER, 0, 1),
         (DocstringBlockKind.SECTION_ENTRY, 1, 2),
@@ -850,7 +838,7 @@ def test_rest_fields_and_generic_reflow_regions_stay_in_source_order() -> None:
     )
 
 
-@pytest.mark.parametrize("convention", (DocstringConvention.NONE, DocstringConvention.PEP257, DocstringConvention.NUMPY))
+@pytest.mark.parametrize("convention", [DocstringConvention.NONE, DocstringConvention.PEP257, DocstringConvention.NUMPY])
 def test_google_sections_are_only_parsed_for_google_convention(convention: DocstringConvention) -> None:
     source = 'def function(value):\n    """Summary.\n\n    Args:\n        value (int): A value.\n    """\n'
     data = PDF.prepare(category_context(source, settings=CheckSettings(docstring_convention=convention)))
@@ -889,7 +877,7 @@ def test_indented_numpy_section_headers_are_recognized_as_malformed_sections() -
     assert tuple((region.initial_indent, region.subsequent_indent) for region in structure.reflow_regions if region.kind == DocstringBlockKind.SECTION_ENTRY) == (("    ", "    "), ("    ", "    "))
 
 
-@pytest.mark.parametrize("header", ("Parameters\n----------", "PARAMETERS\n==========", "Other Parameters", "Returns"))
+@pytest.mark.parametrize("header", ["Parameters\n----------", "PARAMETERS\n==========", "Other Parameters", "Returns"])
 def test_numpy_section_header_variants_are_recognized(header: str) -> None:
     structure = structure_for(f"{header}\nvalue : int\n    Description.", settings=CheckSettings(docstring_convention=DocstringConvention.NUMPY))
     assert len(structure.sections) == 1
@@ -901,7 +889,7 @@ def test_numpy_section_header_variants_are_recognized(header: str) -> None:
 
 @pytest.mark.parametrize(
     "name",
-    (
+    [
         "Attribute",
         "Attributes",
         "Example",
@@ -933,7 +921,7 @@ def test_numpy_section_header_variants_are_recognized(header: str) -> None:
         "Warns",
         "Yield",
         "Yields",
-    ),
+    ],
 )
 def test_all_numpy_section_names_are_recognized(name: str) -> None:
     structure = structure_for(f"{name}\n{'-' * len(name)}\nContent.", settings=CheckSettings(docstring_convention=DocstringConvention.NUMPY))
@@ -967,7 +955,7 @@ def test_numpy_section_headers_and_entries_inside_code_fences_are_opaque() -> No
 
 @pytest.mark.parametrize(
     ("section", "entry_text", "expected_kind", "expected_names", "expected_type"),
-    (
+    [
         ("Returns", "str", DocstringEntryKind.RETURN, (), "str"),
         ("Yields", "Iterator[int]", DocstringEntryKind.YIELD, (), "Iterator[int]"),
         ("Yield", "Iterator[int]", DocstringEntryKind.YIELD, (), "Iterator[int]"),
@@ -985,7 +973,7 @@ def test_numpy_section_headers_and_entries_inside_code_fences_are_opaque() -> No
         ("Parameter", "value : int", DocstringEntryKind.PARAMETER, ("value",), "int"),
         ("Other Parameter", "value : int", DocstringEntryKind.PARAMETER, ("value",), "int"),
         ("Other Param", "value : int", DocstringEntryKind.PARAMETER, ("value",), "int"),
-    ),
+    ],
 )
 def test_numpy_section_names_determine_entry_semantics(section: str, entry_text: str, expected_kind: DocstringEntryKind, expected_names: tuple[str, ...], expected_type: str | None) -> None:
     structure = structure_for(f"{section}\n{'-' * len(section)}\n{entry_text}\n    Description.", settings=CheckSettings(docstring_convention=DocstringConvention.NUMPY))
@@ -1026,18 +1014,14 @@ def test_numpy_bare_return_without_description_does_not_create_reflow_region() -
 
 @pytest.mark.parametrize(
     ("section", "entry_text", "expected_kind", "expected_names", "expected_type"),
-    (
+    [
         ("Returns", "Mapping[str, Sequence[int]]", DocstringEntryKind.RETURN, (), "Mapping[str, Sequence[int]]"),
         ("Yields", "Iterator[tuple[str, int | None]]", DocstringEntryKind.YIELD, (), "Iterator[tuple[str, int | None]]"),
         ("Raises", "mypkg.errors.CustomError", DocstringEntryKind.EXCEPTION, ("mypkg.errors.CustomError",), None),
-    ),
+    ],
 )
 def test_numpy_return_yield_and_raise_entries_preserve_generic_looking_type_text(
-    section: str,
-    entry_text: str,
-    expected_kind: DocstringEntryKind,
-    expected_names: tuple[str, ...],
-    expected_type: str | None,
+    section: str, entry_text: str, expected_kind: DocstringEntryKind, expected_names: tuple[str, ...], expected_type: str | None
 ) -> None:
     structure = structure_for(f"{section}\n{'-' * len(section)}\n{entry_text}\n    Description.", settings=CheckSettings(docstring_convention=DocstringConvention.NUMPY))
     entry = structure.entries[0]
@@ -1061,7 +1045,7 @@ def test_section_block_contains_header_entries_blanks_and_generic_children() -> 
 
 @pytest.mark.parametrize(
     ("field", "expected_kind", "expected_names"),
-    (
+    [
         (":param value: Description.", DocstringEntryKind.PARAMETER, ("value",)),
         (":key value: Description.", DocstringEntryKind.PARAMETER, ("value",)),
         (":kwarg option: Description.", DocstringEntryKind.PARAMETER, ("option",)),
@@ -1080,7 +1064,7 @@ def test_section_block_contains_header_entries_blanks_and_generic_children() -> 
         (":attribute timeout: Description.", DocstringEntryKind.FIELD, ("timeout",)),
         (":cvartype timeout: float", DocstringEntryKind.FIELD, ("timeout",)),
         (":meta private: Description.", DocstringEntryKind.FIELD, ("private",)),
-    ),
+    ],
 )
 def test_rest_field_aliases_map_to_semantic_entry_kinds(field: str, expected_kind: DocstringEntryKind, expected_names: tuple[str, ...]) -> None:
     structure = structure_for(field, settings=CheckSettings(docstring_convention=DocstringConvention.REST))
@@ -1091,14 +1075,14 @@ def test_rest_field_aliases_map_to_semantic_entry_kinds(field: str, expected_kin
 
 @pytest.mark.parametrize(
     ("field", "expected_names", "expected_type"),
-    (
+    [
         (":param int first: Description.", ("first",), "int"),
         (":param int\tfirst: Description.", ("first",), "int"),
         (":param int first : Description.", ("first",), "int"),
         (":param dict[str, int] options: Description.", ("options",), "dict[str, int]"),
         (":param tuple[str, ...] *args: Description.", ("*args",), "tuple[str, ...]"),
         (":kwarg Mapping[str, object] **kwargs: Description.", ("**kwargs",), "Mapping[str, object]"),
-    ),
+    ],
 )
 def test_typed_rest_parameter_fields_split_type_from_name(field: str, expected_names: tuple[str, ...], expected_type: str) -> None:
     structure = structure_for(field, settings=CheckSettings(docstring_convention=DocstringConvention.REST))
@@ -1108,18 +1092,13 @@ def test_typed_rest_parameter_fields_split_type_from_name(field: str, expected_n
 
 @pytest.mark.parametrize(
     ("field", "expected_kind", "expected_names", "expected_description"),
-    (
+    [
         (":rtype: Mapping[str, Sequence[int]]", DocstringEntryKind.RETURN, (), "Mapping[str, Sequence[int]]"),
         (":ytype: Iterator[tuple[str, int | None]]", DocstringEntryKind.YIELD, (), "Iterator[tuple[str, int | None]]"),
         (":raises mypkg.errors.CustomError: Bad value.", DocstringEntryKind.EXCEPTION, ("mypkg.errors.CustomError",), "Bad value."),
-    ),
+    ],
 )
-def test_rest_return_yield_and_raise_fields_preserve_generic_looking_type_text(
-    field: str,
-    expected_kind: DocstringEntryKind,
-    expected_names: tuple[str, ...],
-    expected_description: str,
-) -> None:
+def test_rest_return_yield_and_raise_fields_preserve_generic_looking_type_text(field: str, expected_kind: DocstringEntryKind, expected_names: tuple[str, ...], expected_description: str) -> None:
     structure = structure_for(field, settings=CheckSettings(docstring_convention=DocstringConvention.REST))
     entry = structure.entries[0]
 
@@ -1128,7 +1107,7 @@ def test_rest_return_yield_and_raise_fields_preserve_generic_looking_type_text(
 
 @pytest.mark.parametrize(
     ("field", "expected_kind"),
-    (
+    [
         ("param", DocstringEntryKind.PARAMETER),
         ("parameter", DocstringEntryKind.PARAMETER),
         ("arg", DocstringEntryKind.PARAMETER),
@@ -1147,7 +1126,7 @@ def test_rest_return_yield_and_raise_fields_preserve_generic_looking_type_text(
         ("except", DocstringEntryKind.EXCEPTION),
         ("exception", DocstringEntryKind.EXCEPTION),
         ("custom", DocstringEntryKind.FIELD),
-    ),
+    ],
 )
 def test_all_rest_field_aliases_are_classified(field: str, expected_kind: DocstringEntryKind) -> None:
     entry = structure_for(f":{field}: Description.", settings=CheckSettings(docstring_convention=DocstringConvention.REST)).entries[0]
@@ -1168,24 +1147,15 @@ def test_rest_field_stops_before_a_peer_list_item() -> None:
     value = ":param value: Description.\n- Peer list item."
     structure = structure_for(value, settings=CheckSettings(docstring_convention=DocstringConvention.REST))
     assert tuple((entry.names, entry.start_line, entry.end_line) for entry in structure.entries) == ((("value",), 0, 1),)
-    assert tuple((block.kind, block.start_line, block.end_line) for block in structure.blocks) == (
-        (DocstringBlockKind.REST_FIELD, 0, 1),
-        (DocstringBlockKind.LIST_ITEM, 1, 2),
-    )
+    assert tuple((block.kind, block.start_line, block.end_line) for block in structure.blocks) == ((DocstringBlockKind.REST_FIELD, 0, 1), (DocstringBlockKind.LIST_ITEM, 1, 2))
 
 
 def test_rest_field_includes_indented_protected_body_without_reflowing_it() -> None:
     value = ":param value:\n    - First choice.\n      Continued choice.\n    - Second choice.\n:returns: Result."
     structure = structure_for(value, settings=CheckSettings(docstring_convention=DocstringConvention.REST))
 
-    assert tuple((entry.names, entry.description, entry.start_line, entry.end_line) for entry in structure.entries) == (
-        (("value",), "", 0, 4),
-        ((), "Result.", 4, 5),
-    )
-    assert tuple((block.kind, block.start_line, block.end_line) for block in structure.blocks) == (
-        (DocstringBlockKind.REST_FIELD, 0, 4),
-        (DocstringBlockKind.REST_FIELD, 4, 5),
-    )
+    assert tuple((entry.names, entry.description, entry.start_line, entry.end_line) for entry in structure.entries) == ((("value",), "", 0, 4), ((), "Result.", 4, 5))
+    assert tuple((block.kind, block.start_line, block.end_line) for block in structure.blocks) == ((DocstringBlockKind.REST_FIELD, 0, 4), (DocstringBlockKind.REST_FIELD, 4, 5))
     assert tuple((region.kind, region.start_line, region.end_line, reflow_texts(region.lines)) for region in structure.reflow_regions) == ((DocstringBlockKind.REST_FIELD, 4, 5, ("Result.",)),)
 
 
@@ -1193,14 +1163,8 @@ def test_rest_field_inline_description_reflow_stops_before_protected_body() -> N
     value = ":param value: Intro text.\n    - First choice.\n      Continued choice.\n    - Second choice.\n:returns: Result."
     structure = structure_for(value, settings=CheckSettings(docstring_convention=DocstringConvention.REST))
 
-    assert tuple((entry.names, entry.description, entry.start_line, entry.end_line) for entry in structure.entries) == (
-        (("value",), "Intro text.", 0, 4),
-        ((), "Result.", 4, 5),
-    )
-    assert tuple((block.kind, block.start_line, block.end_line) for block in structure.blocks) == (
-        (DocstringBlockKind.REST_FIELD, 0, 4),
-        (DocstringBlockKind.REST_FIELD, 4, 5),
-    )
+    assert tuple((entry.names, entry.description, entry.start_line, entry.end_line) for entry in structure.entries) == ((("value",), "Intro text.", 0, 4), ((), "Result.", 4, 5))
+    assert tuple((block.kind, block.start_line, block.end_line) for block in structure.blocks) == ((DocstringBlockKind.REST_FIELD, 0, 4), (DocstringBlockKind.REST_FIELD, 4, 5))
     assert tuple((region.kind, region.start_line, region.end_line, reflow_texts(region.lines)) for region in structure.reflow_regions) == (
         (DocstringBlockKind.REST_FIELD, 0, 1, ("Intro text.",)),
         (DocstringBlockKind.REST_FIELD, 4, 5, ("Result.",)),
@@ -1211,10 +1175,7 @@ def test_rest_fields_are_not_semantic_inside_google_sections() -> None:
     value = "Examples:\n    :param value: Description.\n    - Peer list item."
     structure = structure_for(value, settings=CheckSettings(docstring_convention=DocstringConvention.GOOGLE))
     assert structure.entries == ()
-    assert tuple((child.kind, child.start_line, child.end_line) for child in structure.blocks[0].children) == (
-        (DocstringBlockKind.SECTION_HEADER, 0, 1),
-        (DocstringBlockKind.VERBATIM, 1, 3),
-    )
+    assert tuple((child.kind, child.start_line, child.end_line) for child in structure.blocks[0].children) == ((DocstringBlockKind.SECTION_HEADER, 0, 1), (DocstringBlockKind.VERBATIM, 1, 3))
 
 
 @pytest.mark.parametrize("convention", tuple(DocstringConvention))
@@ -1224,11 +1185,11 @@ def test_structure_records_the_explicit_docstring_convention(convention: Docstri
 
 @pytest.mark.parametrize(
     ("value", "expected_ranges", "expected_regions"),
-    (
+    [
         ("- first\n  continuation\n+ second\n* third", ((0, 2), (2, 3), (3, 4)), (("- ", "  "), ("+ ", "  "), ("* ", "  "))),
         ("1. first\n   continuation\n2) second", ((0, 2), (2, 3)), (("1. ", "   "), ("2) ", "   "))),
         ("\n\t- tabbed\n\t\tcontinuation", ((1, 3),), (("\t- ", " " * 6),)),
-    ),
+    ],
 )
 def test_list_markers_boundaries_and_reflow_prefixes(value: str, expected_ranges: tuple[tuple[int, int], ...], expected_regions: tuple[tuple[str, str], ...]) -> None:
     structure = structure_for(value)
@@ -1255,13 +1216,7 @@ def test_block_quote_depth_and_spacing_split_distinct_reflow_regions() -> None:
 
 
 @pytest.mark.parametrize(
-    ("value", "expected_end"),
-    (
-        ("```python\ncode\n```\nafter", 3),
-        ("````\n```\nstill code\n`````\nafter", 4),
-        ("~~~text\ncode\n```\nstill code\n~~~\nafter", 5),
-        ("```\nunclosed", 2),
-    ),
+    ("value", "expected_end"), [("```python\ncode\n```\nafter", 3), ("````\n```\nstill code\n`````\nafter", 4), ("~~~text\ncode\n```\nstill code\n~~~\nafter", 5), ("```\nunclosed", 2)]
 )
 def test_code_fences_require_compatible_closing_delimiters(value: str, expected_end: int) -> None:
     block = structure_for(value).blocks[0]
@@ -1277,13 +1232,10 @@ def test_doctest_consumes_nonblank_transcript_but_stops_at_blank_line() -> None:
     )
 
 
-@pytest.mark.parametrize("prompt", (">>>> quoted", ">>>>>>> branch"))
+@pytest.mark.parametrize("prompt", [">>>> quoted", ">>>>>>> branch"])
 def test_doctest_prompt_requires_trailing_whitespace(prompt: str) -> None:
     structure = structure_for(f"{prompt}\nfollowing prose")
-    assert tuple((block.kind, block.start_line, block.end_line) for block in structure.blocks) == (
-        (DocstringBlockKind.BLOCK_QUOTE, 0, 1),
-        (DocstringBlockKind.PARAGRAPH, 1, 2),
-    )
+    assert tuple((block.kind, block.start_line, block.end_line) for block in structure.blocks) == ((DocstringBlockKind.BLOCK_QUOTE, 0, 1), (DocstringBlockKind.PARAGRAPH, 1, 2))
     assert DocstringBlockKind.DOCTEST not in block_kinds(structure.blocks)
 
 
@@ -1303,11 +1255,7 @@ def test_literal_block_detection_compares_visual_indentation_with_tabs() -> None
 
 @pytest.mark.parametrize(
     ("value", "expected_end"),
-    (
-        ("| A | B |\n| :--- | ---: |\n| 1 | 2 |\nAfter", 3),
-        ("+---+---+\n| A | B |\n+===+===+\n| 1 | 2 |\n+---+---+\nAfter", 5),
-        ("=== ===\nA   B\n--- ---\n1   2\n\nAfter", 4),
-    ),
+    [("| A | B |\n| :--- | ---: |\n| 1 | 2 |\nAfter", 3), ("+---+---+\n| A | B |\n+===+===+\n| 1 | 2 |\n+---+---+\nAfter", 5), ("=== ===\nA   B\n--- ---\n1   2\n\nAfter", 4)],
 )
 def test_markdown_and_rest_table_variants_are_protected(value: str, expected_end: int) -> None:
     block = structure_for(value).blocks[0]
@@ -1315,13 +1263,7 @@ def test_markdown_and_rest_table_variants_are_protected(value: str, expected_end
 
 
 @pytest.mark.parametrize(
-    ("value", "expected_end"),
-    (
-        ("# ATX heading\nAfter", 1),
-        ("### Deeper heading ###\nAfter", 1),
-        ("Setext heading\n===============\nAfter", 2),
-        ("reST heading\n~~~~~~~~~~~~\nAfter", 2),
-    ),
+    ("value", "expected_end"), [("# ATX heading\nAfter", 1), ("### Deeper heading ###\nAfter", 1), ("Setext heading\n===============\nAfter", 2), ("reST heading\n~~~~~~~~~~~~\nAfter", 2)]
 )
 def test_markdown_and_rest_heading_variants_are_protected(value: str, expected_end: int) -> None:
     block = structure_for(value).blocks[0]
@@ -1330,7 +1272,7 @@ def test_markdown_and_rest_heading_variants_are_protected(value: str, expected_e
 
 @pytest.mark.parametrize(
     ("value", "unexpected_kind"),
-    (
+    [
         ("#Not a heading", DocstringBlockKind.HEADING),
         ("| A | B |\n| -- | --- |", DocstringBlockKind.TABLE),
         (".. note: not a directive", DocstringBlockKind.DIRECTIVE),
@@ -1339,7 +1281,7 @@ def test_markdown_and_rest_heading_variants_are_protected(value: str, expected_e
         (":param missing terminator", DocstringBlockKind.REST_FIELD),
         ("-missing marker space", DocstringBlockKind.LIST_ITEM),
         ("ordinary > embedded quote", DocstringBlockKind.BLOCK_QUOTE),
-    ),
+    ],
 )
 def test_malformed_structures_are_not_overclassified(value: str, unexpected_kind: DocstringBlockKind) -> None:
     assert unexpected_kind not in block_kinds(structure_for(value).blocks)
@@ -1379,7 +1321,7 @@ def test_directives_literal_blocks_and_tables_are_opaque_to_section_entry_parsin
 
 @pytest.mark.parametrize(
     ("settings", "source", "kind"),
-    (
+    [
         (CheckSettings(docstring_parse_list_items=False), "- item", DocstringBlockKind.LIST_ITEM),
         (CheckSettings(docstring_parse_headings=False), "# Heading", DocstringBlockKind.HEADING),
         (CheckSettings(docstring_parse_doctests=False), ">>> call()", DocstringBlockKind.DOCTEST),
@@ -1388,7 +1330,7 @@ def test_directives_literal_blocks_and_tables_are_opaque_to_section_entry_parsin
         (CheckSettings(docstring_parse_tables=False), "| A | B |\n| --- | --- |\n| 1 | 2 |", DocstringBlockKind.TABLE),
         (CheckSettings(docstring_parse_directives=False), ".. note::\n    body", DocstringBlockKind.DIRECTIVE),
         (CheckSettings(docstring_parse_literal_blocks=False), "Example::\n\n    value = 1", DocstringBlockKind.LITERAL_BLOCK),
-    ),
+    ],
 )
 def test_structure_recognizers_can_be_disabled(settings: CheckSettings, source: str, kind: DocstringBlockKind) -> None:
     enabled = PDF.prepare(category_context(f'"""{source}"""\n')).docstrings[0].structure

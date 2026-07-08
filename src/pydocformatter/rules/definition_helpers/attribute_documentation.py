@@ -1,16 +1,23 @@
 """Attribute inventory and documented attribute comparison helpers."""
 
+# Future imports
 from __future__ import annotations
 
+# Standard library imports
 import dataclasses
+from typing import TYPE_CHECKING
 
-import pydocformatter.cli.settings_check as settings_check
-import pydocformatter.rules.definition_helpers.docstring_conventions as docstring_conventions
-import pydocformatter.rules.definition_helpers.missing_documentation as missing_documentation
-import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
-import pydocformatter.rules.models as rule_models
+# First-party imports
 import pydocformatter.rules.violations as rule_violations
-from pydocformatter.rules.definition import RuleContext
+import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
+from pydocformatter.cli import settings_check
+from pydocformatter.rules.definition_helpers import docstring_conventions, missing_documentation
+
+
+if TYPE_CHECKING:
+    # First-party imports
+    import pydocformatter.rules.models as rule_models
+    from pydocformatter.rules.definition import RuleContext
 
 
 @dataclasses.dataclass(frozen=True)
@@ -82,9 +89,7 @@ def documented_attributes(docstring: PDF_definition.DocstringInfo) -> tuple[Docu
             continue
         line = docstring.structure.lines[entry.start_line]
         line_numbers = PDF_definition.docstring_line_numbers(docstring, line)
-        for name in entry.names:
-            if name:
-                attributes.append(DocumentedAttribute(name=name, line_numbers=line_numbers))
+        attributes.extend(DocumentedAttribute(name=name, line_numbers=line_numbers) for name in entry.names if name)
     return tuple(attributes)
 
 
@@ -206,13 +211,7 @@ def is_private_attribute_name(name: str) -> bool:
 
 
 def missing_attribute_violations(
-    data: PDF_definition.PDFCategoryData,
-    *,
-    context: RuleContext,
-    meta: rule_models.RuleMetadata,
-    owner_kind: PDF_definition.DefinitionKind,
-    owner_label: str,
-    include_instance: bool,
+    data: PDF_definition.PDFCategoryData, *, context: RuleContext, meta: rule_models.RuleMetadata, owner_kind: PDF_definition.DefinitionKind, owner_label: str, include_instance: bool
 ) -> tuple[rule_violations.RuleViolation, ...]:
     """Return violations for inventory attributes missing documentation.
 
@@ -241,22 +240,14 @@ def missing_attribute_violations(
             suppression_targets = missing_suppression_targets(data, definition, attribute.name)
             violations.append(
                 rule_violations.diagnostic(
-                    meta,
-                    attribute.line_numbers,
-                    suppression_line_numbers=suppression_targets,
-                    instance_message=f"{owner_label} attribute '{attribute.name}' is missing docstring documentation",
+                    meta, attribute.line_numbers, suppression_line_numbers=suppression_targets, instance_message=f"{owner_label} attribute '{attribute.name}' is missing docstring documentation"
                 )
             )
     return tuple(violations)
 
 
 def extraneous_attribute_violations(
-    data: PDF_definition.PDFCategoryData,
-    *,
-    meta: rule_models.RuleMetadata,
-    owner_kind: PDF_definition.DefinitionKind,
-    owner_label: str,
-    include_instance: bool,
+    data: PDF_definition.PDFCategoryData, *, meta: rule_models.RuleMetadata, owner_kind: PDF_definition.DefinitionKind, owner_label: str, include_instance: bool
 ) -> tuple[rule_violations.RuleViolation, ...]:
     """Return violations for docstring attributes absent from inventory.
 
@@ -283,23 +274,12 @@ def extraneous_attribute_violations(
         for attribute in documented_attributes(docstring):
             if attribute.name in allowed_names:
                 continue
-            violations.append(
-                rule_violations.diagnostic(
-                    meta,
-                    attribute.line_numbers,
-                    instance_message=f"{owner_label} docstring documents attribute '{attribute.name}' that is not present",
-                )
-            )
+            violations.append(rule_violations.diagnostic(meta, attribute.line_numbers, instance_message=f"{owner_label} docstring documents attribute '{attribute.name}' that is not present"))
     return tuple(violations)
 
 
 def duplicate_attribute_violations(
-    data: PDF_definition.PDFCategoryData,
-    *,
-    meta: rule_models.RuleMetadata,
-    owner_kind: PDF_definition.DefinitionKind,
-    owner_label: str,
-    include_instance: bool,
+    data: PDF_definition.PDFCategoryData, *, meta: rule_models.RuleMetadata, owner_kind: PDF_definition.DefinitionKind, owner_label: str, include_instance: bool
 ) -> tuple[rule_violations.RuleViolation, ...]:
     """Return violations for attached docstrings duplicated by owner attribute docs.
 
@@ -349,17 +329,12 @@ def _attached_attribute_docstring_name_pairs(data: PDF_definition.PDFCategoryDat
             continue
         if docstring_owner.parent is not owner:
             continue
-        for name in dict.fromkeys(docstring_owner.targets):
-            pairs.append((name, docstring))
+        pairs.extend((name, docstring) for name in dict.fromkeys(docstring_owner.targets))
     return tuple(pairs)
 
 
 def private_owner_attribute_violations(
-    data: PDF_definition.PDFCategoryData,
-    *,
-    meta: rule_models.RuleMetadata,
-    owner_kind: PDF_definition.DefinitionKind,
-    owner_label: str,
+    data: PDF_definition.PDFCategoryData, *, meta: rule_models.RuleMetadata, owner_kind: PDF_definition.DefinitionKind, owner_label: str
 ) -> tuple[rule_violations.RuleViolation, ...]:
     """Return violations for private attributes documented in owner docstrings.
 
@@ -384,23 +359,12 @@ def private_owner_attribute_violations(
         for attribute in documented_attributes(docstring):
             if not is_private_attribute_name(attribute.name):
                 continue
-            violations.append(
-                rule_violations.diagnostic(
-                    meta,
-                    attribute.line_numbers,
-                    instance_message=f"{owner_label} docstring documents private attribute '{attribute.name}'",
-                )
-            )
+            violations.append(rule_violations.diagnostic(meta, attribute.line_numbers, instance_message=f"{owner_label} docstring documents private attribute '{attribute.name}'"))
     return tuple(violations)
 
 
 def private_attached_attribute_violations(
-    data: PDF_definition.PDFCategoryData,
-    *,
-    meta: rule_models.RuleMetadata,
-    owner_kind: PDF_definition.DefinitionKind,
-    owner_label: str,
-    include_instance: bool,
+    data: PDF_definition.PDFCategoryData, *, meta: rule_models.RuleMetadata, owner_kind: PDF_definition.DefinitionKind, owner_label: str, include_instance: bool
 ) -> tuple[rule_violations.RuleViolation, ...]:
     """Return violations for attached docstrings on private attributes.
 
@@ -428,22 +392,14 @@ def private_attached_attribute_violations(
                 continue
             violations.append(
                 rule_violations.diagnostic(
-                    meta,
-                    PDF_definition.docstring_physical_line_numbers(docstring),
-                    instance_message=f"Private {owner_label.lower()} attribute '{name}' should not have an attached docstring",
+                    meta, PDF_definition.docstring_physical_line_numbers(docstring), instance_message=f"Private {owner_label.lower()} attribute '{name}' should not have an attached docstring"
                 )
             )
     return tuple(violations)
 
 
 def attribute_docstring_must_be_owner_violations(
-    data: PDF_definition.PDFCategoryData,
-    *,
-    meta: rule_models.RuleMetadata,
-    owner_kind: PDF_definition.DefinitionKind,
-    owner_label: str,
-    public: bool,
-    include_instance: bool,
+    data: PDF_definition.PDFCategoryData, *, meta: rule_models.RuleMetadata, owner_kind: PDF_definition.DefinitionKind, owner_label: str, public: bool, include_instance: bool
 ) -> tuple[rule_violations.RuleViolation, ...]:
     """Return violations for attached attribute docstrings that should be owner documentation.
 
@@ -482,13 +438,7 @@ def attribute_docstring_must_be_owner_violations(
 
 
 def attribute_docstring_must_be_attached_violations(
-    data: PDF_definition.PDFCategoryData,
-    *,
-    meta: rule_models.RuleMetadata,
-    owner_kind: PDF_definition.DefinitionKind,
-    owner_label: str,
-    public: bool,
-    include_instance: bool,
+    data: PDF_definition.PDFCategoryData, *, meta: rule_models.RuleMetadata, owner_kind: PDF_definition.DefinitionKind, owner_label: str, public: bool, include_instance: bool
 ) -> tuple[rule_violations.RuleViolation, ...]:
     """Return violations for owner attribute documentation that should be attached docstrings.
 

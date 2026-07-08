@@ -1,12 +1,18 @@
+# Standard library imports
 import enum
 import json
 import pathlib
 import unittest
 
+# Third-party imports
+import pytest
+
+# First-party imports
 import pydocformatter.settings as settings_core
 from pydocformatter.cli.settings_check import SETTINGS_SCHEMA, CheckSettings
 from pydocformatter.rules.definitions.PCF.PCF import CommentKind, CommentPlacement
 from pydocformatter.rules.definitions.PDF.PDF import DefinitionKind, DocstringKind
+
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
@@ -37,21 +43,18 @@ class TestCategoryEnums(unittest.TestCase):
         for enum_type in enum_types:
             with self.subTest(enum_type=enum_type.__name__):
                 member = next(iter(enum_type))
-                self.assertTrue(issubclass(enum_type, enum.Enum))
-                self.assertFalse(issubclass(enum_type, enum.StrEnum))
-                self.assertNotEqual(member, member.value)
-                with self.assertRaises(TypeError):
+                assert issubclass(enum_type, enum.Enum)
+                assert not issubclass(enum_type, enum.StrEnum)
+                assert member != member.value
+                with pytest.raises(TypeError):
                     json.dumps(member)
-                self.assertEqual(json.dumps(member.value), f'"{member.value}"')
+                assert json.dumps(member.value) == f'"{member.value}"'
 
     def test_category_options_table_defaults_match_settings_defaults(self) -> None:
         config = CheckSettings()
         definitions_by_key = {definition.key: definition for definition in SETTINGS_SCHEMA.definitions}
 
-        for relative_path in (
-            "src/pydocformatter/rules/definitions/PCF/PCF.md",
-            "src/pydocformatter/rules/definitions/PDF/PDF.md",
-        ):
+        for relative_path in ("src/pydocformatter/rules/definitions/PCF/PCF.md", "src/pydocformatter/rules/definitions/PDF/PDF.md"):
             for row in _options_table_rows(ROOT / relative_path):
                 setting_key = row["Setting"].strip("`")
                 displayed_default = row["Default"].strip("`")
@@ -60,4 +63,4 @@ class TestCategoryEnums(unittest.TestCase):
                 definition = definitions_by_key[setting_key]
                 expected_default = settings_core.format_value(getattr(config, definition.field), definition.value_type).strip('"')
 
-                self.assertEqual(displayed_default, expected_default)
+                assert displayed_default == expected_default

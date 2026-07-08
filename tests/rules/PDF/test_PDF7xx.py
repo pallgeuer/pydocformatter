@@ -1,22 +1,27 @@
 """Tests for PDF7xx typed docstring entry rules."""
 
+# Future imports
 from __future__ import annotations
 
-import libcst as cst
-import pytest
+# Standard library imports
+from typing import TYPE_CHECKING
 
-import pydocformatter.formatter as formatter
-import pydocformatter.rules.definition_helpers.type_expressions as type_expressions
-import pydocformatter.rules_selection as rules_selection
+# Third-party imports
+import libcst as cst
+
+# First-party imports
+from pydocformatter import formatter, rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention
+from pydocformatter.rules.definition_helpers import type_expressions
+
+
+if TYPE_CHECKING:
+    # Third-party imports
+    import pytest
 
 
 def check(
-    source: str,
-    *,
-    select: tuple[str, ...],
-    convention: DocstringConvention = DocstringConvention.GOOGLE,
-    docstring_class_attribute_no_type_base_classes: tuple[str, ...] | None = None,
+    source: str, *, select: tuple[str, ...], convention: DocstringConvention = DocstringConvention.GOOGLE, docstring_class_attribute_no_type_base_classes: tuple[str, ...] | None = None
 ) -> formatter.FormatterResult:
     """Run pydocformatter on source with PDF7xx-oriented settings."""
     settings = CheckSettings(

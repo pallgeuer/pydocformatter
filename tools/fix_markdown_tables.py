@@ -6,15 +6,18 @@ Attributes:
     SEPARATOR_CELL_RE (re.Pattern[str]): Markdown separator cell pattern used to identify pipe table separator rows.
 """
 
+# Future imports
 from __future__ import annotations
 
-import argparse
-import dataclasses
-import pathlib
+# Standard library imports
 import re
-import subprocess
 import sys
 import typing
+import pathlib
+import argparse
+import subprocess
+import dataclasses
+
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 SEPARATOR_CELL_RE = re.compile(r":?-{3,}:?")
@@ -331,7 +334,7 @@ def _is_table_row(line: str) -> bool:
 
 def _is_indented_code_line(line: str) -> bool:
     """Return whether a line starts as Markdown indented code."""
-    return line.startswith("    ") or line.startswith("\t")
+    return line.startswith(("    ", "\t"))
 
 
 def _is_separator_row(line: str) -> bool:

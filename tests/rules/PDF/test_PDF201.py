@@ -1,15 +1,16 @@
+# Third-party imports
 import libcst as cst
-import libcst.metadata as cst_metadata
 import pytest
+import libcst.metadata as cst_metadata
 
-import pydocformatter.formatter as formatter
-import pydocformatter.rules.definition_helpers.source_text as source_text
-import pydocformatter.rules_selection as rules_selection
-import tests.rule_helpers as rule_helpers
+# First-party imports
+from pydocformatter import formatter, rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, DocstringBlankLineStyle, DocstringConvention, IndentStyle, LineEnding
 from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
+from pydocformatter.rules.definition_helpers import source_text
 from pydocformatter.rules.definitions.PDF.PDF import PDF
 from pydocformatter.rules.definitions.PDF.PDF201_missing_blank_line import PDF201MissingBlankLine
+from tests import rule_helpers
 
 
 def contexts(source: str, *, settings: CheckSettings | None = None) -> tuple[RuleCategoryContext, RuleContext]:
@@ -77,7 +78,7 @@ def test_inserts_blank_line_between_summary_and_recognized_structure() -> None:
 
 @pytest.mark.parametrize(
     "structure_source",
-    (
+    [
         "    # Heading",
         "    >>> call()\n    result",
         "    ```text\n    value\n    ```",
@@ -87,7 +88,7 @@ def test_inserts_blank_line_between_summary_and_recognized_structure() -> None:
         "    Example::\n\n        code",
         "    Accepted values:",
         "        verbatim line",
-    ),
+    ],
 )
 def test_inserts_blank_line_between_summary_and_each_recognized_structure_kind(structure_source: str) -> None:
     source = f'def function():\n    """Summary.\n{structure_source}\n    """\n'
@@ -95,6 +96,7 @@ def test_inserts_blank_line_between_summary_and_each_recognized_structure_kind(s
 
     assert result.new_source == f'def function():\n    """Summary.\n\n{structure_source}\n    """\n'
     assert result.fixed_findings[PDF201MissingBlankLine.meta] == 1
+    assert result.new_source is not None
     assert not format_source(result.new_source).modified
 
 
@@ -140,7 +142,7 @@ def test_existing_whitespace_only_separator_prevents_duplicate_insertion() -> No
     assert not result.unfixed_findings
 
 
-@pytest.mark.parametrize("convention", (DocstringConvention.NONE, DocstringConvention.NUMPY, DocstringConvention.PEP257))
+@pytest.mark.parametrize("convention", [DocstringConvention.NONE, DocstringConvention.NUMPY, DocstringConvention.PEP257])
 def test_google_section_syntax_is_separated_as_colon_header_without_google_convention(convention: DocstringConvention) -> None:
     source = 'def function(value):\n    """Summary.\n    Args:\n        value: Description.\n    """\n'
     settings = CheckSettings(select=("PDF201",), docstring_convention=convention)
@@ -150,7 +152,7 @@ def test_google_section_syntax_is_separated_as_colon_header_without_google_conve
     assert result.fixed_findings[PDF201MissingBlankLine.meta] == 1
 
 
-@pytest.mark.parametrize("convention", (DocstringConvention.NONE, DocstringConvention.PEP257, DocstringConvention.GOOGLE))
+@pytest.mark.parametrize("convention", [DocstringConvention.NONE, DocstringConvention.PEP257, DocstringConvention.GOOGLE])
 def test_numpy_section_syntax_is_separated_as_heading_without_numpy_convention(convention: DocstringConvention) -> None:
     source = 'def function(value):\n    """Summary.\n    Parameters\n    ----------\n    value : int\n        Description.\n    """\n'
     settings = CheckSettings(select=("PDF201",), docstring_convention=convention, docstring_blank_line_after_last_section=True)
@@ -316,10 +318,7 @@ def test_final_section_blank_line_insertion_separates_same_line_closing_quotes()
 def test_aligned_style_controls_final_section_blank_line_source() -> None:
     source = 'def function(value):\n    """Summary.\n\n    Args:\n        value: Description."""\n'
     settings = CheckSettings(
-        select=("PDF201",),
-        docstring_convention=DocstringConvention.GOOGLE,
-        docstring_blank_line_after_last_section=True,
-        docstring_blank_line_style=DocstringBlankLineStyle.ALIGNED,
+        select=("PDF201",), docstring_convention=DocstringConvention.GOOGLE, docstring_blank_line_after_last_section=True, docstring_blank_line_style=DocstringBlankLineStyle.ALIGNED
     )
     result = format_source(source, settings=settings)
 
@@ -398,28 +397,20 @@ def test_pdf100_and_pdf101_converge_with_default_final_section_blank_disabled() 
 
 @pytest.mark.parametrize(
     ("source", "expected"),
-    (
-        (
-            'def function(value):\n    """Summary.\n    Args:\n        value: Description."""\n',
-            'def function(value):\n    """Summary.\n\n    Args:\n        value: Description.\n\n    """\n',
-        ),
+    [
+        ('def function(value):\n    """Summary.\n    Args:\n        value: Description."""\n', 'def function(value):\n    """Summary.\n\n    Args:\n        value: Description.\n\n    """\n'),
         (
             'def function(value):\n    """Summary.\n    Args:\n        value: Description.\n\n\n    """\n',
             'def function(value):\n    """Summary.\n\n    Args:\n        value: Description.\n\n    """\n',
         ),
-        (
-            'def function(value):\n    """Summary.\n    Examples:\n    """\n',
-            'def function(value):\n    """Summary.\n\n    Examples:\n    """\n',
-        ),
-        (
-            'def function(value):\n    """Summary.\n    Examples:\n\n\n    """\n',
-            'def function(value):\n    """Summary.\n\n    Examples:\n    """\n',
-        ),
-    ),
+        ('def function(value):\n    """Summary.\n    Examples:\n    """\n', 'def function(value):\n    """Summary.\n\n    Examples:\n    """\n'),
+        ('def function(value):\n    """Summary.\n    Examples:\n\n\n    """\n', 'def function(value):\n    """Summary.\n\n    Examples:\n    """\n'),
+    ],
 )
 def test_pdf100_and_pdf101_converge_with_configured_final_section_blank_cases(source: str, expected: str) -> None:
     settings = CheckSettings(select=("PDF200", "PDF201"), docstring_convention=DocstringConvention.GOOGLE, docstring_blank_line_after_last_section=True)
     result = format_source(source, settings=settings)
 
     assert result.new_source == expected
+    assert result.new_source is not None
     assert not format_source(result.new_source, settings=settings).modified

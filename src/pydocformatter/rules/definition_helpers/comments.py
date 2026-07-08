@@ -22,17 +22,27 @@ Attributes:
         when extraction would be ambiguous.
 """
 
+# Future imports
 from __future__ import annotations
 
-import ast
-import dataclasses
-import functools
+# Standard library imports
 import re
+import ast
 import textwrap
+import functools
+import dataclasses
+from typing import TYPE_CHECKING
 
-import pydocformatter.rules.definition_helpers.text_layout as text_layout
+# First-party imports
 import pydocformatter.rules.definitions.PCF.PCF as PCF_definition
-from pydocformatter.cli.settings_check import CheckSettings, CommentTaskMarkerMode
+from pydocformatter.cli.settings_check import CommentTaskMarkerMode
+from pydocformatter.rules.definition_helpers import text_layout
+
+
+if TYPE_CHECKING:
+    # First-party imports
+    from pydocformatter.cli.settings_check import CheckSettings
+
 
 DISABLED_CODE_RE = re.compile(r"\s*(?:if|for|while|def|class|try|except|print|return)\b")
 LIST_RE = re.compile(r"^(?P<indent>[ \t]*)(?P<marker>(?:[-+*]|\d+[.)]))[ \t]+(?P<text>\S.*)$")

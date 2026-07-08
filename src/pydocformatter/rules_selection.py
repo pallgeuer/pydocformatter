@@ -1,19 +1,28 @@
 """Rule selection, fixability, and per-file ignores."""
 
+# Future imports
 from __future__ import annotations
 
-import dataclasses
+# Standard library imports
 import os
+import dataclasses
 from collections.abc import Mapping
+from typing import TYPE_CHECKING
 
-import pydocformatter.rules.collection as rule_collection
+# First-party imports
 import pydocformatter.settings as settings_core
-import pydocformatter.utils.misc as misc
-from pydocformatter.cli.settings_check import DEFAULT_REQUIRE_EXPLICIT, CheckSettings
+import pydocformatter.rules.collection as rule_collection
+from pydocformatter.cli.settings_check import DEFAULT_REQUIRE_EXPLICIT
 from pydocformatter.rules.codes import ALL_RULE_SELECTOR_TAG, RuleCode, RuleSelector
 from pydocformatter.rules.collection import RuleCollection
 from pydocformatter.rules.models import FixAvailability, RuleMetadata, RuleSettingEffect
+from pydocformatter.utils import misc
 from pydocformatter.utils.globs import BaseRelativeGlobMatcher
+
+
+if TYPE_CHECKING:
+    # First-party imports
+    from pydocformatter.cli.settings_check import CheckSettings
 
 
 @dataclasses.dataclass(frozen=True)
@@ -76,11 +85,7 @@ class PerFileRuleIgnore:
         negated = self.pattern.startswith("!")
         object.__setattr__(self, "negated", negated)
         pattern = self.pattern[1:] if negated else self.pattern
-        object.__setattr__(
-            self,
-            "matcher",
-            BaseRelativeGlobMatcher.compile((pattern,), base_path=self.base_path, match_parent_segments_for_bare=False),
-        )
+        object.__setattr__(self, "matcher", BaseRelativeGlobMatcher.compile((pattern,), base_path=self.base_path, match_parent_segments_for_bare=False))
 
     def matches(self, path: str) -> bool:
         """Return whether this per-file ignore entry matches a normalized path.
@@ -159,49 +164,19 @@ def select_rules(
 
     errors: list[str] = []
     selected_strengths = _resolve_rule_strengths(
-        _selector_groups(
-            settings,
-            primary_field="select",
-            extension_field="extend_select",
-            field_priorities=field_priorities,
-        ),
-        collection=collection,
-        context="rule selection",
-        errors=errors,
+        _selector_groups(settings, primary_field="select", extension_field="extend_select", field_priorities=field_priorities), collection=collection, context="rule selection", errors=errors
     )
     _resolve_rule_strengths(
-        _skipped_selector_groups(
-            settings,
-            primary_field="select",
-            extension_field="extend_select",
-            field_priorities=field_priorities,
-        ),
-        collection=collection,
-        context="rule selection",
-        errors=errors,
+        _skipped_selector_groups(settings, primary_field="select", extension_field="extend_select", field_priorities=field_priorities), collection=collection, context="rule selection", errors=errors
     )
     ignored_strengths = _resolve_rule_strengths(
-        _selector_groups(
-            settings,
-            primary_field="select",
-            extension_field="ignore",
-            field_priorities=field_priorities,
-            include_primary=False,
-        ),
+        _selector_groups(settings, primary_field="select", extension_field="ignore", field_priorities=field_priorities, include_primary=False),
         collection=collection,
         context="ignored rules",
         errors=errors,
     )
     _resolve_rule_strengths(
-        _skipped_selector_groups(
-            settings,
-            primary_field="select",
-            extension_field="ignore",
-            field_priorities=field_priorities,
-        ),
-        collection=collection,
-        context="ignored rules",
-        errors=errors,
+        _skipped_selector_groups(settings, primary_field="select", extension_field="ignore", field_priorities=field_priorities), collection=collection, context="ignored rules", errors=errors
     )
     enabled_strengths = _resolve_enabled_strengths(selected_strengths, ignored_strengths)
     enabled_strengths = _apply_setting_effects(settings, enabled_strengths=enabled_strengths, collection=collection)
@@ -210,51 +185,27 @@ def select_rules(
     enabled_strengths = _resolve_rule_incompatibilities(enabled_strengths, collection=collection, errors=errors)
 
     fixable_strengths = _resolve_rule_strengths(
-        _selector_groups(
-            settings,
-            primary_field="fixable",
-            extension_field="extend_fixable",
-            field_priorities=field_priorities,
-        ),
+        _selector_groups(settings, primary_field="fixable", extension_field="extend_fixable", field_priorities=field_priorities),
         collection=collection,
         context="fixable rules",
         errors=errors,
         require_available_fix=True,
     )
     _resolve_rule_strengths(
-        _skipped_selector_groups(
-            settings,
-            primary_field="fixable",
-            extension_field="extend_fixable",
-            field_priorities=field_priorities,
-        ),
+        _skipped_selector_groups(settings, primary_field="fixable", extension_field="extend_fixable", field_priorities=field_priorities),
         collection=collection,
         context="fixable rules",
         errors=errors,
         require_available_fix=True,
     )
     unfixable_strengths = _resolve_rule_strengths(
-        _selector_groups(
-            settings,
-            primary_field="fixable",
-            extension_field="unfixable",
-            field_priorities=field_priorities,
-            include_primary=False,
-        ),
+        _selector_groups(settings, primary_field="fixable", extension_field="unfixable", field_priorities=field_priorities, include_primary=False),
         collection=collection,
         context="unfixable rules",
         errors=errors,
     )
     _resolve_rule_strengths(
-        _skipped_selector_groups(
-            settings,
-            primary_field="fixable",
-            extension_field="unfixable",
-            field_priorities=field_priorities,
-        ),
-        collection=collection,
-        context="unfixable rules",
-        errors=errors,
+        _skipped_selector_groups(settings, primary_field="fixable", extension_field="unfixable", field_priorities=field_priorities), collection=collection, context="unfixable rules", errors=errors
     )
     effectively_fixable_codes = _resolve_enabled_strengths(fixable_strengths, unfixable_strengths)
 
@@ -294,24 +245,10 @@ def _apply_setting_effects(settings: CheckSettings, *, enabled_strengths: dict[R
     return effective_strengths
 
 
-def _resolve_require_explicit_codes(
-    settings: CheckSettings,
-    *,
-    collection: RuleCollection,
-    errors: list[str],
-    field_priorities: Mapping[str, int] | None,
-) -> frozenset[RuleCode]:
+def _resolve_require_explicit_codes(settings: CheckSettings, *, collection: RuleCollection, errors: list[str], field_priorities: Mapping[str, int] | None) -> frozenset[RuleCode]:
     """Return rules that broad selectors cannot enable without exact rule-code selection."""
     report_unknown = settings.require_explicit != DEFAULT_REQUIRE_EXPLICIT or _field_priority("require_explicit", field_priorities) > settings_core.DEFAULT_SOURCE_PRIORITY
-    return frozenset(
-        _resolve_rule_specificities(
-            settings.require_explicit,
-            collection=collection,
-            context="require-explicit rules",
-            errors=errors,
-            report_unknown=report_unknown,
-        )
-    )
+    return frozenset(_resolve_rule_specificities(settings.require_explicit, collection=collection, context="require-explicit rules", errors=errors, report_unknown=report_unknown))
 
 
 def _apply_require_explicit(enabled_strengths: dict[RuleCode, _SelectorStrength], *, require_explicit_codes: frozenset[RuleCode]) -> dict[RuleCode, _SelectorStrength]:
@@ -336,14 +273,7 @@ def _resolve_rule_incompatibilities(enabled_strengths: dict[RuleCode, _SelectorS
     return effective_strengths
 
 
-def _selector_groups(
-    settings: CheckSettings,
-    *,
-    primary_field: str,
-    extension_field: str,
-    field_priorities: Mapping[str, int] | None,
-    include_primary: bool = True,
-) -> tuple[_SelectorGroup, ...]:
+def _selector_groups(settings: CheckSettings, *, primary_field: str, extension_field: str, field_priorities: Mapping[str, int] | None, include_primary: bool = True) -> tuple[_SelectorGroup, ...]:
     """Return selector groups that participate in Ruff-style source-priority resolution."""
     primary_priority = _field_priority(primary_field, field_priorities)
     groups: list[_SelectorGroup] = []
@@ -384,13 +314,7 @@ def _resolve_per_file_ignores(settings: CheckSettings, *, collection: RuleCollec
 
 
 def _resolve_rule_specificities(
-    selectors: tuple[str, ...],
-    *,
-    collection: RuleCollection,
-    context: str,
-    errors: list[str],
-    require_available_fix: bool = False,
-    report_unknown: bool = True,
+    selectors: tuple[str, ...], *, collection: RuleCollection, context: str, errors: list[str], require_available_fix: bool = False, report_unknown: bool = True
 ) -> dict[RuleCode, int]:
     """Resolve selectors to rule-code specificities and append nonfatal errors for unusable selectors."""
     strengths = _resolve_rule_strengths(
@@ -405,13 +329,7 @@ def _resolve_rule_specificities(
 
 
 def _resolve_rule_strengths(
-    selector_groups: tuple[_SelectorGroup, ...],
-    *,
-    collection: RuleCollection,
-    context: str,
-    errors: list[str],
-    require_available_fix: bool = False,
-    report_unknown: bool = True,
+    selector_groups: tuple[_SelectorGroup, ...], *, collection: RuleCollection, context: str, errors: list[str], require_available_fix: bool = False, report_unknown: bool = True
 ) -> dict[RuleCode, _SelectorStrength]:
     """Resolve selectors to rule-code source strengths and append nonfatal errors for unusable selectors."""
     rule_strengths: dict[RuleCode, _SelectorStrength] = {}

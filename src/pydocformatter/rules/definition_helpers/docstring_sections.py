@@ -35,9 +35,12 @@ Attributes:
         singular, plural, and synonym spellings.
 """
 
+# Future imports
 from __future__ import annotations
 
-import pydocformatter.cli.settings_check as settings_check
+# First-party imports
+from pydocformatter.cli import settings_check
+
 
 GOOGLE_SECTIONS = {
     "arg",
@@ -171,14 +174,8 @@ NUMPY_SECTION_PLURAL_NAMES = {
     "warn": "Warns",
     "yield": "Yields",
 }
-GOOGLE_SECTION_TERM_NAMES = {
-    "arguments": "Args",
-    "keyword arguments": "Keyword Args",
-    "other arguments": "Other Args",
-}
-NUMPY_SECTION_TERM_NAMES = {
-    "other params": "Other Parameters",
-}
+GOOGLE_SECTION_TERM_NAMES = {"arguments": "Args", "keyword arguments": "Keyword Args", "other arguments": "Other Args"}
+NUMPY_SECTION_TERM_NAMES = {"other params": "Other Parameters"}
 REST_PARAMETER_VALUE_FIELDS = frozenset({"param", "parameter", "arg", "argument", "key", "keyword", "kwarg"})
 REST_PARAMETER_TYPE_FIELDS = frozenset({"type"})
 REST_RETURN_VALUE_FIELDS = frozenset({"return", "returns"})
@@ -295,7 +292,7 @@ def convention_parses_sections(convention: settings_check.DocstringConvention) -
     Returns:
         bool: Whether section-heading parsing is enabled for the convention.
     """
-    return convention in (settings_check.DocstringConvention.GOOGLE, settings_check.DocstringConvention.NUMPY)
+    return convention in {settings_check.DocstringConvention.GOOGLE, settings_check.DocstringConvention.NUMPY}
 
 
 def canonical_section_name(convention: settings_check.DocstringConvention, name: str) -> str | None:

@@ -1,5 +1,5 @@
-import pydocformatter.formatter as formatter
-import pydocformatter.rules_selection as rules_selection
+# First-party imports
+from pydocformatter import formatter, rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention, DocstringMissingDocumentation
 from pydocformatter.rules.definitions.PDF.PDF502_missing_return_documentation import PDF502MissingReturnDocumentation
 
@@ -94,11 +94,7 @@ def test_none_and_pep257_conventions_keep_missing_return_documentation_inert_for
     source = 'def function():\n    """Return a value.\n\n    Returns:\n        int: Value.\n    """\n    return 1\n'
 
     for convention in (DocstringConvention.NONE, DocstringConvention.PEP257):
-        assert_pdf502_lines(
-            source,
-            (),
-            settings=CheckSettings(select=("PDF502",), docstring_convention=convention, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS),
-        )
+        assert_pdf502_lines(source, (), settings=CheckSettings(select=("PDF502",), docstring_convention=convention, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS))
 
 
 def test_parameter_section_does_not_satisfy_meaningful_return() -> None:
@@ -111,11 +107,7 @@ def test_none_and_pep257_conventions_keep_missing_return_documentation_inert_for
     source = 'def function():\n    """Return a value.\n\n    :returns: Value.\n    """\n    return 1\n'
 
     for convention in (DocstringConvention.NONE, DocstringConvention.PEP257):
-        assert_pdf502_lines(
-            source,
-            (),
-            settings=CheckSettings(select=("PDF502",), docstring_convention=convention, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS),
-        )
+        assert_pdf502_lines(source, (), settings=CheckSettings(select=("PDF502",), docstring_convention=convention, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS))
 
 
 def test_ignores_bare_return_return_none_generators_missing_docstrings_abstracts_and_stubs() -> None:

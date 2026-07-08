@@ -1,20 +1,33 @@
-import argparse
-import contextlib
-import dataclasses
+# Future imports
+from __future__ import annotations
+
+# Standard library imports
 import os
-import subprocess
+import argparse
 import tempfile
 import unittest
+import contextlib
+import subprocess
+import dataclasses
 import unittest.mock
+from collections.abc import Callable
 from io import StringIO
 from pathlib import Path
-from typing import Callable
+from typing import TYPE_CHECKING
 
-import pydocformatter.file_selection as file_selection
-import pydocformatter.settings as settings_core
+# Third-party imports
+import pytest
+
+# First-party imports
+from pydocformatter import file_selection
 from pydocformatter.cli.global_args import GlobalArgs
 from pydocformatter.cli.settings_check import SETTINGS_SCHEMA, CheckSettings
 from pydocformatter.file_selection import DecisionReason
+
+
+if TYPE_CHECKING:
+    # First-party imports
+    import pydocformatter.settings as settings_core
 
 
 class TestFileSelection(unittest.TestCase):
@@ -34,25 +47,11 @@ class TestFileSelection(unittest.TestCase):
         return SETTINGS_SCHEMA.resolver(global_values=GlobalArgs(isolated=True), field_overrides=dataclasses.asdict(settings))
 
     @staticmethod
-    def _fake_git_check_ignore_for_root(
-        root: Path,
-        ignored_paths: set[str],
-    ) -> Callable[..., subprocess.CompletedProcess[bytes]]:
+    def _fake_git_check_ignore_for_root(root: Path, ignored_paths: set[str]) -> Callable[..., subprocess.CompletedProcess[bytes]]:
         """Return a fake git check-ignore runner for a temporary root."""
 
-        def fake_run(
-            *args: object,
-            **kwargs: object,
-        ) -> subprocess.CompletedProcess[bytes]:
-            expected_command = [
-                "git",
-                "-C",
-                str(root),
-                "check-ignore",
-                "--stdin",
-                "--no-index",
-                "-z",
-            ]
+        def fake_run(*args: object, **kwargs: object) -> subprocess.CompletedProcess[bytes]:
+            expected_command = ["git", "-C", str(root), "check-ignore", "--stdin", "--no-index", "-z"]
             assert args[0] == expected_command
             stdin_bytes = kwargs["input"]
             assert isinstance(stdin_bytes, bytes)
@@ -77,7 +76,7 @@ class TestFileSelection(unittest.TestCase):
             selection = file_selection.select_files([str(root)], self._resolver(settings))
 
         collected = [Path(decision.path).relative_to(root).as_posix() for decision in selection.decisions]
-        self.assertEqual(collected, ["a.py", "b.py", "a_dir/d.py", "z_dir/c.py"])
+        assert collected == ["a.py", "b.py", "a_dir/d.py", "z_dir/c.py"]
 
     def test_selection_displays_real_explicit_paths_as_absolute(self) -> None:
         settings = CheckSettings(respect_gitignore=False)
@@ -91,8 +90,8 @@ class TestFileSelection(unittest.TestCase):
             finally:
                 os.chdir(previous_cwd)
 
-        self.assertEqual(selection.accepted_paths, (str(root / "a.py"),))
-        self.assertEqual(selection.decisions[0].path, str(root / "a.py"))
+        assert selection.accepted_paths == (str(root / "a.py"),)
+        assert selection.decisions[0].path == str(root / "a.py")
 
     def test_virtual_file_is_not_walked_when_path_exists_as_directory(self) -> None:
         settings = CheckSettings(respect_gitignore=False, force_exclude=True)
@@ -107,8 +106,8 @@ class TestFileSelection(unittest.TestCase):
             finally:
                 os.chdir(previous_cwd)
 
-        self.assertEqual(selection.accepted_paths, (str(root / "pkg.py"),))
-        self.assertEqual([decision.path for decision in selection.decisions], [str(root / "pkg.py")])
+        assert selection.accepted_paths == (str(root / "pkg.py"),)
+        assert [decision.path for decision in selection.decisions] == [str(root / "pkg.py")]
 
     def test_selection_deduplicates_equivalent_paths(self) -> None:
         settings = CheckSettings(respect_gitignore=False)
@@ -123,10 +122,10 @@ class TestFileSelection(unittest.TestCase):
             finally:
                 os.chdir(previous_cwd)
 
-        self.assertEqual(selection.accepted_paths, (str(root / "a.py"),))
-        self.assertEqual(selection.decisions[0].reason, DecisionReason.EXPLICIT_INCLUDED)
-        self.assertEqual(selection.decisions[1].reason, DecisionReason.DUPLICATE)
-        self.assertFalse(selection.decisions[1].accepted)
+        assert selection.accepted_paths == (str(root / "a.py"),)
+        assert selection.decisions[0].reason == DecisionReason.EXPLICIT_INCLUDED
+        assert selection.decisions[1].reason == DecisionReason.DUPLICATE
+        assert not selection.decisions[1].accepted
 
     def test_selection_canonicalizes_lexical_path_aliases(self) -> None:
         settings = CheckSettings(respect_gitignore=False)
@@ -141,9 +140,9 @@ class TestFileSelection(unittest.TestCase):
             finally:
                 os.chdir(previous_cwd)
 
-        self.assertEqual(selection.accepted_paths, (str(root / "a.py"),))
-        self.assertEqual([decision.path for decision in selection.decisions], [str(root / "a.py"), str(root / "a.py")])
-        self.assertEqual(selection.decisions[1].reason, DecisionReason.DUPLICATE)
+        assert selection.accepted_paths == (str(root / "a.py"),)
+        assert [decision.path for decision in selection.decisions] == [str(root / "a.py"), str(root / "a.py")]
+        assert selection.decisions[1].reason == DecisionReason.DUPLICATE
 
     def test_selection_displays_absolute_paths_inside_current_directory_as_absolute(self) -> None:
         settings = CheckSettings(respect_gitignore=False)
@@ -158,8 +157,8 @@ class TestFileSelection(unittest.TestCase):
             finally:
                 os.chdir(previous_cwd)
 
-        self.assertEqual(selection.accepted_paths, (str(target),))
-        self.assertEqual(selection.decisions[0].path, str(target))
+        assert selection.accepted_paths == (str(target),)
+        assert selection.decisions[0].path == str(target)
 
     def test_selection_preserves_absolute_paths_outside_current_directory(self) -> None:
         settings = CheckSettings(respect_gitignore=False)
@@ -170,8 +169,8 @@ class TestFileSelection(unittest.TestCase):
 
             selection = file_selection.select_files([str(target)], self._resolver(settings))
 
-        self.assertEqual(selection.accepted_paths, (str(target),))
-        self.assertEqual(selection.decisions[0].path, str(target))
+        assert selection.accepted_paths == (str(target),)
+        assert selection.decisions[0].path == str(target)
 
     def test_selection_deduplicates_symlink_aliases_by_physical_target(self) -> None:
         settings = CheckSettings(respect_gitignore=False)
@@ -191,18 +190,11 @@ class TestFileSelection(unittest.TestCase):
             finally:
                 os.chdir(previous_cwd)
 
-        self.assertEqual(selection.accepted_paths, (str(root / "a.py"),))
-        self.assertEqual(selection.decisions[1].reason, DecisionReason.DUPLICATE)
+        assert selection.accepted_paths == (str(root / "a.py"),)
+        assert selection.decisions[1].reason == DecisionReason.DUPLICATE
 
-    def test_ruff_spec_explicit_file_bypasses_filters_without_force(
-        self,
-    ) -> None:
-        settings = CheckSettings(
-            respect_gitignore=True,
-            force_exclude=False,
-            include=("*.py",),
-            exclude=("skip.py",),
-        )
+    def test_ruff_spec_explicit_file_bypasses_filters_without_force(self) -> None:
+        settings = CheckSettings(respect_gitignore=True, force_exclude=False, include=("*.py",), exclude=("skip.py",))
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             target = root / "skip.txt"
@@ -210,16 +202,11 @@ class TestFileSelection(unittest.TestCase):
 
             selection = file_selection.select_files([str(target)], self._resolver(settings))
 
-        self.assertEqual(selection.accepted_paths, (str(target),))
-        self.assertEqual(selection.decisions[0].reason, DecisionReason.EXPLICIT_INCLUDED)
+        assert selection.accepted_paths == (str(target),)
+        assert selection.decisions[0].reason == DecisionReason.EXPLICIT_INCLUDED
 
     def test_ruff_spec_force_exclude_filters_explicit_file(self) -> None:
-        settings = CheckSettings(
-            respect_gitignore=False,
-            force_exclude=True,
-            include=("*.py",),
-            exclude=("skip.py",),
-        )
+        settings = CheckSettings(respect_gitignore=False, force_exclude=True, include=("*.py",), exclude=("skip.py",))
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             target = root / "skip.py"
@@ -227,8 +214,8 @@ class TestFileSelection(unittest.TestCase):
 
             selection = file_selection.select_files([str(target)], self._resolver(settings))
 
-        self.assertEqual(selection.accepted_paths, ())
-        self.assertEqual(selection.decisions[0].reason, DecisionReason.EXCLUDED)
+        assert selection.accepted_paths == ()
+        assert selection.decisions[0].reason == DecisionReason.EXCLUDED
 
     def test_ruff_spec_gitignore_can_be_disabled(self) -> None:
         settings = CheckSettings(respect_gitignore=False)
@@ -240,8 +227,8 @@ class TestFileSelection(unittest.TestCase):
             with unittest.mock.patch("pydocformatter.file_selection.subprocess.run") as run_mock:
                 selection = file_selection.select_files([str(root)], self._resolver(settings))
 
-        self.assertFalse(run_mock.called)
-        self.assertEqual(selection.accepted_paths, (str(root / "a.py"),))
+        assert not run_mock.called
+        assert selection.accepted_paths == (str(root / "a.py"),)
 
     def test_ruff_spec_gitignore_filters_discovered_files(self) -> None:
         settings = CheckSettings(respect_gitignore=True)
@@ -251,15 +238,12 @@ class TestFileSelection(unittest.TestCase):
             (root / "keep.py").write_text("", encoding="utf-8")
             (root / "skip.py").write_text("", encoding="utf-8")
 
-            with unittest.mock.patch(
-                "pydocformatter.file_selection.subprocess.run",
-                side_effect=self._fake_git_check_ignore_for_root(root, {"skip.py"}),
-            ):
+            with unittest.mock.patch("pydocformatter.file_selection.subprocess.run", side_effect=self._fake_git_check_ignore_for_root(root, {"skip.py"})):
                 selection = file_selection.select_files([str(root)], self._resolver(settings))
 
         decisions_by_name = {Path(decision.path).name: decision for decision in selection.decisions}
-        self.assertEqual(selection.accepted_paths, (str(root / "keep.py"),))
-        self.assertEqual(decisions_by_name["skip.py"].reason, DecisionReason.GITIGNORED)
+        assert selection.accepted_paths == (str(root / "keep.py"),)
+        assert decisions_by_name["skip.py"].reason == DecisionReason.GITIGNORED
 
     def test_ruff_spec_non_git_directory_does_not_warn(self) -> None:
         settings = CheckSettings(respect_gitignore=True)
@@ -268,15 +252,12 @@ class TestFileSelection(unittest.TestCase):
             (root / "a.py").write_text("", encoding="utf-8")
             stdout = StringIO()
 
-            with (
-                unittest.mock.patch("pydocformatter.file_selection.subprocess.run") as run_mock,
-                contextlib.redirect_stdout(stdout),
-            ):
+            with unittest.mock.patch("pydocformatter.file_selection.subprocess.run") as run_mock, contextlib.redirect_stdout(stdout):
                 selection = file_selection.select_files([str(root)], self._resolver(settings))
 
-        self.assertFalse(run_mock.called)
-        self.assertEqual(stdout.getvalue(), "")
-        self.assertEqual(selection.accepted_paths, (str(root / "a.py"),))
+        assert not run_mock.called
+        assert stdout.getvalue() == ""
+        assert selection.accepted_paths == (str(root / "a.py"),)
 
     def test_ruff_spec_gitignore_check_failure_aborts_file_selection(self) -> None:
         settings = CheckSettings(respect_gitignore=True)
@@ -287,16 +268,8 @@ class TestFileSelection(unittest.TestCase):
             (root / "b.py").write_text("", encoding="utf-8")
 
             with (
-                unittest.mock.patch(
-                    "pydocformatter.file_selection.subprocess.run",
-                    return_value=subprocess.CompletedProcess(
-                        ["git"],
-                        128,
-                        stdout=b"",
-                        stderr=b"fatal: no such command",
-                    ),
-                ),
-                self.assertRaisesRegex(file_selection.FileSelectionError, rf"{root}: Unable to apply gitignore filtering: fatal: no such command"),
+                unittest.mock.patch("pydocformatter.file_selection.subprocess.run", return_value=subprocess.CompletedProcess(["git"], 128, stdout=b"", stderr=b"fatal: no such command")),
+                pytest.raises(file_selection.FileSelectionError, match=rf"{root}: Unable to apply gitignore filtering: fatal: no such command"),
             ):
                 file_selection.select_files([str(root)], self._resolver(settings))
 
@@ -309,28 +282,19 @@ class TestFileSelection(unittest.TestCase):
             keep = root / "src" / "pkg" / "keep.py"
             ignored.write_text("", encoding="utf-8")
             keep.write_text("", encoding="utf-8")
-            (root / "pyproject.toml").write_text(
-                '[tool.pydocfmt]\ninclude = ["*.py"]\n',
-                encoding="utf-8",
-            )
-            (root / "src" / "pkg" / "pyproject.toml").write_text(
-                '[tool.pydocfmt]\ninclude = ["*.py"]\nrespect-gitignore = false\n',
-                encoding="utf-8",
-            )
+            (root / "pyproject.toml").write_text('[tool.pydocfmt]\ninclude = ["*.py"]\n', encoding="utf-8")
+            (root / "src" / "pkg" / "pyproject.toml").write_text('[tool.pydocfmt]\ninclude = ["*.py"]\nrespect-gitignore = false\n', encoding="utf-8")
             previous_cwd = os.getcwd()
             os.chdir(root)
             try:
-                with unittest.mock.patch(
-                    "pydocformatter.file_selection.subprocess.run",
-                    side_effect=self._fake_git_check_ignore_for_root(root, {"src/pkg/ignored.py"}),
-                ):
+                with unittest.mock.patch("pydocformatter.file_selection.subprocess.run", side_effect=self._fake_git_check_ignore_for_root(root, {"src/pkg/ignored.py"})):
                     selection = file_selection.select_files(["."], SETTINGS_SCHEMA.resolver())
             finally:
                 os.chdir(previous_cwd)
 
-        self.assertEqual(selection.accepted_paths, (str(keep),))
+        assert selection.accepted_paths == (str(keep),)
         decisions_by_name = {Path(decision.path).name: decision for decision in selection.decisions}
-        self.assertEqual(decisions_by_name["ignored.py"].reason, DecisionReason.GITIGNORED)
+        assert decisions_by_name["ignored.py"].reason == DecisionReason.GITIGNORED
 
     def test_ruff_spec_disabled_gitignore_from_cwd_ignores_child_config_enabling_it(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -341,14 +305,8 @@ class TestFileSelection(unittest.TestCase):
             keep = root / "src" / "pkg" / "keep.py"
             ignored.write_text("", encoding="utf-8")
             keep.write_text("", encoding="utf-8")
-            (root / "pyproject.toml").write_text(
-                '[tool.pydocfmt]\ninclude = ["*.py"]\nrespect-gitignore = false\n',
-                encoding="utf-8",
-            )
-            (root / "src" / "pkg" / "pyproject.toml").write_text(
-                '[tool.pydocfmt]\ninclude = ["*.py"]\nrespect-gitignore = true\n',
-                encoding="utf-8",
-            )
+            (root / "pyproject.toml").write_text('[tool.pydocfmt]\ninclude = ["*.py"]\nrespect-gitignore = false\n', encoding="utf-8")
+            (root / "src" / "pkg" / "pyproject.toml").write_text('[tool.pydocfmt]\ninclude = ["*.py"]\nrespect-gitignore = true\n', encoding="utf-8")
             previous_cwd = os.getcwd()
             os.chdir(root)
             try:
@@ -357,8 +315,8 @@ class TestFileSelection(unittest.TestCase):
             finally:
                 os.chdir(previous_cwd)
 
-        self.assertFalse(run_mock.called)
-        self.assertEqual(selection.accepted_paths, (str(ignored), str(keep)))
+        assert not run_mock.called
+        assert selection.accepted_paths == (str(ignored), str(keep))
 
     def test_ruff_spec_gitignore_setting_is_not_taken_from_each_positional_directory(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -370,32 +328,20 @@ class TestFileSelection(unittest.TestCase):
             (root / "left" / "keep.py").write_text("", encoding="utf-8")
             (root / "right" / "ignored.py").write_text("", encoding="utf-8")
             (root / "right" / "keep.py").write_text("", encoding="utf-8")
-            (root / "left" / "pyproject.toml").write_text(
-                '[tool.pydocfmt]\ninclude = ["*.py"]\nrespect-gitignore = true\n',
-                encoding="utf-8",
-            )
-            (root / "right" / "pyproject.toml").write_text(
-                '[tool.pydocfmt]\ninclude = ["*.py"]\nrespect-gitignore = false\n',
-                encoding="utf-8",
-            )
+            (root / "left" / "pyproject.toml").write_text('[tool.pydocfmt]\ninclude = ["*.py"]\nrespect-gitignore = true\n', encoding="utf-8")
+            (root / "right" / "pyproject.toml").write_text('[tool.pydocfmt]\ninclude = ["*.py"]\nrespect-gitignore = false\n', encoding="utf-8")
             previous_cwd = os.getcwd()
             os.chdir(root)
             try:
-                with unittest.mock.patch(
-                    "pydocformatter.file_selection.subprocess.run",
-                    side_effect=self._fake_git_check_ignore_for_root(root, {"left/ignored.py", "right/ignored.py"}),
-                ):
+                with unittest.mock.patch("pydocformatter.file_selection.subprocess.run", side_effect=self._fake_git_check_ignore_for_root(root, {"left/ignored.py", "right/ignored.py"})):
                     selection = file_selection.select_files(["left", "right"], SETTINGS_SCHEMA.resolver())
             finally:
                 os.chdir(previous_cwd)
 
-        self.assertEqual(selection.accepted_paths, (str(root / "left" / "keep.py"), str(root / "right" / "keep.py")))
+        assert selection.accepted_paths == (str(root / "left" / "keep.py"), str(root / "right" / "keep.py"))
 
     def test_ruff_spec_slash_patterns_are_not_git_root_relative_for_cwd_based_settings(self) -> None:
-        settings = CheckSettings(
-            respect_gitignore=False,
-            exclude=("src/pkg/*.py",),
-        )
+        settings = CheckSettings(respect_gitignore=False, exclude=("src/pkg/*.py",))
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             self._write_git_marker(root)
@@ -409,8 +355,8 @@ class TestFileSelection(unittest.TestCase):
             finally:
                 os.chdir(previous_cwd)
 
-        self.assertEqual(selection.accepted_paths, (str(target),))
-        self.assertEqual(selection.decisions[0].reason, DecisionReason.INCLUDED)
+        assert selection.accepted_paths == (str(target),)
+        assert selection.decisions[0].reason == DecisionReason.INCLUDED
 
     def test_ruff_spec_auto_config_patterns_are_config_directory_relative(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -418,10 +364,7 @@ class TestFileSelection(unittest.TestCase):
             (root / "src" / "pkg").mkdir(parents=True)
             target = root / "src" / "pkg" / "a.py"
             target.write_text("", encoding="utf-8")
-            (root / "pyproject.toml").write_text(
-                '[tool.pydocfmt]\ninclude = ["*.py"]\nexclude = ["src/pkg/*.py"]\nrespect-gitignore = false\n',
-                encoding="utf-8",
-            )
+            (root / "pyproject.toml").write_text('[tool.pydocfmt]\ninclude = ["*.py"]\nexclude = ["src/pkg/*.py"]\nrespect-gitignore = false\n', encoding="utf-8")
             previous_cwd = os.getcwd()
             os.chdir(root / "src")
             try:
@@ -429,8 +372,8 @@ class TestFileSelection(unittest.TestCase):
             finally:
                 os.chdir(previous_cwd)
 
-        self.assertEqual(selection.accepted_paths, ())
-        self.assertEqual(selection.decisions[0].reason, DecisionReason.EXCLUDED)
+        assert selection.accepted_paths == ()
+        assert selection.decisions[0].reason == DecisionReason.EXCLUDED
 
     def test_ruff_spec_inline_config_patterns_are_current_directory_relative(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -448,8 +391,8 @@ class TestFileSelection(unittest.TestCase):
             finally:
                 os.chdir(previous_cwd)
 
-        self.assertEqual(excluded.accepted_paths, ())
-        self.assertEqual(included.accepted_paths, (str(target),))
+        assert excluded.accepted_paths == ()
+        assert included.accepted_paths == (str(target),)
 
     def test_ruff_spec_explicit_config_file_patterns_are_current_directory_relative(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -485,9 +428,9 @@ class TestFileSelection(unittest.TestCase):
             finally:
                 os.chdir(previous_cwd)
 
-        self.assertEqual(from_repo.accepted_paths, ())
-        self.assertEqual(from_src.accepted_paths, (str(target),))
-        self.assertEqual(changed_pattern.accepted_paths, ())
+        assert from_repo.accepted_paths == ()
+        assert from_src.accepted_paths == (str(target),)
+        assert changed_pattern.accepted_paths == ()
 
     def test_ruff_spec_explicit_config_file_ignores_auto_discovered_config(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -495,10 +438,7 @@ class TestFileSelection(unittest.TestCase):
             config = root / "config" / "pydocfmt.toml"
             (root / "auto_skip.py").write_text("", encoding="utf-8")
             (root / "keep.py").write_text("", encoding="utf-8")
-            (root / "pyproject.toml").write_text(
-                '[tool.pydocfmt]\ninclude = ["*.py"]\nexclude = ["auto_skip.py"]\nrespect-gitignore = false\n',
-                encoding="utf-8",
-            )
+            (root / "pyproject.toml").write_text('[tool.pydocfmt]\ninclude = ["*.py"]\nexclude = ["auto_skip.py"]\nrespect-gitignore = false\n', encoding="utf-8")
             config.parent.mkdir()
             config.write_text('include = ["*.py"]\nrespect-gitignore = false\n', encoding="utf-8")
             previous_cwd = os.getcwd()
@@ -508,7 +448,7 @@ class TestFileSelection(unittest.TestCase):
             finally:
                 os.chdir(previous_cwd)
 
-        self.assertEqual(self._selected_relative_paths(selection, root), ("auto_skip.py", "keep.py"))
+        assert self._selected_relative_paths(selection, root) == ("auto_skip.py", "keep.py")
 
     def test_ruff_spec_multiple_explicit_config_files_are_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -518,7 +458,7 @@ class TestFileSelection(unittest.TestCase):
             config_a.write_text('include = ["*.py"]\n', encoding="utf-8")
             config_b.write_text('include = ["*.py"]\n', encoding="utf-8")
 
-            with self.assertRaisesRegex(ValueError, "Only one --config=PATH"):
+            with pytest.raises(ValueError, match="Only one --config=PATH"):
                 SETTINGS_SCHEMA.resolver(global_values=GlobalArgs(config_options=(str(config_a), str(config_b)))).profile_for_path(str(root))
 
     def test_ruff_spec_cli_exclude_patterns_are_current_directory_relative(self) -> None:
@@ -538,16 +478,11 @@ class TestFileSelection(unittest.TestCase):
             finally:
                 os.chdir(previous_cwd)
 
-        self.assertEqual(excluded.accepted_paths, ())
-        self.assertEqual(included.accepted_paths, (str(target),))
+        assert excluded.accepted_paths == ()
+        assert included.accepted_paths == (str(target),)
 
     def test_ruff_spec_include_pattern_shapes(self) -> None:
-        cases = {
-            "*.py": ("pkg/a.py", "src/pkg/a.py"),
-            "pkg/*.py": ("pkg/a.py",),
-            "src/pkg/*.py": ("src/pkg/a.py",),
-            "*.foo": ("src/pkg/named.foo",),
-        }
+        cases = {"*.py": ("pkg/a.py", "src/pkg/a.py"), "pkg/*.py": ("pkg/a.py",), "src/pkg/*.py": ("src/pkg/a.py",), "*.foo": ("src/pkg/named.foo",)}
         for pattern, expected_paths in cases.items():
             with self.subTest(pattern=pattern), tempfile.TemporaryDirectory() as td:
                 root = Path(td)
@@ -564,15 +499,10 @@ class TestFileSelection(unittest.TestCase):
                 finally:
                     os.chdir(previous_cwd)
 
-                self.assertEqual(self._selected_relative_paths(selection, root), expected_paths)
+                assert self._selected_relative_paths(selection, root) == expected_paths
 
     def test_ruff_spec_directory_shaped_include_patterns(self) -> None:
-        cases = {
-            "src": (),
-            "src/": (),
-            "src/**": ("src/a.py",),
-            "**": ("pyproject.toml", "src/a.py"),
-        }
+        cases = {"src": (), "src/": (), "src/**": ("src/a.py",), "**": ("pyproject.toml", "src/a.py")}
         for pattern, expected_paths in cases.items():
             with self.subTest(pattern=pattern), tempfile.TemporaryDirectory() as td:
                 root = Path(td)
@@ -586,7 +516,7 @@ class TestFileSelection(unittest.TestCase):
                 finally:
                     os.chdir(previous_cwd)
 
-                self.assertEqual(self._selected_relative_paths(selection, root), expected_paths)
+                assert self._selected_relative_paths(selection, root) == expected_paths
 
     def test_ruff_spec_exclude_pattern_shapes(self) -> None:
         cases = {
@@ -613,7 +543,7 @@ class TestFileSelection(unittest.TestCase):
                 finally:
                     os.chdir(previous_cwd)
 
-                self.assertEqual(self._selected_relative_paths(selection, root), expected_paths)
+                assert self._selected_relative_paths(selection, root) == expected_paths
 
     def test_ruff_spec_child_config_overrides_parent_file_exclude_but_not_parent_directory_prune(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -622,14 +552,8 @@ class TestFileSelection(unittest.TestCase):
             package.mkdir(parents=True)
             target = package / "a.py"
             target.write_text("", encoding="utf-8")
-            (package / "pyproject.toml").write_text(
-                '[tool.pydocfmt]\ninclude = ["*.py"]\nrespect-gitignore = false\n',
-                encoding="utf-8",
-            )
-            (root / "pyproject.toml").write_text(
-                '[tool.pydocfmt]\ninclude = ["*.py"]\nexclude = ["src/pkg/*.py"]\nrespect-gitignore = false\n',
-                encoding="utf-8",
-            )
+            (package / "pyproject.toml").write_text('[tool.pydocfmt]\ninclude = ["*.py"]\nrespect-gitignore = false\n', encoding="utf-8")
+            (root / "pyproject.toml").write_text('[tool.pydocfmt]\ninclude = ["*.py"]\nexclude = ["src/pkg/*.py"]\nrespect-gitignore = false\n', encoding="utf-8")
             previous_cwd = os.getcwd()
             os.chdir(root)
             try:
@@ -637,7 +561,7 @@ class TestFileSelection(unittest.TestCase):
             finally:
                 os.chdir(previous_cwd)
 
-        self.assertIn(str(target), selection.accepted_paths)
+        assert str(target) in selection.accepted_paths
 
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
@@ -645,14 +569,8 @@ class TestFileSelection(unittest.TestCase):
             package.mkdir(parents=True)
             target = package / "a.py"
             target.write_text("", encoding="utf-8")
-            (package / "pyproject.toml").write_text(
-                '[tool.pydocfmt]\ninclude = ["*.py"]\nrespect-gitignore = false\n',
-                encoding="utf-8",
-            )
-            (root / "pyproject.toml").write_text(
-                '[tool.pydocfmt]\ninclude = ["*.py"]\nexclude = ["src/pkg"]\nrespect-gitignore = false\n',
-                encoding="utf-8",
-            )
+            (package / "pyproject.toml").write_text('[tool.pydocfmt]\ninclude = ["*.py"]\nrespect-gitignore = false\n', encoding="utf-8")
+            (root / "pyproject.toml").write_text('[tool.pydocfmt]\ninclude = ["*.py"]\nexclude = ["src/pkg"]\nrespect-gitignore = false\n', encoding="utf-8")
             previous_cwd = os.getcwd()
             os.chdir(root)
             try:
@@ -660,14 +578,11 @@ class TestFileSelection(unittest.TestCase):
             finally:
                 os.chdir(previous_cwd)
 
-        self.assertNotIn(str(target), selection.accepted_paths)
-        self.assertIn(DecisionReason.EXCLUDED, {decision.reason for decision in selection.decisions})
+        assert str(target) not in selection.accepted_paths
+        assert DecisionReason.EXCLUDED in {decision.reason for decision in selection.decisions}
 
     def test_ruff_spec_direct_excluded_directory_is_skipped(self) -> None:
-        settings = CheckSettings(
-            respect_gitignore=False,
-            exclude=("src/generated",),
-        )
+        settings = CheckSettings(respect_gitignore=False, exclude=("src/generated",))
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             self._write_git_marker(root)
@@ -681,9 +596,9 @@ class TestFileSelection(unittest.TestCase):
             finally:
                 os.chdir(previous_cwd)
 
-        self.assertEqual(selection.accepted_paths, ())
-        self.assertEqual(selection.decisions[0].path, str(root / "src" / "generated"))
-        self.assertEqual(selection.decisions[0].reason, DecisionReason.EXCLUDED)
+        assert selection.accepted_paths == ()
+        assert selection.decisions[0].path == str(root / "src" / "generated")
+        assert selection.decisions[0].reason == DecisionReason.EXCLUDED
 
     def test_ruff_spec_force_exclude_filters_explicit_directory_by_cli_path(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -691,10 +606,7 @@ class TestFileSelection(unittest.TestCase):
             package = root / "pkg"
             package.mkdir()
             (package / "a.py").write_text("", encoding="utf-8")
-            (package / "pyproject.toml").write_text(
-                '[tool.pydocfmt]\ninclude = ["*.py"]\nexclude = ["pkg"]\nrespect-gitignore = false\nforce-exclude = true\n',
-                encoding="utf-8",
-            )
+            (package / "pyproject.toml").write_text('[tool.pydocfmt]\ninclude = ["*.py"]\nexclude = ["pkg"]\nrespect-gitignore = false\nforce-exclude = true\n', encoding="utf-8")
             previous_cwd = os.getcwd()
             os.chdir(root)
             try:
@@ -702,15 +614,12 @@ class TestFileSelection(unittest.TestCase):
             finally:
                 os.chdir(previous_cwd)
 
-        self.assertEqual(selection.accepted_paths, ())
-        self.assertEqual(selection.decisions[0].path, str(package))
-        self.assertEqual(selection.decisions[0].reason, DecisionReason.EXCLUDED)
+        assert selection.accepted_paths == ()
+        assert selection.decisions[0].path == str(package)
+        assert selection.decisions[0].reason == DecisionReason.EXCLUDED
 
     def test_pruned_excluded_directory_is_reported_as_decision(self) -> None:
-        settings = CheckSettings(
-            respect_gitignore=False,
-            exclude=("generated",),
-        )
+        settings = CheckSettings(respect_gitignore=False, exclude=("generated",))
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             (root / "a.py").write_text("", encoding="utf-8")
@@ -720,18 +629,12 @@ class TestFileSelection(unittest.TestCase):
             selection = file_selection.select_files([str(root)], self._resolver(settings))
 
         decisions_by_name = {Path(decision.path).name: decision for decision in selection.decisions}
-        self.assertEqual(selection.accepted_paths, (str(root / "a.py"),))
-        self.assertEqual(decisions_by_name["generated"].reason, DecisionReason.EXCLUDED)
-        self.assertNotIn("ignored.py", decisions_by_name)
+        assert selection.accepted_paths == (str(root / "a.py"),)
+        assert decisions_by_name["generated"].reason == DecisionReason.EXCLUDED
+        assert "ignored.py" not in decisions_by_name
 
-    def test_ruff_spec_slash_directory_exclude_filters_descendant_file(
-        self,
-    ) -> None:
-        settings = CheckSettings(
-            respect_gitignore=False,
-            force_exclude=True,
-            exclude=("src/generated",),
-        )
+    def test_ruff_spec_slash_directory_exclude_filters_descendant_file(self) -> None:
+        settings = CheckSettings(respect_gitignore=False, force_exclude=True, exclude=("src/generated",))
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             self._write_git_marker(root)
@@ -746,8 +649,8 @@ class TestFileSelection(unittest.TestCase):
             finally:
                 os.chdir(previous_cwd)
 
-        self.assertEqual(selection.accepted_paths, ())
-        self.assertEqual(selection.decisions[0].reason, DecisionReason.EXCLUDED)
+        assert selection.accepted_paths == ()
+        assert selection.decisions[0].reason == DecisionReason.EXCLUDED
 
     def test_gitignore_query_encodes_surrogate_paths(self) -> None:
         settings = CheckSettings(respect_gitignore=True)
@@ -757,35 +660,19 @@ class TestFileSelection(unittest.TestCase):
             surrogate_path = "bad_\udcff.py"
             target = root / surrogate_path
             target.write_text("", encoding="utf-8")
-            expected_command = [
-                "git",
-                "-C",
-                str(root),
-                "check-ignore",
-                "--stdin",
-                "--no-index",
-                "-z",
-            ]
+            expected_command = ["git", "-C", str(root), "check-ignore", "--stdin", "--no-index", "-z"]
 
-            def fake_run(
-                *args: object,
-                **kwargs: object,
-            ) -> subprocess.CompletedProcess[bytes]:
+            def fake_run(*args: object, **kwargs: object) -> subprocess.CompletedProcess[bytes]:
                 assert args[0] == expected_command
                 stdin_bytes = kwargs["input"]
                 assert stdin_bytes == b"bad_\xff.py\0"
-                return subprocess.CompletedProcess(
-                    expected_command,
-                    0,
-                    stdout=b"bad_\xff.py\0",
-                    stderr=b"",
-                )
+                return subprocess.CompletedProcess(expected_command, 0, stdout=b"bad_\xff.py\0", stderr=b"")
 
             with unittest.mock.patch("pydocformatter.file_selection.subprocess.run", side_effect=fake_run):
                 selection = file_selection.select_files([str(root)], self._resolver(settings))
 
-        self.assertEqual(selection.accepted_paths, ())
-        self.assertEqual(selection.decisions[0].reason, DecisionReason.GITIGNORED)
+        assert selection.accepted_paths == ()
+        assert selection.decisions[0].reason == DecisionReason.GITIGNORED
 
     def test_gitignore_query_uses_real_paths_for_symlinked_directory_traversal(self) -> None:
         settings = CheckSettings(respect_gitignore=True)
@@ -802,15 +689,12 @@ class TestFileSelection(unittest.TestCase):
             except OSError as error:
                 self.skipTest(f"symlinks are not available: {error}")
 
-            with unittest.mock.patch(
-                "pydocformatter.file_selection.subprocess.run",
-                side_effect=self._fake_git_check_ignore_for_root(root, {"real/ignored.py"}),
-            ):
+            with unittest.mock.patch("pydocformatter.file_selection.subprocess.run", side_effect=self._fake_git_check_ignore_for_root(root, {"real/ignored.py"})):
                 selection = file_selection.select_files([str(alias)], self._resolver(settings))
 
-        self.assertEqual(selection.accepted_paths, (str(alias / "keep.py"),))
+        assert selection.accepted_paths == (str(alias / "keep.py"),)
         decisions_by_name = {Path(decision.path).name: decision for decision in selection.decisions}
-        self.assertEqual(decisions_by_name["ignored.py"].reason, DecisionReason.GITIGNORED)
+        assert decisions_by_name["ignored.py"].reason == DecisionReason.GITIGNORED
 
 
 if __name__ == "__main__":

@@ -1,5 +1,5 @@
-import pydocformatter.formatter as formatter
-import pydocformatter.rules_selection as rules_selection
+# First-party imports
+from pydocformatter import formatter, rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention
 from pydocformatter.rules.definitions.PDF.PDF408_repeated_section import PDF408RepeatedSection
 
@@ -266,10 +266,7 @@ def test_rest_type_fields_repeat_independently_from_value_fields() -> None:
     assert result.new_source == source
     assert not result.fixed_findings
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((9,), (12,))
-    assert tuple(finding.message for finding in result.unfixed_findings) == (
-        "Docstring field ':rtype:' repeats earlier field ':rtype:'",
-        "Docstring field ':ytype:' repeats earlier field ':ytype:'",
-    )
+    assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring field ':rtype:' repeats earlier field ':rtype:'", "Docstring field ':ytype:' repeats earlier field ':ytype:'")
 
 
 def test_rest_named_attribute_repeats_are_not_reported_by_pdf408() -> None:

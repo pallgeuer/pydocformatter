@@ -1,5 +1,5 @@
-import pydocformatter.formatter as formatter
-import pydocformatter.rules_selection as rules_selection
+# First-party imports
+from pydocformatter import formatter, rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention
 from pydocformatter.rules.definitions.PDF.PDF407_section_order import PDF407SectionOrder
 
@@ -37,10 +37,7 @@ def test_reports_each_google_section_after_highest_preceding_rank() -> None:
     assert result.new_source == source
     assert not result.fixed_findings
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((7,), (10,))
-    assert tuple(finding.message for finding in result.unfixed_findings) == (
-        "Docstring section 'Returns' should appear before 'Raises'",
-        "Docstring section 'Args' should appear before 'Raises'",
-    )
+    assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring section 'Returns' should appear before 'Raises'", "Docstring section 'Args' should appear before 'Raises'")
 
 
 def test_unordered_google_narrative_sections_do_not_affect_order() -> None:

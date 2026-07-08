@@ -1,17 +1,26 @@
 """PDF501 extraneous-parameter-documentation rule."""
 
+# Future imports
 from __future__ import annotations
 
-import pydocformatter.rules.definition_helpers.docstring_conventions as docstring_conventions
-import pydocformatter.rules.definition_helpers.parameter_documentation as parameter_documentation
-import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
-import pydocformatter.rules.registration as rule_registration
+# Standard library imports
+from typing import TYPE_CHECKING
+
+# First-party imports
 import pydocformatter.rules.violations as rule_violations
+import pydocformatter.rules.registration as rule_registration
+import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.codes import RuleCode
-from pydocformatter.rules.definition import RuleBase, RuleContext
+from pydocformatter.rules.definition import RuleBase
+from pydocformatter.rules.definition_helpers import docstring_conventions, parameter_documentation
 from pydocformatter.rules.definitions.PDF.PDF import PDF
 from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
+
+
+if TYPE_CHECKING:
+    # First-party imports
+    from pydocformatter.rules.definition import RuleContext
 
 
 @rule_registration.register_rule_to(PDF)
@@ -74,9 +83,9 @@ class PDF501ExtraneousParameterDocumentation(RuleBase):
                 allowed_names.update(typed_dict_keys_by_name[keyword_parameter.unpack_target_name])
             if suppress_unknown_names:
                 continue
-            for parameter in parameter_documentation.documented_parameters(docstring):
-                if parameter.comparison_name not in allowed_names:
-                    violations.append(
-                        rule_violations.diagnostic(cls.meta, parameter.line_numbers, instance_message=f"Docstring documents parameter '{parameter.name}' that is not in the function signature")
-                    )
+            violations.extend(
+                rule_violations.diagnostic(cls.meta, parameter.line_numbers, instance_message=f"Docstring documents parameter '{parameter.name}' that is not in the function signature")
+                for parameter in parameter_documentation.documented_parameters(docstring)
+                if parameter.comparison_name not in allowed_names
+            )
         return tuple(violations)

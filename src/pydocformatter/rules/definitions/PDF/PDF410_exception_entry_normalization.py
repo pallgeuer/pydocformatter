@@ -1,17 +1,26 @@
 """PDF410 exception-entry-normalization rule."""
 
+# Future imports
 from __future__ import annotations
 
-import pydocformatter.rules.definition_helpers.docstring_conventions as docstring_conventions
-import pydocformatter.rules.definition_helpers.section_edits as section_edits
-import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
-import pydocformatter.rules.edits as rule_edits
+# Standard library imports
+from typing import TYPE_CHECKING
+
+# First-party imports
 import pydocformatter.rules.registration as rule_registration
-import pydocformatter.rules.violations as rule_violations
+import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.codes import RuleCode
-from pydocformatter.rules.definition import RuleBase, RuleContext
+from pydocformatter.rules.definition import RuleBase
+from pydocformatter.rules.definition_helpers import docstring_conventions, section_edits
 from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
+
+
+if TYPE_CHECKING:
+    # First-party imports
+    import pydocformatter.rules.edits as rule_edits
+    import pydocformatter.rules.violations as rule_violations
+    from pydocformatter.rules.definition import RuleContext
 
 
 @rule_registration.register_rule_to(PDF_definition.PDF)
@@ -121,7 +130,7 @@ def _canonical_google_exception_entry_line(text: str, entry: PDF_definition.Docs
     description = match.group("description").strip()
     if description == ":" and text.rstrip().endswith("::"):
         return None
-    return f'{match.group("indent")}{", ".join(entry.names)}:{f" {description}" if description else ""}'
+    return f"{match.group('indent')}{', '.join(entry.names)}:{f' {description}' if description else ''}"
 
 
 def _canonical_numpy_exception_entry_line(text: str, entry: PDF_definition.DocstringEntry) -> str | None:
@@ -129,9 +138,9 @@ def _canonical_numpy_exception_entry_line(text: str, entry: PDF_definition.Docst
     exception_match = PDF_definition._NUMPY_EXCEPTION_ENTRY_RE.match(text)
     if exception_match is not None:
         description = exception_match.group("description").strip()
-        return f'{exception_match.group("indent")}{", ".join(entry.names)}:{f" {description}" if description else ""}'
+        return f"{exception_match.group('indent')}{', '.join(entry.names)}:{f' {description}' if description else ''}"
     indent = text[: len(text) - len(text.lstrip(" \t"))]
-    return f'{indent}{", ".join(entry.names)}'
+    return f"{indent}{', '.join(entry.names)}"
 
 
 def _canonical_rest_exception_entry_line(text: str, entry: PDF_definition.DocstringEntry) -> str | None:
@@ -140,4 +149,4 @@ def _canonical_rest_exception_entry_line(text: str, entry: PDF_definition.Docstr
     if match is None or entry.field_name is None:
         return None
     description = match.group("description").strip()
-    return f'{match.group("indent")}:{match.group("field")} {", ".join(entry.names)}:{f" {description}" if description else ""}'
+    return f"{match.group('indent')}:{match.group('field')} {', '.join(entry.names)}:{f' {description}' if description else ''}"

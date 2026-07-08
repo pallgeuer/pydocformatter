@@ -1,23 +1,35 @@
-"""Base classes and execution contexts for rules."""
+"""Base classes and execution contexts for rules.
 
+Attributes:
+    CategoryDataT (TypeVar): Prepared category data type returned by a concrete rule category.
+"""
+
+# Future imports
 from __future__ import annotations
 
-import dataclasses
+# Standard library imports
 import inspect
+import dataclasses
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar, Generic, TypeVar, cast
 
+# Third-party imports
 import libcst as cst
 import libcst.metadata as cst_metadata
 
-import pydocformatter.rules.definition_helpers.source_text as source_text
-import pydocformatter.utils.misc as misc
-from pydocformatter.rules.codes import RuleCode
+# First-party imports
+from pydocformatter.cli.settings_check import CheckSettings
+from pydocformatter.rules.definition_helpers import source_text
 from pydocformatter.rules.models import RuleCategoryMetadata, RuleCheckKind, RuleMetadata
-from pydocformatter.rules.violations import RuleViolation
+from pydocformatter.utils import misc
+
 
 if TYPE_CHECKING:
-    from pydocformatter.cli.settings_check import CheckSettings
+    # First-party imports
+    from pydocformatter.rules.codes import RuleCode
+    from pydocformatter.rules.violations import RuleViolation
+
+CategoryDataT = TypeVar("CategoryDataT")
 
 
 @dataclasses.dataclass(frozen=True)
@@ -121,7 +133,7 @@ def _validate_violations_hook(rule_class: type[RuleBase], hook: object) -> None:
         raise TypeError(f"{rule_class.__name__}.violations must be a @classmethod accepting context")
     if not callable(hook.__func__):
         raise TypeError(f"{rule_class.__name__}.violations must be callable")
-    bound_hook = hook.__get__(None, rule_class)
+    bound_hook = cast("Any", hook).__get__(None, rule_class)
     if not callable(bound_hook):
         raise TypeError(f"{rule_class.__name__}.violations must be callable")
     try:
@@ -138,7 +150,7 @@ def _validate_violations_hook(rule_class: type[RuleBase], hook: object) -> None:
         raise TypeError(f"{rule_class.__name__}.violations must accept exactly one required positional argument named context")
 
 
-class RuleCategoryBase:
+class RuleCategoryBase(Generic[CategoryDataT]):
     """Base class for pydocformatter rule categories.
 
     Attributes:
@@ -184,14 +196,14 @@ class RuleCategoryBase:
         return dict(sorted(cls.code_class_map.items()))
 
     @classmethod
-    def prepare(cls, context: RuleCategoryContext) -> object | None:
+    def prepare(cls, context: RuleCategoryContext) -> CategoryDataT | None:
         """Return optional read-only data shared by this category's rules for one module.
 
         Args:
             context (RuleCategoryContext): Parsed module, source text, settings, and category-selected rule classes.
 
         Returns:
-            object | None: Category-specific prepared data, or None when the category has no shared preparation.
+            CategoryDataT | None: Category-specific prepared data, or None when the category has no shared preparation.
         """
         del context
         return None

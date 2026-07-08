@@ -1,21 +1,30 @@
 """PDF101 docstring-reflow rule."""
 
+# Future imports
 from __future__ import annotations
 
+# Standard library imports
 import dataclasses
 from collections.abc import Sequence
+from typing import TYPE_CHECKING
 
+# Third-party imports
 import libcst as cst
 
-import pydocformatter.rules.definition_helpers.string_literals as string_literals
-import pydocformatter.rules.definition_helpers.text_layout as text_layout
-import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
+# First-party imports
 import pydocformatter.rules.edits as rule_edits
-import pydocformatter.rules.registration as rule_registration
 import pydocformatter.rules.violations as rule_violations
+import pydocformatter.rules.registration as rule_registration
+import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 from pydocformatter.rules.codes import RuleCode
-from pydocformatter.rules.definition import RuleBase, RuleContext
+from pydocformatter.rules.definition import RuleBase
+from pydocformatter.rules.definition_helpers import string_literals, text_layout
 from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata
+
+
+if TYPE_CHECKING:
+    # First-party imports
+    from pydocformatter.rules.definition import RuleContext
 
 
 @rule_registration.register_rule_to(PDF_definition.PDF)
@@ -95,7 +104,7 @@ def _docstring_violation(docstring: PDF_definition.DocstringInfo, *, context: Ru
 
     value = docstring.value
     for replacement in reversed(replacements):
-        value = f"{value[: replacement.start_offset]}{replacement.value_text}{value[replacement.end_offset:]}"
+        value = f"{value[: replacement.start_offset]}{replacement.value_text}{value[replacement.end_offset :]}"
     line_numbers = tuple(sorted({line_number for replacement in replacements for line_number in replacement.line_numbers}))
     change = _planned_change_from_replacements(docstring, replacements, fragments=fragments, value=value, source_is_value=source_is_value) if fragments is not None or source_is_value else None
     return rule_violations.violation_for_optional_planned_source_change(PDF101DocstringReflow.meta, change, line_numbers=line_numbers)
@@ -122,7 +131,6 @@ def _replacement_for_region(
     width = min(initial_width, subsequent_width)
     if _should_split_google_entry_prefix(region, width=width, tab_width=context.settings.indent_width):
         wrapped = _wrapped_region_lines(
-            docstring,
             region,
             initial_width=subsequent_width,
             subsequent_width=subsequent_width,
@@ -145,7 +153,6 @@ def _replacement_for_region(
             line_ending=context.line_ending,
         )
     wrapped = _wrapped_region_lines(
-        docstring,
         region,
         initial_width=initial_width,
         subsequent_width=subsequent_width,
@@ -159,14 +166,7 @@ def _replacement_for_region(
     )
     if not wrapped:
         return None
-    return _render_region_replacement(
-        docstring,
-        region,
-        wrapped=wrapped,
-        source_line_numbers=source_line_numbers,
-        fallback_prefix=fallback_prefix,
-        line_ending=context.line_ending,
-    )
+    return _render_region_replacement(docstring, region, wrapped=wrapped, source_line_numbers=source_line_numbers, fallback_prefix=fallback_prefix, line_ending=context.line_ending)
 
 
 def _opening_delimiter_width(docstring: PDF_definition.DocstringInfo, region: PDF_definition.ReflowRegion, *, context: RuleContext) -> int:
@@ -207,7 +207,6 @@ def _source_line_numbers_for_region(docstring: PDF_definition.DocstringInfo, reg
 
 
 def _wrapped_region_lines(
-    docstring: PDF_definition.DocstringInfo,
     region: PDF_definition.ReflowRegion,
     *,
     initial_width: int,
@@ -238,11 +237,7 @@ def _wrapped_region_lines(
             tuple(
                 word
                 for line in region.lines
-                for word in string_literals.source_words_for_value_slice(
-                    tuple(string_literals.StringValueFragment(value=char, source=char) for char in line.text),
-                    0,
-                    len(line.text),
-                )
+                for word in string_literals.source_words_for_value_slice(tuple(string_literals.StringValueFragment(value=char, source=char) for char in line.text), 0, len(line.text))
             ),
             width=max(1, min(initial_width, subsequent_width)),
             initial_indent=initial_indent,
@@ -292,21 +287,12 @@ def _render_region_replacement(
     value_lines = [_raw_generated_line(docstring, region.start_line, line.value, first_generated_line=index == 0, fallback_prefix=fallback_prefix) for index, line in enumerate(wrapped)]
     source_lines = [_raw_generated_line(docstring, region.start_line, line.source, first_generated_line=index == 0, fallback_prefix=fallback_prefix) for index, line in enumerate(wrapped)]
     return _RegionReplacement(
-        start_offset=region.start_offset,
-        end_offset=region.end_offset,
-        value_text="\n".join(value_lines),
-        source_text=line_ending.join(source_lines),
-        line_numbers=source_line_numbers,
+        start_offset=region.start_offset, end_offset=region.end_offset, value_text="\n".join(value_lines), source_text=line_ending.join(source_lines), line_numbers=source_line_numbers
     )
 
 
 def _planned_change_from_replacements(
-    docstring: PDF_definition.DocstringInfo,
-    replacements: list[_RegionReplacement],
-    *,
-    fragments: tuple[string_literals.StringValueFragment, ...] | None,
-    value: str,
-    source_is_value: bool,
+    docstring: PDF_definition.DocstringInfo, replacements: list[_RegionReplacement], *, fragments: tuple[string_literals.StringValueFragment, ...] | None, value: str, source_is_value: bool
 ) -> rule_edits.PlannedSourceChange | None:
     """Return a source edit after applying source-preserving replacements."""
     if not isinstance(docstring.node, cst.SimpleString):
@@ -314,10 +300,10 @@ def _planned_change_from_replacements(
     source_chunks: list[str] = []
     cursor = 0
     for replacement in sorted(replacements, key=lambda item: item.start_offset):
-        source_chunks.append(
-            docstring.value[cursor : replacement.start_offset] if source_is_value else string_literals.source_for_value_slice(_require_fragments(fragments), cursor, replacement.start_offset)
-        )
-        source_chunks.append(replacement.source_text)
+        source_chunks.extend((
+            docstring.value[cursor : replacement.start_offset] if source_is_value else string_literals.source_for_value_slice(_require_fragments(fragments), cursor, replacement.start_offset),
+            replacement.source_text,
+        ))
         cursor = replacement.end_offset
     source_chunks.append(docstring.value[cursor:] if source_is_value else string_literals.source_for_value_slice(_require_fragments(fragments), cursor, len(_require_fragments(fragments))))
     rendered = string_literals.render_simple_string_from_body_source(docstring.node.prefix, docstring.node.quote, "".join(source_chunks), expected_value=value)
@@ -340,6 +326,8 @@ def _source_body_is_value(docstring: PDF_definition.DocstringInfo) -> bool:
     if not isinstance(docstring.node, cst.SimpleString):
         return False
     body_source = string_literals.simple_string_body_source(docstring.node)
+    if body_source is None:
+        return False
     return body_source == docstring.value and ("r" in docstring.node.prefix.lower() or "\\" not in body_source)
 
 
@@ -374,7 +362,7 @@ def _raw_generated_line(docstring: PDF_definition.DocstringInfo, line_index: int
             return f"{fallback_prefix}{generated_text}"
     if not generated_text.startswith(margin_line.text_indent):
         return f"{fallback_prefix}{generated_text}"
-    return f"{margin_line.raw_indent}{generated_text[len(margin_line.text_indent):]}"
+    return f"{margin_line.raw_indent}{generated_text[len(margin_line.text_indent) :]}"
 
 
 def _fallback_line_prefix(source_lines: Sequence[str], *, docstring: PDF_definition.DocstringInfo, context: RuleContext) -> str:

@@ -1,12 +1,21 @@
-import pytest
+# Future imports
+from __future__ import annotations
 
-import pydocformatter.formatter as formatter
+# Standard library imports
+from typing import TYPE_CHECKING
+
+# First-party imports
 import pydocformatter.rules.definitions.PDF.PDF411_type_like_token_spacing_normalization as PDF411_definition
-import pydocformatter.rules_selection as rules_selection
+from pydocformatter import formatter, rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention
 from pydocformatter.rules.definitions.PDF.PDF409_docstring_entry_spacing import PDF409DocstringEntrySpacing
 from pydocformatter.rules.definitions.PDF.PDF410_exception_entry_normalization import PDF410ExceptionEntryNormalization
 from pydocformatter.rules.definitions.PDF.PDF411_type_like_token_spacing_normalization import PDF411TypeLikeTokenSpacingNormalization
+
+
+if TYPE_CHECKING:
+    # Third-party imports
+    import pytest
 
 
 def format_source(source: str, *, settings: CheckSettings | None = None) -> formatter.FormatterResult:

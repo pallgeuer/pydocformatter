@@ -7,25 +7,30 @@ Attributes:
     TypedDocstringTypeSource (TypeAlias): Docstring type spelling and its source location.
 """
 
+# Future imports
 from __future__ import annotations
 
+# Standard library imports
+import typing
+import operator
 import collections
 import dataclasses
-import typing
 
+# Third-party imports
 import libcst as cst
 
-import pydocformatter.rules.definition_helpers.attribute_documentation as attribute_documentation
-import pydocformatter.rules.definition_helpers.docstring_sections as docstring_sections
-import pydocformatter.rules.definition_helpers.parameter_documentation as parameter_documentation
-import pydocformatter.rules.definition_helpers.static_names as static_names
-import pydocformatter.rules.definition_helpers.type_expressions as type_expressions
-import pydocformatter.rules.definition_helpers.typed_documentation_models as typed_models
-import pydocformatter.rules.definition_helpers.value_documentation as value_documentation
-import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
+# First-party imports
 import pydocformatter.rules.violations as rule_violations
-from pydocformatter.rules.definition import RuleContext
-from pydocformatter.rules.models import RuleMetadata
+import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
+import pydocformatter.rules.definition_helpers.typed_documentation_models as typed_models
+from pydocformatter.rules.definition_helpers import attribute_documentation, docstring_sections, parameter_documentation, static_names, type_expressions, value_documentation
+
+
+if typing.TYPE_CHECKING:
+    # First-party imports
+    from pydocformatter.rules.definition import RuleContext
+    from pydocformatter.rules.models import RuleMetadata
+
 
 _YIELD_CONTAINER_NAMES = (
     "typing.Generator",
@@ -255,17 +260,15 @@ def _attribute_targets(context: RuleContext, *, owner_kind: PDF_definition.Defin
             attribute.name: _attribute_annotation_text(attribute.info, context=context)
             for attribute in attribute_documentation.inventory_attributes(data, definition, include_instance=include_instance)
         }
-        for entry in _logical_entries(docstring, PDF_definition.DocstringEntryKind.ATTRIBUTE):
-            if entry.name is not None and entry.name in annotations:
-                targets.append(TypedDocumentationTarget(name=entry.name, entry=entry, annotation_text=annotations[entry.name], owner=definition))
+        targets.extend(
+            TypedDocumentationTarget(name=entry.name, entry=entry, annotation_text=annotations[entry.name], owner=definition)
+            for entry in _logical_entries(docstring, PDF_definition.DocstringEntryKind.ATTRIBUTE)
+            if entry.name is not None and entry.name in annotations
+        )
     return tuple(targets)
 
 
-def _cached_targets(
-    context: RuleContext,
-    subject: TypedDocumentationSubject,
-    collector: typing.Callable[[], tuple[TypedDocumentationTarget, ...]],
-) -> tuple[TypedDocumentationTarget, ...]:
+def _cached_targets(context: RuleContext, subject: TypedDocumentationSubject, collector: typing.Callable[[], tuple[TypedDocumentationTarget, ...]]) -> tuple[TypedDocumentationTarget, ...]:
     """Return cached typed documentation targets for one subject."""
     data = PDF_definition.PDF.require_data(context)
     cached_targets = data._typed_documentation_targets
@@ -321,8 +324,9 @@ def _collect_return_targets(context: RuleContext) -> tuple[TypedDocumentationTar
         if facts.any_yields:
             continue
         annotation_text = _annotation_text(definition.returns, context=context)
-        for entry in _logical_entries(docstring, PDF_definition.DocstringEntryKind.RETURN):
-            targets.append(TypedDocumentationTarget(name="return", entry=entry, annotation_text=annotation_text, owner=definition))
+        targets.extend(
+            TypedDocumentationTarget(name="return", entry=entry, annotation_text=annotation_text, owner=definition) for entry in _logical_entries(docstring, PDF_definition.DocstringEntryKind.RETURN)
+        )
     return tuple(targets)
 
 
@@ -333,8 +337,9 @@ def _collect_yield_targets(context: RuleContext) -> tuple[TypedDocumentationTarg
         if not facts.any_yields:
             continue
         annotation_text = _yield_annotation_text(definition.returns, context=context)
-        for entry in _logical_entries(docstring, PDF_definition.DocstringEntryKind.YIELD):
-            targets.append(TypedDocumentationTarget(name="yield", entry=entry, annotation_text=annotation_text, owner=definition))
+        targets.extend(
+            TypedDocumentationTarget(name="yield", entry=entry, annotation_text=annotation_text, owner=definition) for entry in _logical_entries(docstring, PDF_definition.DocstringEntryKind.YIELD)
+        )
     return tuple(targets)
 
 
@@ -368,16 +373,11 @@ def _logical_entries(docstring: PDF_definition.DocstringInfo, kind: PDF_definiti
         type_part = queued_type_parts.popleft() if queued_type_parts else None
         if type_part is not None:
             used_type_parts.add(id(type_part))
-        logical.append(
-            (
-                value_part.order,
-                _merged_rest_entry(docstring, name=value_part.name, value_entry=value_part.entry, type_entry=type_part.entry if type_part is not None else None),
-            )
-        )
-    for type_part in type_parts:
-        if id(type_part) not in used_type_parts:
-            logical.append((type_part.order, _merged_rest_entry(docstring, name=type_part.name, value_entry=None, type_entry=type_part.entry)))
-    return tuple(entry for _, entry in sorted(logical, key=lambda item: item[0]))
+        logical.append((value_part.order, _merged_rest_entry(docstring, name=value_part.name, value_entry=value_part.entry, type_entry=type_part.entry if type_part is not None else None)))
+    logical.extend(
+        (type_part.order, _merged_rest_entry(docstring, name=type_part.name, value_entry=None, type_entry=type_part.entry)) for type_part in type_parts if id(type_part) not in used_type_parts
+    )
+    return tuple(entry for _, entry in sorted(logical, key=operator.itemgetter(0)))
 
 
 def _entries_from_raw(docstring: PDF_definition.DocstringInfo, entry: PDF_definition.DocstringEntry) -> tuple[TypedDocstringEntry, ...]:
@@ -389,35 +389,24 @@ def _entries_from_raw(docstring: PDF_definition.DocstringInfo, entry: PDF_defini
 
 
 def _merged_rest_entry(
-    docstring: PDF_definition.DocstringInfo,
-    *,
-    name: str | None,
-    value_entry: PDF_definition.DocstringEntry | None,
-    type_entry: PDF_definition.DocstringEntry | None,
+    docstring: PDF_definition.DocstringInfo, *, name: str | None, value_entry: PDF_definition.DocstringEntry | None, type_entry: PDF_definition.DocstringEntry | None
 ) -> TypedDocstringEntry:
     """Return a logical reST entry from value and type fields."""
     source_entry = value_entry or type_entry
-    assert source_entry is not None
+    if source_entry is None:
+        raise ValueError("A reStructuredText logical entry requires a value or type field")
     source_line_numbers = _entry_line_numbers(docstring, source_entry)
     type_sources = (
         *(() if value_entry is None else _type_sources(docstring, value_entry, fallback_line_numbers=source_line_numbers)),
-        *((() if type_entry is None else _type_sources(docstring, type_entry, fallback_line_numbers=_entry_line_numbers(docstring, type_entry)))),
+        *(() if type_entry is None else _type_sources(docstring, type_entry, fallback_line_numbers=_entry_line_numbers(docstring, type_entry))),
     )
-    return TypedDocstringEntry(
-        name=name,
-        type_sources=type_sources,
-        description=value_entry.description if value_entry is not None else "",
-        line_numbers=source_line_numbers,
-    )
+    return TypedDocstringEntry(name=name, type_sources=type_sources, description=value_entry.description if value_entry is not None else "", line_numbers=source_line_numbers)
 
 
 def _type_sources(docstring: PDF_definition.DocstringInfo, entry: PDF_definition.DocstringEntry, *, fallback_line_numbers: tuple[int, ...]) -> tuple[TypedDocstringTypeSource, ...]:
     """Return concrete type spellings supplied by one parsed entry."""
     text: str | None
-    if entry.field_name in docstring_sections.REST_TYPE_DESCRIPTION_FIELDS:
-        text = entry.description.strip()
-    else:
-        text = entry.type_text
+    text = entry.description.strip() if entry.field_name in docstring_sections.REST_TYPE_DESCRIPTION_FIELDS else entry.type_text
     if text is None or not text.strip():
         return ()
     return (

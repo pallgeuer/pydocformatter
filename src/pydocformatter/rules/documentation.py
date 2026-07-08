@@ -1,27 +1,28 @@
-"""Rule Markdown documentation parsing.
+"""Rule Markdown documentation parsing."""
 
-Attributes:
-    TEMPLATE_PATH (pathlib.Path): Rule documentation template used by tests and docs tooling to validate individual
-        Markdown files.
-    CATEGORY_TEMPLATE_PATH (pathlib.Path): Category documentation template used to keep prefix-level Markdown files
-        structurally consistent.
-"""
-
+# Future imports
 from __future__ import annotations
 
-import dataclasses
-import importlib.resources
+# Standard library imports
+import re
 import inspect
 import pathlib
-import re
 import tomllib
+import dataclasses
+import importlib.resources
+from typing import TYPE_CHECKING
 
+# First-party imports
 from pydocformatter.rules.codes import RuleCode
-from pydocformatter.rules.collection import RuleCollection
-from pydocformatter.rules.models import FixAvailability, RuleCategoryMetadata, RuleMetadata
+from pydocformatter.rules.models import FixAvailability
 
-TEMPLATE_PATH = pathlib.Path(__file__).with_name("templates") / "rule_template.md"
-CATEGORY_TEMPLATE_PATH = pathlib.Path(__file__).with_name("templates") / "rule_category_template.md"
+
+if TYPE_CHECKING:
+    # First-party imports
+    from pydocformatter.rules.collection import RuleCollection
+    from pydocformatter.rules.models import RuleCategoryMetadata, RuleMetadata
+
+
 _EXAMPLE_OPENING_FENCE_RE = re.compile(r"^(?P<fence>`{3,})pydocfmt-example[^\n]*$")
 _SECTION_MARKERS = frozenset(("settings", "input", "output", "output=unchanged", "findings"))
 _FINDING_RE = re.compile(r"^(?P<code>[A-Z]+[0-9]+): (?P<label>Line|Lines) (?P<lines>[0-9][0-9, -]*): (?P<message>.+)$")
@@ -65,14 +66,13 @@ def rule_fix_text(rule: RuleMetadata) -> str:
     """
     if rule.fix_availability == FixAvailability.ALWAYS:
         return "Fix is always available."
-    elif rule.fix_availability == FixAvailability.USUALLY:
+    if rule.fix_availability == FixAvailability.USUALLY:
         return "Fix is usually available."
-    elif rule.fix_availability == FixAvailability.SOMETIMES:
+    if rule.fix_availability == FixAvailability.SOMETIMES:
         return "Fix is sometimes available."
-    elif rule.fix_availability == FixAvailability.NEVER:
+    if rule.fix_availability == FixAvailability.NEVER:
         return "Fix is not available."
-    else:
-        raise AssertionError(f"Unexpected fix availability: {rule.fix_availability}")
+    raise AssertionError(f"Unexpected fix availability: {rule.fix_availability}")
 
 
 @dataclasses.dataclass(frozen=True)
@@ -191,8 +191,7 @@ def _parse_example_block(body: str, *, rule_code: str, example_number: int) -> R
 def _section_marker(line: str, *, rule_code: str, example_number: int) -> tuple[str, str | None] | None:
     """Return the structured example section name for a marker line."""
     marker = line.removesuffix("\n")
-    if marker.endswith("\r"):
-        marker = marker[:-1]
+    marker = marker.removesuffix("\r")
     if not marker.startswith("[") or not marker.endswith("]"):
         return None
     name = marker[1:-1]
@@ -212,7 +211,7 @@ def _section_marker(line: str, *, rule_code: str, example_number: int) -> tuple[
 
 def _section_body(lines: list[str]) -> str:
     """Return section content without the blank separator before the next marker."""
-    if lines and lines[-1] in ("\n", "\r\n"):
+    if lines and lines[-1] in {"\n", "\r\n"}:
         return "".join(lines[:-1])
     return "".join(lines)
 
@@ -261,8 +260,8 @@ def _parse_findings(findings_text: str, *, rule_code: str, example_number: int) 
 def _parse_line_numbers(text: str, *, rule_code: str, example_number: int) -> tuple[int, ...]:
     """Parse comma-separated line numbers and ranges."""
     line_numbers: list[int] = []
-    for part in text.split(","):
-        part = part.strip()
+    for raw_part in text.split(","):
+        part = raw_part.strip()
         if "-" in part:
             start_text, end_text = part.split("-", maxsplit=1)
             start = int(start_text.strip())

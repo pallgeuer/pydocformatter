@@ -9,9 +9,12 @@ Attributes:
         handling.
 """
 
+# Future imports
 from __future__ import annotations
 
+# Standard library imports
 import re
+
 
 NOQA_RE = re.compile(r"^noqa(?:\s*:\s*(?P<selectors>[^#]*?))?(?P<rest>[ \t\f]+#.*|)$", re.IGNORECASE)
 PYDOCFMT_NOQA_RE = re.compile(r"^pydocfmt\s*:\s*noqa(?:\s*:\s*(?P<selectors>[^#]*?))?(?P<rest>[ \t\f]+#.*|)$", re.IGNORECASE)

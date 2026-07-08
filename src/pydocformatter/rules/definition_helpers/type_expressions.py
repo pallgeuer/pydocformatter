@@ -4,13 +4,21 @@ Attributes:
     TypeAliasMap (TypeAlias): Unshadowed source names mapped to absolute import-qualified names for type comparison.
 """
 
+# Future imports
 from __future__ import annotations
 
+# Standard library imports
 import ast
+from typing import TYPE_CHECKING
 
-import libcst as cst
+# First-party imports
+from pydocformatter.rules.definition_helpers import module_bindings
 
-import pydocformatter.rules.definition_helpers.module_bindings as module_bindings
+
+if TYPE_CHECKING:
+    # Third-party imports
+    import libcst as cst
+
 
 TypeAliasMap = module_bindings.TypeAliasMap
 
@@ -153,10 +161,7 @@ def _normalize_type_aliases(node: ast.expr, aliases: TypeAliasMap) -> ast.expr:
             return node
         return ast.copy_location(ast.Attribute(value=normalized_value, attr=node.attr, ctx=node.ctx), node)
     if isinstance(node, ast.Subscript):
-        return ast.copy_location(
-            ast.Subscript(value=_normalize_type_aliases(node.value, aliases), slice=_normalize_type_aliases(node.slice, aliases), ctx=node.ctx),
-            node,
-        )
+        return ast.copy_location(ast.Subscript(value=_normalize_type_aliases(node.value, aliases), slice=_normalize_type_aliases(node.slice, aliases), ctx=node.ctx), node)
     if isinstance(node, ast.Tuple):
         return ast.copy_location(ast.Tuple(elts=[_normalize_type_aliases(element, aliases) for element in node.elts], ctx=node.ctx), node)
     if isinstance(node, ast.List):

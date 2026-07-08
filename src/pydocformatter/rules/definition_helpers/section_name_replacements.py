@@ -8,18 +8,26 @@ Attributes:
     MessageBuilder (TypeAlias): Callable that creates a diagnostic message from the original and replacement spellings.
 """
 
+# Future imports
 from __future__ import annotations
 
+# Standard library imports
 import collections.abc as cabc
+from typing import TYPE_CHECKING
 
-import pydocformatter.rules.definition_helpers.rest_fields as rest_fields
-import pydocformatter.rules.definition_helpers.section_edits as section_edits
+# First-party imports
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
-import pydocformatter.rules.edits as rule_edits
-import pydocformatter.rules.violations as rule_violations
 from pydocformatter.cli.settings_check import DocstringConvention
-from pydocformatter.rules.definition import RuleContext
-from pydocformatter.rules.models import RuleMetadata
+from pydocformatter.rules.definition_helpers import rest_fields, section_edits
+
+
+if TYPE_CHECKING:
+    # First-party imports
+    import pydocformatter.rules.edits as rule_edits
+    import pydocformatter.rules.violations as rule_violations
+    from pydocformatter.rules.definition import RuleContext
+    from pydocformatter.rules.models import RuleMetadata
+
 
 SectionNameMapper = cabc.Callable[[DocstringConvention, str], str | None]
 FieldNameMapper = cabc.Callable[[str], str | None]

@@ -1,20 +1,18 @@
-[build-system]
-requires = ["setuptools>=61.0", "wheel"]
-build-backend = "setuptools.build_meta"
+#
+# Project
+#
 
 [project]
 name = "pydocformatter"
-version = "1.0.0"
-description = "A Python annotation formatter for line-wrapping and formatting python comments and docstrings"
+dynamic = ["version"]
+authors = [{name = "Philipp Allgeuer"}]
+maintainers = [{name = "Philipp Allgeuer"}]
+description = "A Python linter and code formatter targeted at docstrings and comments."
 readme = "README.md"
-license = "MIT"
-authors = [
-    {name = "Philipp Allgeuer"},
-]
-maintainers = [
-    {name = "Philipp Allgeuer"},
-]
-keywords = ["formatter", "docstring", "comment", "python", "code-quality", "linting"]
+license = "GPL-3.0-or-later"
+license-files = ["LICENSE.md"]
+requires-python = ">=3.11"
+keywords = ["linter", "formatter", "docstring", "comment", "python", "code quality"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Environment :: Console",
@@ -22,74 +20,87 @@ classifiers = [
     "Operating System :: OS Independent",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
-    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Software Development :: Code Generators",
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Topic :: Software Development :: Quality Assurance",
     "Topic :: Utilities",
 ]
-requires-python = ">=3.11"
 dependencies = [
     "libcst>=1.8.6",
 ]
 
 [project.urls]
-Homepage = "https://github.com/pallgeuer/pydocformatter"
-Repository = "https://github.com/pallgeuer/pydocformatter"
-Issues = "https://github.com/pallgeuer/pydocformatter/issues"
-Changelog = "https://github.com/pallgeuer/pydocformatter/blob/main/CHANGELOG.md"
-Contributing = "https://github.com/pallgeuer/pydocformatter/blob/main/CONTRIBUTING.md"
+homepage = "https://github.com/pallgeuer/pydocformatter"
+source = "https://github.com/pallgeuer/pydocformatter"
+changelog = "https://github.com/pallgeuer/pydocformatter/blob/main/CHANGELOG.md"
+issues = "https://github.com/pallgeuer/pydocformatter/issues"
 
 [project.scripts]
 pydocfmt = "pydocformatter.cli.main:main"
 
-[tool.setuptools]
-package-dir = {"" = "src"}
-
-[tool.setuptools.packages.find]
-where = ["src"]
-
-[tool.setuptools.package-data]
-"pydocformatter.rules" = ["*.md", "**/*.md"]
-
-[tool.setuptools.data-files]
-"docs" = ["docs/*.md"]
+#
+# Groups and Extras
+#
 
 [dependency-groups]
 test = [
-    "pytest==9.0.3",
+    "pytest==9.1.1",
     "pytest-cov==7.1.0",
     "pytest-xdist==3.8.0",
 ]
 dev = [
     {include-group = "test"},
-    "black==26.3.1",
-    "isort==8.0.1",
-    "mypy==2.1.0",
     "pre-commit==4.6.0",
+    "ruff==0.15.20",
+    "ty==0.0.57",
 ]
+
+#
+# Build
+#
+
+[build-system]
+requires = ["hatchling>=1.29.0"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/pydocformatter"]
+exclude = [
+    "/src/pydocformatter/rules/templates/",
+]
+
+[tool.hatch.build.targets.sdist]
+exclude = [
+    ".github/",
+    "AGENTS.md",
+    "CLAUDE.md",
+    ".codex/",
+    ".claude/",
+]
+
+[tool.hatch.version]
+path = "src/pydocformatter/_version.py"
+
+#
+# pytest
+#
 
 [tool.pytest.ini_options]
 addopts = ["-n", "auto"]
 filterwarnings = ["error"]
 testpaths = ["tests"]
 markers = [
-    "isolated_cwd: run the test in a fresh writable temporary working directory below the test session boundary",
+    "isolated_cwd: Run the test in a fresh writable temporary working directory below the test session boundary",
 ]
 
-[tool.black]
-line-length = 200
-target-version = ["py311"]
-exclude = '/(\.github|\.eggs|\.git|\.hg|\.mypy_cache|\.tox|\.venv|htmlcov|__pycache__|_build|buck-out|build|dist|tests/data)/'
-
-[tool.isort]
-profile = "black"
-line_length = 200
-known_first_party = ["pydocformatter", "tools"]
-skip = [".github", ".eggs", ".git", ".hg", ".mypy_cache", ".tox", ".venv", "htmlcov", "__pycache__", "_build", "buck-out", "build", "dist", "tests/data"]
+#
+# pydocfmt
+#
 
 [tool.pydocfmt]
 line-length = 120
@@ -98,6 +109,7 @@ docstring-convention = "google"
 docstring-missing-documentation = "all-docstrings"
 comment-detect-code = true
 comment-detect-expressions = true
+respect-gitignore = true
 extend-select = ["PDF300", "PDF302", "PDF305", "PDF510", "PDF701", "PDF705", "PDF709", "PDF713", "PDF717"]
 ignore = ["PDF519", "PDF521", "PDF522", "PDF523", "PDF524", "PDF525"]
 require-explicit = []
@@ -108,8 +120,133 @@ require-explicit = []
 [tool.pydocfmt.per-file-settings]
 "tests/**/test_*.py" = { docstring-missing-documentation = "has-section" }
 
-[tool.mypy]
-files = ["src/pydocformatter", "tests", "tools"]
-show_error_codes = true
-pretty = true
-strict = true
+#
+# Ruff
+#
+
+[tool.ruff]
+force-exclude = true
+indent-width = 4
+line-length = 200
+output-format = "grouped"
+preview = true
+respect-gitignore = true
+src = ["src", "tools"]
+
+[tool.ruff.analyze]
+preview = true
+
+[tool.ruff.format]
+docstring-code-format = true
+indent-style = "space"
+line-ending = "lf"
+preview = true
+quote-style = "double"
+skip-magic-trailing-comma = true
+
+[tool.ruff.lint]
+select = [
+    "A", "ANN", "ARG", "ASYNC",
+    "B",
+    "C4", "C90", "COM",
+    "DTZ",
+    "E", "EXE",
+    "F", "FA", "FLY", "FURB",
+    "G",
+    "I", "ICN", "INP", "INT", "ISC",
+    "LOG",
+    "N",
+    "PERF", "PGH", "PIE", "PLC", "PLE", "PLR", "PLW", "PT", "PYI",
+    "RET", "RSE", "RUF",
+    "S", "SIM", "SLOT",
+    "T10", "TC", "TID", "TRY",
+    "UP",
+    "W",
+    "YTT",
+]
+extend-select = [
+    "FBT003",
+]
+ignore = [
+    "ANN401",
+    "COM812", "COM819",
+    "D", "DOC",
+    "E111", "E114", "E117", "E501",
+    "FURB101", "FURB103",
+    "N999",
+    "PLC1901", "PLC2801",
+    "S404", "S607",
+    "TRY003",
+    "W191", "W505",
+]
+extend-unsafe-fixes = []
+unfixable = []
+dummy-variable-rgx = "^_$"
+future-annotations = true
+preview = true
+task-tags = ["TODO", "FIXME", "XXX", "HACK", "BUG", "DEBUG", "NOTE", "OPTIMIZE", "REVIEW"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["S101"]
+"tests/**/test_*.py" = ["PLR0904", "PLR6301", "SLF001"]
+
+[tool.ruff.lint.flake8-implicit-str-concat]
+allow-multiline = true
+
+[tool.ruff.lint.flake8-quotes]
+docstring-quotes = "double"
+inline-quotes = "double"
+multiline-quotes = "double"
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "parents"
+
+[tool.ruff.lint.flake8-type-checking]
+exempt-modules = ["typing", "typing_extensions", "collections.abc", "types", "pathlib"]
+runtime-evaluated-decorators = ["dataclasses.dataclass"]
+
+[tool.ruff.lint.isort]
+combine-as-imports = false
+force-sort-within-sections = false
+length-sort = false
+length-sort-straight = true
+lines-after-imports = 2
+no-sections = false
+order-by-type = true
+split-on-trailing-comma = false
+
+[tool.ruff.lint.isort.import-heading]
+future = "Future imports"
+standard-library = "Standard library imports"
+third-party = "Third-party imports"
+first-party = "First-party imports"
+local-folder = "Local imports"
+
+[tool.ruff.lint.mccabe]
+max-complexity = 50
+
+[tool.ruff.lint.pep8-naming]
+extend-ignore-names = ["[A-Z]", "[A-Z][A-Z]", "PDF_definition", "PCF_definition", "visit_*", "leave_*"]
+
+[tool.ruff.lint.pycodestyle]
+ignore-overlong-task-comments = true
+
+[tool.ruff.lint.pylint]
+allow-magic-value-types = ["str", "bytes", "int"]
+max-args = 20
+max-bool-expr = 20
+max-branches = 30
+max-locals = 50
+max-nested-blocks = 15
+max-positional-args = 6
+max-public-methods = 80
+max-returns = 30
+max-statements = 300
+max-statements-in-try = 25
+
+#
+# ty
+#
+
+[tool.ty.src]
+respect-ignore-files = true

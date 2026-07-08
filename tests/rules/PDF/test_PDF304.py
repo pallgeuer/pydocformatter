@@ -1,16 +1,17 @@
+# Third-party imports
 import libcst as cst
-import libcst.metadata as cst_metadata
 import pytest
+import libcst.metadata as cst_metadata
 
-import pydocformatter.formatter as formatter
-import pydocformatter.rules.definition_helpers.source_text as source_text
-import pydocformatter.rules_selection as rules_selection
-import tests.rule_helpers as rule_helpers
+# First-party imports
+from pydocformatter import formatter, rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, LineEnding
 from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
+from pydocformatter.rules.definition_helpers import source_text
 from pydocformatter.rules.definitions.PDF.PDF import PDF
 from pydocformatter.rules.definitions.PDF.PDF302_non_imperative_summary import PDF302NonImperativeSummary
 from pydocformatter.rules.definitions.PDF.PDF304_summary_first_word_capitalization import PDF304SummaryFirstWordCapitalization
+from tests import rule_helpers
 
 
 def contexts(source: str, *, settings: CheckSettings | None = None) -> tuple[RuleCategoryContext, RuleContext]:
@@ -50,7 +51,7 @@ def format_source(source: str, *, settings: CheckSettings | None = None, fix: bo
 
 @pytest.mark.parametrize(
     ("source", "expected"),
-    (
+    [
         ('def function():\n    """return value."""\n', 'def function():\n    """Return value."""\n'),
         ('def function():\n    """return?"""\n', 'def function():\n    """Return?"""\n'),
         ('def function():\n    """return..."""\n', 'def function():\n    """Return..."""\n'),
@@ -59,7 +60,7 @@ def format_source(source: str, *, settings: CheckSettings | None = None, fix: bo
         ('def function():\n    """  return value."""\n', 'def function():\n    """  Return value."""\n'),
         ('def function(): """return value."""\n', 'def function(): """Return value."""\n'),
         ("def function():\n    '''return value.'''\n", "def function():\n    '''Return value.'''\n"),
-    ),
+    ],
 )
 def test_capitalizes_safe_function_summary_first_words(source: str, expected: str) -> None:
     result = format_source(source)
@@ -67,6 +68,7 @@ def test_capitalizes_safe_function_summary_first_words(source: str, expected: st
     assert result.new_source == expected
     assert result.fixed_findings[PDF304SummaryFirstWordCapitalization.meta] == 1
     assert not result.unfixed_findings
+    assert result.new_source is not None
     assert not format_source(result.new_source).modified
 
 
@@ -98,7 +100,7 @@ def test_capitalizes_first_summary_word_in_multiline_docstrings() -> None:
     assert result.fixed_findings[PDF304SummaryFirstWordCapitalization.meta] == 2
 
 
-@pytest.mark.parametrize("summary", ("Return value.", "RETURN value.", "\u00e9clair value.", "return_value.", "123 value.", "iOS device.", "iPhone device.", "eBay item.", "macOS device."))
+@pytest.mark.parametrize("summary", ["Return value.", "RETURN value.", "\u00e9clair value.", "return_value.", "123 value.", "iOS device.", "iPhone device.", "eBay item.", "macOS device."])
 def test_skips_words_without_safe_ascii_capitalization(summary: str) -> None:
     source = f'def function():\n    """{summary}"""\n'
     result = format_source(source)
@@ -108,7 +110,7 @@ def test_skips_words_without_safe_ascii_capitalization(summary: str) -> None:
     assert not result.unfixed_findings
 
 
-@pytest.mark.parametrize("summary", ("return: value.", "return, value.", "return; value.", '"return" value.', "(return) value.", "return-value."))
+@pytest.mark.parametrize("summary", ["return: value.", "return, value.", "return; value.", '"return" value.', "(return) value.", "return-value."])
 def test_skips_punctuated_or_quoted_words_that_are_not_plain_ascii_prose(summary: str) -> None:
     source = f'def function():\n    """{summary}"""\n'
     result = format_source(source)

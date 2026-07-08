@@ -1,15 +1,16 @@
+# Third-party imports
 import libcst as cst
-import libcst.metadata as cst_metadata
 import pytest
+import libcst.metadata as cst_metadata
 
-import pydocformatter.formatter as formatter
-import pydocformatter.rules.definition_helpers.source_text as source_text
-import pydocformatter.rules_selection as rules_selection
-import tests.rule_helpers as rule_helpers
+# First-party imports
+from pydocformatter import formatter, rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention
 from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
+from pydocformatter.rules.definition_helpers import source_text
 from pydocformatter.rules.definitions.PDF.PDF import PDF
 from pydocformatter.rules.definitions.PDF.PDF305_summary_starts_with_this import PDF305SummaryStartsWithThis
+from tests import rule_helpers
 
 
 def contexts(source: str, *, settings: CheckSettings | None = None) -> tuple[RuleCategoryContext, RuleContext]:
@@ -47,7 +48,7 @@ def format_source(source: str, *, settings: CheckSettings | None = None, fix: bo
     return formatter.format_source(source, "example.py", settings=resolved_settings, rule_selection=rules_selection.select_rules(resolved_settings), fix=fix)
 
 
-@pytest.mark.parametrize("summary", ("This returns value.", "This. Returns value.", '"This" returns value.', "(This) returns value.", "This: returns value.", "`This` returns value."))
+@pytest.mark.parametrize("summary", ["This returns value.", "This. Returns value.", '"This" returns value.', "(This) returns value.", "This: returns value.", "`This` returns value."])
 def test_reports_summaries_starting_with_this(summary: str) -> None:
     source = f'def function():\n    """{summary}"""\n'
     result = format_source(source)
@@ -67,7 +68,7 @@ def test_reports_attribute_docstring_summary_starting_with_this() -> None:
     assert not result.unfixed_findings[0].fixable
 
 
-@pytest.mark.parametrize("summary", ("this returns value.", "THIS returns value.", "'this' returns value."))
+@pytest.mark.parametrize("summary", ["this returns value.", "THIS returns value.", "'this' returns value."])
 def test_this_detection_is_case_insensitive_after_normalization(summary: str) -> None:
     source = f'def function():\n    """{summary}"""\n'
     result = format_source(source)
@@ -75,7 +76,7 @@ def test_this_detection_is_case_insensitive_after_normalization(summary: str) ->
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((2,),)
 
 
-@pytest.mark.parametrize("summary", ("This\\treturns value.", "This\nreturns value.", "This\\u00a0returns value."))
+@pytest.mark.parametrize("summary", ["This\\treturns value.", "This\nreturns value.", "This\\u00a0returns value."])
 def test_reports_this_separated_by_non_space_whitespace(summary: str) -> None:
     source = f'def function():\n    """{summary}"""\n'
     result = format_source(source)
@@ -83,7 +84,7 @@ def test_reports_this_separated_by_non_space_whitespace(summary: str) -> None:
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((2,),)
 
 
-@pytest.mark.parametrize("summary", ("Return this value.", "ThisReturns value.", "this_module value.", "This\\u00e9 returns value."))
+@pytest.mark.parametrize("summary", ["Return this value.", "ThisReturns value.", "this_module value.", "This\\u00e9 returns value."])
 def test_does_not_report_other_first_words(summary: str) -> None:
     source = f'def function():\n    """{summary}"""\n'
     result = format_source(source)
@@ -146,7 +147,7 @@ def test_reports_concatenated_and_escaped_newline_physical_lines() -> None:
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((2, 3), (7,))
 
 
-@pytest.mark.parametrize("convention", (DocstringConvention.GOOGLE, DocstringConvention.PEP257))
+@pytest.mark.parametrize("convention", [DocstringConvention.GOOGLE, DocstringConvention.PEP257])
 def test_google_and_pep257_conventions_ignore_broad_selection_but_exact_selection_still_applies(convention: DocstringConvention) -> None:
     broad = rules_selection.select_rules(CheckSettings(select=("PDF3",), docstring_convention=convention))
     active_codes = tuple(rule.rule.code.tag for rule in broad.rules)

@@ -1,21 +1,28 @@
 """PDF403 section-name-trailing-content rule."""
 
+# Future imports
 from __future__ import annotations
 
+# Standard library imports
 import re
+from typing import TYPE_CHECKING
 
-import pydocformatter.rules.definition_helpers.docstring_conventions as docstring_conventions
-import pydocformatter.rules.definition_helpers.docstring_sections as docstring_sections
-import pydocformatter.rules.definition_helpers.section_edits as section_edits
-import pydocformatter.rules.definition_helpers.text_layout as text_layout
-import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
+# First-party imports
 import pydocformatter.rules.registration as rule_registration
-import pydocformatter.rules.violations as rule_violations
+import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.codes import RuleCode
-from pydocformatter.rules.definition import RuleBase, RuleContext
+from pydocformatter.rules.definition import RuleBase
+from pydocformatter.rules.definition_helpers import docstring_conventions, docstring_sections, section_edits, text_layout
 from pydocformatter.rules.definitions.PDF.PDF import PDF
 from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
+
+
+if TYPE_CHECKING:
+    # First-party imports
+    import pydocformatter.rules.violations as rule_violations
+    from pydocformatter.rules.definition import RuleContext
+
 
 _GOOGLE_TRAILING_CONTENT_RE = re.compile(r"^(?P<indent>[ \t]*)(?P<name>[A-Za-z][A-Za-z ]*?)[ \t]*:[ \t]+(?P<content>\S.*)$")
 
@@ -77,8 +84,7 @@ def _results(context: RuleContext, *, rule: RuleMetadata) -> tuple[rule_violatio
             header, content, name = target
             line_numbers.extend(section_edits.line_numbers(docstring, line))
             messages.append(f"Docstring section '{name}' should be followed by a line break")
-            output_lines.append(PDF_definition.DocstringOutputLine(source=header, value=header))
-            output_lines.append(PDF_definition.DocstringOutputLine(source=content, value=content))
+            output_lines.extend((PDF_definition.DocstringOutputLine(source=header, value=header), PDF_definition.DocstringOutputLine(source=content, value=content)))
             changed = True
         if not changed:
             continue

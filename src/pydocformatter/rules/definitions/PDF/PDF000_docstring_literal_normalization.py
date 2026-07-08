@@ -1,17 +1,28 @@
 """PDF000 docstring-literal-normalization rule."""
 
+# Future imports
 from __future__ import annotations
 
+# Standard library imports
+from typing import TYPE_CHECKING
+
+# Third-party imports
 import libcst as cst
 
-import pydocformatter.rules.definition_helpers.string_literals as string_literals
-import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
+# First-party imports
 import pydocformatter.rules.edits as rule_edits
-import pydocformatter.rules.registration as rule_registration
 import pydocformatter.rules.violations as rule_violations
+import pydocformatter.rules.registration as rule_registration
+import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 from pydocformatter.rules.codes import RuleCode
-from pydocformatter.rules.definition import RuleBase, RuleContext
+from pydocformatter.rules.definition import RuleBase
+from pydocformatter.rules.definition_helpers import string_literals
 from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata
+
+
+if TYPE_CHECKING:
+    # First-party imports
+    from pydocformatter.rules.definition import RuleContext
 
 
 @rule_registration.register_rule_to(PDF_definition.PDF)
@@ -65,11 +76,7 @@ def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo, *, co
     rendered = _rendered_docstring(docstring, line_ending=context.line_ending)
     if rendered is None or rendered == docstring.source:
         return None
-    return rule_edits.PlannedSourceChange(
-        edit=rule_edits.SourceEdit(range=docstring.range, replacement=rendered),
-        line_numbers=_line_numbers(docstring),
-        suppression_line_numbers=(),
-    )
+    return rule_edits.PlannedSourceChange(edit=rule_edits.SourceEdit(range=docstring.range, replacement=rendered), line_numbers=_line_numbers(docstring), suppression_line_numbers=())
 
 
 def _rendered_docstring(docstring: PDF_definition.DocstringInfo, *, line_ending: str) -> str | None:
@@ -135,9 +142,8 @@ def _has_non_normal_line_ending(source: str, *, line_ending: str) -> bool:
                 return True
             index += len(ending)
             continue
-        if char == "\n":
-            if line_ending != "\n":
-                return True
+        if char == "\n" and line_ending != "\n":
+            return True
         index += 1
     return False
 

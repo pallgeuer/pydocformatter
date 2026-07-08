@@ -1,5 +1,5 @@
-import pydocformatter.formatter as formatter
-import pydocformatter.rules_selection as rules_selection
+# First-party imports
+from pydocformatter import formatter, rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention, DocstringMissingDocumentation
 from pydocformatter.rules.definitions.PDF.PDF504_missing_yield_documentation import PDF504MissingYieldDocumentation
 
@@ -106,11 +106,7 @@ def test_none_and_pep257_conventions_keep_missing_yield_documentation_inert() ->
     source = 'def function():\n    """Generate values.\n\n    :yields: Value.\n    """\n    yield 1\n'
 
     for convention in (DocstringConvention.NONE, DocstringConvention.PEP257):
-        assert_pdf504_lines(
-            source,
-            (),
-            settings=CheckSettings(select=("PDF504",), docstring_convention=convention, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS),
-        )
+        assert_pdf504_lines(source, (), settings=CheckSettings(select=("PDF504",), docstring_convention=convention, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS))
 
 
 def test_reports_first_meaningful_yield_after_non_meaningful_yields() -> None:

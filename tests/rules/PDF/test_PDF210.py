@@ -1,5 +1,6 @@
-import tests.rules.PDF.statement_spacing_helpers as statement_spacing_helpers
+# First-party imports
 from pydocformatter.rules.definitions.PDF.PDF210_no_blank_line_after_class_docstring import PDF210NoBlankLineAfterClassDocstring
+from tests.rules.PDF import statement_spacing_helpers
 
 
 def test_removes_blank_lines_after_class_docstring() -> None:

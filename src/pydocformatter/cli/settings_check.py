@@ -25,15 +25,18 @@ Attributes:
         option generation, validation, and settings display.
 """
 
-import dataclasses
-import enum
+# Standard library imports
 import re
+import enum
+import dataclasses
 from typing import Any, TypedDict, cast
 
+# First-party imports
 import pydocformatter.settings as settings_core
 from pydocformatter.rules.codes import ALL_RULE_SELECTOR_TAG
 from pydocformatter.settings import MultiStringMap, PerFileSettingsMap, SettingDefinition, SettingsSchema, StringList
 from pydocformatter.utils.globs import BaseRelativeGlobMatcher
+
 
 DEFAULT_EXCLUDE = (
     ".bzr",
@@ -85,14 +88,7 @@ DEFAULT_REQUIRE_EXPLICIT = (
     "PDF615",
 )
 DEFAULT_DOCSTRING_FORBIDDEN_FUNCTION_DECORATORS = ("typing.overload", "typing_extensions.overload")
-DEFAULT_DOCSTRING_CLASS_ATTRIBUTE_NO_TYPE_BASE_CLASSES = (
-    "enum.Enum",
-    "enum.IntEnum",
-    "enum.StrEnum",
-    "enum.Flag",
-    "enum.IntFlag",
-    "enum.ReprEnum",
-)
+DEFAULT_DOCSTRING_CLASS_ATTRIBUTE_NO_TYPE_BASE_CLASSES = ("enum.Enum", "enum.IntEnum", "enum.StrEnum", "enum.Flag", "enum.IntFlag", "enum.ReprEnum")
 DEFAULT_DOCSTRING_OPTIONAL_FUNCTION_DECORATORS = ("typing.override", "typing_extensions.override")
 DEFAULT_DOCSTRING_PROPERTY_DECORATORS = ("builtins.property", "enum.property", "functools.cached_property", "abc.abstractproperty", "types.DynamicClassAttribute")
 DEFAULT_COMMENT_TASK_MARKERS = ("TODO", "FIXME", "XXX", "HACK", "BUG", "DEBUG", "NOTE", "OPTIMIZE", "REVIEW")
@@ -517,8 +513,8 @@ def validate_parallelism(value: object, context: str) -> float:
     Raises:
         settings_core.SettingsError: If the value is negative, non-numeric, fractional above one, or otherwise invalid.
     """
-    parallelism = _validate_non_negative_float(value, context)
-    if parallelism > 1 and not parallelism.is_integer():
+    parallelism: float = _validate_non_negative_float(value, context)
+    if parallelism > 1 and parallelism % 1 != 0:
         raise settings_core.SettingsError(f"{context} {PARALLELISM_CONSTRAINT_MESSAGE}")
     return parallelism
 
@@ -568,7 +564,7 @@ def validate_per_file_settings(value: object, context: str) -> PerFileSettingsMa
             is invalid.
     """
     if isinstance(value, tuple):
-        items = value
+        items = cast("tuple[tuple[object, object], ...]", value)
     elif isinstance(value, dict):
         items = tuple(value.items())
     else:
@@ -583,9 +579,13 @@ def validate_per_file_settings(value: object, context: str) -> PerFileSettingsMa
         if not pattern:
             raise settings_core.SettingsError(f"{context} keys must not be empty")
         if isinstance(raw_updates, tuple):
-            raw_update_items: dict[str, object] = dict(raw_updates)
+            raw_update_items: dict[str, object] = {}
+            for raw_key, raw_value in cast("tuple[tuple[object, object], ...]", raw_updates):
+                if not isinstance(raw_key, str):
+                    raise settings_core.SettingsError(f"{context}.{pattern} keys must be strings")
+                raw_update_items[raw_key] = raw_value
         elif isinstance(raw_updates, dict):
-            raw_update_items = raw_updates
+            raw_update_items = cast("dict[str, object]", raw_updates)
         else:
             raise settings_core.SettingsError(f"{context}.{pattern} must be a table mapping setting keys to values")
         flattened_updates = settings_core._flatten_prefixed_toml_setting_tables(raw_update_items, prefixes=("docstring", "comment"), context=f"{context}.{pattern}")
@@ -641,11 +641,7 @@ def effective_profile_for_path(profile: settings_core.SettingsProfile[CheckSetti
     for field in updates:
         field_bases[field] = per_file_settings_base
         field_priorities[field] = per_file_settings_priority
-    return settings_core.SettingsProfile(
-        settings=dataclasses.replace(profile.settings, **cast(Any, updates)),
-        field_bases=field_bases,
-        field_priorities=field_priorities,
-    )
+    return settings_core.SettingsProfile(settings=dataclasses.replace(profile.settings, **cast("Any", updates)), field_bases=field_bases, field_priorities=field_priorities)
 
 
 def _definitions_by_key() -> dict[str, SettingDefinition[Any]]:
@@ -655,11 +651,7 @@ def _definitions_by_key() -> dict[str, SettingDefinition[Any]]:
 
 def _per_file_settings_allowed_fields() -> frozenset[str]:
     """Return settings fields that may be overridden for matching files."""
-    behavior_groups = {
-        SettingsGroup.FORMATTING,
-        SettingsGroup.DOCSTRING_FORMATTING,
-        SettingsGroup.COMMENT_FORMATTING,
-    }
+    behavior_groups = {SettingsGroup.FORMATTING, SettingsGroup.DOCSTRING_FORMATTING, SettingsGroup.COMMENT_FORMATTING}
     setting_effect_fields = _rule_setting_effect_fields()
     return frozenset(
         definition.field for definition in SETTINGS_SCHEMA.definitions if definition.available_in_toml and definition.group in behavior_groups and definition.field not in setting_effect_fields
@@ -668,7 +660,8 @@ def _per_file_settings_allowed_fields() -> frozenset[str]:
 
 def _rule_setting_effect_fields() -> frozenset[str]:
     """Return settings fields referenced by rule selection effects."""
-    import pydocformatter.rules.collection as rule_collection
+    # First-party imports
+    import pydocformatter.rules.collection as rule_collection  # noqa: PLC0415
 
     return frozenset(setting_effects.setting for rule_class in rule_collection.RULE_COLLECTION.rules for setting_effects in rule_class.meta.setting_effects)
 
@@ -829,66 +822,16 @@ SETTINGS_SCHEMA = SettingsSchema(
             documentation="Function decorator names whose definitions should be treated as properties for property-specific summary checks. Calls are unwrapped before matching, and dotted names also match import aliases and builtins resolved statically by LibCST; unqualified names are syntactic-only.",
             example='docstring-property-decorators = ["builtins.property", "functools.cached_property", "project.Property"]',
         ),
-        SettingDefinition(
-            field="docstring_parse_list_items",
-            value_type=bool,
-            group=SettingsGroup.DOCSTRING_FORMATTING,
-            help="Parse docstring list items as distinct structures.",
-        ),
-        SettingDefinition(
-            field="docstring_parse_headings",
-            value_type=bool,
-            group=SettingsGroup.DOCSTRING_FORMATTING,
-            help="Parse Markdown and reStructuredText docstring headings.",
-        ),
-        SettingDefinition(
-            field="docstring_parse_doctests",
-            value_type=bool,
-            group=SettingsGroup.DOCSTRING_FORMATTING,
-            help="Parse and protect doctest regions in docstrings.",
-        ),
-        SettingDefinition(
-            field="docstring_parse_code_fences",
-            value_type=bool,
-            group=SettingsGroup.DOCSTRING_FORMATTING,
-            help="Parse and protect fenced code blocks in docstrings.",
-        ),
-        SettingDefinition(
-            field="docstring_parse_block_quotes",
-            value_type=bool,
-            group=SettingsGroup.DOCSTRING_FORMATTING,
-            help="Parse Markdown block quotes in docstrings.",
-        ),
-        SettingDefinition(
-            field="docstring_parse_tables",
-            value_type=bool,
-            group=SettingsGroup.DOCSTRING_FORMATTING,
-            help="Parse and protect Markdown and reStructuredText tables in docstrings.",
-        ),
-        SettingDefinition(
-            field="docstring_parse_directives",
-            value_type=bool,
-            group=SettingsGroup.DOCSTRING_FORMATTING,
-            help="Parse reStructuredText directives and their bodies in docstrings.",
-        ),
-        SettingDefinition(
-            field="docstring_parse_literal_blocks",
-            value_type=bool,
-            group=SettingsGroup.DOCSTRING_FORMATTING,
-            help="Parse and protect reStructuredText literal blocks in docstrings.",
-        ),
-        SettingDefinition(
-            field="comment_join_standalone_lines",
-            value_type=bool,
-            group=SettingsGroup.COMMENT_FORMATTING,
-            help="Join consecutive standalone prose comment lines before wrapping.",
-        ),
-        SettingDefinition(
-            field="comment_format_list_items",
-            value_type=bool,
-            group=SettingsGroup.COMMENT_FORMATTING,
-            help="Detect and reflow standalone comment list items with hanging indentation.",
-        ),
+        SettingDefinition(field="docstring_parse_list_items", value_type=bool, group=SettingsGroup.DOCSTRING_FORMATTING, help="Parse docstring list items as distinct structures."),
+        SettingDefinition(field="docstring_parse_headings", value_type=bool, group=SettingsGroup.DOCSTRING_FORMATTING, help="Parse Markdown and reStructuredText docstring headings."),
+        SettingDefinition(field="docstring_parse_doctests", value_type=bool, group=SettingsGroup.DOCSTRING_FORMATTING, help="Parse and protect doctest regions in docstrings."),
+        SettingDefinition(field="docstring_parse_code_fences", value_type=bool, group=SettingsGroup.DOCSTRING_FORMATTING, help="Parse and protect fenced code blocks in docstrings."),
+        SettingDefinition(field="docstring_parse_block_quotes", value_type=bool, group=SettingsGroup.DOCSTRING_FORMATTING, help="Parse Markdown block quotes in docstrings."),
+        SettingDefinition(field="docstring_parse_tables", value_type=bool, group=SettingsGroup.DOCSTRING_FORMATTING, help="Parse and protect Markdown and reStructuredText tables in docstrings."),
+        SettingDefinition(field="docstring_parse_directives", value_type=bool, group=SettingsGroup.DOCSTRING_FORMATTING, help="Parse reStructuredText directives and their bodies in docstrings."),
+        SettingDefinition(field="docstring_parse_literal_blocks", value_type=bool, group=SettingsGroup.DOCSTRING_FORMATTING, help="Parse and protect reStructuredText literal blocks in docstrings."),
+        SettingDefinition(field="comment_join_standalone_lines", value_type=bool, group=SettingsGroup.COMMENT_FORMATTING, help="Join consecutive standalone prose comment lines before wrapping."),
+        SettingDefinition(field="comment_format_list_items", value_type=bool, group=SettingsGroup.COMMENT_FORMATTING, help="Detect and reflow standalone comment list items with hanging indentation."),
         SettingDefinition(
             field="comment_task_marker_mode",
             value_type=CommentTaskMarkerMode,
@@ -906,42 +849,12 @@ SETTINGS_SCHEMA = SettingsSchema(
             documentation=f"Exact uppercase task marker labels recognized before a colon; defaults to {_setting_default_text('comment_task_markers', StringList)}. Use an empty list to disable recognition.",
             example='comment-task-markers = ["TODO", "FIXME", "BUG"]',
         ),
-        SettingDefinition(
-            field="comment_preserve_headings",
-            value_type=bool,
-            group=SettingsGroup.COMMENT_FORMATTING,
-            help="Preserve detected Markdown and reStructuredText comment headings.",
-        ),
-        SettingDefinition(
-            field="comment_preserve_doctests",
-            value_type=bool,
-            group=SettingsGroup.COMMENT_FORMATTING,
-            help="Preserve standalone doctest comment regions.",
-        ),
-        SettingDefinition(
-            field="comment_preserve_code_fences",
-            value_type=bool,
-            group=SettingsGroup.COMMENT_FORMATTING,
-            help="Preserve fenced code regions in standalone comments.",
-        ),
-        SettingDefinition(
-            field="comment_format_block_quotes",
-            value_type=bool,
-            group=SettingsGroup.COMMENT_FORMATTING,
-            help="Detect and reflow Markdown block quotes in standalone comments.",
-        ),
-        SettingDefinition(
-            field="comment_preserve_tables",
-            value_type=bool,
-            group=SettingsGroup.COMMENT_FORMATTING,
-            help="Preserve detected Markdown and reStructuredText comment tables.",
-        ),
-        SettingDefinition(
-            field="comment_preserve_directives",
-            value_type=bool,
-            group=SettingsGroup.COMMENT_FORMATTING,
-            help="Preserve reStructuredText directives and their indented bodies.",
-        ),
+        SettingDefinition(field="comment_preserve_headings", value_type=bool, group=SettingsGroup.COMMENT_FORMATTING, help="Preserve detected Markdown and reStructuredText comment headings."),
+        SettingDefinition(field="comment_preserve_doctests", value_type=bool, group=SettingsGroup.COMMENT_FORMATTING, help="Preserve standalone doctest comment regions."),
+        SettingDefinition(field="comment_preserve_code_fences", value_type=bool, group=SettingsGroup.COMMENT_FORMATTING, help="Preserve fenced code regions in standalone comments."),
+        SettingDefinition(field="comment_format_block_quotes", value_type=bool, group=SettingsGroup.COMMENT_FORMATTING, help="Detect and reflow Markdown block quotes in standalone comments."),
+        SettingDefinition(field="comment_preserve_tables", value_type=bool, group=SettingsGroup.COMMENT_FORMATTING, help="Preserve detected Markdown and reStructuredText comment tables."),
+        SettingDefinition(field="comment_preserve_directives", value_type=bool, group=SettingsGroup.COMMENT_FORMATTING, help="Preserve reStructuredText directives and their indented bodies."),
         SettingDefinition(
             field="comment_trailing_extraction_syntax_aware",
             value_type=bool,
@@ -956,24 +869,9 @@ SETTINGS_SCHEMA = SettingsSchema(
             help="Avoid extracting trailing comments with unsafe standalone content.",
             documentation="Whether overlong trailing-comment extraction avoids content that enabled standalone comment structure and code detectors, or the content-aware operator heuristic, would make unsafe to reinterpret as a standalone comment.",
         ),
-        SettingDefinition(
-            field="comment_detect_code",
-            value_type=bool,
-            group=SettingsGroup.COMMENT_FORMATTING,
-            help="Protect standalone runs matching the indentation and leading-keyword heuristic.",
-        ),
-        SettingDefinition(
-            field="comment_detect_statements",
-            value_type=bool,
-            group=SettingsGroup.COMMENT_FORMATTING,
-            help="Protect standalone runs containing parseable Python statements.",
-        ),
-        SettingDefinition(
-            field="comment_detect_expressions",
-            value_type=bool,
-            group=SettingsGroup.COMMENT_FORMATTING,
-            help="Protect standalone runs containing nontrivial Python expressions.",
-        ),
+        SettingDefinition(field="comment_detect_code", value_type=bool, group=SettingsGroup.COMMENT_FORMATTING, help="Protect standalone runs matching the indentation and leading-keyword heuristic."),
+        SettingDefinition(field="comment_detect_statements", value_type=bool, group=SettingsGroup.COMMENT_FORMATTING, help="Protect standalone runs containing parseable Python statements."),
+        SettingDefinition(field="comment_detect_expressions", value_type=bool, group=SettingsGroup.COMMENT_FORMATTING, help="Protect standalone runs containing nontrivial Python expressions."),
         SettingDefinition(
             field="select",
             value_type=StringList,
@@ -1099,18 +997,8 @@ SETTINGS_SCHEMA = SettingsSchema(
             cli={"metavar": "GLOB"},
             documentation="Additional exclude glob patterns.",
         ),
-        SettingDefinition(
-            field="respect_gitignore",
-            value_type=bool,
-            group=SettingsGroup.FILE_SELECTION,
-            help="Respect .gitignore when discovering files.",
-        ),
-        SettingDefinition(
-            field="force_exclude",
-            value_type=bool,
-            group=SettingsGroup.FILE_SELECTION,
-            help="Apply exclude rules even to files passed explicitly.",
-        ),
+        SettingDefinition(field="respect_gitignore", value_type=bool, group=SettingsGroup.FILE_SELECTION, help="Respect .gitignore when discovering files."),
+        SettingDefinition(field="force_exclude", value_type=bool, group=SettingsGroup.FILE_SELECTION, help="Apply exclude rules even to files passed explicitly."),
     ),
     table_path=("tool", "pydocfmt"),
 )

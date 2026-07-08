@@ -1,12 +1,22 @@
+# Future imports
+from __future__ import annotations
+
+# Standard library imports
 import pathlib
 import tomllib
+from typing import TYPE_CHECKING
 
-import pydocformatter.formatter as formatter
+# First-party imports
 import pydocformatter.rules.documentation as rule_documentation
-import pydocformatter.rules.models as rule_models
-import pydocformatter.rules_selection as rules_selection
+from pydocformatter import formatter, rules_selection
 from pydocformatter.cli import global_args, settings_check
-from pydocformatter.rules.codes import RuleCode
+
+
+if TYPE_CHECKING:
+    # First-party imports
+    import pydocformatter.rules.models as rule_models
+    from pydocformatter.rules.codes import RuleCode
+
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 SUPPRESSIONS_PATH = ROOT / "docs" / "rule_suppressions.md"
@@ -45,9 +55,7 @@ def _validate_example_settings(example_number: int, example: rule_documentation.
 
 def _settings_for_example(example: rule_documentation.RuleMarkdownExample) -> settings_check.CheckSettings:
     """Return resolved settings for one suppression guide example."""
-    return settings_check.SETTINGS_SCHEMA.load(
-        global_values=global_args.GlobalArgs(config_options=(example.settings_text,), isolated=True),
-    )
+    return settings_check.SETTINGS_SCHEMA.load(global_values=global_args.GlobalArgs(config_options=(example.settings_text,), isolated=True))
 
 
 def _finding_key(findings: tuple[rule_models.RuleFinding, ...]) -> tuple[tuple[RuleCode, tuple[int, ...], str], ...]:

@@ -1,16 +1,17 @@
+# Third-party imports
 import libcst as cst
-import libcst.metadata as cst_metadata
 import pytest
+import libcst.metadata as cst_metadata
 
-import pydocformatter.formatter as formatter
-import pydocformatter.rules.definition_helpers.source_text as source_text
-import pydocformatter.rules_selection as rules_selection
-import tests.rule_helpers as rule_helpers
+# First-party imports
+from pydocformatter import formatter, rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention, LineEnding
 from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
+from pydocformatter.rules.definition_helpers import source_text
 from pydocformatter.rules.definitions.PDF.PDF import PDF
 from pydocformatter.rules.definitions.PDF.PDF101_docstring_reflow import PDF101DocstringReflow
 from pydocformatter.rules.definitions.PDF.PDF300_summary_trailing_period import PDF300SummaryTrailingPeriod
+from tests import rule_helpers
 
 
 def contexts(source: str, *, settings: CheckSettings | None = None) -> tuple[RuleCategoryContext, RuleContext]:
@@ -50,7 +51,7 @@ def format_source(source: str, *, settings: CheckSettings | None = None, fix: bo
 
 @pytest.mark.parametrize(
     ("source", "expected"),
-    (
+    [
         ('def function():\n    """Return value"""\n', 'def function():\n    """Return value."""\n'),
         ("def function():\n    '''Return value'''\n", "def function():\n    '''Return value.'''\n"),
         ('def function(): """Return value"""\n', 'def function(): """Return value."""\n'),
@@ -59,7 +60,7 @@ def format_source(source: str, *, settings: CheckSettings | None = None, fix: bo
         ('def function():\n    """Return value\n    continued\n    """\n', 'def function():\n    """Return value\n    continued.\n    """\n'),
         ('def function():\n    """Return value\n\n    Body.\n    """\n', 'def function():\n    """Return value.\n\n    Body.\n    """\n'),
         ('def function():\n    """\n    Return value\n    """\n', 'def function():\n    """\n    Return value.\n    """\n'),
-    ),
+    ],
 )
 def test_inserts_period_for_safe_missing_period(source: str, expected: str) -> None:
     result = format_source(source)
@@ -67,6 +68,7 @@ def test_inserts_period_for_safe_missing_period(source: str, expected: str) -> N
     assert result.new_source == expected
     assert result.fixed_findings[PDF300SummaryTrailingPeriod.meta] == 1
     assert not result.unfixed_findings
+    assert result.new_source is not None
     assert not format_source(result.new_source).modified
 
 
@@ -80,7 +82,7 @@ def test_inserts_period_for_attribute_docstring_summary() -> None:
     assert not format_source(result.new_source).modified
 
 
-@pytest.mark.parametrize("punctuation", (",", "?", "!", ":", ";"))
+@pytest.mark.parametrize("punctuation", [",", "?", "!", ":", ";"])
 def test_reports_but_does_not_fix_other_punctuation(punctuation: str) -> None:
     source = f'def function():\n    """Return value{punctuation}"""\n'
     result = format_source(source)
@@ -136,7 +138,7 @@ def test_skips_numpy_section_only_docstring() -> None:
     assert not result.unfixed_findings
 
 
-@pytest.mark.parametrize("summary", ("Parameters", "Extended summary"))
+@pytest.mark.parametrize("summary", ["Parameters", "Extended summary"])
 def test_google_convention_punctuates_numpy_only_section_names_as_summaries(summary: str) -> None:
     source = f'def function():\n    """{summary}"""\n'
     result = format_source(source, settings=CheckSettings(select=("PDF300",), docstring_convention=DocstringConvention.GOOGLE))
@@ -212,7 +214,7 @@ def test_rest_like_summary_is_punctuated_when_field_marker_is_invalid_or_convent
     assert result.fixed_findings[PDF300SummaryTrailingPeriod.meta] == 2
 
 
-@pytest.mark.parametrize("adornment", ("===", "---"))
+@pytest.mark.parametrize("adornment", ["===", "---"])
 def test_lone_adornment_line_is_not_punctuated(adornment: str) -> None:
     source = f'def function():\n    """{adornment}"""\n'
     result = format_source(source)

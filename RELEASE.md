@@ -5,7 +5,7 @@
 ### Code Quality
 - [x] All tests pass with project-default pytest-xdist multiprocessing (`uv run pytest -q`)
 - [x] Package builds successfully (`uv build`)
-- [x] No linting errors (`uv run black --check .`, `uv run isort --check .`, `uv run mypy`, `uv run pydocfmt check`)
+- [x] No linting errors (`uv run ruff check`, `uv run pydocfmt check`, `uv run ruff format --check`, `uv run ty check`)
 - [x] Pre-commit hooks pass (`uv run pre-commit run --all-files`)
 
 ### Documentation
@@ -122,7 +122,7 @@ After release, verify:
      - repo: https://github.com/pallgeuer/pydocformatter
        rev: v1.0.0
        hooks:
-         - id: pydocfmt
+         - id: pydocfmt-fix
    ```
 
 3. **GitHub Features:**

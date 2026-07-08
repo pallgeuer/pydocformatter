@@ -1,14 +1,16 @@
+# Standard library imports
 import typing
 
+# Third-party imports
 import libcst as cst
-import libcst.metadata as cst_metadata
 import pytest
+import libcst.metadata as cst_metadata
 
-import pydocformatter.formatter as formatter
-import pydocformatter.rules.definition_helpers.source_text as source_text
-import pydocformatter.rules_selection as rules_selection
+# First-party imports
+from pydocformatter import formatter, rules_selection
 from pydocformatter.cli.settings_check import CheckSettings
 from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
+from pydocformatter.rules.definition_helpers import source_text
 from pydocformatter.rules.definitions.PCF.PCF import PCF, CommentKind, CommentPlacement, available_comment_width, render_comment
 
 
@@ -157,14 +159,14 @@ def test_require_data_validates_category_data_type() -> None:
 
 @pytest.mark.parametrize(
     ("source", "expected_kinds"),
-    (
+    [
         ("#!/usr/bin/python\n# coding=utf-8\n", (CommentKind.SHEBANG, CommentKind.ENCODING_COOKIE)),
         ("# ordinary first line\n# CoDiNg: latin-1\n", (CommentKind.REGULAR, CommentKind.REGULAR)),
         ("\n# coding: utf-8\n", (CommentKind.ENCODING_COOKIE,)),
         ("value = 1\n# coding: utf-8\n", (CommentKind.REGULAR,)),
         ("\n\n# coding: utf-8\n", (CommentKind.REGULAR,)),
         (" #!/usr/bin/python\n", (CommentKind.SHEBANG,)),
-    ),
+    ],
 )
 def test_prepare_classifies_shebang_and_encoding_cookie_boundaries(source: str, expected_kinds: tuple[CommentKind, ...]) -> None:
     data = PCF.prepare(category_context(source))
@@ -173,7 +175,7 @@ def test_prepare_classifies_shebang_and_encoding_cookie_boundaries(source: str, 
 
 @pytest.mark.parametrize(
     "directive",
-    (
+    [
         "# type: ignore",
         "# TYPE : ignore",
         "#noqa",
@@ -200,26 +202,16 @@ def test_prepare_classifies_shebang_and_encoding_cookie_boundaries(source: str, 
         "# fmt: off",
         "# isort: skip",
         "# pragma: no cover",
-    ),
+    ],
 )
 def test_prepare_protects_type_and_tool_directives_case_insensitively(directive: str) -> None:
     data = PCF.prepare(category_context(f"value = 1  {directive}\n"))
-    assert data.comments[0].kind in (CommentKind.TYPE_DIRECTIVE, CommentKind.TOOL_DIRECTIVE)
+    assert data.comments[0].kind in {CommentKind.TYPE_DIRECTIVE, CommentKind.TOOL_DIRECTIVE}
 
 
 @pytest.mark.parametrize(
     "comment",
-    (
-        "# typewriter: prose",
-        "# noqaish prose",
-        "# nosecurity prose",
-        "# formatted prose",
-        "# isotope prose",
-        "# pragmatic prose",
-        "# noinspect prose",
-        "# language prose",
-        "# @formatting:off",
-    ),
+    ["# typewriter: prose", "# noqaish prose", "# nosecurity prose", "# formatted prose", "# isotope prose", "# pragmatic prose", "# noinspect prose", "# language prose", "# @formatting:off"],
 )
 def test_prepare_does_not_overclassify_directive_prefixes(comment: str) -> None:
     data = PCF.prepare(category_context(f"value = 1  {comment}\n"))
@@ -228,12 +220,7 @@ def test_prepare_does_not_overclassify_directive_prefixes(comment: str) -> None:
 
 @pytest.mark.parametrize(
     ("text", "raw_content", "body", "content", "is_empty", "is_hash_only"),
-    (
-        ("#", "", "", "", True, True),
-        ("# \t", " \t", "\t", "", True, True),
-        ("### \t", "## \t", "## \t", "##", False, True),
-        ("## heading ", "# heading ", "# heading ", "# heading", False, False),
-    ),
+    [("#", "", "", "", True, True), ("# \t", " \t", "\t", "", True, True), ("### \t", "## \t", "## \t", "##", False, True), ("## heading ", "# heading ", "# heading ", "# heading", False, False)],
 )
 def test_comment_info_content_views(text: str, raw_content: str, body: str, content: str, is_empty: bool, is_hash_only: bool) -> None:
     comment = PCF.prepare(category_context(f"{text}\n")).comments[0]

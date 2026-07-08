@@ -1,19 +1,30 @@
+# Future imports
+from __future__ import annotations
+
+# Standard library imports
+import tomllib
 import collections
 import dataclasses
-import tomllib
+from typing import TYPE_CHECKING
 
+# Third-party imports
 import libcst as cst
 import pytest
 
-import pydocformatter.formatter as formatter
+# First-party imports
+import pydocformatter.rules.runner as rule_runner
 import pydocformatter.rules.collection as rule_collection
 import pydocformatter.rules.documentation as rule_documentation
-import pydocformatter.rules.line_endings as line_endings
-import pydocformatter.rules.models as rule_models
-import pydocformatter.rules.runner as rule_runner
-import pydocformatter.rules_selection as rules_selection
+from pydocformatter import formatter, rules_selection
 from pydocformatter.cli import global_args, settings_check
+from pydocformatter.rules import line_endings
 from pydocformatter.rules.codes import RuleCode
+
+
+if TYPE_CHECKING:
+    # First-party imports
+    import pydocformatter.rules.models as rule_models
+
 
 _RULE_SELECTION_SETTING_KEYS = frozenset(definition.key for definition in settings_check.SETTINGS_SCHEMA.definitions if definition.group == settings_check.SettingsGroup.RULE_SELECTION)
 _REQUIRE_EXPLICIT_NOTICE = "Rule must by default be explicitly selected, unless it is removed from `require-explicit`."
@@ -231,6 +242,7 @@ PDF101: Line 4
             rule_code="PDF101",
         )
 
+    # The \x20 preserves an intentionally blank finding message without source trailing whitespace.
     with pytest.raises(rule_documentation.RuleMarkdownExampleParseError, match="invalid finding line"):
         rule_documentation.parse_rule_markdown_examples(
             """```pydocfmt-example
@@ -239,7 +251,7 @@ pass
 
 [output=unchanged]
 [findings]
-PDF101: Line 4: 
+PDF101: Line 4:\x20
 ```
 """,
             rule_code="PDF101",
@@ -262,10 +274,7 @@ PDF101: Line 4: Second exact message: with colon
         rule_code="PDF101",
     )
 
-    assert examples[0].findings == (
-        (RuleCode("PDF101"), (4,), "First exact message"),
-        (RuleCode("PDF101"), (4,), "Second exact message: with colon"),
-    )
+    assert examples[0].findings == ((RuleCode("PDF101"), (4,), "First exact message"), (RuleCode("PDF101"), (4,), "Second exact message: with colon"))
 
 
 def test_parse_rule_markdown_examples_rejects_output_matching_input() -> None:
@@ -369,8 +378,7 @@ def _settings_for_example(rule_code: str, example: rule_documentation.RuleMarkdo
     """Return resolved settings for one example, with only the documented rule selected."""
     config_options = (example.settings_text,) if example.settings_text else ()
     return settings_check.SETTINGS_SCHEMA.load(
-        global_values=global_args.GlobalArgs(config_options=config_options, isolated=True),
-        field_overrides=settings_check.CheckSettingsOverrides(select=(rule_code,)),
+        global_values=global_args.GlobalArgs(config_options=config_options, isolated=True), field_overrides=settings_check.CheckSettingsOverrides(select=(rule_code,))
     )
 
 

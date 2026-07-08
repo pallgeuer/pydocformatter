@@ -1,13 +1,17 @@
 """Shared rule metadata and diagnostic models."""
 
+# Future imports
 from __future__ import annotations
 
-import dataclasses
-import enum
+# Standard library imports
 import re
+import enum
+import dataclasses
 
-import pydocformatter.rules.line_targets as line_targets
+# First-party imports
+from pydocformatter.rules import line_targets
 from pydocformatter.rules.codes import ALL_RULE_SELECTOR_TAG, RuleCode
+
 
 _RULE_PREFIX_RE = re.compile(r"^[A-Z]+$")
 
@@ -238,12 +242,11 @@ class RuleFinding:
             return self.instance_fixable
         if self.rule.fix_availability == FixAvailability.ALWAYS:
             return True
-        elif self.rule.fix_availability == FixAvailability.NEVER:
+        if self.rule.fix_availability == FixAvailability.NEVER:
             return False
-        elif self.rule.fix_availability in {FixAvailability.USUALLY, FixAvailability.SOMETIMES}:
+        if self.rule.fix_availability in {FixAvailability.USUALLY, FixAvailability.SOMETIMES}:
             raise ValueError(f"{self.rule.code}: Findings for {self.rule.fix_availability.lower()}-fixable rules must specify instance_fixable")
-        else:
-            raise AssertionError(f"Unexpected fix availability: {self.rule.fix_availability}")
+        raise AssertionError(f"Unexpected fix availability: {self.rule.fix_availability}")
 
     @property
     def grouping_key(self) -> RuleFinding.Key:

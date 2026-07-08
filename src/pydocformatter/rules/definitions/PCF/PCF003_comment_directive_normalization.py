@@ -1,17 +1,27 @@
 """PCF003 comment-directive-normalization rule."""
 
+# Future imports
 from __future__ import annotations
 
+# Standard library imports
 import re
+from typing import TYPE_CHECKING
 
-import pydocformatter.rules.definition_helpers.directives as directive_helpers
-import pydocformatter.rules.definitions.PCF.PCF as PCF_definition
-import pydocformatter.rules.edits as rule_edits
-import pydocformatter.rules.registration as rule_registration
+# First-party imports
 import pydocformatter.rules.violations as rule_violations
+import pydocformatter.rules.registration as rule_registration
+import pydocformatter.rules.definitions.PCF.PCF as PCF_definition
+import pydocformatter.rules.definition_helpers.directives as directive_helpers
 from pydocformatter.rules.codes import RuleCode
-from pydocformatter.rules.definition import RuleBase, RuleContext
+from pydocformatter.rules.definition import RuleBase
 from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata
+
+
+if TYPE_CHECKING:
+    # First-party imports
+    import pydocformatter.rules.edits as rule_edits
+    from pydocformatter.rules.definition import RuleContext
+
 
 _LIST_ITEM_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
 # ty: prefixes are accepted only in type: ignore[...] lists, where mixed type-checker payloads are used.
@@ -67,7 +77,7 @@ def _planned_changes(context: RuleContext) -> tuple[rule_edits.PlannedSourceChan
     data = PCF_definition.PCF.require_data(context)
     changes: list[rule_edits.PlannedSourceChange] = []
     for comment in data.comments:
-        if comment.kind not in (PCF_definition.CommentKind.TYPE_DIRECTIVE, PCF_definition.CommentKind.TOOL_DIRECTIVE):
+        if comment.kind not in {PCF_definition.CommentKind.TYPE_DIRECTIVE, PCF_definition.CommentKind.TOOL_DIRECTIVE}:
             continue
         content = _normalized_directive_content(comment.content)
         if comment.placement == PCF_definition.CommentPlacement.TRAILING:
@@ -120,7 +130,7 @@ def _normalized_directive_content(content: str) -> str:
         return _normalized_colon_value(match.group("head"), match.group("value"))
     for keyword in ("nosec", "nosemgrep"):
         if content.lower().startswith(keyword):
-            return f"{keyword}{content[len(keyword):]}"
+            return f"{keyword}{content[len(keyword) :]}"
     return content
 
 
@@ -164,11 +174,11 @@ def _normalized_comma_list(text: str, *, item_re: re.Pattern[str], uppercase: bo
 def _normalized_colon_value(head: str, value: str) -> str:
     """Return a normalized colon directive while preserving unknown value text."""
     normalized_head = head.lower()
-    if normalized_head == "fmt" and value.lower() in {"on", "off", "skip"}:
-        value = value.lower()
-    elif normalized_head == "isort" and value.lower() in {"off", "on", "skip", "skip_file", "split"}:
-        value = value.lower()
-    elif normalized_head == "pragma" and value.lower() in {"no cover", "no branch"}:
+    if (
+        (normalized_head == "fmt" and value.lower() in {"on", "off", "skip"})
+        or (normalized_head == "isort" and value.lower() in {"off", "on", "skip", "skip_file", "split"})
+        or (normalized_head == "pragma" and value.lower() in {"no cover", "no branch"})
+    ):
         value = value.lower()
     return _normalized_colon_payload(normalized_head, value)
 

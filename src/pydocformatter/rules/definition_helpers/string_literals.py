@@ -1,12 +1,17 @@
 """Source-preserving Python string literal helpers."""
 
+# Future imports
 from __future__ import annotations
 
+# Standard library imports
+import string
 import dataclasses
 
+# Third-party imports
 import libcst as cst
 
-import pydocformatter.rules.definition_helpers.text_layout as text_layout
+# First-party imports
+from pydocformatter.rules.definition_helpers import text_layout
 
 
 @dataclasses.dataclass(frozen=True)
@@ -68,18 +73,7 @@ def _source_line(indent: str, words: tuple[SourceWord, ...]) -> WrappedSourceLin
     return WrappedSourceLine(value=f"{indent}{' '.join(word.value for word in words)}", source=f"{indent}{' '.join(word.source for word in words)}")
 
 
-_SIMPLE_ESCAPES = {
-    "\\": "\\",
-    "'": "'",
-    '"': '"',
-    "a": "\a",
-    "b": "\b",
-    "f": "\f",
-    "n": "\n",
-    "r": "\r",
-    "t": "\t",
-    "v": "\v",
-}
+_SIMPLE_ESCAPES = {"\\": "\\", "'": "'", '"': '"', "a": "\a", "b": "\b", "f": "\f", "n": "\n", "r": "\r", "t": "\t", "v": "\v"}
 _SIMPLE_ESCAPE_SOURCES = {value: f"\\{source}" for source, value in _SIMPLE_ESCAPES.items() if source not in {"'", '"', "n"}}
 
 
@@ -147,13 +141,7 @@ def simple_string_body_source(node: cst.SimpleString) -> str | None:
     return value[prefix_length + len(quote) : -len(quote)]
 
 
-def render_simple_string_from_fragments(
-    node: cst.SimpleString,
-    fragments: tuple[StringValueFragment, ...],
-    *,
-    expected_value: str,
-    prefix: str | None = None,
-) -> str | None:
+def render_simple_string_from_fragments(node: cst.SimpleString, fragments: tuple[StringValueFragment, ...], *, expected_value: str, prefix: str | None = None) -> str | None:
     """Render a simple string from source fragments and validate its value.
 
     Args:
@@ -379,15 +367,7 @@ def wrap_source_words(
 
 
 def _wrap_source_words_with_balanced_spans(
-    words: tuple[SourceWord, ...],
-    *,
-    width: int,
-    initial_width: int | None,
-    subsequent_width: int | None,
-    final_suffix_width: int,
-    initial_indent: str,
-    subsequent_indent: str,
-    tab_width: int,
+    words: tuple[SourceWord, ...], *, width: int, initial_width: int | None, subsequent_width: int | None, final_suffix_width: int, initial_indent: str, subsequent_indent: str, tab_width: int
 ) -> tuple[WrappedSourceLine, ...]:
     """Wrap source words with shared URL-aware balanced spans."""
     if not words:
@@ -408,14 +388,7 @@ def _wrap_source_words_with_balanced_spans(
 
 
 def _wrap_source_words_with_variable_widths(
-    words: tuple[SourceWord, ...],
-    *,
-    initial_width: int,
-    subsequent_width: int,
-    final_suffix_width: int,
-    initial_indent: str,
-    subsequent_indent: str,
-    tab_width: int,
+    words: tuple[SourceWord, ...], *, initial_width: int, subsequent_width: int, final_suffix_width: int, initial_indent: str, subsequent_indent: str, tab_width: int
 ) -> tuple[WrappedSourceLine, ...]:
     """Wrap words when first, continuation, or final physical lines have different budgets."""
     if not words:
@@ -520,9 +493,9 @@ def parse_simple_string_escape(body: str, start: int) -> StringEscape | None:
     if escaped == "U" and _has_hex_digits(body, start + 2, 8):
         source = body[start : start + 10]
         return StringEscape(value=chr(int(body[start + 2 : start + 10], 16)), source=source, end=start + 10)
-    if escaped in "01234567":
+    if escaped in string.octdigits:
         end = start + 2
-        while end < min(start + 4, len(body)) and body[end] in "01234567":
+        while end < min(start + 4, len(body)) and body[end] in string.octdigits:
             end += 1
         source = body[start:end]
         return StringEscape(value=chr(int(body[start + 1 : end], 8)), source=source, end=end)
@@ -544,7 +517,7 @@ def parse_simple_string_escape(body: str, start: int) -> StringEscape | None:
 
 def _has_hex_digits(text: str, start: int, length: int) -> bool:
     """Return whether a text span contains exactly the requested number of hex digits."""
-    return start + length <= len(text) and all(char in "0123456789abcdefABCDEF" for char in text[start : start + length])
+    return start + length <= len(text) and all(char in string.hexdigits for char in text[start : start + length])
 
 
 def _retarget_fragment(fragment: StringValueFragment, *, quote: str, line_ending: str) -> StringValueFragment:

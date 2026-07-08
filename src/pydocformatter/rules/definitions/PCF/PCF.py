@@ -1,27 +1,36 @@
 """PCF comment-formatting rule category."""
 
+# Future imports
 from __future__ import annotations
 
-import dataclasses
-import enum
+# Standard library imports
 import re
+import enum
+import dataclasses
 from collections.abc import Mapping
+from typing import TYPE_CHECKING
 
+# Third-party imports
 import libcst as cst
 import libcst.metadata as cst_metadata
 
-import pydocformatter.rules.definition_helpers.source_text as source_text
-import pydocformatter.rules.definition_helpers.text_layout as text_layout
+# First-party imports
 import pydocformatter.rules.edits as rule_edits
 import pydocformatter.rules.registration as rule_registration
-from pydocformatter.rules.definition import RuleCategoryBase, RuleCategoryContext, RuleContext
+from pydocformatter.rules.definition import RuleCategoryBase
+from pydocformatter.rules.definition_helpers import source_text, text_layout
 from pydocformatter.rules.models import RuleCategoryMetadata
+
+
+if TYPE_CHECKING:
+    # First-party imports
+    from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
+
 
 _ENCODING_COOKIE_RE = re.compile(r"^#.*?coding[:=][ \t]*[-_.a-zA-Z0-9]+")
 _TYPE_DIRECTIVE_RE = re.compile(r"^#\s*type\s*:", re.IGNORECASE)
 _TOOL_DIRECTIVE_RE = re.compile(
-    r"^#\s*(?:noqa\b|nosec\b|nosemgrep\b|pydocfmt\b|pylint\b|pyright\b|mypy\b|ty\s*:|ruff\b|flake8\b|fmt\s*:|isort\s*:|pragma\b|noinspection\b|language\s*=|@formatter\s*:)",
-    re.IGNORECASE,
+    r"^#\s*(?:noqa\b|nosec\b|nosemgrep\b|pydocfmt\b|pylint\b|pyright\b|mypy\b|ty\s*:|ruff\b|flake8\b|fmt\s*:|isort\s*:|pragma\b|noinspection\b|language\s*=|@formatter\s*:)", re.IGNORECASE
 )
 
 
@@ -97,7 +106,7 @@ class CommentInfo:
             str: Comment content used for prose and structure parsing.
         """
         content = self.raw_content
-        return content[1:] if content.startswith(" ") else content
+        return content.removeprefix(" ")
 
     @property
     def content(self) -> str:
@@ -204,18 +213,14 @@ class _CommentCollector(cst.CSTVisitor):
 
 
 @rule_registration.register_rule_category
-class PCF(RuleCategoryBase):
+class PCF(RuleCategoryBase[PCFCategoryData]):
     """Comment formatting rule category.
 
     Attributes:
         meta (RuleMetadata): Static metadata used for registration, diagnostics, and rule selection.
     """
 
-    meta = RuleCategoryMetadata(
-        prefix="PCF",
-        name="pydocformatter comment formatting",
-        url="https://github.com/pallgeuer/pydocformatter",
-    )
+    meta = RuleCategoryMetadata(prefix="PCF", name="pydocformatter comment formatting", url="https://github.com/pallgeuer/pydocformatter")
 
     @classmethod
     def prepare(cls, context: RuleCategoryContext) -> PCFCategoryData:
@@ -229,12 +234,7 @@ class PCF(RuleCategoryBase):
         """
         del cls
         if "#" not in context.source:
-            return PCFCategoryData(
-                source_lines=context.source_lines,
-                comments=(),
-                standalone_runs=(),
-                trailing_comments=(),
-            )
+            return PCFCategoryData(source_lines=context.source_lines, comments=(), standalone_runs=(), trailing_comments=())
         collector = _CommentCollector()
         context.module.visit(collector)
         source_lines_with_endings = context.source_lines
@@ -313,11 +313,7 @@ def render_inline_trailing_comment(code: str, content: str) -> str:
     return f"{code}  # {content}" if content else f"{code}  #"
 
 
-def planned_full_line_change(
-    data: PCFCategoryData,
-    comment: CommentInfo,
-    replacement: str,
-) -> rule_edits.PlannedSourceChange | None:
+def planned_full_line_change(data: PCFCategoryData, comment: CommentInfo, replacement: str) -> rule_edits.PlannedSourceChange | None:
     """Return a full-line source change unless source already matches.
 
     Args:
@@ -328,17 +324,10 @@ def planned_full_line_change(
     Returns:
         rule_edits.PlannedSourceChange | None: Full-line replacement, or None when source already matches.
     """
-    code_range = cst_metadata.CodeRange(
-        start=cst_metadata.CodePosition(line=comment.range.start.line, column=0),
-        end=comment.range.end,
-    )
+    code_range = cst_metadata.CodeRange(start=cst_metadata.CodePosition(line=comment.range.start.line, column=0), end=comment.range.end)
     if data.source_for(code_range) == replacement:
         return None
-    return rule_edits.PlannedSourceChange(
-        edit=rule_edits.SourceEdit(range=code_range, replacement=replacement),
-        line_numbers=(comment.range.start.line,),
-        suppression_line_numbers=(),
-    )
+    return rule_edits.PlannedSourceChange(edit=rule_edits.SourceEdit(range=code_range, replacement=replacement), line_numbers=(comment.range.start.line,), suppression_line_numbers=())
 
 
 def _comment_info(node: cst.Comment, *, positions: Mapping[cst.CSTNode, cst_metadata.CodeRange], source_lines: list[str], syntax_sensitive: bool) -> CommentInfo:
@@ -399,13 +388,7 @@ def _standalone_runs(comments: tuple[CommentInfo, ...]) -> tuple[StandaloneComme
     def flush() -> None:
         if not current:
             return
-        runs.append(
-            StandaloneCommentRun(
-                comments=tuple(current),
-                range=cst_metadata.CodeRange(start=current[0].range.start, end=current[-1].range.end),
-                indent=current[0].indent,
-            )
-        )
+        runs.append(StandaloneCommentRun(comments=tuple(current), range=cst_metadata.CodeRange(start=current[0].range.start, end=current[-1].range.end), indent=current[0].indent))
         current.clear()
 
     for comment in comments:

@@ -1,8 +1,10 @@
 """Docstring convention policy helpers."""
 
+# Future imports
 from __future__ import annotations
 
-import pydocformatter.cli.settings_check as settings_check
+# First-party imports
+from pydocformatter.cli import settings_check
 
 
 def ignored_conventions_except(*allowed: settings_check.DocstringConvention) -> tuple[settings_check.DocstringConvention, ...]:
@@ -28,4 +30,4 @@ def missing_documentation_is_inert(convention: settings_check.DocstringConventio
     Returns:
         bool: Whether missing-documentation checks should avoid reporting convention-targeted findings.
     """
-    return convention in (settings_check.DocstringConvention.NONE, settings_check.DocstringConvention.PEP257)
+    return convention in {settings_check.DocstringConvention.NONE, settings_check.DocstringConvention.PEP257}
