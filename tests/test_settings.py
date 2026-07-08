@@ -1,5 +1,7 @@
+# Future imports
+from __future__ import annotations
+
 # Standard library imports
-import os
 import re
 import enum
 import json
@@ -7,14 +9,18 @@ import math
 import typing
 import argparse
 import tempfile
-import unittest
 import subprocess
 import dataclasses
-import unittest.mock
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 # Third-party imports
 import pytest
+
+
+if TYPE_CHECKING:
+    # Third-party imports
+    from pytest_mock import MockerFixture
 
 # First-party imports
 import pydocformatter.settings as pydocformatter_settings_core
@@ -22,1325 +28,1282 @@ import pydocformatter.cli.global_args as pydocformatter_global_args
 import pydocformatter.cli.settings_check as pydocformatter_settings
 from pydocformatter.cli.settings_check import DEFAULT_EXCLUDE, DEFAULT_INCLUDE, CheckSettings, CheckSettingsOverrides, CommentTaskMarkerMode, IndentStyle, LineEnding, OutputFormat, SettingsGroup
 from pydocformatter.settings import MultiStringMap, SettingCLIDefinition, SettingCLIOptions, SettingCLIValueKind, SettingDefinition, SettingsError, SettingsSchema, StringList
+from tests import git_helpers
 
 
 FRACTIONAL_PARALLELISM = 0.5
 
 
-@pytest.mark.isolated_cwd
-class TestSettings(unittest.TestCase):
-    @staticmethod
-    def _repo_root() -> Path:
-        """Return the repository root used for subprocess-based tool checks."""
-        return Path(__file__).resolve().parents[1]
+pytestmark = pytest.mark.isolated_cwd
 
-    @staticmethod
-    def _write_git_marker(root: Path) -> None:
-        """Write a minimal git worktree marker in a temporary root."""
-        (root / ".git").write_text("gitdir: .git-test\n", encoding="utf-8")
 
-    def test_check_settings_schema_uses_generic_settings_definitions(self) -> None:
-        assert pydocformatter_settings.SETTINGS_SCHEMA.settings_type is CheckSettings
-        assert pydocformatter_settings.SETTINGS_SCHEMA.overrides_type is CheckSettingsOverrides
-        assert all(isinstance(definition, SettingDefinition) for definition in pydocformatter_settings.SETTINGS_SCHEMA.definitions)
-        assert "tags" not in tuple(field.name for field in dataclasses.fields(SettingDefinition))
-        assert "render" not in tuple(field.name for field in dataclasses.fields(SettingDefinition))
-        assert tuple(field.name for field in dataclasses.fields(SettingDefinition)) == (
-            "field",
-            "value_type",
-            "group",
-            "help",
-            "key",
-            "available_in_cli",
-            "available_in_toml",
-            "validator",
-            "cli",
-            "documentation",
-            "example",
-        )
-        assert tuple(field.name for field in dataclasses.fields(SettingsSchema)) == ("settings_type", "overrides_type", "group_type", "definitions", "table_path", "table_name", "post_validate")
-        assert not next(field for field in dataclasses.fields(SettingsSchema) if field.name == "table_name").init
-        assert pydocformatter_settings.SETTINGS_SCHEMA.table_name == "tool.pydocfmt"
-        assert pydocformatter_settings.SETTINGS_SCHEMA.group_type is SettingsGroup
-        assert SettingsError is pydocformatter_settings_core.SettingsError
-        assert hasattr(pydocformatter_settings_core, "SettingCLIDefinition")
-        assert hasattr(pydocformatter_settings_core, "SettingCLIOptions")
-        assert not hasattr(pydocformatter_settings_core, "SettingCliDefinition")
-        assert hasattr(pydocformatter_settings_core, "StringList")
-        assert hasattr(pydocformatter_settings_core, "MultiStringMap")
-        assert not hasattr(pydocformatter_settings, "RuleSelectorMap")
+def _repo_root() -> Path:
+    """Return the repository root used for subprocess-based tool checks."""
+    return Path(__file__).resolve().parents[1]
 
-    def test_cli_options_and_resolved_definition_fields_match(self) -> None:
-        options_hints = typing.get_type_hints(SettingCLIOptions)
-        definition_hints = typing.get_type_hints(SettingCLIDefinition)
 
-        assert not SettingCLIOptions.__total__
-        assert options_hints == definition_hints
-        assert tuple(options_hints) == tuple(field.name for field in dataclasses.fields(SettingCLIDefinition))
+def test_check_settings_schema_uses_generic_settings_definitions() -> None:
+    assert pydocformatter_settings.SETTINGS_SCHEMA.settings_type is CheckSettings
+    assert pydocformatter_settings.SETTINGS_SCHEMA.overrides_type is CheckSettingsOverrides
+    assert all(isinstance(definition, SettingDefinition) for definition in pydocformatter_settings.SETTINGS_SCHEMA.definitions)
+    assert "tags" not in tuple(field.name for field in dataclasses.fields(SettingDefinition))
+    assert "render" not in tuple(field.name for field in dataclasses.fields(SettingDefinition))
+    assert tuple(field.name for field in dataclasses.fields(SettingDefinition)) == (
+        "field",
+        "value_type",
+        "group",
+        "help",
+        "key",
+        "available_in_cli",
+        "available_in_toml",
+        "validator",
+        "cli",
+        "documentation",
+        "example",
+    )
+    assert tuple(field.name for field in dataclasses.fields(SettingsSchema)) == ("settings_type", "overrides_type", "group_type", "definitions", "table_path", "table_name", "post_validate")
+    assert not next(field for field in dataclasses.fields(SettingsSchema) if field.name == "table_name").init
+    assert pydocformatter_settings.SETTINGS_SCHEMA.table_name == "tool.pydocfmt"
+    assert pydocformatter_settings.SETTINGS_SCHEMA.group_type is SettingsGroup
+    assert SettingsError is pydocformatter_settings_core.SettingsError
+    assert hasattr(pydocformatter_settings_core, "SettingCLIDefinition")
+    assert hasattr(pydocformatter_settings_core, "SettingCLIOptions")
+    assert not hasattr(pydocformatter_settings_core, "SettingCliDefinition")
+    assert hasattr(pydocformatter_settings_core, "StringList")
+    assert hasattr(pydocformatter_settings_core, "MultiStringMap")
+    assert not hasattr(pydocformatter_settings, "RuleSelectorMap")
 
-    def test_cli_definition_stores_resolved_show_default(self) -> None:
-        assert SettingCLIDefinition().show_default
-        assert SettingCLIDefinition(value_kind=SettingCLIValueKind.COMMA_LIST).show_default
-        assert not SettingCLIDefinition(show_default=False).show_default
-        assert SettingCLIDefinition(value_kind=SettingCLIValueKind.COMMA_LIST, show_default=True).show_default
 
-    def test_setting_definition_resolves_default_key_and_cli_flags(self) -> None:
-        definition = SettingDefinition(field="line_length", value_type=int, group=SettingsGroup.FORMATTING, help="Maximum line length.", validator=pydocformatter_settings_core.validate_int())
-        empty_documentation_definition = SettingDefinition(field="line_length", value_type=int, group=SettingsGroup.FORMATTING, help="Maximum line length.", documentation="")
-        none_documentation_definition = SettingDefinition(field="line_length", value_type=int, group=SettingsGroup.FORMATTING, help="Maximum line length.", documentation=None)
-        example_definition = SettingDefinition(field="line_length", value_type=int, group=SettingsGroup.FORMATTING, help="Maximum line length.", example="line-length = 120")
+def test_cli_options_and_resolved_definition_fields_match() -> None:
+    options_hints = typing.get_type_hints(SettingCLIOptions)
+    definition_hints = typing.get_type_hints(SettingCLIDefinition)
 
-        assert definition.key == "line-length"
-        assert definition.documentation == definition.help
-        assert definition.example == ""
-        assert empty_documentation_definition.documentation == empty_documentation_definition.help
-        assert none_documentation_definition.documentation == none_documentation_definition.help
-        assert example_definition.example == "line-length = 120"
-        assert definition.cli is not None
-        cli = definition.cli
-        assert cli is not None
-        assert cli.flags == ("--line-length",)
+    assert not SettingCLIOptions.__total__
+    assert options_hints == definition_hints
+    assert tuple(options_hints) == tuple(field.name for field in dataclasses.fields(SettingCLIDefinition))
 
-    def test_setting_definition_respects_explicit_key_and_cli_flags(self) -> None:
-        definition = SettingDefinition(
-            field="config_options",
-            value_type=StringList,
-            group=SettingsGroup.FORMATTING,
-            help="Configuration options.",
-            key="config",
-            validator=pydocformatter_settings_core.validate_string_list,
-            cli={"flags": ("-c", "--config")},
-        )
 
-        assert definition.key == "config"
-        assert definition.cli is not None
-        cli = definition.cli
-        assert cli is not None
-        assert cli.flags == ("-c", "--config")
+def test_cli_definition_stores_resolved_show_default() -> None:
+    assert SettingCLIDefinition().show_default
+    assert SettingCLIDefinition(value_kind=SettingCLIValueKind.COMMA_LIST).show_default
+    assert not SettingCLIDefinition(show_default=False).show_default
+    assert SettingCLIDefinition(value_kind=SettingCLIValueKind.COMMA_LIST, show_default=True).show_default
 
-    def test_setting_definition_uses_explicit_key_for_default_cli_flags(self) -> None:
-        definition = SettingDefinition(
-            field="config_options", value_type=StringList, group=SettingsGroup.FORMATTING, help="Configuration options.", key="config", validator=pydocformatter_settings_core.validate_string_list
-        )
 
-        assert definition.key == "config"
-        assert definition.cli is not None
-        cli = definition.cli
-        assert cli is not None
-        assert cli.flags == ("--config",)
+def test_setting_definition_resolves_default_key_and_cli_flags() -> None:
+    definition = SettingDefinition(field="line_length", value_type=int, group=SettingsGroup.FORMATTING, help="Maximum line length.", validator=pydocformatter_settings_core.validate_int())
+    empty_documentation_definition = SettingDefinition(field="line_length", value_type=int, group=SettingsGroup.FORMATTING, help="Maximum line length.", documentation="")
+    none_documentation_definition = SettingDefinition(field="line_length", value_type=int, group=SettingsGroup.FORMATTING, help="Maximum line length.", documentation=None)
+    example_definition = SettingDefinition(field="line_length", value_type=int, group=SettingsGroup.FORMATTING, help="Maximum line length.", example="line-length = 120")
 
-    def test_setting_definition_respects_explicit_no_cli(self) -> None:
-        definition = SettingDefinition(field="force_exclude", value_type=bool, group=SettingsGroup.FORMATTING, help="Force excludes.", available_in_cli=False)
+    assert definition.key == "line-length"
+    assert definition.documentation == definition.help
+    assert definition.example == ""
+    assert empty_documentation_definition.documentation == empty_documentation_definition.help
+    assert none_documentation_definition.documentation == none_documentation_definition.help
+    assert example_definition.example == "line-length = 120"
+    assert definition.cli is not None
+    cli = definition.cli
+    assert cli is not None
+    assert cli.flags == ("--line-length",)
 
-        assert not definition.available_in_cli
-        assert definition.cli is None
 
-    def test_setting_definition_derives_defaults_from_type(self) -> None:
-        enum_definition = SettingDefinition(field="line_ending", value_type=LineEnding, group=SettingsGroup.FORMATTING, help="Line ending.")
-        bool_definition = SettingDefinition(field="force_exclude", value_type=bool, group=SettingsGroup.FORMATTING, help="Force excludes.")
-        int_definition = SettingDefinition(field="line_length", value_type=int, group=SettingsGroup.FORMATTING, help="Line length.")
-        float_definition = SettingDefinition(field="parallelism", value_type=float, group=SettingsGroup.FORMATTING, help="Parallelism.")
-        string_list_definition = SettingDefinition(field="include", value_type=StringList, group=SettingsGroup.FILE_SELECTION, help="Include.")
-        string_map_definition = SettingDefinition(field="per_file_ignores", value_type=MultiStringMap, group=SettingsGroup.RULE_SELECTION, help="Per-file ignores.")
+def test_setting_definition_respects_explicit_key_and_cli_flags() -> None:
+    definition = SettingDefinition(
+        field="config_options",
+        value_type=StringList,
+        group=SettingsGroup.FORMATTING,
+        help="Configuration options.",
+        key="config",
+        validator=pydocformatter_settings_core.validate_string_list,
+        cli={"flags": ("-c", "--config")},
+    )
 
-        assert enum_definition.cli is not None
-        assert bool_definition.cli is not None
-        assert int_definition.cli is not None
-        assert string_list_definition.cli is not None
-        assert string_map_definition.cli is not None
-        assert enum_definition.cli.choices == tuple(member.value for member in LineEnding)
-        assert bool_definition.cli.action is argparse.BooleanOptionalAction
-        assert int_definition.cli.type is int
-        assert float_definition.cli is not None
-        assert float_definition.cli is not None
-        assert float_definition.cli.type is float
-        assert string_list_definition.cli.action == "append"
-        assert string_list_definition.cli.value_kind == SettingCLIValueKind.COMMA_LIST
-        assert not string_list_definition.cli.show_default
-        assert string_map_definition.cli.action == "append"
-        assert string_map_definition.cli.value_kind == SettingCLIValueKind.TOML_MAP
-        assert not string_map_definition.cli.show_default
-        assert enum_definition.validator("lf", "line-ending") == LineEnding.LF
-        force_exclude = True
-        assert bool_definition.validator(force_exclude, "force-exclude")
-        assert int_definition.validator(1, "line-length") == 1
-        assert float_definition.validator(FRACTIONAL_PARALLELISM, "parallelism") == FRACTIONAL_PARALLELISM
-        assert string_list_definition.validator(["*.py"], "include") == ("*.py",)
-        assert string_map_definition.validator({"tests/*.py": ["PCF001"]}, "per-file-ignores") == (("tests/*.py", ("PCF001",)),)
+    assert definition.key == "config"
+    assert definition.cli is not None
+    cli = definition.cli
+    assert cli is not None
+    assert cli.flags == ("-c", "--config")
 
-    def test_setting_definition_respects_explicit_cli_options_during_defaulting(self) -> None:
-        default_int_definition = SettingDefinition(field="line_length", value_type=int, group=SettingsGroup.FORMATTING, help="Line length.")
-        raw_list_definition = SettingDefinition(field="include", value_type=StringList, group=SettingsGroup.FILE_SELECTION, help="Include.", cli={"value_kind": SettingCLIValueKind.RAW})
-        show_default_list_definition = SettingDefinition(field="include", value_type=StringList, group=SettingsGroup.FILE_SELECTION, help="Include.", cli={"show_default": True})
 
-        assert default_int_definition.cli is not None
-        assert raw_list_definition.cli is not None
-        assert show_default_list_definition.cli is not None
-        assert default_int_definition.cli.value_kind == SettingCLIValueKind.RAW
-        assert default_int_definition.cli.show_default
-        assert raw_list_definition.cli.value_kind == SettingCLIValueKind.RAW
-        assert raw_list_definition.cli.show_default
-        assert show_default_list_definition.cli.value_kind == SettingCLIValueKind.COMMA_LIST
-        assert show_default_list_definition.cli.show_default
+def test_setting_definition_uses_explicit_key_for_default_cli_flags() -> None:
+    definition = SettingDefinition(
+        field="config_options", value_type=StringList, group=SettingsGroup.FORMATTING, help="Configuration options.", key="config", validator=pydocformatter_settings_core.validate_string_list
+    )
 
-    def test_global_args_defaults_without_parser_values(self) -> None:
-        args = argparse.Namespace()
+    assert definition.key == "config"
+    assert definition.cli is not None
+    cli = definition.cli
+    assert cli is not None
+    assert cli.flags == ("--config",)
 
-        assert pydocformatter_global_args.global_values_from_arguments(args, dest_prefixes=("global", "command")) == pydocformatter_global_args.GlobalArgs()
 
-    def test_global_args_parse_all_parser_levels(self) -> None:
-        parser = argparse.ArgumentParser()
-        pydocformatter_global_args.add_global_arguments(parser, dest_prefix="global")
-        subparsers = parser.add_subparsers(dest="command")
-        command = subparsers.add_parser("check")
-        pydocformatter_global_args.add_global_arguments(command, dest_prefix="command")
+def test_setting_definition_respects_explicit_no_cli() -> None:
+    definition = SettingDefinition(field="force_exclude", value_type=bool, group=SettingsGroup.FORMATTING, help="Force excludes.", available_in_cli=False)
 
-        args = parser.parse_args(["--config", "line-length = 90", "check", "--config", "line-length = 91", "--isolated"])
+    assert not definition.available_in_cli
+    assert definition.cli is None
 
-        global_values = pydocformatter_global_args.global_values_from_arguments(args, dest_prefixes=("global", "command"))
 
-        assert global_values.config_options == ("line-length = 90", "line-length = 91")
-        assert global_values.isolated
+def test_setting_definition_derives_defaults_from_type() -> None:
+    enum_definition = SettingDefinition(field="line_ending", value_type=LineEnding, group=SettingsGroup.FORMATTING, help="Line ending.")
+    bool_definition = SettingDefinition(field="force_exclude", value_type=bool, group=SettingsGroup.FORMATTING, help="Force excludes.")
+    int_definition = SettingDefinition(field="line_length", value_type=int, group=SettingsGroup.FORMATTING, help="Line length.")
+    float_definition = SettingDefinition(field="parallelism", value_type=float, group=SettingsGroup.FORMATTING, help="Parallelism.")
+    string_list_definition = SettingDefinition(field="include", value_type=StringList, group=SettingsGroup.FILE_SELECTION, help="Include.")
+    string_map_definition = SettingDefinition(field="per_file_ignores", value_type=MultiStringMap, group=SettingsGroup.RULE_SELECTION, help="Per-file ignores.")
 
-    def test_setting_definitions_match_formatter_settings_fields(self) -> None:
-        setting_fields = tuple(field.name for field in dataclasses.fields(CheckSettings))
-        setting_annotations = typing.get_type_hints(CheckSettings)
-        override_annotations = typing.get_type_hints(CheckSettingsOverrides)
-        definition_fields = tuple(definition.field for definition in pydocformatter_settings.SETTINGS_SCHEMA.definitions)
+    assert enum_definition.cli is not None
+    assert bool_definition.cli is not None
+    assert int_definition.cli is not None
+    assert string_list_definition.cli is not None
+    assert string_map_definition.cli is not None
+    assert enum_definition.cli.choices == tuple(member.value for member in LineEnding)
+    assert bool_definition.cli.action is argparse.BooleanOptionalAction
+    assert int_definition.cli.type is int
+    assert float_definition.cli is not None
+    assert float_definition.cli is not None
+    assert float_definition.cli.type is float
+    assert string_list_definition.cli.action == "append"
+    assert string_list_definition.cli.value_kind == SettingCLIValueKind.COMMA_LIST
+    assert not string_list_definition.cli.show_default
+    assert string_map_definition.cli.action == "append"
+    assert string_map_definition.cli.value_kind == SettingCLIValueKind.TOML_MAP
+    assert not string_map_definition.cli.show_default
+    assert enum_definition.validator("lf", "line-ending") == LineEnding.LF
+    force_exclude = True
+    assert bool_definition.validator(force_exclude, "force-exclude")
+    assert int_definition.validator(1, "line-length") == 1
+    assert float_definition.validator(FRACTIONAL_PARALLELISM, "parallelism") == FRACTIONAL_PARALLELISM
+    assert string_list_definition.validator(["*.py"], "include") == ("*.py",)
+    assert string_map_definition.validator({"tests/*.py": ["PCF001"]}, "per-file-ignores") == (("tests/*.py", ("PCF001",)),)
 
-        assert definition_fields == setting_fields
-        assert tuple(definition.value_type for definition in pydocformatter_settings.SETTINGS_SCHEMA.definitions) == tuple(setting_annotations[field] for field in setting_fields)
-        assert set(override_annotations) == set(setting_fields)
-        assert override_annotations == {field: setting_annotations[field] for field in setting_fields}
-        assert tuple(getattr(CheckSettings(), definition.field) for definition in pydocformatter_settings.SETTINGS_SCHEMA.definitions) == tuple(
-            getattr(CheckSettings(), field) for field in setting_fields
-        )
 
-    def test_setting_definitions_are_iterable_by_group(self) -> None:
-        run_fields = tuple(definition.field for definition in pydocformatter_settings.SETTINGS_SCHEMA.definitions if definition.group == SettingsGroup.RUN)
-        formatting_fields = tuple(definition.field for definition in pydocformatter_settings.SETTINGS_SCHEMA.definitions if definition.group == SettingsGroup.FORMATTING)
-        docstring_formatting_fields = tuple(definition.field for definition in pydocformatter_settings.SETTINGS_SCHEMA.definitions if definition.group == SettingsGroup.DOCSTRING_FORMATTING)
-        comment_formatting_fields = tuple(definition.field for definition in pydocformatter_settings.SETTINGS_SCHEMA.definitions if definition.group == SettingsGroup.COMMENT_FORMATTING)
-        rule_selection_fields = tuple(definition.field for definition in pydocformatter_settings.SETTINGS_SCHEMA.definitions if definition.group == SettingsGroup.RULE_SELECTION)
-        file_selection_fields = tuple(definition.field for definition in pydocformatter_settings.SETTINGS_SCHEMA.definitions if definition.group == SettingsGroup.FILE_SELECTION)
-        configuration_fields = tuple(definition.field for definition in pydocformatter_settings.SETTINGS_SCHEMA.definitions if definition.group == SettingsGroup.CONFIGURATION)
+def test_setting_definition_respects_explicit_cli_options_during_defaulting() -> None:
+    default_int_definition = SettingDefinition(field="line_length", value_type=int, group=SettingsGroup.FORMATTING, help="Line length.")
+    raw_list_definition = SettingDefinition(field="include", value_type=StringList, group=SettingsGroup.FILE_SELECTION, help="Include.", cli={"value_kind": SettingCLIValueKind.RAW})
+    show_default_list_definition = SettingDefinition(field="include", value_type=StringList, group=SettingsGroup.FILE_SELECTION, help="Include.", cli={"show_default": True})
 
-        assert run_fields == ("output_format", "parallelism")
-        assert formatting_fields == ("line_length", "url_aware_wrapping", "line_ending", "indent_style", "indent_width")
-        assert docstring_formatting_fields == (
-            "docstring_convention",
-            "docstring_blank_line_style",
-            "docstring_blank_line_after_last_section",
-            "docstring_missing_documentation",
-            "docstring_missing_documentation_public_only",
-            "docstring_require_init_attribute_documentation",
-            "docstring_class_attribute_no_type_base_classes",
-            "docstring_forbidden_function_decorators",
-            "docstring_optional_function_decorators",
-            "docstring_property_decorators",
-            "docstring_parse_list_items",
-            "docstring_parse_headings",
-            "docstring_parse_doctests",
-            "docstring_parse_code_fences",
-            "docstring_parse_block_quotes",
-            "docstring_parse_tables",
-            "docstring_parse_directives",
-            "docstring_parse_literal_blocks",
-        )
-        assert comment_formatting_fields == (
-            "comment_join_standalone_lines",
-            "comment_format_list_items",
-            "comment_task_marker_mode",
-            "comment_task_markers",
-            "comment_preserve_headings",
-            "comment_preserve_doctests",
-            "comment_preserve_code_fences",
-            "comment_format_block_quotes",
-            "comment_preserve_tables",
-            "comment_preserve_directives",
-            "comment_trailing_extraction_syntax_aware",
-            "comment_trailing_extraction_content_aware",
-            "comment_detect_code",
-            "comment_detect_statements",
-            "comment_detect_expressions",
-        )
-        assert rule_selection_fields == ("select", "ignore", "extend_select", "require_explicit", "per_file_ignores", "extend_per_file_ignores", "fixable", "unfixable", "extend_fixable")
-        assert file_selection_fields == ("include", "extend_include", "exclude", "extend_exclude", "respect_gitignore", "force_exclude")
-        assert configuration_fields == ("per_file_settings",)
+    assert default_int_definition.cli is not None
+    assert raw_list_definition.cli is not None
+    assert show_default_list_definition.cli is not None
+    assert default_int_definition.cli.value_kind == SettingCLIValueKind.RAW
+    assert default_int_definition.cli.show_default
+    assert raw_list_definition.cli.value_kind == SettingCLIValueKind.RAW
+    assert raw_list_definition.cli.show_default
+    assert show_default_list_definition.cli.value_kind == SettingCLIValueKind.COMMA_LIST
+    assert show_default_list_definition.cli.show_default
 
-    def test_settings_schema_add_arguments_adds_groups_in_order(self) -> None:
-        parser = argparse.ArgumentParser()
 
-        pydocformatter_settings.SETTINGS_SCHEMA.add_arguments(parser, CheckSettings())
+def test_global_args_defaults_without_parser_values() -> None:
+    args = argparse.Namespace()
 
-        group_titles = tuple(group.title for group in parser._action_groups)
-        assert group_titles.index(SettingsGroup.RUN.value) < group_titles.index(SettingsGroup.FORMATTING.value)
-        assert group_titles.index(SettingsGroup.FORMATTING.value) < group_titles.index(SettingsGroup.COMMENT_FORMATTING.value)
-        assert group_titles.index(SettingsGroup.FORMATTING.value) < group_titles.index(SettingsGroup.DOCSTRING_FORMATTING.value)
-        assert group_titles.index(SettingsGroup.DOCSTRING_FORMATTING.value) < group_titles.index(SettingsGroup.COMMENT_FORMATTING.value)
-        assert group_titles.index(SettingsGroup.COMMENT_FORMATTING.value) < group_titles.index(SettingsGroup.RULE_SELECTION.value)
-        assert group_titles.index(SettingsGroup.RULE_SELECTION.value) < group_titles.index(SettingsGroup.FILE_SELECTION.value)
-        assert group_titles.index(SettingsGroup.FILE_SELECTION.value) < group_titles.index(SettingsGroup.CONFIGURATION.value)
-        option_strings = {option for action in parser._actions for option in action.option_strings}
-        schema_option_strings = {
-            flag for definition in pydocformatter_settings.SETTINGS_SCHEMA.definitions if definition.available_in_cli for flag in typing.cast("SettingCLIDefinition", definition.cli).flags
-        }
-        assert schema_option_strings <= option_strings
+    assert pydocformatter_global_args.global_values_from_arguments(args, dest_prefixes=("global", "command")) == pydocformatter_global_args.GlobalArgs()
 
-    def test_settings_schema_rejects_invalid_definition_group(self) -> None:
-        class OtherGroup(enum.StrEnum):
-            OTHER = "Other"
 
-        with pytest.raises(TypeError, match=r"must belong to SettingsGroup.*line_length"):
-            SettingsSchema(
-                settings_type=CheckSettings,
-                overrides_type=CheckSettingsOverrides,
-                group_type=SettingsGroup,
-                definitions=(SettingDefinition(field="line_length", value_type=int, group=OtherGroup.OTHER, help="Maximum line length."),),
-                table_path=("tool", "custom"),
-            )
+def test_global_args_parse_all_parser_levels() -> None:
+    parser = argparse.ArgumentParser()
+    pydocformatter_global_args.add_global_arguments(parser, dest_prefix="global")
+    subparsers = parser.add_subparsers(dest="command")
+    command = subparsers.add_parser("check")
+    pydocformatter_global_args.add_global_arguments(command, dest_prefix="command")
 
-    def test_settings_schema_rejects_empty_table_path(self) -> None:
-        with pytest.raises(ValueError, match=r"table_path.*non-empty"):
-            SettingsSchema(settings_type=CheckSettings, overrides_type=CheckSettingsOverrides, group_type=SettingsGroup, definitions=pydocformatter_settings.SETTINGS_SCHEMA.definitions, table_path=())
+    args = parser.parse_args(["--config", "line-length = 90", "check", "--config", "line-length = 91", "--isolated"])
 
-    def test_settings_schema_rejects_empty_table_path_segment(self) -> None:
-        with pytest.raises(ValueError, match=r"table_path.*non-empty"):
-            SettingsSchema(
-                settings_type=CheckSettings, overrides_type=CheckSettingsOverrides, group_type=SettingsGroup, definitions=pydocformatter_settings.SETTINGS_SCHEMA.definitions, table_path=("tool", "")
-            )
+    global_values = pydocformatter_global_args.global_values_from_arguments(args, dest_prefixes=("global", "command"))
 
-    def test_validation_context_uses_explicit_key(self) -> None:
-        @dataclasses.dataclass(frozen=True)
-        class CustomSettings:
-            config_options: StringList = ()
+    assert global_values.config_options == ("line-length = 90", "line-length = 91")
+    assert global_values.isolated
 
-        schema = SettingsSchema(
-            settings_type=CustomSettings,
-            overrides_type=dict[str, object],
+
+def test_setting_definitions_match_formatter_settings_fields() -> None:
+    setting_fields = tuple(field.name for field in dataclasses.fields(CheckSettings))
+    setting_annotations = typing.get_type_hints(CheckSettings)
+    override_annotations = typing.get_type_hints(CheckSettingsOverrides)
+    definition_fields = tuple(definition.field for definition in pydocformatter_settings.SETTINGS_SCHEMA.definitions)
+
+    assert definition_fields == setting_fields
+    assert tuple(definition.value_type for definition in pydocformatter_settings.SETTINGS_SCHEMA.definitions) == tuple(setting_annotations[field] for field in setting_fields)
+    assert set(override_annotations) == set(setting_fields)
+    assert override_annotations == {field: setting_annotations[field] for field in setting_fields}
+    assert tuple(getattr(CheckSettings(), definition.field) for definition in pydocformatter_settings.SETTINGS_SCHEMA.definitions) == tuple(getattr(CheckSettings(), field) for field in setting_fields)
+
+
+def test_setting_definitions_are_iterable_by_group() -> None:
+    run_fields = tuple(definition.field for definition in pydocformatter_settings.SETTINGS_SCHEMA.definitions if definition.group == SettingsGroup.RUN)
+    formatting_fields = tuple(definition.field for definition in pydocformatter_settings.SETTINGS_SCHEMA.definitions if definition.group == SettingsGroup.FORMATTING)
+    docstring_formatting_fields = tuple(definition.field for definition in pydocformatter_settings.SETTINGS_SCHEMA.definitions if definition.group == SettingsGroup.DOCSTRING_FORMATTING)
+    comment_formatting_fields = tuple(definition.field for definition in pydocformatter_settings.SETTINGS_SCHEMA.definitions if definition.group == SettingsGroup.COMMENT_FORMATTING)
+    rule_selection_fields = tuple(definition.field for definition in pydocformatter_settings.SETTINGS_SCHEMA.definitions if definition.group == SettingsGroup.RULE_SELECTION)
+    file_selection_fields = tuple(definition.field for definition in pydocformatter_settings.SETTINGS_SCHEMA.definitions if definition.group == SettingsGroup.FILE_SELECTION)
+    configuration_fields = tuple(definition.field for definition in pydocformatter_settings.SETTINGS_SCHEMA.definitions if definition.group == SettingsGroup.CONFIGURATION)
+
+    assert run_fields == ("output_format", "parallelism")
+    assert formatting_fields == ("line_length", "url_aware_wrapping", "line_ending", "indent_style", "indent_width")
+    assert docstring_formatting_fields == (
+        "docstring_convention",
+        "docstring_blank_line_style",
+        "docstring_blank_line_after_last_section",
+        "docstring_missing_documentation",
+        "docstring_missing_documentation_public_only",
+        "docstring_require_init_attribute_documentation",
+        "docstring_class_attribute_no_type_base_classes",
+        "docstring_forbidden_function_decorators",
+        "docstring_optional_function_decorators",
+        "docstring_property_decorators",
+        "docstring_parse_list_items",
+        "docstring_parse_headings",
+        "docstring_parse_doctests",
+        "docstring_parse_code_fences",
+        "docstring_parse_block_quotes",
+        "docstring_parse_tables",
+        "docstring_parse_directives",
+        "docstring_parse_literal_blocks",
+    )
+    assert comment_formatting_fields == (
+        "comment_join_standalone_lines",
+        "comment_format_list_items",
+        "comment_task_marker_mode",
+        "comment_task_markers",
+        "comment_preserve_headings",
+        "comment_preserve_doctests",
+        "comment_preserve_code_fences",
+        "comment_format_block_quotes",
+        "comment_preserve_tables",
+        "comment_preserve_directives",
+        "comment_trailing_extraction_syntax_aware",
+        "comment_trailing_extraction_content_aware",
+        "comment_detect_code",
+        "comment_detect_statements",
+        "comment_detect_expressions",
+    )
+    assert rule_selection_fields == ("select", "ignore", "extend_select", "require_explicit", "per_file_ignores", "extend_per_file_ignores", "fixable", "unfixable", "extend_fixable")
+    assert file_selection_fields == ("include", "extend_include", "exclude", "extend_exclude", "respect_gitignore", "force_exclude")
+    assert configuration_fields == ("per_file_settings",)
+
+
+def test_settings_schema_add_arguments_adds_groups_in_order() -> None:
+    parser = argparse.ArgumentParser()
+
+    pydocformatter_settings.SETTINGS_SCHEMA.add_arguments(parser, CheckSettings())
+
+    group_titles = tuple(group.title for group in parser._action_groups)
+    assert group_titles.index(SettingsGroup.RUN.value) < group_titles.index(SettingsGroup.FORMATTING.value)
+    assert group_titles.index(SettingsGroup.FORMATTING.value) < group_titles.index(SettingsGroup.COMMENT_FORMATTING.value)
+    assert group_titles.index(SettingsGroup.FORMATTING.value) < group_titles.index(SettingsGroup.DOCSTRING_FORMATTING.value)
+    assert group_titles.index(SettingsGroup.DOCSTRING_FORMATTING.value) < group_titles.index(SettingsGroup.COMMENT_FORMATTING.value)
+    assert group_titles.index(SettingsGroup.COMMENT_FORMATTING.value) < group_titles.index(SettingsGroup.RULE_SELECTION.value)
+    assert group_titles.index(SettingsGroup.RULE_SELECTION.value) < group_titles.index(SettingsGroup.FILE_SELECTION.value)
+    assert group_titles.index(SettingsGroup.FILE_SELECTION.value) < group_titles.index(SettingsGroup.CONFIGURATION.value)
+    option_strings = {option for action in parser._actions for option in action.option_strings}
+    schema_option_strings = {
+        flag for definition in pydocformatter_settings.SETTINGS_SCHEMA.definitions if definition.available_in_cli for flag in typing.cast("SettingCLIDefinition", definition.cli).flags
+    }
+    assert schema_option_strings <= option_strings
+
+
+def test_settings_schema_rejects_invalid_definition_group() -> None:
+    class OtherGroup(enum.StrEnum):
+        OTHER = "Other"
+
+    with pytest.raises(TypeError, match=r"must belong to SettingsGroup.*line_length"):
+        SettingsSchema(
+            settings_type=CheckSettings,
+            overrides_type=CheckSettingsOverrides,
             group_type=SettingsGroup,
-            definitions=(SettingDefinition(field="config_options", value_type=StringList, group=SettingsGroup.FORMATTING, help="Configuration options.", key="config"),),
+            definitions=(SettingDefinition(field="line_length", value_type=int, group=OtherGroup.OTHER, help="Maximum line length."),),
             table_path=("tool", "custom"),
         )
 
-        with pytest.raises(SettingsError) as context:
-            schema.load(field_overrides={"config_options": "not-a-list"}, global_values=pydocformatter_global_args.GlobalArgs(isolated=True))
 
-        assert "<overrides>.config" in str(context.value)
-        assert "config-options" not in str(context.value)
+def test_settings_schema_rejects_empty_table_path() -> None:
+    with pytest.raises(ValueError, match=r"table_path.*non-empty"):
+        SettingsSchema(settings_type=CheckSettings, overrides_type=CheckSettingsOverrides, group_type=SettingsGroup, definitions=pydocformatter_settings.SETTINGS_SCHEMA.definitions, table_path=())
 
-    def test_load_toml_file_does_not_check_exists_before_open(self) -> None:
-        with unittest.mock.patch("pydocformatter.settings.os.path.exists", side_effect=AssertionError("exists should not be called")):
-            assert pydocformatter_settings_core._load_toml_file("missing.toml", required=False) is None
 
-    def test_settings_overrides_are_dict_like_and_omit_unspecified_values(self) -> None:
-        overrides = CheckSettingsOverrides(line_length=103)
+def test_settings_schema_rejects_empty_table_path_segment() -> None:
+    with pytest.raises(ValueError, match=r"table_path.*non-empty"):
+        SettingsSchema(
+            settings_type=CheckSettings, overrides_type=CheckSettingsOverrides, group_type=SettingsGroup, definitions=pydocformatter_settings.SETTINGS_SCHEMA.definitions, table_path=("tool", "")
+        )
 
-        assert overrides == {"line_length": 103}
-        assert "line_ending" not in overrides
 
-    def test_readme_configuration_links_to_detailed_specs(self) -> None:
-        readme = (Path(__file__).resolve().parent.parent / "README.md").read_text(encoding="utf-8")
+def test_validation_context_uses_explicit_key() -> None:
+    @dataclasses.dataclass(frozen=True)
+    class CustomSettings:
+        config_options: StringList = ()
 
-        assert "pydocfmt config" in readme
-        assert "docs/settings_spec.md" in readme
-        assert "docs/file_selection_spec.md" in readme
-        assert "docs/rule_selection_spec.md" in readme
+    schema = SettingsSchema(
+        settings_type=CustomSettings,
+        overrides_type=dict[str, object],
+        group_type=SettingsGroup,
+        definitions=(SettingDefinition(field="config_options", value_type=StringList, group=SettingsGroup.FORMATTING, help="Configuration options.", key="config"),),
+        table_path=("tool", "custom"),
+    )
 
-    def test_load_settings_defaults_in_isolated_mode(self) -> None:
-        with tempfile.TemporaryDirectory() as td:
-            previous_cwd = os.getcwd()
-            os.chdir(td)
-            try:
-                config = pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(isolated=True))
-            finally:
-                os.chdir(previous_cwd)
+    with pytest.raises(SettingsError) as context:
+        schema.load(field_overrides={"config_options": "not-a-list"}, global_values=pydocformatter_global_args.GlobalArgs(isolated=True))
 
-        assert config.line_length == 88
-        assert config.url_aware_wrapping
-        assert config.line_ending is LineEnding.AUTO
-        assert config.indent_style is IndentStyle.SPACE
-        assert config.indent_width == 4
-        assert config.parallelism == 0.0  # noqa: RUF069
-        assert config.docstring_convention is pydocformatter_settings.DocstringConvention.PEP257
-        assert not config.comment_join_standalone_lines
-        assert config.comment_format_list_items
-        assert config.comment_task_marker_mode is CommentTaskMarkerMode.NO_WRAP
-        assert config.comment_task_markers == pydocformatter_settings.DEFAULT_COMMENT_TASK_MARKERS
-        assert config.comment_preserve_headings
-        assert config.comment_preserve_doctests
-        assert config.comment_preserve_code_fences
-        assert config.comment_format_block_quotes
-        assert config.comment_preserve_tables
-        assert config.comment_preserve_directives
-        assert config.comment_trailing_extraction_syntax_aware
-        assert config.comment_trailing_extraction_content_aware
-        assert not config.comment_detect_code
-        assert config.comment_detect_statements
-        assert not config.comment_detect_expressions
-        assert config.include == DEFAULT_INCLUDE
-        assert config.extend_include == ()
-        assert config.exclude == DEFAULT_EXCLUDE
-        assert config.extend_exclude == ()
-        assert config.respect_gitignore
-        assert not config.force_exclude
-        assert config.output_format is OutputFormat.GROUPED
-        assert config.select == ("ALL",)
-        assert config.extend_select == ()
-        assert config.require_explicit == pydocformatter_settings.DEFAULT_REQUIRE_EXPLICIT
-        assert config.ignore == ()
-        assert config.fixable == ("ALL",)
-        assert config.extend_fixable == ()
-        assert config.unfixable == ()
-        assert config.per_file_ignores == ()
-        assert config.extend_per_file_ignores == ()
-        assert config.per_file_settings == ()
+    assert "<overrides>.config" in str(context.value)
+    assert "config-options" not in str(context.value)
 
-    def test_default_exclude_matches_ruff_default(self) -> None:
-        result = subprocess.run(["uv", "run", "ruff", "config", "exclude"], cwd=self._repo_root(), shell=False, check=True, capture_output=True, text=True)
-        default_match = re.search(r"^Default value: (?P<value>\[.*\])$", result.stdout, re.MULTILINE)
-        assert default_match is not None
 
-        assert tuple(json.loads(default_match.group("value"))) == DEFAULT_EXCLUDE
+def test_load_toml_file_does_not_check_exists_before_open(mocker: MockerFixture) -> None:
+    mocker.patch("pydocformatter.settings.os.path.exists", side_effect=AssertionError("exists should not be called"), autospec=True)
+    assert pydocformatter_settings_core._load_toml_file("missing.toml", required=False) is None
 
-    def test_ty_default_exclude_matches_shared_default_directories(self) -> None:
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
-            (root / "pyproject.toml").write_text('[project]\nname = "ty-default-excludes"\nversion = "0.0.0"\nrequires-python = ">=3.11"\n', encoding="utf-8")
-            (root / "kept.py").write_text("x = 1\n", encoding="utf-8")
-            for directory in DEFAULT_EXCLUDE:
-                ignored_dir = root / directory
-                ignored_dir.mkdir(parents=True)
-                (ignored_dir / "ignored.py").write_text("x = 1\n", encoding="utf-8")
 
-            result = subprocess.run(  # noqa: S603
-                ["uv", "run", "ty", "check", "--project", str(root), "-vv", "--no-progress", "--output-format", "concise"],
-                cwd=self._repo_root(),
-                shell=False,
-                check=True,
-                capture_output=True,
-                text=True,
-            )
+def test_settings_overrides_are_dict_like_and_omit_unspecified_values() -> None:
+    overrides = CheckSettingsOverrides(line_length=103)
 
-        assert "Indexed 1 file(s)" in result.stderr
-        assert f"Checking file '{root / 'kept.py'}'" in result.stderr
-        assert "ignored.py" not in result.stderr
+    assert overrides == {"line_length": 103}
+    assert "line_ending" not in overrides
+
+
+def test_readme_configuration_links_to_detailed_specs() -> None:
+    readme = (Path(__file__).resolve().parent.parent / "README.md").read_text(encoding="utf-8")
+
+    assert "pydocfmt config" in readme
+    assert "docs/settings_spec.md" in readme
+    assert "docs/file_selection_spec.md" in readme
+    assert "docs/rule_selection_spec.md" in readme
+
+
+def test_load_settings_defaults_in_isolated_mode(monkeypatch: pytest.MonkeyPatch) -> None:
+    with tempfile.TemporaryDirectory() as td:
+        monkeypatch.chdir(td)
+        config = pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(isolated=True))
+
+    assert config.line_length == 88
+    assert config.url_aware_wrapping
+    assert config.line_ending is LineEnding.AUTO
+    assert config.indent_style is IndentStyle.SPACE
+    assert config.indent_width == 4
+    assert config.parallelism == 0.0  # noqa: RUF069
+    assert config.docstring_convention is pydocformatter_settings.DocstringConvention.PEP257
+    assert not config.comment_join_standalone_lines
+    assert config.comment_format_list_items
+    assert config.comment_task_marker_mode is CommentTaskMarkerMode.NO_WRAP
+    assert config.comment_task_markers == pydocformatter_settings.DEFAULT_COMMENT_TASK_MARKERS
+    assert config.comment_preserve_headings
+    assert config.comment_preserve_doctests
+    assert config.comment_preserve_code_fences
+    assert config.comment_format_block_quotes
+    assert config.comment_preserve_tables
+    assert config.comment_preserve_directives
+    assert config.comment_trailing_extraction_syntax_aware
+    assert config.comment_trailing_extraction_content_aware
+    assert not config.comment_detect_code
+    assert config.comment_detect_statements
+    assert not config.comment_detect_expressions
+    assert config.include == DEFAULT_INCLUDE
+    assert config.extend_include == ()
+    assert config.exclude == DEFAULT_EXCLUDE
+    assert config.extend_exclude == ()
+    assert config.respect_gitignore
+    assert not config.force_exclude
+    assert config.output_format is OutputFormat.GROUPED
+    assert config.select == ("ALL",)
+    assert config.extend_select == ()
+    assert config.require_explicit == pydocformatter_settings.DEFAULT_REQUIRE_EXPLICIT
+    assert config.ignore == ()
+    assert config.fixable == ("ALL",)
+    assert config.extend_fixable == ()
+    assert config.unfixable == ()
+    assert config.per_file_ignores == ()
+    assert config.extend_per_file_ignores == ()
+    assert config.per_file_settings == ()
+
+
+def test_default_exclude_matches_ruff_default() -> None:
+    result = subprocess.run(["uv", "run", "ruff", "config", "exclude"], cwd=_repo_root(), shell=False, check=True, capture_output=True, text=True)
+    default_match = re.search(r"^Default value: (?P<value>\[.*\])$", result.stdout, re.MULTILINE)
+    assert default_match is not None
+
+    assert tuple(json.loads(default_match.group("value"))) == DEFAULT_EXCLUDE
+
+
+def test_ty_default_exclude_matches_shared_default_directories() -> None:
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        (root / "pyproject.toml").write_text('[project]\nname = "ty-default-excludes"\nversion = "0.0.0"\nrequires-python = ">=3.11"\n', encoding="utf-8")
+        (root / "kept.py").write_text("x = 1\n", encoding="utf-8")
         for directory in DEFAULT_EXCLUDE:
-            assert f"Skipping directory '{root / directory}'" in result.stderr
+            ignored_dir = root / directory
+            ignored_dir.mkdir(parents=True)
+            (ignored_dir / "ignored.py").write_text("x = 1\n", encoding="utf-8")
 
-    def test_setting_documentation_default_mentions_match_resolved_defaults(self) -> None:
-        for definition in pydocformatter_settings.SETTINGS_SCHEMA.definitions:
-            default_match = re.search(r"defaults to (?P<default>[^.]+)\.", definition.documentation)
-            if default_match is None:
-                continue
-            config = CheckSettings()
-            expected_default = pydocformatter_settings_core.format_value(getattr(config, definition.field), definition.value_type)
-
-            assert default_match.group("default") == expected_default
-
-    def test_load_profile_tracks_field_source_priorities(self) -> None:
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
-            (root / "pyproject.toml").write_text('[tool.pydocfmt]\nselect = ["PDF"]\n', encoding="utf-8")
-            previous_cwd = os.getcwd()
-            os.chdir(root)
-            try:
-                profile = pydocformatter_settings.SETTINGS_SCHEMA.load_profile(
-                    global_values=pydocformatter_global_args.GlobalArgs(config_options=('ignore = ["PDF101"]',)),
-                    args=argparse.Namespace(extend_select=["PCF"]),
-                    field_overrides=CheckSettingsOverrides(fixable=("PDF101",)),
-                )
-            finally:
-                os.chdir(previous_cwd)
-
-        assert profile.priority_for_field("select") == pydocformatter_settings_core.CONFIG_FILE_SOURCE_PRIORITY
-        assert profile.priority_for_field("ignore") == pydocformatter_settings_core.INLINE_CONFIG_SOURCE_PRIORITY
-        assert profile.priority_for_field("extend_select") == pydocformatter_settings_core.ARGUMENT_SOURCE_PRIORITY
-        assert profile.priority_for_field("fixable") == pydocformatter_settings_core.FIELD_OVERRIDE_SOURCE_PRIORITY
-        assert profile.priority_for_field("unfixable") == pydocformatter_settings_core.DEFAULT_SOURCE_PRIORITY
-
-    def test_settings_profile_key_is_hashable_and_mapping_order_independent(self) -> None:
-        settings = CheckSettings()
-        first = pydocformatter_settings_core.SettingsProfile(settings=settings, field_bases={"select": "/a", "ignore": "/b"}, field_priorities={"select": 1, "ignore": 2})
-        second = pydocformatter_settings_core.SettingsProfile(settings=settings, field_bases={"ignore": "/b", "select": "/a"}, field_priorities={"ignore": 2, "select": 1})
-
-        assert isinstance(first.key(), pydocformatter_settings_core.SettingsProfile.Key)
-        assert first.key() == second.key()
-        assert {first.key(): "value"}[second.key()] == "value"
-
-    def test_git_root_pyproject_is_loaded_from_subdirectory(self) -> None:
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
-            subdir = root / "src"
-            subdir.mkdir()
-            self._write_git_marker(root)
-            (root / "pyproject.toml").write_text("[tool.pydocfmt]\nline-length = 73\n", encoding="utf-8")
-            previous_cwd = os.getcwd()
-            os.chdir(subdir)
-            try:
-                config = pydocformatter_settings.SETTINGS_SCHEMA.load()
-            finally:
-                os.chdir(previous_cwd)
-
-        assert config.line_length == 73
-
-    def test_current_directory_pyproject_overrides_git_root_pyproject(self) -> None:
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
-            subdir = root / "src"
-            subdir.mkdir()
-            self._write_git_marker(root)
-            (root / "pyproject.toml").write_text("[tool.pydocfmt]\nline-length = 73\nindent-width = 2\n", encoding="utf-8")
-            (subdir / "pyproject.toml").write_text("[tool.pydocfmt]\nline-length = 74\n", encoding="utf-8")
-            previous_cwd = os.getcwd()
-            os.chdir(subdir)
-            try:
-                config = pydocformatter_settings.SETTINGS_SCHEMA.load()
-            finally:
-                os.chdir(previous_cwd)
-
-        assert config.line_length == 74
-        assert config.indent_width == 4
-
-    def test_config_options_override_auto_discovered_git_root_and_current_pyprojects(self) -> None:
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
-            subdir = root / "src"
-            subdir.mkdir()
-            self._write_git_marker(root)
-            (root / "pyproject.toml").write_text("[tool.pydocfmt]\nline-length = 73\nindent-width = 2\n", encoding="utf-8")
-            (subdir / "pyproject.toml").write_text("[tool.pydocfmt]\nline-length = 74\n", encoding="utf-8")
-            config_path = root / "pydocfmt.toml"
-            config_path.write_text("line-length = 75\nindent-width = 3\n", encoding="utf-8")
-            previous_cwd = os.getcwd()
-            os.chdir(subdir)
-            try:
-                config = pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(config_options=(str(config_path), "line-length = 76")))
-            finally:
-                os.chdir(previous_cwd)
-
-        assert config.line_length == 76
-        assert config.indent_width == 3
-
-    def test_explicit_config_file_ignores_auto_discovered_pyproject(self) -> None:
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
-            config_path = root / "pydocfmt.toml"
-            (root / "pyproject.toml").write_text("[tool.pydocfmt]\nindent-width = 2\n", encoding="utf-8")
-            config_path.write_text("line-length = 75\n", encoding="utf-8")
-            previous_cwd = os.getcwd()
-            os.chdir(root)
-            try:
-                config = pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(config_options=(str(config_path),)))
-            finally:
-                os.chdir(previous_cwd)
-
-        assert config.line_length == 75
-        assert config.indent_width == 4
-
-    def test_isolated_ignores_git_root_and_current_directory_pyprojects(self) -> None:
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
-            subdir = root / "src"
-            subdir.mkdir()
-            self._write_git_marker(root)
-            (root / "pyproject.toml").write_text("[tool.pydocfmt]\nline-length = 73\n", encoding="utf-8")
-            (subdir / "pyproject.toml").write_text("[tool.pydocfmt]\nline-length = 74\n", encoding="utf-8")
-            previous_cwd = os.getcwd()
-            os.chdir(subdir)
-            try:
-                config = pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(isolated=True))
-            finally:
-                os.chdir(previous_cwd)
-
-        assert config.line_length == 88
-
-    def test_auto_discovered_pyproject_path_skips_files_without_pydocfmt_table(self) -> None:
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
-            self._write_git_marker(root)
-            candidate = root / "pyproject.toml"
-            candidate.write_text("[tool.other]\nvalue = true\n", encoding="utf-8")
-            previous_cwd = os.getcwd()
-            os.chdir(root)
-            try:
-                path = pydocformatter_settings_core._auto_discovered_pyproject_path_for_path(None, table_path=("tool", "pydocfmt"))
-            finally:
-                os.chdir(previous_cwd)
-
-        assert path is not None
-        assert path != str(candidate)
-
-    def test_suite_temporary_directories_stay_below_configuration_boundary(self) -> None:
-        boundary = Path(tempfile.gettempdir())
-        boundary_config = boundary / "pyproject.toml"
-
-        assert boundary_config.read_text(encoding="utf-8") == "[tool.pydocfmt]\n"
-        with tempfile.TemporaryDirectory() as td:
-            nested = Path(td) / "nested"
-            nested.mkdir()
-            discovered = pydocformatter_settings_core._auto_discovered_pyproject_path_for_path(str(nested), table_path=("tool", "pydocfmt"))
-            settings = pydocformatter_settings.SETTINGS_SCHEMA.load_profile(path=str(nested)).settings
-
-        assert nested.is_relative_to(boundary)
-        assert discovered == str(boundary_config)
-        assert settings == CheckSettings()
-
-    def test_rule_settings_accept_all_rule_prefixes(self) -> None:
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
-            (root / "pyproject.toml").write_text(
-                '[tool.pydocfmt]\nselect = ["PDF", "PCF"]\nignore = ["PDF101"]\nfixable = ["ALL"]\n[tool.pydocfmt.per-file-ignores]\n"tests/*.py" = ["PCF001"]\n', encoding="utf-8"
-            )
-            previous_cwd = os.getcwd()
-            os.chdir(root)
-            try:
-                config = pydocformatter_settings.SETTINGS_SCHEMA.load()
-            finally:
-                os.chdir(previous_cwd)
-
-        assert config.select == ("PDF", "PCF")
-        assert config.ignore == ("PDF101",)
-        assert config.fixable == ("ALL",)
-        assert config.per_file_ignores == (("tests/*.py", ("PCF001",)),)
-
-    def test_nested_docstring_table_settings_are_loaded_from_pyproject(self) -> None:
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
-            (root / "pyproject.toml").write_text(
-                '[tool.pydocfmt.docstring]\nconvention = "google"\nblank-line-style = "aligned"\nblank-line-after-last-section = true\nproperty-decorators = ["project.Property"]\nparse-tables = false\n',
-                encoding="utf-8",
-            )
-            previous_cwd = os.getcwd()
-            os.chdir(root)
-            try:
-                config = pydocformatter_settings.SETTINGS_SCHEMA.load()
-            finally:
-                os.chdir(previous_cwd)
-
-        assert config.docstring_convention == pydocformatter_settings.DocstringConvention.GOOGLE
-        assert config.docstring_blank_line_style == pydocformatter_settings.DocstringBlankLineStyle.ALIGNED
-        assert config.docstring_blank_line_after_last_section
-        assert config.docstring_property_decorators == ("project.Property",)
-        assert not config.docstring_parse_tables
-
-    def test_nested_comment_table_settings_are_loaded_from_dedicated_config_file(self) -> None:
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
-            config_path = root / "pydocfmt.toml"
-            config_path.write_text("[comment]\njoin-standalone-lines = true\npreserve-tables = false\ndetect-expressions = true\n", encoding="utf-8")
-
-            config = pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(config_options=(str(config_path),)))
-
-        assert config.comment_join_standalone_lines
-        assert not config.comment_preserve_tables
-        assert config.comment_detect_expressions
-
-    def test_nested_setting_tables_are_loaded_from_inline_config_options(self) -> None:
-        config = pydocformatter_settings.SETTINGS_SCHEMA.load(
-            global_values=pydocformatter_global_args.GlobalArgs(config_options=('docstring.convention = "numpy"\ncomment.detect-code = true',), isolated=True)
+        result = subprocess.run(  # noqa: S603
+            ["uv", "run", "ty", "check", "--project", str(root), "-vv", "--no-progress", "--output-format", "concise"], cwd=_repo_root(), shell=False, check=True, capture_output=True, text=True
         )
 
-        assert config.docstring_convention == pydocformatter_settings.DocstringConvention.NUMPY
-        assert config.comment_detect_code
+    assert "Indexed 1 file(s)" in result.stderr
+    assert f"Checking file '{root / 'kept.py'}'" in result.stderr
+    assert "ignored.py" not in result.stderr
+    for directory in DEFAULT_EXCLUDE:
+        assert f"Skipping directory '{root / directory}'" in result.stderr
 
-    def test_nested_setting_table_rejects_duplicate_flat_key(self) -> None:
-        with pytest.raises(SettingsError, match="sets docstring-convention more than once"):
-            pydocformatter_settings.SETTINGS_SCHEMA.load(
-                global_values=pydocformatter_global_args.GlobalArgs(config_options=('docstring-convention = "google"\n[docstring]\nconvention = "numpy"',), isolated=True)
-            )
 
-    def test_nested_setting_table_rejects_unknown_flattened_key(self) -> None:
-        with pytest.raises(SettingsError, match="docstring-unknown"):
-            pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(config_options=("[docstring]\nunknown = true",), isolated=True))
+def test_setting_documentation_default_mentions_match_resolved_defaults() -> None:
+    for definition in pydocformatter_settings.SETTINGS_SCHEMA.definitions:
+        default_match = re.search(r"defaults to (?P<default>[^.]+)\.", definition.documentation)
+        if default_match is None:
+            continue
+        config = CheckSettings()
+        expected_default = pydocformatter_settings_core.format_value(getattr(config, definition.field), definition.value_type)
 
-    def test_nested_setting_table_rejects_deeper_tables(self) -> None:
-        with pytest.raises(SettingsError, match="docstring-parse must not be a table"):
-            pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(config_options=("[docstring.parse]\ntables = false",), isolated=True))
+        assert default_match.group("default") == expected_default
 
-    def test_unrelated_nested_setting_table_is_rejected(self) -> None:
-        with pytest.raises(SettingsError, match="formatting"):
-            pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(config_options=("[formatting]\nline-length = 99",), isolated=True))
 
-    def test_inline_per_file_rule_settings_are_applied(self) -> None:
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
-            (root / "pyproject.toml").write_text('[tool.pydocfmt]\nper-file-ignores = {"tests/*.py" = ["PCF001"]}\nextend-per-file-ignores = {"generated/*.py" = ["PCF002"]}\n', encoding="utf-8")
-            previous_cwd = os.getcwd()
-            os.chdir(root)
-            try:
-                config = pydocformatter_settings.SETTINGS_SCHEMA.load()
-            finally:
-                os.chdir(previous_cwd)
-
-        assert config.per_file_ignores == (("tests/*.py", ("PCF001",)),)
-        assert config.extend_per_file_ignores == (("generated/*.py", ("PCF002",)),)
-
-    def test_per_file_settings_are_loaded(self) -> None:
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
-            (root / "pyproject.toml").write_text(
-                "[tool.pydocfmt.per-file-settings]\n"
-                '"tests/*.py" = { docstring = { missing-documentation = "has-section" }, comment = { detect-code = true } }\n'
-                '"generated/*.py" = { line-length = 100 }\n',
-                encoding="utf-8",
-            )
-            previous_cwd = os.getcwd()
-            os.chdir(root)
-            try:
-                config = pydocformatter_settings.SETTINGS_SCHEMA.load()
-            finally:
-                os.chdir(previous_cwd)
-
-        assert config.per_file_settings == (
-            ("tests/*.py", (("docstring-missing-documentation", pydocformatter_settings.DocstringMissingDocumentation.HAS_SECTION), ("comment-detect-code", True))),
-            ("generated/*.py", (("line-length", 100),)),
+def test_load_profile_tracks_field_source_priorities(monkeypatch: pytest.MonkeyPatch) -> None:
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        (root / "pyproject.toml").write_text('[tool.pydocfmt]\nselect = ["PDF"]\n', encoding="utf-8")
+        monkeypatch.chdir(root)
+        profile = pydocformatter_settings.SETTINGS_SCHEMA.load_profile(
+            global_values=pydocformatter_global_args.GlobalArgs(config_options=('ignore = ["PDF101"]',)),
+            args=argparse.Namespace(extend_select=["PCF"]),
+            field_overrides=CheckSettingsOverrides(fixable=("PDF101",)),
         )
 
-    def test_per_file_settings_reject_disallowed_settings(self) -> None:
-        cases = (
-            ("rule selection", 'per-file-settings = {"tests/*.py" = { select = ["PDF101"] }}', "select"),
-            ("file selection", 'per-file-settings = {"tests/*.py" = { include = ["*.py"] }}', "include"),
-            ("run setting", 'per-file-settings = {"tests/*.py" = { parallelism = 1 }}', "parallelism"),
-            ("rule setting effect", 'per-file-settings = {"tests/*.py" = { docstring-convention = "google" }}', "docstring-convention"),
-        )
-        for name, config, key in cases:
-            with self.subTest(name=name), pytest.raises(SettingsError, match=rf"{key} cannot be configured in per-file-settings"):
-                pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(config_options=(config,), isolated=True))
+    assert profile.priority_for_field("select") == pydocformatter_settings_core.CONFIG_FILE_SOURCE_PRIORITY
+    assert profile.priority_for_field("ignore") == pydocformatter_settings_core.INLINE_CONFIG_SOURCE_PRIORITY
+    assert profile.priority_for_field("extend_select") == pydocformatter_settings_core.ARGUMENT_SOURCE_PRIORITY
+    assert profile.priority_for_field("fixable") == pydocformatter_settings_core.FIELD_OVERRIDE_SOURCE_PRIORITY
+    assert profile.priority_for_field("unfixable") == pydocformatter_settings_core.DEFAULT_SOURCE_PRIORITY
 
-    def test_per_file_settings_reject_invalid_tables(self) -> None:
-        cases = (
-            ('per-file-settings = {"tests/*.py" = {}}', "must not be empty"),
-            ('per-file-settings = {"" = { line-length = 100 }}', "keys must not be empty"),
-            ('per-file-settings = {"tests/*.py" = { unknown = true }}', "unknown"),
-            (
-                'per-file-settings = {"tests/*.py" = { docstring-missing-documentation = "has-section", docstring = { missing-documentation = "all-docstrings" } }}',
-                "sets docstring-missing-documentation more than once",
+
+def test_settings_profile_key_is_hashable_and_mapping_order_independent() -> None:
+    settings = CheckSettings()
+    first = pydocformatter_settings_core.SettingsProfile(settings=settings, field_bases={"select": "/a", "ignore": "/b"}, field_priorities={"select": 1, "ignore": 2})
+    second = pydocformatter_settings_core.SettingsProfile(settings=settings, field_bases={"ignore": "/b", "select": "/a"}, field_priorities={"ignore": 2, "select": 1})
+
+    assert isinstance(first.key(), pydocformatter_settings_core.SettingsProfile.Key)
+    assert first.key() == second.key()
+    assert {first.key(): "value"}[second.key()] == "value"
+
+
+def test_git_root_pyproject_is_loaded_from_subdirectory(monkeypatch: pytest.MonkeyPatch) -> None:
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        subdir = root / "src"
+        subdir.mkdir()
+        git_helpers.write_git_marker(root)
+        (root / "pyproject.toml").write_text("[tool.pydocfmt]\nline-length = 73\n", encoding="utf-8")
+        monkeypatch.chdir(subdir)
+        config = pydocformatter_settings.SETTINGS_SCHEMA.load()
+
+    assert config.line_length == 73
+
+
+def test_current_directory_pyproject_overrides_git_root_pyproject(monkeypatch: pytest.MonkeyPatch) -> None:
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        subdir = root / "src"
+        subdir.mkdir()
+        git_helpers.write_git_marker(root)
+        (root / "pyproject.toml").write_text("[tool.pydocfmt]\nline-length = 73\nindent-width = 2\n", encoding="utf-8")
+        (subdir / "pyproject.toml").write_text("[tool.pydocfmt]\nline-length = 74\n", encoding="utf-8")
+        monkeypatch.chdir(subdir)
+        config = pydocformatter_settings.SETTINGS_SCHEMA.load()
+
+    assert config.line_length == 74
+    assert config.indent_width == 4
+
+
+def test_config_options_override_auto_discovered_git_root_and_current_pyprojects(monkeypatch: pytest.MonkeyPatch) -> None:
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        subdir = root / "src"
+        subdir.mkdir()
+        git_helpers.write_git_marker(root)
+        (root / "pyproject.toml").write_text("[tool.pydocfmt]\nline-length = 73\nindent-width = 2\n", encoding="utf-8")
+        (subdir / "pyproject.toml").write_text("[tool.pydocfmt]\nline-length = 74\n", encoding="utf-8")
+        config_path = root / "pydocfmt.toml"
+        config_path.write_text("line-length = 75\nindent-width = 3\n", encoding="utf-8")
+        monkeypatch.chdir(subdir)
+        config = pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(config_options=(str(config_path), "line-length = 76")))
+
+    assert config.line_length == 76
+    assert config.indent_width == 3
+
+
+def test_explicit_config_file_ignores_auto_discovered_pyproject(monkeypatch: pytest.MonkeyPatch) -> None:
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        config_path = root / "pydocfmt.toml"
+        (root / "pyproject.toml").write_text("[tool.pydocfmt]\nindent-width = 2\n", encoding="utf-8")
+        config_path.write_text("line-length = 75\n", encoding="utf-8")
+        monkeypatch.chdir(root)
+        config = pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(config_options=(str(config_path),)))
+
+    assert config.line_length == 75
+    assert config.indent_width == 4
+
+
+def test_isolated_ignores_git_root_and_current_directory_pyprojects(monkeypatch: pytest.MonkeyPatch) -> None:
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        subdir = root / "src"
+        subdir.mkdir()
+        git_helpers.write_git_marker(root)
+        (root / "pyproject.toml").write_text("[tool.pydocfmt]\nline-length = 73\n", encoding="utf-8")
+        (subdir / "pyproject.toml").write_text("[tool.pydocfmt]\nline-length = 74\n", encoding="utf-8")
+        monkeypatch.chdir(subdir)
+        config = pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(isolated=True))
+
+    assert config.line_length == 88
+
+
+def test_auto_discovered_pyproject_path_skips_files_without_pydocfmt_table(monkeypatch: pytest.MonkeyPatch) -> None:
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        git_helpers.write_git_marker(root)
+        candidate = root / "pyproject.toml"
+        candidate.write_text("[tool.other]\nvalue = true\n", encoding="utf-8")
+        monkeypatch.chdir(root)
+        path = pydocformatter_settings_core._auto_discovered_pyproject_path_for_path(None, table_path=("tool", "pydocfmt"))
+
+    assert path is not None
+    assert path != str(candidate)
+
+
+def test_suite_temporary_directories_stay_below_configuration_boundary() -> None:
+    boundary = Path(tempfile.gettempdir())
+    boundary_config = boundary / "pyproject.toml"
+
+    assert boundary_config.read_text(encoding="utf-8") == "[tool.pydocfmt]\n"
+    with tempfile.TemporaryDirectory() as td:
+        nested = Path(td) / "nested"
+        nested.mkdir()
+        discovered = pydocformatter_settings_core._auto_discovered_pyproject_path_for_path(str(nested), table_path=("tool", "pydocfmt"))
+        settings = pydocformatter_settings.SETTINGS_SCHEMA.load_profile(path=str(nested)).settings
+
+    assert nested.is_relative_to(boundary)
+    assert discovered == str(boundary_config)
+    assert settings == CheckSettings()
+
+
+def test_rule_settings_accept_all_rule_prefixes(monkeypatch: pytest.MonkeyPatch) -> None:
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        (root / "pyproject.toml").write_text(
+            '[tool.pydocfmt]\nselect = ["PDF", "PCF"]\nignore = ["PDF101"]\nfixable = ["ALL"]\n[tool.pydocfmt.per-file-ignores]\n"tests/*.py" = ["PCF001"]\n', encoding="utf-8"
+        )
+        monkeypatch.chdir(root)
+        config = pydocformatter_settings.SETTINGS_SCHEMA.load()
+
+    assert config.select == ("PDF", "PCF")
+    assert config.ignore == ("PDF101",)
+    assert config.fixable == ("ALL",)
+    assert config.per_file_ignores == (("tests/*.py", ("PCF001",)),)
+
+
+def test_nested_docstring_table_settings_are_loaded_from_pyproject(monkeypatch: pytest.MonkeyPatch) -> None:
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        (root / "pyproject.toml").write_text(
+            '[tool.pydocfmt.docstring]\nconvention = "google"\nblank-line-style = "aligned"\nblank-line-after-last-section = true\nproperty-decorators = ["project.Property"]\nparse-tables = false\n',
+            encoding="utf-8",
+        )
+        monkeypatch.chdir(root)
+        config = pydocformatter_settings.SETTINGS_SCHEMA.load()
+
+    assert config.docstring_convention == pydocformatter_settings.DocstringConvention.GOOGLE
+    assert config.docstring_blank_line_style == pydocformatter_settings.DocstringBlankLineStyle.ALIGNED
+    assert config.docstring_blank_line_after_last_section
+    assert config.docstring_property_decorators == ("project.Property",)
+    assert not config.docstring_parse_tables
+
+
+def test_nested_comment_table_settings_are_loaded_from_dedicated_config_file() -> None:
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        config_path = root / "pydocfmt.toml"
+        config_path.write_text("[comment]\njoin-standalone-lines = true\npreserve-tables = false\ndetect-expressions = true\n", encoding="utf-8")
+
+        config = pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(config_options=(str(config_path),)))
+
+    assert config.comment_join_standalone_lines
+    assert not config.comment_preserve_tables
+    assert config.comment_detect_expressions
+
+
+def test_nested_setting_tables_are_loaded_from_inline_config_options() -> None:
+    config = pydocformatter_settings.SETTINGS_SCHEMA.load(
+        global_values=pydocformatter_global_args.GlobalArgs(config_options=('docstring.convention = "numpy"\ncomment.detect-code = true',), isolated=True)
+    )
+
+    assert config.docstring_convention == pydocformatter_settings.DocstringConvention.NUMPY
+    assert config.comment_detect_code
+
+
+def test_nested_setting_table_rejects_duplicate_flat_key() -> None:
+    with pytest.raises(SettingsError, match="sets docstring-convention more than once"):
+        pydocformatter_settings.SETTINGS_SCHEMA.load(
+            global_values=pydocformatter_global_args.GlobalArgs(config_options=('docstring-convention = "google"\n[docstring]\nconvention = "numpy"',), isolated=True)
+        )
+
+
+def test_nested_setting_table_rejects_unknown_flattened_key() -> None:
+    with pytest.raises(SettingsError, match="docstring-unknown"):
+        pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(config_options=("[docstring]\nunknown = true",), isolated=True))
+
+
+def test_nested_setting_table_rejects_deeper_tables() -> None:
+    with pytest.raises(SettingsError, match="docstring-parse must not be a table"):
+        pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(config_options=("[docstring.parse]\ntables = false",), isolated=True))
+
+
+def test_unrelated_nested_setting_table_is_rejected() -> None:
+    with pytest.raises(SettingsError, match="formatting"):
+        pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(config_options=("[formatting]\nline-length = 99",), isolated=True))
+
+
+def test_inline_per_file_rule_settings_are_applied(monkeypatch: pytest.MonkeyPatch) -> None:
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        (root / "pyproject.toml").write_text('[tool.pydocfmt]\nper-file-ignores = {"tests/*.py" = ["PCF001"]}\nextend-per-file-ignores = {"generated/*.py" = ["PCF002"]}\n', encoding="utf-8")
+        monkeypatch.chdir(root)
+        config = pydocformatter_settings.SETTINGS_SCHEMA.load()
+
+    assert config.per_file_ignores == (("tests/*.py", ("PCF001",)),)
+    assert config.extend_per_file_ignores == (("generated/*.py", ("PCF002",)),)
+
+
+def test_per_file_settings_are_loaded(monkeypatch: pytest.MonkeyPatch) -> None:
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        (root / "pyproject.toml").write_text(
+            '[tool.pydocfmt.per-file-settings]\n"tests/*.py" = { docstring = { missing-documentation = "has-section" }, comment = { detect-code = true } }\n"generated/*.py" = { line-length = 100 }\n',
+            encoding="utf-8",
+        )
+        monkeypatch.chdir(root)
+        config = pydocformatter_settings.SETTINGS_SCHEMA.load()
+
+    assert config.per_file_settings == (
+        ("tests/*.py", (("docstring-missing-documentation", pydocformatter_settings.DocstringMissingDocumentation.HAS_SECTION), ("comment-detect-code", True))),
+        ("generated/*.py", (("line-length", 100),)),
+    )
+
+
+@pytest.mark.parametrize(
+    ("config", "key"),
+    [
+        pytest.param('per-file-settings = {"tests/*.py" = { select = ["PDF101"] }}', "select", id="rule-selection"),
+        pytest.param('per-file-settings = {"tests/*.py" = { include = ["*.py"] }}', "include", id="file-selection"),
+        pytest.param('per-file-settings = {"tests/*.py" = { parallelism = 1 }}', "parallelism", id="run-setting"),
+        pytest.param('per-file-settings = {"tests/*.py" = { docstring-convention = "google" }}', "docstring-convention", id="rule-setting-effect"),
+    ],
+)
+def test_per_file_settings_reject_disallowed_settings(config: str, key: str) -> None:
+    with pytest.raises(SettingsError, match=rf"{key} cannot be configured in per-file-settings"):
+        pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(config_options=(config,), isolated=True))
+
+
+@pytest.mark.parametrize(
+    ("config", "message"),
+    [
+        pytest.param('per-file-settings = {"tests/*.py" = {}}', "must not be empty", id="empty-table"),
+        pytest.param('per-file-settings = {"" = { line-length = 100 }}', "keys must not be empty", id="empty-key"),
+        pytest.param('per-file-settings = {"tests/*.py" = { unknown = true }}', "unknown", id="unknown-key"),
+        pytest.param(
+            'per-file-settings = {"tests/*.py" = { docstring-missing-documentation = "has-section", docstring = { missing-documentation = "all-docstrings" } }}',
+            "sets docstring-missing-documentation more than once",
+            id="duplicate-nested-setting",
+        ),
+    ],
+)
+def test_per_file_settings_reject_invalid_tables(config: str, message: str) -> None:
+    with pytest.raises(SettingsError, match=message):
+        pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(config_options=(config,), isolated=True))
+
+
+def test_effective_profile_applies_matching_per_file_settings(monkeypatch: pytest.MonkeyPatch) -> None:
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        settings = CheckSettings(
+            docstring_missing_documentation=pydocformatter_settings.DocstringMissingDocumentation.ALL_DOCSTRINGS,
+            per_file_settings=(("tests/*.py", (("docstring-missing-documentation", pydocformatter_settings.DocstringMissingDocumentation.HAS_SECTION), ("line-length", 100))),),
+        )
+        monkeypatch.chdir(root)
+        profile = pydocformatter_settings.SETTINGS_SCHEMA.load_profile(global_values=pydocformatter_global_args.GlobalArgs(isolated=True), field_overrides=dataclasses.asdict(settings))
+        matching = pydocformatter_settings.effective_profile_for_path(profile, str(root / "tests" / "test_example.py"))
+        nonmatching = pydocformatter_settings.effective_profile_for_path(profile, str(root / "src" / "example.py"))
+
+    assert matching.settings.docstring_missing_documentation == pydocformatter_settings.DocstringMissingDocumentation.HAS_SECTION
+    assert matching.settings.line_length == 100
+    assert nonmatching.settings.docstring_missing_documentation == pydocformatter_settings.DocstringMissingDocumentation.ALL_DOCSTRINGS
+    assert nonmatching.settings.line_length == 88
+
+
+def test_effective_profile_supports_negated_per_file_settings(monkeypatch: pytest.MonkeyPatch) -> None:
+    settings = CheckSettings(per_file_settings=(("!src/*.py", (("line-length", 100),)),))
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        monkeypatch.chdir(root)
+        profile = pydocformatter_settings.SETTINGS_SCHEMA.load_profile(global_values=pydocformatter_global_args.GlobalArgs(isolated=True), field_overrides=dataclasses.asdict(settings))
+        included = pydocformatter_settings.effective_profile_for_path(profile, str(root / "src" / "example.py"))
+        excluded = pydocformatter_settings.effective_profile_for_path(profile, str(root / "tests" / "example.py"))
+
+    assert included.settings.line_length == 88
+    assert excluded.settings.line_length == 100
+
+
+def test_command_line_setting_has_priority_over_config_per_file_setting(monkeypatch: pytest.MonkeyPatch) -> None:
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        target = root / "tests" / "test_example.py"
+        target.parent.mkdir()
+        target.write_text("", encoding="utf-8")
+        (root / "pyproject.toml").write_text('[tool.pydocfmt.per-file-settings]\n"tests/*.py" = { docstring-missing-documentation = "has-section" }\n', encoding="utf-8")
+        monkeypatch.chdir(root)
+        profile = pydocformatter_settings.SETTINGS_SCHEMA.load_profile(args=argparse.Namespace(docstring_missing_documentation="all-docstrings"), path=str(target))
+        effective = pydocformatter_settings.effective_profile_for_path(profile, str(target))
+
+    assert profile.settings.docstring_missing_documentation == pydocformatter_settings.DocstringMissingDocumentation.ALL_DOCSTRINGS
+    assert effective.settings.docstring_missing_documentation == pydocformatter_settings.DocstringMissingDocumentation.ALL_DOCSTRINGS
+
+
+def test_cli_rule_overrides_are_applied() -> None:
+    config = pydocformatter_settings.SETTINGS_SCHEMA.load(field_overrides=CheckSettingsOverrides(select=("PCF",), ignore=("PCF002",), per_file_ignores=(("tests/*.py", ("PCF001",)),)))
+
+    assert config.select == ("PCF",)
+    assert config.ignore == ("PCF002",)
+    assert config.per_file_ignores == (("tests/*.py", ("PCF001",)),)
+
+
+def test_format_settings_returns_stable_toml_output() -> None:
+    settings = CheckSettings(line_ending=LineEnding.LF, select=("PDF", "PCF"), per_file_ignores=(('tests/"quoted"/*.py', ("PCF001",)),))
+
+    output = pydocformatter_settings.SETTINGS_SCHEMA.format(settings)
+    expected_require_explicit = ", ".join(f'"{selector}"' for selector in CheckSettings().require_explicit)
+
+    assert "[tool.pydocfmt]\n" in output
+    assert output.index("output-format") < output.index("line-length")
+    assert output.index("indent-width") < output.index("parallelism")
+    assert "parallelism = 0.0\n" in output
+    assert 'line-ending = "lf"\n' in output
+    assert 'select = ["PDF", "PCF"]\n' in output
+    assert f"require-explicit = [{expected_require_explicit}]\n" in output
+    assert 'per-file-ignores = {"tests/\\"quoted\\"/*.py" = ["PCF001"]}\n' in output
+
+
+def test_parallelism_setting_accepts_numbers() -> None:
+    config = pydocformatter_settings.SETTINGS_SCHEMA.load(field_overrides=CheckSettingsOverrides(parallelism=FRACTIONAL_PARALLELISM))
+
+    assert config.parallelism == FRACTIONAL_PARALLELISM
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        pytest.param(-1, id="negative"),
+        pytest.param(True, id="bool"),
+        pytest.param("auto", id="string"),
+        pytest.param(math.inf, id="infinity"),
+        pytest.param(math.nan, id="nan"),
+        pytest.param(1.5, id="non-integer"),
+    ],
+)
+def test_parallelism_setting_rejects_invalid_values(value: object) -> None:
+    with pytest.raises(SettingsError):
+        pydocformatter_settings.SETTINGS_SCHEMA.load(field_overrides={"parallelism": value})
+
+
+def test_url_aware_wrapping_setting_is_loaded_from_toml_and_cli() -> None:
+    configured = pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(isolated=True, config_options=("url-aware-wrapping = true",)))
+    overridden = pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(isolated=True), args=argparse.Namespace(url_aware_wrapping=True))
+    disabled = pydocformatter_settings.SETTINGS_SCHEMA.load(
+        global_values=pydocformatter_global_args.GlobalArgs(isolated=True, config_options=("url-aware-wrapping = true",)), args=argparse.Namespace(url_aware_wrapping=False)
+    )
+
+    assert configured.url_aware_wrapping
+    assert overridden.url_aware_wrapping
+    assert not disabled.url_aware_wrapping
+
+
+def test_comment_formatting_settings_are_loaded_from_toml_and_cli() -> None:
+    configured = pydocformatter_settings.SETTINGS_SCHEMA.load(
+        global_values=pydocformatter_global_args.GlobalArgs(
+            isolated=True,
+            config_options=(
+                'comment-join-standalone-lines = true\ncomment-format-list-items = true\ncomment-task-marker-mode = "hanging"\ncomment-task-markers = ["TODO", "BUG"]\ncomment-trailing-extraction-syntax-aware = false\ncomment-trailing-extraction-content-aware = false\ncomment-detect-code = false',
             ),
         )
-        for config, message in cases:
-            with self.subTest(config=config), pytest.raises(SettingsError, match=message):
-                pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(config_options=(config,), isolated=True))
+    )
+    overridden = pydocformatter_settings.SETTINGS_SCHEMA.load(
+        global_values=pydocformatter_global_args.GlobalArgs(isolated=True),
+        args=argparse.Namespace(comment_preserve_tables=True, comment_task_marker_mode="none", comment_task_markers=("FIXME", "TODO_SEC"), comment_detect_code=False),
+    )
 
-    def test_effective_profile_applies_matching_per_file_settings(self) -> None:
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
-            settings = CheckSettings(
-                docstring_missing_documentation=pydocformatter_settings.DocstringMissingDocumentation.ALL_DOCSTRINGS,
-                per_file_settings=(("tests/*.py", (("docstring-missing-documentation", pydocformatter_settings.DocstringMissingDocumentation.HAS_SECTION), ("line-length", 100))),),
-            )
-            previous_cwd = os.getcwd()
-            os.chdir(root)
-            try:
-                profile = pydocformatter_settings.SETTINGS_SCHEMA.load_profile(global_values=pydocformatter_global_args.GlobalArgs(isolated=True), field_overrides=dataclasses.asdict(settings))
-                matching = pydocformatter_settings.effective_profile_for_path(profile, str(root / "tests" / "test_example.py"))
-                nonmatching = pydocformatter_settings.effective_profile_for_path(profile, str(root / "src" / "example.py"))
-            finally:
-                os.chdir(previous_cwd)
+    assert configured.comment_join_standalone_lines
+    assert configured.comment_format_list_items
+    assert configured.comment_task_marker_mode is CommentTaskMarkerMode.HANGING
+    assert configured.comment_task_markers == ("TODO", "BUG")
+    assert not configured.comment_trailing_extraction_syntax_aware
+    assert not configured.comment_trailing_extraction_content_aware
+    assert not configured.comment_detect_code
+    assert overridden.comment_preserve_tables
+    assert overridden.comment_task_marker_mode is CommentTaskMarkerMode.NONE
+    assert overridden.comment_task_markers == ("FIXME", "TODO_SEC")
+    assert not overridden.comment_detect_code
 
-        assert matching.settings.docstring_missing_documentation == pydocformatter_settings.DocstringMissingDocumentation.HAS_SECTION
-        assert matching.settings.line_length == 100
-        assert nonmatching.settings.docstring_missing_documentation == pydocformatter_settings.DocstringMissingDocumentation.ALL_DOCSTRINGS
-        assert nonmatching.settings.line_length == 88
 
-    def test_effective_profile_supports_negated_per_file_settings(self) -> None:
-        settings = CheckSettings(per_file_settings=(("!src/*.py", (("line-length", 100),)),))
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
-            previous_cwd = os.getcwd()
-            os.chdir(root)
-            try:
-                profile = pydocformatter_settings.SETTINGS_SCHEMA.load_profile(global_values=pydocformatter_global_args.GlobalArgs(isolated=True), field_overrides=dataclasses.asdict(settings))
-                included = pydocformatter_settings.effective_profile_for_path(profile, str(root / "src" / "example.py"))
-                excluded = pydocformatter_settings.effective_profile_for_path(profile, str(root / "tests" / "example.py"))
-            finally:
-                os.chdir(previous_cwd)
+def test_comment_task_marker_setting_validation() -> None:
+    valid_empty = pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(isolated=True, config_options=("comment-task-markers = []",)))
 
-        assert included.settings.line_length == 88
-        assert excluded.settings.line_length == 100
+    assert valid_empty.comment_task_markers == ()
+    with pytest.raises(SettingsError):
+        pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(isolated=True, config_options=('comment-task-markers = ["TODO", "TODO"]',)))
+    with pytest.raises(SettingsError):
+        pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(isolated=True, config_options=('comment-task-markers = ["todo"]',)))
+    with pytest.raises(SettingsError):
+        pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(isolated=True, config_options=("comment-format-task-markers = false",)))
 
-    def test_command_line_setting_has_priority_over_config_per_file_setting(self) -> None:
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
-            target = root / "tests" / "test_example.py"
-            target.parent.mkdir()
-            target.write_text("", encoding="utf-8")
-            (root / "pyproject.toml").write_text('[tool.pydocfmt.per-file-settings]\n"tests/*.py" = { docstring-missing-documentation = "has-section" }\n', encoding="utf-8")
-            previous_cwd = os.getcwd()
-            os.chdir(root)
-            try:
-                profile = pydocformatter_settings.SETTINGS_SCHEMA.load_profile(args=argparse.Namespace(docstring_missing_documentation="all-docstrings"), path=str(target))
-                effective = pydocformatter_settings.effective_profile_for_path(profile, str(target))
-            finally:
-                os.chdir(previous_cwd)
 
-        assert profile.settings.docstring_missing_documentation == pydocformatter_settings.DocstringMissingDocumentation.ALL_DOCSTRINGS
-        assert effective.settings.docstring_missing_documentation == pydocformatter_settings.DocstringMissingDocumentation.ALL_DOCSTRINGS
+def test_docstring_parsing_settings_are_loaded_and_validated() -> None:
+    definition = next(definition for definition in pydocformatter_settings.SETTINGS_SCHEMA.definitions if definition.field == "docstring_convention")
+    assert definition.cli is not None
+    assert definition.cli.choices == ("none", "pep257", "google", "numpy", "rest")
 
-    def test_cli_rule_overrides_are_applied(self) -> None:
-        config = pydocformatter_settings.SETTINGS_SCHEMA.load(field_overrides=CheckSettingsOverrides(select=("PCF",), ignore=("PCF002",), per_file_ignores=(("tests/*.py", ("PCF001",)),)))
+    for convention in pydocformatter_settings.DocstringConvention:
+        config = pydocformatter_settings.SETTINGS_SCHEMA.load(field_overrides={"docstring_convention": convention.value})
+        assert config.docstring_convention == convention
+    for blank_line_style in pydocformatter_settings.DocstringBlankLineStyle:
+        config = pydocformatter_settings.SETTINGS_SCHEMA.load(field_overrides={"docstring_blank_line_style": blank_line_style.value})
+        assert config.docstring_blank_line_style == blank_line_style
+    for missing_documentation in pydocformatter_settings.DocstringMissingDocumentation:
+        config = pydocformatter_settings.SETTINGS_SCHEMA.load(field_overrides={"docstring_missing_documentation": missing_documentation.value})
+        assert config.docstring_missing_documentation == missing_documentation
 
-        assert config.select == ("PCF",)
-        assert config.ignore == ("PCF002",)
-        assert config.per_file_ignores == (("tests/*.py", ("PCF001",)),)
-
-    def test_format_settings_returns_stable_toml_output(self) -> None:
-        settings = CheckSettings(line_ending=LineEnding.LF, select=("PDF", "PCF"), per_file_ignores=(('tests/"quoted"/*.py', ("PCF001",)),))
-
-        output = pydocformatter_settings.SETTINGS_SCHEMA.format(settings)
-        expected_require_explicit = ", ".join(f'"{selector}"' for selector in CheckSettings().require_explicit)
-
-        assert "[tool.pydocfmt]\n" in output
-        assert output.index("output-format") < output.index("line-length")
-        assert output.index("indent-width") < output.index("parallelism")
-        assert "parallelism = 0.0\n" in output
-        assert 'line-ending = "lf"\n' in output
-        assert 'select = ["PDF", "PCF"]\n' in output
-        assert f"require-explicit = [{expected_require_explicit}]\n" in output
-        assert 'per-file-ignores = {"tests/\\"quoted\\"/*.py" = ["PCF001"]}\n' in output
-
-    def test_parallelism_setting_accepts_numbers(self) -> None:
-        config = pydocformatter_settings.SETTINGS_SCHEMA.load(field_overrides=CheckSettingsOverrides(parallelism=FRACTIONAL_PARALLELISM))
-
-        assert config.parallelism == FRACTIONAL_PARALLELISM
-
-    def test_parallelism_setting_rejects_invalid_values(self) -> None:
-        for value in (-1, True, "auto", math.inf, math.nan, 1.5):
-            with self.subTest(value=value), pytest.raises(SettingsError):
-                pydocformatter_settings.SETTINGS_SCHEMA.load(field_overrides={"parallelism": value})
-
-    def test_url_aware_wrapping_setting_is_loaded_from_toml_and_cli(self) -> None:
-        configured = pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(isolated=True, config_options=("url-aware-wrapping = true",)))
-        overridden = pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(isolated=True), args=argparse.Namespace(url_aware_wrapping=True))
-        disabled = pydocformatter_settings.SETTINGS_SCHEMA.load(
-            global_values=pydocformatter_global_args.GlobalArgs(isolated=True, config_options=("url-aware-wrapping = true",)), args=argparse.Namespace(url_aware_wrapping=False)
-        )
-
-        assert configured.url_aware_wrapping
-        assert overridden.url_aware_wrapping
-        assert not disabled.url_aware_wrapping
-
-    def test_comment_formatting_settings_are_loaded_from_toml_and_cli(self) -> None:
-        configured = pydocformatter_settings.SETTINGS_SCHEMA.load(
-            global_values=pydocformatter_global_args.GlobalArgs(
-                isolated=True,
-                config_options=(
-                    'comment-join-standalone-lines = true\ncomment-format-list-items = true\ncomment-task-marker-mode = "hanging"\ncomment-task-markers = ["TODO", "BUG"]\ncomment-trailing-extraction-syntax-aware = false\ncomment-trailing-extraction-content-aware = false\ncomment-detect-code = false',
-                ),
-            )
-        )
-        overridden = pydocformatter_settings.SETTINGS_SCHEMA.load(
-            global_values=pydocformatter_global_args.GlobalArgs(isolated=True),
-            args=argparse.Namespace(comment_preserve_tables=True, comment_task_marker_mode="none", comment_task_markers=("FIXME", "TODO_SEC"), comment_detect_code=False),
-        )
-
-        assert configured.comment_join_standalone_lines
-        assert configured.comment_format_list_items
-        assert configured.comment_task_marker_mode is CommentTaskMarkerMode.HANGING
-        assert configured.comment_task_markers == ("TODO", "BUG")
-        assert not configured.comment_trailing_extraction_syntax_aware
-        assert not configured.comment_trailing_extraction_content_aware
-        assert not configured.comment_detect_code
-        assert overridden.comment_preserve_tables
-        assert overridden.comment_task_marker_mode is CommentTaskMarkerMode.NONE
-        assert overridden.comment_task_markers == ("FIXME", "TODO_SEC")
-        assert not overridden.comment_detect_code
-
-    def test_comment_task_marker_setting_validation(self) -> None:
-        valid_empty = pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(isolated=True, config_options=("comment-task-markers = []",)))
-
-        assert valid_empty.comment_task_markers == ()
-        with pytest.raises(SettingsError):
-            pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(isolated=True, config_options=('comment-task-markers = ["TODO", "TODO"]',)))
-        with pytest.raises(SettingsError):
-            pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(isolated=True, config_options=('comment-task-markers = ["todo"]',)))
-        with pytest.raises(SettingsError):
-            pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(isolated=True, config_options=("comment-format-task-markers = false",)))
-
-    def test_docstring_parsing_settings_are_loaded_and_validated(self) -> None:
-        definition = next(definition for definition in pydocformatter_settings.SETTINGS_SCHEMA.definitions if definition.field == "docstring_convention")
-        assert definition.cli is not None
-        assert definition.cli.choices == ("none", "pep257", "google", "numpy", "rest")
-
-        for convention in pydocformatter_settings.DocstringConvention:
-            config = pydocformatter_settings.SETTINGS_SCHEMA.load(field_overrides={"docstring_convention": convention.value})
-            assert config.docstring_convention == convention
-        for blank_line_style in pydocformatter_settings.DocstringBlankLineStyle:
-            config = pydocformatter_settings.SETTINGS_SCHEMA.load(field_overrides={"docstring_blank_line_style": blank_line_style.value})
-            assert config.docstring_blank_line_style == blank_line_style
-        for missing_documentation in pydocformatter_settings.DocstringMissingDocumentation:
-            config = pydocformatter_settings.SETTINGS_SCHEMA.load(field_overrides={"docstring_missing_documentation": missing_documentation.value})
-            assert config.docstring_missing_documentation == missing_documentation
-
-        configured = pydocformatter_settings.SETTINGS_SCHEMA.load(
-            global_values=pydocformatter_global_args.GlobalArgs(
-                isolated=True,
-                config_options=(
-                    'docstring-convention = "google"\ndocstring-blank-line-style = "aligned"\ndocstring-blank-line-after-last-section = true\ndocstring-missing-documentation = "all-docstrings"\ndocstring-missing-documentation-public-only = false\ndocstring-require-init-attribute-documentation = true\ndocstring-class-attribute-no-type-base-classes = ["enum.Enum"]\ndocstring-forbidden-function-decorators = ["project.overload"]\ndocstring-optional-function-decorators = ["project.override"]\ndocstring-property-decorators = ["project.Property"]\ndocstring-parse-tables = false',
-                ),
-            )
-        )
-        overridden = pydocformatter_settings.SETTINGS_SCHEMA.load(
-            global_values=pydocformatter_global_args.GlobalArgs(isolated=True),
-            args=argparse.Namespace(
-                docstring_convention="numpy",
-                docstring_blank_line_style="blank",
-                docstring_blank_line_after_last_section=False,
-                docstring_missing_documentation="non-summary-docstrings",
-                docstring_missing_documentation_public_only=True,
-                docstring_require_init_attribute_documentation=False,
-                docstring_class_attribute_no_type_base_classes=("Flag,enum.Flag",),
-                docstring_forbidden_function_decorators=("typing.overload,overload",),
-                docstring_optional_function_decorators=("typing.override,override",),
-                docstring_property_decorators=("property,project.Property",),
-                docstring_parse_tables=False,
+    configured = pydocformatter_settings.SETTINGS_SCHEMA.load(
+        global_values=pydocformatter_global_args.GlobalArgs(
+            isolated=True,
+            config_options=(
+                'docstring-convention = "google"\ndocstring-blank-line-style = "aligned"\ndocstring-blank-line-after-last-section = true\ndocstring-missing-documentation = "all-docstrings"\ndocstring-missing-documentation-public-only = false\ndocstring-require-init-attribute-documentation = true\ndocstring-class-attribute-no-type-base-classes = ["enum.Enum"]\ndocstring-forbidden-function-decorators = ["project.overload"]\ndocstring-optional-function-decorators = ["project.override"]\ndocstring-property-decorators = ["project.Property"]\ndocstring-parse-tables = false',
             ),
         )
-        assert configured.docstring_convention == pydocformatter_settings.DocstringConvention.GOOGLE
-        assert configured.docstring_blank_line_style == pydocformatter_settings.DocstringBlankLineStyle.ALIGNED
-        assert configured.docstring_blank_line_after_last_section
-        assert configured.docstring_missing_documentation == pydocformatter_settings.DocstringMissingDocumentation.ALL_DOCSTRINGS
-        assert not configured.docstring_missing_documentation_public_only
-        assert configured.docstring_require_init_attribute_documentation
-        assert configured.docstring_class_attribute_no_type_base_classes == ("enum.Enum",)
-        assert configured.docstring_forbidden_function_decorators == ("project.overload",)
-        assert configured.docstring_optional_function_decorators == ("project.override",)
-        assert configured.docstring_property_decorators == ("project.Property",)
-        assert not configured.docstring_parse_tables
-        assert overridden.docstring_convention == pydocformatter_settings.DocstringConvention.NUMPY
-        assert overridden.docstring_blank_line_style == pydocformatter_settings.DocstringBlankLineStyle.BLANK
-        assert not overridden.docstring_blank_line_after_last_section
-        assert overridden.docstring_missing_documentation == pydocformatter_settings.DocstringMissingDocumentation.NON_SUMMARY_DOCSTRINGS
-        assert overridden.docstring_missing_documentation_public_only
-        assert not overridden.docstring_require_init_attribute_documentation
-        assert overridden.docstring_class_attribute_no_type_base_classes == ("Flag", "enum.Flag")
-        assert overridden.docstring_forbidden_function_decorators == ("typing.overload", "overload")
-        assert overridden.docstring_optional_function_decorators == ("typing.override", "override")
-        assert overridden.docstring_property_decorators == ("property", "project.Property")
-        assert not overridden.docstring_parse_tables
+    )
+    overridden = pydocformatter_settings.SETTINGS_SCHEMA.load(
+        global_values=pydocformatter_global_args.GlobalArgs(isolated=True),
+        args=argparse.Namespace(
+            docstring_convention="numpy",
+            docstring_blank_line_style="blank",
+            docstring_blank_line_after_last_section=False,
+            docstring_missing_documentation="non-summary-docstrings",
+            docstring_missing_documentation_public_only=True,
+            docstring_require_init_attribute_documentation=False,
+            docstring_class_attribute_no_type_base_classes=("Flag,enum.Flag",),
+            docstring_forbidden_function_decorators=("typing.overload,overload",),
+            docstring_optional_function_decorators=("typing.override,override",),
+            docstring_property_decorators=("property,project.Property",),
+            docstring_parse_tables=False,
+        ),
+    )
+    assert configured.docstring_convention == pydocformatter_settings.DocstringConvention.GOOGLE
+    assert configured.docstring_blank_line_style == pydocformatter_settings.DocstringBlankLineStyle.ALIGNED
+    assert configured.docstring_blank_line_after_last_section
+    assert configured.docstring_missing_documentation == pydocformatter_settings.DocstringMissingDocumentation.ALL_DOCSTRINGS
+    assert not configured.docstring_missing_documentation_public_only
+    assert configured.docstring_require_init_attribute_documentation
+    assert configured.docstring_class_attribute_no_type_base_classes == ("enum.Enum",)
+    assert configured.docstring_forbidden_function_decorators == ("project.overload",)
+    assert configured.docstring_optional_function_decorators == ("project.override",)
+    assert configured.docstring_property_decorators == ("project.Property",)
+    assert not configured.docstring_parse_tables
+    assert overridden.docstring_convention == pydocformatter_settings.DocstringConvention.NUMPY
+    assert overridden.docstring_blank_line_style == pydocformatter_settings.DocstringBlankLineStyle.BLANK
+    assert not overridden.docstring_blank_line_after_last_section
+    assert overridden.docstring_missing_documentation == pydocformatter_settings.DocstringMissingDocumentation.NON_SUMMARY_DOCSTRINGS
+    assert overridden.docstring_missing_documentation_public_only
+    assert not overridden.docstring_require_init_attribute_documentation
+    assert overridden.docstring_class_attribute_no_type_base_classes == ("Flag", "enum.Flag")
+    assert overridden.docstring_forbidden_function_decorators == ("typing.overload", "overload")
+    assert overridden.docstring_optional_function_decorators == ("typing.override", "override")
+    assert overridden.docstring_property_decorators == ("property", "project.Property")
+    assert not overridden.docstring_parse_tables
 
-        empty_decorator_config = pydocformatter_settings.SETTINGS_SCHEMA.load(
-            field_overrides={
-                "docstring_forbidden_function_decorators": (),
-                "docstring_optional_function_decorators": (),
-                "docstring_property_decorators": (),
-                "docstring_class_attribute_no_type_base_classes": (),
-            }
+    empty_decorator_config = pydocformatter_settings.SETTINGS_SCHEMA.load(
+        field_overrides={
+            "docstring_forbidden_function_decorators": (),
+            "docstring_optional_function_decorators": (),
+            "docstring_property_decorators": (),
+            "docstring_class_attribute_no_type_base_classes": (),
+        }
+    )
+    assert empty_decorator_config.docstring_forbidden_function_decorators == ()
+    assert empty_decorator_config.docstring_optional_function_decorators == ()
+    assert empty_decorator_config.docstring_property_decorators == ()
+    assert empty_decorator_config.docstring_class_attribute_no_type_base_classes == ()
+
+    config = pydocformatter_settings.SETTINGS_SCHEMA.load(
+        field_overrides={
+            "docstring_parse_list_items": False,
+            "docstring_parse_headings": False,
+            "docstring_parse_doctests": False,
+            "docstring_parse_code_fences": False,
+            "docstring_parse_block_quotes": False,
+            "docstring_parse_tables": False,
+            "docstring_parse_directives": False,
+            "docstring_parse_literal_blocks": False,
+        }
+    )
+    assert not config.docstring_parse_list_items
+    assert not config.docstring_parse_headings
+    assert not config.docstring_parse_doctests
+    assert not config.docstring_parse_code_fences
+    assert not config.docstring_parse_block_quotes
+    assert not config.docstring_parse_tables
+    assert not config.docstring_parse_directives
+    assert not config.docstring_parse_literal_blocks
+
+    with pytest.raises(SettingsError, match="docstring_convention must be one of"):
+        pydocformatter_settings.SETTINGS_SCHEMA.load(field_overrides={"docstring_convention": "automatic"})
+
+    with pytest.raises(SettingsError, match="Unknown setting: docstring_parse_sphinx_fields"):
+        pydocformatter_settings.SETTINGS_SCHEMA.load(field_overrides={"docstring_parse_sphinx_fields": False})
+
+
+def test_output_format_setting_is_applied(monkeypatch: pytest.MonkeyPatch) -> None:
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        (root / "pyproject.toml").write_text('[tool.pydocfmt]\noutput-format = "grouped"\n', encoding="utf-8")
+        monkeypatch.chdir(root)
+        config = pydocformatter_settings.SETTINGS_SCHEMA.load()
+
+    assert config.output_format is OutputFormat.GROUPED
+
+
+def test_output_format_cli_override_is_applied() -> None:
+    config = pydocformatter_settings.SETTINGS_SCHEMA.load(field_overrides=CheckSettingsOverrides(output_format=OutputFormat.GROUPED))
+
+    assert config.output_format is OutputFormat.GROUPED
+
+
+def test_output_format_setting_must_be_grouped(monkeypatch: pytest.MonkeyPatch) -> None:
+    unsupported_output_formats = ("json",)
+    unsupported_output_format = unsupported_output_formats[0]
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        (root / "pyproject.toml").write_text(f'[tool.pydocfmt]\noutput-format = "{unsupported_output_format}"\n', encoding="utf-8")
+        monkeypatch.chdir(root)
+        with pytest.raises(SettingsError, match="output-format"):
+            pydocformatter_settings.SETTINGS_SCHEMA.load()
+
+
+def test_settings_overrides_replace_independent_list_keys(monkeypatch: pytest.MonkeyPatch) -> None:
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        (root / "pyproject.toml").write_text(
+            "[tool.pydocfmt]\n"
+            "line-length = 77\n"
+            'line-ending = "cr-lf"\n'
+            'indent-style = "space"\n'
+            "indent-width = 3\n"
+            'include = ["*.pyi"]\n'
+            'extend-include = ["*.pyw"]\n'
+            'exclude = ["build"]\n'
+            'extend-exclude = ["dist"]\n'
+            "force-exclude = true\n",
+            encoding="utf-8",
         )
-        assert empty_decorator_config.docstring_forbidden_function_decorators == ()
-        assert empty_decorator_config.docstring_optional_function_decorators == ()
-        assert empty_decorator_config.docstring_property_decorators == ()
-        assert empty_decorator_config.docstring_class_attribute_no_type_base_classes == ()
-
-        config = pydocformatter_settings.SETTINGS_SCHEMA.load(
-            field_overrides={
-                "docstring_parse_list_items": False,
-                "docstring_parse_headings": False,
-                "docstring_parse_doctests": False,
-                "docstring_parse_code_fences": False,
-                "docstring_parse_block_quotes": False,
-                "docstring_parse_tables": False,
-                "docstring_parse_directives": False,
-                "docstring_parse_literal_blocks": False,
-            }
-        )
-        assert not config.docstring_parse_list_items
-        assert not config.docstring_parse_headings
-        assert not config.docstring_parse_doctests
-        assert not config.docstring_parse_code_fences
-        assert not config.docstring_parse_block_quotes
-        assert not config.docstring_parse_tables
-        assert not config.docstring_parse_directives
-        assert not config.docstring_parse_literal_blocks
-
-        with pytest.raises(SettingsError, match="docstring_convention must be one of"):
-            pydocformatter_settings.SETTINGS_SCHEMA.load(field_overrides={"docstring_convention": "automatic"})
-
-        with pytest.raises(SettingsError, match="Unknown setting: docstring_parse_sphinx_fields"):
-            pydocformatter_settings.SETTINGS_SCHEMA.load(field_overrides={"docstring_parse_sphinx_fields": False})
-
-    def test_output_format_setting_is_applied(self) -> None:
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
-            (root / "pyproject.toml").write_text('[tool.pydocfmt]\noutput-format = "grouped"\n', encoding="utf-8")
-            previous_cwd = os.getcwd()
-            os.chdir(root)
-            try:
-                config = pydocformatter_settings.SETTINGS_SCHEMA.load()
-            finally:
-                os.chdir(previous_cwd)
-
-        assert config.output_format is OutputFormat.GROUPED
-
-    def test_output_format_cli_override_is_applied(self) -> None:
-        config = pydocformatter_settings.SETTINGS_SCHEMA.load(field_overrides=CheckSettingsOverrides(output_format=OutputFormat.GROUPED))
-
-        assert config.output_format is OutputFormat.GROUPED
-
-    def test_output_format_setting_must_be_grouped(self) -> None:
-        unsupported_output_formats = ("json",)
-        unsupported_output_format = unsupported_output_formats[0]
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
-            (root / "pyproject.toml").write_text(f'[tool.pydocfmt]\noutput-format = "{unsupported_output_format}"\n', encoding="utf-8")
-            previous_cwd = os.getcwd()
-            os.chdir(root)
-            try:
-                with pytest.raises(SettingsError, match="output-format"):
-                    pydocformatter_settings.SETTINGS_SCHEMA.load()
-            finally:
-                os.chdir(previous_cwd)
-
-    def test_settings_overrides_replace_independent_list_keys(self) -> None:
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
-            (root / "pyproject.toml").write_text(
-                "[tool.pydocfmt]\n"
-                "line-length = 77\n"
-                'line-ending = "cr-lf"\n'
-                'indent-style = "space"\n'
-                "indent-width = 3\n"
-                'include = ["*.pyi"]\n'
-                'extend-include = ["*.pyw"]\n'
-                'exclude = ["build"]\n'
-                'extend-exclude = ["dist"]\n'
-                "force-exclude = true\n",
-                encoding="utf-8",
-            )
-            previous_cwd = os.getcwd()
-            os.chdir(root)
-            try:
-                config = pydocformatter_settings.SETTINGS_SCHEMA.load()
-            finally:
-                os.chdir(previous_cwd)
-
-        assert config.line_length == 77
-        assert config.line_ending is LineEnding.CR_LF
-        assert config.indent_style is IndentStyle.SPACE
-        assert config.indent_width == 3
-        assert config.include == ("*.pyi",)
-        assert config.extend_include == ("*.pyw",)
-        assert config.exclude == ("build",)
-        assert config.extend_exclude == ("dist",)
-        assert config.force_exclude
-
-    def test_overrides_replace_extend_lists(self) -> None:
-        config = pydocformatter_settings.SETTINGS_SCHEMA.load(field_overrides=CheckSettingsOverrides(include=("*.py",), extend_include=("*.pyw",), exclude=(), extend_exclude=("generated.py",)))
-
-        assert config.include == ("*.py",)
-        assert config.extend_include == ("*.pyw",)
-        assert config.exclude == ()
-        assert config.extend_exclude == ("generated.py",)
-
-    def test_overrides_replace_indent_settings(self) -> None:
-        config = pydocformatter_settings.SETTINGS_SCHEMA.load(field_overrides=CheckSettingsOverrides(indent_style=IndentStyle.TAB, indent_width=2))
-
-        assert config.indent_style is IndentStyle.TAB
-        assert config.indent_width == 2
-
-    def test_overrides_replace_line_ending(self) -> None:
-        config = pydocformatter_settings.SETTINGS_SCHEMA.load(field_overrides=CheckSettingsOverrides(line_ending=LineEnding.NATIVE))
-
-        assert config.line_ending is LineEnding.NATIVE
-
-    def test_unknown_hyphenated_key_is_rejected(self) -> None:
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
-            (root / "pyproject.toml").write_text("[tool.pydocfmt]\nunknown-key = true\n", encoding="utf-8")
-            previous_cwd = os.getcwd()
-            os.chdir(root)
-            try:
-                with pytest.raises(SettingsError, match="unknown-key"):
-                    pydocformatter_settings.SETTINGS_SCHEMA.load()
-            finally:
-                os.chdir(previous_cwd)
-
-    def test_underscore_alias_is_rejected(self) -> None:
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
-            (root / "pyproject.toml").write_text("[tool.pydocfmt]\nline_length = 100\n", encoding="utf-8")
-            previous_cwd = os.getcwd()
-            os.chdir(root)
-            try:
-                with pytest.raises(SettingsError, match="line_length"):
-                    pydocformatter_settings.SETTINGS_SCHEMA.load()
-            finally:
-                os.chdir(previous_cwd)
-
-    def test_bool_line_length_is_rejected(self) -> None:
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
-            (root / "pyproject.toml").write_text("[tool.pydocfmt]\nline-length = true\n", encoding="utf-8")
-            previous_cwd = os.getcwd()
-            os.chdir(root)
-            try:
-                with pytest.raises(SettingsError, match="line-length"):
-                    pydocformatter_settings.SETTINGS_SCHEMA.load()
-            finally:
-                os.chdir(previous_cwd)
-
-    def test_line_length_accepts_inclusive_bounds(self) -> None:
-        lower = pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(config_options=("line-length = 1",), isolated=True))
-        upper = pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(config_options=("line-length = 320",), isolated=True))
-
-        assert lower.line_length == 1
-        assert upper.line_length == 320
-
-    def test_line_length_rejects_values_outside_bounds(self) -> None:
-        with pytest.raises(SettingsError, match=r"line-length.*greater than or equal to 1"):
-            pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(config_options=("line-length = 0",), isolated=True))
-        with pytest.raises(SettingsError, match=r"line-length.*less than or equal to 320"):
-            pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(config_options=("line-length = 321",), isolated=True))
-
-    def test_indent_width_accepts_inclusive_bounds(self) -> None:
-        lower = pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(config_options=("indent-width = 1",), isolated=True))
-        upper = pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(config_options=("indent-width = 255",), isolated=True))
-
-        assert lower.indent_width == 1
-        assert upper.indent_width == 255
-
-    def test_indent_width_rejects_values_outside_bounds(self) -> None:
-        with pytest.raises(SettingsError, match=r"indent-width.*greater than or equal to 1"):
-            pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(config_options=("indent-width = 0",), isolated=True))
-        with pytest.raises(SettingsError, match=r"indent-width.*less than or equal to 255"):
-            pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(config_options=("indent-width = 256",), isolated=True))
-
-    def test_invalid_indent_style_is_rejected(self) -> None:
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
-            (root / "pyproject.toml").write_text('[tool.pydocfmt]\nindent-style = "spaces"\n', encoding="utf-8")
-            previous_cwd = os.getcwd()
-            os.chdir(root)
-            try:
-                with pytest.raises(SettingsError, match="indent-style"):
-                    pydocformatter_settings.SETTINGS_SCHEMA.load()
-            finally:
-                os.chdir(previous_cwd)
-
-    def test_invalid_line_ending_lists_enum_options(self) -> None:
-        with pytest.raises(SettingsError, match=r"line-ending.*\{'auto', 'lf', 'cr-lf', 'native'\}"):
-            pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(config_options=('line-ending = "crlf"',), isolated=True))
-
-    def test_invalid_line_ending_is_rejected(self) -> None:
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
-            (root / "pyproject.toml").write_text('[tool.pydocfmt]\nline-ending = "crlf"\n', encoding="utf-8")
-            previous_cwd = os.getcwd()
-            os.chdir(root)
-            try:
-                with pytest.raises(SettingsError, match="line-ending"):
-                    pydocformatter_settings.SETTINGS_SCHEMA.load()
-            finally:
-                os.chdir(previous_cwd)
-
-    def test_invalid_indent_width_is_rejected(self) -> None:
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
-            (root / "pyproject.toml").write_text("[tool.pydocfmt]\nindent-width = 0\n", encoding="utf-8")
-            previous_cwd = os.getcwd()
-            os.chdir(root)
-            try:
-                with pytest.raises(SettingsError, match="indent-width"):
-                    pydocformatter_settings.SETTINGS_SCHEMA.load()
-            finally:
-                os.chdir(previous_cwd)
-
-    def test_formatter_config_must_be_table(self) -> None:
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
-            (root / "pyproject.toml").write_text("[tool]\npydocfmt = false\n", encoding="utf-8")
-            previous_cwd = os.getcwd()
-            os.chdir(root)
-            try:
-                with pytest.raises(SettingsError, match=r"\[tool\.pydocfmt\] section must be a table"):
-                    pydocformatter_settings.SETTINGS_SCHEMA.load()
-            finally:
-                os.chdir(previous_cwd)
-
-    def test_nested_tool_table_is_rejected(self) -> None:
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
-            (root / "pyproject.toml").write_text("[tool.pydocfmt.pydocfmt]\nline-length = 72\n", encoding="utf-8")
-            previous_cwd = os.getcwd()
-            os.chdir(root)
-            try:
-                with pytest.raises(SettingsError, match="pydocfmt"):
-                    pydocformatter_settings.SETTINGS_SCHEMA.load()
-            finally:
-                os.chdir(previous_cwd)
-
-    def test_invalid_list_type_is_rejected(self) -> None:
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
-            (root / "pyproject.toml").write_text('[tool.pydocfmt]\ninclude = "*.py"\n', encoding="utf-8")
-            previous_cwd = os.getcwd()
-            os.chdir(root)
-            try:
-                with pytest.raises(SettingsError, match="include"):
-                    pydocformatter_settings.SETTINGS_SCHEMA.load()
-            finally:
-                os.chdir(previous_cwd)
-
-    def test_settings_include_pattern_shape_is_not_file_selection_validated(self) -> None:
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
-            (root / "pyproject.toml").write_text('[tool.pydocfmt]\ninclude = ["src/"]\n', encoding="utf-8")
-            previous_cwd = os.getcwd()
-            os.chdir(root)
-            try:
-                config = pydocformatter_settings.SETTINGS_SCHEMA.load()
-            finally:
-                os.chdir(previous_cwd)
-
-        assert config.include == ("src/",)
-
-    def test_empty_config_exclude_string_is_rejected(self) -> None:
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
-            (root / "pyproject.toml").write_text('[tool.pydocfmt]\nexclude = [""]\n', encoding="utf-8")
-            previous_cwd = os.getcwd()
-            os.chdir(root)
-            try:
-                with pytest.raises(SettingsError, match=r"exclude.*empty strings"):
-                    pydocformatter_settings.SETTINGS_SCHEMA.load()
-            finally:
-                os.chdir(previous_cwd)
-
-    def test_empty_cli_include_string_is_rejected(self) -> None:
-        with tempfile.TemporaryDirectory() as td:
-            previous_cwd = os.getcwd()
-            os.chdir(td)
-            try:
-                with pytest.raises(SettingsError, match=r"include.*empty strings"):
-                    pydocformatter_settings.SETTINGS_SCHEMA.load(field_overrides=CheckSettingsOverrides(include=("",)))
-            finally:
-                os.chdir(previous_cwd)
-
-    def test_empty_cli_exclude_string_is_rejected(self) -> None:
-        with tempfile.TemporaryDirectory() as td:
-            previous_cwd = os.getcwd()
-            os.chdir(td)
-            try:
-                with pytest.raises(SettingsError, match=r"exclude.*empty strings"):
-                    pydocformatter_settings.SETTINGS_SCHEMA.load(field_overrides=CheckSettingsOverrides(exclude=("",)))
-            finally:
-                os.chdir(previous_cwd)
-
-    def test_explicit_pyproject_config_file_is_applied(self) -> None:
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
-            config_path = root / "pyproject.toml"
-            config_path.write_text("[tool.pydocfmt]\nline-length = 99\nrespect-gitignore = false\n", encoding="utf-8")
-            previous_cwd = os.getcwd()
-            os.chdir(root)
-            try:
-                config = pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(config_options=(str(config_path),)))
-            finally:
-                os.chdir(previous_cwd)
-
-        assert config.line_length == 99
-        assert not config.respect_gitignore
-
-    def test_explicit_dedicated_config_file_is_applied(self) -> None:
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
-            config_path = root / "pydocfmt.toml"
-            config_path.write_text('line-ending = "lf"\nselect = ["PCF"]\n', encoding="utf-8")
-            previous_cwd = os.getcwd()
-            os.chdir(root)
-            try:
-                config = pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(config_options=(str(config_path),)))
-            finally:
-                os.chdir(previous_cwd)
-
-        assert config.line_ending is LineEnding.LF
-        assert config.select == ("PCF",)
-
-    def test_explicit_non_pyproject_file_rejects_pyproject_style_table(self) -> None:
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
-            config_path = root / "config.toml"
-            config_path.write_text("[tool.pydocfmt]\nline-length = 99\n", encoding="utf-8")
-
-            with pytest.raises(SettingsError, match=r"unknown setting.*tool"):
-                pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(config_options=(str(config_path),)))
-
-    def test_inline_config_option_is_applied(self) -> None:
-        config = pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(config_options=('line-length = 101\nignore = ["PCF001"]',)))
-
-        assert config.line_length == 101
-        assert config.ignore == ("PCF001",)
-
-    def test_inline_config_options_override_config_files(self) -> None:
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
-            config_path = root / "pydocfmt.toml"
-            config_path.write_text("line-length = 90\n", encoding="utf-8")
-            config = pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(config_options=(str(config_path), "line-length = 91")))
-
-        assert config.line_length == 91
-
-    def test_command_line_overrides_override_inline_config_options(self) -> None:
-        config = pydocformatter_settings.SETTINGS_SCHEMA.load(
-            field_overrides=CheckSettingsOverrides(line_length=103), global_values=pydocformatter_global_args.GlobalArgs(config_options=("line-length = 102",))
-        )
-
-        assert config.line_length == 103
-
-    def test_load_accepts_argparse_namespace_overrides(self) -> None:
-        args = argparse.Namespace(line_length=103, select=["PDF,PCF"], require_explicit=["PCF005, PDF003"], per_file_ignores=['{"tests/*.py" = ["PCF001"]}'])
-
-        config = pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(config_options=("line-length = 102",)), args=args)
-
-        assert config.line_length == 103
-        assert config.select == ("PDF", "PCF")
-        assert config.require_explicit == ("PCF005", "PDF003")
-        assert config.per_file_ignores == (("tests/*.py", ("PCF001",)),)
-
-    def test_toml_map_cli_repeated_patterns_append_values(self) -> None:
-        args = argparse.Namespace(per_file_ignores=['{"tests/*.py" = ["PDF200"], "src/*.py" = ["PDF106"]}', '{"tests/*.py" = ["PDF110"]}'])
-
-        config = pydocformatter_settings.SETTINGS_SCHEMA.load(args=args)
-
-        assert config.per_file_ignores == (("tests/*.py", ("PDF200", "PDF110")), ("src/*.py", ("PDF106",)))
-
-    def test_rule_selection_cli_comma_lists_strip_whitespace_as_documented_delta(self) -> None:
-        config = pydocformatter_settings.SETTINGS_SCHEMA.load(args=argparse.Namespace(select=["PDF200, PDF110"]))
-
-        assert config.select == ("PDF200", "PDF110")
-
-    def test_explicit_overrides_override_argparse_namespace_overrides(self) -> None:
-        config = pydocformatter_settings.SETTINGS_SCHEMA.load(args=argparse.Namespace(line_length=102), field_overrides=CheckSettingsOverrides(line_length=103))
-
-        assert config.line_length == 103
-
-    def test_isolated_ignores_auto_discovered_pyproject_config(self) -> None:
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
-            (root / "pyproject.toml").write_text("[tool.pydocfmt]\nline-length = 72\n", encoding="utf-8")
-            previous_cwd = os.getcwd()
-            os.chdir(root)
-            try:
-                config = pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(isolated=True))
-            finally:
-                os.chdir(previous_cwd)
-
-        assert config.line_length == 88
-
-    def test_isolated_accepts_inline_config_options(self) -> None:
-        config = pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(config_options=("line-length = 104",), isolated=True))
-
-        assert config.line_length == 104
-
-    def test_isolated_rejects_explicit_config_file(self) -> None:
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
-            config_path = root / "pydocfmt.toml"
-            config_path.write_text("line-length = 105\n", encoding="utf-8")
-
-            with pytest.raises(SettingsError, match="--config=PATH"):
-                pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(config_options=(str(config_path),), isolated=True))
-
-
-if __name__ == "__main__":
-    unittest.main()
+        monkeypatch.chdir(root)
+        config = pydocformatter_settings.SETTINGS_SCHEMA.load()
+
+    assert config.line_length == 77
+    assert config.line_ending is LineEnding.CR_LF
+    assert config.indent_style is IndentStyle.SPACE
+    assert config.indent_width == 3
+    assert config.include == ("*.pyi",)
+    assert config.extend_include == ("*.pyw",)
+    assert config.exclude == ("build",)
+    assert config.extend_exclude == ("dist",)
+    assert config.force_exclude
+
+
+def test_overrides_replace_extend_lists() -> None:
+    config = pydocformatter_settings.SETTINGS_SCHEMA.load(field_overrides=CheckSettingsOverrides(include=("*.py",), extend_include=("*.pyw",), exclude=(), extend_exclude=("generated.py",)))
+
+    assert config.include == ("*.py",)
+    assert config.extend_include == ("*.pyw",)
+    assert config.exclude == ()
+    assert config.extend_exclude == ("generated.py",)
+
+
+def test_overrides_replace_indent_settings() -> None:
+    config = pydocformatter_settings.SETTINGS_SCHEMA.load(field_overrides=CheckSettingsOverrides(indent_style=IndentStyle.TAB, indent_width=2))
+
+    assert config.indent_style is IndentStyle.TAB
+    assert config.indent_width == 2
+
+
+def test_overrides_replace_line_ending() -> None:
+    config = pydocformatter_settings.SETTINGS_SCHEMA.load(field_overrides=CheckSettingsOverrides(line_ending=LineEnding.NATIVE))
+
+    assert config.line_ending is LineEnding.NATIVE
+
+
+def test_unknown_hyphenated_key_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        (root / "pyproject.toml").write_text("[tool.pydocfmt]\nunknown-key = true\n", encoding="utf-8")
+        monkeypatch.chdir(root)
+        with pytest.raises(SettingsError, match="unknown-key"):
+            pydocformatter_settings.SETTINGS_SCHEMA.load()
+
+
+def test_underscore_alias_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        (root / "pyproject.toml").write_text("[tool.pydocfmt]\nline_length = 100\n", encoding="utf-8")
+        monkeypatch.chdir(root)
+        with pytest.raises(SettingsError, match="line_length"):
+            pydocformatter_settings.SETTINGS_SCHEMA.load()
+
+
+def test_bool_line_length_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        (root / "pyproject.toml").write_text("[tool.pydocfmt]\nline-length = true\n", encoding="utf-8")
+        monkeypatch.chdir(root)
+        with pytest.raises(SettingsError, match="line-length"):
+            pydocformatter_settings.SETTINGS_SCHEMA.load()
+
+
+def test_line_length_accepts_inclusive_bounds() -> None:
+    lower = pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(config_options=("line-length = 1",), isolated=True))
+    upper = pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(config_options=("line-length = 320",), isolated=True))
+
+    assert lower.line_length == 1
+    assert upper.line_length == 320
+
+
+def test_line_length_rejects_values_outside_bounds() -> None:
+    with pytest.raises(SettingsError, match=r"line-length.*greater than or equal to 1"):
+        pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(config_options=("line-length = 0",), isolated=True))
+    with pytest.raises(SettingsError, match=r"line-length.*less than or equal to 320"):
+        pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(config_options=("line-length = 321",), isolated=True))
+
+
+def test_indent_width_accepts_inclusive_bounds() -> None:
+    lower = pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(config_options=("indent-width = 1",), isolated=True))
+    upper = pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(config_options=("indent-width = 255",), isolated=True))
+
+    assert lower.indent_width == 1
+    assert upper.indent_width == 255
+
+
+def test_indent_width_rejects_values_outside_bounds() -> None:
+    with pytest.raises(SettingsError, match=r"indent-width.*greater than or equal to 1"):
+        pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(config_options=("indent-width = 0",), isolated=True))
+    with pytest.raises(SettingsError, match=r"indent-width.*less than or equal to 255"):
+        pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(config_options=("indent-width = 256",), isolated=True))
+
+
+def test_invalid_indent_style_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        (root / "pyproject.toml").write_text('[tool.pydocfmt]\nindent-style = "spaces"\n', encoding="utf-8")
+        monkeypatch.chdir(root)
+        with pytest.raises(SettingsError, match="indent-style"):
+            pydocformatter_settings.SETTINGS_SCHEMA.load()
+
+
+def test_invalid_line_ending_lists_enum_options() -> None:
+    with pytest.raises(SettingsError, match=r"line-ending.*\{'auto', 'lf', 'cr-lf', 'native'\}"):
+        pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(config_options=('line-ending = "crlf"',), isolated=True))
+
+
+def test_invalid_line_ending_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        (root / "pyproject.toml").write_text('[tool.pydocfmt]\nline-ending = "crlf"\n', encoding="utf-8")
+        monkeypatch.chdir(root)
+        with pytest.raises(SettingsError, match="line-ending"):
+            pydocformatter_settings.SETTINGS_SCHEMA.load()
+
+
+def test_invalid_indent_width_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        (root / "pyproject.toml").write_text("[tool.pydocfmt]\nindent-width = 0\n", encoding="utf-8")
+        monkeypatch.chdir(root)
+        with pytest.raises(SettingsError, match="indent-width"):
+            pydocformatter_settings.SETTINGS_SCHEMA.load()
+
+
+def test_formatter_config_must_be_table(monkeypatch: pytest.MonkeyPatch) -> None:
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        (root / "pyproject.toml").write_text("[tool]\npydocfmt = false\n", encoding="utf-8")
+        monkeypatch.chdir(root)
+        with pytest.raises(SettingsError, match=r"\[tool\.pydocfmt\] section must be a table"):
+            pydocformatter_settings.SETTINGS_SCHEMA.load()
+
+
+def test_nested_tool_table_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        (root / "pyproject.toml").write_text("[tool.pydocfmt.pydocfmt]\nline-length = 72\n", encoding="utf-8")
+        monkeypatch.chdir(root)
+        with pytest.raises(SettingsError, match="pydocfmt"):
+            pydocformatter_settings.SETTINGS_SCHEMA.load()
+
+
+def test_invalid_list_type_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        (root / "pyproject.toml").write_text('[tool.pydocfmt]\ninclude = "*.py"\n', encoding="utf-8")
+        monkeypatch.chdir(root)
+        with pytest.raises(SettingsError, match="include"):
+            pydocformatter_settings.SETTINGS_SCHEMA.load()
+
+
+def test_settings_include_pattern_shape_is_not_file_selection_validated(monkeypatch: pytest.MonkeyPatch) -> None:
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        (root / "pyproject.toml").write_text('[tool.pydocfmt]\ninclude = ["src/"]\n', encoding="utf-8")
+        monkeypatch.chdir(root)
+        config = pydocformatter_settings.SETTINGS_SCHEMA.load()
+
+    assert config.include == ("src/",)
+
+
+def test_empty_config_exclude_string_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        (root / "pyproject.toml").write_text('[tool.pydocfmt]\nexclude = [""]\n', encoding="utf-8")
+        monkeypatch.chdir(root)
+        with pytest.raises(SettingsError, match=r"exclude.*empty strings"):
+            pydocformatter_settings.SETTINGS_SCHEMA.load()
+
+
+def test_empty_cli_include_string_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
+    with tempfile.TemporaryDirectory() as td:
+        monkeypatch.chdir(td)
+        with pytest.raises(SettingsError, match=r"include.*empty strings"):
+            pydocformatter_settings.SETTINGS_SCHEMA.load(field_overrides=CheckSettingsOverrides(include=("",)))
+
+
+def test_empty_cli_exclude_string_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
+    with tempfile.TemporaryDirectory() as td:
+        monkeypatch.chdir(td)
+        with pytest.raises(SettingsError, match=r"exclude.*empty strings"):
+            pydocformatter_settings.SETTINGS_SCHEMA.load(field_overrides=CheckSettingsOverrides(exclude=("",)))
+
+
+def test_explicit_pyproject_config_file_is_applied(monkeypatch: pytest.MonkeyPatch) -> None:
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        config_path = root / "pyproject.toml"
+        config_path.write_text("[tool.pydocfmt]\nline-length = 99\nrespect-gitignore = false\n", encoding="utf-8")
+        monkeypatch.chdir(root)
+        config = pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(config_options=(str(config_path),)))
+
+    assert config.line_length == 99
+    assert not config.respect_gitignore
+
+
+def test_explicit_dedicated_config_file_is_applied(monkeypatch: pytest.MonkeyPatch) -> None:
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        config_path = root / "pydocfmt.toml"
+        config_path.write_text('line-ending = "lf"\nselect = ["PCF"]\n', encoding="utf-8")
+        monkeypatch.chdir(root)
+        config = pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(config_options=(str(config_path),)))
+
+    assert config.line_ending is LineEnding.LF
+    assert config.select == ("PCF",)
+
+
+def test_explicit_non_pyproject_file_rejects_pyproject_style_table() -> None:
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        config_path = root / "config.toml"
+        config_path.write_text("[tool.pydocfmt]\nline-length = 99\n", encoding="utf-8")
+
+        with pytest.raises(SettingsError, match=r"unknown setting.*tool"):
+            pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(config_options=(str(config_path),)))
+
+
+def test_inline_config_option_is_applied() -> None:
+    config = pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(config_options=('line-length = 101\nignore = ["PCF001"]',)))
+
+    assert config.line_length == 101
+    assert config.ignore == ("PCF001",)
+
+
+def test_inline_config_options_override_config_files() -> None:
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        config_path = root / "pydocfmt.toml"
+        config_path.write_text("line-length = 90\n", encoding="utf-8")
+        config = pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(config_options=(str(config_path), "line-length = 91")))
+
+    assert config.line_length == 91
+
+
+def test_command_line_overrides_override_inline_config_options() -> None:
+    config = pydocformatter_settings.SETTINGS_SCHEMA.load(
+        field_overrides=CheckSettingsOverrides(line_length=103), global_values=pydocformatter_global_args.GlobalArgs(config_options=("line-length = 102",))
+    )
+
+    assert config.line_length == 103
+
+
+def test_load_accepts_argparse_namespace_overrides() -> None:
+    args = argparse.Namespace(line_length=103, select=["PDF,PCF"], require_explicit=["PCF005, PDF003"], per_file_ignores=['{"tests/*.py" = ["PCF001"]}'])
+
+    config = pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(config_options=("line-length = 102",)), args=args)
+
+    assert config.line_length == 103
+    assert config.select == ("PDF", "PCF")
+    assert config.require_explicit == ("PCF005", "PDF003")
+    assert config.per_file_ignores == (("tests/*.py", ("PCF001",)),)
+
+
+def test_toml_map_cli_repeated_patterns_append_values() -> None:
+    args = argparse.Namespace(per_file_ignores=['{"tests/*.py" = ["PDF200"], "src/*.py" = ["PDF106"]}', '{"tests/*.py" = ["PDF110"]}'])
+
+    config = pydocformatter_settings.SETTINGS_SCHEMA.load(args=args)
+
+    assert config.per_file_ignores == (("tests/*.py", ("PDF200", "PDF110")), ("src/*.py", ("PDF106",)))
+
+
+def test_rule_selection_cli_comma_lists_strip_whitespace_as_documented_delta() -> None:
+    config = pydocformatter_settings.SETTINGS_SCHEMA.load(args=argparse.Namespace(select=["PDF200, PDF110"]))
+
+    assert config.select == ("PDF200", "PDF110")
+
+
+def test_explicit_overrides_override_argparse_namespace_overrides() -> None:
+    config = pydocformatter_settings.SETTINGS_SCHEMA.load(args=argparse.Namespace(line_length=102), field_overrides=CheckSettingsOverrides(line_length=103))
+
+    assert config.line_length == 103
+
+
+def test_isolated_ignores_auto_discovered_pyproject_config(monkeypatch: pytest.MonkeyPatch) -> None:
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        (root / "pyproject.toml").write_text("[tool.pydocfmt]\nline-length = 72\n", encoding="utf-8")
+        monkeypatch.chdir(root)
+        config = pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(isolated=True))
+
+    assert config.line_length == 88
+
+
+def test_isolated_accepts_inline_config_options() -> None:
+    config = pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(config_options=("line-length = 104",), isolated=True))
+
+    assert config.line_length == 104
+
+
+def test_isolated_rejects_explicit_config_file() -> None:
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        config_path = root / "pydocfmt.toml"
+        config_path.write_text("line-length = 105\n", encoding="utf-8")
+
+        with pytest.raises(SettingsError, match="--config=PATH"):
+            pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(config_options=(str(config_path),), isolated=True))

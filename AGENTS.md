@@ -16,6 +16,10 @@
 - Use ty for type checking, Ruff for code formatting/linting, and `pydocfmt check --fix` to format docstrings/comments.
 - Do not run pydocfmt on Markdown files; it only parses Python source and will fail on Markdown.
 
+## Tests
+
+- Write tests as module-level pytest functions. Use plain `assert`, `pytest.raises`, fixtures, `@pytest.mark.parametrize`, and `pytest-mock`; do not add `unittest.TestCase` test classes.
+
 ## Workflows
 
 - Interview me for relevant details when making plans, unless the details are quite clear already from the provided information.

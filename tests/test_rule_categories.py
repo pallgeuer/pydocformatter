@@ -2,7 +2,6 @@
 import enum
 import json
 import pathlib
-import unittest
 
 # Third-party imports
 import pytest
@@ -36,31 +35,28 @@ def _split_markdown_row(line: str) -> list[str]:
     return [cell.strip() for cell in line.strip().strip("|").split("|")]
 
 
-class TestCategoryEnums(unittest.TestCase):
-    def test_internal_classification_enums_require_explicit_string_conversion(self) -> None:
-        enum_types = (DefinitionKind, DocstringKind, CommentPlacement, CommentKind)
+@pytest.mark.parametrize("enum_type", [DefinitionKind, DocstringKind, CommentPlacement, CommentKind], ids=lambda enum_type: enum_type.__name__)
+def test_internal_classification_enums_require_explicit_string_conversion(enum_type: type[enum.Enum]) -> None:
+    member = next(iter(enum_type))
+    assert issubclass(enum_type, enum.Enum)
+    assert not issubclass(enum_type, enum.StrEnum)
+    assert member != member.value
+    with pytest.raises(TypeError):
+        json.dumps(member)
+    assert json.dumps(member.value) == f'"{member.value}"'
 
-        for enum_type in enum_types:
-            with self.subTest(enum_type=enum_type.__name__):
-                member = next(iter(enum_type))
-                assert issubclass(enum_type, enum.Enum)
-                assert not issubclass(enum_type, enum.StrEnum)
-                assert member != member.value
-                with pytest.raises(TypeError):
-                    json.dumps(member)
-                assert json.dumps(member.value) == f'"{member.value}"'
 
-    def test_category_options_table_defaults_match_settings_defaults(self) -> None:
-        config = CheckSettings()
-        definitions_by_key = {definition.key: definition for definition in SETTINGS_SCHEMA.definitions}
+def test_category_options_table_defaults_match_settings_defaults() -> None:
+    config = CheckSettings()
+    definitions_by_key = {definition.key: definition for definition in SETTINGS_SCHEMA.definitions}
 
-        for relative_path in ("src/pydocformatter/rules/definitions/PCF/PCF.md", "src/pydocformatter/rules/definitions/PDF/PDF.md"):
-            for row in _options_table_rows(ROOT / relative_path):
-                setting_key = row["Setting"].strip("`")
-                displayed_default = row["Default"].strip("`")
-                if displayed_default == "list":
-                    continue
-                definition = definitions_by_key[setting_key]
-                expected_default = settings_core.format_value(getattr(config, definition.field), definition.value_type).strip('"')
+    for relative_path in ("src/pydocformatter/rules/definitions/PCF/PCF.md", "src/pydocformatter/rules/definitions/PDF/PDF.md"):
+        for row in _options_table_rows(ROOT / relative_path):
+            setting_key = row["Setting"].strip("`")
+            displayed_default = row["Default"].strip("`")
+            if displayed_default == "list":
+                continue
+            definition = definitions_by_key[setting_key]
+            expected_default = settings_core.format_value(getattr(config, definition.field), definition.value_type).strip('"')
 
-                assert displayed_default == expected_default
+            assert displayed_default == expected_default

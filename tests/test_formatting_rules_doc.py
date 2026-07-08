@@ -4,7 +4,6 @@ from __future__ import annotations
 # Standard library imports
 import re
 import pathlib
-import unittest
 from typing import TYPE_CHECKING
 
 # First-party imports
@@ -85,72 +84,69 @@ def _codes_for_mapping_label(cell: str, label: str, code_pattern: str) -> list[s
     return [code for clause in cell.split(";") if (stripped := clause.strip()).startswith(label) for code in re.findall(code_pattern, stripped)]
 
 
-class TestFormattingRulesDoc(unittest.TestCase):
-    def test_pydocformatter_rule_tables_match_rule_metadata(self) -> None:
-        text = FORMAT_RULES_PATH.read_text(encoding="utf-8")
-        rows = _table_rows_after_heading(text, "### pydocformatter comments (PCF)") + _table_rows_after_heading(text, "### pydocformatter docstrings (PDF)")
-        row_by_code = {row["Code"]: row for row in rows}
-        expected_codes = tuple(str(rule_class.meta.code) for rule_class in rule_collection.RULE_COLLECTION.rules)
+def test_pydocformatter_rule_tables_match_rule_metadata() -> None:
+    text = FORMAT_RULES_PATH.read_text(encoding="utf-8")
+    rows = _table_rows_after_heading(text, "### pydocformatter comments (PCF)") + _table_rows_after_heading(text, "### pydocformatter docstrings (PDF)")
+    row_by_code = {row["Code"]: row for row in rows}
+    expected_codes = tuple(str(rule_class.meta.code) for rule_class in rule_collection.RULE_COLLECTION.rules)
 
-        assert tuple(row_by_code) == expected_codes
-        for rule_class in rule_collection.RULE_COLLECTION.rules:
-            rule = rule_class.meta
-            row = row_by_code[str(rule.code)]
-            assert row["Name"] == rule.name
-            assert row["Message"] == rule.message
-            assert row["Fixable"] == rule.fix_availability.value
-            assert row["Explicit"] == _explicit_cell(rule)
-            assert row["Stable Since"] == rule.stable_since
+    assert tuple(row_by_code) == expected_codes
+    for rule_class in rule_collection.RULE_COLLECTION.rules:
+        rule = rule_class.meta
+        row = row_by_code[str(rule.code)]
+        assert row["Name"] == rule.name
+        assert row["Message"] == rule.message
+        assert row["Fixable"] == rule.fix_availability.value
+        assert row["Explicit"] == _explicit_cell(rule)
+        assert row["Stable Since"] == rule.stable_since
 
-            if rule.code.prefix == "PDF":
-                assert row["None"] == _convention_cell(rule, DocstringConvention.NONE)
-                assert row["PEP257"] == _convention_cell(rule, DocstringConvention.PEP257)
-                assert row["Google"] == _convention_cell(rule, DocstringConvention.GOOGLE)
-                assert row["NumPy"] == _convention_cell(rule, DocstringConvention.NUMPY)
-                assert row["reST"] == _convention_cell(rule, DocstringConvention.REST)
-                assert row["Conflicts"] == _conflicts_cell(rule)
+        if rule.code.prefix == "PDF":
+            assert row["None"] == _convention_cell(rule, DocstringConvention.NONE)
+            assert row["PEP257"] == _convention_cell(rule, DocstringConvention.PEP257)
+            assert row["Google"] == _convention_cell(rule, DocstringConvention.GOOGLE)
+            assert row["NumPy"] == _convention_cell(rule, DocstringConvention.NUMPY)
+            assert row["reST"] == _convention_cell(rule, DocstringConvention.REST)
+            assert row["Conflicts"] == _conflicts_cell(rule)
 
-    def test_rule_list_ruff_replacement_mappings_are_bidirectional(self) -> None:
-        text = FORMAT_RULES_PATH.read_text(encoding="utf-8")
-        pydocformatter_rows = _table_rows_after_heading(text, "### pydocformatter comments (PCF)") + _table_rows_after_heading(text, "### pydocformatter docstrings (PDF)")
-        ruff_rows = _table_rows_after_heading(text, "## Ruff Rules")
-        disabled_by_ruff_rule: dict[str, list[str]] = {}
-        replaced_by_ruff_rule: dict[str, list[str]] = {}
 
-        for row in pydocformatter_rows:
-            for ruff_code in _codes_for_mapping_label(row.get("Ruff Rules", ""), "Disable ", r"(?:D|DOC|E|W)\d{3}"):
-                disabled_by_ruff_rule.setdefault(ruff_code, []).append(row["Code"])
+def test_rule_list_ruff_replacement_mappings_are_bidirectional() -> None:
+    text = FORMAT_RULES_PATH.read_text(encoding="utf-8")
+    pydocformatter_rows = _table_rows_after_heading(text, "### pydocformatter comments (PCF)") + _table_rows_after_heading(text, "### pydocformatter docstrings (PDF)")
+    ruff_rows = _table_rows_after_heading(text, "## Ruff Rules")
+    disabled_by_ruff_rule: dict[str, list[str]] = {}
+    replaced_by_ruff_rule: dict[str, list[str]] = {}
 
-        for row in ruff_rows:
-            replacements = _codes_for_mapping_label(row["Support by pydocformatter"], "Replaced by ", r"P[CD]F\d{3}")
-            if replacements:
-                replaced_by_ruff_rule[row["Code"]] = replacements
+    for row in pydocformatter_rows:
+        for ruff_code in _codes_for_mapping_label(row.get("Ruff Rules", ""), "Disable ", r"(?:D|DOC|E|W)\d{3}"):
+            disabled_by_ruff_rule.setdefault(ruff_code, []).append(row["Code"])
 
-        assert _sorted_mapping_values(disabled_by_ruff_rule) == _sorted_mapping_values(replaced_by_ruff_rule)
+    for row in ruff_rows:
+        replacements = _codes_for_mapping_label(row["Support by pydocformatter"], "Replaced by ", r"P[CD]F\d{3}")
+        if replacements:
+            replaced_by_ruff_rule[row["Code"]] = replacements
 
-    def test_rule_list_ruff_related_mappings_are_bidirectional(self) -> None:
-        text = FORMAT_RULES_PATH.read_text(encoding="utf-8")
-        pydocformatter_rows = _table_rows_after_heading(text, "### pydocformatter comments (PCF)") + _table_rows_after_heading(text, "### pydocformatter docstrings (PDF)")
-        ruff_rows = _table_rows_after_heading(text, "## Ruff Rules")
-        related_by_ruff_rule: dict[str, list[str]] = {}
-        related_by_pydocformatter_rule: dict[str, list[str]] = {}
+    assert _sorted_mapping_values(disabled_by_ruff_rule) == _sorted_mapping_values(replaced_by_ruff_rule)
 
-        for row in pydocformatter_rows:
-            for ruff_code in _codes_for_mapping_label(row.get("Ruff Rules", ""), "Related to ", r"(?:D|DOC|E|W)\d{3}"):
-                related_by_ruff_rule.setdefault(ruff_code, []).append(row["Code"])
 
-        for row in ruff_rows:
-            related_rules = _codes_for_mapping_label(row["Support by pydocformatter"], "Related to ", r"P[CD]F\d{3}")
-            if related_rules:
-                related_by_pydocformatter_rule[row["Code"]] = related_rules
+def test_rule_list_ruff_related_mappings_are_bidirectional() -> None:
+    text = FORMAT_RULES_PATH.read_text(encoding="utf-8")
+    pydocformatter_rows = _table_rows_after_heading(text, "### pydocformatter comments (PCF)") + _table_rows_after_heading(text, "### pydocformatter docstrings (PDF)")
+    ruff_rows = _table_rows_after_heading(text, "## Ruff Rules")
+    related_by_ruff_rule: dict[str, list[str]] = {}
+    related_by_pydocformatter_rule: dict[str, list[str]] = {}
 
-        assert _sorted_mapping_values(related_by_ruff_rule) == _sorted_mapping_values(related_by_pydocformatter_rule)
+    for row in pydocformatter_rows:
+        for ruff_code in _codes_for_mapping_label(row.get("Ruff Rules", ""), "Related to ", r"(?:D|DOC|E|W)\d{3}"):
+            related_by_ruff_rule.setdefault(ruff_code, []).append(row["Code"])
+
+    for row in ruff_rows:
+        related_rules = _codes_for_mapping_label(row["Support by pydocformatter"], "Related to ", r"P[CD]F\d{3}")
+        if related_rules:
+            related_by_pydocformatter_rule[row["Code"]] = related_rules
+
+    assert _sorted_mapping_values(related_by_ruff_rule) == _sorted_mapping_values(related_by_pydocformatter_rule)
 
 
 def _sorted_mapping_values(mapping: dict[str, list[str]]) -> dict[str, list[str]]:
     """Return mapping values sorted for order-insensitive code comparisons."""
     return {key: sorted(values) for key, values in mapping.items()}
-
-
-if __name__ == "__main__":
-    unittest.main()
