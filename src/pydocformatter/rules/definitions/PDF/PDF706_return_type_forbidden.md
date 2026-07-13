@@ -2,9 +2,9 @@
 
 Fix is not available.
 
-Rule is ignored if `docstring-convention` is `none`, `pep257`, `google`, `numpy`, or `rest`.
+Rule is disabled if `docstring-convention` is `none` or `pep257`, and ignored by broad selectors under `google`, `numpy`, and `rest`.
 
-Rule is incompatible with `PDF705`, `PDF707`.
+Rule is incompatible with `PDF705` and `PDF707`.
 
 ## What it does
 Checks that parsed return entries in owning function docstrings do not include documented types.
@@ -76,4 +76,4 @@ PDF706: Line 5: Function return 'return' docstring entry should not include a ty
 ```
 
 ## Options
-- `docstring-convention`: The rule is exact opt-in; exact rule-code selection restores it for parsed conventions.
+None.

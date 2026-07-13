@@ -194,5 +194,4 @@ PDF307: Line 8: Attribute 'timeout' documentation is too generic
 ```
 
 ## Options
-- `docstring-convention`: Controls whether Google, NumPy, or reStructuredText owner-docstring attribute entries are parsed. Broad selections ignore PDF307 under `none` and `pep257`. Exact selection can restore the rule under those conventions; attached attribute docstrings can still be checked, but convention-specific owner entries are not parsed.
-- `docstring-parse-list-items` and `docstring-parse-headings`: Can affect whether a single-line attached attribute docstring is treated as ordinary summary text or as a protected list item or heading. Protected structures are not checked as generic attached summaries.
+None.

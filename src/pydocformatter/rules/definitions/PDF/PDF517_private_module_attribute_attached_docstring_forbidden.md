@@ -111,4 +111,4 @@ f"Formatted {value}"
 ```
 
 ## Options
-- `require-explicit`: Keeps PDF517 out of broad rule selections by default. Exact rule-code selection enables it.
+None.

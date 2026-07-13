@@ -69,4 +69,4 @@ PDF520: Line 2: Public module attribute 'timeout' must use module docstring docu
 ```
 
 ## Options
-- `require-explicit`: Keeps PDF520 out of broad rule selections by default. Exact rule-code selection enables it.
+None.

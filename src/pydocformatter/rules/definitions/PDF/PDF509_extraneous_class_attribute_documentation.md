@@ -2,7 +2,7 @@
 
 Fix is not available.
 
-Rule is ignored if `docstring-convention` is `none` or `pep257`.
+Rule is disabled if `docstring-convention` is `none` or `pep257`.
 
 ## What it does
 Checks that class docstring attribute entries name attributes that are present on the class.
@@ -154,4 +154,4 @@ PDF509: Line 5: Class docstring documents attribute 'inner_timeout' that is not 
 ```
 
 ## Options
-- `docstring-convention`: Controls whether Google `Attributes` sections, NumPy `Attributes` sections, or reST attribute fields are parsed. Ignored by broad rule selections under `none` and `pep257`.
+None.

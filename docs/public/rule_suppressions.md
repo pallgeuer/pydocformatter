@@ -1,4 +1,4 @@
-# Rule Suppressions
+# Rule suppressions
 
 This document specifies how pydocfmt source comments suppress pydocformatter rule findings and automatic fixes. Suppression payloads use pydocformatter rule selectors such as `PDF101`, `PDF`, `PCF001`, `PCF`, and `ALL`.
 

@@ -25,6 +25,7 @@ import libcst.metadata as cst_metadata
 # First-party imports
 import pydocformatter.rules.edits as rule_edits
 import pydocformatter.rules.registration as rule_registration
+from pydocformatter import docs_urls
 from pydocformatter.cli import settings_check
 from pydocformatter.rules import line_endings
 from pydocformatter.rules.definition import RuleCategoryBase
@@ -973,7 +974,7 @@ class PDF(RuleCategoryBase[PDFCategoryData]):
         meta (RuleMetadata): Static metadata used for registration, diagnostics, and rule selection.
     """
 
-    meta = RuleCategoryMetadata(prefix="PDF", name="pydocformatter docstring formatting", url="https://github.com/pallgeuer/pydocformatter")
+    meta = RuleCategoryMetadata(prefix="PDF", name="pydocformatter docstring formatting", url=docs_urls.category_url("PDF"))
 
     @classmethod
     def prepare(cls, context: RuleCategoryContext) -> PDFCategoryData:

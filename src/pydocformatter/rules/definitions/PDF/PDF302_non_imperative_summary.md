@@ -122,6 +122,4 @@ PDF302: Line 2: Docstring summary first word 'Returns' is not imperative
 ```
 
 ## Options
-- `docstring-convention`: Ignores PDF302 for broad rule selections under the Google convention.
-- `docstring-property-decorators`: Function decorator names that make PDF302 skip a function as property-like. Calls are unwrapped before matching, dotted names also match import aliases and builtins resolved statically by LibCST, and unqualified names are syntactic-only. Property accessor decorators such as `value.getter`, `value.setter`, and `value.deleter` are always treated as property-like.
-- `docstring-parse-*`: Controls whether generic structures such as headings, lists, doctests, code fences, block quotes, tables, directives, and literal blocks are protected from summary-style checks.
+- `docstring-property-decorators`: Function decorator names that make PDF302 skip a function as property-like. Calls are unwrapped before matching, dotted names also match import aliases and builtins resolved statically by LibCST, and unqualified names are syntactic-only.

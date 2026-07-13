@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 import pydocformatter.rules.registration as rule_registration
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase
-from pydocformatter.rules.definition_helpers import entry_description_style
+from pydocformatter.rules.definition_helpers import docstring_conventions, entry_description_style
 from pydocformatter.rules.definitions.PDF.PDF import PDF
 from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata
 
@@ -35,7 +35,7 @@ class PDF310EntryDescriptionFirstWordCapitalization(RuleBase):
         message="Docstring entry description first word should be capitalized",
         fix_availability=FixAvailability.SOMETIMES,
         stable_since="1.0.0",
-        setting_effects=(),
+        setting_effects=docstring_conventions.convention_setting_effects(disabled=docstring_conventions.UNPARSED_CONVENTIONS),
         incompatible_with=(),
         check_kind=RuleCheckKind.STANDARD,
     )

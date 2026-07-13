@@ -7,6 +7,7 @@ import enum
 import json
 import math
 import typing
+import tomllib
 import argparse
 import tempfile
 import subprocess
@@ -40,6 +41,19 @@ pytestmark = pytest.mark.isolated_cwd
 def _repo_root() -> Path:
     """Return the repository root used for subprocess-based tool checks."""
     return Path(__file__).resolve().parents[1]
+
+
+def _markdown_section_lines(path: Path, heading: str) -> list[str]:
+    """Return non-empty lines from a level-two Markdown section."""
+    lines = path.read_text(encoding="utf-8").splitlines()
+    heading_index = lines.index(f"## {heading}")
+    section_lines: list[str] = []
+    for line in lines[heading_index + 1 :]:
+        if line.startswith("## "):
+            break
+        if line.strip():
+            section_lines.append(line)
+    return section_lines
 
 
 def test_check_settings_schema_uses_generic_settings_definitions() -> None:
@@ -364,9 +378,23 @@ def test_readme_configuration_links_to_detailed_specs() -> None:
     readme = (Path(__file__).resolve().parent.parent / "README.md").read_text(encoding="utf-8")
 
     assert "pydocfmt config" in readme
-    assert "docs/settings_spec.md" in readme
-    assert "docs/file_selection_spec.md" in readme
-    assert "docs/rule_selection_spec.md" in readme
+    assert "docs/public/settings_spec.md" in readme
+    assert "docs/public/file_selection_spec.md" in readme
+    assert "docs/public/rule_selection_spec.md" in readme
+
+
+def test_file_selection_spec_defaults_match_settings_defaults() -> None:
+    defaults_lines = _markdown_section_lines(_repo_root() / "docs" / "public" / "file_selection_spec.md", "Defaults")
+    defaults = tomllib.loads("\n".join(line.removeprefix("- `").removesuffix("`") for line in defaults_lines))
+    file_selection_definitions = tuple(definition for definition in pydocformatter_settings.SETTINGS_SCHEMA.definitions if definition.group == SettingsGroup.FILE_SELECTION)
+    config = CheckSettings()
+
+    assert tuple(defaults) == tuple(definition.key for definition in file_selection_definitions)
+    for definition in file_selection_definitions:
+        expected = getattr(config, definition.field)
+        if isinstance(expected, tuple):
+            expected = list(expected)
+        assert defaults[definition.key] == expected
 
 
 def test_load_settings_defaults_in_isolated_mode(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -453,6 +481,19 @@ def test_setting_documentation_default_mentions_match_resolved_defaults() -> Non
         expected_default = pydocformatter_settings_core.format_value(getattr(config, definition.field), definition.value_type)
 
         assert default_match.group("default") == expected_default
+
+
+def test_setting_documentation_omits_long_string_list_defaults() -> None:
+    short_default = '["PCF005", "PDF003", "PDF516", "PDF517", "PDF518"]'
+
+    assert len(short_default) == 50
+    assert pydocformatter_settings._documented_default_text(short_default, pydocformatter_settings_core.StringList) == short_default
+    assert pydocformatter_settings._documented_default_text(f"{short_default}x", pydocformatter_settings_core.StringList) is None
+    assert pydocformatter_settings._setting_default_text("select", pydocformatter_settings_core.StringList) == '["ALL"]'
+    assert pydocformatter_settings._setting_default_text("comment_task_markers", pydocformatter_settings_core.StringList) is None
+    assert pydocformatter_settings._setting_default_text("require_explicit", pydocformatter_settings_core.StringList) is None
+    assert "has a default value" in pydocformatter_settings._setting_default_clause("require_explicit", pydocformatter_settings_core.StringList)
+    assert "defaults to" not in pydocformatter_settings._setting_default_clause("require_explicit", pydocformatter_settings_core.StringList)
 
 
 def test_load_profile_tracks_field_source_priorities(monkeypatch: pytest.MonkeyPatch) -> None:

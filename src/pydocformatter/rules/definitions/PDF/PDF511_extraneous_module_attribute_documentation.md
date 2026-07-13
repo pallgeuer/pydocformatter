@@ -2,7 +2,7 @@
 
 Fix is not available.
 
-Rule is ignored if `docstring-convention` is `none` or `pep257`.
+Rule is disabled if `docstring-convention` is `none` or `pep257`.
 
 ## What it does
 Checks that module docstring attribute entries name attributes that are present at module scope.
@@ -147,4 +147,4 @@ PDF511: Line 4: Module docstring documents attribute 'primary' that is not prese
 ```
 
 ## Options
-- `docstring-convention`: Controls whether Google `Attributes` sections, NumPy `Attributes` sections, or reST attribute fields are parsed. Ignored by broad rule selections under `none` and `pep257`.
+None.

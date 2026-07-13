@@ -74,4 +74,4 @@ PDF522: Line 6: Private class attribute '_token' must use class docstring docume
 ```
 
 ## Options
-- `require-explicit`: Keeps PDF522 out of broad rule selections by default. Exact rule-code selection enables it.
+None.

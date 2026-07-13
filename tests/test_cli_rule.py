@@ -28,6 +28,7 @@ def test_pydocfmt_rule_prints_rule_json() -> None:
     assert output["name"] == "summary-too-long"
     assert output["code"] == "PDF203"
     assert output["linter"] == "pydocformatter"
+    assert output["url"] == "https://pallgeuer.github.io/pydocformatter/rules/summary-too-long/"
     assert output["fix"] == "Fix is not available."
     assert output["fix_availability"] == "Never"
     assert output["status"] == {"Stable": {"since": "v1.0.0"}}
@@ -65,6 +66,8 @@ def test_pydocfmt_rule_prints_all_rules_json() -> None:
 
     assert result.exit_code == 0
     assert tuple(rule["code"] for rule in output) == expected_codes
+    assert all(rule["url"].startswith("https://pallgeuer.github.io/pydocformatter/rules/") for rule in output)
+    assert all(rule["url"].endswith("/") for rule in output)
 
 
 def test_pydocfmt_rule_rejects_missing_rule() -> None:

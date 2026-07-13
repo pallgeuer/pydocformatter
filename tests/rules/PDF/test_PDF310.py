@@ -206,11 +206,14 @@ def test_skips_rest_type_and_generic_fields() -> None:
     assert not result.unfixed_findings
 
 
-def test_broad_selection_has_no_convention_effects_like_pdf304() -> None:
+def test_broad_selection_requires_parsed_docstring_convention() -> None:
     for convention in DocstringConvention:
         selection = rules_selection.select_rules(CheckSettings(select=("PDF3",), docstring_convention=convention))
 
-        assert "PDF310" in {rule.rule.code.tag for rule in selection.rules}
+        if convention in {DocstringConvention.NONE, DocstringConvention.PEP257}:
+            assert "PDF310" not in {rule.rule.code.tag for rule in selection.rules}
+        else:
+            assert "PDF310" in {rule.rule.code.tag for rule in selection.rules}
 
 
 def test_none_convention_selection_does_not_parse_convention_entries() -> None:

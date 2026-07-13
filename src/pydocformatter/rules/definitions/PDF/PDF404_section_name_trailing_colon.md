@@ -2,7 +2,7 @@
 
 Fix is sometimes available.
 
-Rule is ignored if `docstring-convention` is `none`, `numpy`, or `pep257`.
+Rule is disabled if `docstring-convention` is `none`, `pep257`, `numpy`, or `rest`.
 
 ## What it does
 PDF404 reports recognized Google section names that are missing the required trailing colon. The fix adds one colon immediately after the stripped section name and removes spaces or tabs that appeared after the section name on that line.
@@ -145,4 +145,4 @@ PDF404: Lines 2-4: Docstring section 'Args' should end with a colon
 ```
 
 ## Options
-- `docstring-convention`: Enables Google section recognition. `none`, `numpy`, and `pep257` ignore this rule.
+None.

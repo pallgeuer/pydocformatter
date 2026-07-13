@@ -227,30 +227,19 @@ if value:
 ```
 
 ## Options
-Wrapping settings:
-
-- `line-length`: Maximum display width used when wrapping generated comment lines.
-- `line-ending`: Line ending used for generated comment lines.
-- `indent-width`: Tab display width used for wrapping calculations.
-- `url-aware-wrapping`: When enabled, URL tokens remain unbroken while surrounding prose may be balanced across lines.
-
-Structure settings:
-
-- `comment-join-standalone-lines`: When enabled, adjacent ordinary prose lines are joined with one space. Preserved structures, list items, block quotes, and standalone colon-ended label lines remain formatting boundaries.
-- `comment-format-list-items`: Recognizes `-`, `+`, `*`, `1.`, and `1)` markers, including marker indentation and more-indented continuation lines. Each item is reflowed independently with hanging indentation.
-- `comment-task-marker-mode`: Controls recognized task markers with `none`, `no-wrap`, or `hanging`. The default `no-wrap` normalizes recognized task-marker units without wrapping them; `hanging` reflows their payloads with hanging indentation.
-- `comment-task-markers`: Configures exact uppercase task marker labels recognized before `:`. The default markers are `TODO`, `FIXME`, `XXX`, `HACK`, `BUG`, `DEBUG`, `NOTE`, `OPTIMIZE`, and `REVIEW`.
-- `comment-preserve-headings`: Preserves ATX headings and paired Setext/reStructuredText adornment headings unchanged.
-- `comment-preserve-doctests`: Preserves from the first line whose semantic text starts with `>>>` through the end of the physical run. An empty comment separator ends the run.
-- `comment-preserve-code-fences`: Preserves regions opened by at least three backticks or tildes through a matching fence containing no trailing text. An unclosed fence protects the remainder of the run.
-- `comment-format-block-quotes`: Joins and wraps consecutive quote lines with the same one-or-more-`>` prefix while retaining that prefix on every output line.
-- `comment-preserve-tables`: Requires structural delimiter rows. It recognizes Markdown pipe-table delimiter rows, reStructuredText grid borders, and reStructuredText simple-table borders rather than treating every pipe as a table.
-- `comment-preserve-directives`: Recognizes `.. name::`, preserves that line, and preserves following lines whose content is more indented. Formatting resumes at the next same-level ordinary line.
-
-Code-detection settings:
-
-- `comment-detect-code`: When enabled, a run is protected when raw content starts with at least four spaces or semantic text starts with `if`, `for`, `while`, `def`, `class`, `try`, `except`, `print`, or `return`.
-- `comment-detect-statements`: Parses individual lines and a dedented multiline candidate. It protects successful parses containing assignments, imports, control-flow statements, definitions, or other non-expression statements.
-- `comment-detect-expressions`: Protects calls, attribute or subscript access, operators, comparisons, comprehensions, container displays, lambdas, and similar nontrivial expressions. Bare names and scalar constants are deliberately excluded.
-
-When list or block-quote formatting is enabled, those structural prefixes are removed before keyword or AST code detection. All positive code detections protect the whole physical run.
+- `line-length`: Maximum display width used when wrapping generated standalone comment lines.
+- `indent-width`: Tab display width used for wrapping and structure-prefix calculations.
+- `url-aware-wrapping`: Keeps URL tokens unbroken while balancing surrounding prose when wrapping.
+- `comment-join-standalone-lines`: Joins adjacent ordinary prose comments into paragraphs before wrapping.
+- `comment-format-list-items`: Detects ordered and unordered list items and reflows them with hanging indentation.
+- `comment-format-block-quotes`: Detects Markdown block quotes and reflows text while retaining quote prefixes.
+- `comment-task-marker-mode`: Controls whether recognized task markers are ordinary text, normalized without wrapping, or wrapped with hanging indentation.
+- `comment-task-markers`: Defines the uppercase task marker labels recognized before `:`.
+- `comment-preserve-headings`: Preserves detected Markdown and reStructuredText heading comments unchanged.
+- `comment-preserve-doctests`: Preserves standalone doctest comment regions unchanged.
+- `comment-preserve-code-fences`: Preserves fenced code regions in standalone comments unchanged.
+- `comment-preserve-tables`: Preserves detected Markdown and reStructuredText tables unchanged.
+- `comment-preserve-directives`: Preserves reStructuredText directives and their indented bodies unchanged.
+- `comment-detect-code`: Protects whole standalone runs when the indentation or leading-keyword heuristic detects disabled code.
+- `comment-detect-statements`: Protects whole standalone runs when comment text parses as Python containing a non-expression statement.
+- `comment-detect-expressions`: Protects whole standalone runs when comment text parses as a nontrivial Python expression.

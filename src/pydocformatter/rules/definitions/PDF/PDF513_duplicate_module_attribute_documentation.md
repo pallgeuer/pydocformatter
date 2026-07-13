@@ -2,7 +2,7 @@
 
 Fix is not available.
 
-Rule is ignored if `docstring-convention` is `none` or `pep257`.
+Rule is disabled if `docstring-convention` is `none` or `pep257`.
 
 ## What it does
 Checks for module attributes documented both in the module docstring attribute documentation and by an adjacent attached attribute docstring.
@@ -159,4 +159,4 @@ def configure():
 ```
 
 ## Options
-- `docstring-convention`: Controls whether Google `Attributes` sections, NumPy `Attributes` sections, or reST attribute fields are parsed. Ignored by broad rule selections under `none` and `pep257`.
+None.

@@ -1,8 +1,8 @@
-# Rule Implementation Specification
+# Rule implementation specification
 
 This document specifies how pydocformatter rule categories, rule implementations, adjacent rule documentation, and rule tests are structured.
 
-## Rule Identity and Layout
+## Rule identity and layout
 
 Rule categories live under `src/pydocformatter/rules/definitions/<PREFIX>/`. Each category package contains a prefix-named category module, adjacent category documentation, and zero or more rule modules:
 
@@ -17,9 +17,9 @@ Category modules define exactly one `RuleCategoryBase` subclass named after the 
 
 Rule module stems use `<CODE>_<rule_name_with_underscores>`. Rule class names use `<CODE><RuleNamePartsCapitalized>`. Rule metadata names use stable kebab-case. Built-in rule file stems, class names, metadata names, and Markdown headings must agree.
 
-Rule code prefixes and numeric ranges are documented in each category document. `docs/rule_list.md` is the user-facing rule table and Ruff-rule mapping.
+Rule code prefixes and numeric ranges are documented in each category document. `docs/public/ruff_rule_links.md` is the user-facing Ruff-rule mapping.
 
-## Metadata and Selection Contract
+## Metadata and selection contract
 
 Every rule class defines `meta = RuleMetadata(...)` with:
 
@@ -38,7 +38,7 @@ Setting effects describe selection behavior only. Use `Ignored` when an exact se
 
 Rules that should not be enabled by broad selectors belong in the default `require-explicit` setting, not in rule implementation code.
 
-## Rule Execution Contract
+## Rule execution contract
 
 Standard rules implement:
 
@@ -55,7 +55,7 @@ Category `prepare()` data is read-only for the current module. If a fix changes 
 
 Rule code must not read or apply source suppressions. The runner filters suppressed violations, applies configured effective fixability, validates source-edit consistency, applies fixes, and accounts for fixed and unfixed findings.
 
-## Violations and Source Fixes
+## Violations and source fixes
 
 Each rule issue is reported as one `RuleViolation`. Built-in rule modules and reusable rule-definition helpers construct violations through `pydocformatter.rules.violations` helpers instead of constructing `RuleFinding`, `RuleViolation`, or `RuleSourceFix` directly.
 
@@ -69,9 +69,11 @@ Source fixes are planned source edits only. Rules do not return replacement LibC
 
 Reusable parsing, rendering, and source-edit behavior belongs in existing helpers under `src/pydocformatter/rules/definition_helpers/` or `src/pydocformatter/rules/edits.py` when it has more than one rule-level use.
 
-## Documentation and Tests
+## Documentation and tests
 
 Each built-in rule has adjacent Markdown documentation with the same stem as its Python file. Rule documents follow `src/pydocformatter/rules/templates/rule_template.md`; category documents follow `src/pydocformatter/rules/templates/rule_category_template.md`.
+
+Each new or changed rule updates `docs/devel/rule_settings_audit.md`. Audit every setting read by the rule implementation, by category preparation data the rule consumes, and by helper functions called from the rule path. The audit's `Options settings to document` column is the source of truth for parseable setting bullets in the rule's `## Options` section.
 
 Rule documents start with `# <rule-name> (<CODE>)`, include the fix availability sentence matching `RuleMetadata.fix_availability`, document setting effects and incompatibilities when present, and include focused structured `pydocfmt-example` blocks. Use `[output=unchanged]` when output equals input. Include `[findings]` only for findings that remain after fixing, with exact diagnostic messages.
 
@@ -81,7 +83,7 @@ Direct rule-hook tests use the shared direct-rule helpers in `tests/rule_helpers
 
 CLI tests are required when a rule affects `pydocfmt check`, `--show-rules`, `pydocfmt rule`, output messages, or selection behavior. Settings tests and rule-selection tests are required when a rule introduces settings, setting effects, fixability behavior, or conflicts.
 
-## Loader and Verification Invariants
+## Loader and verification invariants
 
 The built-in loader validates that:
 

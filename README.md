@@ -1,7 +1,6 @@
 # pydocformatter
 
-[![CI](https://github.com/pallgeuer/pydocformatter/actions/workflows/unit-tests.yml/badge.svg)](https://github.com/pallgeuer/pydocformatter/actions)
-[![CI](https://github.com/pallgeuer/pydocformatter/actions/workflows/pre-commit-checks.yml/badge.svg)](https://github.com/pallgeuer/pydocformatter/actions)
+[![CI](https://github.com/pallgeuer/pydocformatter/actions/workflows/pre_commit_checks.yml/badge.svg)](https://github.com/pallgeuer/pydocformatter/actions)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/release/python-3110/)
 [![License: GPL-3.0-or-later](https://img.shields.io/badge/License-GPL--3.0--or--later-blue.svg)](https://www.gnu.org/licenses/gpl-3.0.html)
 
@@ -9,7 +8,7 @@
 
 ---
 
-## Key Features
+## Key features
 
 ### Docstrings
 - **Google-style docstring formatting:** Support for Google docstring conventions
@@ -25,11 +24,17 @@
 - **Special comment preservation:** Maintains pylint, mypy, ty, noqa, pragma, and formatter directives
 - **Smart spacing:** Ensures consistent spacing between code and comments
 
-### File Selection and Configuration
+### File selection and configuration
 - **Ruff-style file selection:** Supports glob-based include/exclude rules, default excludes, `force-exclude`, and `.gitignore`-aware discovery
 - **Ruff-style configuration:** Reads `[tool.pydocfmt]` and its docstring/comment subtables from auto-discovered `pyproject.toml` files
 - **File-selection preview:** Reports included and ignored files, including excluded directories and gitignored paths
 - **Line-aware check diagnostics:** Reports affected files with line numbers and compressed line ranges in check mode
+
+---
+
+## Documentation
+
+The public documentation site is published at <https://pallgeuer.github.io/pydocformatter/>. Maintainer build commands are documented in [Contributing](CONTRIBUTING.md#documentation-site).
 
 ---
 
@@ -43,7 +48,7 @@ pip install pydocformatter
 
 ---
 
-## Quick Start
+## Quick start
 
 Check formatting without making changes:
 
@@ -59,7 +64,7 @@ pydocfmt check --fix
 
 ---
 
-## Command Line Usage
+## Command line usage
 
 Format Python docstrings and comments:
 
@@ -129,7 +134,7 @@ If no files or directories are specified, `pydocfmt check` checks the current di
 - `--comment-detect-statements`, `--no-comment-detect-statements`: Toggle parseable Python statement detection (default: enabled)
 - `--comment-detect-expressions`, `--no-comment-detect-expressions`: Toggle nontrivial Python expression detection (default: disabled)
 
-**Rule Selection:**
+**Rule selection:**
 - `--select RULE`: Comma-separated rule selector(s) to enable
 - `--ignore RULE`: Comma-separated rule selector(s) to ignore
 - `--extend-select RULE`: Comma-separated additional rule selector(s) to enable
@@ -140,7 +145,7 @@ If no files or directories are specified, `pydocfmt check` checks the current di
 - `--unfixable RULE`: Comma-separated rule selector(s) ineligible for automatic fixes
 - `--extend-fixable RULE`: Comma-separated additional rule selector(s) eligible for automatic fixes
 
-**File Selection:**
+**File selection:**
 - `--include GLOB`: Comma-separated glob pattern(s) for files to include
 - `--extend-include GLOB`: Comma-separated additional glob pattern(s) for files to include
 - `--exclude GLOB`: Comma-separated glob pattern(s) for files to exclude
@@ -153,7 +158,7 @@ If no files or directories are specified, `pydocfmt check` checks the current di
 - `-e`, `--exit-zero`: Exit with status code `0`, even when formatting violations are detected
 - `--exit-non-zero-on-fix`: Exit with a non-zero status code if `--fix` modifies any files
 
-**Global Options:**
+**Global options:**
 - `--config CONFIG`: Path to a TOML configuration file, or a TOML `<KEY> = <VALUE>` setting override
 - `--isolated`: Ignore auto-discovered configuration files
 
@@ -285,7 +290,7 @@ detect-expressions = false
 
 For TOML configuration, `[tool.pydocfmt.docstring]` and `[tool.pydocfmt.comment]` are the intended way to specify docstring and comment settings. Flat hyphenated forms such as `docstring-convention = "google"` also work for compatibility, but do not specify both forms for the same setting in one configuration.
 
-Use `pydocfmt config` to list supported settings and their accepted values. For the full configuration contract, see [Settings Specification](docs/settings_spec.md). File discovery is specified in [File Selection Specification](docs/file_selection_spec.md), and rule selectors, per-file ignores, and fixability are specified in [Rule Selection Specification](docs/rule_selection_spec.md).
+Use `pydocfmt config` to list supported settings and their accepted values. For the full configuration contract, see [Settings specification](docs/public/settings_spec.md). File discovery is specified in [File selection specification](docs/public/file_selection_spec.md), and rule selectors, per-file ignores, and fixability are specified in [Rule selection specification](docs/public/rule_selection_spec.md).
 
 ---
 
@@ -375,11 +380,11 @@ Prefer using a Python project's `pyproject.toml` to statically configure `pydocf
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md).
+See [Contributing](CONTRIBUTING.md).
 
 ## License
 
-This project is licensed under the GNU General Public License v3.0 or later - see the [LICENSE.md](LICENSE.md) file for details.
+This project is licensed under the GNU General Public License v3.0 or later. See the [License](LICENSE.md) for details.
 
 ---
 

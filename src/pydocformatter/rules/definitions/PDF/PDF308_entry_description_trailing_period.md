@@ -2,7 +2,7 @@
 
 Fix is sometimes available.
 
-Rule is ignored if `docstring-convention` is `google`.
+Rule is disabled if `docstring-convention` is `none` or `pep257`, and ignored by broad selectors under `google`.
 
 ## What it does
 Checks that parsed docstring entry descriptions end with a period.
@@ -262,5 +262,4 @@ PDF308: Lines 2-6: Docstring entry description should end with a period
 ```
 
 ## Options
-- `docstring-convention`: Controls whether Google sections, NumPy sections, or reStructuredText fields are parsed. Broad selections ignore PDF308 under the Google convention, matching PDF300.
-- `docstring-parse-*`: Controls whether generic nested structures such as lists, doctests, code fences, block quotes, tables, directives, and literal blocks are protected from entry-description punctuation checks.
+None.

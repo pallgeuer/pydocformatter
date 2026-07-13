@@ -13,7 +13,7 @@ The replacement is value-preserving and keeps reusable source spellings for indi
 Implicitly concatenated docstrings have source-level boundaries that do not exist in the runtime docstring value. Escaped whitespace such as `\n` has logical line structure that does not appear as physical source lines. Normalizing these forms first gives later docstring formatting rules a single literal with explicit source lines to inspect and rewrite, which avoids ambiguous edits around adjacent string tokens, comments between tokens, and hidden line breaks.
 
 ## Ruff compatibility
-None. Ruff can flag some implicit string concatenation patterns in other contexts, but PDF000 is specific to Python docstring ownership and rewrites only recognized docstrings.
+Ruff can flag some implicit string concatenation patterns in other contexts, but PDF000 is specific to Python docstring ownership and rewrites only recognized docstrings.
 
 ## Examples
 The canonical concatenation case is a function docstring composed of adjacent string literals:

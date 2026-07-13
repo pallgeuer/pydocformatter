@@ -72,4 +72,4 @@ PDF518: Line 3: Public class attribute 'timeout' must use class docstring docume
 ```
 
 ## Options
-- `require-explicit`: Keeps PDF518 out of broad rule selections by default. Exact rule-code selection enables it.
+None.

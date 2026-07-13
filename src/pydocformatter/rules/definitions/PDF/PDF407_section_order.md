@@ -2,7 +2,7 @@
 
 Fix is not available.
 
-Rule is ignored if `docstring-convention` is `none` or `pep257`.
+Rule is disabled if `docstring-convention` is `none` or `pep257`.
 
 ## What it does
 PDF407 reports recognized Google and NumPy sections, plus reST fields under the reST convention, that appear after a later ordered item for the active convention. Duplicate sections and fields with the same order rank are allowed.
@@ -161,4 +161,4 @@ PDF407: Line 5: Docstring field ':param arg:' should appear before ':returns:'
 ```
 
 ## Options
-- `docstring-convention`: Enables Google and NumPy section recognition and reST field recognition. `none` and `pep257` ignore this rule.
+None.

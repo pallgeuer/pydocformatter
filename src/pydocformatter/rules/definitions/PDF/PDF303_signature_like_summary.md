@@ -108,5 +108,4 @@ PDF303: Line 2: Docstring summary should not include a function signature
 ```
 
 ## Options
-- `docstring-convention`: Ignores PDF303 for broad rule selections under the NumPy convention.
-- `docstring-parse-*`: Controls whether generic structures such as headings, lists, doctests, code fences, block quotes, tables, directives, and literal blocks are protected from summary-style checks.
+None.

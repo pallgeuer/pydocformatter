@@ -2,7 +2,7 @@
 
 Fix is not available.
 
-Rule is ignored if `docstring-convention` is `google` or `pep257`.
+Rule is ignored if `docstring-convention` is `pep257` or `google`.
 
 ## What it does
 Checks module, class, function, and method docstring summaries whose first normalized word is `this`.
@@ -116,5 +116,4 @@ PDF305: Line 2: Docstring summary should not start with "This"
 ```
 
 ## Options
-- `docstring-convention`: Ignores PDF305 for broad rule selections under the Google and PEP 257 conventions.
-- `docstring-parse-*`: Controls whether generic structures such as headings, lists, doctests, code fences, block quotes, tables, directives, and literal blocks are protected from summary-style checks.
+None.

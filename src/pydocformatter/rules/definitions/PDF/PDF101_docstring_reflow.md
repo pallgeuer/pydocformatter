@@ -243,15 +243,6 @@ def example():
 
 ## Options
 - `line-length`: Maximum display width used when wrapping generated docstring lines.
-- `url-aware-wrapping`: Enables URL-aware line balancing without splitting URL tokens.
-- `line-ending`: Line ending used inside rewritten docstring literals. Untouched source outside the replacement is preserved.
-- `indent-width`: Tab display width used for wrapping calculations and generated continuation indentation.
-- `docstring-convention`: Enables convention-aware parsing for Google sections, NumPy sections, or reST fields.
-- `docstring-parse-list-items`: Controls whether list items are reflowed with list hanging indentation.
-- `docstring-parse-headings`: Controls whether Markdown and reStructuredText headings are protected.
-- `docstring-parse-doctests`: Controls whether doctest transcripts are protected.
-- `docstring-parse-code-fences`: Controls whether fenced code blocks are protected.
-- `docstring-parse-block-quotes`: Controls whether block quotes are reflowed with quote prefixes.
-- `docstring-parse-tables`: Controls whether Markdown and reStructuredText tables are protected.
-- `docstring-parse-directives`: Controls whether reStructuredText directives and their bodies are protected.
-- `docstring-parse-literal-blocks`: Controls whether literal blocks are protected.
+- `url-aware-wrapping`: Keeps URL tokens unbroken while balancing surrounding prose when wrapping.
+- `indent-style`: Indentation style used for generated continuation indentation.
+- `indent-width`: Tab display width used for wrapping calculations and generated indentation width.

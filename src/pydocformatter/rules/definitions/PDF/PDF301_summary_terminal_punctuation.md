@@ -2,7 +2,7 @@
 
 Fix is sometimes available.
 
-Rule is ignored if `docstring-convention` is `numpy` or `pep257`.
+Rule is ignored if `docstring-convention` is `pep257` or `numpy`.
 
 ## What it does
 Checks that the docstring summary punctuation target ends with terminal punctuation: a period, question mark, exclamation point, or Unicode ellipsis (`\u2026`).
@@ -151,5 +151,4 @@ def title():
 ```
 
 ## Options
-- `docstring-convention`: Ignores PDF301 for broad rule selections under the NumPy and PEP 257 conventions.
-- `docstring-parse-headings`: Controls whether Markdown and reStructuredText headings are protected from summary punctuation checks.
+None.

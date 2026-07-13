@@ -1,15 +1,15 @@
-# Rule Performance Audit
+# Rule performance audit
 
 Rule inventory up-to-date commit: `20d4d33a95ad72cc2435e4f45524824a3e9afb4a`
 
 Audit status: complete as of 2026-06-22. This document is the editable source of truth for rule performance audits. Each future audit rerun should execute the goal command below, refresh the inventory tables from Git-tracked rule files, update evidence and analysis as work proceeds, and add or update concrete findings with `Status:` fields.
 
-## Goal Command
+## Goal command
 
 Paste this command into Codex when the audit needs to be rerun after rules are added, removed, renamed, or modified:
 
 ```text
-/goal Audit every pydocformatter rule category and rule implementation for unnecessarily or avoidably slow code. First update every inventory table in docs/rule_performance_audit.md from the latest Git-tracked rule category and rule implementation files, because rules may have been added, removed, renamed, or substantially changed since the rule inventory up-to-date commit recorded at the top of the file. Then measure or otherwise characterize performance, analyze the implementation code for behavior-preserving speedups, and maintain docs/rule_performance_audit.md continuously as the source of truth. Do not implement fixes during the audit unless I explicitly ask for an implementation pass. Do not recommend externally visible behavior changes unless they are confirmed bugs; if an apparent speedup depends on changing behavior, record the bug-versus-intended-behavior question in the plan and ask me to confirm before treating it as an optimization. The goal is complete only when every category and every rule row in the plan has performance evidence, code-analysis notes, potential speedup classification, and any detailed findings or no-finding rationale recorded.
+/goal Audit every pydocformatter rule category and rule implementation for unnecessarily or avoidably slow code. First update every inventory table in docs/devel/rule_performance_audit.md from the latest Git-tracked rule category and rule implementation files, because rules may have been added, removed, renamed, or substantially changed since the rule inventory up-to-date commit recorded at the top of the file. Then measure or otherwise characterize performance, analyze the implementation code for behavior-preserving speedups, and maintain docs/devel/rule_performance_audit.md continuously as the source of truth. Do not implement fixes during the audit unless I explicitly ask for an implementation pass. Do not recommend externally visible behavior changes unless they are confirmed bugs; if an apparent speedup depends on changing behavior, record the bug-versus-intended-behavior question in the plan and ask me to confirm before treating it as an optimization. The goal is complete only when every category and every rule row in the plan has performance evidence, code-analysis notes, potential speedup classification, and any detailed findings or no-finding rationale recorded.
 ```
 
 ## Scope
@@ -19,7 +19,7 @@ Paste this command into Codex when the audit needs to be rerun after rules are a
 - Record all findings here before implementation.
 - Keep behavior-preserving opportunities separate from possible bug fixes.
 
-## Audit Commands
+## Audit commands
 
 Current pytest commands use project-default multiprocessing through pytest-xdist. These audit measurements were recorded before that default was enabled; pass `-n 0` when a future audit specifically needs serial pytest timings.
 
@@ -36,7 +36,7 @@ Current pytest commands use project-default multiprocessing through pytest-xdist
 | Findings 3-5 implementation benchmark | `uv run python - <<'PY' ... PY`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | Inline script ran `formatter.format_source(..., fix=False)` with generated source, 5 repeats per case. Before/after means: `PCF004` dense comments 250 0.089912s/0.092336s, 500 0.183348s/0.175877s, 1000 0.385439s/0.354546s; `PDF411` repeated type text 250 0.140476s/0.114494s, 500 0.281797s/0.230110s, 1000 0.578069s/0.475138s; `PDF501` many TypedDict classes/functions without unpack 250 0.172624s/0.175216s, 500 0.351357s/0.354167s, 1000 0.731793s/0.744814s. PDF501 remains parse/category dominated in this end-to-end harness; a focused regression test verifies the TypedDict scan is skipped when no unpacked keyword parameter needs it. |
 | Original behavior guard               | `uv run pydocfmt check src tests docs`; `uv run pytest tests/rules ...`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | These commands established the audited implementation was passing before the implementation follow-up pass. Post-fix verification is recorded in the individual findings.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 
-## Status Legend
+## Status legend
 
 - `Not started`: no audit work recorded yet.
 - `Measuring`: timing or profiling is underway.
@@ -51,14 +51,14 @@ Potential classifications:
 - `Moderate`: likely measurable on realistic larger workloads or when several affected rules are selected.
 - `High`: clear avoidable pathological cost with direct measurement.
 
-## Category Inventory
+## Category inventory
 
 | Category | Implementation                                    | Status | Performance evidence                                                                                                                                                                                 | Code-analysis notes                                                                                                                                                                                                       | Potential | Findings                                                                               |
 |----------|---------------------------------------------------|--------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------|----------------------------------------------------------------------------------------|
 | PCF      | `src/pydocformatter/rules/definitions/PCF/PCF.py` | Done   | Baseline full check passed in `real 0.40`; PCF-focused tests passed within the 2.11s focused run.                                                                                                    | `prepare()` exits early when `#` is absent, then collects comments once and shares `comments`, `standalone_runs`, and `trailing_comments`. Parent metadata for syntax-sensitive trailing extraction is lazy.              | Fixed     | Finding 3 fixed. Otherwise no category-level bottleneck.                               |
 | PDF      | `src/pydocformatter/rules/definitions/PDF/PDF.py` | Done   | Baseline full check passed in `real 0.40`; PDF-focused tests passed. Post-fix isolated owner lookup benchmark: 6000 `docstring_for()` calls 0.000480s mean, down from 0.032304s mean before the fix. | `prepare()` necessarily visits definitions and parses docstring structures once per pass. `PDFCategoryData.docstring_for()` now uses a lazy private owner-id map. Value-documentation facts are memoized after first use. | Fixed     | Finding 2 fixed. Otherwise category parsing is the intended shared cost for PDF rules. |
 
-## Rule Inventory
+## Rule inventory
 
 | Rule   | Implementation                                                                              | Status | Performance evidence                                                                                                                                                                                                                                                     | Code-analysis notes                                                                                                                                                                                                                                                           | Potential | Findings                                                                                  |
 |--------|---------------------------------------------------------------------------------------------|--------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------|-------------------------------------------------------------------------------------------|
@@ -178,7 +178,7 @@ Potential classifications:
 - **Tests/verification:** Added monkeypatch-backed tests proving ordinary no-unpack signatures do not call `typed_dict_keys_by_name()` and unpacked keyword parameters still call it once when needed. `uv run pytest -n 0 tests/rules/PCF/test_PCF004.py tests/rules/PDF/test_PDF411.py tests/rules/PDF/test_PDF501.py` passed with 160 tests; `uv run pytest tests/rules/PCF tests/rules/PDF` passed with 1512 tests; `uv run mypy` passed.
 - **User decisions needed:** None.
 
-## Possible Bug Decisions
+## Possible bug decisions
 
 No possible bug-versus-intended-behavior questions were identified during this audit. Remaining recorded opportunities can be pursued as behavior-preserving optimizations if implemented carefully. Any future `PDF101` change that intentionally changes wrapping output must be treated as a behavior question first.
 
@@ -186,7 +186,7 @@ No possible bug-versus-intended-behavior questions were identified during this a
 |----------|---------------------------|--------------------------------------------------------------------|---------------|--------|
 | None     | None                      | No speedup currently requires treating existing behavior as a bug. | Not needed    | Done   |
 
-## Highest-Value Behavior-Preserving Opportunities
+## Highest-value behavior-preserving opportunities
 
 1. Fixed: replace `PDF101` variable-width source wrapping with equivalent greedy longest-fitting-line wrapping.
 2. Fixed: add an owner-to-docstring map to `PDFCategoryData` for documentation rules.
@@ -194,7 +194,7 @@ No possible bug-versus-intended-behavior questions were identified during this a
 4. Fixed: replace `PCF004` previous-boundary reverse scans with direct previous-line lookup.
 5. Fixed: defer `PDF501` TypedDict scanning until an unpacked keyword parameter needs it.
 
-## Completion Checklist
+## Completion checklist
 
 - [x] Baseline commands and environment recorded.
 - [x] PCF category implementation checked.

@@ -159,6 +159,4 @@ class Client:
 ```
 
 ## Options
-- `docstring-convention`: Controls whether convention-specific structures such as reStructuredText fields are recognized instead of treated as summary text.
-- `docstring-property-decorators`: Function decorator names that make PDF311 treat a function as property-like. Calls are unwrapped before matching, dotted names also match import aliases and builtins resolved statically by LibCST, and unqualified names are syntactic-only. Property accessor decorators such as `value.getter`, `value.setter`, and `value.deleter` are always treated as property-like.
-- `docstring-parse-*`: Controls whether generic structures such as headings, lists, doctests, code fences, block quotes, tables, directives, and literal blocks are protected from summary-style checks.
+- `docstring-property-decorators`: Function decorator names that make PDF311 treat a function as property-like. Calls are unwrapped before matching, dotted names also match import aliases and builtins resolved statically by LibCST, and unqualified names are syntactic-only.

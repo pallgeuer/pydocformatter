@@ -2,7 +2,7 @@
 
 Fix is not available.
 
-Rule is ignored if `docstring-convention` is `none` or `pep257`.
+Rule is disabled if `docstring-convention` is `none` or `pep257`.
 
 ## What it does
 Checks function and method docstrings for yield documentation on functions that do not yield a meaningful value.
@@ -122,4 +122,4 @@ def values():
 ```
 
 ## Options
-- `docstring-convention`: Controls whether Google yield sections, NumPy yield sections, or reST yield fields such as `:yields:` and `:ytype:` are recognized. `none` and `pep257` ignore this rule by default.
+None.

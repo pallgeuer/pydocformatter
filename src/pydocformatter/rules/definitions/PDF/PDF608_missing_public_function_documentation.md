@@ -81,5 +81,5 @@ def _connect():
 ```
 
 ## Options
-- `docstring-optional-function-decorators`: Exact function decorator names that make PDF608 allow a public top-level function to omit a docstring.
-- `docstring-forbidden-function-decorators`: Exact function decorator names that make PDF608 allow a public top-level function to omit a docstring because PDF616 reports docstrings on those definitions instead.
+- `docstring-optional-function-decorators`: Function decorator names that allow a public top-level function to omit a docstring.
+- `docstring-forbidden-function-decorators`: Function decorator names that allow a public top-level function to omit a docstring because PDF616 reports docstrings on those definitions instead.

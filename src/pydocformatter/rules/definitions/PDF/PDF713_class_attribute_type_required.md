@@ -2,7 +2,7 @@
 
 Fix is not available.
 
-Rule is ignored if `docstring-convention` is `none`, `pep257`, `google`, `numpy`, or `rest`.
+Rule is disabled if `docstring-convention` is `none` or `pep257`, and ignored by broad selectors under `google`, `numpy`, and `rest`.
 
 Rule is incompatible with `PDF714`.
 
@@ -112,5 +112,4 @@ PDF713: Line 8: Class attribute 'RED' docstring entry should not include a type
 ```
 
 ## Options
-- `docstring-convention`: The rule is exact opt-in; exact rule-code selection restores it for parsed conventions.
 - `docstring-class-attribute-no-type-base-classes`: Direct enum-like base names whose class attribute entries should not include types. Dotted names also match direct import aliases resolved statically by LibCST, and unqualified names are syntactic-only.

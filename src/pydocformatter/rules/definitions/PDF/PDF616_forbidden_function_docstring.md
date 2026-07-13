@@ -276,5 +276,4 @@ def connect():
 ```
 
 ## Options
-- `docstring-forbidden-function-decorators`: Function decorator names that PDF616 reports when the decorated function has a docstring. Calls are unwrapped before matching, and dotted names also match import aliases resolved statically by LibCST. Set this to an empty list to disable PDF616 reports.
-- `docstring-optional-function-decorators`: Does not cause PDF616 reports. It only lets PDF608 through PDF615 allow matching functions and methods to omit docstrings, with the same decorator matching behavior.
+- `docstring-forbidden-function-decorators`: Function decorator names that PDF616 reports when the decorated function has a docstring. Calls are unwrapped before matching, and dotted names also match import aliases resolved statically by LibCST.

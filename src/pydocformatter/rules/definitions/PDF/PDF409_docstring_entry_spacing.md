@@ -2,7 +2,7 @@
 
 Fix is sometimes available.
 
-Rule is ignored if `docstring-convention` is `none` or `pep257`.
+Rule is disabled if `docstring-convention` is `none` or `pep257`.
 
 ## What it does
 PDF409 reports recognized convention entries and reST fields whose nominal prefix spacing is not canonical for the active docstring convention.
@@ -247,5 +247,4 @@ PDF409: Lines 2-4: Docstring convention entry spacing should be normalized
 ```
 
 ## Options
-- `docstring-convention`: Enables Google entry recognition, NumPy entry recognition, or reST field recognition. `none` and `pep257` ignore this rule.
-- `docstring-parse-*`: Parser protection settings can affect whether entry-like text inside structures such as code fences and literal blocks is opaque or can be parsed as convention entries.
+None.

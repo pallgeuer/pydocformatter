@@ -1,8 +1,8 @@
-# Rule Selection Specification
+# Rule selection specification
 
 This document specifies how `pydocfmt` discovers rule definitions and resolves rule-selection, per-file-ignore, and fixability settings, and how rule selection information is exposed via the CLI.
 
-## Ruff Compatibility Deltas
+## Ruff compatibility deltas
 
 - **D1: Rule catalog and selector prefixes.**
   pydocformatter has its own rule catalog and requires selectors to use complete pydocformatter rule prefixes such as `PDF` or `PCF`. The selector `P` does not match `PDF` or `PCF` rules.
@@ -15,7 +15,7 @@ This document specifies how `pydocfmt` discovers rule definitions and resolves r
 - **D5: Command-line comma-list whitespace.**
   pydocformatter strips whitespace around entries in dedicated command-line comma-list options, so `--select "PDF200, PDF110"` is accepted as `PDF200` and `PDF110`. Ruff rejects whitespace-containing selector entries such as ` F841`.
 
-## Rule Definitions
+## Rule definitions
 
 Rules and rule categories live under `pydocformatter.rules.definitions`. Importing `pydocformatter.rules.collection` imports each category module before its rule modules and builds the default `RULE_COLLECTION`.
 
@@ -47,7 +47,7 @@ Rule classes register with their category through `@register_rule_to(PDF)`. Rule
 
 `RuleBase` rejects subclasses without `meta`, or with non-`RuleMetadata` metadata, at class definition time. `RuleMetadata` rejects non-`RuleCode` codes, non-`FixAvailability` fix availability values, non-`RuleCheckKind` check kinds, empty names, messages, or stable versions, malformed setting-effect records, malformed incompatibility tuples, and duplicate incompatible codes. Category registration rejects rules whose code prefix differs from the category prefix and rejects duplicate rule codes from different classes.
 
-## Rule Codes
+## Rule codes
 
 Rule codes are the canonical lookup keys.
 
@@ -82,7 +82,7 @@ Definition package loading validates the complete built-in layout: the definitio
 
 With default settings, a custom empty catalog resolves to an empty active ruleset without errors.
 
-## Selector Grammar
+## Selector grammar
 
 Rule selectors are:
 
@@ -95,7 +95,7 @@ Selectors are case-sensitive and must use complete rule prefixes. For example, `
 
 Selectors outside the grammar are operational errors. Selectors that match no collected rule are operational errors, except `ALL`, which may match an empty collection without error. Invalid or unknown selectors resolve to no rules and resolution continues.
 
-## Source Priority and Specificity
+## Source priority and specificity
 
 Selection conflicts are resolved first by configuration source priority, then by selector specificity. Selector order inside one setting is not significant.
 
@@ -129,7 +129,7 @@ Examples:
 - A command-line `--select PDF1` enables `PDF142` even when a lower-priority config file has `ignore = ["PDF142"]`.
 - A command-line `--ignore PDF1` disables `PDF142` even when a lower-priority config file has `select = ["PDF142"]`.
 
-## Setting Effects
+## Setting effects
 
 After normal `select` and `ignore` precedence is resolved, each selected rule's metadata is evaluated against the resolved `CheckSettings` values. Effects from all declared setting fields are combined:
 
@@ -140,7 +140,7 @@ After normal `select` and `ignore` precedence is resolved, each selected rule's 
 - Setting effects do not change effective fixability.
 - A metadata field name that is not present on `CheckSettings` is a programming error identifying the rule and unknown field.
 
-## Global Rule Selection
+## Global rule selection
 
 Defaults:
 
@@ -163,7 +163,7 @@ The output `rules` tuple preserves deterministic rule-code order after filtering
 
 `require-explicit` is intended for rules that should remain available through exact selection without being enabled by broad selectors such as `ALL`, `PDF`, or `PCF`. For a rule matched by `require-explicit`, `select = ["ALL"]` does not enable it, while including the rule's exact code in `extend-select` enables it. Setting `require-explicit = []` lets broad selectors enable all selected rules.
 
-## Rule Incompatibilities
+## Rule incompatibilities
 
 After normal selection precedence, setting effects, and explicit-selection requirements are resolved, selected rule incompatibilities are resolved once for the complete settings profile:
 
@@ -178,7 +178,7 @@ The built-in opposing pairs (e.g. `PDF106`/`PDF107` and `PDF108`/`PDF109`) are m
 
 `docstring-convention = "pep257"` is the default named convention profile. It does not parse Google sections, NumPy sections, or reStructuredText fields, and it applies PEP 257/pydocstyle-compatible broad-rule carve-outs. `docstring-convention = "none"` also avoids convention-specific parsing, but keeps the stricter generic no-convention rule profile for rules that can act without convention parsing.
 
-## Per-File Ignores
+## Per-file ignores
 
 Defaults:
 
@@ -216,11 +216,11 @@ Examples:
 
 `pydocfmt check --show-rules` prints the global active rules and does not apply per-file ignores.
 
-## Per-File Settings Boundary
+## Per-file settings boundary
 
-Per-file settings are specified in [Settings Specification](settings_spec.md). They are intentionally outside rule selection: they apply after global rule selection, do not re-run selector resolution, and cannot change which rules are active. `pydocfmt check --show-rules` therefore remains global/cwd-oriented and does not apply path-specific per-file setting overrides.
+Per-file settings are specified in [Settings specification](settings_spec.md). They are intentionally outside rule selection: they apply after global rule selection, do not re-run selector resolution, and cannot change which rules are active. `pydocfmt check --show-rules` therefore remains global/cwd-oriented and does not apply path-specific per-file setting overrides.
 
-## CLI List Options
+## CLI list options
 
 Rule-selection CLI list options accept comma-separated selector values per option occurrence:
 
@@ -274,7 +274,7 @@ Examples:
 - A command-line `--fixable PDF1` makes `PDF142` configured-fixable even when a lower-priority config file has `unfixable = ["PDF142"]`.
 - A command-line `--unfixable PDF1` makes `PDF142` configured-unfixable even when a lower-priority config file has `fixable = ["PDF142"]`.
 
-## Operational Errors
+## Operational errors
 
 Rule selection is tolerant of selector errors. `select_rules()` accumulates nonfatal error strings and continues with invalid or unknown selectors resolving to no rules.
 
@@ -295,7 +295,7 @@ Contexts include:
 
 When `pydocfmt check --show-rules` sees rule-selection errors, it prints them before the rule list and exits with status `1`. Normal check execution includes these errors in grouped output handling.
 
-## Resolved Selection API
+## Resolved selection API
 
 `select_rules(settings, collection=None)` resolves a `CheckSettings` object against a `RuleCollection`. If no collection is passed, it uses `pydocformatter.rules.collection.RULE_COLLECTION`. Callers can pass a `SettingsProfile` to preserve source bases and source priorities from configuration loading; when no profile or explicit field priorities are provided, all selectors are treated as coming from the same source priority.
 
@@ -321,7 +321,7 @@ It returns `RuleSelection`:
 
 `RuleSelection.for_path(path)` returns the selected rules after applying matching per-file ignores to the normalized path.
 
-## CLI Behavior
+## CLI behavior
 
 `pydocfmt check --show-rules`:
 
@@ -333,7 +333,7 @@ It returns `RuleSelection`:
 
 Only global rule selection is displayed. Per-file ignores are intentionally not reflected in `--show-rules` output because they depend on a path.
 
-## CLI Rule Explanations
+## CLI rule explanations
 
 `pydocfmt rule [RULE|--all]` exposes Ruff-style rule explanations.
 
@@ -342,9 +342,9 @@ Only global rule selection is displayed. Per-file ignores are intentionally not 
 - `--output-format text` prints the adjacent Markdown rule document directly.
 - `--output-format json` prints Ruff-style metadata for one rule, or a list of metadata objects with `--all`; its `explanation` field omits the Markdown title and fixability paragraph.
 
-Rule documents live next to their rule definition modules with the same basename and a `.md` extension. For example, `src/pydocformatter/rules/definitions/PDF/PDF101_docstring_reflow.py` is documented by `src/pydocformatter/rules/definitions/PDF/PDF101_docstring_reflow.md`. New rule docs should follow `src/pydocformatter/rules/templates/rule_template.md`.
+Rule documents live next to their rule definition modules with the same basename and a `.md` extension. For example, `src/pydocformatter/rules/definitions/PDF/PDF101_docstring_reflow.py` is documented by `src/pydocformatter/rules/definitions/PDF/PDF101_docstring_reflow.md`.
 
-## CLI Linter Listing
+## CLI linter listing
 
 `pydocfmt linter` exposes Ruff-style linter metadata translated from collected rule categories. The public command retains Ruff's terminology even though the internal model uses categories.
 

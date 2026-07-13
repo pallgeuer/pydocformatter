@@ -9,7 +9,6 @@ from typing import TYPE_CHECKING
 # First-party imports
 import pydocformatter.rules.registration as rule_registration
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
-from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase
 from pydocformatter.rules.definition_helpers import docstring_conventions, docstring_sections, documentation_style, parameter_documentation
@@ -77,16 +76,7 @@ class PDF306ParameterDocumentationTooGeneric(RuleBase):
         message="Parameter documentation is too generic",
         fix_availability=FixAvailability.NEVER,
         stable_since="1.0.0",
-        setting_effects=(
-            RuleSettingEffects(
-                setting="docstring_convention",
-                effects=(
-                    RuleSettingEffectValues(
-                        effect=RuleSettingEffect.IGNORED, values=docstring_conventions.ignored_conventions_except(DocstringConvention.GOOGLE, DocstringConvention.NUMPY, DocstringConvention.REST)
-                    ),
-                ),
-            ),
-        ),
+        setting_effects=(RuleSettingEffects(setting="docstring_convention", effects=(RuleSettingEffectValues(effect=RuleSettingEffect.DISABLED, values=docstring_conventions.UNPARSED_CONVENTIONS),)),),
         incompatible_with=(),
         check_kind=RuleCheckKind.STANDARD,
     )

@@ -2,7 +2,7 @@
 
 Fix is not available.
 
-Rule is ignored if `docstring-convention` is `none`, `pep257`, `google`, `numpy`, or `rest`.
+Rule is disabled if `docstring-convention` is `none` or `pep257`, and ignored by broad selectors under `google`, `numpy`, and `rest`.
 
 Rule is incompatible with `PDF702`.
 
@@ -77,4 +77,4 @@ def function(value: int):
 ```
 
 ## Options
-- `docstring-convention`: The rule is exact opt-in; exact rule-code selection restores it for parsed conventions.
+None.

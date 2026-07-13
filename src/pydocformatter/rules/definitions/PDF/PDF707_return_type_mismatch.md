@@ -2,7 +2,7 @@
 
 Fix is not available.
 
-Rule is ignored if `docstring-convention` is `none` or `pep257`.
+Rule is disabled if `docstring-convention` is `none` or `pep257`.
 
 Rule is incompatible with `PDF706`.
 
@@ -78,4 +78,4 @@ def generate() -> Iterator[str]:
 ```
 
 ## Options
-- `docstring-convention`: Google, NumPy, and reST entries are checked.
+None.

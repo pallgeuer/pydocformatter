@@ -1,8 +1,8 @@
-# Settings Specification
+# Settings specification
 
 This document specifies how `pydocfmt` loads, validates, resolves, displays, and applies configuration settings.
 
-## Configuration Sources
+## Configuration sources
 
 For each path being checked, settings are resolved from these sources:
 
@@ -17,7 +17,7 @@ Explicit `--config PATH` files and auto-discovered `pyproject.toml` files share 
 
 Auto-discovered configuration is hierarchical: the single closest config file applies to the path being evaluated, and parent config files are not merged into child config files. During directory traversal, a parent directory exclude can still prune a child directory before that child directory's config is entered.
 
-## Source Priority
+## Source priority
 
 Settings use these source priorities:
 
@@ -29,7 +29,7 @@ Settings use these source priorities:
 
 For every ordinary setting, the highest-priority specified value wins. The same list setting does not accumulate across configuration and command-line layers. Domain-specific settings can later interpret resolved base and extension fields together; for example, file selection appends resolved `extend-include` to resolved `include`, while rule selection applies its own selector precedence after the fields are resolved.
 
-## Configuration Layout
+## Configuration layout
 
 Auto-discovered configuration is read from `[tool.pydocfmt]` in `pyproject.toml`.
 
@@ -53,7 +53,7 @@ preserve-tables = false
 
 Flat hyphenated forms such as `docstring-convention = "google"` and `comment-preserve-tables = false` also work for compatibility. Do not specify both the flat form and the nested-table form for the same setting in one configuration. CLI flags, `pydocfmt config`, `--show-settings`, and inline `--config` overrides use flat hyphenated names.
 
-## Path Pattern Bases
+## Path pattern bases
 
 Path-pattern settings are matched against normalized POSIX-style paths relative to the setting source base.
 
@@ -65,7 +65,7 @@ Pattern bases:
 
 This base model is shared by file-selection patterns, per-file ignores, and per-file settings. Each domain still owns its own matching semantics and effect.
 
-## Per-File Settings
+## Per-file settings
 
 `[tool.pydocfmt.per-file-settings]` maps file patterns to formatter setting override tables:
 
@@ -97,7 +97,7 @@ Per-file settings carry the source priority of the `per-file-settings` field its
 
 `pydocfmt check --show-settings` remains current-working-directory oriented and does not apply path-specific per-file setting overrides.
 
-## Setting Notes
+## Setting notes
 
 `line-ending = "auto"` uses the first line ending detected in the source file, defaulting to LF when the file has no line endings. The setting controls rewritten files; files that do not require formatting are not rewritten solely to normalize line endings.
 
@@ -111,7 +111,7 @@ The `comment-*` settings affect the rule-based formatter. PCF001 defaults to for
 
 The `docstring-convention` setting never auto-detects a convention. Google sections, NumPy sections, and reST fields are only parsed when their matching convention is selected; `none` and `pep257` leave those convention syntaxes as ordinary content. The default `pep257` convention applies PEP 257/pydocstyle-compatible broad-rule carve-outs, while `none` is the stricter no-convention profile for generic rules that can act without convention parsing. Compared with `pep257`, `none` broadly enables PDF106, PDF301, and PDF305. The resolved convention can also ignore incompatible PDF rules selected through broad selectors; selecting an exact rule code restores an ignored rule, but disabled rules stay off even when selected exactly. The `docstring-parse-*` settings control generic semantic structures independently, `docstring-property-decorators` controls decorator names treated as property-like by property-specific summary rules, `docstring-class-attribute-no-type-base-classes` controls direct class bases whose class attribute entries should not include types for PDF713, and PCF rules are not affected by docstring conventions. For those name-matching settings and the function-decorator settings, dotted configured names also match import aliases resolved statically by LibCST; unqualified names are syntactic-only.
 
-## Related Specifications
+## Related specifications
 
-- [File Selection Specification](file_selection_spec.md) specifies how resolved file-selection settings choose files.
-- [Rule Selection Specification](rule_selection_spec.md) specifies how resolved rule-selection settings choose active rules, per-file ignores, and fixability.
+- [File selection specification](file_selection_spec.md) specifies how resolved file-selection settings choose files.
+- [Rule selection specification](rule_selection_spec.md) specifies how resolved rule-selection settings choose active rules, per-file ignores, and fixability.

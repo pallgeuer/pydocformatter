@@ -336,6 +336,6 @@ def concatenated() -> None:
 When `PDF000` is also selected outside this rule-specific example context, it can literalize escaped blank lines before PDF200 collapses them in a later rule pass.
 
 ## Options
-- `docstring-convention`: Enables recursive compact spacing inside recognized Google or NumPy sections, one retained blank line between adjacent Google or NumPy sections, and compact spacing between adjacent reST fields. `none` and `pep257` leave convention-specific syntax as ordinary generic chunks.
-- `docstring-blank-line-after-last-section`: Keeps exactly one trailing blank line after the final recognized Google or NumPy section when enabled; removes final-section trailing blanks when disabled.
-- `docstring-parse-*`: Controls whether generic structures such as lists, headings, doctests, code fences, block quotes, tables, directives, and literal blocks are distinct or protected chunks for blank-line collapsing.
+- `docstring-blank-line-after-last-section`: Keeps exactly one trailing blank line after the final recognized section when enabled.
+- `indent-style`: Indentation style used when generated blank-line output needs docstring indentation.
+- `indent-width`: Indentation width used when generated blank-line output needs docstring indentation and tab measurement.

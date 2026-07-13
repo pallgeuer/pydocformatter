@@ -2,7 +2,7 @@
 
 Fix is not available.
 
-Rule is ignored if `docstring-convention` is `none` or `pep257`.
+Rule is disabled if `docstring-convention` is `none` or `pep257`.
 
 ## What it does
 Checks function and method docstrings for directly raised exception classes missing from the exception documentation.
@@ -166,6 +166,5 @@ def validate():
 ```
 
 ## Options
-- `docstring-convention`: Controls whether Google `Raises` sections, NumPy `Raises` sections, or reST exception fields such as `:raises ValueError:` are recognized. `none` and `pep257` ignore this rule by default, and exact selection remains inert under those conventions.
-- `docstring-missing-documentation`: Controls when missing exception documentation is reported. `has-section` reports only docstrings with recognized exception documentation. `non-summary-docstrings` additionally reports public docstrings with more than just a summary. `all-docstrings` additionally reports all public docstrings.
-- `docstring-missing-documentation-public-only`: When `true`, the broad parts of `non-summary-docstrings` and `all-docstrings` apply only to public functions and methods. Explicit exception documentation is always checked, including for private functions.
+- `docstring-missing-documentation`: Controls whether missing exception documentation is reported only when exception documentation already exists, for non-summary docstrings, or for all eligible docstrings.
+- `docstring-missing-documentation-public-only`: Limits broad missing-exception checks to public functions and methods when enabled.

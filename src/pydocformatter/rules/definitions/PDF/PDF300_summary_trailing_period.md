@@ -129,5 +129,4 @@ def title():
 ```
 
 ## Options
-- `docstring-convention`: Ignores PDF300 for broad rule selections under the Google convention.
-- `docstring-parse-headings`: Controls whether Markdown and reStructuredText headings are protected from summary punctuation checks.
+None.

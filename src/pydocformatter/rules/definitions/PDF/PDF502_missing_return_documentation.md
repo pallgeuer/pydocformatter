@@ -2,7 +2,7 @@
 
 Fix is not available.
 
-Rule is ignored if `docstring-convention` is `none` or `pep257`.
+Rule is disabled if `docstring-convention` is `none` or `pep257`.
 
 ## What it does
 Checks function and method docstrings for missing return-value documentation when the function body has a meaningful return value.
@@ -130,7 +130,7 @@ def numpy_value():
 [output=unchanged]
 ```
 
-The active convention controls which documentation is recognized. Under `none` and `pep257`, this rule is ignored by default and remains inert when selected explicitly:
+The active convention controls which documentation is recognized. Under `none` and `pep257`, this rule is disabled even when selected explicitly:
 
 ```pydocfmt-example
 [settings]
@@ -149,6 +149,5 @@ def value():
 ```
 
 ## Options
-- `docstring-convention`: Controls whether Google return sections, NumPy return sections, or reST return fields such as `:returns:` and `:rtype:` are recognized. `none` and `pep257` ignore this rule by default, and exact selection remains inert under those conventions.
-- `docstring-missing-documentation`: Controls when missing return documentation is reported. `has-section` reports only docstrings with recognized return documentation. `non-summary-docstrings` additionally reports public docstrings with more than just a summary. `all-docstrings` additionally reports all public docstrings.
-- `docstring-missing-documentation-public-only`: When `true`, the broad parts of `non-summary-docstrings` and `all-docstrings` apply only to public functions and methods. Explicit return documentation is always checked, including for private functions.
+- `docstring-missing-documentation`: Controls whether missing return documentation is reported only when return documentation already exists, for non-summary docstrings, or for all eligible docstrings.
+- `docstring-missing-documentation-public-only`: Limits broad missing-return checks to public functions and methods when enabled.

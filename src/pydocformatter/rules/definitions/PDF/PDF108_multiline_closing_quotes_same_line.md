@@ -2,7 +2,7 @@
 
 Fix is always available.
 
-Rule is ignored if `docstring-convention` is `none`, `google`, `numpy`, or `pep257`.
+Rule is ignored by broad selectors for all `docstring-convention` values.
 
 Rule is incompatible with `PDF109`.
 

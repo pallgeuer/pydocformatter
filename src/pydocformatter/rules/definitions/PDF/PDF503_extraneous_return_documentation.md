@@ -2,7 +2,7 @@
 
 Fix is not available.
 
-Rule is ignored if `docstring-convention` is `none` or `pep257`.
+Rule is disabled if `docstring-convention` is `none` or `pep257`.
 
 ## What it does
 Checks function and method docstrings for return documentation on functions that do not return a meaningful ordinary value.
@@ -139,4 +139,4 @@ def value():
 ```
 
 ## Options
-- `docstring-convention`: Controls whether Google return sections, NumPy return sections, or reST return fields such as `:returns:` and `:rtype:` are recognized. `none` and `pep257` ignore this rule by default.
+None.

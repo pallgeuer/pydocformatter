@@ -2,7 +2,7 @@
 
 Fix is always available.
 
-Rule is ignored by broad selectors for all `docstring-convention` values. Select `PDF210` exactly to opt into this spacing style. If `PDF211` is also selected through a broader selector, ignore `PDF211` so the incompatible default style does not disable `PDF210`.
+Rule is ignored by broad selectors for all `docstring-convention` values.
 
 Rule is incompatible with `PDF211`.
 
@@ -15,7 +15,7 @@ Only the adjacent blank-line run after the docstring statement is changed. Comme
 Some projects prefer keeping class docstrings directly attached to the following class body.
 
 ## Ruff compatibility
-None. This is the style-opposite companion to `PDF211`, which replaces Ruff's `D204`.
+This is the style-opposite companion to `PDF211`, which replaces Ruff's `D204`.
 
 ## Examples
 The canonical fix removes blank lines after a class docstring:
@@ -78,4 +78,4 @@ class Client:
 ```
 
 ## Options
-None. `docstring-convention` does not change this rule's behavior. Broad selectors ignore this rule for every convention; select `PDF210` exactly to use it, and ignore `PDF211` if that incompatible companion is also selected.
+None.

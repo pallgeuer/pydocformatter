@@ -2,7 +2,7 @@
 
 Fix is sometimes available.
 
-Rule is ignored if `docstring-convention` is `none`, `google`, `pep257`, or `rest`.
+Rule is disabled if `docstring-convention` is `none`, `pep257`, `google`, or `rest`.
 
 ## What it does
 PDF413 reports recognized NumPy section names that end with a superfluous trailing colon. The fix removes the colon and any spaces or tabs after it from the section-name line, while preserving the section-name spelling and indentation.
@@ -315,5 +315,4 @@ PDF413: Lines 2-6: Docstring section 'Parameters' should not end with a colon
 ```
 
 ## Options
-- `docstring-convention`: Enables NumPy section recognition. `none`, `google`, `pep257`, and `rest` ignore this rule.
-- `docstring-parse-code-fences`: When enabled, fenced code blocks are protected from PDF413. When disabled, section-like lines inside fences can be checked as ordinary docstring text when they appear at clear section-boundary positions.
+None.

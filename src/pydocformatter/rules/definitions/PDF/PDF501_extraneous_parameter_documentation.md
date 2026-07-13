@@ -2,7 +2,7 @@
 
 Fix is not available.
 
-Rule is ignored if `docstring-convention` is `none` or `pep257`.
+Rule is disabled if `docstring-convention` is `none` or `pep257`.
 
 ## What it does
 Checks that parsed docstring parameter documentation only names parameters that exist in the function signature.
@@ -143,4 +143,4 @@ def value(first):
 ```
 
 ## Options
-- `docstring-convention`: Controls whether Google parameter sections, NumPy parameter sections, or reST parameter fields are parsed. `none` and `pep257` ignore this rule by default, and convention syntax is ordinary content under those conventions.
+None.

@@ -15,7 +15,7 @@ Docstrings are reported without a fix when automatic escaping could change the v
 ASCII-only docstring source keeps files compatible with strict source encodings while preserving the runtime documentation text.
 
 ## Ruff compatibility
-None. PDF003 intentionally cooperates with PDF002 by avoiding automatic fixes for docstrings whose source backslashes are still actionable by the raw-prefix rule.
+PDF003 intentionally cooperates with PDF002 by avoiding automatic fixes for docstrings whose source backslashes are still actionable by the raw-prefix rule.
 
 ## Examples
 Literal non-ASCII source is escaped while preserving the evaluated docstring value:

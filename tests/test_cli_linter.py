@@ -22,8 +22,8 @@ def test_pydocfmt_linter_prints_linter_json() -> None:
     output = json.loads(result.stdout)
     assert result.exit_code == 0
     assert output == [
-        {"prefix": "PCF", "name": "pydocformatter comment formatting", "url": "https://github.com/pallgeuer/pydocformatter"},
-        {"prefix": "PDF", "name": "pydocformatter docstring formatting", "url": "https://github.com/pallgeuer/pydocformatter"},
+        {"prefix": "PCF", "name": "pydocformatter comment formatting", "url": "https://pallgeuer.github.io/pydocformatter/rules/pcf/"},
+        {"prefix": "PDF", "name": "pydocformatter docstring formatting", "url": "https://pallgeuer.github.io/pydocformatter/rules/pdf/"},
     ]
 
 

@@ -39,8 +39,7 @@ class PDF404SectionNameTrailingColon(RuleBase):
         stable_since="1.0.0",
         setting_effects=(
             RuleSettingEffects(
-                setting="docstring_convention",
-                effects=(RuleSettingEffectValues(effect=RuleSettingEffect.IGNORED, values=docstring_conventions.ignored_conventions_except(DocstringConvention.GOOGLE)),),
+                setting="docstring_convention", effects=(RuleSettingEffectValues(effect=RuleSettingEffect.DISABLED, values=docstring_conventions.conventions_except(DocstringConvention.GOOGLE)),)
             ),
         ),
         incompatible_with=(),

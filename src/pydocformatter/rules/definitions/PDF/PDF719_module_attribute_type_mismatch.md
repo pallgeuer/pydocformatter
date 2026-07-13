@@ -2,7 +2,7 @@
 
 Fix is not available.
 
-Rule is ignored if `docstring-convention` is `none` or `pep257`.
+Rule is disabled if `docstring-convention` is `none` or `pep257`.
 
 Rule is incompatible with `PDF718`.
 
@@ -80,4 +80,4 @@ PDF719: Line 5: Module attribute 'fallback' docstring type does not match the an
 ```
 
 ## Options
-- `docstring-convention`: Google, NumPy, and reST entries are checked.
+None.

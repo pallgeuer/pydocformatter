@@ -18,11 +18,28 @@ if TYPE_CHECKING:
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-FORMAT_RULES_PATH = ROOT / "docs" / "rule_list.md"
+FORMAT_RULES_PATH = ROOT / "docs" / "public" / "ruff_rule_links.md"
+EXPECTED_PCF_HEADERS = ("Code", "Name", "Message", "Fixable", "Explicit", "Since", "Ruff rules")
+EXPECTED_PDF_HEADERS = ("Code", "Name", "Message", "Fixable", "Explicit", "Convention effects", "Since", "Conflicts", "Ruff rules")
+EXPECTED_RUFF_HEADERS = ("Code", "Name", "Message", "Fixable", "Since", "Support by pydocformatter")
+PCF_HEADING = "### PCF: pydocformatter comment formatting"
+PDF_HEADING = "### PDF: pydocformatter docstring formatting"
+CONVENTION_NAMES = {DocstringConvention.NONE: "None", DocstringConvention.PEP257: "PEP257", DocstringConvention.GOOGLE: "Google", DocstringConvention.NUMPY: "NumPy", DocstringConvention.REST: "reST"}
 
 
 def _table_rows_after_heading(text: str, heading: str) -> list[dict[str, str]]:
     """Return Markdown table rows immediately following a heading."""
+    table_lines = _table_lines_after_heading(text, heading)
+    headers = _split_markdown_row(table_lines[0])
+    rows = [dict(zip(headers, cells, strict=True)) for cells in (_split_markdown_row(line) for line in table_lines[2:])]
+    for row in rows:
+        if "Code" in row:
+            row["Code"] = _plain_code_cell(row["Code"])
+    return rows
+
+
+def _table_lines_after_heading(text: str, heading: str) -> list[str]:
+    """Return Markdown table lines immediately following a heading."""
     lines = text.splitlines()
     heading_index = lines.index(heading)
     table_lines: list[str] = []
@@ -38,14 +55,20 @@ def _table_rows_after_heading(text: str, heading: str) -> list[dict[str, str]]:
 
     if len(table_lines) < 2:
         raise AssertionError(f"No Markdown table found after {heading}")
-
-    headers = _split_markdown_row(table_lines[0])
-    return [dict(zip(headers, cells, strict=True)) for cells in (_split_markdown_row(line) for line in table_lines[2:])]
+    return table_lines
 
 
 def _split_markdown_row(line: str) -> list[str]:
     """Split a simple Markdown table row into stripped cell values."""
     return [cell.strip() for cell in line.strip().strip("|").split("|")]
+
+
+def _plain_code_cell(cell: str) -> str:
+    """Return the visible rule code from a linked or code-formatted table cell."""
+    match = re.fullmatch(r"\[`([^`]+)`\]\([^)]+\)", cell)
+    if match:
+        return match.group(1)
+    return cell.strip("`")
 
 
 def _convention_effects(rule: rule_models.RuleMetadata) -> dict[DocstringConvention, rule_models.RuleSettingEffect]:
@@ -62,15 +85,22 @@ def _convention_effects(rule: rule_models.RuleMetadata) -> dict[DocstringConvent
     return effects
 
 
-def _convention_cell(rule: rule_models.RuleMetadata, convention: DocstringConvention) -> str:
-    """Return the formatting rules table cell for one convention."""
-    effect = _convention_effects(rule).get(convention)
-    return "-" if effect is None else effect.value
+def _convention_effects_cell(rule: rule_models.RuleMetadata) -> str:
+    """Return the formatting rules table cell for convention effects."""
+    effects = _convention_effects(rule)
+    disabled = [CONVENTION_NAMES[convention] for convention in DocstringConvention if effects.get(convention) and effects[convention].value == "Disabled"]
+    ignored = [CONVENTION_NAMES[convention] for convention in DocstringConvention if effects.get(convention) and effects[convention].value == "Ignored"]
+    parts = []
+    if disabled:
+        parts.append(f"Disabled: {', '.join(disabled)}")
+    if ignored:
+        parts.append(f"Ignored: {', '.join(ignored)}")
+    return "; ".join(parts) or "-"
 
 
 def _conflicts_cell(rule: rule_models.RuleMetadata) -> str:
     """Return the formatting rules table cell for incompatible rules."""
-    return ", ".join(str(code) for code in rule.incompatible_with)
+    return ", ".join(str(code) for code in rule.incompatible_with) or "-"
 
 
 def _explicit_cell(rule: rule_models.RuleMetadata) -> str:
@@ -84,9 +114,18 @@ def _codes_for_mapping_label(cell: str, label: str, code_pattern: str) -> list[s
     return [code for clause in cell.split(";") if (stripped := clause.strip()).startswith(label) for code in re.findall(code_pattern, stripped)]
 
 
+def test_rule_list_table_headers_are_sentence_case() -> None:
+    """Rule-list table headers must keep sentence-case wording."""
+    text = FORMAT_RULES_PATH.read_text(encoding="utf-8")
+
+    assert tuple(_split_markdown_row(_table_lines_after_heading(text, PCF_HEADING)[0])) == EXPECTED_PCF_HEADERS
+    assert tuple(_split_markdown_row(_table_lines_after_heading(text, PDF_HEADING)[0])) == EXPECTED_PDF_HEADERS
+    assert tuple(_split_markdown_row(_table_lines_after_heading(text, "## Ruff rules")[0])) == EXPECTED_RUFF_HEADERS
+
+
 def test_pydocformatter_rule_tables_match_rule_metadata() -> None:
     text = FORMAT_RULES_PATH.read_text(encoding="utf-8")
-    rows = _table_rows_after_heading(text, "### pydocformatter comments (PCF)") + _table_rows_after_heading(text, "### pydocformatter docstrings (PDF)")
+    rows = _table_rows_after_heading(text, PCF_HEADING) + _table_rows_after_heading(text, PDF_HEADING)
     row_by_code = {row["Code"]: row for row in rows}
     expected_codes = tuple(str(rule_class.meta.code) for rule_class in rule_collection.RULE_COLLECTION.rules)
 
@@ -98,26 +137,22 @@ def test_pydocformatter_rule_tables_match_rule_metadata() -> None:
         assert row["Message"] == rule.message
         assert row["Fixable"] == rule.fix_availability.value
         assert row["Explicit"] == _explicit_cell(rule)
-        assert row["Stable Since"] == rule.stable_since
+        assert row["Since"] == rule.stable_since
 
         if rule.code.prefix == "PDF":
-            assert row["None"] == _convention_cell(rule, DocstringConvention.NONE)
-            assert row["PEP257"] == _convention_cell(rule, DocstringConvention.PEP257)
-            assert row["Google"] == _convention_cell(rule, DocstringConvention.GOOGLE)
-            assert row["NumPy"] == _convention_cell(rule, DocstringConvention.NUMPY)
-            assert row["reST"] == _convention_cell(rule, DocstringConvention.REST)
+            assert row["Convention effects"] == _convention_effects_cell(rule)
             assert row["Conflicts"] == _conflicts_cell(rule)
 
 
 def test_rule_list_ruff_replacement_mappings_are_bidirectional() -> None:
     text = FORMAT_RULES_PATH.read_text(encoding="utf-8")
-    pydocformatter_rows = _table_rows_after_heading(text, "### pydocformatter comments (PCF)") + _table_rows_after_heading(text, "### pydocformatter docstrings (PDF)")
-    ruff_rows = _table_rows_after_heading(text, "## Ruff Rules")
+    pydocformatter_rows = _table_rows_after_heading(text, PCF_HEADING) + _table_rows_after_heading(text, PDF_HEADING)
+    ruff_rows = _table_rows_after_heading(text, "## Ruff rules")
     disabled_by_ruff_rule: dict[str, list[str]] = {}
     replaced_by_ruff_rule: dict[str, list[str]] = {}
 
     for row in pydocformatter_rows:
-        for ruff_code in _codes_for_mapping_label(row.get("Ruff Rules", ""), "Disable ", r"(?:D|DOC|E|W)\d{3}"):
+        for ruff_code in _codes_for_mapping_label(row.get("Ruff rules", ""), "Disable ", r"(?:D|DOC|E|W)\d{3}"):
             disabled_by_ruff_rule.setdefault(ruff_code, []).append(row["Code"])
 
     for row in ruff_rows:
@@ -130,13 +165,13 @@ def test_rule_list_ruff_replacement_mappings_are_bidirectional() -> None:
 
 def test_rule_list_ruff_related_mappings_are_bidirectional() -> None:
     text = FORMAT_RULES_PATH.read_text(encoding="utf-8")
-    pydocformatter_rows = _table_rows_after_heading(text, "### pydocformatter comments (PCF)") + _table_rows_after_heading(text, "### pydocformatter docstrings (PDF)")
-    ruff_rows = _table_rows_after_heading(text, "## Ruff Rules")
+    pydocformatter_rows = _table_rows_after_heading(text, PCF_HEADING) + _table_rows_after_heading(text, PDF_HEADING)
+    ruff_rows = _table_rows_after_heading(text, "## Ruff rules")
     related_by_ruff_rule: dict[str, list[str]] = {}
     related_by_pydocformatter_rule: dict[str, list[str]] = {}
 
     for row in pydocformatter_rows:
-        for ruff_code in _codes_for_mapping_label(row.get("Ruff Rules", ""), "Related to ", r"(?:D|DOC|E|W)\d{3}"):
+        for ruff_code in _codes_for_mapping_label(row.get("Ruff rules", ""), "Related to ", r"(?:D|DOC|E|W)\d{3}"):
             related_by_ruff_rule.setdefault(ruff_code, []).append(row["Code"])
 
     for row in ruff_rows:

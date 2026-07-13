@@ -96,4 +96,4 @@ class Simple: """Docstring."""; value = 1
 ```
 
 ## Options
-None. `docstring-convention` does not change this rule's behavior.
+None.

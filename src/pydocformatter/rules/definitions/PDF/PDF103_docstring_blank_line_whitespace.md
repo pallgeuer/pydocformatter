@@ -170,4 +170,6 @@ def escaped_newline() -> None:
 ```
 
 ## Options
-- `docstring-blank-line-style`: Controls whether ordinary blank docstring lines are made truly blank (`blank`) or aligned to the docstring's base/quote indentation (`aligned`).
+- `docstring-blank-line-style`: Controls whether blank docstring lines are made empty or aligned to the docstring indentation.
+- `indent-style`: Indentation style used when aligned blank lines require generated indentation.
+- `indent-width`: Indentation width used when aligned blank lines require generated indentation and tab measurement.

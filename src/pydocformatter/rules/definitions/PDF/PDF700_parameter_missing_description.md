@@ -2,7 +2,7 @@
 
 Fix is not available.
 
-Rule is ignored if `docstring-convention` is `none` or `pep257`.
+Rule is disabled if `docstring-convention` is `none` or `pep257`.
 
 ## What it does
 Checks that parsed parameter entries in owning function docstrings include a prose description.
@@ -78,4 +78,4 @@ PDF700: Line 5: Function parameter '*items' docstring entry is missing a descrip
 ```
 
 ## Options
-- `docstring-convention`: Google, NumPy, and reST entries are checked.
+None.

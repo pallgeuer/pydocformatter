@@ -4,7 +4,7 @@ Brief description of the changes and the motivation behind them.
 
 Fixes #(issue)
 
-## Type of Change
+## Type of change
 
 Please delete options that are not relevant.
 
@@ -17,7 +17,7 @@ Please delete options that are not relevant.
 - [ ] Test coverage improvement
 - [ ] Dependency update
 
-## Changes Made
+## Changes made
 
 Please provide a clear list of changes made:
 
@@ -25,19 +25,19 @@ Please provide a clear list of changes made:
 
 ## Testing
 
-### Test Coverage
+### Test coverage
 
 - [ ] New tests added for new functionality
 - [ ] All existing tests pass
 - [ ] Test coverage maintained or improved
 
-### Manual Testing
+### Manual testing
 
 - [ ] Tested locally with various Python files
 - [ ] Tested edge cases and error conditions
 - [ ] Verified CLI functionality works as expected
 
-### Test Commands Run
+### Test commands run
 
 ```bash
 # Add the commands you used to test your changes. Pytest uses project-default xdist multiprocessing.
@@ -50,7 +50,7 @@ Please provide a clear list of changes made:
 # uv run pre-commit run --all-files
 ```
 
-## Formatting and Style
+## Formatting and style
 
 - [ ] Code follows the project's style guidelines
 - [ ] `ruff` lint checks pass
@@ -67,7 +67,7 @@ Please provide a clear list of changes made:
 - [ ] Comments added for complex logic
 - [ ] Type hints added for new functions
 
-## Performance and Compatibility
+## Performance and compatibility
 
 - [ ] Changes don't negatively impact performance
 - [ ] Compatible with Python 3.11+
@@ -75,7 +75,7 @@ Please provide a clear list of changes made:
 - [ ] Memory usage is reasonable for large files
 - [ ] All tests pass
 
-## Security Considerations
+## Security considerations
 
 - [ ] Input validation added where appropriate
 - [ ] File path handling is secure
@@ -95,13 +95,13 @@ For CLI changes or output formatting changes, please add before/after examples:
 # Example of new behavior
 ```
 
-## Related Issues and PRs
+## Related issues and PRs
 
 - Related Issue: #
 - Depends on: #
 - Blocks: #
 
-## Breaking Changes
+## Breaking changes
 
 If this is a breaking change, please describe:
 
@@ -110,17 +110,17 @@ If this is a breaking change, please describe:
 3. How users should update their code
 4. Migration guide (if complex)
 
-## Additional Notes
+## Additional notes
 
 Any additional information, considerations, or context that reviewers should know:
 
 - 
 
-## Reviewer Checklist
+## Reviewer checklist
 
 *For the reviewer - please check these items during review:*
 
-### Code Quality
+### Code quality
 
 - [ ] Code is readable and well-structured
 - [ ] Appropriate error handling is in place
@@ -152,7 +152,7 @@ Any additional information, considerations, or context that reviewers should kno
 - [ ] Input validation is appropriate
 - [ ] File operations are safe
 
-## Post-Merge Checklist
+## Post-merge checklist
 
 *To be completed after merging:*
 
@@ -170,6 +170,6 @@ Any additional information, considerations, or context that reviewers should kno
 
 **Note to Reviewers:**
 - Please provide constructive feedback
-- Check that the PR follows our [Contributing Guidelines](../CONTRIBUTING.md)
+- Check that the PR follows our [Contributing guidelines](../CONTRIBUTING.md)
 - Consider the impact on existing users
 - Test the changes locally if possible

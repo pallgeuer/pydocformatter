@@ -204,4 +204,5 @@ def not_docstring() -> None:
 ```
 
 ## Options
-None.
+- `indent-style`: Indentation style used when generating the separate closing-quote line.
+- `indent-width`: Indentation width used when generating the separate closing-quote line and measuring indentation.

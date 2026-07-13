@@ -2,7 +2,7 @@
 
 Fix is sometimes available.
 
-Rule is ignored if `docstring-convention` is `none`, `numpy`, `pep257`, or `rest`.
+Rule is disabled if `docstring-convention` is `none`, `pep257`, `numpy`, or `rest`.
 
 ## What it does
 PDF403 reports recognized Google section names that have section content on the same logical line when that line is parsed as ordinary paragraph text. The target layout keeps the section name on its own line and moves the trailing content to the next line at the configured Google section body indentation.
@@ -124,5 +124,5 @@ def example():
 ````
 
 ## Options
-- `docstring-convention`: Enables Google section recognition. `none`, `numpy`, `pep257`, and `rest` ignore this rule.
-- `indent-style` and `indent-width`: Control the generated indentation of content moved below the section name.
+- `indent-style`: Indentation style used for content moved below the section name.
+- `indent-width`: Indentation width used for content moved below the section name.

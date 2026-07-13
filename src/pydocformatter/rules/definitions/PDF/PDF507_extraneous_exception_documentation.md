@@ -2,7 +2,7 @@
 
 Fix is not available.
 
-Rule is ignored by broad selectors for all `docstring-convention` values. Select `PDF507` exactly to opt into this strict consistency check.
+Rule is disabled if `docstring-convention` is `none` or `pep257`, and ignored by broad selectors under `google`, `numpy`, and `rest`.
 
 ## What it does
 Checks function and method docstrings for documented exception classes that are not directly raised by the function body.
@@ -201,4 +201,4 @@ def parse(value):
 ```
 
 ## Options
-- `docstring-convention`: Controls whether Google `Raises` sections, NumPy `Raises` sections, or reST exception fields such as `:raises ValueError:` are recognized. Ignores PDF507 for broad rule selections under every convention.
+None.

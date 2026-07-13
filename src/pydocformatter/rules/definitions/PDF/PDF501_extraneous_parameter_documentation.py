@@ -10,7 +10,6 @@ from typing import TYPE_CHECKING
 import pydocformatter.rules.violations as rule_violations
 import pydocformatter.rules.registration as rule_registration
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
-from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase
 from pydocformatter.rules.definition_helpers import docstring_conventions, parameter_documentation
@@ -37,16 +36,7 @@ class PDF501ExtraneousParameterDocumentation(RuleBase):
         message="Docstring documents a parameter that is not in the function signature",
         fix_availability=FixAvailability.NEVER,
         stable_since="1.0.0",
-        setting_effects=(
-            RuleSettingEffects(
-                setting="docstring_convention",
-                effects=(
-                    RuleSettingEffectValues(
-                        effect=RuleSettingEffect.IGNORED, values=docstring_conventions.ignored_conventions_except(DocstringConvention.GOOGLE, DocstringConvention.NUMPY, DocstringConvention.REST)
-                    ),
-                ),
-            ),
-        ),
+        setting_effects=(RuleSettingEffects(setting="docstring_convention", effects=(RuleSettingEffectValues(effect=RuleSettingEffect.DISABLED, values=docstring_conventions.UNPARSED_CONVENTIONS),)),),
         incompatible_with=(),
         check_kind=RuleCheckKind.STANDARD,
     )

@@ -2,7 +2,7 @@
 
 Fix is not available.
 
-Rule is ignored if `docstring-convention` is `none` or `pep257`.
+Rule is disabled if `docstring-convention` is `none` or `pep257`.
 
 ## What it does
 Checks parsed parameter documentation whose description only restates the documented parameter name with generic filler such as "value", "parameter", or "argument".
@@ -175,4 +175,4 @@ PDF306: Line 5: Parameter 'token' documentation is too generic
 ```
 
 ## Options
-- `docstring-convention`: Controls whether Google, NumPy, or reStructuredText parameter entries are parsed. Broad selections ignore PDF306 under `none` and `pep257`. Exact selection can restore the rule under those conventions, but without parsed parameter entries there is no parameter documentation for PDF306 to check.
+None.

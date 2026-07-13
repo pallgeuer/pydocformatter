@@ -38,7 +38,7 @@ class PDF504MissingYieldDocumentation(RuleBase):
         fix_availability=FixAvailability.NEVER,
         stable_since="1.0.0",
         setting_effects=(
-            RuleSettingEffects(setting="docstring_convention", effects=(RuleSettingEffectValues(effect=RuleSettingEffect.IGNORED, values=(DocstringConvention.NONE, DocstringConvention.PEP257)),)),
+            RuleSettingEffects(setting="docstring_convention", effects=(RuleSettingEffectValues(effect=RuleSettingEffect.DISABLED, values=(DocstringConvention.NONE, DocstringConvention.PEP257)),)),
         ),
         incompatible_with=(),
         check_kind=RuleCheckKind.STANDARD,

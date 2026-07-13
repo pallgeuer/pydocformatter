@@ -13,28 +13,18 @@ import typing
 # First-party imports
 import pydocformatter.rules.violations as rule_violations
 import pydocformatter.rules.definition_helpers.typed_documentation_models as typed_models
-from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleContext
 from pydocformatter.rules.definition_helpers import docstring_conventions, typed_documentation
-from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
+from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata
 
 
 TypedDocumentationSubject = typed_models.TypedDocumentationSubject
 _TargetCollector = typing.Callable[[RuleContext], tuple[typed_models.TypedDocumentationTarget, ...]]
 _RequiredTypePolicy = typing.Callable[[RuleContext, RuleMetadata, TypedDocumentationSubject, str], tuple[rule_violations.RuleViolation, ...]]
 
-_SUPPORTED_CONVENTION_EFFECT = (
-    RuleSettingEffects(
-        setting="docstring_convention",
-        effects=(
-            RuleSettingEffectValues(
-                effect=RuleSettingEffect.IGNORED, values=docstring_conventions.ignored_conventions_except(DocstringConvention.GOOGLE, DocstringConvention.NUMPY, DocstringConvention.REST)
-            ),
-        ),
-    ),
-)
-_EXACT_OPT_IN_EFFECT = (RuleSettingEffects(setting="docstring_convention", effects=(RuleSettingEffectValues(effect=RuleSettingEffect.IGNORED, values=tuple(DocstringConvention)),)),)
+_SUPPORTED_CONVENTION_EFFECT = docstring_conventions.convention_setting_effects(disabled=docstring_conventions.UNPARSED_CONVENTIONS)
+_EXACT_OPT_IN_EFFECT = docstring_conventions.convention_setting_effects(disabled=docstring_conventions.UNPARSED_CONVENTIONS, ignored=docstring_conventions.PARSED_CONVENTIONS)
 
 _TARGET_COLLECTORS: dict[TypedDocumentationSubject, _TargetCollector] = {
     TypedDocumentationSubject.PARAMETER: typed_documentation.parameter_targets,

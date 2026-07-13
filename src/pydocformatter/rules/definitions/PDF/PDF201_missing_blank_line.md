@@ -279,7 +279,7 @@ def concatenated() -> None:
 ```
 
 ## Options
-- `docstring-convention`: Enables Google section, NumPy section, and reST field recognition. `none` and `pep257` leave convention syntax as generic docstring content, though other enabled generic structure parsers can still recognize headings, lists, and other structures.
-- `docstring-blank-line-style`: Controls the source whitespace used on inserted blank lines.
-- `docstring-blank-line-after-last-section`: Requires one trailing blank line after the final recognized Google or NumPy section when enabled.
-- `docstring-parse-*`: Controls whether generic structures such as lists, headings, doctests, code fences, block quotes, tables, directives, and literal blocks are recognized as structures after a summary.
+- `docstring-blank-line-style`: Controls whether inserted blank docstring lines are empty or aligned to the docstring indentation.
+- `docstring-blank-line-after-last-section`: Requires one trailing blank line after the final recognized section when enabled.
+- `indent-style`: Indentation style used when inserted blank lines need generated indentation.
+- `indent-width`: Indentation width used when inserted blank lines need generated indentation and tab measurement.

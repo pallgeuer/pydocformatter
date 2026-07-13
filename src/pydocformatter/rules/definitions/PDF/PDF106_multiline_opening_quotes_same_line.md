@@ -2,7 +2,7 @@
 
 Fix is always available.
 
-Rule is ignored if `docstring-convention` is `numpy` or `pep257`.
+Rule is ignored if `docstring-convention` is `pep257` or `numpy`.
 
 Rule is incompatible with `PDF107`.
 

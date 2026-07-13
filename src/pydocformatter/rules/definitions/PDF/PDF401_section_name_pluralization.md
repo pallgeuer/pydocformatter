@@ -2,7 +2,7 @@
 
 Fix is sometimes available.
 
-Rule is ignored if `docstring-convention` is `none` or `pep257`.
+Rule is disabled if `docstring-convention` is `none` or `pep257`.
 
 ## What it does
 PDF401 reports recognized Google and NumPy section names whose spelling uses a singular form when the plural form is preferred. Examples include `Arg` to `Args`, `Return` to `Returns`, `Warning` to `Warnings`, and NumPy `Other Param` to `Other Params`. It also reports parsed reStructuredText field names whose singular or plural spelling differs from the preferred Sphinx-style spelling: `returns` becomes `return`, `yields` becomes `yield`, and `raise` becomes `raises`.
@@ -185,4 +185,4 @@ PDF401: Lines 2-4: Docstring section name 'Return' should use plural form 'Retur
 ```
 
 ## Options
-- `docstring-convention`: Enables Google and NumPy section recognition and reStructuredText field recognition. `none` and `pep257` ignore this rule.
+None.

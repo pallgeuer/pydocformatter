@@ -10,12 +10,11 @@ from typing import TYPE_CHECKING
 import pydocformatter.rules.violations as rule_violations
 import pydocformatter.rules.registration as rule_registration
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
-from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase
-from pydocformatter.rules.definition_helpers import value_documentation
+from pydocformatter.rules.definition_helpers import docstring_conventions, value_documentation
 from pydocformatter.rules.definitions.PDF.PDF import PDF
-from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
+from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata
 
 
 if TYPE_CHECKING:
@@ -37,16 +36,7 @@ class PDF507ExtraneousExceptionDocumentation(RuleBase):
         message="Docstring documents an exception that is not explicitly raised",
         fix_availability=FixAvailability.NEVER,
         stable_since="1.0.0",
-        setting_effects=(
-            RuleSettingEffects(
-                setting="docstring_convention",
-                effects=(
-                    RuleSettingEffectValues(
-                        effect=RuleSettingEffect.IGNORED, values=(DocstringConvention.NONE, DocstringConvention.PEP257, DocstringConvention.GOOGLE, DocstringConvention.NUMPY, DocstringConvention.REST)
-                    ),
-                ),
-            ),
-        ),
+        setting_effects=docstring_conventions.convention_setting_effects(disabled=docstring_conventions.UNPARSED_CONVENTIONS, ignored=docstring_conventions.PARSED_CONVENTIONS),
         incompatible_with=(),
         check_kind=RuleCheckKind.STANDARD,
     )

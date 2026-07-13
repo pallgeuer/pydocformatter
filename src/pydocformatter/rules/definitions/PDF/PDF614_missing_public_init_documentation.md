@@ -70,5 +70,5 @@ class _Client:
 ```
 
 ## Options
-- `docstring-optional-function-decorators`: Exact function decorator names that make PDF614 allow a public `__init__` method to omit a docstring.
-- `docstring-forbidden-function-decorators`: Exact function decorator names that make PDF614 allow a public `__init__` method to omit a docstring because PDF616 reports docstrings on those definitions instead.
+- `docstring-optional-function-decorators`: Function decorator names that allow a public `__init__` method to omit a docstring.
+- `docstring-forbidden-function-decorators`: Function decorator names that allow a public `__init__` method to omit a docstring because PDF616 reports docstrings on those definitions instead.

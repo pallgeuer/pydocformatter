@@ -2,7 +2,7 @@
 
 Fix is not available.
 
-Rule is ignored if `docstring-convention` is `none` or `pep257`.
+Rule is disabled if `docstring-convention` is `none` or `pep257`.
 
 ## What it does
 PDF408 reports recognized Google and NumPy sections, plus non-named reST fields under the reST convention, that repeat within one docstring under the active convention. The first occurrence is allowed, and each later matching item is reported.
@@ -373,5 +373,4 @@ PDF408: Lines 2-6: Docstring section 'Args' repeats earlier section 'Args'
 ```
 
 ## Options
-- `docstring-convention`: Enables Google and NumPy section recognition and reST field recognition. `none` and `pep257` ignore this rule.
-- `docstring-parse-*`: Controls whether section-like text inside protected structures, such as literal blocks or code fences, is ignored as structure content or can be parsed as ordinary section text.
+None.

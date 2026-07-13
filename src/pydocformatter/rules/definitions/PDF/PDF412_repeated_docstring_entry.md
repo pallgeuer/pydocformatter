@@ -2,7 +2,7 @@
 
 Fix is not available.
 
-Rule is ignored if `docstring-convention` is `none` or `pep257`.
+Rule is disabled if `docstring-convention` is `none` or `pep257`.
 
 ## What it does
 PDF412 reports parsed docstring entries that repeat within one docstring. It checks Google, NumPy, and named reStructuredText entries under the active convention, across the whole docstring rather than only within one section.
@@ -368,5 +368,4 @@ PDF412: Lines 2-5: Docstring parameter entry 'arg' repeats earlier entry
 ```
 
 ## Options
-- `docstring-convention`: Enables Google, NumPy, and reST entry recognition. `none` and `pep257` ignore this rule.
-- `docstring-parse-*`: Controls whether entry-like text inside protected structures, such as literal blocks or code fences, is ignored as structure content or can be parsed as ordinary entry text.
+None.

@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-SUPPRESSIONS_PATH = ROOT / "docs" / "rule_suppressions.md"
+SUPPRESSIONS_PATH = ROOT / "docs" / "public" / "rule_suppressions.md"
 
 
 def test_suppression_markdown_examples_match_formatter_behavior() -> None:

@@ -2,7 +2,7 @@
 
 Fix is not available.
 
-Rule is ignored if `docstring-convention` is `none` or `pep257`.
+Rule is disabled if `docstring-convention` is `none` or `pep257`.
 
 ## What it does
 Checks that parsed module attribute entries in owning module docstrings include a prose description.
@@ -75,4 +75,4 @@ Attributes:
 ```
 
 ## Options
-- `docstring-convention`: Google, NumPy, and reST entries are checked.
+None.

@@ -2,7 +2,7 @@
 
 Fix is sometimes available.
 
-Rule is ignored if `docstring-convention` is `none`, `google`, or `pep257`.
+Rule is disabled if `docstring-convention` is `none`, `pep257`, `google`, or `rest`.
 
 ## What it does
 PDF405 reports recognized NumPy sections whose underline is missing, separated from the section name by blank lines, uses the wrong adornment character, or does not match the section-name length. The target underline is a line of hyphens immediately after the section name, with the same evaluated indentation as the section name.
@@ -146,4 +146,4 @@ PDF405: Lines 2-6: Docstring section 'Parameters' underline should be normalized
 ```
 
 ## Options
-- `docstring-convention`: Enables NumPy section recognition. `none`, `google`, and `pep257` ignore this rule.
+None.

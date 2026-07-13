@@ -1,4 +1,4 @@
-# File Selection Specification
+# File selection specification
 
 This document specifies how `pydocfmt` selects files for processing.
 
@@ -11,15 +11,15 @@ This document specifies how `pydocfmt` selects files for processing.
 - `respect-gitignore = true`
 - `force-exclude = false`
 
-## Configuration Layout
+## Configuration layout
 
-General configuration loading, source priority, and path-pattern bases are specified in [Settings Specification](settings_spec.md). File selection consumes the resolved `include`, `extend-include`, `exclude`, `extend-exclude`, `respect-gitignore`, and `force-exclude` settings for each evaluated path.
+General configuration loading, source priority, and path-pattern bases are specified in [Settings specification](settings_spec.md). File selection consumes the resolved `include`, `extend-include`, `exclude`, `extend-exclude`, `respect-gitignore`, and `force-exclude` settings for each evaluated path.
 
 Auto-discovered configuration is hierarchical: the single closest config file applies to the file or directory being evaluated, and parent config files are not merged into child config files. During traversal, a parent directory exclude can still prune a child directory before that child directory's config is entered.
 
 `--show-settings` displays settings resolved for the current working directory. The `respect-gitignore` value used during a file-selection run is also resolved from the current working directory, not separately from each traversed path.
 
-## File Selection Algorithm
+## File selection algorithm
 
 Given positional CLI paths, defaulting to `.` when no paths are specified:
 
@@ -58,7 +58,7 @@ Existing filesystem paths are displayed as absolute normalized paths. Non-existi
 
 Accepted existing paths are deduplicated by normalized real path after gitignore filtering. The retained spelling is chosen by a stable display-path score; duplicate aliases are recorded as ignored duplicate decisions. Non-existing explicit paths are not deduplicated.
 
-## Decision Table
+## Decision table
 
 `Filter result` means the combined include, exclude, and gitignore checks for files.
 
@@ -80,7 +80,7 @@ Accepted existing paths are deduplicated by normalized real path after gitignore
 
 Directory arguments are evaluated before this table applies to files below them. A directory argument that is excluded is rejected as an ignored directory decision. A directory argument that is not excluded is walked, and files found below it are evaluated as discovered files.
 
-## CLI List Options
+## CLI list options
 
 The CLI accepts comma-separated glob values per option occurrence:
 
@@ -96,7 +96,7 @@ pydocfmt check --fix --include "*.py" --include "*.pyi" src/
 
 The resulting command-line list still replaces lower-precedence values for the same setting. For example, `--extend-exclude cli.py` replaces a configured `extend-exclude = ["config.py"]`, although the resolved final exclude list is still `exclude + extend-exclude`.
 
-## Ruff Compatibility Notes
+## Ruff compatibility notes
 
 pydocfmt intentionally uses Ruff-style file-selection settings where they map to pydocfmt behavior. The related settings are:
 
@@ -107,7 +107,7 @@ pydocfmt intentionally uses Ruff-style file-selection settings where they map to
 - `respect-gitignore`
 - `force-exclude`
 
-Settings outside this list are not part of the Ruff compatibility surface. Per-file-ignore pattern bases follow the same source-base rules as file-selection patterns, but per-file ignores are specified in `docs/rule_selection_spec.md` because they affect rule selection after a file has already been selected.
+Settings outside this list are not part of the Ruff compatibility surface. Per-file-ignore pattern bases follow the same source-base rules as file-selection patterns, but per-file ignores are specified in the [Rule selection specification](rule_selection_spec.md) because they affect rule selection after a file has already been selected.
 
 - **D1: pydocformatter include default.**
   pydocformatter defaults to the runtime `DEFAULT_INCLUDE` patterns, because these are the file types it can process. This intentionally differs from Ruff's broader default include set.

@@ -94,4 +94,4 @@ def function(): """Docstring."""; return None
 ```
 
 ## Options
-None. `docstring-convention` does not change this rule's behavior.
+None.

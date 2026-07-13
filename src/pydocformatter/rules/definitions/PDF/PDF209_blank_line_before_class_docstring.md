@@ -2,7 +2,7 @@
 
 Fix is always available.
 
-Rule is ignored by broad selectors for all `docstring-convention` values. Select `PDF209` exactly to opt into this spacing style. If `PDF208` is also selected through a broader selector, ignore `PDF208` so the incompatible default style does not disable `PDF209`.
+Rule is ignored by broad selectors for all `docstring-convention` values.
 
 Rule is incompatible with `PDF208`.
 
@@ -81,4 +81,4 @@ def function():
 ```
 
 ## Options
-None. `docstring-convention` does not change this rule's behavior. Broad selectors ignore this rule for every convention; select `PDF209` exactly to use it, and ignore `PDF208` if that incompatible companion is also selected.
+None.

@@ -2,7 +2,7 @@
 
 Fix is sometimes available.
 
-Rule is ignored if `docstring-convention` is `none` or `pep257`.
+Rule is disabled if `docstring-convention` is `none` or `pep257`.
 
 ## What it does
 PDF400 reports recognized Google and NumPy section names whose spelling differs from the canonical capitalization for the active docstring convention. Canonical section-name capitalization is title case, such as `Args`, `Keyword Args`, `Other Parameters`, and `See Also`. It also reports parsed reStructuredText field names that are not lowercase, including standard fields such as `:param:` and custom fields such as `:custom-field:`.
@@ -182,4 +182,4 @@ PDF400: Lines 2-4: Docstring section name 'args' should be capitalized as 'Args'
 ```
 
 ## Options
-- `docstring-convention`: Enables Google and NumPy section recognition and reStructuredText field recognition. `none` and `pep257` ignore this rule.
+None.

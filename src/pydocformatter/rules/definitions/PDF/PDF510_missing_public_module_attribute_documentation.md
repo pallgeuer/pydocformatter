@@ -2,7 +2,7 @@
 
 Fix is not available.
 
-Rule is ignored by broad selectors for all `docstring-convention` values. Select `PDF510` exactly to opt into this module-level check.
+Rule is disabled if `docstring-convention` is `none` or `pep257`, and ignored by broad selectors under `google`, `numpy`, and `rest`.
 
 ## What it does
 Checks that public module attributes are documented either in the module docstring attribute documentation or by an adjacent attribute docstring.
@@ -11,7 +11,7 @@ The rule compares supported module-level assignments against names documented in
 
 PDF510 checks whether public module attributes have any recognized documentation. It does not care whether that documentation is in the module docstring or attached to the assignment; use PDF520 or PDF521 for a location policy, PDF511 for stale module docstring entries, and PDF513 for duplicated module attribute documentation.
 
-PDF510 is ignored by broad selectors for every docstring convention, so select `PDF510` exactly to opt into this module-level check. With the default public-only setting, files named like private modules or private packages are skipped.
+PDF510 is ignored by broad selectors under parsed docstring conventions, so select `PDF510` exactly under `google`, `numpy`, or `rest` to opt into this module-level check. With the default public-only setting, files named like private modules or private packages are skipped.
 
 ## Why is this useful?
 Module attribute documentation can otherwise drift from exported module state.
@@ -160,6 +160,5 @@ PDF510: Line 6: Public module attribute 'timeout' is missing docstring documenta
 ```
 
 ## Options
-- `docstring-convention`: Controls whether Google `Attributes` sections, NumPy `Attributes` sections, or reST attribute fields are parsed. Ignored by broad rule selections under every convention, so exact `PDF510` selection is required.
-- `docstring-missing-documentation`: Controls when PDF510 is active after exact selection. `has-section` reports only modules with recognized attribute documentation, including attached attribute docstrings. `non-summary-docstrings` additionally reports public module docstrings with more than just a summary. `all-docstrings` additionally reports all public module docstrings.
-- `docstring-missing-documentation-public-only`: When `true`, missing-attribute checks skip private module paths. A file such as `_internal.py` or `_package/__init__.py` is private, while `package/__init__.py` is public. Private attributes are never required by PDF510.
+- `docstring-missing-documentation`: Controls whether missing module attribute documentation is reported only when attribute documentation already exists, for non-summary module docstrings, or for all eligible module docstrings.
+- `docstring-missing-documentation-public-only`: Skips private module paths for broad missing-module-attribute checks when enabled.

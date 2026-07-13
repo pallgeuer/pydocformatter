@@ -2,7 +2,7 @@
 
 Fix is sometimes available.
 
-Rule is ignored if `docstring-convention` is `none` or `pep257`.
+Rule is disabled if `docstring-convention` is `none` or `pep257`.
 
 ## What it does
 PDF402 reports recognized Google and NumPy section names whose spelling uses a non-preferred equivalent term for the active docstring convention. For Google docstrings, it normalizes `Arguments` to `Args`, `Keyword Arguments` to `Keyword Args`, and `Other Arguments` to `Other Args`. For NumPy docstrings, it normalizes `Other Params` to `Other Parameters`. For reStructuredText docstrings, it normalizes Sphinx-style field aliases with clear preferred spellings: `arg`, `argument`, `key`, `keyword`, `kwarg`, and `parameter` become `param`, while `except` and `exception` become `raises`.
@@ -190,4 +190,4 @@ PDF402: Lines 2-4: Docstring section name 'Arguments' should use equivalent term
 ```
 
 ## Options
-- `docstring-convention`: Enables Google and NumPy section recognition and reStructuredText field recognition. `none` and `pep257` ignore this rule.
+None.

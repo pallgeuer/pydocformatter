@@ -92,5 +92,5 @@ class Client:
 ```
 
 ## Options
-- `docstring-optional-function-decorators`: Exact function decorator names that make PDF611 allow a private non-dunder method to omit a docstring.
-- `docstring-forbidden-function-decorators`: Exact function decorator names that make PDF611 allow a private non-dunder method to omit a docstring because PDF616 reports docstrings on those definitions instead.
+- `docstring-optional-function-decorators`: Function decorator names that allow a private non-dunder method to omit a docstring.
+- `docstring-forbidden-function-decorators`: Function decorator names that allow a private non-dunder method to omit a docstring because PDF616 reports docstrings on those definitions instead.

@@ -243,6 +243,4 @@ def escaped() -> None:
 
 ## Options
 - `line-length`: Maximum display width allowed for the complete collapsed source line.
-- `indent-width`: Display width used when measuring tabs.
-- `docstring-convention`: Controls whether Google sections, NumPy sections, and reST fields are recognized instead of treated as summary text.
-- `docstring-parse-*`: Controls whether generic structures such as lists, headings, doctests, directives, and block quotes are protected from one-line summary collapse.
+- `indent-width`: Tab display width used when measuring the collapsed source line.

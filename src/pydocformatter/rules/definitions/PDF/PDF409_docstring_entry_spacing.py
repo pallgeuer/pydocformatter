@@ -37,16 +37,7 @@ class PDF409DocstringEntrySpacing(RuleBase):
         message="Docstring convention entry spacing should be normalized",
         fix_availability=FixAvailability.SOMETIMES,
         stable_since="1.0.0",
-        setting_effects=(
-            RuleSettingEffects(
-                setting="docstring_convention",
-                effects=(
-                    RuleSettingEffectValues(
-                        effect=RuleSettingEffect.IGNORED, values=docstring_conventions.ignored_conventions_except(DocstringConvention.GOOGLE, DocstringConvention.NUMPY, DocstringConvention.REST)
-                    ),
-                ),
-            ),
-        ),
+        setting_effects=(RuleSettingEffects(setting="docstring_convention", effects=(RuleSettingEffectValues(effect=RuleSettingEffect.DISABLED, values=docstring_conventions.UNPARSED_CONVENTIONS),)),),
         incompatible_with=(),
         check_kind=RuleCheckKind.STANDARD,
     )

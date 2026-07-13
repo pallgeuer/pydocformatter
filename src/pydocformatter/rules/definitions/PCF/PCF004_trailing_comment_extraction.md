@@ -203,29 +203,20 @@ value = compute()
 ```
 
 ## Options
-Wrapping and line-generation settings:
-
-- `line-length`: Maximum display width for deciding whether the canonical code-plus-comment line is overlong and for wrapping the extracted standalone block.
-- `line-ending`: Line ending used between generated lines inside the extracted replacement block.
-- `indent-width`: Tab display width used when measuring the original inline line and the available standalone comment width.
-- `url-aware-wrapping`: When enabled, URL tokens remain unbroken while surrounding prose may be balanced across lines.
-
-Extraction safety settings:
-
-- `comment-trailing-extraction-syntax-aware`: When enabled, keep overlong trailing comments inline in decorators, compound statement headers, arguments, and continuation contexts.
-- `comment-trailing-extraction-content-aware`: When enabled, keep overlong trailing comments inline when their content matches an enabled standalone structure/code detector or the content-aware operator-like heuristic.
-
-Content-safety detector settings:
-
-- `comment-format-list-items`: When enabled, list-like trailing content is unsafe to extract; leading `-`, `*`, and related operator-like tokens remain unsafe even when list formatting is disabled.
-- `comment-task-marker-mode`: Controls recognized task-marker trailing comments with `none`, `no-wrap`, or `hanging`; marker payloads that match an enabled code detector remain inline.
-- `comment-task-markers`: Configures exact uppercase task marker labels recognized before `:`.
-- `comment-preserve-headings`: When enabled, ATX headings and heading-adornment lines are unsafe to extract. Text that also looks like a table remains unsafe while table preservation is enabled.
-- `comment-preserve-doctests`: When enabled, trailing content starting with `>>>` is unsafe to extract.
-- `comment-preserve-code-fences`: When enabled, trailing content starting with a Markdown code fence is unsafe to extract.
-- `comment-format-block-quotes`: When enabled, block-quote-like trailing content is unsafe to extract; leading `>` is also operator-like and remains unsafe when block-quote formatting is disabled.
-- `comment-preserve-tables`: When enabled, Markdown pipe-table delimiter rows and reStructuredText grid or simple-table border rows are unsafe to extract.
-- `comment-preserve-directives`: When enabled, reStructuredText directive-like trailing content is unsafe to extract.
-- `comment-detect-code`: When enabled, disabled-code-like trailing content is unsafe to extract.
-- `comment-detect-statements`: When enabled, trailing content that parses as a Python statement is unsafe to extract.
-- `comment-detect-expressions`: When enabled, trailing content that parses as a nontrivial Python expression is unsafe to extract.
+- `line-length`: Maximum display width used to decide whether a canonical trailing comment is overlong and to wrap extracted standalone comments.
+- `indent-width`: Tab display width used when measuring inline comments and standalone comment width.
+- `url-aware-wrapping`: Keeps URL tokens unbroken while balancing surrounding prose in extracted standalone comments.
+- `comment-task-marker-mode`: Controls whether recognized task markers in extracted comments are normalized without wrapping or wrapped with hanging indentation.
+- `comment-task-markers`: Defines the uppercase task marker labels recognized before `:`.
+- `comment-trailing-extraction-syntax-aware`: Keeps overlong trailing comments inline in syntax-sensitive positions.
+- `comment-trailing-extraction-content-aware`: Keeps overlong trailing comments inline when comment content would be unsafe to reinterpret as standalone text.
+- `comment-format-list-items`: Makes content-aware extraction treat list-item text as unsafe to extract.
+- `comment-format-block-quotes`: Makes content-aware extraction treat block-quote text as unsafe to extract.
+- `comment-preserve-headings`: Makes content-aware extraction treat heading text as unsafe to extract.
+- `comment-preserve-doctests`: Makes content-aware extraction treat doctest prompts as unsafe to extract.
+- `comment-preserve-code-fences`: Makes content-aware extraction treat fenced-code openers as unsafe to extract.
+- `comment-preserve-tables`: Makes content-aware extraction treat table borders as unsafe to extract.
+- `comment-preserve-directives`: Makes content-aware extraction treat reStructuredText directives as unsafe to extract.
+- `comment-detect-code`: Makes content-aware extraction keep disabled-code-looking comments inline.
+- `comment-detect-statements`: Makes content-aware extraction keep Python-statement-looking comments inline.
+- `comment-detect-expressions`: Makes content-aware extraction keep nontrivial Python-expression-looking comments inline.

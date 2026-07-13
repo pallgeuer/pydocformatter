@@ -2,7 +2,7 @@
 
 Fix is sometimes available.
 
-Rule is ignored if `docstring-convention` is `none` or `pep257`.
+Rule is disabled if `docstring-convention` is `none` or `pep257`.
 
 ## What it does
 PDF410 reports parsed exception and warning entries whose exception-name lists are not in canonical form.
@@ -224,5 +224,4 @@ PDF410: Lines 2-4: Docstring exception entry should use canonical spelling
 ```
 
 ## Options
-- `docstring-convention`: Controls whether Google sections, NumPy sections, or reST fields are recognized. Ignores PDF410 when set to `none` or `pep257`.
-- `docstring-parse-*`: Parser protection settings can affect whether entry-like text inside structures such as code fences and literal blocks is opaque or can be parsed as convention entries.
+None.

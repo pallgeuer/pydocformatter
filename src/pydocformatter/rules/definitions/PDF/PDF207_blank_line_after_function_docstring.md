@@ -2,7 +2,7 @@
 
 Fix is always available.
 
-Rule is ignored by broad selectors for all `docstring-convention` values. Select `PDF207` exactly to opt into this spacing style.
+Rule is ignored by broad selectors for all `docstring-convention` values.
 
 Rule is incompatible with `PDF206`.
 
@@ -15,7 +15,7 @@ Only the adjacent blank-line run after the docstring statement is changed. Comme
 Some projects prefer visually separating function docstrings from executable body statements.
 
 ## Ruff compatibility
-None. This is the style-opposite companion to `PDF206`, which replaces Ruff's `D202`.
+This is the style-opposite companion to `PDF206`, which replaces Ruff's `D202`.
 
 ## Examples
 The canonical fix inserts one blank line after a function docstring:
@@ -96,4 +96,4 @@ def simple(): """Docstring."""; return None
 ```
 
 ## Options
-None. `docstring-convention` does not change this rule's behavior. Broad selectors ignore this rule for every convention; select `PDF207` exactly to use it.
+None.

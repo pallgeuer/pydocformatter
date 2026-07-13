@@ -69,4 +69,4 @@ PDF524: Line 5: Private module attribute '_token' must use module docstring docu
 ```
 
 ## Options
-- `require-explicit`: Keeps PDF524 out of broad rule selections by default. Exact rule-code selection enables it.
+None.

@@ -93,6 +93,7 @@ DEFAULT_DOCSTRING_OPTIONAL_FUNCTION_DECORATORS = ("typing.override", "typing_ext
 DEFAULT_DOCSTRING_PROPERTY_DECORATORS = ("builtins.property", "enum.property", "functools.cached_property", "abc.abstractproperty", "types.DynamicClassAttribute")
 DEFAULT_COMMENT_TASK_MARKERS = ("TODO", "FIXME", "XXX", "HACK", "BUG", "DEBUG", "NOTE", "OPTIMIZE", "REVIEW")
 PARALLELISM_CONSTRAINT_MESSAGE = "must be 0, a fractional value greater than 0 and less than 1, or a whole number greater than or equal to 1"
+_MAX_DOCUMENTED_STRING_LIST_DEFAULT_LENGTH = 50
 _TASK_MARKER_RE = re.compile(r"^[A-Z][A-Z0-9_-]*$")
 _validate_non_negative_float = settings_core.validate_float(min_value=0)
 
@@ -675,9 +676,25 @@ def _per_file_settings_pattern_matches(pattern: str, path: str, *, base_path: st
     return not matched if negated else matched
 
 
-def _setting_default_text(field: str, value_type: Any) -> str:
-    """Return the TOML-formatted default value for a settings field."""
-    return settings_core.format_value(getattr(CheckSettings(), field), value_type)
+def _setting_default_text(field: str, value_type: Any) -> str | None:
+    """Return a concise TOML-formatted default value for a settings field."""
+    default_text = settings_core.format_value(getattr(CheckSettings(), field), value_type)
+    return _documented_default_text(default_text, value_type)
+
+
+def _documented_default_text(default_text: str, value_type: Any) -> str | None:
+    """Return a default value only when it is short enough for prose."""
+    if value_type is StringList and len(default_text) > _MAX_DOCUMENTED_STRING_LIST_DEFAULT_LENGTH:
+        return None
+    return default_text
+
+
+def _setting_default_clause(field: str, value_type: Any) -> str:
+    """Return a concise prose clause describing a settings field default."""
+    default_text = _setting_default_text(field, value_type)
+    if default_text is None:
+        return "has a default value"
+    return f"defaults to {default_text}"
 
 
 SETTINGS_SCHEMA = SettingsSchema(
@@ -846,7 +863,7 @@ SETTINGS_SCHEMA = SettingsSchema(
             help="Task marker labels recognized before a colon.",
             validator=validate_comment_task_markers,
             cli={"metavar": "MARKER"},
-            documentation=f"Exact uppercase task marker labels recognized before a colon; defaults to {_setting_default_text('comment_task_markers', StringList)}. Use an empty list to disable recognition.",
+            documentation=f"Exact uppercase task marker labels recognized before a colon; {_setting_default_clause('comment_task_markers', StringList)}. Use an empty list to disable recognition.",
             example='comment-task-markers = ["TODO", "FIXME", "BUG"]',
         ),
         SettingDefinition(field="comment_preserve_headings", value_type=bool, group=SettingsGroup.COMMENT_FORMATTING, help="Preserve detected Markdown and reStructuredText comment headings."),
@@ -879,7 +896,7 @@ SETTINGS_SCHEMA = SettingsSchema(
             help="Comma-separated rule selector(s) to enable.",
             validator=settings_core.validate_non_empty_string_list,
             cli={"metavar": "RULE"},
-            documentation=f"Rule selectors to enable; defaults to {_setting_default_text('select', StringList)}.",
+            documentation=f"Rule selectors to enable; {_setting_default_clause('select', StringList)}.",
         ),
         SettingDefinition(
             field="ignore",
@@ -906,7 +923,7 @@ SETTINGS_SCHEMA = SettingsSchema(
             help="Comma-separated rule selector(s) that require exact rule-code selection.",
             validator=settings_core.validate_non_empty_string_list,
             cli={"metavar": "RULE"},
-            documentation=f"Rule selectors that broad rule selectors do not enable unless an exact rule-code selector also participates; defaults to {_setting_default_text('require_explicit', StringList)}.",
+            documentation=f"Rule selectors that broad rule selectors do not enable unless an exact rule-code selector also participates; {_setting_default_clause('require_explicit', StringList)}.",
         ),
         SettingDefinition(
             field="per_file_ignores",
@@ -941,7 +958,7 @@ SETTINGS_SCHEMA = SettingsSchema(
             help="Comma-separated rule selector(s) eligible for automatic fixes.",
             validator=settings_core.validate_non_empty_string_list,
             cli={"metavar": "RULE"},
-            documentation=f"Rule selectors eligible for automatic fixes; defaults to {_setting_default_text('fixable', StringList)}.",
+            documentation=f"Rule selectors eligible for automatic fixes; {_setting_default_clause('fixable', StringList)}.",
         ),
         SettingDefinition(
             field="unfixable",

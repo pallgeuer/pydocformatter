@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 # Standard library imports
+import re
+import pathlib
 import tomllib
 import collections
 import dataclasses
@@ -19,15 +21,22 @@ from pydocformatter import formatter, rules_selection
 from pydocformatter.cli import global_args, settings_check
 from pydocformatter.rules import line_endings
 from pydocformatter.rules.codes import RuleCode
+from pydocformatter.rules.models import RuleSettingEffect
 
 
 if TYPE_CHECKING:
     # First-party imports
     import pydocformatter.rules.models as rule_models
+    from pydocformatter.rules.definition import RuleBase
 
 
 _RULE_SELECTION_SETTING_KEYS = frozenset(definition.key for definition in settings_check.SETTINGS_SCHEMA.definitions if definition.group == settings_check.SettingsGroup.RULE_SELECTION)
 _REQUIRE_EXPLICIT_NOTICE = "Rule must by default be explicitly selected, unless it is removed from `require-explicit`."
+_FENCED_CODE_BLOCK_RE = re.compile(r"^(`{3,}|~{3,}).*?^\1\s*$", re.DOTALL | re.MULTILINE)
+_RUFF_RULE_REFERENCE_RE = re.compile(r"\b(?:D|DOC|E|W)\d{3}\b")
+_PYDOCFORMATTER_RULE_REFERENCE_RE = re.compile(r"\bP[CD]F\d{3}\b")
+_MARKDOWN_TABLE_SEPARATOR_RE = re.compile(r":?-{3,}:?")
+_TEMPLATE_PLACEHOLDERS = ("Describe the rule's check", "This line says", "CODE101", "related-setting", "Topic name", "Briefly describe")
 
 
 @dataclasses.dataclass(frozen=True)
@@ -42,7 +51,7 @@ class _PreparedRuleMarkdownExample:
     check_result: formatter.FormatterResult
 
 
-def _rule_cases() -> tuple[tuple[str, type[object]], ...]:
+def _rule_cases() -> tuple[tuple[str, type[RuleBase]], ...]:
     """Return built-in rule cases for pytest parametrization."""
     return tuple((rule_class.meta.code.tag, rule_class) for rule_class in rule_collection.RULE_COLLECTION.rules)
 
@@ -144,6 +153,233 @@ def test_rule_markdown_require_explicit_notices_match_default_setting() -> None:
     noticed_codes = frozenset(rule_code for rule_code, rule_class in _rule_cases() if _REQUIRE_EXPLICIT_NOTICE in rule_documentation.load_rule_explanation(rule_class))
 
     assert noticed_codes == frozenset(settings_check.DEFAULT_REQUIRE_EXPLICIT)
+
+
+def test_rule_markdown_preambles_match_metadata() -> None:
+    """Rule docs must start with canonical metadata-derived notices."""
+    for rule_code, rule_class in _rule_cases():
+        paragraphs = _leading_rule_markdown_paragraphs(rule_documentation.load_rule_explanation(rule_class))
+        expected = [f"# {rule_class.meta.name} ({rule_code})", rule_documentation.rule_fix_text(rule_class.meta)]
+        if (docstring_convention_notice := _expected_docstring_convention_notice(rule_class.meta)) is not None:
+            expected.append(docstring_convention_notice)
+        if rule_code in settings_check.DEFAULT_REQUIRE_EXPLICIT:
+            expected.append(_REQUIRE_EXPLICIT_NOTICE)
+        if rule_class.meta.incompatible_with:
+            expected.append(_expected_incompatibility_notice(rule_class.meta))
+
+        assert paragraphs == tuple(expected), f"{rule_code}: unexpected rule Markdown preamble"
+
+
+def _expected_docstring_convention_notice(rule: rule_models.RuleMetadata) -> str | None:
+    """Return the canonical docstring-convention notice for rule metadata."""
+    effects = _docstring_convention_effects(rule)
+    disabled = tuple(convention for convention in settings_check.DocstringConvention if convention in effects[RuleSettingEffect.DISABLED])
+    ignored = tuple(convention for convention in settings_check.DocstringConvention if convention in effects[RuleSettingEffect.IGNORED])
+
+    if disabled and ignored:
+        return f"Rule is disabled if `docstring-convention` is {_or_list(disabled)}, and ignored by broad selectors under {_and_list(ignored)}."
+    if disabled:
+        return f"Rule is disabled if `docstring-convention` is {_or_list(disabled)}."
+    if ignored:
+        if len(ignored) == len(tuple(settings_check.DocstringConvention)):
+            return "Rule is ignored by broad selectors for all `docstring-convention` values."
+        return f"Rule is ignored if `docstring-convention` is {_or_list(ignored)}."
+    return None
+
+
+def _docstring_convention_effects(rule: rule_models.RuleMetadata) -> dict[RuleSettingEffect, frozenset[settings_check.DocstringConvention]]:
+    """Return disabled and ignored docstring conventions for a rule."""
+    effects: dict[RuleSettingEffect, set[settings_check.DocstringConvention]] = {RuleSettingEffect.DISABLED: set(), RuleSettingEffect.IGNORED: set()}
+    for setting_effects in rule.setting_effects:
+        if setting_effects.setting != "docstring_convention":
+            continue
+        for effect_values in setting_effects.effects:
+            for value in effect_values.values:
+                if isinstance(value, settings_check.DocstringConvention):
+                    effects[effect_values.effect].add(value)
+    return {effect: frozenset(values) for effect, values in effects.items()}
+
+
+def _leading_rule_markdown_paragraphs(markdown: str) -> tuple[str, ...]:
+    """Return rule Markdown preamble paragraphs before the rule body."""
+    preamble = markdown.split("\n## What it does", maxsplit=1)[0]
+    return tuple(paragraph.strip() for paragraph in preamble.split("\n\n") if paragraph.strip())
+
+
+def _expected_incompatibility_notice(rule: rule_models.RuleMetadata) -> str:
+    """Return the canonical incompatibility notice for rule metadata."""
+    return f"Rule is incompatible with {_joined_rule_codes(rule.incompatible_with)}."
+
+
+def _joined_rule_codes(rule_codes: tuple[RuleCode, ...]) -> str:
+    """Return rule codes as a human-readable list."""
+    quoted = tuple(f"`{rule_code}`" for rule_code in rule_codes)
+    if len(quoted) == 1:
+        return quoted[0]
+    if len(quoted) == 2:
+        return f"{quoted[0]} and {quoted[1]}"
+    return f"{', '.join(quoted[:-1])}, and {quoted[-1]}"
+
+
+def test_rule_markdown_ruff_references_exist_in_rule_list() -> None:
+    """Rule-level Ruff compatibility text must not mention unknown Ruff codes."""
+    known_ruff_codes = _rule_list_ruff_codes()
+    for rule_code, rule_class in _rule_cases():
+        section = _markdown_section(rule_documentation.load_rule_explanation(rule_class), "Ruff compatibility")
+        mentioned_codes = frozenset(_RUFF_RULE_REFERENCE_RE.findall(section))
+
+        assert mentioned_codes <= known_ruff_codes, f"{rule_code}: unknown Ruff compatibility references: {sorted(mentioned_codes - known_ruff_codes)}"
+
+
+def test_rule_markdown_ruff_none_sections_are_canonical() -> None:
+    """Ruff compatibility sections must use None only when there is no Ruff prose."""
+    for rule_code, rule_class in _rule_cases():
+        section = _markdown_section(rule_documentation.load_rule_explanation(rule_class), "Ruff compatibility").strip()
+        if section == "None.":
+            assert not _RUFF_RULE_REFERENCE_RE.search(section), f"{rule_code}: Ruff compatibility None section mentions Ruff codes"
+            continue
+
+        assert not section.startswith("None."), f"{rule_code}: Ruff compatibility section must not combine None with prose"
+
+
+def test_rule_markdown_rule_references_exist() -> None:
+    """Rule docs must not mention unknown pydocformatter rule codes."""
+    known_rule_codes = frozenset(rule_collection.RULE_COLLECTION.rule_class)
+    for label, markdown in _rule_and_category_markdown_documents():
+        mentioned_codes = frozenset(RuleCode(code) for code in _PYDOCFORMATTER_RULE_REFERENCE_RE.findall(_FENCED_CODE_BLOCK_RE.sub("", markdown)))
+
+        assert mentioned_codes <= known_rule_codes, f"{label}: unknown pydocformatter rule references: {sorted(mentioned_codes - known_rule_codes)}"
+
+
+def test_rule_markdown_tables_are_well_formed() -> None:
+    """Markdown pipe tables in rule docs must have consistent row shapes."""
+    for label, markdown in _rule_and_category_markdown_documents():
+        for table_index, table_lines in enumerate(_markdown_pipe_tables(_FENCED_CODE_BLOCK_RE.sub("", markdown)), start=1):
+            _assert_well_formed_markdown_table(label, table_index, table_lines)
+
+
+def _rule_list_ruff_codes() -> frozenset[str]:
+    """Return Ruff codes documented in the public Ruff rules table."""
+    text = (pathlib.Path(__file__).resolve().parents[1] / "docs" / "public" / "ruff_rule_links.md").read_text(encoding="utf-8")
+    return frozenset(_plain_code_cell(row["Code"]) for row in _markdown_table_rows_after_heading(text, "## Ruff rules"))
+
+
+def _plain_code_cell(cell: str) -> str:
+    """Return the visible rule code from a linked or code-formatted table cell."""
+    match = re.fullmatch(r"\[`([^`]+)`\]\([^)]+\)", cell)
+    if match:
+        return match.group(1)
+    return cell.strip("`")
+
+
+def _rule_and_category_markdown_documents() -> tuple[tuple[str, str], ...]:
+    """Return labels and Markdown text for built-in rule and category docs."""
+    documents = [(rule_code, rule_documentation.load_rule_explanation(rule_class)) for rule_code, rule_class in _rule_cases()]
+    documents.extend((category_class.meta.prefix, rule_documentation.load_rule_explanation(category_class)) for category_class in rule_collection.RULE_COLLECTION.categories)
+    return tuple(documents)
+
+
+def _markdown_pipe_tables(markdown: str) -> tuple[tuple[str, ...], ...]:
+    """Return contiguous pipe-table line groups from Markdown text."""
+    tables: list[tuple[str, ...]] = []
+    table_lines: list[str] = []
+    for line in markdown.splitlines():
+        if line.startswith("|"):
+            table_lines.append(line)
+            continue
+        if table_lines:
+            tables.append(tuple(table_lines))
+            table_lines = []
+    if table_lines:
+        tables.append(tuple(table_lines))
+    return tuple(tables)
+
+
+def _assert_well_formed_markdown_table(label: str, table_index: int, table_lines: tuple[str, ...]) -> None:
+    """Assert one Markdown pipe table has a consistent, parseable shape."""
+    assert len(table_lines) >= 3, f"{label}: table {table_index} must include header, separator, and body row"
+    header_cells = _split_markdown_row(table_lines[0])
+    separator_cells = _split_markdown_row(table_lines[1])
+    expected_cell_count = len(header_cells)
+
+    assert expected_cell_count > 0, f"{label}: table {table_index} must have at least one column"
+    assert all(header_cells), f"{label}: table {table_index} has an empty header cell"
+    assert len(separator_cells) == expected_cell_count, f"{label}: table {table_index} separator cell count does not match header"
+    assert all(_MARKDOWN_TABLE_SEPARATOR_RE.fullmatch(cell) is not None for cell in separator_cells), f"{label}: table {table_index} has an invalid separator row"
+
+    for row_number, row in enumerate(table_lines[2:], start=3):
+        cells = _split_markdown_row(row)
+        assert len(cells) == expected_cell_count, f"{label}: table {table_index} row {row_number} cell count does not match header"
+
+
+def _markdown_table_rows_after_heading(text: str, heading: str) -> tuple[dict[str, str], ...]:
+    """Return simple Markdown table rows immediately after a heading."""
+    lines = text.splitlines()
+    heading_index = lines.index(heading)
+    table_lines: list[str] = []
+    for line in lines[heading_index + 1 :]:
+        if not line.strip():
+            if table_lines:
+                break
+            continue
+        if table_lines and not line.startswith("|"):
+            break
+        if line.startswith("|"):
+            table_lines.append(line)
+    if len(table_lines) < 2:
+        raise AssertionError(f"No Markdown table found after {heading}")
+    headers = _split_markdown_row(table_lines[0])
+    return tuple(dict(zip(headers, cells, strict=True)) for cells in (_split_markdown_row(line) for line in table_lines[2:]))
+
+
+def _split_markdown_row(line: str) -> list[str]:
+    """Split one simple Markdown table row into stripped cells."""
+    return [cell.strip() for cell in line.strip().strip("|").split("|")]
+
+
+def _markdown_section(markdown: str, heading: str) -> str:
+    """Return the body of a level-two Markdown section."""
+    marker = f"## {heading}"
+    lines = markdown.splitlines()
+    start = lines.index(marker) + 1
+    end = next((index for index, line in enumerate(lines[start:], start=start) if line.startswith("## ")), len(lines))
+    return "\n".join(lines[start:end])
+
+
+def test_rule_and_category_markdown_do_not_contain_template_placeholders() -> None:
+    """Built-in Markdown docs must not retain targeted template placeholders."""
+    for rule_code, rule_class in _rule_cases():
+        _assert_no_template_placeholders(f"{rule_code}", rule_documentation.load_rule_explanation(rule_class))
+    for category_class in rule_collection.RULE_COLLECTION.categories:
+        _assert_no_template_placeholders(category_class.meta.prefix, rule_documentation.load_rule_explanation(category_class))
+
+
+def _assert_no_template_placeholders(label: str, markdown: str) -> None:
+    """Assert targeted template placeholder text is absent from Markdown prose."""
+    prose_markdown = _FENCED_CODE_BLOCK_RE.sub("", markdown)
+    for placeholder in _TEMPLATE_PLACEHOLDERS:
+        haystack = markdown if placeholder == "CODE101" else prose_markdown
+        assert placeholder not in haystack, f"{label}: template placeholder remains: {placeholder}"
+
+
+def _or_list(conventions: tuple[settings_check.DocstringConvention, ...]) -> str:
+    """Return convention values joined with `or`."""
+    return _joined_conventions(conventions, conjunction="or")
+
+
+def _and_list(conventions: tuple[settings_check.DocstringConvention, ...]) -> str:
+    """Return convention values joined with `and`."""
+    return _joined_conventions(conventions, conjunction="and")
+
+
+def _joined_conventions(conventions: tuple[settings_check.DocstringConvention, ...], *, conjunction: str) -> str:
+    """Return convention values as a human-readable list."""
+    quoted = tuple(f"`{convention.value}`" for convention in conventions)
+    if len(quoted) == 1:
+        return quoted[0]
+    if len(quoted) == 2:
+        return f"{quoted[0]} {conjunction} {quoted[1]}"
+    return f"{', '.join(quoted[:-1])}, {conjunction} {quoted[-1]}"
 
 
 def test_parse_rule_markdown_examples_rejects_reversed_finding_ranges() -> None:

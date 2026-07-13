@@ -2,7 +2,7 @@
 
 Fix is not available.
 
-Rule is ignored if `docstring-convention` is `none` or `pep257`.
+Rule is disabled if `docstring-convention` is `none` or `pep257`.
 
 ## What it does
 PDF406 reports recognized Google and NumPy sections, plus reST fields under the reST convention, that contain no meaningful body content after their header or field marker. Header-only sections, sections containing only blank lines, and empty reST fields are findings.
@@ -131,4 +131,4 @@ def value(arg):
 ```
 
 ## Options
-- `docstring-convention`: Enables Google and NumPy section recognition and reST field recognition. `none` and `pep257` ignore this rule.
+None.

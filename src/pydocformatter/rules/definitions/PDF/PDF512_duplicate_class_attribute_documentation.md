@@ -2,7 +2,7 @@
 
 Fix is not available.
 
-Rule is ignored if `docstring-convention` is `none` or `pep257`.
+Rule is disabled if `docstring-convention` is `none` or `pep257`.
 
 ## What it does
 Checks for class attributes documented both in the class docstring attribute documentation and by an adjacent attached attribute docstring.
@@ -169,5 +169,4 @@ PDF512: Line 11: Attached docstring for class attribute 'timeout' duplicates cla
 ```
 
 ## Options
-- `docstring-convention`: Controls whether Google `Attributes` sections, NumPy `Attributes` sections, or reST attribute fields are parsed. Ignored by broad rule selections under `none` and `pep257`.
-- `docstring-require-init-attribute-documentation`: Does not control PDF512. Attached `self.*` docstrings from `__init__` can duplicate class docstring attribute documentation whether or not missing-attribute rules require instance attribute documentation.
+None.

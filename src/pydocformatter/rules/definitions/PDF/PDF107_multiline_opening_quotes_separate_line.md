@@ -2,7 +2,7 @@
 
 Fix is always available.
 
-Rule is ignored if `docstring-convention` is `none`, `google`, `numpy`, or `pep257`.
+Rule is ignored by broad selectors for all `docstring-convention` values.
 
 Rule is incompatible with `PDF106`.
 
@@ -184,4 +184,5 @@ def not_docstring() -> None:
 ```
 
 ## Options
-None.
+- `indent-style`: Indentation style used when generating the moved first content line.
+- `indent-width`: Indentation width used when generating the moved first content line and measuring indentation.

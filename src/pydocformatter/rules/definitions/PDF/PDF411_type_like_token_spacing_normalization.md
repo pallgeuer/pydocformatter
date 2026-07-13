@@ -2,7 +2,7 @@
 
 Fix is sometimes available.
 
-Rule is ignored if `docstring-convention` is `none` or `pep257`.
+Rule is disabled if `docstring-convention` is `none` or `pep257`.
 
 ## What it does
 PDF411 reports parsed convention type-like tokens whose internal spacing can be safely normalized with Python expression parsing.
@@ -288,5 +288,4 @@ PDF411: Lines 2-6: Docstring type-like token spacing should be normalized
 ```
 
 ## Options
-- `docstring-convention`: Controls whether Google sections, NumPy sections, or reST fields are recognized. Ignores PDF411 when set to `none` or `pep257`.
-- `docstring-parse-*`: Parser protection settings can affect whether entry-like text inside structures such as code fences and literal blocks is opaque or can be parsed as convention entries.
+None.

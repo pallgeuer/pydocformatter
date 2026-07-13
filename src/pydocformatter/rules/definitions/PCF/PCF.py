@@ -17,6 +17,7 @@ import libcst.metadata as cst_metadata
 # First-party imports
 import pydocformatter.rules.edits as rule_edits
 import pydocformatter.rules.registration as rule_registration
+from pydocformatter import docs_urls
 from pydocformatter.rules.definition import RuleCategoryBase
 from pydocformatter.rules.definition_helpers import source_text, text_layout
 from pydocformatter.rules.models import RuleCategoryMetadata
@@ -220,7 +221,7 @@ class PCF(RuleCategoryBase[PCFCategoryData]):
         meta (RuleMetadata): Static metadata used for registration, diagnostics, and rule selection.
     """
 
-    meta = RuleCategoryMetadata(prefix="PCF", name="pydocformatter comment formatting", url="https://github.com/pallgeuer/pydocformatter")
+    meta = RuleCategoryMetadata(prefix="PCF", name="pydocformatter comment formatting", url=docs_urls.category_url("PCF"))
 
     @classmethod
     def prepare(cls, context: RuleCategoryContext) -> PCFCategoryData:

@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, TypedDict
 # First-party imports
 import pydocformatter.rules.collection as rule_collection
 import pydocformatter.rules.documentation as rule_documentation
+from pydocformatter import docs_urls
 from pydocformatter.cli import global_args
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.utils import argparser
@@ -57,6 +58,7 @@ class RuleMetadataOutput(TypedDict):
         name (str): Stable rule name used in documentation and JSON output.
         code (str): Full rule code such as `PDF101`.
         linter (str): Rule category prefix that owns the rule.
+        url (str): Public documentation URL for the generated rule page.
         summary (str): Short rule summary from the adjacent Markdown documentation.
         message_formats (list[str]): Diagnostic message templates this rule can emit.
         fix (str): Human-readable automatic-fix availability.
@@ -70,6 +72,7 @@ class RuleMetadataOutput(TypedDict):
     name: str
     code: str
     linter: str
+    url: str
     summary: str
     message_formats: list[str]
     fix: str
@@ -159,6 +162,7 @@ def rule_json(rule_class: type[RuleBase]) -> RuleMetadataOutput:
         name=rule.name,
         code=rule.code.tag,
         linter="pydocformatter",
+        url=docs_urls.rule_url(rule.name),
         summary=rule.message,
         message_formats=[rule.message],
         fix=rule_documentation.rule_fix_text(rule),

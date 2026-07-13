@@ -183,5 +183,4 @@ PDF203: Lines 2-3: Docstring summary spans 2 lines and does not fit on one line
 ```
 
 ## Options
-- `docstring-convention`: Controls whether Google sections, NumPy sections, and reST fields are recognized instead of treated as summary text.
-- `docstring-parse-*`: Controls whether generic structures such as lists, headings, doctests, directives, block quotes, code fences, and tables are protected from summary-length checks.
+None.

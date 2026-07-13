@@ -2,7 +2,7 @@
 
 Fix is not available.
 
-Rule is ignored if `docstring-convention` is `none` or `pep257`.
+Rule is disabled if `docstring-convention` is `none` or `pep257`.
 
 ## What it does
 Checks that parsed yield entries in owning function docstrings include a prose description.
@@ -73,4 +73,4 @@ def function() -> int:
 ```
 
 ## Options
-- `docstring-convention`: Google, NumPy, and reST entries are checked.
+None.

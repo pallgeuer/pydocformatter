@@ -2,9 +2,9 @@
 
 Fix is not available.
 
-Rule must by default be explicitly selected, unless it is removed from `require-explicit`.
+Rule is disabled if `docstring-convention` is `none` or `pep257`.
 
-Rule is ignored if `docstring-convention` is `none` or `pep257`.
+Rule must by default be explicitly selected, unless it is removed from `require-explicit`.
 
 Rule is incompatible with `PDF520`.
 
@@ -106,5 +106,4 @@ timeout: float
 ```
 
 ## Options
-- `require-explicit`: Keeps PDF521 out of broad rule selections by default. Exact rule-code selection enables it.
-- `docstring-convention`: Controls whether Google, NumPy, or reStructuredText attribute entries are parsed. Broad selectors ignore PDF521 under `none` and `pep257`.
+None.

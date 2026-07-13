@@ -130,5 +130,4 @@ class Client:
 ```
 
 ## Options
-- `require-explicit`: Keeps PDF516 out of broad rule selections by default. Exact rule-code selection enables it.
-- `docstring-require-init-attribute-documentation`: Does not control PDF516. Supported `self.*` docstrings from `__init__` are checked whether or not missing-attribute rules require instance attribute documentation.
+None.

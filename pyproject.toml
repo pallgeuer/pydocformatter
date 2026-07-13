@@ -38,6 +38,7 @@ dependencies = [
 homepage = "https://github.com/pallgeuer/pydocformatter"
 source = "https://github.com/pallgeuer/pydocformatter"
 changelog = "https://github.com/pallgeuer/pydocformatter/blob/main/CHANGELOG.md"
+documentation = "https://pallgeuer.github.io/pydocformatter/"
 issues = "https://github.com/pallgeuer/pydocformatter/issues"
 
 [project.scripts]
@@ -54,8 +55,13 @@ test = [
     "pytest-mock==3.15.1",
     "pytest-xdist==3.8.0",
 ]
+docs = [
+    "mdformat==1.0.0",
+    "zensical==0.0.48",
+]
 dev = [
     {include-group = "test"},
+    {include-group = "docs"},
     "pre-commit==4.6.0",
     "ruff==0.15.20",
     "ty==0.0.57",
@@ -106,14 +112,20 @@ markers = [
 [tool.pydocfmt]
 line-length = 120
 indent-style = "space"
-docstring-convention = "google"
-docstring-missing-documentation = "all-docstrings"
-comment-detect-code = true
-comment-detect-expressions = true
+indent-width = 4
+line-ending = "lf"
 respect-gitignore = true
 extend-select = ["PDF300", "PDF302", "PDF305", "PDF510", "PDF701", "PDF705", "PDF709", "PDF713", "PDF717"]
 ignore = ["PDF519", "PDF521", "PDF522", "PDF523", "PDF524", "PDF525"]
 require-explicit = []
+
+[tool.pydocfmt.docstring]
+convention = "google"
+missing-documentation = "all-docstrings"
+
+[tool.pydocfmt.comment]
+detect-code = true
+detect-expressions = true
 
 [tool.pydocfmt.per-file-ignores]
 "tests/**/test_*.py" = ["PDF6"]
@@ -172,7 +184,7 @@ ignore = [
     "ANN401",
     "COM812", "COM819",
     "D", "DOC",
-    "E111", "E114", "E117", "E501",
+    "E111", "E114", "E117", "E261", "E262", "E265", "E266", "E501",
     "FURB101", "FURB103",
     "N999",
     "PLC1901", "PLC2801",

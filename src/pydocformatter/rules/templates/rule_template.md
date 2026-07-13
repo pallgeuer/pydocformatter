@@ -2,7 +2,11 @@
 
 Fix is always available. (Use `Fix is usually available.`, `Fix is sometimes available.`, or `Fix is not available.` when that matches the rule metadata.)
 
-(Only if rule has `setting_effects` like ignored or disabled:) Rule is ignored if `docstring-convention` is `google` or `numpy`.
+(Only if rule has `setting_effects` like ignored or disabled:) Use one leading sentence that matches the metadata:
+
+- Ignored only: "Rule is ignored if `docstring-convention` is `google` or `numpy`."
+- Disabled only: "Rule is disabled if `docstring-convention` is `none` or `pep257`."
+- Both disabled and ignored: "Rule is disabled if `docstring-convention` is `none` or `pep257`, and ignored by broad selectors under `google`, `numpy`, and `rest`."
 
 (Only if rule is listed in the default `require-explicit` setting:) Rule must by default be explicitly selected, unless it is removed from `require-explicit`.
 
@@ -54,6 +58,6 @@ CODE101: Line 1: Example path-sensitive finding
 ```
 
 ## Options
-List only settings that materially change this rule's user-visible behavior, such as ignored state, finding targets, fix output, or examples. Do not list settings only because shared category preparation reads them. Group setting families like `docstring-parse-*` when every setting has the same effect for this rule. Use `None.` when no setting is directly material.
+Before writing this section, update `docs/devel/rule_settings_audit.md` with every setting the rule uses directly or through helpers. Then list only (but *exactly* all) settings from that audit that positively and directly change this rule's user-visible findings or fix output. Do not list rule-selection settings, global fixability settings, per-file settings, line-ending settings, `require-explicit`, `docstring-convention`, `docstring-parse-*`, or settings only read by shared category preparation. Use `None.` when no allowed setting is directly material.
 
 - `related-setting`: Describe the behavior this setting changes for this rule.

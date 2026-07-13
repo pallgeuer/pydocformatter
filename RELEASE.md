@@ -1,33 +1,34 @@
-# Release Checklist for pydocformatter
+# Release checklist for pydocformatter
 
-## Pre-Release Validation
+## Pre-release validation
 
-### Code Quality
+### Code quality
 - [x] All tests pass with project-default pytest-xdist multiprocessing (`uv run pytest -q`)
 - [x] Package builds successfully (`uv build`)
 - [x] No linting errors (`uv run ruff check`, `uv run pydocfmt check`, `uv run ruff format --check`, `uv run ty check`)
 - [x] Pre-commit hooks pass (`uv run pre-commit run --all-files`)
 
 ### Documentation
-- [x] [README.md](README.md) is comprehensive and up-to-date
-- [x] [CHANGELOG.md](CHANGELOG.md) is complete for new version
-- [x] [RELEASE.md](RELEASE.md) is up-to-date with current uv-based commands
-- [x] [CONTRIBUTING.md](CONTRIBUTING.md) provides clear guidelines
+- [x] [README](README.md) is comprehensive and up-to-date
+- [x] [Changelog](CHANGELOG.md) is complete for new version
+- [x] [Release checklist](RELEASE.md) is up-to-date with current uv-based commands
+- [x] [Contributing](CONTRIBUTING.md) provides clear guidelines
+- [x] Generated Zensical documentation builds successfully (`uv run python tools/docs/generate_zensical.py`, `uv run zensical build --strict -f zensical.generated.toml`)
 - [x] All docstrings are properly formatted
 
-### Project Configuration
+### Project configuration
 - [x] pyproject.toml has complete metadata
 - [x] Version number is correct
 - [x] License information is accurate
 - [x] Entry points are configured correctly
 - [x] Dependencies are minimal and correct
 
-### GitHub Setup
+### GitHub setup
 - [x] .pre-commit-hooks.yaml for external consumption
 - [x] Pull request template
 - [x] GitHub Actions workflows
 
-## Release Process
+## Release process
 
 Set the release version once and use it consistently in the commands below:
 
@@ -35,10 +36,23 @@ Set the release version once and use it consistently in the commands below:
 VERSION=1.0.0
 ```
 
-### Step 1: Final Validation
+### Step 1: Final validation
 ```bash
 # Run tests one more time with project-default pytest-xdist multiprocessing
 uv run pytest -q
+
+# Check linting, formatting, and types
+uv run ruff check
+uv run pydocfmt check
+uv run ruff format --check
+uv run ty check
+
+# Build documentation site
+uv run python tools/docs/generate_zensical.py
+uv run zensical build --strict -f zensical.generated.toml
+
+# Run pre-commit hooks
+uv run pre-commit run --all-files
 
 # Test build
 uv build
@@ -61,7 +75,7 @@ print(Path(fname).read_text())
 "
 ```
 
-### Step 2: Commit and Push Final Changes
+### Step 2: Commit and push final changes
 ```bash
 # Stage all changes
 git add .
@@ -73,8 +87,8 @@ git commit -m "feat: prepare for v${VERSION} release"
 git push origin main
 ```
 
-### Step 3: Create GitHub Release
-1. Go to https://github.com/pallgeuer/pydocformatter/releases
+### Step 3: Create GitHub release
+1. Go to <https://github.com/pallgeuer/pydocformatter/releases>
 2. Click "Create a new release"
 3. Tag: `v${VERSION}`
 4. Title: `pydocformatter v${VERSION} release`
@@ -90,13 +104,13 @@ uv publish --token pypi-...           # <-- Option A
 UV_PUBLISH_TOKEN=pypi-... uv publish  # <-- Option B
 ```
 
-### Step 5: Post-Release Tasks
+### Step 5: Post-release tasks
 - [ ] Update README badges if needed
 - [ ] Announce on social media/relevant communities
 - [ ] Monitor for issues and feedback
 - [ ] Plan next release features
 
-## Release Artifacts
+## Release artifacts
 
 The following files will be created and distributed:
 
@@ -105,18 +119,18 @@ The following files will be created and distributed:
 3. **GitHub Release:** With release notes and assets
 4. **PyPI Package:** Available via `pip install pydocformatter`
 
-## Post-Release Validation
+## Post-release validation
 
 After release, verify:
 
-1. **PyPI Installation:**
+1. **PyPI installation:**
    ```bash
    pip install pydocformatter
    pydocfmt --help
    pydocfmt check --help
    ```
 
-2. **Pre-commit Hook Usage:**
+2. **Pre-commit hook usage:**
    ```yaml
    repos:
      - repo: https://github.com/pallgeuer/pydocformatter
@@ -125,11 +139,11 @@ After release, verify:
          - id: pydocfmt-fix
    ```
 
-3. **GitHub Features:**
+3. **GitHub features:**
    - [ ] Actions run successfully
    - [ ] Pre-commit hooks work for external users
 
-## Success Criteria
+## Success criteria
 
 **Release is successful when:**
 - Package installs cleanly from PyPI
@@ -138,7 +152,7 @@ After release, verify:
 - Documentation is accessible and helpful
 - No critical bugs reported in first 24 hours
 
-## Support Channels
+## Support channels
 
 After release, users can get help via:
 - GitHub Issues: Bug reports and feature requests

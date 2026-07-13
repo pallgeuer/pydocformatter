@@ -2,6 +2,8 @@
 
 Fix is sometimes available.
 
+Rule is disabled if `docstring-convention` is `none` or `pep257`.
+
 ## What it does
 Checks that parsed docstring entry descriptions start with a capitalized first word when that capitalization is safe.
 
@@ -271,5 +273,4 @@ PDF310: Lines 2-6: Docstring entry description first word 'timeout' should be ca
 ```
 
 ## Options
-- `docstring-convention`: Controls whether Google sections, NumPy sections, or reStructuredText fields are parsed.
-- `docstring-parse-*`: Controls whether generic nested structures such as lists, doctests, code fences, block quotes, tables, directives, and literal blocks are protected from entry-description capitalization checks.
+None.

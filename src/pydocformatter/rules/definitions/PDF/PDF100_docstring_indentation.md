@@ -369,6 +369,5 @@ def not_a_docstring():
 ```
 
 ## Options
-- `indent-style`: Indentation style used for generated convention indentation units and rewritten docstring indentation.
-- `indent-width`: Indentation width used for generated convention indentation units, single-line-suite docstring margins, and indentation measurement.
-- `docstring-convention`: Enables Google or NumPy section-aware indentation. With `none` or `pep257`, convention-looking text is treated as ordinary continuation content.
+- `indent-style`: Indentation style used for generated docstring indentation.
+- `indent-width`: Indentation width used for generated docstring indentation and indentation measurement.

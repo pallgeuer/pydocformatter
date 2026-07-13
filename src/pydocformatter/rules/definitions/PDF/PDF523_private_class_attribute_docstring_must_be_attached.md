@@ -2,11 +2,11 @@
 
 Fix is not available.
 
+Rule is disabled if `docstring-convention` is `none` or `pep257`.
+
 Rule must by default be explicitly selected, unless it is removed from `require-explicit`.
 
-Rule is ignored if `docstring-convention` is `none` or `pep257`.
-
-Rule is incompatible with `PDF522` and `PDF516`.
+Rule is incompatible with `PDF516` and `PDF522`.
 
 ## What it does
 Checks for private class attributes documented in class docstring attribute entries when private class attribute documentation must use attached docstrings.
@@ -116,5 +116,4 @@ class Client:
 ```
 
 ## Options
-- `require-explicit`: Keeps PDF523 out of broad rule selections by default. Exact rule-code selection enables it.
-- `docstring-convention`: Controls whether Google, NumPy, or reStructuredText attribute entries are parsed. Broad selectors ignore PDF523 under `none` and `pep257`.
+None.

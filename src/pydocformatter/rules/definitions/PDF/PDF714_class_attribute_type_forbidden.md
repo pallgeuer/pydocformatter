@@ -2,9 +2,9 @@
 
 Fix is not available.
 
-Rule is ignored if `docstring-convention` is `none`, `pep257`, `google`, `numpy`, or `rest`.
+Rule is disabled if `docstring-convention` is `none` or `pep257`, and ignored by broad selectors under `google`, `numpy`, and `rest`.
 
-Rule is incompatible with `PDF713`, `PDF715`.
+Rule is incompatible with `PDF713` and `PDF715`.
 
 ## What it does
 Checks that parsed class attribute entries in owning class docstrings do not include documented types.
@@ -86,4 +86,4 @@ PDF714: Line 6: Class attribute 'fallback' docstring entry should not include a 
 ```
 
 ## Options
-- `docstring-convention`: The rule is exact opt-in; exact rule-code selection restores it for parsed conventions.
+None.

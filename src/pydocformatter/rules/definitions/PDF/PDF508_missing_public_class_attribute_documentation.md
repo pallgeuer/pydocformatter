@@ -2,7 +2,7 @@
 
 Fix is not available.
 
-Rule is ignored if `docstring-convention` is `none` or `pep257`.
+Rule is disabled if `docstring-convention` is `none` or `pep257`.
 
 ## What it does
 Checks that public class attributes are documented either in the class docstring attribute documentation or by an adjacent attribute docstring.
@@ -155,7 +155,6 @@ PDF508: Line 11: Public class attribute 'retries' is missing docstring documenta
 ```
 
 ## Options
-- `docstring-convention`: Controls whether Google `Attributes` sections, NumPy `Attributes` sections, or reST attribute fields are parsed. Ignored by broad rule selections under `none` and `pep257`.
-- `docstring-missing-documentation`: Controls when PDF508 is active. `has-section` reports only owners with recognized attribute documentation, including attached attribute docstrings. `non-summary-docstrings` additionally reports public class docstrings with more than just a summary. `all-docstrings` additionally reports all public class docstrings.
-- `docstring-missing-documentation-public-only`: When `true`, missing-attribute checks skip private classes. Private attributes are never required by PDF508.
-- `docstring-require-init-attribute-documentation`: When `true`, supported `self.*` assignments in `__init__` are also required by PDF508.
+- `docstring-missing-documentation`: Controls whether missing class attribute documentation is reported only when attribute documentation already exists, for non-summary class docstrings, or for all eligible class docstrings.
+- `docstring-missing-documentation-public-only`: Skips private classes for broad missing-class-attribute checks when enabled.
+- `docstring-require-init-attribute-documentation`: Requires supported `self.*` assignments in `__init__` to have class attribute documentation when enabled.
