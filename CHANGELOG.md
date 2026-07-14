@@ -296,6 +296,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 - Fixed generated project documentation to preserve label-prefixed Markdown lists as bullet lists in the final Zensical site.
 - Fixed generated rule-table enabled labels to use the documented `Convention` value, documented the future `Setting-gated` value, and removed disabled redirect-generation code.
 - Fixed generated documentation site configuration to avoid view-source links pointing at ignored generated Markdown files.
+- Fixed generated settings table Markdown to keep enum type separators inside the type cell for stricter Markdown table parsers.
 
 #### Docstring formatting
 
@@ -615,6 +616,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 #### Developer dependencies
 
 - Removed the unused `build` and `twine` dev dependencies now that package build and publish workflows use uv directly.
+- Removed the unused `mdformat` docs dependency.
 
 #### Developer workflow
 

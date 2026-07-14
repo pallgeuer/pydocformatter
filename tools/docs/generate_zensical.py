@@ -560,7 +560,7 @@ def _settings_markdown(rule_pages: tuple[RulePage, ...]) -> str:
             default_text = settings_core.format_value(getattr(defaults, definition.field), definition.value_type)
             setting_name = f"`{definition.key}`" if definition.available_in_toml else f"`{definition.field}`"
             cli_text = ", ".join(f"`{flag}`" for flag in definition.cli.flags) if definition.cli else "-"
-            row = f"| {setting_name} | {cli_text} | `{_type_text(definition.value_type)}` | `{_escape_table_cell(default_text)}` |"
+            row = f"| {setting_name} | {cli_text} | {_table_code_cell(_type_text(definition.value_type))} | {_table_code_cell(default_text)} |"
             if has_related_rules:
                 related_rules = _related_rule_links(related_rules_by_field.get(definition.field, ()), page_by_code, limit=4) or "-"
                 row = f"{row} {related_rules} |"
@@ -967,6 +967,11 @@ def _write_generated_markdown(path: pathlib.Path, text: str) -> None:
 def _escape_table_cell(text: str) -> str:
     """Escape text for a Markdown table cell."""
     return text.replace("|", "\\|").replace("\n", " ")
+
+
+def _table_code_cell(text: str) -> str:
+    """Return inline code HTML that is safe inside a Markdown table cell."""
+    return f"<code>{html.escape(text, quote=False).replace('|', '&#124;').replace(chr(10), ' ')}</code>"
 
 
 def _yaml_double_quoted(text: str) -> str:

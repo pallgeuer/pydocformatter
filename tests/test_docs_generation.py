@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 # Standard library imports
+import html
 import types
 import typing
 import pathlib
@@ -23,7 +24,7 @@ from pydocformatter.rules.models import RuleSettingEffect, RuleSettingEffects
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-FORBIDDEN_DOCS_DEPENDENCIES = {"mkdocs", "mkdocs-material", "mkdocs-redirects", "mkdocstrings", "mkdocstrings-python", "properdocs"}
+FORBIDDEN_DOCS_DEPENDENCIES = {"mdformat", "mkdocs", "mkdocs-material", "mkdocs-redirects", "mkdocstrings", "mkdocstrings-python", "properdocs"}
 
 
 def _render_markdown(text: str) -> str:
@@ -424,6 +425,27 @@ def test_settings_markdown_tables_are_compact_without_scope() -> None:
     assert "[Settings spec](reference/settings-spec.md)" not in markdown
 
 
+def test_settings_markdown_tables_have_consistent_cell_counts() -> None:
+    """Generated settings tables must not contain unescaped cell delimiters."""
+    markdown = generate_zensical._settings_markdown(generate_zensical.rule_pages())
+
+    for table in markdown.split('<div class="pydocformatter-settings-table-wrapper" markdown="1">')[1:]:
+        table_lines = [line for line in table.split("</div>", maxsplit=1)[0].splitlines() if line.startswith("|")]
+        header_cell_count = len(table_lines[0].split("|"))
+
+        assert all(len(line.split("|")) == header_cell_count for line in table_lines)
+
+
+def test_settings_markdown_enum_type_table_cells_render_readable_pipes() -> None:
+    """Generated enum type cells must render pipe separators without visible escapes."""
+    markdown = generate_zensical._settings_markdown(generate_zensical.rule_pages())
+    row = next(line for line in markdown.splitlines() if line.startswith("| `line-ending` "))
+    rendered = html.unescape(markdown_core.markdown("| Type |\n| --- |\n|" + row.split("|")[3] + "|\n", extensions=["tables"]))
+
+    assert "<code>auto | lf | cr-lf | native</code>" in rendered
+    assert "\\|" not in rendered
+
+
 def test_settings_markdown_omits_empty_related_rules_table_columns() -> None:
     """Generated settings tables must omit unused Related rules columns."""
     markdown = generate_zensical._settings_markdown(generate_zensical.rule_pages())
@@ -636,8 +658,8 @@ def test_generated_config_does_not_contain_mkdocs(generated_site: tuple[pathlib.
     assert "redirects" not in text
 
 
-def test_docs_dependency_group_is_mkdocs_free() -> None:
-    """The docs dependency group must reject MkDocs and known compatibility packages."""
+def test_docs_dependency_group_omits_unused_or_compatibility_packages() -> None:
+    """The docs dependency group must reject unused or compatibility packages."""
     pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     docs_dependencies = pyproject["dependency-groups"]["docs"]
     dependency_names = {_normalized_dependency_name(dependency) for dependency in docs_dependencies}

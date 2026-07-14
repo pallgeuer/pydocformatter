@@ -50,7 +50,6 @@ pydocfmt = "pydocformatter.cli.main:main"
 
 [dependency-groups]
 docs = [
-    "mdformat==1.0.0",
     "zensical==0.0.48",
 ]
 test = [
