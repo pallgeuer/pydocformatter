@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 # Standard library imports
+import types
+import typing
 import pathlib
 import tomllib
 
@@ -17,7 +19,7 @@ import pydocformatter.rules.collection as rule_collection
 import pydocformatter.rules.documentation as rule_documentation
 from pydocformatter import docs_urls
 from pydocformatter.cli import settings_check
-from pydocformatter.rules.models import RuleSettingEffect
+from pydocformatter.rules.models import RuleSettingEffect, RuleSettingEffects
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -51,11 +53,9 @@ def generated_site(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> t
     """Generate the documentation site source into a temporary directory."""
     generated_root = tmp_path / ".generated" / "zensical"
     generated_docs_dir = generated_root / "docs"
-    generated_redirects_dir = generated_root / "redirects"
     generated_config_path = tmp_path / "zensical.generated.toml"
     monkeypatch.setattr(generate_zensical, "GENERATED_ROOT", generated_root)
     monkeypatch.setattr(generate_zensical, "GENERATED_DOCS_DIR", generated_docs_dir)
-    monkeypatch.setattr(generate_zensical, "GENERATED_REDIRECTS_DIR", generated_redirects_dir)
     monkeypatch.setattr(generate_zensical, "GENERATED_CONFIG_PATH", generated_config_path)
 
     generate_zensical.generate()
@@ -121,8 +121,8 @@ def test_rule_index_groups_all_rules_by_category(generated_site: tuple[pathlib.P
                 assert f"[`{rule.code}`]" not in section
 
 
-def test_rule_index_labels_convention_gated_rules(generated_site: tuple[pathlib.Path, pathlib.Path]) -> None:
-    """The generated rule index must identify convention-gated rules."""
+def test_rule_index_labels_convention_rules(generated_site: tuple[pathlib.Path, pathlib.Path]) -> None:
+    """The generated rule index must identify convention-dependent rules."""
     generated_docs_dir, _ = generated_site
     markdown = (generated_docs_dir / "rules.md").read_text(encoding="utf-8")
 
@@ -136,11 +136,12 @@ def test_rule_index_labels_convention_gated_rules(generated_site: tuple[pathlib.
             if isinstance(value, settings_check.DocstringConvention)
         }
         if convention_effects and any(convention_effects.get(convention) not in {RuleSettingEffect.IGNORED, RuleSettingEffect.DISABLED} for convention in settings_check.DocstringConvention):
-            assert "| Convention-gated |" in markdown
-            assert generate_zensical._enabled_text(rule_class) == "Convention-gated"
+            assert "| Convention |" in markdown
+            assert "| Convention-gated |" not in markdown
+            assert generate_zensical._enabled_text(rule_class) == "Convention"
             break
     else:
-        raise AssertionError("Expected at least one convention-gated rule")
+        raise AssertionError("Expected at least one convention-dependent rule")
 
 
 def test_rule_index_labels_convention_explicit_rules(generated_site: tuple[pathlib.Path, pathlib.Path]) -> None:
@@ -174,8 +175,22 @@ def test_rule_index_explains_table_columns(generated_site: tuple[pathlib.Path, p
     assert '<a id="rule-table-columns"></a>' in explanation
     assert "The `Fix available` column" in explanation
     assert "The `Enabled` column" in explanation
-    for value in ("Always", "Usually", "Sometimes", "Never", "By default", "Requires explicit", "Convention", "Convention-explicit"):
+    for value in ("Always", "Usually", "Sometimes", "Never", "By default", "Requires explicit", "Convention", "Convention-explicit", "Setting-gated"):
         assert f"- `{value}`:" in explanation
+
+
+def test_enabled_text_values_are_documented(generated_site: tuple[pathlib.Path, pathlib.Path]) -> None:
+    """Every generated enabled-state label must be documented."""
+    generated_docs_dir, _ = generated_site
+    markdown = (generated_docs_dir / "rules.md").read_text(encoding="utf-8")
+    explanation = markdown.split("### PCF:", maxsplit=1)[0]
+    by_default_rule = next(rule_class for rule_class in rule_collection.RULE_COLLECTION.rules if generate_zensical._enabled_text(rule_class) == "By default")
+    fake_setting_gated_rule = types.SimpleNamespace(meta=types.SimpleNamespace(code=by_default_rule.meta.code, setting_effects=(RuleSettingEffects(setting="future_setting", effects=()),)))
+    labels = {generate_zensical._enabled_text(rule_class) for rule_class in rule_collection.RULE_COLLECTION.rules}
+    labels.add(generate_zensical._enabled_text(typing.cast("type[typing.Any]", fake_setting_gated_rule)))
+
+    for label in labels:
+        assert f"- `{label}`:" in explanation
 
 
 def test_category_pages_include_category_rules(generated_site: tuple[pathlib.Path, pathlib.Path]) -> None:
@@ -381,7 +396,7 @@ def test_rule_page_footer_tags_order_category_before_code(generated_site: tuple[
 
 def test_settings_markdown_contains_schema_settings() -> None:
     """Generated settings Markdown must include every schema definition."""
-    markdown = generate_zensical._settings_markdown()
+    markdown = generate_zensical._settings_markdown(generate_zensical.rule_pages())
 
     for definition in settings_check.SETTINGS_SCHEMA.definitions:
         setting_name = definition.key if definition.available_in_toml else definition.field
@@ -390,7 +405,7 @@ def test_settings_markdown_contains_schema_settings() -> None:
 
 def test_settings_markdown_explains_table_columns() -> None:
     """Generated settings Markdown must explain table columns and CLI help."""
-    markdown = generate_zensical._settings_markdown()
+    markdown = generate_zensical._settings_markdown(generate_zensical.rule_pages())
     introduction = markdown.split("\n## ", maxsplit=1)[0]
 
     for expected in ("`Setting` column", "TOML key", "`CLI` column", "`pydocfmt check` flag", "`pydocfmt check --help`", "`pydocfmt config`", "`pydocfmt config require-explicit`"):
@@ -399,7 +414,7 @@ def test_settings_markdown_explains_table_columns() -> None:
 
 def test_settings_markdown_tables_are_compact_without_scope() -> None:
     """Generated settings Markdown must use compact tables without scope text."""
-    markdown = generate_zensical._settings_markdown()
+    markdown = generate_zensical._settings_markdown(generate_zensical.rule_pages())
 
     assert '<div class="pydocformatter-settings-table-wrapper" markdown="1">' in markdown
     assert "| Setting | CLI | Type | Default | Related rules |" in markdown
@@ -411,7 +426,7 @@ def test_settings_markdown_tables_are_compact_without_scope() -> None:
 
 def test_settings_markdown_omits_empty_related_rules_table_columns() -> None:
     """Generated settings tables must omit unused Related rules columns."""
-    markdown = generate_zensical._settings_markdown()
+    markdown = generate_zensical._settings_markdown(generate_zensical.rule_pages())
     related_rules_by_field = generate_zensical._related_rules_by_field()
 
     for group in settings_check.SettingsGroup:
@@ -429,8 +444,9 @@ def test_settings_markdown_omits_empty_related_rules_table_columns() -> None:
 
 def test_settings_markdown_links_related_rules() -> None:
     """Generated settings Markdown must link related rules to generated rule pages."""
-    markdown = generate_zensical._settings_markdown()
-    page_by_code = {page.code: page for page in generate_zensical.rule_pages()}
+    pages = generate_zensical.rule_pages()
+    markdown = generate_zensical._settings_markdown(pages)
+    page_by_code = {page.code: page for page in pages}
 
     for rule_class in rule_collection.RULE_COLLECTION.rules:
         if rule_class.meta.setting_effects:
@@ -581,6 +597,8 @@ def test_generated_config_uses_zensical_paths(generated_site: tuple[pathlib.Path
 
     assert generated_config_path.name == "zensical.generated.toml"
     assert config["project"]["docs_dir"] == ".generated/zensical/docs"
+    assert "edit_uri" not in config["project"]
+    assert "content.action.view" not in config["project"]["theme"]["features"]
 
 
 def test_generated_config_uses_expected_nav_labels(generated_site: tuple[pathlib.Path, pathlib.Path]) -> None:
@@ -642,15 +660,3 @@ def test_api_reference_page_explains_deferred_api_reference(generated_site: tupl
 
     for expected in ("pydocfmt", "api reference", "deferred", "zensical", "native"):
         assert expected in text
-
-
-def test_optional_redirects_are_generated_without_plugins() -> None:
-    """Optional redirects must be static HTML and not plugin configuration."""
-    pages = generate_zensical.rule_pages()
-    redirects = generate_zensical._redirect_maps(pages)
-    first_page = pages[0]
-    html = generate_zensical._redirect_html("../docstring-reflow/")
-
-    assert redirects[f"rules/{first_page.code}.md"] == first_page.path.as_posix()
-    assert '<meta http-equiv="refresh"' in html
-    assert "redirects" not in html

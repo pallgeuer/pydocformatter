@@ -5,13 +5,11 @@ Attributes:
     DOCS_SITE_DIR (pathlib.Path): Hand-authored web documentation source copied into generated Zensical input.
     GENERATED_ROOT (pathlib.Path): Root directory for generated documentation artifacts.
     GENERATED_DOCS_DIR (pathlib.Path): Generated Zensical `docs_dir` populated by this script.
-    GENERATED_REDIRECTS_DIR (pathlib.Path): Generated static redirect metadata and pages, when redirects are enabled.
     TEMPLATE_PATH (pathlib.Path): Hand-authored Zensical template loaded before generated nav is injected.
     GENERATED_CONFIG_PATH (pathlib.Path): Generated Zensical configuration path consumed by local and CI builds.
     GENERATED_NAV_MARKER (str): Template marker replaced with deterministic generated navigation TOML.
     SOURCE_BLOB_URL (str): GitHub source browser base URL used for generated source links.
     SITE_URL (str): Canonical GitHub Pages URL expected in the generated Zensical configuration.
-    GENERATE_REDIRECTS (bool): Whether static compatibility redirect pages are generated.
     PUBLIC_DOCS_DIR (pathlib.Path): Repository docs directory copied into the generated public reference section.
     DEVEL_DOCS_DIR (pathlib.Path): Repository docs directory intentionally omitted from the public site.
     REFERENCE_DOCS (dict[pathlib.Path, pathlib.Path]): Public repository docs mapped to generated reference paths.
@@ -68,13 +66,11 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 DOCS_SITE_DIR = ROOT / "docs_site"
 GENERATED_ROOT = ROOT / ".generated" / "zensical"
 GENERATED_DOCS_DIR = GENERATED_ROOT / "docs"
-GENERATED_REDIRECTS_DIR = GENERATED_ROOT / "redirects"
 TEMPLATE_PATH = ROOT / "zensical.template.toml"
 GENERATED_CONFIG_PATH = ROOT / "zensical.generated.toml"
 GENERATED_NAV_MARKER = "# __GENERATED_NAV__"
 SOURCE_BLOB_URL = "https://github.com/pallgeuer/pydocformatter/blob/main"
 SITE_URL = docs_urls.PUBLIC_DOCS_URL
-GENERATE_REDIRECTS = False
 
 PUBLIC_DOCS_DIR = ROOT / "docs" / "public"
 DEVEL_DOCS_DIR = ROOT / "docs" / "devel"
@@ -139,10 +135,8 @@ def generate() -> None:
     _copy_project_docs()
     _copy_reference_docs()
     _write_rules(pages)
-    _write_settings()
+    _write_settings(pages)
     _write_api_reference_if_missing()
-    if GENERATE_REDIRECTS:
-        _write_redirect_pages(pages)
     _write_generated_config(pages)
 
 
@@ -172,7 +166,6 @@ def _reset_generated_docs() -> None:
     if GENERATED_ROOT.exists():
         shutil.rmtree(GENERATED_ROOT)
     GENERATED_DOCS_DIR.mkdir(parents=True)
-    GENERATED_REDIRECTS_DIR.mkdir(parents=True)
 
 
 def _copy_authored_docs() -> None:
@@ -407,6 +400,7 @@ def _write_rules_index(rule_pages: tuple[RulePage, ...]) -> None:
         "- `Requires explicit`: Not selected by broad selectors unless the exact rule code is also selected, because it is included in the default `require-explicit` setting.",
         "- `Convention`: Default selection depends on the active `docstring-convention` setting, with at least one convention selecting the rule by default.",
         "- `Convention-explicit`: Removed by every `docstring-convention` value. Ignored conventions can be restored by exact rule-code selection, while disabled conventions cannot.",
+        "- `Setting-gated`: Default selection depends on a setting other than `docstring-convention`.",
         "",
     ))
     page_by_code = {page.code: page for page in rule_pages}
@@ -511,9 +505,9 @@ def _rule_nav_link(page: RulePage, *, relation: str) -> str:
     return f'<a class="pydocformatter-rule-nav__link pydocformatter-rule-nav__link--{relation}" href="{page.slug}.md" aria-label="{direction_text}: {escaped_label}"><span class="pydocformatter-rule-nav__direction">{direction_text}</span><span class="pydocformatter-rule-nav__target"><code>{escaped_code}</code> {escaped_name}</span></a>'
 
 
-def _write_settings() -> None:
+def _write_settings(rule_pages: tuple[RulePage, ...]) -> None:
     """Write the generated settings reference page."""
-    _write_generated_markdown(pathlib.Path("settings.md"), _settings_markdown())
+    _write_generated_markdown(pathlib.Path("settings.md"), _settings_markdown(rule_pages))
 
 
 def _write_api_reference_if_missing() -> None:
@@ -534,11 +528,11 @@ def _write_api_reference_if_missing() -> None:
     _write_generated_markdown(pathlib.Path("api-reference.md"), "\n".join(lines))
 
 
-def _settings_markdown() -> str:
+def _settings_markdown(rule_pages: tuple[RulePage, ...]) -> str:
     """Return the generated settings reference page Markdown."""
     defaults = settings_check.CheckSettings()
     related_rules_by_field = _related_rules_by_field()
-    page_by_code = {page.code: page for page in rule_pages()}
+    page_by_code = {page.code: page for page in rule_pages}
     lines = [
         "# Settings",
         "",
@@ -798,47 +792,6 @@ def _toml_string(value: str) -> str:
     return json.dumps(value)
 
 
-def _redirect_maps(rule_pages: tuple[RulePage, ...]) -> dict[str, str]:
-    """Return optional static redirect maps."""
-    redirects = {"rules/PCF.md": "rules/pcf.md", "rules/PDF.md": "rules/pdf.md"}
-    for page in rule_pages:
-        redirects[f"rules/{page.code}.md"] = page.path.as_posix()
-        redirects[f"rules/{page.code.lower()}.md"] = page.path.as_posix()
-        redirects[f"rules/{page.code}_{page.slug.replace('-', '_')}.md"] = page.path.as_posix()
-    return dict(sorted(redirects.items()))
-
-
-def _write_redirect_pages(rule_pages: tuple[RulePage, ...]) -> None:
-    """Write optional plugin-free static redirect pages."""
-    for source, target in _redirect_maps(rule_pages).items():
-        redirect_path = GENERATED_DOCS_DIR / source
-        redirect_path.parent.mkdir(parents=True, exist_ok=True)
-        relative_target = posixpath.relpath(target, start=pathlib.Path(source).parent.as_posix())
-        html = _redirect_html(relative_target)
-        redirect_path.write_text(html, encoding="utf-8")
-        metadata_path = GENERATED_REDIRECTS_DIR / f"{pathlib.Path(source).with_suffix('').as_posix().replace('/', '__')}.txt"
-        metadata_path.write_text(f"{source} -> {target}\n", encoding="utf-8")
-
-
-def _redirect_html(target: str) -> str:
-    """Return a static redirect HTML document for a relative target URL."""
-    escaped_target = target.replace("&", "&amp;").replace('"', "&quot;").replace("<", "&lt;").replace(">", "&gt;")
-    return (
-        "<!doctype html>\n"
-        '<html lang="en">\n'
-        "  <head>\n"
-        '    <meta charset="utf-8">\n'
-        f'    <meta http-equiv="refresh" content="0; url={escaped_target}">\n'
-        f'    <link rel="canonical" href="{escaped_target}">\n'
-        "    <title>Redirecting...</title>\n"
-        "  </head>\n"
-        "  <body>\n"
-        f'    <p><a href="{escaped_target}">Redirecting...</a></p>\n'
-        "  </body>\n"
-        "</html>\n"
-    )
-
-
 def _enabled_text(rule_class: type[RuleBase]) -> str:
     """Return compact rule activation text."""
     rule = rule_class.meta
@@ -848,7 +801,7 @@ def _enabled_text(rule_class: type[RuleBase]) -> str:
     if any(selector.selects_code(rule.code) for selector in explicit_selectors):
         return "Requires explicit"
     if any(setting_effects.setting == "docstring_convention" for setting_effects in rule.setting_effects):
-        return "Convention-gated"
+        return "Convention"
     if rule.setting_effects:
         return "Setting-gated"
     return "By default"

@@ -13,7 +13,7 @@ from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase
 from pydocformatter.rules.definition_helpers import docstring_conventions, section_edits
-from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
+from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata
 
 
 if TYPE_CHECKING:
@@ -37,7 +37,7 @@ class PDF410ExceptionEntryNormalization(RuleBase):
         message="Docstring exception entry should use canonical spelling",
         fix_availability=FixAvailability.SOMETIMES,
         stable_since="1.0.0",
-        setting_effects=(RuleSettingEffects(setting="docstring_convention", effects=(RuleSettingEffectValues(effect=RuleSettingEffect.DISABLED, values=docstring_conventions.UNPARSED_CONVENTIONS),)),),
+        setting_effects=docstring_conventions.convention_setting_effects(disabled=docstring_conventions.UNPARSED_CONVENTIONS),
         incompatible_with=(),
         check_kind=RuleCheckKind.STANDARD,
     )

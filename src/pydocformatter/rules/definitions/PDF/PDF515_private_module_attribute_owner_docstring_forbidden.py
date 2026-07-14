@@ -9,12 +9,11 @@ from typing import TYPE_CHECKING
 # First-party imports
 import pydocformatter.rules.registration as rule_registration
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
-from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase
-from pydocformatter.rules.definition_helpers import attribute_documentation
+from pydocformatter.rules.definition_helpers import attribute_documentation, docstring_conventions
 from pydocformatter.rules.definitions.PDF.PDF import PDF
-from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
+from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata
 
 
 if TYPE_CHECKING:
@@ -37,9 +36,7 @@ class PDF515PrivateModuleAttributeOwnerDocstringForbidden(RuleBase):
         message="Module docstring documents a private attribute",
         fix_availability=FixAvailability.NEVER,
         stable_since="1.0.0",
-        setting_effects=(
-            RuleSettingEffects(setting="docstring_convention", effects=(RuleSettingEffectValues(effect=RuleSettingEffect.DISABLED, values=(DocstringConvention.NONE, DocstringConvention.PEP257)),)),
-        ),
+        setting_effects=docstring_conventions.convention_setting_effects(disabled=docstring_conventions.UNPARSED_CONVENTIONS),
         incompatible_with=(RuleCode("PDF524"),),
         check_kind=RuleCheckKind.STANDARD,
     )

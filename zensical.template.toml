@@ -4,7 +4,6 @@ site_description = "A Python linter and code formatter targeted at docstrings an
 site_url = "https://pallgeuer.github.io/pydocformatter/"
 repo_url = "https://github.com/pallgeuer/pydocformatter"
 repo_name = "pallgeuer/pydocformatter"
-edit_uri = "edit/main/.generated/zensical/docs/"
 docs_dir = ".generated/zensical/docs"
 site_dir = "site"
 strict = true
@@ -23,7 +22,6 @@ features = [
   "navigation.path",
   "navigation.top",
   "toc.follow",
-  "content.action.view",
 ]
 
 [[project.theme.palette]]

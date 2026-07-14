@@ -198,6 +198,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 - Renamed `PDF508` and `PDF510` user-facing rule names and diagnostics to refer to missing public class and module attribute documentation.
 - Changed the default `docstring-convention` from `none` to `pep257`, keeping `none` as the stricter no-convention profile for generic rules that can act without Google, NumPy, or reST parsing.
 - Changed convention-dependent rules that have no possible target under a convention to use disabled selection effects, so exact rule-code selection no longer restores rules under `none` or `pep257` when parsed convention entries are unavailable.
+- Consolidated convention-disabled rule metadata through the shared docstring convention helper.
 - Standardized docstring convention display order as None, PEP257, Google, NumPy, and reST, while keeping lowercase configuration values unchanged.
 
 #### Comment formatting
@@ -285,6 +286,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 - Added missing docstring summaries and documentation sections so repository `pydocfmt check` passes.
 - Added a rule documentation check that verifies docstring-convention ignored and disabled notices match rule metadata.
 - Fixed nondeterministic pytest parametrization order that could make xdist workers report different collected tests.
+- Added Markdown rendering dependencies to the test dependency group so documentation-generation tests can run without the docs dependency group.
 
 #### Documentation
 
@@ -292,6 +294,8 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 - Fixed generated docs to convert structured `pydocfmt-example` blocks in every copied Markdown source, including public reference docs such as the rule suppressions guide.
 - Fixed generated docs to keep adjacent structured examples in separate tab groups.
 - Fixed generated project documentation to preserve label-prefixed Markdown lists as bullet lists in the final Zensical site.
+- Fixed generated rule-table enabled labels to use the documented `Convention` value, documented the future `Setting-gated` value, and removed disabled redirect-generation code.
+- Fixed generated documentation site configuration to avoid view-source links pointing at ignored generated Markdown files.
 
 #### Docstring formatting
 
