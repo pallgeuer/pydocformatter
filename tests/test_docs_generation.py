@@ -208,6 +208,44 @@ def test_category_pages_include_category_rules(generated_site: tuple[pathlib.Pat
                 assert f"[`{rule_class.meta.code}`]" in markdown
 
 
+def test_category_pages_include_first_and_last_rule_navigation(generated_site: tuple[pathlib.Path, pathlib.Path]) -> None:
+    """Generated category pages must link their first and last rules at the top and bottom."""
+    generated_docs_dir, _ = generated_site
+    page_by_code = {page.code: page for page in generate_zensical.rule_pages()}
+
+    for category_class in rule_collection.RULE_COLLECTION.categories:
+        category = category_class.meta
+        category_rules = tuple(rule_class.meta for rule_class in rule_collection.RULE_COLLECTION.rules if rule_class.meta.code.prefix == category.prefix)
+        first_page = page_by_code[category_rules[0].code.tag]
+        last_page = page_by_code[category_rules[-1].code.tag]
+        markdown = (generated_docs_dir / "rules" / f"{category.prefix.lower()}.md").read_text(encoding="utf-8")
+
+        assert markdown.count('<nav class="pydocformatter-rule-nav pydocformatter-rule-nav--top" aria-label="Category rule navigation">') == 1
+        assert markdown.count('<nav class="pydocformatter-rule-nav pydocformatter-rule-nav--bottom" aria-label="Category rule navigation">') == 1
+        assert markdown.count(f'href="{first_page.slug}.md"') == 2
+        assert markdown.count(f"<code>{first_page.code}</code> {first_page.name}") == 2
+        assert markdown.count(f'href="{last_page.slug}.md"') == 2
+        assert markdown.count(f"<code>{last_page.code}</code> {last_page.name}") == 2
+        assert markdown.count("First rule") == 4
+        assert markdown.count("Last rule") == 4
+        assert "&larr; First rule" not in markdown
+        assert "Last rule &rarr;" not in markdown
+
+
+def test_category_pages_include_directional_quick_links(generated_site: tuple[pathlib.Path, pathlib.Path]) -> None:
+    """Generated category pages must link down to their table and back to all rules."""
+    generated_docs_dir, _ = generated_site
+
+    for category_class in rule_collection.RULE_COLLECTION.categories:
+        category = category_class.meta
+        markdown = (generated_docs_dir / "rules" / f"{category.prefix.lower()}.md").read_text(encoding="utf-8")
+
+        jump_link = "[Jump to rule table &darr;](#rules-in-this-category)"
+        assert markdown.count(jump_link) == 1
+        assert markdown.index(jump_link) < markdown.index("## What it does")
+        assert markdown.count("[&larr; Back to all rules](../rules.md)") == 1
+
+
 def test_rule_pages_include_source_links(generated_site: tuple[pathlib.Path, pathlib.Path]) -> None:
     """Generated rule pages must link implementation and Markdown sources."""
     generated_docs_dir, _ = generated_site

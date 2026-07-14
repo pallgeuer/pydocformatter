@@ -115,6 +115,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 
 - Added a Zensical-based documentation site pipeline with authored user guides, generated rule and settings references, copied public project/reference documents, strict local builds, and GitHub Pages workflow support.
 - Added generated Previous rule and Next rule navigation links at the top of each rule detail page.
+- Added first/last rule navigation and quick rule-table links to generated rule-category pages.
 - Grouped the generated rules reference by rule category, with prefix-first category links, compact navigation labels, explanatory rule-table labels, category-page explanation links, and per-category all-rules tables.
 - Refined the generated settings reference with clearer CLI and TOML guidance, compact summary tables, concise long-default prose, and related rules discovered from rule metadata and documented rule options.
 - Added a test-performance audit plan for finding coverage-preserving speedups across the complete test set, fixtures, helpers, and testing approaches.

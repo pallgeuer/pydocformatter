@@ -205,7 +205,8 @@ html .md-footer-meta.md-typeset a:hover {
   text-decoration: none;
 }
 
-.pydocformatter-rule-nav__link--next {
+.pydocformatter-rule-nav__link--next,
+.pydocformatter-rule-nav__link--last {
   grid-column: 2;
   text-align: right;
 }
@@ -243,7 +244,8 @@ html .md-footer-meta.md-typeset a:hover {
     grid-template-columns: 1fr;
   }
 
-  .pydocformatter-rule-nav__link--next {
+  .pydocformatter-rule-nav__link--next,
+  .pydocformatter-rule-nav__link--last {
     grid-column: 1;
     text-align: left;
   }

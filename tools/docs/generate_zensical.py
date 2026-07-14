@@ -420,11 +420,25 @@ def _write_category_page(category_class: type[RuleCategoryBase], rule_pages: tup
     if body.startswith("# "):
         body = "\n".join(body.splitlines()[1:]).lstrip()
     body = _link_options_settings(body, settings_path="../settings.md", context=f"{category.prefix} category")
-    lines = [f"# {category.name} ({category.prefix})", "", body, "", "## Rules in this category", "", "See [rule table column explanations](../rules.md#rule-table-columns).", ""]
     page_by_code = {page.code: page for page in rule_pages}
     category_rules = tuple(rule_class for rule_class in rule_collection.RULE_COLLECTION.rules if rule_class.meta.code.prefix == category.prefix)
+    first_page = page_by_code[category_rules[0].meta.code.tag]
+    last_page = page_by_code[category_rules[-1].meta.code.tag]
+    lines = [
+        f"# {category.name} ({category.prefix})",
+        "",
+        *_category_rule_nav_lines(first_page=first_page, last_page=last_page),
+        "[Jump to rule table &darr;](#rules-in-this-category)",
+        "",
+        body,
+        "",
+        "## Rules in this category",
+        "",
+        "See [rule table column explanations](../rules.md#rule-table-columns).",
+        "",
+    ]
     _extend_rule_table(lines, category_rules, page_by_code, rule_link_prefix="")
-    lines.extend(("", "[Back to all rules](../rules.md)", ""))
+    lines.extend(("", "[&larr; Back to all rules](../rules.md)", "", *_category_rule_nav_lines(first_page=first_page, last_page=last_page, position="bottom")))
     _write_generated_markdown(pathlib.Path("rules") / f"{category.prefix.lower()}.md", "\n".join(lines))
 
 
@@ -491,8 +505,16 @@ def _rule_nav_lines(*, previous_page: RulePage | None, next_page: RulePage | Non
     return tuple(lines)
 
 
+def _category_rule_nav_lines(*, first_page: RulePage, last_page: RulePage, position: str = "top") -> tuple[str, ...]:
+    """Return a first and last rule navigation block for a category."""
+    lines = [f'<nav class="pydocformatter-rule-nav pydocformatter-rule-nav--{position}" aria-label="Category rule navigation">']
+    lines.extend((_rule_nav_link(first_page, relation="first"), _rule_nav_link(last_page, relation="last")))
+    lines.extend(("</nav>", ""))
+    return tuple(lines)
+
+
 def _rule_nav_link(page: RulePage, *, relation: str) -> str:
-    """Return one previous or next rule navigation link."""
+    """Return one rule navigation link."""
     escaped_code = html.escape(page.code)
     escaped_name = html.escape(page.name)
     escaped_label = f"{escaped_code}: {escaped_name}"
@@ -500,6 +522,10 @@ def _rule_nav_link(page: RulePage, *, relation: str) -> str:
         direction_text = "&larr; Previous rule"
     elif relation == "next":
         direction_text = "Next rule &rarr;"
+    elif relation == "first":
+        direction_text = "First rule"
+    elif relation == "last":
+        direction_text = "Last rule"
     else:
         raise ValueError(f"Unsupported rule navigation relation: {relation!r}")
     return f'<a class="pydocformatter-rule-nav__link pydocformatter-rule-nav__link--{relation}" href="{page.slug}.md" aria-label="{direction_text}: {escaped_label}"><span class="pydocformatter-rule-nav__direction">{direction_text}</span><span class="pydocformatter-rule-nav__target"><code>{escaped_code}</code> {escaped_name}</span></a>'
