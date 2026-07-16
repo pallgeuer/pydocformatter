@@ -612,14 +612,24 @@ def test_contributing_release_process_is_removed_from_public_copy(generated_site
     assert "release checklist" not in contributing_text
 
 
-def test_links_between_moved_docs_are_rewritten(generated_site: tuple[pathlib.Path, pathlib.Path]) -> None:
+@pytest.mark.parametrize(("target", "expected"), [("CONTRIBUTING.md", "contributing.md"), ("CHANGELOG.md", "changelog.md"), ("LICENSE.md", "license.md")])
+def test_links_between_moved_docs_are_rewritten(target: str, expected: str) -> None:
     """Relative links between copied public docs must be rewritten to generated paths."""
+    rewritten = generate_zensical._rewrite_link_target(target, source=pathlib.Path("README.md"), generated=pathlib.Path("project/readme.md"))
+
+    assert rewritten == expected
+
+
+def test_generated_readme_uses_absolute_project_document_links(generated_site: tuple[pathlib.Path, pathlib.Path]) -> None:
+    """Generated README project links must remain valid without a relative base URL."""
     generated_docs_dir, _ = generated_site
     readme_text = (generated_docs_dir / "project" / "readme.md").read_text(encoding="utf-8")
 
-    assert "[Contributing](contributing.md)" in readme_text
-    assert "[GNU General Public License v3.0 or later](license.md)" in readme_text
+    assert "[Contributing](https://pallgeuer.github.io/pydocformatter/project/contributing/)" in readme_text
+    assert "[Changelog](https://pallgeuer.github.io/pydocformatter/project/changelog/)" in readme_text
+    assert "[GNU General Public License v3.0 or later](https://pallgeuer.github.io/pydocformatter/project/license/)" in readme_text
     assert "](CONTRIBUTING.md)" not in readme_text
+    assert "](CHANGELOG.md)" not in readme_text
     assert "](LICENSE.md)" not in readme_text
 
 

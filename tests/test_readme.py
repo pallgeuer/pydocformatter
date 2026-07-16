@@ -4,7 +4,9 @@
 from __future__ import annotations
 
 # Standard library imports
+import re
 import pathlib
+import urllib.parse
 
 # First-party imports
 import pydocformatter.rules.documentation as rule_documentation
@@ -33,3 +35,18 @@ def test_readme_configuration_links_to_detailed_documentation() -> None:
     assert "https://pallgeuer.github.io/pydocformatter/settings/" in readme
     assert "https://pallgeuer.github.io/pydocformatter/reference/file-selection/" in readme
     assert "https://pallgeuer.github.io/pydocformatter/reference/rule-selection/" in readme
+
+
+def test_readme_links_are_package_index_portable() -> None:
+    """README links must resolve without a repository-relative base URL."""
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    targets = [match.group("target") for match in re.finditer(r"\]\((?P<target>[^)]+)\)", readme)]
+    invalid_targets = []
+
+    for target in targets:
+        parsed = urllib.parse.urlsplit(target)
+        if target.startswith("#") or (parsed.scheme in {"http", "https"} and parsed.netloc):
+            continue
+        invalid_targets.append(target)
+
+    assert not invalid_targets

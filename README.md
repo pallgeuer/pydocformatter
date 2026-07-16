@@ -183,11 +183,11 @@ pydocformatter is intended to own docstring and comment formatting where its rul
 
 ## Contributing
 
-See [Contributing](CONTRIBUTING.md) for the development environment, rule implementation workflow, documentation pipeline, and pull request checks. Project history and current unreleased changes are recorded in the [Changelog](CHANGELOG.md).
+See [Contributing](https://pallgeuer.github.io/pydocformatter/project/contributing/) for the development environment, rule implementation workflow, documentation pipeline, and pull request checks. Project history and current unreleased changes are recorded in the [Changelog](https://pallgeuer.github.io/pydocformatter/project/changelog/).
 
 ## License
 
-pydocformatter is licensed under the [GNU General Public License v3.0 or later](LICENSE.md).
+pydocformatter is licensed under the [GNU General Public License v3.0 or later](https://pallgeuer.github.io/pydocformatter/project/license/).
 
 ## Acknowledgments
 

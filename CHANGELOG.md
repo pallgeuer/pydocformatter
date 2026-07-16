@@ -14,7 +14,10 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## Unreleased
 
-None.
+### Fixed
+
+- **Documentation:**
+  - Changed the README links for Contributing, Changelog, and License to absolute documentation-site targets so they resolve correctly in package descriptions rendered by PyPI.
 
 ---
 
