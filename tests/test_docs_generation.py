@@ -305,6 +305,25 @@ def test_all_generated_pydocfmt_examples_are_transformed(generated_site: tuple[p
     assert offenders == []
 
 
+def test_readme_examples_generate_valid_tab_sets(generated_site: tuple[pathlib.Path, pathlib.Path]) -> None:
+    """README examples must render the tabs declared by each example."""
+    generated_docs_dir, _ = generated_site
+    source = (ROOT / "README.md").read_text(encoding="utf-8")
+    examples = rule_documentation.parse_rule_markdown_examples(source, rule_code="README")
+    markdown = (generated_docs_dir / "project" / "readme.md").read_text(encoding="utf-8")
+
+    assert examples
+    assert "```pydocfmt-example" not in markdown
+    for example in examples:
+        tabs = generate_zensical._example_tabs(example)
+        assert tabs in markdown
+        assert tabs.count('=== "Settings"') == bool(example.settings_text)
+        assert tabs.count('===+ "Before') == 1
+        assert tabs.count('=== "After"') == (example.input_source != example.output_source)
+        assert tabs.count('=== "Findings"') == bool(example.findings)
+        assert _render_markdown(tabs).count('class="tabbed-set') == 1
+
+
 def test_reference_pydocfmt_examples_are_transformed(generated_site: tuple[pathlib.Path, pathlib.Path]) -> None:
     """Structured examples in copied reference docs must become content tabs."""
     generated_docs_dir, _ = generated_site
@@ -598,8 +617,10 @@ def test_links_between_moved_docs_are_rewritten(generated_site: tuple[pathlib.Pa
     generated_docs_dir, _ = generated_site
     readme_text = (generated_docs_dir / "project" / "readme.md").read_text(encoding="utf-8")
 
-    assert "](../reference/settings-spec.md)" in readme_text
-    assert "](docs/public/settings_spec.md)" not in readme_text
+    assert "[Contributing](contributing.md)" in readme_text
+    assert "[GNU General Public License v3.0 or later](license.md)" in readme_text
+    assert "](CONTRIBUTING.md)" not in readme_text
+    assert "](LICENSE.md)" not in readme_text
 
 
 def test_links_from_rule_docs_to_moved_docs_are_rewritten(generated_site: tuple[pathlib.Path, pathlib.Path]) -> None:
@@ -617,12 +638,9 @@ def test_copied_markdown_lists_render_as_lists(generated_site: tuple[pathlib.Pat
     readme_text = (generated_docs_dir / "project" / "readme.md").read_text(encoding="utf-8")
     html = _render_markdown(readme_text)
 
-    assert "**Options:**\n\n- `--help`" in readme_text
-    assert "**Available hooks:**\n\n- `pydocfmt-fix`" in readme_text
-    assert "<p><strong>Options:</strong>\n-" not in html
-    assert "<p><strong>Available hooks:</strong>\n-" not in html
-    assert "<li><code>--help</code>: Show help message and exit</li>" in html
-    assert "<li><code>pydocfmt-fix</code>: Format and check docstrings and comments (modifies files)</li>" in html
+    assert "## What it does\n\n- Reflows docstring and comment prose" in readme_text
+    assert "<p>- Reflows docstring and comment prose" not in html
+    assert "<li>Reflows docstring and comment prose" in html
 
 
 def test_markdown_list_separation_skips_fenced_code() -> None:

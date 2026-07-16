@@ -1,175 +1,52 @@
-## Description
+## Summary
 
-Brief description of the changes and the motivation behind them.
+<!-- Explain the problem, the chosen solution, and the intended scope. -->
 
-Fixes #(issue)
+Closes #
 
-## Type of change
+<!-- Remove the line above when no issue applies. Link related or dependent work here as needed. -->
 
-Please delete options that are not relevant.
+## User-visible behavior
 
-- [ ] Bug fix (non-breaking change which fixes an issue)
-- [ ] New feature (non-breaking change which adds functionality)
-- [ ] Breaking change (fix or feature that would cause existing functionality to not work as expected)
-- [ ] Documentation update
-- [ ] Performance improvement
-- [ ] Code refactoring (no functional changes)
-- [ ] Test coverage improvement
-- [ ] Dependency update
+<!-- Describe the relevant before-and-after behavior. Include concise examples for formatting, diagnostics, or CLI output. State "No user-visible change" for internal work. -->
 
-## Changes made
+## Implementation notes
 
-Please provide a clear list of changes made:
+<!-- Explain non-obvious design decisions, architecture boundaries, or follow-up work. Remove this section when the summary is sufficient. -->
 
-- 
+## Compatibility and risks
 
-## Testing
+<!-- Address changes to formatting, diagnostics, CLI behavior, configuration, rule selection, fixability, source preservation, or supported platforms. Explain migrations for breaking changes. Mention material performance or security considerations; otherwise state that none are known. -->
 
-### Test coverage
+## Verification
 
-- [ ] New tests added for new functionality
-- [ ] All existing tests pass
-- [ ] Test coverage maintained or improved
+<!-- Replace placeholders with the exact test paths or other commands used. For successful checks, "passed" is sufficient; do not paste full output. Include output only when it explains a failure, warning, skipped check, or other notable result. Use "Not applicable" with a brief reason where appropriate. -->
 
-### Manual testing
+- Focused tests: `uv run pytest -n 0 <test paths or node IDs>` — Passed/Failed.
+- Full checks: `uv run pre-commit run --all-files` — Passed/Failed.
+- Documentation build: `uv run python tools/docs/generate_zensical.py`, then `uv run zensical build --strict -f zensical.generated.toml` — Passed/Failed.
+- Manual or platform-specific checks: Passed/Not applicable.
 
-- [ ] Tested locally with various Python files
-- [ ] Tested edge cases and error conditions
-- [ ] Verified CLI functionality works as expected
+## Documentation and changelog
 
-### Test commands run
+<!-- List updated user documentation, specifications, rule documentation, docstrings, and CHANGELOG entries. Explain why no update is needed when behavior changes without documentation changes. -->
 
-```bash
-# Add the commands you used to test your changes. Pytest uses project-default xdist multiprocessing.
-# uv run ruff check
-# uv run pydocfmt check
-# uv run ruff format --check
-# uv run ty check
-# uv run pytest -q
-# uv run pytest -n 0 -q  # <-- For serial debugging or focused-run speed
-# uv run pre-commit run --all-files
-```
+## Rule change checklist
 
-## Formatting and style
+<!-- Remove this section when the pull request does not add or change built-in rule behavior. -->
 
-- [ ] Code follows the project's style guidelines
-- [ ] `ruff` lint checks pass
-- [ ] `pydocfmt` docstring and comment checks pass
-- [ ] `ruff` formatting applied
-- [ ] `ty` type checks pass
-- [ ] Pre-commit hooks pass
+- [ ] I followed the [rule implementation specification](https://github.com/pallgeuer/pydocformatter/blob/main/docs/devel/rule_implementation_spec.md).
+- [ ] Rule identity, metadata, registration, fix availability, setting effects, and incompatibilities are consistent.
+- [ ] Adjacent rule or category documentation follows its template and contains executable examples with exact findings.
+- [ ] `docs/devel/rule_settings_audit.md` covers all direct and helper-driven setting reads.
+- [ ] Focused rule tests cover diagnostics, fixes or non-fixable behavior, no-op and edge cases, settings, idempotence, suppressions, and line endings where relevant.
+- [ ] Category, selection, settings, formatter, and CLI tests are updated where the change crosses those boundaries.
 
-## Documentation
+## Final checklist
 
-- [ ] Docstrings added/updated for new functions and classes
-- [ ] [README.md](../README.md) updated if needed
-- [ ] [CHANGELOG.md](../CHANGELOG.md) updated for significant changes
-- [ ] Comments added for complex logic
-- [ ] Type hints added for new functions
-
-## Performance and compatibility
-
-- [ ] Changes don't negatively impact performance
-- [ ] Compatible with Python 3.11+
-- [ ] Cross-platform compatibility maintained (Windows, macOS, Linux)
-- [ ] Memory usage is reasonable for large files
-- [ ] All tests pass
-
-## Security considerations
-
-- [ ] Input validation added where appropriate
-- [ ] File path handling is secure
-- [ ] No sensitive information exposed in logs or output
-
-## Screenshots (if applicable)
-
-For CLI changes or output formatting changes, please add before/after examples:
-
-**Before:**
-```
-# Example of current behavior
-```
-
-**After:**
-```
-# Example of new behavior
-```
-
-## Related issues and PRs
-
-- Related Issue: #
-- Depends on: #
-- Blocks: #
-
-## Breaking changes
-
-If this is a breaking change, please describe:
-
-1. What functionality is being changed or removed
-2. Why the change is necessary
-3. How users should update their code
-4. Migration guide (if complex)
-
-## Additional notes
-
-Any additional information, considerations, or context that reviewers should know:
-
-- 
-
-## Reviewer checklist
-
-*For the reviewer - please check these items during review:*
-
-### Code quality
-
-- [ ] Code is readable and well-structured
-- [ ] Appropriate error handling is in place
-- [ ] No code duplication
-- [ ] Functions are focused and have single responsibilities
-- [ ] Variable and function names are descriptive
-
-### Testing
-
-- [ ] Tests cover the new functionality
-- [ ] Tests include edge cases
-- [ ] All tests pass locally and in CI
-- [ ] Test names are descriptive
-
-### Documentation
-
-- [ ] Code is self-documenting or well-commented
-- [ ] Public APIs are documented
-- [ ] Examples are provided where helpful
-
-### Performance
-
-- [ ] No obvious performance regressions
-- [ ] Efficient algorithms used
-- [ ] Memory usage is reasonable
-
-### Security
-
-- [ ] Input validation is appropriate
-- [ ] File operations are safe
-
-## Post-merge checklist
-
-*To be completed after merging:*
-
-- [ ] Delete feature branch
-- [ ] Update local main branch
-- [ ] Monitor for any issues in production use
-- [ ] Update project board/issues if applicable
-
----
-
-**Note to Contributors:**
-- Please ensure all checkboxes are completed before requesting review
-- Feel free to delete sections that don't apply to your PR
-- If you need help with any of these requirements, please ask in the PR comments
-
-**Note to Reviewers:**
-- Please provide constructive feedback
-- Check that the PR follows our [Contributing guidelines](../CONTRIBUTING.md)
-- Consider the impact on existing users
-- Test the changes locally if possible
+- [ ] The diff is focused and contains no unintended or generated files.
+- [ ] Any new or changed behavior has appropriate automated tests.
+- [ ] Any affected documentation and docstrings are updated.
+- [ ] Any significant user-facing or developer-facing work is recorded under `CHANGELOG.md`'s Unreleased section.
+- [ ] Any dependency changes include `pyproject.toml` and the corresponding `uv.lock` update.
+- [ ] The reported verification passes on the final diff.

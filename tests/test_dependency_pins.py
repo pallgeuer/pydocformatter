@@ -105,20 +105,20 @@ def test_dependency_groups_use_exact_pins() -> None:
 
 def test_dependency_pin_errors_accepts_pinned_test_and_dev_groups() -> None:
     """Check that pinned test and dev dependencies pass."""
-    pyproject: dict[str, Any] = {"dependency-groups": {"test": ["pytest==9.1.1"], "dev": [{"include-group": "test"}, "ruff==0.15.20"]}}
+    pyproject: dict[str, Any] = {"dependency-groups": {"test": ["pytest==9.1.1"], "dev": [{"include-group": "test"}, "ruff==0.15.21"]}}
 
     assert dependency_pin_errors(pyproject) == []
 
 
 def test_dependency_pin_errors_rejects_flexible_dependency_pins() -> None:
     """Check that flexible dependency specifiers fail."""
-    pyproject: dict[str, Any] = {"dependency-groups": {"test": ["pytest>=9.1.1"], "dev": [{"include-group": "test"}, "ruff==0.15.20"]}}
+    pyproject: dict[str, Any] = {"dependency-groups": {"test": ["pytest>=9.1.1"], "dev": [{"include-group": "test"}, "ruff==0.15.21"]}}
 
     assert dependency_pin_errors(pyproject) == ["dependency-groups.test must use exact pins (name==version): 'pytest>=9.1.1'"]
 
 
 def test_dependency_pin_errors_rejects_unsupported_table_entries() -> None:
     """Check that only include-group table entries are skipped."""
-    pyproject: dict[str, Any] = {"dependency-groups": {"test": ["pytest==9.1.1"], "dev": [{"include-group": "test", "extra": "bad"}, "ruff==0.15.20"]}}
+    pyproject: dict[str, Any] = {"dependency-groups": {"test": ["pytest==9.1.1"], "dev": [{"include-group": "test", "extra": "bad"}, "ruff==0.15.21"]}}
 
     assert dependency_pin_errors(pyproject) == ["dependency-groups.dev contains unsupported table entry: {'include-group': 'test', 'extra': 'bad'}"]

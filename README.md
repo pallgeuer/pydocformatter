@@ -1,397 +1,194 @@
 # pydocformatter
 
-[![CI](https://github.com/pallgeuer/pydocformatter/actions/workflows/pre_commit_checks.yml/badge.svg)](https://github.com/pallgeuer/pydocformatter/actions)
-[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/release/python-3110/)
-[![License: GPL-3.0-or-later](https://img.shields.io/badge/License-GPL--3.0--or--later-blue.svg)](https://www.gnu.org/licenses/gpl-3.0.html)
+[![PyPI version](https://img.shields.io/pypi/v/pydocformatter.svg)](https://pypi.org/project/pydocformatter/)
+[![Python versions](https://img.shields.io/pypi/pyversions/pydocformatter.svg)](https://pypi.org/project/pydocformatter/)
+[![CI](https://github.com/pallgeuer/pydocformatter/actions/workflows/pre_commit_checks.yml/badge.svg)](https://github.com/pallgeuer/pydocformatter/actions/workflows/pre_commit_checks.yml)
+[![Documentation](https://github.com/pallgeuer/pydocformatter/actions/workflows/build_deploy_docs.yml/badge.svg)](https://github.com/pallgeuer/pydocformatter/actions/workflows/build_deploy_docs.yml)
+[![License: GPL-3.0-or-later](https://img.shields.io/badge/license-GPL--3.0--or--later-blue.svg)](https://www.gnu.org/licenses/gpl-3.0.html)
 
-**pydocformatter** provides a Ruff-style Python formatter, `pydocfmt`, for formatting docstrings and comments. It is designed to be maximally compatible with [Ruff](https://docs.astral.sh/ruff/).
+pydocformatter is a rule-based linter and source formatter for Python docstrings and comments. Its `pydocfmt` command reports precise rule findings, applies fixes when source changes are safe, and leaves ambiguous or content-creating decisions to the author.
 
----
+pydocformatter handles documentation and comment source; it does not format ordinary Python expressions or statements. Use it alongside [Ruff](https://docs.astral.sh/ruff/) or another general Python formatter.
 
-## Key features
+## What it does
 
-### Docstrings
-- **Google-style docstring formatting:** Support for Google docstring conventions
-- **Multi-line summary handling:** Formats long summaries that span multiple lines
-- **Smart section parsing:** Handles Args, Returns, Raises, Examples, and other sections
-- **Code block preservation:** Maintains formatting within Examples sections with automatic fencing
-- **Type annotation support:** Handles parameter type annotations gracefully
-- **Blank line management:** Ensures proper spacing between summary, description, and sections
+- Reflows docstring and comment prose, normalizes source layout, and preserves supported structured regions such as doctests, code fences, directives, lists, tables, and block quotes.
+- Understands PEP 257, Google, NumPy, and reStructuredText docstring conventions, including semantic sections and documented parameters, returns, yields, exceptions, and attributes.
+- Formats standalone and trailing comments while protecting recognized type-checker, linter, formatter, security, and IDE directives.
+- Selects independently documented PCF comment rules and PDF docstring rules, with per-rule diagnostics and explicit fix availability.
+- Uses Ruff-style configuration, file discovery, selectors, per-file ignores, fixability controls, source suppressions, and inspection commands.
+- Preserves evaluated docstring values for source-literal rewrites that require semantic equivalence, while content-formatting rules may intentionally change docstring whitespace, and avoids automatic changes when the intended source rewrite or missing documentation cannot be inferred safely.
 
-### Comments
-- **Comment wrapping:** Respects line length while preserving meaning
-- **Inline and block comment handling:** Applies appropriate formatting to each comment shape
-- **Special comment preservation:** Maintains pylint, mypy, ty, noqa, pragma, and formatter directives
-- **Smart spacing:** Ensures consistent spacing between code and comments
+## Documentation and help
 
-### File selection and configuration
-- **Ruff-style file selection:** Supports glob-based include/exclude rules, default excludes, `force-exclude`, and `.gitignore`-aware discovery
-- **Ruff-style configuration:** Reads `[tool.pydocfmt]` and its docstring/comment subtables from auto-discovered `pyproject.toml` files
-- **File-selection preview:** Reports included and ignored files, including excluded directories and gitignored paths
-- **Line-aware check diagnostics:** Reports affected files with line numbers and compressed line ranges in check mode
+The [documentation site](https://pallgeuer.github.io/pydocformatter/) is the complete user guide and reference. These links go directly to the relevant help:
 
----
-
-## Documentation
-
-The public documentation site is published at <https://pallgeuer.github.io/pydocformatter/>. Maintainer build commands are documented in [Contributing](CONTRIBUTING.md#documentation-site).
-
----
+| Need                                                           | Resource                                                                                                                                                                                                                                                                                                                         |
+|----------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Install and complete a first run                               | [Tutorial](https://pallgeuer.github.io/pydocformatter/tutorial/) and [Installation](https://pallgeuer.github.io/pydocformatter/installation/)                                                                                                                                                                                    |
+| Configure pydocfmt                                             | [Configuration](https://pallgeuer.github.io/pydocformatter/configuration/) and generated [Settings](https://pallgeuer.github.io/pydocformatter/settings/)                                                                                                                                                                        |
+| Configure Ruff alongside pydocformatter                        | [Ruff rule links](https://pallgeuer.github.io/pydocformatter/rules/ruff-rule-links/)                                                                                                                                                                                                                                             |
+| Understand a rule or browse available rules                    | [Rules](https://pallgeuer.github.io/pydocformatter/rules/) or `pydocfmt rule RULE`                                                                                                                                                                                                                                               |
+| Choose or inspect active, ignored, per-file, and fixable rules | [Rule selection](https://pallgeuer.github.io/pydocformatter/reference/rule-selection/) and `pydocfmt check --show-rules`                                                                                                                                                                                                         |
+| Understand checking, fixing, suppressions, and file discovery  | [Checking](https://pallgeuer.github.io/pydocformatter/checking/), [Formatting](https://pallgeuer.github.io/pydocformatter/formatting/), [Rule suppressions](https://pallgeuer.github.io/pydocformatter/reference/rule-suppressions/), and [File selection](https://pallgeuer.github.io/pydocformatter/reference/file-selection/) |
+| Add pre-commit, CI, or editor workflows                        | [Integrations](https://pallgeuer.github.io/pydocformatter/integrations/)                                                                                                                                                                                                                                                         |
+| Resolve common questions                                       | [FAQ](https://pallgeuer.github.io/pydocformatter/faq/), `pydocfmt --help`, `pydocfmt check --help`, and `pydocfmt config SETTING`                                                                                                                                                                                                |
+| Report a bug or propose a change                               | [GitHub Issues](https://github.com/pallgeuer/pydocformatter/issues)                                                                                                                                                                                                                                                              |
 
 ## Installation
 
-Install pydocformatter via pip:
+pydocformatter requires Python 3.11 or newer. Add it to a project as a development dependency with uv:
 
 ```bash
-pip install pydocformatter
+uv add --dev pydocformatter
+uv run pydocfmt --version
 ```
 
----
+To install the command independently of a project environment:
+
+```bash
+uv tool install pydocformatter
+```
+
+See [Installation](https://pallgeuer.github.io/pydocformatter/installation/) for pip, pipx, and Git pre-commit alternatives. If `pydocfmt` is already available on `PATH`, omit `uv run` from the commands below.
 
 ## Quick start
 
-Check formatting without making changes:
+Run pydocformatter from a project root to check discovered Python files without changing them:
 
 ```bash
-pydocfmt check
+uv run pydocfmt check
 ```
 
-Format all Python files in your project:
+Preview automatic fixes as a unified diff, or apply them in place:
 
 ```bash
-pydocfmt check --fix
+uv run pydocfmt check --diff
+uv run pydocfmt check --fix
 ```
 
----
-
-## Command line usage
-
-Format Python docstrings and comments:
-
-```bash
-pydocfmt check --fix [OPTIONS] [FILES/DIRECTORIES]
-```
-
-Check Python docstrings and comments without changing files:
-
-```bash
-pydocfmt check [OPTIONS] [FILES/DIRECTORIES]
-```
-
-If no files or directories are specified, `pydocfmt check` checks the current directory.
-
-**Options:**
-- `--help`: Show help message and exit
-- `--fix`, `--no-fix`: Toggle applying fixes instead of only checking
-- `--diff`: Print a unified diff for fixes without writing changed files
-- `--show-settings`: Show resolved settings without formatting files
-- `--show-rules`: Show active rules without formatting files
-- `--show-files`: Show file-selection decisions without formatting files
-- `-o`, `--output-file FILE`: Write diagnostics and show output to a file instead of stdout
-
-**Run:**
-- `--output-format {grouped}`: Output format for rule findings (default: grouped)
-- `--parallelism JOBS`: File-level parallelism, as a worker count, CPU ratio, or `0` for all logical CPUs subject to platform process-pool limits (default: 0.0)
-
-**Formatting:**
-- `--line-length LENGTH`: Maximum line length for docstrings and comments (default: 88)
-- `--url-aware-wrapping`, `--no-url-aware-wrapping`: Toggle URL-aware wrapping balance without splitting URLs (default: enabled)
-- `--line-ending {auto,lf,cr-lf,native}`: Line ending to use when rewriting files (default: auto)
-- `--indent-style {space,tab}`: Indentation style for generated docstring sections (default: space)
-- `--indent-width WIDTH`: Generated docstring indentation width and comment tab width (default: 4)
-
-**Docstring formatting:**
-- `--docstring-convention {none,pep257,google,numpy,rest}`: Convention used to parse semantic docstring sections (default: pep257)
-- `--docstring-blank-line-style {blank,aligned}`: Whitespace style for blank docstring lines (default: blank)
-- `--docstring-blank-line-after-last-section`, `--no-docstring-blank-line-after-last-section`: Toggle keeping one blank line after the last recognized Google or NumPy docstring section (default: disabled)
-- `--docstring-missing-documentation {has-section,non-summary-docstrings,all-docstrings}`: When missing-documentation rules report missing documentation (default: has-section)
-- `--docstring-missing-documentation-public-only`, `--no-docstring-missing-documentation-public-only`: Toggle limiting broad missing-documentation checks to public API definitions (default: enabled)
-- `--docstring-require-init-attribute-documentation`, `--no-docstring-require-init-attribute-documentation`: Toggle requiring supported `self.*` attributes assigned in `__init__` for class missing-attribute documentation checks (default: disabled)
-- `--docstring-class-attribute-no-type-base-classes BASE`: Direct class base names whose class attribute docstring entries should not include types for PDF713
-- `--docstring-parse-list-items`, `--no-docstring-parse-list-items`: Toggle parsing docstring list items (default: enabled)
-- `--docstring-parse-headings`, `--no-docstring-parse-headings`: Toggle parsing docstring headings (default: enabled)
-- `--docstring-parse-doctests`, `--no-docstring-parse-doctests`: Toggle parsing and protecting doctest regions (default: enabled)
-- `--docstring-parse-code-fences`, `--no-docstring-parse-code-fences`: Toggle parsing and protecting fenced code blocks (default: enabled)
-- `--docstring-parse-block-quotes`, `--no-docstring-parse-block-quotes`: Toggle parsing Markdown block quotes (default: enabled)
-- `--docstring-parse-tables`, `--no-docstring-parse-tables`: Toggle parsing and protecting tables (default: enabled)
-- `--docstring-parse-directives`, `--no-docstring-parse-directives`: Toggle parsing reStructuredText directives (default: enabled)
-- `--docstring-parse-literal-blocks`, `--no-docstring-parse-literal-blocks`: Toggle parsing reStructuredText literal blocks (default: enabled)
-
-**Comment formatting:**
-- `--comment-join-standalone-lines`, `--no-comment-join-standalone-lines`: Toggle joining standalone prose lines before wrapping (default: disabled)
-- `--comment-format-list-items`, `--no-comment-format-list-items`: Toggle list-item detection and hanging-indented reflow (default: enabled)
-- `--comment-task-marker-mode {none,no-wrap,hanging}`: Treatment for recognized task-marker comments (default: no-wrap)
-- `--comment-task-markers MARKER`: Task marker labels recognized before a colon
-- `--comment-preserve-headings`, `--no-comment-preserve-headings`: Toggle preserving Markdown and reStructuredText headings (default: enabled)
-- `--comment-preserve-doctests`, `--no-comment-preserve-doctests`: Toggle preserving standalone doctest regions (default: enabled)
-- `--comment-preserve-code-fences`, `--no-comment-preserve-code-fences`: Toggle preserving fenced code regions (default: enabled)
-- `--comment-format-block-quotes`, `--no-comment-format-block-quotes`: Toggle prefix-preserving block-quote reflow (default: enabled)
-- `--comment-preserve-tables`, `--no-comment-preserve-tables`: Toggle preserving detected Markdown and reStructuredText tables (default: enabled)
-- `--comment-preserve-directives`, `--no-comment-preserve-directives`: Toggle preserving reStructuredText directives and their indented bodies (default: enabled)
-- `--comment-trailing-extraction-syntax-aware`, `--no-comment-trailing-extraction-syntax-aware`: Toggle keeping overlong trailing comments inline in syntax-sensitive positions (default: enabled)
-- `--comment-trailing-extraction-content-aware`, `--no-comment-trailing-extraction-content-aware`: Toggle keeping overlong trailing comments inline when content is unsafe to reinterpret as standalone comments (default: enabled)
-- `--comment-detect-code`, `--no-comment-detect-code`: Toggle the disabled-code indentation and leading-keyword heuristic (default: disabled)
-- `--comment-detect-statements`, `--no-comment-detect-statements`: Toggle parseable Python statement detection (default: enabled)
-- `--comment-detect-expressions`, `--no-comment-detect-expressions`: Toggle nontrivial Python expression detection (default: disabled)
-
-**Rule selection:**
-- `--select RULE`: Comma-separated rule selector(s) to enable
-- `--ignore RULE`: Comma-separated rule selector(s) to ignore
-- `--extend-select RULE`: Comma-separated additional rule selector(s) to enable
-- `--require-explicit RULE`: Comma-separated rule selector(s) that require exact rule-code selection
-- `--per-file-ignores RULE_TOML`: TOML inline table mapping file patterns to ignored rule selectors
-- `--extend-per-file-ignores RULE_TOML`: TOML inline table mapping file patterns to additional ignored rule selectors
-- `--fixable RULE`: Comma-separated rule selector(s) eligible for automatic fixes
-- `--unfixable RULE`: Comma-separated rule selector(s) ineligible for automatic fixes
-- `--extend-fixable RULE`: Comma-separated additional rule selector(s) eligible for automatic fixes
-
-**File selection:**
-- `--include GLOB`: Comma-separated glob pattern(s) for files to include
-- `--extend-include GLOB`: Comma-separated additional glob pattern(s) for files to include
-- `--exclude GLOB`: Comma-separated glob pattern(s) for files to exclude
-- `--extend-exclude GLOB`: Comma-separated additional glob pattern(s) for files to exclude
-- `--respect-gitignore`, `--no-respect-gitignore`: Toggle .gitignore-aware discovery (default: enabled)
-- `--force-exclude`, `--no-force-exclude`: Apply exclude rules even to explicitly listed files
-
-**Miscellaneous:**
-- `--stdin-filename FILENAME`: File name to use when checking or fixing source from stdin
-- `-e`, `--exit-zero`: Exit with status code `0`, even when formatting violations are detected
-- `--exit-non-zero-on-fix`: Exit with a non-zero status code if `--fix` modifies any files
-
-**Global options:**
-- `--config CONFIG`: Path to a TOML configuration file, or a TOML `<KEY> = <VALUE>` setting override
-- `--isolated`: Ignore auto-discovered configuration files
-
-**Examples:**
-
-```bash
-# Format current directory
-pydocfmt check --fix
-
-# Format specific files
-pydocfmt check --fix myfile.py another_file.py
-
-# Format an entire directory
-pydocfmt check --fix src/
-
-# Check formatting without changes
-pydocfmt check src/
-
-# Check source from stdin
-cat myfile.py | pydocfmt check - --stdin-filename myfile.py
-
-# Write diagnostics to a file
-pydocfmt check src/ --output-file pydocfmt.txt
-
-# Custom line length
-pydocfmt check --fix --line-length 100 src/
-
-# Custom rewritten line ending
-pydocfmt check --fix --line-ending lf src/
-
-# Custom generated docstring indentation
-pydocfmt check --fix --indent-style tab --indent-width 4 src/
-
-# Include/exclude patterns
-pydocfmt check --fix src/ --include "*.py" --exclude "test_*.py"
-
-# Multiple include globs in one option value
-pydocfmt check --fix src/ --include "*.py,*.pyi"
-
-# Show resolved settings
-pydocfmt check --show-settings
-
-# Show active rules
-pydocfmt check --show-rules
-
-# Override one setting without editing pyproject.toml
-pydocfmt check --config "line-length = 100" src/
-
-# Use a dedicated config file
-pydocfmt check --config pydocfmt.toml src/
-
-# Ignore pyproject.toml while applying an inline override
-pydocfmt check --isolated --config "line-length = 100" src/
-
-# Show included and ignored files
-pydocfmt check --show-files src/
-
-# Apply exclude rules to explicit files too
-pydocfmt check --fix --force-exclude generated.py src/
-```
-
----
+Pass files or directories to limit the run, for example `uv run pydocfmt check src tests`. With no paths, pydocformatter checks the current directory. Check mode returns a nonzero exit status when it finds rule violations or operational errors, which makes the same command suitable for CI.
 
 ## Configuration
 
-pydocformatter can be configured via `pyproject.toml` (exhaustive example):
+Place project settings in `pyproject.toml`. A small configuration might specify only the shared line length and the project's docstring convention:
 
 ```toml
 [tool.pydocfmt]
-output-format = "grouped"
 line-length = 88
-url-aware-wrapping = true
-line-ending = "auto"
-indent-style = "space"
-indent-width = 4
-parallelism = 0.0
-select = ["ALL"]
-ignore = []
-extend-select = []
-require-explicit = ["PCF005", "PDF003"]
-per-file-ignores = {"tests/*.py" = ["PCF001"]}
-extend-per-file-ignores = {}
-fixable = ["ALL"]
-unfixable = []
-extend-fixable = []
-include = ["*.py", "*.pyi", "*.pyw"]
-extend-include = []
-exclude = [".venv", "dist"]
-extend-exclude = ["generated"]
-respect-gitignore = true
-force-exclude = false
 
 [tool.pydocfmt.docstring]
-convention = "pep257"
-blank-line-style = "blank"
-blank-line-after-last-section = false
-missing-documentation = "has-section"
-missing-documentation-public-only = true
-require-init-attribute-documentation = false
-parse-list-items = true
-parse-headings = true
-parse-doctests = true
-parse-code-fences = true
-parse-block-quotes = true
-parse-tables = true
-parse-directives = true
-parse-literal-blocks = true
-
-[tool.pydocfmt.comment]
-join-standalone-lines = false
-format-list-items = true
-task-marker-mode = "no-wrap"
-task-markers = ["TODO", "FIXME", "XXX", "HACK", "BUG", "DEBUG", "NOTE", "OPTIMIZE", "REVIEW"]
-preserve-headings = true
-preserve-doctests = true
-preserve-code-fences = true
-format-block-quotes = true
-preserve-tables = true
-preserve-directives = true
-trailing-extraction-syntax-aware = true
-trailing-extraction-content-aware = true
-detect-code = false
-detect-statements = true
-detect-expressions = false
-
-[tool.pydocfmt.per-file-settings]
-"tests/**/*.py" = { docstring-missing-documentation = "has-section" }
+convention = "google"
 ```
 
-For TOML configuration, `[tool.pydocfmt.docstring]` and `[tool.pydocfmt.comment]` are the intended way to specify docstring and comment settings. Flat hyphenated forms such as `docstring-convention = "google"` also work for compatibility, but do not specify both forms for the same setting in one configuration.
+Inspect the resolved configuration, discovered files, and active rules before changing source:
 
-Use `pydocfmt config` to list supported settings and their accepted values. For the full configuration contract, see [Settings specification](docs/public/settings_spec.md). File discovery is specified in [File selection specification](docs/public/file_selection_spec.md), and rule selectors, per-file ignores, and fixability are specified in [Rule selection specification](docs/public/rule_selection_spec.md).
+```bash
+uv run pydocfmt check --show-settings
+uv run pydocfmt check --show-files
+uv run pydocfmt check --show-rules
+uv run pydocfmt rule PDF101
+```
 
----
+Use `uv run pydocfmt config` to list every setting, or pass a setting name such as `uv run pydocfmt config line-length` for focused help. The documentation table above links the full configuration, settings, rule-selection, and Ruff-compatibility references.
 
 ## Examples
 
-### Before
+In each example, `[settings]` or `Settings` (when present) shows the relevant pydocformatter settings used, including pertinent defaults. `[input]` or `Before` shows the original source, `[output]` or `After` shows the source after automatic fixes, and `[findings]` or `Findings` shows the diagnostics that remain afterward (not auto-fixable).
 
-```python
-def calculate_mean(numbers):
-    """Calculate the arithmetic mean of a list of numbers.
-    
-    This function calculates the arithmetic mean of a list of numbers and returns the result as a float value."""
-    
-    # This is a very long comment that exceeds the line length limit and should be wrapped to multiple lines for better readability
-    return sum(numbers) / len(numbers)
-```
+### Reflow with human-authored documentation left to do
 
-### After
+This function has ordinary long prose and a partially documented Google-style signature. pydocformatter can reflow the prose, but it cannot decide how the summary should be shortened or invent documentation for `default_role`.
 
-```python
-def calculate_mean(numbers):
+```pydocfmt-example
+[settings]
+line-length = 88
+docstring-convention = "google"
+
+[input]
+"""User configuration helpers."""
+
+
+def load_user(path, default_role):
+    """Loads a user record from disk and returns normalized settings for the application with predictable defaults.
+
+    Args:
+        path: Path to the user configuration file.
     """
-    Calculate the arithmetic mean of a list of numbers.
-    
-    This function calculates the arithmetic mean of a list of numbers and returns the
-    result as a float value.
+    # Keep the fallback role in the returned record so callers can handle incomplete configuration files consistently across environments.
+    return {"path": path, "role": default_role}
+
+[output]
+"""User configuration helpers."""
+
+
+def load_user(path, default_role):
+    """Loads a user record from disk and returns normalized settings for the application
+    with predictable defaults.
+
+    Args:
+        path: Path to the user configuration file.
     """
-    
-    # This is a very long comment that exceeds the line length limit and should be
-    # wrapped to multiple lines for better readability
-    return sum(numbers) / len(numbers)
+    # Keep the fallback role in the returned record so callers can handle incomplete
+    # configuration files consistently across environments.
+    return {"path": path, "role": default_role}
+
+[findings]
+PDF203: Lines 5-6: Docstring summary spans 2 lines and does not fit on one line
+PDF500: Line 4: Function parameter 'default_role' is missing docstring documentation
 ```
 
----
+[`PDF101`](https://pallgeuer.github.io/pydocformatter/rules/docstring-reflow/) and [`PCF001`](https://pallgeuer.github.io/pydocformatter/rules/standalone-comment-formatting/) apply the safe wrapping changes. [`PDF203`](https://pallgeuer.github.io/pydocformatter/rules/summary-too-long/) and [`PDF500`](https://pallgeuer.github.io/pydocformatter/rules/missing-parameter-documentation/) remain as diagnostic-only findings for the author to resolve, including in particular that the docstring summary line now does not fit on one line, when in general it should.
 
-## Integration
+### Trailing comments and stale suppressions
 
-### Pre-commit
+This retry helper contains an overlong trailing explanation and a suppression that no longer suppresses anything. Moving the explanation and removing the obsolete directive are separate policy decisions, so the relevant rules expose them separately.
 
-External projects can use the published pydocformatter hooks. Choose either the fixing hook or the read-only check hook:
+```pydocfmt-example
+[settings]
+line-length = 72
 
-```yaml
-repos:
-  - repo: https://github.com/pallgeuer/pydocformatter
-    rev: v1.0.0
-    hooks:
-      - id: pydocfmt-fix
-      # - id: pydocfmt-check
+[input]
+"""Retry policy helpers."""
+
+
+def _retry_delay(attempt):
+    # pydocfmt: ignore[PCF001]
+    # Keep retry delays bounded.
+    delay = min(2**attempt, 60)#Cap exponential backoff so temporary failures do not stall a worker indefinitely.
+    return delay
+
+[output]
+"""Retry policy helpers."""
+
+
+def _retry_delay(attempt):
+    # pydocfmt: ignore[PCF001]
+    # Keep retry delays bounded.
+
+    # Cap exponential backoff so temporary failures do not stall a
+    # worker indefinitely.
+    delay = min(2**attempt, 60)
+    return delay
+
+[findings]
+PCF006: Line 5: Suppression selector 'PCF001' did not suppress any findings
 ```
 
-**Available hooks:**
-- `pydocfmt-fix`: Format and check docstrings and comments (modifies files)
-- `pydocfmt-check`: Check docstring and comment formatting (read-only)
+[`PCF002`](https://pallgeuer.github.io/pydocformatter/rules/trailing-comment-spacing/) normalizes the trailing-comment delimiter before [`PCF004`](https://pallgeuer.github.io/pydocformatter/rules/trailing-comment-extraction/) moves and wraps the explanation. The blank line preserves separation from the independently authored comment above it. [`PCF006`](https://pallgeuer.github.io/pydocformatter/rules/unused-suppression/) reports the stale suppression but deliberately does not delete it.
 
-Projects that manage pydocformatter through their own uv environment can instead use local system hooks. Choose one hook:
+## Using pydocformatter with Ruff
 
-```yaml
-repos:
-  - repo: local
-    hooks:
-      - id: pydocfmt-fix
-        name: pydocfmt (fix)
-        entry: uv run pydocfmt check --fix --force-exclude
-        language: system
-        types: [python]
-      # - id: pydocfmt-check
-      #   name: pydocfmt (check)
-      #   entry: uv run pydocfmt check --force-exclude
-      #   language: system
-      #   types: [python]
-```
-
-Prefer using a Python project's `pyproject.toml` to statically configure `pydocfmt`, as opposed to requiring certain arguments to be passed to every invocation in order for it to do the right thing.
-
----
-
-## Why pydocformatter?
-
-- **Compatible:** Designed to work alongside [Ruff](https://docs.astral.sh/ruff/)
-- **Uncompromising:** Consistent formatting across your entire codebase
-- **Fast:** Efficiently processes large codebases
-- **Configurable:** Adapt to your team's style preferences
-- **Reliable:** Extensively tested with comprehensive test suite
-- **Simple:** Easy to integrate into existing workflows
-
----
+pydocformatter is intended to own docstring and comment formatting where its rules overlap with Ruff. Align shared settings such as indentation and line endings, and disable Ruff rules that would enforce the same docstring or comment policy. The [Ruff rule links](https://pallgeuer.github.io/pydocformatter/rules/ruff-rule-links/) page provides a paired configuration and rule-by-rule compatibility mapping.
 
 ## Contributing
 
-See [Contributing](CONTRIBUTING.md).
+See [Contributing](CONTRIBUTING.md) for the development environment, rule implementation workflow, documentation pipeline, and pull request checks. Project history and current unreleased changes are recorded in the [Changelog](CHANGELOG.md).
 
 ## License
 
-This project is licensed under the GNU General Public License v3.0 or later. See the [License](LICENSE.md) for details.
-
----
+pydocformatter is licensed under the [GNU General Public License v3.0 or later](LICENSE.md).
 
 ## Acknowledgments
 
-Inspired by the excellent work of:
-- [pyformatter](https://github.com/RikGhosh487/pyformatter) - Project inspiration
-- [Black](https://github.com/psf/black) - The uncompromising Python code formatter
-- [isort](https://github.com/PyCQA/isort) - A Python utility to sort imports
-- [docformatter](https://github.com/PyCQA/docformatter) - Formats docstrings to follow conventions
+pydocformatter draws inspiration from [pyformatter](https://github.com/RikGhosh487/pyformatter), [docformatter](https://github.com/PyCQA/docformatter), and established Python formatting tools such as [Ruff](https://docs.astral.sh/ruff).

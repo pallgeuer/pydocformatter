@@ -374,15 +374,6 @@ def test_settings_overrides_are_dict_like_and_omit_unspecified_values() -> None:
     assert "line_ending" not in overrides
 
 
-def test_readme_configuration_links_to_detailed_specs() -> None:
-    readme = (Path(__file__).resolve().parent.parent / "README.md").read_text(encoding="utf-8")
-
-    assert "pydocfmt config" in readme
-    assert "docs/public/settings_spec.md" in readme
-    assert "docs/public/file_selection_spec.md" in readme
-    assert "docs/public/rule_selection_spec.md" in readme
-
-
 def test_file_selection_spec_defaults_match_settings_defaults() -> None:
     defaults_lines = _markdown_section_lines(_repo_root() / "docs" / "public" / "file_selection_spec.md", "Defaults")
     defaults = tomllib.loads("\n".join(line.removeprefix("- `").removesuffix("`") for line in defaults_lines))

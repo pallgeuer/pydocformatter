@@ -50,7 +50,7 @@ pydocfmt = "pydocformatter.cli.main:main"
 
 [dependency-groups]
 docs = [
-    "zensical==0.0.48",
+    "zensical==0.0.50",
 ]
 test = [
     {include-group = "docs"},
@@ -62,8 +62,9 @@ test = [
 dev = [
     {include-group = "test"},
     "pre-commit==4.6.0",
-    "ruff==0.15.20",
-    "ty==0.0.57",
+    "ruff==0.15.21",
+    "twine==6.2.0",
+    "ty==0.0.60",
 ]
 
 #
@@ -71,7 +72,7 @@ dev = [
 #
 
 [build-system]
-requires = ["hatchling>=1.29.0"]
+requires = ["hatchling>=1.31.0"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]

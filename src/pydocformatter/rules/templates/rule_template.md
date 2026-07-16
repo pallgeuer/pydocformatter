@@ -25,9 +25,6 @@ Describe how this rule complements, replaces, or differs from relevant Ruff rule
 This line says something about the following example or examples:
 
 ```pydocfmt-example
-[settings]
-line-length = 72
-
 [input]
 # Example that triggers the rule.
 
@@ -35,7 +32,7 @@ line-length = 72
 # Preferred formatting. This output MUST be the actual tested output of applying the rule to the given input.
 ```
 
-Use `[output=unchanged]` instead of `[output]` when the exact input is expected to remain unchanged. Add a `[findings]` section after `[output]` or `[output=unchanged]` only when applying the rule is expected to leave non-fixed findings (e.g. each line under `[findings]` is something like `PDF110: Line 2` or `PDF101: Lines 3-4, 8`):
+Add `[settings]` only when the setting context is pertinent to the applied rule or necessary to understand the scenario. Pertinent context includes the active convention or parser mode, a configured threshold or boundary, and a contrast referenced by the lead-in prose, even when the setting matches the current default. Do not require readers to know default setting values. Use `[output=unchanged]` instead of `[output]` when the exact input is expected to remain unchanged. Add a `[findings]` section after `[output]` or `[output=unchanged]` only when applying the rule is expected to leave non-fixed findings (e.g. each line under `[findings]` is something like `PDF110: Line 2` or `PDF101: Lines 3-4, 8`):
 
 ```pydocfmt-example
 [input]
@@ -46,7 +43,7 @@ Use `[output=unchanged]` instead of `[output]` when the exact input is expected 
 CODE101: Lines 1-2, 7
 ```
 
-Use `[input=package/module.py]` instead of `[input]` only when the example's behavior depends on the source display path:
+Use `[input=package/module.py]` instead of `[input]` only when the path is pertinent to the rule or scenario, including public/private/package classification and examples whose point is behavior in a particular kind of path:
 
 ```pydocfmt-example
 [input=package/module.py]

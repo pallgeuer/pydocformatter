@@ -9,6 +9,12 @@ from pathlib import Path
 # Third-party imports
 import pytest
 
+# First-party imports
+from tests import assertion_rewriting
+
+
+pytest.register_assert_rewrite(*assertion_rewriting.ASSERT_REWRITE_MODULES)
+
 
 @pytest.fixture(scope="session", autouse=True)
 def isolated_test_root(tmp_path_factory: pytest.TempPathFactory) -> Generator[Path, None, None]:

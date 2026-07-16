@@ -1,8 +1,6 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
-
-The format is based on the ideas of [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) (e.g. Added, Changed, Fixed, Removed), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and pydocformatter follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
@@ -210,7 +208,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 
 - Renamed the published fixing pre-commit hook to `pydocfmt-fix`, retained `pydocfmt-check`, and documented examples for both published and local uv hook styles.
 - Harmonized default tool discovery so Ruff, pydocfmt, and ty use project-root defaults with explicit gitignore-respecting configuration.
-- Updated Ruff to 0.15.20 and adjusted check-command output error handling for the current preview lint rules.
+- Updated Ruff to 0.15.21 and adjusted check-command output error handling for the current preview lint rules.
 - Replaced Black, isort, and mypy with Ruff and ty for project formatting, linting, import sorting, and type checking, while keeping pydocfmt responsible for comment and docstring formatting.
 - Moved packaging from setuptools to hatchling, with the package version read from `src/pydocformatter/_version.py` and project license metadata updated to `GPL-3.0-or-later`.
 - Changed the Loupe review skill to orchestrate parallel Claude Code and Codex CLI review passes with a timeout-bounded helper script and verified final review synthesis.
@@ -220,7 +218,9 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 - Changed the Loupe review workflow to clean successful temporary artifact directories by deleting only known artifact files before removing the empty directory.
 - Moved dependency-pin validation into pytest and removed the dedicated dependency-pin pre-commit hook.
 - Updated pytest to 9.1.1.
-- Updated ty to 0.0.57.
+- Updated ty to 0.0.60.
+- Updated Zensical to 0.0.50, restoring documentation-site search after the upstream 0.0.48 regression.
+- Raised the minimum Hatchling build backend to 1.31.0.
 - Changed the Loupe final review format to keep one continuous finding number sequence across all reviewer sections.
 - Changed Loupe reviewer definitions to declare optional required executables instead of deriving launch requirements from reviewer display names.
 - Changed Loupe reviewer launch planning to attach helper dependency failures directly to planned reviewer runs in one cached availability pass.
@@ -575,15 +575,17 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 #### Developer dependencies
 
 - Updated mypy from 1.20.2 to 2.1.0.
+- Pinned Twine 6.2.0 for reproducible release artifact validation.
 
 #### Tests
 
 - Added a session-wide temporary configuration boundary and per-test working directories so tests no longer inherit ancestor `[tool.pydocfmt]` configuration, removing latent coupling for CLI and file-selection tests.
+- Added shared executable contract coverage for structured README, rule, and suppression-guide examples, including generic optional sections, documented input paths resolved before test fallbacks, and assertion-rewritten shared helpers.
 - Made the README settings-documentation test locate `README.md` relative to the test file instead of the current working directory.
 
 #### Documentation
 
-- Updated README, contributing, release, pull request, and file-selection docs for the single-command workflow and latest file-selection behavior.
+- Updated README, contributing, release, pull request, and file-selection docs for the single-command workflow and latest file-selection behavior, including tested portable release checksum generation that fails without retaining a stale manifest and validates the exact artifacts selected for publication.
 
 #### Rule selection
 
@@ -616,7 +618,7 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 
 #### Developer dependencies
 
-- Removed the unused `build` and `twine` dev dependencies now that package build and publish workflows use uv directly.
+- Removed the unused `build` dev dependency now that package builds use uv directly.
 - Removed the unused `mdformat` docs dependency.
 
 #### Developer workflow
@@ -644,3 +646,13 @@ The format is based on the ideas of [Keep a Changelog](https://keepachangelog.co
 ### Fixed
 
 ### Removed
+
+---
+
+## v0.2.0
+
+Released 2026-05-01
+
+### Added
+
+- Initial preliminary release of `pydocformatter` as a simple direct formatter of comments and docstrings (no linting, no concept of rules, no complete CLI interface, and no complete/correct coverage of formatting fixes yet).
