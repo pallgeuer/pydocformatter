@@ -47,13 +47,13 @@ Use one published repository hook when pre-commit should manage the pydocformatt
 ```yaml
 repos:
   - repo: https://github.com/pallgeuer/pydocformatter
-    rev: vX.X.X
+    rev: v1.0.0
     hooks:
       - id: pydocfmt-check
       # - id: pydocfmt-fix
 ```
 
-Replace `vX.X.X` with the version you want to pin.
+Update `rev` when you intentionally adopt a newer pydocformatter release.
 
 Use a local hook instead when the project already installs pydocformatter, for example in a uv-managed development environment. Choose one hook:
 
