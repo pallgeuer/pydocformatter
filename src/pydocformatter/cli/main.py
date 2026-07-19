@@ -11,6 +11,7 @@ from collections.abc import Callable
 
 # First-party imports
 import pydocformatter.cli.rule as rule_command
+import pydocformatter.cli.clean as clean_command
 import pydocformatter.cli.config as config_command
 import pydocformatter.cli.linter as linter_command
 from pydocformatter.cli import check, global_args
@@ -49,7 +50,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparser.create_parser(prog="pydocfmt", description="Format Python docstrings and comments.")
     parser.add_argument("-V", "--version", action="store_true", help="Print version and exit.")
 
-    subcommands = {"check": check.add_parser, "config": config_command.add_parser, "linter": linter_command.add_parser, "rule": rule_command.add_parser, "version": add_version_parser}
+    subcommands = {
+        "check": check.add_parser,
+        "clean": clean_command.add_parser,
+        "config": config_command.add_parser,
+        "linter": linter_command.add_parser,
+        "rule": rule_command.add_parser,
+        "version": add_version_parser,
+    }
 
     subparsers = parser.add_subparsers(title="Commands", dest="command", metavar="COMMAND")
     command_parsers = {command: add_command_func(subparsers) for command, add_command_func in subcommands.items()}

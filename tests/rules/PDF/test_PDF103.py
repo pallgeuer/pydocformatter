@@ -9,6 +9,7 @@ from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
 from pydocformatter.rules.definition_helpers import source_text
 from pydocformatter.rules.definitions.PDF.PDF import PDF
 from pydocformatter.rules.definitions.PDF.PDF103_docstring_blank_line_whitespace import PDF103DocstringBlankLineWhitespace
+from pydocformatter.source_path import SourcePathContext
 from tests import rule_helpers
 
 
@@ -18,6 +19,7 @@ def contexts(source: str, *, settings: settings_check.CheckSettings | None = Non
     wrapper = cst_metadata.MetadataWrapper(module, unsafe_skip_copy=True)
     category = RuleCategoryContext(
         path="example.py",
+        source_path=SourcePathContext.for_path("example.py"),
         settings=settings_check.CheckSettings(select=("PDF103",)) if settings is None else settings,
         module=module,
         metadata_wrapper=wrapper,
@@ -29,6 +31,7 @@ def contexts(source: str, *, settings: settings_check.CheckSettings | None = Non
     )
     return category, RuleContext(
         path=category.path,
+        source_path=category.source_path,
         settings=category.settings,
         module=category.module,
         metadata_wrapper=category.metadata_wrapper,

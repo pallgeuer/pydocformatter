@@ -24,6 +24,7 @@ from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleCategoryContext
 from pydocformatter.rules.definition_helpers import source_text
 from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleFinding, RuleMetadata
+from pydocformatter.source_path import SourcePathContext
 
 
 def test_planned_source_changes_apply_edits_and_create_violations() -> None:
@@ -389,6 +390,7 @@ def test_context_source_changes_apply_cached_context_source_without_reading_modu
     lines = tuple(source_text.source_lines(source))
     context = RuleCategoryContext(
         path="example.py",
+        source_path=SourcePathContext.for_path("example.py"),
         settings=CheckSettings(),
         module=module,
         metadata_wrapper=metadata_wrapper,

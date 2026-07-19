@@ -8,6 +8,12 @@ pydocfmt check
 
 By default, pydocformatter discovers Python files below the current directory using the configured include, exclude, gitignore, and force-exclude settings.
 
+## Persistent cache
+
+Selected disk files use persistent clean-proof caching by default. A warm proof is accepted only after the complete current file contents and all analysis semantics match, then pydocformatter skips parsing and rule execution. Disable it with `--no-cache`, choose a location with `--cache-dir PATH`, or print internal counters to stderr with `--cache-stats`.
+
+The default `.pydocfmt_cache` directory contains hashes and metadata only. pydocformatter may create the configured cache directory, but its immediate parent must already exist as a directory. Otherwise it emits one warning and runs uncached without changing findings, fixes, or status. Run `pydocfmt clean` or `pydocfmt clean --cache-dir PATH` to remove verified pydocfmt-owned cache data. Cache writes, recovery, and cleanup are serialized with a retained native lock, and lookup or mutation never trusts a missing or symlinked ownership tag. See [Persistent cache](reference/cache.md) for invalidation, population, storage, cleanup, failure handling, trust, statistics, and performance details.
+
 ## Diagnostics
 
 Diagnostics are grouped by file and include the rule code, affected line numbers, and message. Use `--output-file` to write diagnostics to a file:

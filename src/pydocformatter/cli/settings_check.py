@@ -21,6 +21,10 @@ Attributes:
     DEFAULT_COMMENT_TASK_MARKERS (tuple[str, ...]): Task marker labels recognized by default in comments.
     PARALLELISM_CONSTRAINT_MESSAGE (str): Shared validation text for the worker-count setting accepted by the check
         command.
+    CHECK_SETTING_DEFINITIONS (tuple[CheckSettingDefinition, ...]): Check setting metadata with co-located clean-proof
+        identity roles.
+    DIRECT_ANALYSIS_DEFINITIONS (tuple[SettingDefinition[Any], ...]): Schema-ordered setting definitions whose effective
+        values determine clean analysis.
     SETTINGS_SCHEMA (SettingsSchema[CheckSettings]): Complete `pydocfmt check` schema used for config loading, CLI
         option generation, validation, and settings display.
 """
@@ -48,6 +52,7 @@ DEFAULT_EXCLUDE = (
     ".mypy_cache",
     ".nox",
     ".pants.d",
+    ".pydocfmt_cache",
     ".pytype",
     ".ruff_cache",
     ".svn",
@@ -200,6 +205,8 @@ class CheckSettings:
 
     Attributes:
         output_format (OutputFormat): Output format used for rule findings.
+        cache (bool): Whether persistent clean-proof caching is enabled.
+        cache_dir (str): Project-relative or source-base-relative persistent cache directory.
         line_length (int): Maximum line length used when wrapping docstrings or comments.
         url_aware_wrapping (bool): Whether wrapping balances prose around unbroken URL tokens.
         line_ending (LineEnding): Line ending used when rewriting files.
@@ -271,6 +278,8 @@ class CheckSettings:
     """
 
     output_format: OutputFormat = OutputFormat.GROUPED
+    cache: bool = True
+    cache_dir: str = ".pydocfmt_cache"
     line_length: int = 88
     url_aware_wrapping: bool = True
     line_ending: LineEnding = LineEnding.AUTO
@@ -351,6 +360,8 @@ class CheckSettingsOverrides(TypedDict, total=False):
 
     Attributes:
         output_format (OutputFormat): Output format used for rule findings.
+        cache (bool): Whether persistent clean-proof caching is enabled.
+        cache_dir (str): Project-relative or source-base-relative persistent cache directory.
         line_length (int): Maximum line length used when wrapping docstrings or comments.
         url_aware_wrapping (bool): Whether wrapping balances prose around unbroken URL tokens.
         line_ending (LineEnding): Line ending used when rewriting files.
@@ -422,6 +433,8 @@ class CheckSettingsOverrides(TypedDict, total=False):
     """
 
     output_format: OutputFormat
+    cache: bool
+    cache_dir: str
     line_length: int
     url_aware_wrapping: bool
     line_ending: LineEnding
@@ -499,6 +512,48 @@ class SettingsGroup(enum.StrEnum):
     RULE_SELECTION = "Rule selection"
     FILE_SELECTION = "File selection"
     CONFIGURATION = "Configuration"
+
+
+class CacheIdentityRole(enum.StrEnum):
+    """Roles of resolved setting fields in persistent clean-proof identity.
+
+    A configuration-relative path must not use the ordinary direct-value role until a canonical semantic-path encoding
+    has been designed for its source-base and relocation semantics.
+
+    Attributes:
+        DIRECT_ANALYSIS_VALUE: Include the effective value after path-specific configuration is applied.
+        FINAL_RULE_CODES: Exclude the raw value after it is represented by successfully resolved final rule codes.
+        CLEAN_PROOF_IRRELEVANT: Exclude a value that cannot change whether existing source bytes are finding-free.
+        DISCOVERY_ONLY: Exclude a value after file selection has completed.
+        APPLIED_CONFIGURATION: Exclude raw configuration after its matching effective values are applied.
+    """
+
+    DIRECT_ANALYSIS_VALUE = "direct-analysis-value"
+    FINAL_RULE_CODES = "final-rule-codes"
+    CLEAN_PROOF_IRRELEVANT = "clean-proof-irrelevant"
+    DISCOVERY_ONLY = "discovery-only"
+    APPLIED_CONFIGURATION = "applied-configuration"
+
+
+@dataclasses.dataclass(frozen=True, init=False)
+class CheckSettingDefinition(SettingDefinition[Any]):
+    """Check setting metadata with its intentional persistent-cache role.
+
+    Attributes:
+        cache_identity_role (CacheIdentityRole): How the resolved setting participates in clean-proof identity.
+    """
+
+    cache_identity_role: CacheIdentityRole
+
+    def __init__(self, *, cache_identity_role: CacheIdentityRole, **definition: Any) -> None:
+        """Initialize generic setting metadata and its required cache identity role.
+
+        Args:
+            cache_identity_role (CacheIdentityRole): Intentional persistent-cache role for this setting.
+            **definition (Any): Keyword arguments forwarded to the generic setting definition.
+        """
+        super().__init__(**definition)
+        object.__setattr__(self, "cache_identity_role", cache_identity_role)
 
 
 def validate_parallelism(value: object, context: str) -> float:
@@ -642,7 +697,22 @@ def effective_profile_for_path(profile: settings_core.SettingsProfile[CheckSetti
     for field in updates:
         field_bases[field] = per_file_settings_base
         field_priorities[field] = per_file_settings_priority
-    return settings_core.SettingsProfile(settings=dataclasses.replace(profile.settings, **cast("Any", updates)), field_bases=field_bases, field_priorities=field_priorities)
+    return settings_core.SettingsProfile(
+        settings=dataclasses.replace(profile.settings, **cast("Any", updates)), field_bases=field_bases, field_priorities=field_priorities, project_root=profile.project_root
+    )
+
+
+def analysis_settings_identity(profile: settings_core.SettingsProfile[CheckSettings]) -> tuple[tuple[str, object], ...]:
+    """Return effective setting names and values that determine clean analysis.
+
+    Args:
+        profile (settings_core.SettingsProfile[CheckSettings]): Effective profile after matching per-file settings are
+            applied.
+
+    Returns:
+        tuple[tuple[str, object], ...]: Schema-ordered direct-analysis setting names and normalized effective values.
+    """
+    return tuple((definition.field, getattr(profile.settings, definition.field)) for definition in DIRECT_ANALYSIS_DEFINITIONS)
 
 
 def _definitions_by_key() -> dict[str, SettingDefinition[Any]]:
@@ -702,14 +772,35 @@ SETTINGS_SCHEMA = SettingsSchema(
     overrides_type=CheckSettingsOverrides,
     group_type=SettingsGroup,
     definitions=(
-        SettingDefinition(
+        CheckSettingDefinition(
+            cache_identity_role=CacheIdentityRole.CLEAN_PROOF_IRRELEVANT,
             field="output_format",
             value_type=OutputFormat,
             group=SettingsGroup.RUN,
             help="Output format for rule findings.",
             documentation='Output format for rule findings; currently only "grouped" is supported.',
         ),
-        SettingDefinition(
+        CheckSettingDefinition(
+            cache_identity_role=CacheIdentityRole.CLEAN_PROOF_IRRELEVANT,
+            field="cache",
+            value_type=bool,
+            group=SettingsGroup.RUN,
+            help="Use persistent clean-proof caching.",
+            documentation="Whether selected disk files may reuse and populate persistent clean proofs. Disable this for diagnostics or when a cache location is not trusted.",
+        ),
+        CheckSettingDefinition(
+            cache_identity_role=CacheIdentityRole.CLEAN_PROOF_IRRELEVANT,
+            field="cache_dir",
+            value_type=str,
+            group=SettingsGroup.RUN,
+            help="Cache directory to create; its immediate parent must exist.",
+            validator=settings_core.validate_non_empty_path,
+            cli={"metavar": "PATH"},
+            documentation="Persistent cache directory. The default is relative to the auto-discovered project configuration root, while explicitly configured values follow their normal setting source base. pydocformatter may create this directory, but it does not create missing ancestor directories; the immediate parent must already be a directory.",
+            example='cache-dir = ".pydocfmt_cache"',
+        ),
+        CheckSettingDefinition(
+            cache_identity_role=CacheIdentityRole.DIRECT_ANALYSIS_VALUE,
             field="line_length",
             value_type=int,
             group=SettingsGroup.FORMATTING,
@@ -717,28 +808,32 @@ SETTINGS_SCHEMA = SettingsSchema(
             validator=settings_core.validate_int(min_value=1, max_value=320),
             cli={"metavar": "LENGTH"},
         ),
-        SettingDefinition(
+        CheckSettingDefinition(
+            cache_identity_role=CacheIdentityRole.DIRECT_ANALYSIS_VALUE,
             field="url_aware_wrapping",
             value_type=bool,
             group=SettingsGroup.FORMATTING,
             help="Balance wrapping around URL tokens without splitting URLs.",
             documentation="Whether comment and docstring wrapping should balance surrounding prose around URL tokens without splitting URLs.",
         ),
-        SettingDefinition(
+        CheckSettingDefinition(
+            cache_identity_role=CacheIdentityRole.DIRECT_ANALYSIS_VALUE,
             field="line_ending",
             value_type=LineEnding,
             group=SettingsGroup.FORMATTING,
             help="Line ending to use when rewriting files.",
             documentation='Line ending to use when rewriting files; one of "auto", "lf", "cr-lf", or "native".',
         ),
-        SettingDefinition(
+        CheckSettingDefinition(
+            cache_identity_role=CacheIdentityRole.DIRECT_ANALYSIS_VALUE,
             field="indent_style",
             value_type=IndentStyle,
             group=SettingsGroup.FORMATTING,
             help="Indentation style for generated and normalized docstring indentation.",
             documentation='Generated and normalized docstring indentation style; one of "space" or "tab".',
         ),
-        SettingDefinition(
+        CheckSettingDefinition(
+            cache_identity_role=CacheIdentityRole.DIRECT_ANALYSIS_VALUE,
             field="indent_width",
             value_type=int,
             group=SettingsGroup.FORMATTING,
@@ -747,7 +842,8 @@ SETTINGS_SCHEMA = SettingsSchema(
             cli={"metavar": "WIDTH"},
             documentation="Generated docstring indentation width and tab expansion width used when measuring docstrings and comments.",
         ),
-        SettingDefinition(
+        CheckSettingDefinition(
+            cache_identity_role=CacheIdentityRole.CLEAN_PROOF_IRRELEVANT,
             field="parallelism",
             value_type=float,
             group=SettingsGroup.RUN,
@@ -757,49 +853,56 @@ SETTINGS_SCHEMA = SettingsSchema(
             documentation="File-level parallelism. Use 0 for all logical CPU cores subject to platform process-pool limits, a whole number greater than or equal to 1 for an exact worker count, or a fractional value greater than 0 and less than 1 for that ratio of logical CPU cores. Small file sets may be slower with parallelism due to process startup overhead.",
             example="parallelism = 0.0",
         ),
-        SettingDefinition(
+        CheckSettingDefinition(
+            cache_identity_role=CacheIdentityRole.DIRECT_ANALYSIS_VALUE,
             field="docstring_convention",
             value_type=DocstringConvention,
             group=SettingsGroup.DOCSTRING_FORMATTING,
             help="Convention used to parse semantic docstring sections.",
             documentation='Docstring convention; one of "none", "pep257", "google", "numpy", or "rest".',
         ),
-        SettingDefinition(
+        CheckSettingDefinition(
+            cache_identity_role=CacheIdentityRole.DIRECT_ANALYSIS_VALUE,
             field="docstring_blank_line_style",
             value_type=DocstringBlankLineStyle,
             group=SettingsGroup.DOCSTRING_FORMATTING,
             help="Whitespace style for blank docstring lines.",
             documentation='Blank docstring line whitespace style used by PDF103; one of "blank" or "aligned".',
         ),
-        SettingDefinition(
+        CheckSettingDefinition(
+            cache_identity_role=CacheIdentityRole.DIRECT_ANALYSIS_VALUE,
             field="docstring_blank_line_after_last_section",
             value_type=bool,
             group=SettingsGroup.DOCSTRING_FORMATTING,
             help="Keep one blank line after the last docstring section.",
             documentation="Whether PDF200 and PDF201 keep one blank line after the last recognized Google or NumPy docstring section.",
         ),
-        SettingDefinition(
+        CheckSettingDefinition(
+            cache_identity_role=CacheIdentityRole.DIRECT_ANALYSIS_VALUE,
             field="docstring_missing_documentation",
             value_type=DocstringMissingDocumentation,
             group=SettingsGroup.DOCSTRING_FORMATTING,
             help="When missing-documentation rules report missing documentation.",
             documentation='When missing-documentation rules report missing documentation; one of "has-section", "non-summary-docstrings", or "all-docstrings".',
         ),
-        SettingDefinition(
+        CheckSettingDefinition(
+            cache_identity_role=CacheIdentityRole.DIRECT_ANALYSIS_VALUE,
             field="docstring_missing_documentation_public_only",
             value_type=bool,
             group=SettingsGroup.DOCSTRING_FORMATTING,
             help="Limit broad missing-documentation checks to public API definitions.",
             documentation="Whether broad missing-documentation checks only apply to public API definitions; explicit relevant documentation is always checked for consistency.",
         ),
-        SettingDefinition(
+        CheckSettingDefinition(
+            cache_identity_role=CacheIdentityRole.DIRECT_ANALYSIS_VALUE,
             field="docstring_require_init_attribute_documentation",
             value_type=bool,
             group=SettingsGroup.DOCSTRING_FORMATTING,
             help="Require documented `__init__` instance attributes.",
             documentation="Whether class missing-attribute documentation rules require supported `self.*` attributes assigned in `__init__`; extraneous class-attribute documentation checks always treat those attributes as present.",
         ),
-        SettingDefinition(
+        CheckSettingDefinition(
+            cache_identity_role=CacheIdentityRole.DIRECT_ANALYSIS_VALUE,
             field="docstring_class_attribute_no_type_base_classes",
             value_type=StringList,
             group=SettingsGroup.DOCSTRING_FORMATTING,
@@ -809,7 +912,8 @@ SETTINGS_SCHEMA = SettingsSchema(
             documentation="Direct class base names whose class attribute docstring entries should not include types for PDF713. Dotted names also match direct import aliases resolved statically by LibCST; unqualified names are syntactic-only, and transitive inheritance is not resolved.",
             example='docstring-class-attribute-no-type-base-classes = ["enum.Enum"]',
         ),
-        SettingDefinition(
+        CheckSettingDefinition(
+            cache_identity_role=CacheIdentityRole.DIRECT_ANALYSIS_VALUE,
             field="docstring_forbidden_function_decorators",
             value_type=StringList,
             group=SettingsGroup.DOCSTRING_FORMATTING,
@@ -819,7 +923,8 @@ SETTINGS_SCHEMA = SettingsSchema(
             documentation="Function decorator names whose definitions should not have docstrings. Calls are unwrapped before matching, and dotted names also match import aliases resolved statically by LibCST; unqualified names are syntactic-only.",
             example='docstring-forbidden-function-decorators = ["typing.overload", "typing_extensions.overload"]',
         ),
-        SettingDefinition(
+        CheckSettingDefinition(
+            cache_identity_role=CacheIdentityRole.DIRECT_ANALYSIS_VALUE,
             field="docstring_optional_function_decorators",
             value_type=StringList,
             group=SettingsGroup.DOCSTRING_FORMATTING,
@@ -829,7 +934,8 @@ SETTINGS_SCHEMA = SettingsSchema(
             documentation="Function decorator names whose definitions may omit docstrings. Calls are unwrapped before matching, and dotted names also match import aliases resolved statically by LibCST; unqualified names are syntactic-only.",
             example='docstring-optional-function-decorators = ["typing.override", "typing_extensions.override"]',
         ),
-        SettingDefinition(
+        CheckSettingDefinition(
+            cache_identity_role=CacheIdentityRole.DIRECT_ANALYSIS_VALUE,
             field="docstring_property_decorators",
             value_type=StringList,
             group=SettingsGroup.DOCSTRING_FORMATTING,
@@ -839,24 +945,86 @@ SETTINGS_SCHEMA = SettingsSchema(
             documentation="Function decorator names whose definitions should be treated as properties for property-specific summary checks. Calls are unwrapped before matching, and dotted names also match import aliases and builtins resolved statically by LibCST; unqualified names are syntactic-only.",
             example='docstring-property-decorators = ["builtins.property", "functools.cached_property", "project.Property"]',
         ),
-        SettingDefinition(field="docstring_parse_list_items", value_type=bool, group=SettingsGroup.DOCSTRING_FORMATTING, help="Parse docstring list items as distinct structures."),
-        SettingDefinition(field="docstring_parse_headings", value_type=bool, group=SettingsGroup.DOCSTRING_FORMATTING, help="Parse Markdown and reStructuredText docstring headings."),
-        SettingDefinition(field="docstring_parse_doctests", value_type=bool, group=SettingsGroup.DOCSTRING_FORMATTING, help="Parse and protect doctest regions in docstrings."),
-        SettingDefinition(field="docstring_parse_code_fences", value_type=bool, group=SettingsGroup.DOCSTRING_FORMATTING, help="Parse and protect fenced code blocks in docstrings."),
-        SettingDefinition(field="docstring_parse_block_quotes", value_type=bool, group=SettingsGroup.DOCSTRING_FORMATTING, help="Parse Markdown block quotes in docstrings."),
-        SettingDefinition(field="docstring_parse_tables", value_type=bool, group=SettingsGroup.DOCSTRING_FORMATTING, help="Parse and protect Markdown and reStructuredText tables in docstrings."),
-        SettingDefinition(field="docstring_parse_directives", value_type=bool, group=SettingsGroup.DOCSTRING_FORMATTING, help="Parse reStructuredText directives and their bodies in docstrings."),
-        SettingDefinition(field="docstring_parse_literal_blocks", value_type=bool, group=SettingsGroup.DOCSTRING_FORMATTING, help="Parse and protect reStructuredText literal blocks in docstrings."),
-        SettingDefinition(field="comment_join_standalone_lines", value_type=bool, group=SettingsGroup.COMMENT_FORMATTING, help="Join consecutive standalone prose comment lines before wrapping."),
-        SettingDefinition(field="comment_format_list_items", value_type=bool, group=SettingsGroup.COMMENT_FORMATTING, help="Detect and reflow standalone comment list items with hanging indentation."),
-        SettingDefinition(
+        CheckSettingDefinition(
+            cache_identity_role=CacheIdentityRole.DIRECT_ANALYSIS_VALUE,
+            field="docstring_parse_list_items",
+            value_type=bool,
+            group=SettingsGroup.DOCSTRING_FORMATTING,
+            help="Parse docstring list items as distinct structures.",
+        ),
+        CheckSettingDefinition(
+            cache_identity_role=CacheIdentityRole.DIRECT_ANALYSIS_VALUE,
+            field="docstring_parse_headings",
+            value_type=bool,
+            group=SettingsGroup.DOCSTRING_FORMATTING,
+            help="Parse Markdown and reStructuredText docstring headings.",
+        ),
+        CheckSettingDefinition(
+            cache_identity_role=CacheIdentityRole.DIRECT_ANALYSIS_VALUE,
+            field="docstring_parse_doctests",
+            value_type=bool,
+            group=SettingsGroup.DOCSTRING_FORMATTING,
+            help="Parse and protect doctest regions in docstrings.",
+        ),
+        CheckSettingDefinition(
+            cache_identity_role=CacheIdentityRole.DIRECT_ANALYSIS_VALUE,
+            field="docstring_parse_code_fences",
+            value_type=bool,
+            group=SettingsGroup.DOCSTRING_FORMATTING,
+            help="Parse and protect fenced code blocks in docstrings.",
+        ),
+        CheckSettingDefinition(
+            cache_identity_role=CacheIdentityRole.DIRECT_ANALYSIS_VALUE,
+            field="docstring_parse_block_quotes",
+            value_type=bool,
+            group=SettingsGroup.DOCSTRING_FORMATTING,
+            help="Parse Markdown block quotes in docstrings.",
+        ),
+        CheckSettingDefinition(
+            cache_identity_role=CacheIdentityRole.DIRECT_ANALYSIS_VALUE,
+            field="docstring_parse_tables",
+            value_type=bool,
+            group=SettingsGroup.DOCSTRING_FORMATTING,
+            help="Parse and protect Markdown and reStructuredText tables in docstrings.",
+        ),
+        CheckSettingDefinition(
+            cache_identity_role=CacheIdentityRole.DIRECT_ANALYSIS_VALUE,
+            field="docstring_parse_directives",
+            value_type=bool,
+            group=SettingsGroup.DOCSTRING_FORMATTING,
+            help="Parse reStructuredText directives and their bodies in docstrings.",
+        ),
+        CheckSettingDefinition(
+            cache_identity_role=CacheIdentityRole.DIRECT_ANALYSIS_VALUE,
+            field="docstring_parse_literal_blocks",
+            value_type=bool,
+            group=SettingsGroup.DOCSTRING_FORMATTING,
+            help="Parse and protect reStructuredText literal blocks in docstrings.",
+        ),
+        CheckSettingDefinition(
+            cache_identity_role=CacheIdentityRole.DIRECT_ANALYSIS_VALUE,
+            field="comment_join_standalone_lines",
+            value_type=bool,
+            group=SettingsGroup.COMMENT_FORMATTING,
+            help="Join consecutive standalone prose comment lines before wrapping.",
+        ),
+        CheckSettingDefinition(
+            cache_identity_role=CacheIdentityRole.DIRECT_ANALYSIS_VALUE,
+            field="comment_format_list_items",
+            value_type=bool,
+            group=SettingsGroup.COMMENT_FORMATTING,
+            help="Detect and reflow standalone comment list items with hanging indentation.",
+        ),
+        CheckSettingDefinition(
+            cache_identity_role=CacheIdentityRole.DIRECT_ANALYSIS_VALUE,
             field="comment_task_marker_mode",
             value_type=CommentTaskMarkerMode,
             group=SettingsGroup.COMMENT_FORMATTING,
             help="Treatment for recognized task-marker comments.",
             documentation='Treatment for recognized task-marker comments; one of "none", "no-wrap", or "hanging".',
         ),
-        SettingDefinition(
+        CheckSettingDefinition(
+            cache_identity_role=CacheIdentityRole.DIRECT_ANALYSIS_VALUE,
             field="comment_task_markers",
             value_type=StringList,
             group=SettingsGroup.COMMENT_FORMATTING,
@@ -866,30 +1034,87 @@ SETTINGS_SCHEMA = SettingsSchema(
             documentation=f"Exact uppercase task marker labels recognized before a colon; {_setting_default_clause('comment_task_markers', StringList)}. Use an empty list to disable recognition.",
             example='comment-task-markers = ["TODO", "FIXME", "BUG"]',
         ),
-        SettingDefinition(field="comment_preserve_headings", value_type=bool, group=SettingsGroup.COMMENT_FORMATTING, help="Preserve detected Markdown and reStructuredText comment headings."),
-        SettingDefinition(field="comment_preserve_doctests", value_type=bool, group=SettingsGroup.COMMENT_FORMATTING, help="Preserve standalone doctest comment regions."),
-        SettingDefinition(field="comment_preserve_code_fences", value_type=bool, group=SettingsGroup.COMMENT_FORMATTING, help="Preserve fenced code regions in standalone comments."),
-        SettingDefinition(field="comment_format_block_quotes", value_type=bool, group=SettingsGroup.COMMENT_FORMATTING, help="Detect and reflow Markdown block quotes in standalone comments."),
-        SettingDefinition(field="comment_preserve_tables", value_type=bool, group=SettingsGroup.COMMENT_FORMATTING, help="Preserve detected Markdown and reStructuredText comment tables."),
-        SettingDefinition(field="comment_preserve_directives", value_type=bool, group=SettingsGroup.COMMENT_FORMATTING, help="Preserve reStructuredText directives and their indented bodies."),
-        SettingDefinition(
+        CheckSettingDefinition(
+            cache_identity_role=CacheIdentityRole.DIRECT_ANALYSIS_VALUE,
+            field="comment_preserve_headings",
+            value_type=bool,
+            group=SettingsGroup.COMMENT_FORMATTING,
+            help="Preserve detected Markdown and reStructuredText comment headings.",
+        ),
+        CheckSettingDefinition(
+            cache_identity_role=CacheIdentityRole.DIRECT_ANALYSIS_VALUE,
+            field="comment_preserve_doctests",
+            value_type=bool,
+            group=SettingsGroup.COMMENT_FORMATTING,
+            help="Preserve standalone doctest comment regions.",
+        ),
+        CheckSettingDefinition(
+            cache_identity_role=CacheIdentityRole.DIRECT_ANALYSIS_VALUE,
+            field="comment_preserve_code_fences",
+            value_type=bool,
+            group=SettingsGroup.COMMENT_FORMATTING,
+            help="Preserve fenced code regions in standalone comments.",
+        ),
+        CheckSettingDefinition(
+            cache_identity_role=CacheIdentityRole.DIRECT_ANALYSIS_VALUE,
+            field="comment_format_block_quotes",
+            value_type=bool,
+            group=SettingsGroup.COMMENT_FORMATTING,
+            help="Detect and reflow Markdown block quotes in standalone comments.",
+        ),
+        CheckSettingDefinition(
+            cache_identity_role=CacheIdentityRole.DIRECT_ANALYSIS_VALUE,
+            field="comment_preserve_tables",
+            value_type=bool,
+            group=SettingsGroup.COMMENT_FORMATTING,
+            help="Preserve detected Markdown and reStructuredText comment tables.",
+        ),
+        CheckSettingDefinition(
+            cache_identity_role=CacheIdentityRole.DIRECT_ANALYSIS_VALUE,
+            field="comment_preserve_directives",
+            value_type=bool,
+            group=SettingsGroup.COMMENT_FORMATTING,
+            help="Preserve reStructuredText directives and their indented bodies.",
+        ),
+        CheckSettingDefinition(
+            cache_identity_role=CacheIdentityRole.DIRECT_ANALYSIS_VALUE,
             field="comment_trailing_extraction_syntax_aware",
             value_type=bool,
             group=SettingsGroup.COMMENT_FORMATTING,
             help="Avoid extracting trailing comments from syntax-sensitive positions.",
             documentation="Whether overlong trailing-comment extraction avoids decorators, compound statement headers, arguments, and parenthesized or continuation contexts.",
         ),
-        SettingDefinition(
+        CheckSettingDefinition(
+            cache_identity_role=CacheIdentityRole.DIRECT_ANALYSIS_VALUE,
             field="comment_trailing_extraction_content_aware",
             value_type=bool,
             group=SettingsGroup.COMMENT_FORMATTING,
             help="Avoid extracting trailing comments with unsafe standalone content.",
             documentation="Whether overlong trailing-comment extraction avoids content that enabled standalone comment structure and code detectors, or the content-aware operator heuristic, would make unsafe to reinterpret as a standalone comment.",
         ),
-        SettingDefinition(field="comment_detect_code", value_type=bool, group=SettingsGroup.COMMENT_FORMATTING, help="Protect standalone runs matching the indentation and leading-keyword heuristic."),
-        SettingDefinition(field="comment_detect_statements", value_type=bool, group=SettingsGroup.COMMENT_FORMATTING, help="Protect standalone runs containing parseable Python statements."),
-        SettingDefinition(field="comment_detect_expressions", value_type=bool, group=SettingsGroup.COMMENT_FORMATTING, help="Protect standalone runs containing nontrivial Python expressions."),
-        SettingDefinition(
+        CheckSettingDefinition(
+            cache_identity_role=CacheIdentityRole.DIRECT_ANALYSIS_VALUE,
+            field="comment_detect_code",
+            value_type=bool,
+            group=SettingsGroup.COMMENT_FORMATTING,
+            help="Protect standalone runs matching the indentation and leading-keyword heuristic.",
+        ),
+        CheckSettingDefinition(
+            cache_identity_role=CacheIdentityRole.DIRECT_ANALYSIS_VALUE,
+            field="comment_detect_statements",
+            value_type=bool,
+            group=SettingsGroup.COMMENT_FORMATTING,
+            help="Protect standalone runs containing parseable Python statements.",
+        ),
+        CheckSettingDefinition(
+            cache_identity_role=CacheIdentityRole.DIRECT_ANALYSIS_VALUE,
+            field="comment_detect_expressions",
+            value_type=bool,
+            group=SettingsGroup.COMMENT_FORMATTING,
+            help="Protect standalone runs containing nontrivial Python expressions.",
+        ),
+        CheckSettingDefinition(
+            cache_identity_role=CacheIdentityRole.FINAL_RULE_CODES,
             field="select",
             value_type=StringList,
             group=SettingsGroup.RULE_SELECTION,
@@ -898,7 +1123,8 @@ SETTINGS_SCHEMA = SettingsSchema(
             cli={"metavar": "RULE"},
             documentation=f"Rule selectors to enable; {_setting_default_clause('select', StringList)}.",
         ),
-        SettingDefinition(
+        CheckSettingDefinition(
+            cache_identity_role=CacheIdentityRole.FINAL_RULE_CODES,
             field="ignore",
             value_type=StringList,
             group=SettingsGroup.RULE_SELECTION,
@@ -907,7 +1133,8 @@ SETTINGS_SCHEMA = SettingsSchema(
             cli={"metavar": "RULE"},
             documentation="Rule selectors to ignore.",
         ),
-        SettingDefinition(
+        CheckSettingDefinition(
+            cache_identity_role=CacheIdentityRole.FINAL_RULE_CODES,
             field="extend_select",
             value_type=StringList,
             group=SettingsGroup.RULE_SELECTION,
@@ -916,7 +1143,8 @@ SETTINGS_SCHEMA = SettingsSchema(
             cli={"metavar": "RULE"},
             documentation="Additional rule selectors to enable.",
         ),
-        SettingDefinition(
+        CheckSettingDefinition(
+            cache_identity_role=CacheIdentityRole.FINAL_RULE_CODES,
             field="require_explicit",
             value_type=StringList,
             group=SettingsGroup.RULE_SELECTION,
@@ -925,7 +1153,8 @@ SETTINGS_SCHEMA = SettingsSchema(
             cli={"metavar": "RULE"},
             documentation=f"Rule selectors that broad rule selectors do not enable unless an exact rule-code selector also participates; {_setting_default_clause('require_explicit', StringList)}.",
         ),
-        SettingDefinition(
+        CheckSettingDefinition(
+            cache_identity_role=CacheIdentityRole.FINAL_RULE_CODES,
             field="per_file_ignores",
             value_type=MultiStringMap,
             group=SettingsGroup.RULE_SELECTION,
@@ -933,7 +1162,8 @@ SETTINGS_SCHEMA = SettingsSchema(
             cli={"metavar": "RULE_TOML"},
             documentation="File-pattern-specific ignored rule selectors.",
         ),
-        SettingDefinition(
+        CheckSettingDefinition(
+            cache_identity_role=CacheIdentityRole.FINAL_RULE_CODES,
             field="extend_per_file_ignores",
             value_type=MultiStringMap,
             group=SettingsGroup.RULE_SELECTION,
@@ -941,7 +1171,8 @@ SETTINGS_SCHEMA = SettingsSchema(
             cli={"metavar": "RULE_TOML"},
             documentation="Additional file-pattern-specific ignored rule selectors.",
         ),
-        SettingDefinition(
+        CheckSettingDefinition(
+            cache_identity_role=CacheIdentityRole.APPLIED_CONFIGURATION,
             field="per_file_settings",
             value_type=PerFileSettingsMap,
             group=SettingsGroup.CONFIGURATION,
@@ -951,7 +1182,8 @@ SETTINGS_SCHEMA = SettingsSchema(
             documentation="File-pattern-specific formatter setting overrides. Rule-selection, file-selection, run-level, and rule-selection-effect settings cannot be overridden per file.",
             example='[tool.pydocfmt.per-file-settings]\n"tests/**/*.py" = { docstring-missing-documentation = "has-section" }',
         ),
-        SettingDefinition(
+        CheckSettingDefinition(
+            cache_identity_role=CacheIdentityRole.CLEAN_PROOF_IRRELEVANT,
             field="fixable",
             value_type=StringList,
             group=SettingsGroup.RULE_SELECTION,
@@ -960,7 +1192,8 @@ SETTINGS_SCHEMA = SettingsSchema(
             cli={"metavar": "RULE"},
             documentation=f"Rule selectors eligible for automatic fixes; {_setting_default_clause('fixable', StringList)}.",
         ),
-        SettingDefinition(
+        CheckSettingDefinition(
+            cache_identity_role=CacheIdentityRole.CLEAN_PROOF_IRRELEVANT,
             field="unfixable",
             value_type=StringList,
             group=SettingsGroup.RULE_SELECTION,
@@ -969,7 +1202,8 @@ SETTINGS_SCHEMA = SettingsSchema(
             cli={"metavar": "RULE"},
             documentation="Rule selectors ineligible for automatic fixes.",
         ),
-        SettingDefinition(
+        CheckSettingDefinition(
+            cache_identity_role=CacheIdentityRole.CLEAN_PROOF_IRRELEVANT,
             field="extend_fixable",
             value_type=StringList,
             group=SettingsGroup.RULE_SELECTION,
@@ -978,7 +1212,8 @@ SETTINGS_SCHEMA = SettingsSchema(
             cli={"metavar": "RULE"},
             documentation="Additional rule selectors eligible for automatic fixes.",
         ),
-        SettingDefinition(
+        CheckSettingDefinition(
+            cache_identity_role=CacheIdentityRole.DISCOVERY_ONLY,
             field="include",
             value_type=StringList,
             group=SettingsGroup.FILE_SELECTION,
@@ -987,7 +1222,8 @@ SETTINGS_SCHEMA = SettingsSchema(
             cli={"metavar": "GLOB"},
             documentation="Glob patterns for files to include.",
         ),
-        SettingDefinition(
+        CheckSettingDefinition(
+            cache_identity_role=CacheIdentityRole.DISCOVERY_ONLY,
             field="extend_include",
             value_type=StringList,
             group=SettingsGroup.FILE_SELECTION,
@@ -996,7 +1232,8 @@ SETTINGS_SCHEMA = SettingsSchema(
             cli={"metavar": "GLOB"},
             documentation="Additional include glob patterns.",
         ),
-        SettingDefinition(
+        CheckSettingDefinition(
+            cache_identity_role=CacheIdentityRole.DISCOVERY_ONLY,
             field="exclude",
             value_type=StringList,
             group=SettingsGroup.FILE_SELECTION,
@@ -1005,7 +1242,8 @@ SETTINGS_SCHEMA = SettingsSchema(
             cli={"metavar": "GLOB"},
             documentation="Glob patterns for files/directories to exclude.",
         ),
-        SettingDefinition(
+        CheckSettingDefinition(
+            cache_identity_role=CacheIdentityRole.DISCOVERY_ONLY,
             field="extend_exclude",
             value_type=StringList,
             group=SettingsGroup.FILE_SELECTION,
@@ -1014,8 +1252,19 @@ SETTINGS_SCHEMA = SettingsSchema(
             cli={"metavar": "GLOB"},
             documentation="Additional exclude glob patterns.",
         ),
-        SettingDefinition(field="respect_gitignore", value_type=bool, group=SettingsGroup.FILE_SELECTION, help="Respect .gitignore when discovering files."),
-        SettingDefinition(field="force_exclude", value_type=bool, group=SettingsGroup.FILE_SELECTION, help="Apply exclude rules even to files passed explicitly."),
+        CheckSettingDefinition(
+            cache_identity_role=CacheIdentityRole.DISCOVERY_ONLY, field="respect_gitignore", value_type=bool, group=SettingsGroup.FILE_SELECTION, help="Respect .gitignore when discovering files."
+        ),
+        CheckSettingDefinition(
+            cache_identity_role=CacheIdentityRole.DISCOVERY_ONLY,
+            field="force_exclude",
+            value_type=bool,
+            group=SettingsGroup.FILE_SELECTION,
+            help="Apply exclude rules even to files passed explicitly.",
+        ),
     ),
     table_path=("tool", "pydocfmt"),
 )
+
+CHECK_SETTING_DEFINITIONS = tuple(cast("CheckSettingDefinition", definition) for definition in SETTINGS_SCHEMA.definitions)
+DIRECT_ANALYSIS_DEFINITIONS = tuple(definition for definition in CHECK_SETTING_DEFINITIONS if definition.cache_identity_role is CacheIdentityRole.DIRECT_ANALYSIS_VALUE)

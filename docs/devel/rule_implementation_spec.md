@@ -31,6 +31,7 @@ Every rule class defines `meta = RuleMetadata(...)` with:
 - `setting_effects`: A tuple, explicitly `()` when empty.
 - `incompatible_with`: A tuple, explicitly `()` when empty.
 - `check_kind`: The rule execution kind.
+- `cache_behavior`: An intentional persistent-cache dependency declaration. Built-in file-local rules pass `cache_behavior=RuleCacheBehavior.FILE_LOCAL` directly to `RuleMetadata(...)`; omitting the argument fails closed as uncacheable.
 
 Rule incompatibilities must be declared on both rules. Rule collection rejects one-sided, self-referential, unknown, or duplicate incompatibilities.
 
@@ -50,6 +51,10 @@ def violations(cls, context: RuleContext) -> tuple[RuleViolation, ...]: ...
 `violations()` must be a class method accepting exactly one required positional argument named `context`. Suppression-audit rules may omit `violations()` when the runner synthesizes their findings.
 
 Rule code reads source state from `RuleContext`. Category-level shared data is prepared by `RuleCategoryBase.prepare()` and exposed through `context.category_data`; categories that provide typed data should also provide a checked accessor such as `PDF.require_data(context)` or `PCF.require_data(context)`.
+
+Cacheable rule finding and error behavior may depend only on source bytes, effective settings classified as direct analysis values, the final ordered rule codes, `context.source_path`, engine identity, and the concrete line ending. Rule code receives the complete `CheckSettings`, but a cacheable rule must not make finding or error existence depend on excluded run controls, discovery inputs, raw selection values, configuration provenance, or fixability. A rule that reads other project files, environment variables, clocks, random state, subprocess output, network data, mutable global state, or another excluded input must remain `UNCACHEABLE` until that dependency has a canonical invalidation fingerprint. New dependency kinds must be documented and tested before cacheability is enabled.
+
+Configured fixability remains available to the runner for finding labels and repair decisions, but it is not part of final rule-code identity. Persistent proofs are populated only for finding-free, error-free on-disk source states, so a reusable proof has no finding whose label or fix behavior could change. If future behavior makes fixability affect whether a finding or analysis error exists, its identity treatment and invalidation tests must change with that behavior.
 
 Category `prepare()` data is read-only for the current module. If a fix changes the module, the runner prepares fresh category data for the new module state before later rules rely on it.
 

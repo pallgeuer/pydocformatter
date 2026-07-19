@@ -18,7 +18,7 @@ import pydocformatter.rules.definitions.PDF.PDF002_docstring_backslash_raw_prefi
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase
 from pydocformatter.rules.definition_helpers import source_text, string_literals
-from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata
+from pydocformatter.rules.models import FixAvailability, RuleCacheBehavior, RuleCheckKind, RuleMetadata
 
 
 if TYPE_CHECKING:
@@ -43,6 +43,7 @@ class PDF003DocstringAsciiOnly(RuleBase):
         setting_effects=(),
         incompatible_with=(),
         check_kind=RuleCheckKind.STANDARD,
+        cache_behavior=RuleCacheBehavior.FILE_LOCAL,
     )
 
     @classmethod

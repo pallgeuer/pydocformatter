@@ -13,7 +13,7 @@ from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase
 from pydocformatter.rules.definition_helpers import attribute_documentation, docstring_conventions
 from pydocformatter.rules.definitions.PDF.PDF import PDF
-from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata
+from pydocformatter.rules.models import FixAvailability, RuleCacheBehavior, RuleCheckKind, RuleMetadata
 
 
 if TYPE_CHECKING:
@@ -39,6 +39,7 @@ class PDF525PrivateModuleAttributeDocstringMustBeAttached(RuleBase):
         setting_effects=docstring_conventions.convention_setting_effects(disabled=docstring_conventions.UNPARSED_CONVENTIONS),
         incompatible_with=(RuleCode("PDF517"), RuleCode("PDF524")),
         check_kind=RuleCheckKind.STANDARD,
+        cache_behavior=RuleCacheBehavior.FILE_LOCAL,
     )
 
     @classmethod

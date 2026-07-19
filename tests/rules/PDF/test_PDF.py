@@ -27,6 +27,7 @@ from pydocformatter.rules.definitions.PDF.PDF import (
     escaped_closing_quote_body_source,
     simple_docstring_body_source_candidates,
 )
+from pydocformatter.source_path import SourcePathContext
 
 
 if typing.TYPE_CHECKING:
@@ -43,6 +44,7 @@ def category_context(source: str, *, settings: CheckSettings | None = None) -> R
     metadata_wrapper = cst_metadata.MetadataWrapper(module, unsafe_skip_copy=True)
     return RuleCategoryContext(
         path="example.py",
+        source_path=SourcePathContext.for_path("example.py"),
         settings=CheckSettings() if settings is None else settings,
         module=module,
         metadata_wrapper=metadata_wrapper,
@@ -57,6 +59,7 @@ def category_context(source: str, *, settings: CheckSettings | None = None) -> R
 def rule_context(context: RuleCategoryContext, data: object | None) -> RuleContext:
     return RuleContext(
         path=context.path,
+        source_path=context.source_path,
         settings=context.settings,
         module=context.module,
         metadata_wrapper=context.metadata_wrapper,

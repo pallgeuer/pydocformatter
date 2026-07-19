@@ -47,9 +47,12 @@ pydocfmt check --config 'line-length = 100'
 "tests/**/test_*.py" = { docstring-missing-documentation = "has-section" }
 ```
 
+Run-level cache settings cannot be overridden per file. The default cache location is relative to the auto-discovered project configuration root; explicitly configured relative locations follow their normal configuration source base. pydocformatter may create the cache directory, but its immediate parent must already exist as a directory. `pydocfmt clean` uses the same configuration discovery and global `--config`/`--isolated` arguments, and accepts `--cache-dir PATH` as a direct override.
+
 ## Reference
 
 - [Settings](settings.md) lists every setting.
+- [Persistent cache](reference/cache.md) documents cache validation, population, lifecycle, failures, and trust.
 - [Settings specification](reference/settings-spec.md) documents loading and precedence.
 - [File selection](reference/file-selection.md) documents include, exclude, gitignore, and explicit-path behavior.
 - [Rule selection](reference/rule-selection.md) documents selectors, fixability, and per-file ignores.

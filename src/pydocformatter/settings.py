@@ -88,6 +88,7 @@ class SettingsProfile(Generic[SettingsT]):
         settings (SettingsT): Fully resolved settings object for a path or config layer.
         field_bases (Mapping[str, str]): Absolute base directories used to interpret path-like fields.
         field_priorities (Mapping[str, int]): Configuration-source priorities that supplied each field.
+        project_root (str): Root established by auto-discovered configuration, or the invocation working directory.
     """
 
     @dataclasses.dataclass(frozen=True)
@@ -98,15 +99,18 @@ class SettingsProfile(Generic[SettingsT]):
             settings (SettingsKeyT): Hashable representation of the resolved settings object.
             field_bases (tuple[tuple[str, str], ...]): Sorted source-base mapping for path-like settings.
             field_priorities (tuple[tuple[str, int], ...]): Sorted priority mapping for resolved setting fields.
+            project_root (str): Root established by auto-discovered configuration or the invocation directory.
         """
 
         settings: SettingsKeyT
         field_bases: tuple[tuple[str, str], ...]
         field_priorities: tuple[tuple[str, int], ...]
+        project_root: str
 
     settings: SettingsT
     field_bases: Mapping[str, str]
     field_priorities: Mapping[str, int]
+    project_root: str
 
     def key(self) -> SettingsProfile.Key[SettingsT]:
         """Return a stable hashable identity for this resolved settings profile.
@@ -114,7 +118,9 @@ class SettingsProfile(Generic[SettingsT]):
         Returns:
             SettingsProfile.Key[SettingsT]: Cache key combining settings values, field bases, and field priorities.
         """
-        return SettingsProfile.Key(settings=self.settings, field_bases=tuple(sorted(self.field_bases.items())), field_priorities=tuple(sorted(self.field_priorities.items())))
+        return SettingsProfile.Key(
+            settings=self.settings, field_bases=tuple(sorted(self.field_bases.items())), field_priorities=tuple(sorted(self.field_priorities.items())), project_root=self.project_root
+        )
 
     def base_for_field(self, field: str) -> str:
         """Return the absolute base directory associated with a resolved field.
@@ -139,9 +145,188 @@ class SettingsProfile(Generic[SettingsT]):
         return self.field_priorities.get(field, DEFAULT_SOURCE_PRIORITY)
 
 
+class _SettingsProfileSourceKind(enum.Enum):
+    """Configuration source category used to share equivalent resolver profiles."""
+
+    ISOLATED = enum.auto()
+    EXPLICIT = enum.auto()
+    AUTO = enum.auto()
+    NO_CONFIG = enum.auto()
+
+
+@dataclasses.dataclass(frozen=True)
+class _SettingsProfileSource:
+    """Identity of the configuration source and lookup base used to build a profile.
+
+    Attributes:
+        kind (_SettingsProfileSourceKind): Configuration discovery mode that selected the source.
+        config_path (str | None): Explicit spelling or absolute auto-discovered path of the selected config file.
+        cwd_base (str): Working directory captured for this uncached lookup and used by non-auto source layers.
+    """
+
+    kind: _SettingsProfileSourceKind
+    config_path: str | None
+    cwd_base: str
+
+
+@dataclasses.dataclass
+class _SettingsConfigInputs:
+    """Classified global configuration inputs for one resolver working-directory base.
+
+    Attributes:
+        inline_options (tuple[str, ...]): Ordered inline TOML strings from global configuration options.
+        explicit_path (str | None): Sole explicit config path spelling, if supplied.
+        parsed_inline_sections (tuple[dict[str, Any], ...] | None): Successfully parsed inline documents, or None before
+            parsing succeeds.
+    """
+
+    inline_options: tuple[str, ...]
+    explicit_path: str | None
+    parsed_inline_sections: tuple[dict[str, Any], ...] | None = None
+
+
+@dataclasses.dataclass
+class _SettingsResolutionContext(Generic[SettingsT]):
+    """Mutable invocation snapshot shared by one path-aware settings resolver.
+
+    Successfully parsed TOML documents are shared read-only because table extraction only navigates them and flattening
+    copies the selected section before validation. Discovery and profile caches deliberately snapshot filesystem
+    configuration for the resolver lifetime. Config input classification and source identity retain the working
+    directory captured for each uncached lookup so a resolver used across working-directory changes preserves existing
+    lookup-time bases. Resolver arguments, global values, and field overrides are invocation inputs and must not be
+    mutated after lookups begin.
+
+    Attributes:
+        parsed_toml_by_path (dict[str, dict[str, Any]]): Successful TOML documents keyed by normalized absolute lexical
+            path.
+        closest_auto_config_by_start_dir (dict[str, str | None]): Closest applicable auto config or negative discovery
+            result for searched absolute directories.
+        profiles_by_source (dict[_SettingsProfileSource, SettingsProfile[SettingsT]]): Fully layered profiles shared by
+            explicit source identity rather than settings equality.
+        config_inputs_by_cwd (dict[str, _SettingsConfigInputs]): Lazily classified global config options for each
+            lookup-time working directory.
+        argument_overrides (dict[str, Any] | None): Successfully computed dedicated CLI overrides, or None before
+            computation.
+    """
+
+    parsed_toml_by_path: dict[str, dict[str, Any]] = dataclasses.field(default_factory=dict)
+    closest_auto_config_by_start_dir: dict[str, str | None] = dataclasses.field(default_factory=dict)
+    profiles_by_source: dict[_SettingsProfileSource, SettingsProfile[SettingsT]] = dataclasses.field(default_factory=dict)
+    config_inputs_by_cwd: dict[str, _SettingsConfigInputs] = dataclasses.field(default_factory=dict)
+    argument_overrides: dict[str, Any] | None = None
+
+    def load_toml_file(self, path: str, *, required: bool) -> dict[str, Any] | None:
+        """Load and cache one successful TOML document by normalized lexical path.
+
+        Args:
+            path (str): Original file spelling retained for opening and user-facing errors.
+            required (bool): Whether an absent file raises instead of returning None.
+
+        Returns:
+            dict[str, Any] | None: Shared successfully parsed document, or None for an optional absent file.
+
+        Raises:
+            SettingsError: If a required file is missing or an existing file cannot be read or decoded.
+        """
+        cache_key = os.path.normcase(os.path.abspath(os.path.normpath(path)))
+        cached_config = self.parsed_toml_by_path.get(cache_key)
+        if cached_config is not None:
+            return cached_config
+        config = _load_toml_file(path, required=required)
+        if config is not None:
+            self.parsed_toml_by_path[cache_key] = config
+        return config
+
+    def config_inputs_for_cwd(self, global_values: GlobalArgs, cwd_base: str) -> _SettingsConfigInputs:
+        """Return lazily classified global config options for one working-directory base.
+
+        Args:
+            global_values (GlobalArgs): Invocation inputs containing ordered inline or path config options and isolated
+                mode.
+            cwd_base (str): Lookup-time working directory used to classify relative spellings containing an equals sign.
+
+        Returns:
+            _SettingsConfigInputs: Cached successful classification for `cwd_base`.
+
+        Raises:
+            SettingsError: If multiple explicit paths are supplied or isolated mode is combined with an explicit path.
+        """
+        cached_inputs = self.config_inputs_by_cwd.get(cwd_base)
+        if cached_inputs is not None:
+            return cached_inputs
+
+        inline_options: list[str] = []
+        path_options: list[str] = []
+        for option in global_values.config_options:
+            candidate = option if os.path.isabs(option) else os.path.join(cwd_base, option)
+            if "=" in option and not os.path.exists(candidate):
+                inline_options.append(option)
+            else:
+                path_options.append(option)
+        if len(path_options) > 1:
+            raise SettingsError("Only one --config=PATH configuration file can be supplied")
+        if global_values.isolated and path_options:
+            raise SettingsError("The argument --config=PATH cannot be used with --isolated")
+
+        config_inputs = _SettingsConfigInputs(inline_options=tuple(inline_options), explicit_path=path_options[0] if path_options else None)
+        self.config_inputs_by_cwd[cwd_base] = config_inputs
+        return config_inputs
+
+    @staticmethod
+    def inline_sections(config_inputs: _SettingsConfigInputs) -> Iterable[dict[str, Any]]:
+        """Yield inline TOML sections in parse and application order.
+
+        Args:
+            config_inputs (_SettingsConfigInputs): Classified inputs whose inline strings should be parsed.
+
+        Yields:
+            dict[str, Any]: Next ordered inline section, with the complete sequence cached after the caller processes
+                every string.
+
+        Raises:
+            SettingsError: If an inline TOML string cannot be decoded.
+        """
+        if config_inputs.parsed_inline_sections is not None:
+            yield from config_inputs.parsed_inline_sections
+            return
+
+        sections: list[dict[str, Any]] = []
+        for option in config_inputs.inline_options:
+            try:
+                section = tomllib.loads(option)
+            except tomllib.TOMLDecodeError as error:
+                raise SettingsError(f"Failed to decode --config inline TOML: {error}") from error
+            sections.append(section)
+            yield section
+        config_inputs.parsed_inline_sections = tuple(sections)
+
+    def argument_overrides_for(self, schema: SettingsSchema[SettingsT], args: argparse.Namespace | None) -> dict[str, Any]:
+        """Return dedicated CLI overrides after one successful lazy computation.
+
+        Args:
+            schema (SettingsSchema[SettingsT]): Schema that converts command arguments into field overrides.
+            args (argparse.Namespace | None): Parsed invocation arguments, or None when no dedicated layer exists.
+
+        Returns:
+            dict[str, Any]: Shared field-keyed argument overrides, which may be empty.
+
+        Raises:
+            tomllib.TOMLDecodeError: If a TOML-map command argument cannot be decoded.
+        """
+        if self.argument_overrides is None:
+            self.argument_overrides = {} if args is None else schema.argument_overrides(args)
+        return self.argument_overrides
+
+
 @dataclasses.dataclass(frozen=True)
 class SettingsResolver(Generic[SettingsT]):
-    """Resolve settings for paths using Ruff-style closest-config semantics.
+    """Resolve settings for paths using an invocation-scoped configuration snapshot.
+
+    Exact starting directories retain first-level aliases, while equivalent source identities share one fully layered
+    profile. Successfully parsed files and searched ancestors remain snapshots for this resolver's lifetime. Separate
+    resolvers start empty and observe current filesystem state. Lookup-time working directories remain part of source
+    identity, and exact directory aliases resolved before a working-directory change remain unchanged. Global values,
+    argparse values, and field overrides are treated as immutable invocation inputs once resolution begins.
 
     Attributes:
         schema (SettingsSchema[SettingsT]): Settings schema used to load and validate profiles.
@@ -155,9 +340,10 @@ class SettingsResolver(Generic[SettingsT]):
     args: argparse.Namespace | None = None
     field_overrides: Mapping[str, Any] | None = None
     _profiles_by_start_dir: dict[str, SettingsProfile[SettingsT]] = dataclasses.field(default_factory=dict)
+    _context: _SettingsResolutionContext[SettingsT] = dataclasses.field(default_factory=_SettingsResolutionContext, compare=False, repr=False)
 
     def profile_for_path(self, path: str | None = None) -> SettingsProfile[SettingsT]:
-        """Return settings for a path, caching by the path's containing directory.
+        """Return settings for a path from exact-directory and shared-source caches.
 
         Args:
             path (str | None): File or directory path whose closest applicable config should be resolved, or the current
@@ -170,7 +356,21 @@ class SettingsResolver(Generic[SettingsT]):
         cached_profile = self._profiles_by_start_dir.get(start_dir)
         if cached_profile is not None:
             return cached_profile
-        profile = self.schema.load_profile(global_values=self.global_values, args=self.args, field_overrides=self.field_overrides, path=start_dir)
+
+        cwd_base = os.getcwd()
+        config_inputs = self._context.config_inputs_for_cwd(self.global_values, cwd_base)
+        if self.global_values.isolated:
+            source = _SettingsProfileSource(kind=_SettingsProfileSourceKind.ISOLATED, config_path=None, cwd_base=cwd_base)
+        elif config_inputs.explicit_path is not None:
+            source = _SettingsProfileSource(kind=_SettingsProfileSourceKind.EXPLICIT, config_path=config_inputs.explicit_path, cwd_base=cwd_base)
+        else:
+            auto_path = _auto_discovered_pyproject_path_for_path_with_context(start_dir, table_path=self.schema.table_path, context=self._context)
+            source = _SettingsProfileSource(kind=_SettingsProfileSourceKind.NO_CONFIG if auto_path is None else _SettingsProfileSourceKind.AUTO, config_path=auto_path, cwd_base=cwd_base)
+
+        profile = self._context.profiles_by_source.get(source)
+        if profile is None:
+            profile = _load_profile_from_source(self.schema, args=self.args, field_overrides=self.field_overrides, cwd_base=cwd_base, source=source, config_inputs=config_inputs, context=self._context)
+            self._context.profiles_by_source[source] = profile
         self._profiles_by_start_dir[start_dir] = profile
         return profile
 
@@ -445,7 +645,7 @@ class SettingsSchema(Generic[SettingsT]):
     def load_profile(
         self, *, global_values: GlobalArgs | None = None, args: argparse.Namespace | None = None, field_overrides: Mapping[str, Any] | None = None, path: str | None = None
     ) -> SettingsProfile[SettingsT]:
-        """Resolve settings and source metadata for one path.
+        """Resolve fresh settings and source metadata for one path.
 
         Args:
             global_values (GlobalArgs | None): Global configuration options and isolated-mode flag.
@@ -460,55 +660,7 @@ class SettingsSchema(Generic[SettingsT]):
             SettingsError: If any configuration source cannot be loaded or validated.
             tomllib.TOMLDecodeError: If a TOML-map CLI value is malformed.
         """
-        if global_values is None:
-            global_values = GlobalArgs()
-
-        inline_options: list[str] = []
-        path_options: list[str] = []
-        for option in global_values.config_options:
-            if "=" in option and not os.path.exists(option):
-                inline_options.append(option)
-            else:
-                path_options.append(option)
-        if len(path_options) > 1:
-            raise SettingsError("Only one --config=PATH configuration file can be supplied")
-
-        cwd_base = os.getcwd()
-        profile = SettingsProfile(
-            settings=self.settings_type(),
-            field_bases={definition.field: cwd_base for definition in self.definitions},
-            field_priorities={definition.field: DEFAULT_SOURCE_PRIORITY for definition in self.definitions},
-        )
-
-        if global_values.isolated:
-            if path_options:
-                raise SettingsError("The argument --config=PATH cannot be used with --isolated")
-        else:
-            if not path_options:
-                auto_path = _auto_discovered_pyproject_path_for_path(path, table_path=self.table_path)
-                if auto_path is not None:
-                    profile = _apply_toml_file_profile(
-                        self, profile, path=auto_path, required=False, source_base=os.path.dirname(os.path.abspath(auto_path)), source_priority=CONFIG_FILE_SOURCE_PRIORITY
-                    )
-            for option in path_options:
-                profile = _apply_toml_file_profile(self, profile, path=option, required=True, source_base=cwd_base, source_priority=CONFIG_FILE_SOURCE_PRIORITY)
-
-        for option in inline_options:
-            try:
-                section = tomllib.loads(option)
-            except tomllib.TOMLDecodeError as error:
-                raise SettingsError(f"Failed to decode --config inline TOML: {error}") from error
-            profile = _apply_toml_section_profile(self, profile, section=section, context="<--config>", source_base=cwd_base, source_priority=INLINE_CONFIG_SOURCE_PRIORITY)
-
-        if args is not None:
-            argument_overrides = self.argument_overrides(args)
-            if argument_overrides:
-                profile = _apply_field_values_profile(self, profile, values=argument_overrides, context="<argparse>", key_based=False, source_base=cwd_base, source_priority=ARGUMENT_SOURCE_PRIORITY)
-
-        if field_overrides:
-            profile = _apply_field_values_profile(self, profile, values=field_overrides, context="<overrides>", key_based=False, source_base=cwd_base, source_priority=FIELD_OVERRIDE_SOURCE_PRIORITY)
-
-        return profile
+        return self.resolver(global_values=global_values, args=args, field_overrides=field_overrides).profile_for_path(path)
 
     def format(self, settings: SettingsT) -> str:
         """Return resolved settings in a stable TOML-like form.
@@ -546,23 +698,32 @@ class SettingsSchema(Generic[SettingsT]):
                 if definition.group == group:
                     handled_definitions.append(definition)
                     if definition.available_in_cli:
-                        if definition.cli is None:
-                            raise AssertionError(f"Setting definition for {definition.field!r} has no CLI metadata")
-                        kwargs: dict[str, Any] = {"default": None, "dest": definition.field, "help": _format_cli_help(definition, settings)}
-                        if definition.cli.action is not None:
-                            kwargs["action"] = definition.cli.action
-                        if definition.cli.choices is not None:
-                            kwargs["choices"] = definition.cli.choices
-                        if definition.cli.type is not None:
-                            kwargs["type"] = definition.cli.type
-                        if definition.cli.metavar is not None:
-                            kwargs["metavar"] = definition.cli.metavar
-                        argument_group.add_argument(*definition.cli.flags, **kwargs)
+                        _add_setting_argument(argument_group, definition, settings)
 
         if len(handled_definitions) != len(self.definitions):
             handled_fields = {definition.field for definition in handled_definitions}
             missing_fields = tuple(definition.field for definition in self.definitions if definition.field not in handled_fields)
             raise AssertionError(f"Not all settings definitions were added to argparse groups: {', '.join(missing_fields)}")
+
+    def add_argument(self, parser: argparse.ArgumentParser, settings: SettingsT, field: str) -> None:
+        """Add one schema-backed CLI setting argument to a parser.
+
+        Args:
+            parser (argparse.ArgumentParser): Parser that should receive the setting argument.
+            settings (SettingsT): Settings object supplying the current default for help text.
+            field (str): Dataclass field whose CLI definition should be added.
+
+        Raises:
+            KeyError: If the field is unknown.
+            ValueError: If the setting is unavailable on the CLI.
+        """
+        try:
+            definition = next(definition for definition in self.definitions if definition.field == field)
+        except StopIteration:
+            raise KeyError(field) from None
+        if not definition.available_in_cli:
+            raise ValueError(f"Setting {field!r} is not available on the CLI")
+        _add_setting_argument(parser, definition, settings)
 
     def argument_overrides(self, args: argparse.Namespace) -> dict[str, Any]:
         """Build settings overrides dict from parsed command-line arguments.
@@ -604,6 +765,22 @@ class SettingsSchema(Generic[SettingsT]):
                 else:
                     raise AssertionError(f"Unknown CLI value kind: {definition.cli.value_kind}")
         return values
+
+
+def _add_setting_argument(parser: argparse._ActionsContainer, definition: SettingDefinition[Any], settings: Any) -> None:
+    """Add one resolved schema definition to an argparse container."""
+    if definition.cli is None:
+        raise AssertionError(f"Setting definition for {definition.field!r} has no CLI metadata")
+    kwargs: dict[str, Any] = {"default": None, "dest": definition.field, "help": _format_cli_help(definition, settings)}
+    if definition.cli.action is not None:
+        kwargs["action"] = definition.cli.action
+    if definition.cli.choices is not None:
+        kwargs["choices"] = definition.cli.choices
+    if definition.cli.type is not None:
+        kwargs["type"] = definition.cli.type
+    if definition.cli.metavar is not None:
+        kwargs["metavar"] = definition.cli.metavar
+    parser.add_argument(*definition.cli.flags, **kwargs)
 
 
 def _format_cli_help(definition: SettingDefinition[Any], settings: Any) -> str:
@@ -857,6 +1034,28 @@ def validate_non_empty_string_list(value: Any, context: str) -> StringList:
     return values
 
 
+def validate_non_empty_path(value: Any, context: str) -> str:
+    """Validate a non-empty filesystem path string without changing its spelling.
+
+    Args:
+        value (Any): Raw value supplied by a configuration source.
+        context (str): User-facing setting label included in validation errors.
+
+    Returns:
+        str: Original non-empty path string.
+
+    Raises:
+        SettingsError: If the value is not a non-empty string.
+    """
+    if not isinstance(value, str):
+        raise SettingsError(f"{context} must be a string path")
+    if not value:
+        raise SettingsError(f"{context} must not be empty")
+    if "\0" in value:
+        raise SettingsError(f"{context} must not contain NUL characters")
+    return value
+
+
 def validate_multi_string_map(value: Any, context: str) -> MultiStringMap:
     """Validate and return a mapping of strings to non-empty string lists.
 
@@ -938,20 +1137,106 @@ def _settings_start_dir(path: str | None) -> str:
     return os.path.dirname(absolute_path)
 
 
-def _auto_discovered_pyproject_path_for_path(path: str | None, *, table_path: tuple[str, ...]) -> str | None:
-    """Return the closest containing pyproject with the configured table."""
+def _auto_discovered_pyproject_path_for_path_with_context(path: str | None, *, table_path: tuple[str, ...], context: _SettingsResolutionContext[Any]) -> str | None:
+    """Return the closest containing pyproject with child-first ancestor caching.
+
+    Every uncached directory examines its own candidate before consulting a cached parent so an earlier parent lookup
+    cannot hide an existing nested configuration.
+
+    Args:
+        path (str | None): File or directory whose containing ancestors should be searched, defaulting to cwd.
+        table_path (tuple[str, ...]): Nested TOML table that makes a candidate applicable.
+        context (_SettingsResolutionContext[Any]): Resolver-owned parsed-document and closest-result snapshot.
+
+    Returns:
+        str | None: Absolute closest applicable pyproject path, or None when no ancestor matches.
+
+    Raises:
+        SettingsError: If an existing candidate cannot be read, decoded, or traversed as the requested table shape.
+    """
     current_dir = _settings_start_dir(path)
+    visited: list[str] = []
+    result: str | None
     while True:
+        if current_dir in context.closest_auto_config_by_start_dir:
+            result = context.closest_auto_config_by_start_dir[current_dir]
+            break
+
         candidate = os.path.join(current_dir, "pyproject.toml")
         if os.path.exists(candidate):
-            config = _load_toml_file(candidate, required=True)
+            config = context.load_toml_file(candidate, required=True)
             if config is not None and _toml_section_at_table_path(config, path=candidate, table_path=table_path, required=False) is not None:
-                return candidate
+                result = candidate
+                context.closest_auto_config_by_start_dir[current_dir] = result
+                break
 
+        visited.append(current_dir)
         parent_dir = os.path.dirname(current_dir)
         if parent_dir == current_dir:
-            return None
+            result = None
+            break
         current_dir = parent_dir
+
+    for visited_dir in visited:
+        context.closest_auto_config_by_start_dir[visited_dir] = result
+    return result
+
+
+def _load_profile_from_source(
+    schema: SettingsSchema[SettingsT],
+    *,
+    args: argparse.Namespace | None,
+    field_overrides: Mapping[str, Any] | None,
+    cwd_base: str,
+    source: _SettingsProfileSource,
+    config_inputs: _SettingsConfigInputs,
+    context: _SettingsResolutionContext[SettingsT],
+) -> SettingsProfile[SettingsT]:
+    """Build one fully layered profile from an already resolved source identity.
+
+    Args:
+        schema (SettingsSchema[SettingsT]): Schema used for defaults, validation, and layer application.
+        args (argparse.Namespace | None): Parsed command arguments applied after file and inline layers.
+        field_overrides (Mapping[str, Any] | None): Programmatic overrides applied at the highest priority.
+        cwd_base (str): Lookup-time working directory used for defaults and non-auto source bases.
+        source (_SettingsProfileSource): Already discovered source kind, path, and working-directory identity.
+        config_inputs (_SettingsConfigInputs): Classified and lazily parsed global config inputs for `cwd_base`.
+        context (_SettingsResolutionContext[SettingsT]): Resolver-owned parsed-document and lazy-override snapshot.
+
+    Returns:
+        SettingsProfile[SettingsT]: Frozen resolved settings and source metadata.
+
+    Raises:
+        SettingsError: If any file, inline, argument, or field layer cannot be loaded or validated.
+        tomllib.TOMLDecodeError: If a TOML-map command argument cannot be decoded.
+    """
+    profile = SettingsProfile(
+        settings=schema.settings_type(),
+        field_bases={definition.field: cwd_base for definition in schema.definitions},
+        field_priorities={definition.field: DEFAULT_SOURCE_PRIORITY for definition in schema.definitions},
+        project_root=cwd_base,
+    )
+
+    if source.kind is _SettingsProfileSourceKind.EXPLICIT:
+        config_path = cast("str", source.config_path)
+        profile = _apply_toml_file_profile(schema, profile, path=config_path, required=True, source_base=cwd_base, source_priority=CONFIG_FILE_SOURCE_PRIORITY, context=context)
+    elif source.kind is _SettingsProfileSourceKind.AUTO:
+        config_path = cast("str", source.config_path)
+        project_root = os.path.dirname(os.path.abspath(config_path))
+        profile = dataclasses.replace(profile, project_root=project_root)
+        profile = _apply_toml_file_profile(schema, profile, path=config_path, required=False, source_base=project_root, source_priority=CONFIG_FILE_SOURCE_PRIORITY, context=context)
+
+    for section in context.inline_sections(config_inputs):
+        profile = _apply_toml_section_profile(schema, profile, section=section, context="<--config>", source_base=cwd_base, source_priority=INLINE_CONFIG_SOURCE_PRIORITY)
+
+    argument_overrides = context.argument_overrides_for(schema, args)
+    if argument_overrides:
+        profile = _apply_field_values_profile(schema, profile, values=argument_overrides, context="<argparse>", key_based=False, source_base=cwd_base, source_priority=ARGUMENT_SOURCE_PRIORITY)
+
+    if field_overrides:
+        profile = _apply_field_values_profile(schema, profile, values=field_overrides, context="<overrides>", key_based=False, source_base=cwd_base, source_priority=FIELD_OVERRIDE_SOURCE_PRIORITY)
+
+    return profile
 
 
 def _toml_section_at_table_path(config: dict[str, Any], *, path: str, table_path: tuple[str, ...], required: bool) -> dict[str, Any] | None:
@@ -975,10 +1260,27 @@ def _toml_section_at_table_path(config: dict[str, Any], *, path: str, table_path
 
 
 def _apply_toml_file_profile(
-    schema: SettingsSchema[SettingsT], profile: SettingsProfile[SettingsT], *, path: str, required: bool, source_base: str, source_priority: int
+    schema: SettingsSchema[SettingsT], profile: SettingsProfile[SettingsT], *, path: str, required: bool, source_base: str, source_priority: int, context: _SettingsResolutionContext[SettingsT]
 ) -> SettingsProfile[SettingsT]:
-    """Apply one config file to the passed settings profile."""
-    section = _load_toml_file(path, required=required)  # Only returns None if the file is both absent and not required
+    """Apply one resolver-cached config file to the passed settings profile.
+
+    Args:
+        schema (SettingsSchema[SettingsT]): Schema used to locate and validate the applicable settings table.
+        profile (SettingsProfile[SettingsT]): Profile to update from the selected file.
+        path (str): Original config path spelling retained for loading and error context.
+        required (bool): Whether an absent file or pyproject settings table raises.
+        source_base (str): Base assigned to fields updated by this file.
+        source_priority (int): Priority assigned to fields updated by this file.
+        context (_SettingsResolutionContext[SettingsT]): Resolver-owned successful-document cache.
+
+    Returns:
+        SettingsProfile[SettingsT]: Updated profile, or the input profile for an optional absent source.
+
+    Raises:
+        SettingsError: If the file or applicable table cannot be loaded or validated.
+    """
+    # Only returns None if the file is both absent and not required
+    section = context.load_toml_file(path, required=required)
     if section is None:
         return profile
 
@@ -987,11 +1289,11 @@ def _apply_toml_file_profile(
         section = _toml_section_at_table_path(section, path=path, table_path=schema.table_path, required=required)
         if section is None:
             return profile
-        context = f"<{path}>.{schema.table_name}"
+        section_context = f"<{path}>.{schema.table_name}"
     else:
-        context = f"<{path}>"
+        section_context = f"<{path}>"
 
-    return _apply_toml_section_profile(schema, profile, section=section, context=context, source_base=source_base, source_priority=source_priority)
+    return _apply_toml_section_profile(schema, profile, section=section, context=section_context, source_base=source_base, source_priority=source_priority)
 
 
 def _apply_toml_section_profile(
@@ -1055,4 +1357,4 @@ def _apply_field_values_profile(
     for field in updates:
         field_bases[field] = absolute_source_base
         field_priorities[field] = source_priority
-    return SettingsProfile(settings=settings, field_bases=field_bases, field_priorities=field_priorities)
+    return SettingsProfile(settings=settings, field_bases=field_bases, field_priorities=field_priorities, project_root=profile.project_root)

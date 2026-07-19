@@ -14,10 +14,59 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## Unreleased
 
+### Added
+
+- **Persistent caching:**
+  - Added strict persistent clean-proof caching for disk-backed checks and fixes, with complete source hashing, semantic analysis-setting and final-rule-code invalidation, shared invocation-local analysis fingerprints, engine/path invalidation, miss-only process execution, bounded parent-side probes, and source-free warm results.
+  - Added `cache` and `cache-dir` settings, `--cache`/`--no-cache`, `--cache-dir`, opt-in `--cache-stats`, safe project cache self-pruning, and the ownership-checked `pydocfmt clean` command with its own `--cache-dir` override.
+  - Added a dedicated public cache reference covering validation, population, mode reuse, storage, cleanup, failures, trust, statistics, and performance expectations.
+
+### Changed
+
+- **Command performance:**
+  - Reused successfully parsed configuration documents, closest-config discovery results, and resolved source profiles within each invocation.
+  - Reduced directory-walk resolver calls and repeated cache-root, glob-segment, and literal-pattern preparation without changing file-selection semantics.
+- **Caching performance:**
+  - Reused resolved package ancestry and canonical sibling path encodings within each invocation while preserving exact cache identities and rule-facing path semantics.
+  - Batched complete-source proof validation with worker-proportional task submission and pending futures while preserving full-content hashing, ordered results, and the all-hit no-analysis-pool path.
+  - Released raw input bytes before parsing and rule execution, and skipped metadata collection when clean source snapshots are not requested.
+  - Derived normal-wheel implementation identities from complete trusted distribution-manifest metadata only when it identifies the imported package root, with complete source-tree hashing retained for editable installs, source runs, mismatched installations, and unusable manifests.
+  - Reduced worker requests to immutable path-specific rule execution plans, returned frozen batch results, made probe and persistence outcomes explicit, aggregated cache statistics once per phase, and touched each engine retention row once with its maximum observed day.
+  - Deferred engine, path-builder, and store construction until at least one selected file is cacheable, so disabled and wholly uncacheable runs avoid cache-only fingerprint work.
+- **Rule and path contracts:**
+  - Centralized package, module, symlink-target, and public/private path semantics in a precomputed rule context shared with cache invalidation.
+  - Made rule cache dependencies explicit and fail closed, with every built-in rule audited as file-local and new external dependency kinds requiring canonical invalidation before cache use.
+- **Configuration:**
+  - Extended settings profiles with the auto-discovered project root so default cache locations are stable across nested paths and relocated workspaces.
+
 ### Fixed
 
+- **Persistent caching:**
+  - Prevented a configured cache directory equal to the traversal root from suppressing all input files; an unusable shared or project-root cache now degrades without changing file selection.
+  - Fingerprinted symlinked implementation sources and targets without disabling caching for valid symlinked package trees, while rejecting incomplete or cyclic identities.
+  - Reused the frozen source-path context during rule execution so concurrent package-marker changes cannot misalign analysis and proof identities.
+  - Limited internal-cache pruning to the safe current-working-directory run root so nested or non-empty unowned cache settings cannot hide source files.
+  - Reported cache cleanup filesystem failures as contextual status-2 errors without leaking tracebacks, including safe retry guidance after partial cleanup.
+  - Required exact ownership before corrupt or incompatible databases can be quarantined or replaced, preserved unowned databases and sidecars, and limited cleanup to numeric version directories and their quarantine files.
+  - Required the ownership tag to be a non-symlinked regular file for lookup and every mutation, while retaining the intentional ability to claim an empty untagged directory only during cache creation.
+  - Serialized cache writes, recovery, quarantine, pruning, and cleanup with a retained native file lock; writers now revalidate the current database after locking so stale lookup state cannot replace newer proofs.
+  - Kept transaction rollback and connection closure inside the mutation-lock lifetime, and sampled each quarantine candidate through one non-following metadata read before retention decisions.
+  - Preserved committed WAL data by checkpointing readable incompatible databases and quarantining main, WAL, and shared-memory files as recoverable groups with group-aware retention and partial-move rollback.
+  - Counted engine-identity, shared-analysis, path-fingerprint, malformed-row, lookup, lock, recovery, and commit failures through explicit typed outcomes while keeping valid path-context mismatches as ordinary misses.
+  - Prevented filesystem roots from contributing an empty package component to rule and cache path semantics.
+  - Separated list identities from tuples and other canonical values, rejected non-finite floats, and made normal-wheel manifest identities complete and unambiguous.
+  - Reported a missing or non-directory immediate cache parent exactly once while preserving uncached findings, fixes, and status.
+  - Pruned the configured owned cache directory when traversal reaches it through a physical parent alias, while continuing to reject a symlinked final cache component.
+  - Made retention days follow backward wall-clock changes so disposable cache entries are reanalyzed earlier instead of being pinned by future timestamps.
+- **Configuration:**
+  - Rejected NUL characters in `cache-dir` values from programmatic, inline, TOML, and command-line settings with contextual status-2 errors.
 - **Documentation:**
   - Changed the README links for Contributing, Changelog, and License to absolute documentation-site targets so they resolve correctly in package descriptions rendered by PyPI.
+
+### Removed
+
+- **Internal cleanup:**
+  - Removed the full selector and per-file matcher payload from workers, duplicate path-fingerprint helper APIs, contradictory optional cache-evidence states, the parallel cache-role map, duplicate store-side clean-proof validators, the unused source-context display field, the test-only settings-discovery wrapper, cached glob-pattern tuples, optional rule-context path fallbacks, duplicate formatter and rule-runner compatibility entry points, and pass-through CLI worker wrappers.
 
 ---
 

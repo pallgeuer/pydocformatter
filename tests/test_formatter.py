@@ -8,6 +8,7 @@ import tempfile
 import contextlib
 import collections
 import dataclasses
+from collections.abc import Callable
 from io import StringIO
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -41,6 +42,7 @@ from pydocformatter.formatter import FormatterResult
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition_helpers import source_text
 from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleFinding, RuleMetadata
+from pydocformatter.source_path import SourcePathContext
 from tests import cli_helpers
 
 
@@ -78,6 +80,30 @@ PCF100_RULE = RuleMetadata(
 
 def default_rule_selection() -> rules_selection.RuleSelection:
     return rules_selection.select_rules(CheckSettings())
+
+
+def disk_request(path: str, *, fix: bool, write: bool, collect_clean_snapshot: bool = False) -> formatter.DiskFormatRequest:
+    rule_selection = default_rule_selection()
+    return formatter.DiskFormatRequest(
+        path=path,
+        settings=CheckSettings(),
+        execution_plan=rule_selection.execution_plan_for_path(path),
+        source_path=SourcePathContext.for_path(path),
+        fix=fix,
+        write=write,
+        collect_clean_snapshot=collect_clean_snapshot,
+    )
+
+
+def _patch_disk_formatter(mocker: MockerFixture, side_effect: Callable[..., FormatterResult]) -> None:
+    """Patch the evidence-producing disk formatter around a result-only test fake."""
+
+    def adapter(request: formatter.DiskFormatRequest) -> formatter.DiskFormatResult:
+        rule_selection = rules_selection.RuleSelection(rules=request.execution_plan.selected_rules, per_file_ignores=(), errors=(), collection=request.execution_plan.collection)
+        result = side_effect(request.path, file=None, settings=request.settings, rule_selection=rule_selection, fix=request.fix, write=request.write)
+        return formatter.DiskFormatResult(result=result, clean_snapshot=None)
+
+    mocker.patch("pydocformatter.formatter.format_disk_file", side_effect=adapter, autospec=True)
 
 
 def isolated_rule_selection(*categories: type[rule_base.RuleCategoryBase], fixable: bool = True, fixable_by_code: dict[RuleCode, bool] | None = None) -> rules_selection.RuleSelection:
@@ -146,10 +172,17 @@ def test_formatter_result_field_order_has_no_defaults() -> None:
     assert all(field.default_factory is dataclasses.MISSING for field in fields)
 
 
-def test_rule_file_formatter_write_has_no_default() -> None:
-    signature = inspect.signature(formatter.format_file)
+def test_disk_format_request_write_has_no_default() -> None:
+    fields = {field.name: field for field in dataclasses.fields(formatter.DiskFormatRequest)}
 
-    assert signature.parameters["write"].default is inspect.Parameter.empty
+    assert fields["write"].default is dataclasses.MISSING
+
+
+def test_stream_formatter_requires_open_file_and_cannot_write() -> None:
+    signature = inspect.signature(formatter.format_stream)
+
+    assert signature.parameters["file"].default is inspect.Parameter.empty
+    assert "write" not in signature.parameters
 
 
 def test_rule_source_formatter_requires_precomputed_rule_selection() -> None:
@@ -451,7 +484,7 @@ def test_rule_formatter_interface_is_noop_and_preserves_display_path(monkeypatch
         target = root / "a.py"
         target.write_text('"""Module."""\n\nx = 1\n', encoding="utf-8")
         monkeypatch.chdir(root)
-        result = formatter.format_file("a.py", settings=CheckSettings(), rule_selection=default_rule_selection(), fix=True, write=True)
+        result = formatter.format_disk_file(disk_request("a.py", fix=True, write=True)).result
 
         assert result.path == "a.py"
         assert result.old_source == '"""Module."""\n\nx = 1\n'
@@ -615,7 +648,16 @@ def test_rule_runner_recomputes_source_after_seeded_fix_replaces_module(mocker: 
     module = cst.parse_module("x = 1\n")
     selection = isolated_rule_selection(TST, TSW)
     mocker.patch.object(cst.Module, "code", new=property(_count_code_access))
-    result = rule_runner.run_rules(module, path="a.py", settings=CheckSettings(), line_ending="\n", rule_selection=selection, fix=True, source="x = 1\n")
+    result = rule_runner.run_rule_plan(
+        module,
+        path="a.py",
+        settings=CheckSettings(),
+        line_ending="\n",
+        execution_plan=selection.execution_plan_for_path("a.py"),
+        fix=True,
+        source_path=SourcePathContext.for_path("a.py"),
+        source="x = 1\n",
+    )
 
     assert result.source_changed
     assert result.fixed_findings == (RuleFinding(rule=TST001InsertLeadingLine.meta, line_numbers=(1,), instance_fixable=None),)
@@ -665,8 +707,10 @@ def test_rule_runner_skips_fix_hooks_when_precheck_has_no_fixable_findings() -> 
     selection = isolated_rule_selection(TST, fixable_by_code={TST001Manual.meta.code: False, TST002UnexpectedFix.meta.code: True})
     module = cst.parse_module("x = 1\n")
 
-    check_result = rule_runner.run_rules(module, path="a.py", settings=settings, line_ending="\n", rule_selection=selection, fix=False)
-    fix_result = rule_runner.run_rules(module, path="a.py", settings=settings, line_ending="\n", rule_selection=selection, fix=True)
+    execution_plan = selection.execution_plan_for_path("a.py")
+    source_path = SourcePathContext.for_path("a.py")
+    check_result = rule_runner.run_rule_plan(module, path="a.py", settings=settings, line_ending="\n", execution_plan=execution_plan, fix=False, source_path=source_path)
+    fix_result = rule_runner.run_rule_plan(module, path="a.py", settings=settings, line_ending="\n", execution_plan=execution_plan, fix=True, source_path=source_path)
 
     assert fix_result.module is module
     assert not fix_result.source_changed
@@ -819,9 +863,10 @@ def test_rule_fix_pass_same_module_noop_skips_source_comparison(mocker: MockerFi
         path="a.py",
         settings=settings,
         line_ending="\n",
-        rule_selection=selection,
+        execution_plan=selection.execution_plan_for_path("a.py"),
         selected_rule_by_code=selected_rule_by_code,
         errors=errors,
+        source_path=SourcePathContext.for_path("a.py"),
         source_seed=rule_runner._ModuleSourceSeed(module=module, source="x = 1\n"),
     )
 
@@ -870,7 +915,14 @@ def test_rule_fix_pass_rejects_same_source_reported_fix(mocker: MockerFixture) -
     errors: list[str] = []
     mocker.patch.object(cst.Module, "code", new=property(_count_code_access))
     result_module, findings, changed = rule_runner._run_fix_pass(
-        module, path="a.py", settings=settings, line_ending="\n", rule_selection=selection, selected_rule_by_code=selected_rule_by_code, errors=errors
+        module,
+        path="a.py",
+        settings=settings,
+        line_ending="\n",
+        execution_plan=selection.execution_plan_for_path("a.py"),
+        selected_rule_by_code=selected_rule_by_code,
+        errors=errors,
+        source_path=SourcePathContext.for_path("a.py"),
     )
 
     assert result_module is module
@@ -908,7 +960,14 @@ def test_rule_fix_pass_does_not_apply_suppressed_violations() -> None:
     errors: list[str] = []
 
     result_module, findings, changed = rule_runner._run_fix_pass(
-        module, path="a.py", settings=settings, line_ending="\n", rule_selection=selection, selected_rule_by_code=selected_rule_by_code, errors=errors
+        module,
+        path="a.py",
+        settings=settings,
+        line_ending="\n",
+        execution_plan=selection.execution_plan_for_path("a.py"),
+        selected_rule_by_code=selected_rule_by_code,
+        errors=errors,
+        source_path=SourcePathContext.for_path("a.py"),
     )
 
     assert result_module is module
@@ -945,7 +1004,16 @@ def test_rule_check_pass_rejects_finding_outside_source() -> None:
     selected_rule_by_code = {selected_rule.rule.code: selected_rule for selected_rule in selection.for_path("a.py")}
     errors: list[str] = []
 
-    findings = rule_runner._run_check_pass(module, path="a.py", settings=settings, line_ending="\n", rule_selection=selection, selected_rule_by_code=selected_rule_by_code, errors=errors)
+    findings = rule_runner._run_check_pass(
+        module,
+        path="a.py",
+        settings=settings,
+        line_ending="\n",
+        execution_plan=selection.execution_plan_for_path("a.py"),
+        selected_rule_by_code=selected_rule_by_code,
+        errors=errors,
+        source_path=SourcePathContext.for_path("a.py"),
+    )
 
     assert findings == ()
     assert errors == ["a.py: TST001 check returned a finding outside the source line range"]
@@ -998,7 +1066,14 @@ def test_rule_fix_pass_rejects_violation_fixability_mismatch() -> None:
     errors: list[str] = []
 
     result_module, findings, changed = rule_runner._run_fix_pass(
-        module, path="a.py", settings=settings, line_ending="\n", rule_selection=selection, selected_rule_by_code=selected_rule_by_code, errors=errors
+        module,
+        path="a.py",
+        settings=settings,
+        line_ending="\n",
+        execution_plan=selection.execution_plan_for_path("a.py"),
+        selected_rule_by_code=selected_rule_by_code,
+        errors=errors,
+        source_path=SourcePathContext.for_path("a.py"),
     )
 
     assert result_module is module
@@ -1040,7 +1115,14 @@ def test_rule_fix_pass_rejects_mismatched_source_change_targets() -> None:
     errors: list[str] = []
 
     result_module, findings, changed = rule_runner._run_fix_pass(
-        module, path="a.py", settings=settings, line_ending="\n", rule_selection=selection, selected_rule_by_code=selected_rule_by_code, errors=errors
+        module,
+        path="a.py",
+        settings=settings,
+        line_ending="\n",
+        execution_plan=selection.execution_plan_for_path("a.py"),
+        selected_rule_by_code=selected_rule_by_code,
+        errors=errors,
+        source_path=SourcePathContext.for_path("a.py"),
     )
 
     assert result_module is module
@@ -1111,7 +1193,16 @@ def test_rule_check_pass_reuses_position_metadata_across_categories(mocker: Mock
     selected_rule_by_code = {selected_rule.rule.code: selected_rule for selected_rule in selection.for_path("a.py")}
     errors: list[str] = []
     mocker.patch.object(cst_metadata.MetadataWrapper, "resolve", autospec=True, side_effect=_count_position_resolve)
-    findings = rule_runner._run_check_pass(module, path="a.py", settings=settings, line_ending="\n", rule_selection=selection, selected_rule_by_code=selected_rule_by_code, errors=errors)
+    findings = rule_runner._run_check_pass(
+        module,
+        path="a.py",
+        settings=settings,
+        line_ending="\n",
+        execution_plan=selection.execution_plan_for_path("a.py"),
+        selected_rule_by_code=selected_rule_by_code,
+        errors=errors,
+        source_path=SourcePathContext.for_path("a.py"),
+    )
 
     assert findings == ()
     assert errors == []
@@ -1155,7 +1246,16 @@ def test_rule_check_pass_reports_position_metadata_errors_as_category_preparatio
     selected_rule_by_code = {selected_rule.rule.code: selected_rule for selected_rule in selection.for_path("a.py")}
     errors: list[str] = []
     mocker.patch.object(cst_metadata.MetadataWrapper, "resolve", autospec=True, side_effect=_raise_position_resolve)
-    findings = rule_runner._run_check_pass(module, path="a.py", settings=settings, line_ending="\n", rule_selection=selection, selected_rule_by_code=selected_rule_by_code, errors=errors)
+    findings = rule_runner._run_check_pass(
+        module,
+        path="a.py",
+        settings=settings,
+        line_ending="\n",
+        execution_plan=selection.execution_plan_for_path("a.py"),
+        selected_rule_by_code=selected_rule_by_code,
+        errors=errors,
+        source_path=SourcePathContext.for_path("a.py"),
+    )
 
     assert findings == ()
     assert errors == ["a.py: TST category preparation failed: position metadata failed"]
@@ -1224,7 +1324,14 @@ def test_rule_fix_pass_reuses_position_metadata_across_unchanged_categories(mock
     errors: list[str] = []
     mocker.patch.object(cst_metadata.MetadataWrapper, "resolve", autospec=True, side_effect=_count_position_resolve)
     result_module, findings, changed = rule_runner._run_fix_pass(
-        module, path="a.py", settings=settings, line_ending="\n", rule_selection=selection, selected_rule_by_code=selected_rule_by_code, errors=errors
+        module,
+        path="a.py",
+        settings=settings,
+        line_ending="\n",
+        execution_plan=selection.execution_plan_for_path("a.py"),
+        selected_rule_by_code=selected_rule_by_code,
+        errors=errors,
+        source_path=SourcePathContext.for_path("a.py"),
     )
 
     assert result_module is module
@@ -1235,6 +1342,28 @@ def test_rule_fix_pass_reuses_position_metadata_across_unchanged_categories(mock
     assert len(observed_contexts) == 2
     assert observed_contexts[0][0] is observed_contexts[1][0]
     assert observed_contexts[0][1] is observed_contexts[1][1]
+
+
+def test_rule_checks_fixes_and_rebuilt_contexts_reuse_one_source_path(mocker: MockerFixture) -> None:
+    source_path = SourcePathContext.for_path("a.py")
+    settings = CheckSettings(select=("PDF300",))
+    category_context = mocker.spy(rule_runner, "_category_context")
+
+    selection = rules_selection.select_rules(settings)
+    result = formatter._format_source_plan('"""Summary"""\n', "a.py", settings=settings, execution_plan=selection.execution_plan_for_path("a.py"), fix=True, source_path=source_path)
+
+    assert result.new_source == '"""Summary."""\n'
+    assert category_context.call_count >= 3
+    assert all(call.kwargs["source_path"] is source_path for call in category_context.call_args_list)
+
+
+@pytest.mark.parametrize("context_class", [rule_base.RuleCategoryContext, rule_base.RuleContext])
+def test_direct_rule_context_construction_requires_non_optional_source_path(context_class: type[object]) -> None:
+    parameter = inspect.signature(context_class).parameters["source_path"]
+
+    assert parameter.kind is inspect.Parameter.KEYWORD_ONLY
+    assert parameter.default is inspect.Parameter.empty
+    assert typing.get_type_hints(context_class)["source_path"] is SourcePathContext
 
 
 def test_rule_fix_pass_reports_position_metadata_errors_as_category_preparation(mocker: MockerFixture) -> None:
@@ -1268,7 +1397,14 @@ def test_rule_fix_pass_reports_position_metadata_errors_as_category_preparation(
     errors: list[str] = []
     mocker.patch.object(cst_metadata.MetadataWrapper, "resolve", autospec=True, side_effect=_raise_position_resolve)
     result_module, findings, changed = rule_runner._run_fix_pass(
-        module, path="a.py", settings=settings, line_ending="\n", rule_selection=selection, selected_rule_by_code=selected_rule_by_code, errors=errors
+        module,
+        path="a.py",
+        settings=settings,
+        line_ending="\n",
+        execution_plan=selection.execution_plan_for_path("a.py"),
+        selected_rule_by_code=selected_rule_by_code,
+        errors=errors,
+        source_path=SourcePathContext.for_path("a.py"),
     )
 
     assert result_module is module
@@ -1349,7 +1485,14 @@ def test_rule_fix_pass_refreshes_position_metadata_after_changed_module(mocker: 
     errors: list[str] = []
     mocker.patch.object(cst_metadata.MetadataWrapper, "resolve", autospec=True, side_effect=_count_position_resolve)
     result_module, findings, changed = rule_runner._run_fix_pass(
-        module, path="a.py", settings=settings, line_ending="\n", rule_selection=selection, selected_rule_by_code=selected_rule_by_code, errors=errors
+        module,
+        path="a.py",
+        settings=settings,
+        line_ending="\n",
+        execution_plan=selection.execution_plan_for_path("a.py"),
+        selected_rule_by_code=selected_rule_by_code,
+        errors=errors,
+        source_path=SourcePathContext.for_path("a.py"),
     )
 
     assert result_module.code == "\nx = 1\n"
@@ -1706,20 +1849,20 @@ def test_rule_source_formatter_reports_libcst_parse_errors() -> None:
     assert "Failed to parse broken.py with LibCST" in result.errors[0]
 
 
-def test_rule_file_formatter_delegates_to_source_formatter(mocker: MockerFixture) -> None:
+def test_disk_formatter_delegates_to_resolved_source_plan(mocker: MockerFixture) -> None:
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
         target = root / "a.py"
         target.write_text("x = 1\n", encoding="utf-8")
         called_args: list[tuple[str, str, bool]] = []
 
-        def fake_format_source(source: str, path: str, settings: CheckSettings, rule_selection: rules_selection.RuleSelection, fix: bool) -> FormatterResult:
-            del settings, rule_selection
+        def fake_format_source(source: str, path: str, *, settings: CheckSettings, execution_plan: rules_selection.RuleExecutionPlan, fix: bool, source_path: SourcePathContext) -> FormatterResult:
+            del settings, execution_plan, source_path
             called_args.append((source, path, fix))
             return FormatterResult(path=path, old_source=source, new_source=source, modified=False, fixed_findings=collections.Counter(), unfixed_findings=(), errors=())
 
-        mocker.patch("pydocformatter.formatter.format_source", side_effect=fake_format_source, autospec=True)
-        result = formatter.format_file(str(target), settings=CheckSettings(), rule_selection=default_rule_selection(), fix=False, write=True)
+        mocker.patch("pydocformatter.formatter._format_source_plan", side_effect=fake_format_source, autospec=True)
+        result = formatter.format_disk_file(disk_request(str(target), fix=False, write=True)).result
 
     assert called_args == [("x = 1\n", str(target), False)]
     assert result.path == str(target)
@@ -1727,18 +1870,18 @@ def test_rule_file_formatter_delegates_to_source_formatter(mocker: MockerFixture
     assert not result.modified
 
 
-def test_rule_file_formatter_writes_modified_fix_result(mocker: MockerFixture) -> None:
+def test_disk_formatter_writes_modified_fix_result(mocker: MockerFixture) -> None:
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
         target = root / "a.py"
         target.write_text("x = 1\n", encoding="utf-8")
 
-        def fake_format_source(source: str, path: str, settings: CheckSettings, rule_selection: rules_selection.RuleSelection, fix: bool) -> FormatterResult:
-            del source, settings, rule_selection, fix
+        def fake_format_source(source: str, path: str, *, settings: CheckSettings, execution_plan: rules_selection.RuleExecutionPlan, fix: bool, source_path: SourcePathContext) -> FormatterResult:
+            del source, settings, execution_plan, fix, source_path
             return FormatterResult(path=path, old_source="x = 1\n", new_source="x = 2\n", modified=True, fixed_findings=collections.Counter({PDF101_RULE: 1}), unfixed_findings=(), errors=())
 
-        mocker.patch("pydocformatter.formatter.format_source", side_effect=fake_format_source, autospec=True)
-        result = formatter.format_file(str(target), settings=CheckSettings(), rule_selection=default_rule_selection(), fix=True, write=True)
+        mocker.patch("pydocformatter.formatter._format_source_plan", side_effect=fake_format_source, autospec=True)
+        result = formatter.format_disk_file(disk_request(str(target), fix=True, write=True)).result
 
         assert result.new_source == "x = 2\n"
         assert result.old_source == "x = 1\n"
@@ -1746,18 +1889,18 @@ def test_rule_file_formatter_writes_modified_fix_result(mocker: MockerFixture) -
         assert target.read_text(encoding="utf-8") == "x = 2\n"
 
 
-def test_rule_file_formatter_can_skip_modified_fix_write(mocker: MockerFixture) -> None:
+def test_disk_formatter_can_skip_modified_fix_write(mocker: MockerFixture) -> None:
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
         target = root / "a.py"
         target.write_text("x = 1\n", encoding="utf-8")
 
-        def fake_format_source(source: str, path: str, settings: CheckSettings, rule_selection: rules_selection.RuleSelection, fix: bool) -> FormatterResult:
-            del source, settings, rule_selection, fix
+        def fake_format_source(source: str, path: str, *, settings: CheckSettings, execution_plan: rules_selection.RuleExecutionPlan, fix: bool, source_path: SourcePathContext) -> FormatterResult:
+            del source, settings, execution_plan, fix, source_path
             return FormatterResult(path=path, old_source="x = 1\n", new_source="x = 2\n", modified=True, fixed_findings=collections.Counter({PDF101_RULE: 1}), unfixed_findings=(), errors=())
 
-        mocker.patch("pydocformatter.formatter.format_source", side_effect=fake_format_source, autospec=True)
-        result = formatter.format_file(str(target), settings=CheckSettings(), rule_selection=default_rule_selection(), fix=True, write=False)
+        mocker.patch("pydocformatter.formatter._format_source_plan", side_effect=fake_format_source, autospec=True)
+        result = formatter.format_disk_file(disk_request(str(target), fix=True, write=False)).result
 
         assert result.new_source == "x = 2\n"
         assert result.old_source == "x = 1\n"
@@ -1765,10 +1908,10 @@ def test_rule_file_formatter_can_skip_modified_fix_write(mocker: MockerFixture) 
         assert target.read_text(encoding="utf-8") == "x = 1\n"
 
 
-def test_rule_file_formatter_reports_file_io_errors() -> None:
+def test_disk_formatter_reports_file_io_errors() -> None:
     with tempfile.TemporaryDirectory() as td:
         missing = str(Path(td) / "missing.py")
-        result = formatter.format_file(missing, settings=CheckSettings(), rule_selection=default_rule_selection(), fix=False, write=True)
+        result = formatter.format_disk_file(disk_request(missing, fix=False, write=True)).result
 
     assert result.new_source is None
     assert not result.modified
@@ -1777,21 +1920,21 @@ def test_rule_file_formatter_reports_file_io_errors() -> None:
     assert f"Failed to read file {missing}" in result.errors[0]
 
 
-def test_format_files_formats_each_received_path_without_deduplicating(mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_disk_formatter_formats_each_received_path_without_deduplicating(mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch) -> None:
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
         target = root / "a.py"
         target.write_text("x = 1\n", encoding="utf-8")
         called_paths: list[str] = []
 
-        def fake_format_source(source: str, path: str, settings: CheckSettings, rule_selection: rules_selection.RuleSelection, fix: bool) -> FormatterResult:
-            del source, settings, rule_selection, fix
+        def fake_format_source(source: str, path: str, *, settings: CheckSettings, execution_plan: rules_selection.RuleExecutionPlan, fix: bool, source_path: SourcePathContext) -> FormatterResult:
+            del source, settings, execution_plan, fix, source_path
             called_paths.append(path)
             return FormatterResult(path=path, old_source="", new_source="", modified=False, fixed_findings=collections.Counter(), unfixed_findings=(), errors=())
 
         monkeypatch.chdir(root)
-        mocker.patch("pydocformatter.formatter.format_source", side_effect=fake_format_source, autospec=True)
-        results = [formatter.format_file(path, settings=CheckSettings(), rule_selection=default_rule_selection(), fix=True, write=True) for path in ("a.py", str(target))]
+        mocker.patch("pydocformatter.formatter._format_source_plan", side_effect=fake_format_source, autospec=True)
+        results = [formatter.format_disk_file(disk_request(path, fix=True, write=True)).result for path in ("a.py", str(target))]
 
     assert called_paths == ["a.py", str(target)]
     assert [result.path for result in results] == ["a.py", str(target)]
@@ -1815,7 +1958,7 @@ def test_check_formatter_applies_per_file_settings_without_reselecting_rules(moc
             calls.append((settings.line_length, rule_selection))
             return FormatterResult(path=str(target), old_source="", new_source="", modified=False, fixed_findings=collections.Counter(), unfixed_findings=(), errors=())
 
-        mocker.patch("pydocformatter.formatter.format_file", side_effect=fake_format_file, autospec=True)
+        _patch_disk_formatter(mocker, fake_format_file)
         check_command.format_selected_files((selected_file,), rule_selections={profile.key(): rule_selection}, use_stdin=False, fix=False, write=False, parallelism=1)
 
     assert calls == [(100, rule_selection)]
@@ -1832,7 +1975,7 @@ def test_check_exit_status_depends_on_remaining_findings_not_modified_results(mo
             del file, settings, rule_selection, fix, write
             return FormatterResult(path=path, old_source="", new_source="", modified=True, fixed_findings=collections.Counter({PDF101_RULE: 1}), unfixed_findings=(), errors=())
 
-        mocker.patch("pydocformatter.formatter.format_file", side_effect=fake_format_file, autospec=True)
+        _patch_disk_formatter(mocker, fake_format_file)
         result = cli_helpers.run_cli(pydocfmt_cli.main, ["pydocfmt", "check", str(target)])
 
     assert result.exit_code == 0
@@ -1867,7 +2010,7 @@ def test_exit_zero_suppresses_remaining_findings(mocker: MockerFixture) -> None:
                 errors=(),
             )
 
-        mocker.patch("pydocformatter.formatter.format_file", side_effect=fake_format_file, autospec=True)
+        _patch_disk_formatter(mocker, fake_format_file)
         result = cli_helpers.run_cli(pydocfmt_cli.main, ["pydocfmt", "check", "--exit-zero", str(target)])
 
     assert result.exit_code == 0
@@ -1884,7 +2027,7 @@ def test_errors_affect_exit_status_without_findings(mocker: MockerFixture) -> No
             del file, settings, rule_selection, fix, write
             return FormatterResult(path=path, old_source=None, new_source=None, modified=False, fixed_findings=collections.Counter(), unfixed_findings=(), errors=("Failed to read file",))
 
-        mocker.patch("pydocformatter.formatter.format_file", side_effect=fake_format_file, autospec=True)
+        _patch_disk_formatter(mocker, fake_format_file)
         for extra_args, expected_exit_code in (([], 1), (["--exit-zero"], 0)):
             result = cli_helpers.run_cli(pydocfmt_cli.main, ["pydocfmt", "check", *extra_args, str(target)])
 
@@ -1921,7 +2064,7 @@ def test_fix_mode_exits_nonzero_for_remaining_findings(mocker: MockerFixture) ->
                 errors=(),
             )
 
-        mocker.patch("pydocformatter.formatter.format_file", side_effect=fake_format_file, autospec=True)
+        _patch_disk_formatter(mocker, fake_format_file)
         result = cli_helpers.run_cli(pydocfmt_cli.main, ["pydocfmt", "check", "--fix", str(target)])
 
     assert result.exit_code == 1
@@ -1938,7 +2081,7 @@ def test_exit_non_zero_on_fix_reports_modified_files(mocker: MockerFixture) -> N
             del file, settings, rule_selection, fix, write
             return FormatterResult(path=path, old_source="", new_source="", modified=True, fixed_findings=collections.Counter({PDF101_RULE: 1}), unfixed_findings=(), errors=())
 
-        mocker.patch("pydocformatter.formatter.format_file", side_effect=fake_format_file, autospec=True)
+        _patch_disk_formatter(mocker, fake_format_file)
         for extra_args, expected_exit_code in ((["--fix"], 0), (["--fix", "--exit-non-zero-on-fix"], 1)):
             result = cli_helpers.run_cli(pydocfmt_cli.main, ["pydocfmt", "check", *extra_args, str(target)])
 

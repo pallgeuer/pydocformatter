@@ -12,6 +12,7 @@ from pydocformatter.cli.settings_check import CheckSettings
 from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
 from pydocformatter.rules.definition_helpers import source_text
 from pydocformatter.rules.definitions.PCF.PCF import PCF, CommentKind, CommentPlacement, available_comment_width, render_comment
+from pydocformatter.source_path import SourcePathContext
 
 
 def category_context(source: str) -> RuleCategoryContext:
@@ -19,6 +20,7 @@ def category_context(source: str) -> RuleCategoryContext:
     metadata_wrapper = cst_metadata.MetadataWrapper(module, unsafe_skip_copy=True)
     return RuleCategoryContext(
         path="example.py",
+        source_path=SourcePathContext.for_path("example.py"),
         settings=CheckSettings(),
         module=module,
         metadata_wrapper=metadata_wrapper,
@@ -33,6 +35,7 @@ def category_context(source: str) -> RuleCategoryContext:
 def rule_context(context: RuleCategoryContext, data: object | None) -> RuleContext:
     return RuleContext(
         path=context.path,
+        source_path=context.source_path,
         settings=context.settings,
         module=context.module,
         metadata_wrapper=context.metadata_wrapper,

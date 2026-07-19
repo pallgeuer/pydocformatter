@@ -10,6 +10,7 @@ from pydocformatter.rules.definition_helpers import source_text
 from pydocformatter.rules.definitions.PDF.PDF import PDF
 from pydocformatter.rules.definitions.PDF.PDF107_multiline_opening_quotes_separate_line import PDF107MultilineOpeningQuotesSeparateLine
 from pydocformatter.rules.definitions.PDF.PDF109_multiline_closing_quotes_separate_line import PDF109MultilineClosingQuotesSeparateLine
+from pydocformatter.source_path import SourcePathContext
 from tests import rule_helpers
 
 
@@ -19,6 +20,7 @@ def contexts(source: str, *, settings: CheckSettings | None = None) -> tuple[Rul
     wrapper = cst_metadata.MetadataWrapper(module, unsafe_skip_copy=True)
     category = RuleCategoryContext(
         path="example.py",
+        source_path=SourcePathContext.for_path("example.py"),
         settings=CheckSettings(select=("PDF107",)) if settings is None else settings,
         module=module,
         metadata_wrapper=wrapper,
@@ -30,6 +32,7 @@ def contexts(source: str, *, settings: CheckSettings | None = None) -> tuple[Rul
     )
     return category, RuleContext(
         path=category.path,
+        source_path=category.source_path,
         settings=category.settings,
         module=category.module,
         metadata_wrapper=category.metadata_wrapper,

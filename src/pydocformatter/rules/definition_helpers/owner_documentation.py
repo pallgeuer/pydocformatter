@@ -9,7 +9,6 @@ from __future__ import annotations
 
 # Standard library imports
 import typing
-import pathlib
 import dataclasses
 
 # Third-party imports
@@ -18,6 +17,7 @@ import libcst as cst
 # First-party imports
 import pydocformatter.rules.violations as rule_violations
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
+from pydocformatter import source_path
 from pydocformatter.rules.definition_helpers import function_decorators, missing_documentation
 
 
@@ -65,7 +65,7 @@ def missing_owner_docstring_violations(
     Returns:
         Missing owner-docstring diagnostics for matching definitions.
     """
-    path_policy = _path_policy(context.path)
+    path_policy = _path_policy(context.source_path)
     violations: list[rule_violations.RuleViolation] = []
     for definition in data.definitions:
         if data.docstring_for(definition) is not None or not _matches_policy(definition, context=context, path_policy=path_policy, policy=policy):
@@ -135,14 +135,9 @@ def _has_class_api_owner_chain(definition: PDF_definition.DefinitionInfo | None)
     return False
 
 
-def _path_policy(path: str) -> _PathPolicy:
+def _path_policy(path: source_path.SourcePathContext) -> _PathPolicy:
     """Return package and visibility classification for one source path."""
-    return _PathPolicy(package=_is_package_path(path), public=missing_documentation.is_public_module_path(path))
-
-
-def _is_package_path(path: str) -> bool:
-    """Return whether a path names a package initializer."""
-    return pathlib.PurePath(path).stem == "__init__"
+    return _PathPolicy(package=path.package_initializer, public=path.public)
 
 
 def _is_dunder_method(definition: PDF_definition.DefinitionInfo) -> bool:

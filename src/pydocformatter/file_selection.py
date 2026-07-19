@@ -10,6 +10,7 @@ from __future__ import annotations
 
 # Standard library imports
 import os
+import pathlib
 import subprocess
 import dataclasses
 from collections import defaultdict
@@ -18,6 +19,7 @@ from enum import StrEnum
 
 # First-party imports
 import pydocformatter.settings as settings_core
+import pydocformatter.cache.directory as cache_directory
 from pydocformatter.cli.settings_check import CheckSettings
 from pydocformatter.utils import misc
 from pydocformatter.utils.globs import BaseRelativeGlobMatcher
@@ -40,6 +42,7 @@ class DecisionReason(StrEnum):
         EXCLUDED: The path matched configured exclude patterns.
         GITIGNORED: The path was rejected because git reported it as ignored.
         DUPLICATE: The path resolves to the same file as another accepted path.
+        CACHE_DIRECTORY: The directory is the configured internal cache root by lexical or physical identity.
     """
 
     INCLUDED = "included"
@@ -48,6 +51,7 @@ class DecisionReason(StrEnum):
     EXCLUDED = "excluded"
     GITIGNORED = "gitignored"
     DUPLICATE = "duplicate"
+    CACHE_DIRECTORY = "cache-directory"
 
 
 _REASON_MESSAGES = {
@@ -57,6 +61,7 @@ _REASON_MESSAGES = {
     DecisionReason.EXCLUDED: "matches exclude patterns",
     DecisionReason.GITIGNORED: "matches .gitignore",
     DecisionReason.DUPLICATE: "duplicate path to already selected file",
+    DecisionReason.CACHE_DIRECTORY: "internal pydocfmt cache directory",
 }
 
 
@@ -175,10 +180,25 @@ class _PatternMatcher:
 
 @dataclasses.dataclass
 class _SelectionContext:
-    """Shared state for one file-selection run."""
+    """Profile-derived matcher and cache-root state for one file-selection run.
+
+    Attributes:
+        resolver (settings_core.SettingsResolver[CheckSettings]): Path-aware resolver shared by the selection run.
+        respect_gitignore (bool): Current-working-directory gitignore policy applied to discovered candidates.
+        cache_directory_path (str): Normalized absolute lexical cache root used by this invocation.
+        cache_directory_identity (str | None): Normalized physical cache root when its final component is not a symlink.
+        cache_directory_name (str): Normalized final cache-root name used to avoid unnecessary physical resolution.
+        cache_enabled (bool): Whether an empty run cache root can be claimed by this invocation.
+        matcher_cache (dict[int, tuple[_PatternMatcher, _PatternMatcher]]): Include and exclude matchers keyed by shared
+            profile identity.
+    """
 
     resolver: settings_core.SettingsResolver[CheckSettings]
     respect_gitignore: bool
+    cache_directory_path: str
+    cache_directory_identity: str | None
+    cache_directory_name: str
+    cache_enabled: bool
     matcher_cache: dict[int, tuple[_PatternMatcher, _PatternMatcher]] = dataclasses.field(default_factory=dict)
 
     def matchers_for_profile(self, profile: settings_core.SettingsProfile[CheckSettings]) -> tuple[_PatternMatcher, _PatternMatcher]:
@@ -196,6 +216,35 @@ class _SelectionContext:
         )
         self.matcher_cache[profile_id] = matchers
         return matchers
+
+    def is_internal_cache_directory(self, path: str) -> bool:
+        """Return whether a directory is the owned or claimable run-level cache root.
+
+        Args:
+            path (str): Candidate directory compared by normalized absolute lexical spelling.
+
+        Returns:
+            bool: Whether `path` is safe to prune as this invocation's internal cache root.
+        """
+        root = pathlib.Path(path)
+        if root.is_symlink():
+            return False
+
+        lexical_path = os.path.normcase(os.path.abspath(os.path.normpath(path)))
+        matches_cache_root = lexical_path == self.cache_directory_path
+        if not matches_cache_root and self.cache_directory_identity is not None and os.path.normcase(os.path.basename(lexical_path)) == self.cache_directory_name:
+            matches_cache_root = path_identity_key(path) == self.cache_directory_identity
+        if not matches_cache_root:
+            return False
+
+        if cache_directory.cache_root_is_owned(root):
+            return True
+        if not self.cache_enabled or not root.is_dir():
+            return False
+        try:
+            return not any(root.iterdir())
+        except OSError:
+            return False
 
 
 _CollectedPath = _Candidate | FileDecision
@@ -245,7 +294,18 @@ def select_virtual_file(path: str, resolver: settings_core.SettingsResolver[Chec
 
 def _selection_context(resolver: settings_core.SettingsResolver[CheckSettings]) -> _SelectionContext:
     """Return a selection context from a path-aware settings resolver."""
-    return _SelectionContext(resolver, respect_gitignore=resolver.profile_for_path(os.getcwd()).settings.respect_gitignore)
+    run_profile = resolver.profile_for_path(os.getcwd())
+    cache_path = os.path.normcase(os.path.abspath(os.path.normpath(cache_directory.cache_directory_for_profile(run_profile))))
+    cache_root = pathlib.Path(cache_path)
+    cache_identity = None if cache_root.is_symlink() else path_identity_key(cache_path)
+    return _SelectionContext(
+        resolver,
+        respect_gitignore=run_profile.settings.respect_gitignore,
+        cache_directory_path=cache_path,
+        cache_directory_identity=cache_identity,
+        cache_directory_name=os.path.normcase(os.path.basename(cache_path)),
+        cache_enabled=run_profile.settings.cache,
+    )
 
 
 def _selection_result_with_gitignore(evaluated: tuple[FileDecision, ...]) -> SelectionResult:
@@ -275,7 +335,16 @@ def _collect_candidates(paths: list[str], context: _SelectionContext) -> tuple[_
 
 
 def _walk_directory(path: str, context: _SelectionContext, *, respect_gitignore: bool) -> tuple[_CollectedPath, ...]:
-    """Recursively collect candidates below one accepted directory."""
+    """Recursively collect candidates while reusing each walk root's profile for its direct files.
+
+    Args:
+        path (str): Accepted traversal root.
+        context (_SelectionContext): Resolver and profile-derived state shared by this selection run.
+        respect_gitignore (bool): Whether discovered file candidates remain eligible for later Git filtering.
+
+    Returns:
+        tuple[_CollectedPath, ...]: Ordered file candidates and pruned-directory decisions.
+    """
     candidates: list[_CollectedPath] = []
     for root, dirs, files in os.walk(path):
         profile = context.resolver.profile_for_path(root)
@@ -284,7 +353,9 @@ def _walk_directory(path: str, context: _SelectionContext, *, respect_gitignore:
         kept_dirs = []
         for name in sorted(dirs):
             directory = os.path.join(root, name)
-            if exclude_matcher.matches(directory):
+            if context.is_internal_cache_directory(directory):
+                candidates.append(_cache_directory_decision(directory, explicit=False, profile=profile))
+            elif exclude_matcher.matches(directory):
                 candidates.append(_excluded_directory_decision(directory, explicit=False, profile=profile))
             else:
                 kept_dirs.append(name)
@@ -295,7 +366,7 @@ def _walk_directory(path: str, context: _SelectionContext, *, respect_gitignore:
             if name == ".git":
                 continue
             file_path = os.path.join(root, name)
-            candidates.append(_Candidate(path=file_path, explicit=False, profile=context.resolver.profile_for_path(file_path), respect_gitignore=respect_gitignore))
+            candidates.append(_Candidate(path=file_path, explicit=False, profile=profile, respect_gitignore=respect_gitignore))
     return tuple(candidates)
 
 
@@ -333,6 +404,11 @@ def _force_excluded_explicit_directory(path: str, profile: settings_core.Setting
         return False
     matcher = BaseRelativeGlobMatcher.compile(profile.settings.exclude_patterns, base_path=os.getcwd(), match_parent_segments_for_bare=True, match_descendants_for_slash=True)
     return matcher.matches(path)
+
+
+def _cache_directory_decision(path: str, *, explicit: bool, profile: settings_core.SettingsProfile[CheckSettings]) -> FileDecision:
+    """Return an internal-cache directory pruning decision."""
+    return FileDecision(path=path, accepted=False, reason=DecisionReason.CACHE_DIRECTORY, explicit=explicit, profile=profile, respect_gitignore=False)
 
 
 def _excluded_directory_decision(path: str, *, explicit: bool, profile: settings_core.SettingsProfile[CheckSettings]) -> FileDecision:

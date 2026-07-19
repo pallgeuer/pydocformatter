@@ -12,6 +12,7 @@ from pydocformatter.rules.definitions.PDF.PDF import PDF
 from pydocformatter.rules.definitions.PDF.PDF101_docstring_reflow import PDF101DocstringReflow
 from pydocformatter.rules.definitions.PDF.PDF201_missing_blank_line import PDF201MissingBlankLine
 from pydocformatter.rules.definitions.PDF.PDF203_summary_too_long import PDF203SummaryTooLong
+from pydocformatter.source_path import SourcePathContext
 from tests import rule_helpers
 
 
@@ -21,6 +22,7 @@ def contexts(source: str, *, settings: CheckSettings | None = None) -> tuple[Rul
     wrapper = cst_metadata.MetadataWrapper(module, unsafe_skip_copy=True)
     category = RuleCategoryContext(
         path="example.py",
+        source_path=SourcePathContext.for_path("example.py"),
         settings=CheckSettings(select=("PDF203",)) if settings is None else settings,
         module=module,
         metadata_wrapper=wrapper,
@@ -32,6 +34,7 @@ def contexts(source: str, *, settings: CheckSettings | None = None) -> tuple[Rul
     )
     return category, RuleContext(
         path=category.path,
+        source_path=category.source_path,
         settings=category.settings,
         module=category.module,
         metadata_wrapper=category.metadata_wrapper,

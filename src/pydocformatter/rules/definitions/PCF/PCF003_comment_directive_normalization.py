@@ -14,7 +14,7 @@ import pydocformatter.rules.definitions.PCF.PCF as PCF_definition
 import pydocformatter.rules.definition_helpers.directives as directive_helpers
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase
-from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata
+from pydocformatter.rules.models import FixAvailability, RuleCacheBehavior, RuleCheckKind, RuleMetadata
 
 
 if TYPE_CHECKING:
@@ -57,6 +57,7 @@ class PCF003CommentDirectiveNormalization(RuleBase):
         setting_effects=(),
         incompatible_with=(),
         check_kind=RuleCheckKind.STANDARD,
+        cache_behavior=RuleCacheBehavior.FILE_LOCAL,
     )
 
     @classmethod

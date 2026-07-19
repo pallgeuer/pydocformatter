@@ -31,6 +31,7 @@ classifiers = [
     "Topic :: Utilities",
 ]
 dependencies = [
+    "filelock>=3.30.0",
     "libcst>=1.8.6",
 ]
 

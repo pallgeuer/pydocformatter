@@ -21,6 +21,7 @@ import libcst.metadata as cst_metadata
 from pydocformatter.cli.settings_check import CheckSettings
 from pydocformatter.rules.definition_helpers import source_text
 from pydocformatter.rules.models import RuleCategoryMetadata, RuleCheckKind, RuleMetadata
+from pydocformatter.source_path import SourcePathContext
 from pydocformatter.utils import misc
 
 
@@ -38,6 +39,7 @@ class RuleCategoryContext:
 
     Attributes:
         path (str): Display path for diagnostics and path-sensitive settings.
+        source_path (SourcePathContext): Precomputed module, package, visibility, and physical-path semantics.
         settings (CheckSettings): Resolved check settings for `path`.
         module (cst.Module): Parsed LibCST module currently being checked or fixed.
         metadata_wrapper (cst_metadata.MetadataWrapper): Metadata wrapper for resolving LibCST providers.
@@ -49,6 +51,7 @@ class RuleCategoryContext:
     """
 
     path: str
+    source_path: SourcePathContext = dataclasses.field(kw_only=True)
     settings: CheckSettings
     module: cst.Module
     metadata_wrapper: cst_metadata.MetadataWrapper
@@ -85,6 +88,7 @@ class RuleBase:
         stable_since (str): Alias for the pydocformatter version in which the rule became stable.
         setting_effects (tuple[RuleSettingEffects, ...]): Alias for selection effects driven by resolved settings.
         incompatible_with (tuple[RuleCode, ...]): Alias for rule codes that cannot be selected with this rule.
+        cache_behavior (RuleCacheBehavior): Alias for the rule's declared persistent-cache dependency behavior.
     """
 
     meta: ClassVar[RuleMetadata]
@@ -99,6 +103,7 @@ class RuleBase:
     stable_since = misc.alias_to_class_field("meta.stable_since")
     setting_effects = misc.alias_to_class_field("meta.setting_effects")
     incompatible_with = misc.alias_to_class_field("meta.incompatible_with")
+    cache_behavior = misc.alias_to_class_field("meta.cache_behavior")
 
     def __init_subclass__(cls) -> None:
         """Require implemented rule classes to define metadata and the current rule API."""

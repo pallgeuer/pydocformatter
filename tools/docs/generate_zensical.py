@@ -76,6 +76,7 @@ PUBLIC_DOCS_DIR = ROOT / "docs" / "public"
 DEVEL_DOCS_DIR = ROOT / "docs" / "devel"
 
 REFERENCE_DOCS = {
+    pathlib.Path("docs/public/cache_spec.md"): pathlib.Path("reference/cache.md"),
     pathlib.Path("docs/public/file_selection_spec.md"): pathlib.Path("reference/file-selection.md"),
     pathlib.Path("docs/public/rule_selection_spec.md"): pathlib.Path("reference/rule-selection.md"),
     pathlib.Path("docs/public/rule_suppressions.md"): pathlib.Path("reference/rule-suppressions.md"),
@@ -766,6 +767,7 @@ def _nav() -> list[Any]:
         {"Settings": "settings.md"},
         {
             "Reference": [
+                {"Persistent cache": "reference/cache.md"},
                 {"File selection": "reference/file-selection.md"},
                 {"Rule selection": "reference/rule-selection.md"},
                 {"Rule suppressions": "reference/rule-suppressions.md"},

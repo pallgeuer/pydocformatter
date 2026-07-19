@@ -21,7 +21,7 @@ import pydocformatter.cli.main as pydocfmt_cli
 import pydocformatter.settings as settings_core
 import pydocformatter.cli.check as check_command
 import pydocformatter.rules.collection as rule_collection
-from pydocformatter import file_selection, rules_selection
+from pydocformatter import file_selection, formatter, rules_selection
 from pydocformatter.cli import settings_check
 from pydocformatter.cli.settings_check import CheckSettings
 from pydocformatter.formatter import FormatterResult
@@ -100,7 +100,18 @@ pytestmark = pytest.mark.isolated_cwd
 
 def _profile(settings: CheckSettings) -> settings_core.SettingsProfile[CheckSettings]:
     """Return a minimal settings profile for CLI orchestration tests."""
-    return settings_core.SettingsProfile(settings=settings, field_bases={}, field_priorities={})
+    return settings_core.SettingsProfile(settings=settings, field_bases={}, field_priorities={}, project_root=os.getcwd())
+
+
+def _patch_disk_formatter(mocker: MockerFixture, side_effect: Callable[..., FormatterResult]) -> None:
+    """Patch the evidence-producing disk formatter around a result-only test fake."""
+
+    def adapter(request: formatter.DiskFormatRequest) -> formatter.DiskFormatResult:
+        rule_selection = rules_selection.RuleSelection(rules=request.execution_plan.selected_rules, per_file_ignores=(), errors=(), collection=request.execution_plan.collection)
+        result = side_effect(request.path, file=None, settings=request.settings, rule_selection=rule_selection, fix=request.fix, write=request.write)
+        return formatter.DiskFormatResult(result=result, clean_snapshot=None)
+
+    mocker.patch("pydocformatter.formatter.format_disk_file", side_effect=adapter, autospec=True)
 
 
 def _make_sample_tree() -> tempfile.TemporaryDirectory[str]:
@@ -128,7 +139,7 @@ def test_pydocfmt_show_files_lists_included_and_ignored_files(mocker: MockerFixt
         root = Path(td)
 
         argv = ["pydocfmt", "check", str(root), "--show-files", "--include", "*.py", "--exclude", "skip.py"]
-        format_file = mocker.patch("pydocformatter.formatter.format_file", autospec=True)
+        format_file = mocker.patch("pydocformatter.formatter.format_disk_file", autospec=True)
         result = cli_helpers.run_cli(pydocfmt_cli.main, argv)
 
         expected_lines = [f"{root / 'a.py'} INCLUDED", f"{root / 'b.txt'} IGNORED: does not match include patterns", f"{root / 'skip.py'} IGNORED: matches exclude patterns"]
@@ -148,7 +159,7 @@ def test_pydocfmt_defaults_to_current_directory_without_files(mocker: MockerFixt
             return FormatterResult(path=path, old_source="", new_source="", modified=False, fixed_findings=collections.Counter(), unfixed_findings=(), errors=())
 
         argv = ["pydocfmt", "check", "--fix", "--no-respect-gitignore", "--parallelism", "1"]
-        mocker.patch("pydocformatter.formatter.format_file", side_effect=fake_format, autospec=True)
+        _patch_disk_formatter(mocker, fake_format)
         cli_helpers.run_cli(pydocfmt_cli.main, argv, cwd=root)
 
         assert [Path(path) for path in called_paths] == [root / "a.py", root / "skip.py"]
@@ -162,7 +173,7 @@ def test_pydocfmt_show_files_lists_pruned_directories(mocker: MockerFixture) -> 
         (root / ".venv" / "ignored.py").write_text("x = 2\n", encoding="utf-8")
 
         argv = ["pydocfmt", "check", str(root), "--show-files"]
-        format_file = mocker.patch("pydocformatter.formatter.format_file", autospec=True)
+        format_file = mocker.patch("pydocformatter.formatter.format_disk_file", autospec=True)
         result = cli_helpers.run_cli(pydocfmt_cli.main, argv)
 
         expected_lines = [f"{root / '.venv'} IGNORED: matches exclude patterns", f"{root / 'a.py'} INCLUDED"]
@@ -175,7 +186,7 @@ def test_pydocfmt_comma_separated_globs_per_include_and_exclude_option(mocker: M
         root = Path(td)
 
         argv = ["pydocfmt", "check", str(root), "--show-files", "--include", "*.py,*.txt", "--exclude", "skip.py,b.txt"]
-        format_file = mocker.patch("pydocformatter.formatter.format_file", autospec=True)
+        format_file = mocker.patch("pydocformatter.formatter.format_disk_file", autospec=True)
         result = cli_helpers.run_cli(pydocfmt_cli.main, argv)
 
         expected_lines = [f"{root / 'a.py'} INCLUDED", f"{root / 'b.txt'} IGNORED: matches exclude patterns", f"{root / 'skip.py'} IGNORED: matches exclude patterns"]
@@ -188,7 +199,7 @@ def test_pydocfmt_multiple_globs_before_positional_path_after_separator(mocker: 
         root = Path(td)
 
         argv = ["pydocfmt", "check", "--show-files", "--include", "*.py,*.txt", "--exclude", "skip.py", "--", str(root)]
-        format_file = mocker.patch("pydocformatter.formatter.format_file", autospec=True)
+        format_file = mocker.patch("pydocformatter.formatter.format_disk_file", autospec=True)
         result = cli_helpers.run_cli(pydocfmt_cli.main, argv)
 
         expected_lines = [f"{root / 'a.py'} INCLUDED", f"{root / 'b.txt'} INCLUDED", f"{root / 'skip.py'} IGNORED: matches exclude patterns"]
@@ -202,7 +213,7 @@ def test_pydocfmt_default_respects_gitignore(mocker: MockerFixture) -> None:
 
         argv = ["pydocfmt", "check", "--show-files", str(root)]
         mocker.patch("pydocformatter.file_selection.subprocess.run", side_effect=git_helpers.fake_git_check_ignore_for_root(root, {"skip.py"}), autospec=True)
-        format_file = mocker.patch("pydocformatter.formatter.format_file", autospec=True)
+        format_file = mocker.patch("pydocformatter.formatter.format_disk_file", autospec=True)
         result = cli_helpers.run_cli(pydocfmt_cli.main, argv)
 
         expected_lines = [f"{root / 'a.py'} INCLUDED", f"{root / 'skip.py'} IGNORED: matches .gitignore"]
@@ -216,7 +227,7 @@ def test_pydocfmt_no_respect_gitignore_disables_gitignore_filtering(mocker: Mock
 
         argv = ["pydocfmt", "check", "--show-files", "--no-respect-gitignore", str(root)]
         run_mock = mocker.patch("pydocformatter.file_selection.subprocess.run", autospec=True)
-        format_file = mocker.patch("pydocformatter.formatter.format_file", autospec=True)
+        format_file = mocker.patch("pydocformatter.formatter.format_disk_file", autospec=True)
         result = cli_helpers.run_cli(pydocfmt_cli.main, argv)
 
         assert not run_mock.called
@@ -232,7 +243,7 @@ def test_pydocfmt_show_files_with_rule_formatter_does_not_format(mocker: MockerF
             return_value=FormatterResult(path=str(root / "a.py"), old_source="", new_source="", modified=False, fixed_findings=collections.Counter(), unfixed_findings=(), errors=())
         )
         argv = ["pydocfmt", "check", "--show-files", str(root)]
-        mocker.patch("pydocformatter.formatter.format_file", format_file)
+        mocker.patch("pydocformatter.formatter.format_disk_file", format_file)
         result = cli_helpers.run_cli(pydocfmt_cli.main, argv)
 
         assert result.exit_code == 0
@@ -245,7 +256,7 @@ def test_pydocfmt_show_files_reports_duplicate_paths_without_formatting(mocker: 
         root = Path(td)
         format_file = mocker.Mock(return_value=False)
         argv = ["pydocfmt", "check", "--show-files", "a.py", str(root / "a.py")]
-        mocker.patch("pydocformatter.formatter.format_file", format_file)
+        mocker.patch("pydocformatter.formatter.format_disk_file", format_file)
         result = cli_helpers.run_cli(pydocfmt_cli.main, argv, cwd=root)
 
         assert result.exit_code == 0
@@ -276,9 +287,9 @@ def test_pydocfmt_hyphenated_pyproject_settings_are_applied(mocker: MockerFixtur
             assert write
             return FormatterResult(path=path, old_source="", new_source="", modified=False, fixed_findings=collections.Counter(), unfixed_findings=(), errors=())
 
-        argv = ["pydocfmt", "check", "--fix", str(root)]
+        argv = ["pydocfmt", "check", "--fix", "--no-cache", str(root)]
         run_mock = mocker.patch("pydocformatter.file_selection.subprocess.run", autospec=True)
-        mocker.patch("pydocformatter.formatter.format_file", side_effect=fake_rule_format, autospec=True)
+        _patch_disk_formatter(mocker, fake_rule_format)
         cli_helpers.run_cli(pydocfmt_cli.main, argv, cwd=root)
 
         assert not run_mock.called
@@ -298,7 +309,7 @@ def test_pydocfmt_indent_cli_settings_are_applied(mocker: MockerFixture) -> None
             return FormatterResult(path=path, old_source="", new_source="", modified=False, fixed_findings=collections.Counter(), unfixed_findings=(), errors=())
 
         argv = ["pydocfmt", "check", "--fix", "--indent-style", "tab", "--indent-width", "2", str(root / "a.py")]
-        mocker.patch("pydocformatter.formatter.format_file", side_effect=fake_format, autospec=True)
+        _patch_disk_formatter(mocker, fake_format)
         cli_helpers.run_cli(pydocfmt_cli.main, argv)
 
         assert called_settings == [("tab", 2)]
@@ -318,7 +329,7 @@ def test_line_ending_cli_setting_is_applied(mocker: MockerFixture) -> None:
             return FormatterResult(path=path, old_source="", new_source="", modified=False, fixed_findings=collections.Counter(), unfixed_findings=(), errors=())
 
         argv = ["pydocfmt", "check", "--fix", "--line-ending", "cr-lf", str(target)]
-        mocker.patch("pydocformatter.formatter.format_file", side_effect=fake_format, autospec=True)
+        _patch_disk_formatter(mocker, fake_format)
         cli_helpers.run_cli(pydocfmt_cli.main, argv)
 
         assert called_settings == ["cr-lf"]
@@ -339,6 +350,7 @@ def test_rule_cli_settings_are_applied(mocker: MockerFixture) -> None:
         argv = [
             "pydocfmt",
             "check",
+            "--no-cache",
             str(target),
             "--output-format",
             "grouped",
@@ -354,7 +366,7 @@ def test_rule_cli_settings_are_applied(mocker: MockerFixture) -> None:
             '{"tests/*.py" = ["PCF001"]}',
         ]
         mocker.patch("pydocformatter.rules_selection.select_rules", return_value=mocker.Mock(errors=()), autospec=True)
-        mocker.patch("pydocformatter.formatter.format_file", side_effect=fake_format, autospec=True)
+        _patch_disk_formatter(mocker, fake_format)
         result = cli_helpers.run_cli(pydocfmt_cli.main, argv)
 
         assert result.exit_code == 0
@@ -402,7 +414,7 @@ def test_force_exclude_filters_explicit_file_when_enabled(mocker: MockerFixture)
         target.write_text("x = 1\n", encoding="utf-8")
 
         argv = ["pydocfmt", "check", str(target), "--show-files", "--force-exclude", "--exclude", "skip.py"]
-        format_file = mocker.patch("pydocformatter.formatter.format_file", autospec=True)
+        format_file = mocker.patch("pydocformatter.formatter.format_disk_file", autospec=True)
         result = cli_helpers.run_cli(pydocfmt_cli.main, argv)
 
         assert result.stdout.splitlines() == [f"{target} IGNORED: matches exclude patterns"]
@@ -416,7 +428,7 @@ def test_force_exclude_does_not_filter_explicit_file_by_gitignore(mocker: Mocker
 
         argv = ["pydocfmt", "check", "--show-files", "--force-exclude", str(target)]
         run_mock = mocker.patch("pydocformatter.file_selection.subprocess.run", side_effect=git_helpers.fake_git_check_ignore_for_root(root, {"skip.py"}), autospec=True)
-        format_file = mocker.patch("pydocformatter.formatter.format_file", autospec=True)
+        format_file = mocker.patch("pydocformatter.formatter.format_disk_file", autospec=True)
         result = cli_helpers.run_cli(pydocfmt_cli.main, argv)
 
         assert result.stdout.splitlines() == [f"{target} INCLUDED"]
@@ -439,7 +451,7 @@ def test_command_line_extend_exclude_overrides_config_extend_exclude(mocker: Moc
             return FormatterResult(path=path, old_source="", new_source="", modified=False, fixed_findings=collections.Counter(), unfixed_findings=(), errors=())
 
         argv = ["pydocfmt", "check", "--fix", str(target), "--force-exclude", "--extend-exclude", "other.py"]
-        mocker.patch("pydocformatter.formatter.format_file", side_effect=fake_format, autospec=True)
+        _patch_disk_formatter(mocker, fake_format)
         cli_helpers.run_cli(pydocfmt_cli.main, argv, cwd=root)
 
         assert called_paths == [str(target)]
@@ -849,7 +861,7 @@ def test_pydocfmt_aborts_when_gitignore_check_fails(mocker: MockerFixture) -> No
 
         argv = ["pydocfmt", "check", "--show-files", str(root)]
         mocker.patch("pydocformatter.file_selection.subprocess.run", return_value=subprocess.CompletedProcess(["git"], 128, stdout=b"", stderr=b"fatal: broken git"), autospec=True)
-        format_file = mocker.patch("pydocformatter.formatter.format_file", autospec=True)
+        format_file = mocker.patch("pydocformatter.formatter.format_disk_file", autospec=True)
         result = cli_helpers.run_cli(pydocfmt_cli.main, argv)
 
         assert result.exit_code == 2
@@ -938,7 +950,7 @@ def test_pydocfmt_diff_prints_unified_diff_without_writing_file(mocker: MockerFi
             )
 
         argv = ["pydocfmt", "check", "--diff", str(target)]
-        mocker.patch("pydocformatter.formatter.format_file", side_effect=fake_format, autospec=True)
+        _patch_disk_formatter(mocker, fake_format)
         result = cli_helpers.run_cli(pydocfmt_cli.main, argv)
 
         assert result.exit_code == 1
@@ -972,10 +984,10 @@ def test_format_selected_files_caps_windows_workers_at_process_pool_limit(mocker
     created_max_workers: list[int | None] = []
 
     class FakeFuture:
-        def __init__(self, result: FormatterResult) -> None:
+        def __init__(self, result: formatter.DiskFormatResult) -> None:
             self._result = result
 
-        def result(self) -> FormatterResult:
+        def result(self) -> formatter.DiskFormatResult:
             return self._result
 
     class FakeExecutor:
@@ -988,9 +1000,10 @@ def test_format_selected_files_caps_windows_workers_at_process_pool_limit(mocker
         def __exit__(self, *args: object) -> None:
             return None
 
-        def submit(self, fn: object, request: check_command._SelectedFileFormatRequest, **kwargs: object) -> FakeFuture:
+        def submit(self, fn: object, request: formatter.DiskFormatRequest, **kwargs: object) -> FakeFuture:
             del self, fn, kwargs
-            return FakeFuture(FormatterResult(path=request.selected_file.path, old_source="", new_source="", modified=False, fixed_findings=collections.Counter(), unfixed_findings=(), errors=()))
+            result = FormatterResult(path=request.path, old_source="", new_source="", modified=False, fixed_findings=collections.Counter(), unfixed_findings=(), errors=())
+            return FakeFuture(formatter.DiskFormatResult(result=result, clean_snapshot=None))
 
     mocker.patch("pydocformatter.cli.check.os.cpu_count", return_value=128, autospec=True)
     mocker.patch("pydocformatter.cli.check.sys.platform", "win32")
@@ -1009,11 +1022,11 @@ def test_format_selected_files_preserves_selected_order_when_parallel_results_co
     completion_order: list[str] = []
 
     class FakeFuture:
-        def __init__(self, result: FormatterResult) -> None:
+        def __init__(self, result: formatter.DiskFormatResult) -> None:
             self._result = result
 
-        def result(self) -> FormatterResult:
-            completion_order.append(self._result.path)
+        def result(self) -> formatter.DiskFormatResult:
+            completion_order.append(self._result.result.path)
             return self._result
 
     class FakeExecutor:
@@ -1026,17 +1039,18 @@ def test_format_selected_files_preserves_selected_order_when_parallel_results_co
         def __exit__(self, *args: object) -> None:
             return None
 
-        def submit(self, fn: object, request: check_command._SelectedFileFormatRequest, **kwargs: object) -> FakeFuture:
+        def submit(self, fn: object, request: formatter.DiskFormatRequest, **kwargs: object) -> FakeFuture:
             del self, fn, kwargs
-            return FakeFuture(FormatterResult(path=request.selected_file.path, old_source="", new_source="", modified=False, fixed_findings=collections.Counter(), unfixed_findings=(), errors=()))
+            result = FormatterResult(path=request.path, old_source="", new_source="", modified=False, fixed_findings=collections.Counter(), unfixed_findings=(), errors=())
+            return FakeFuture(formatter.DiskFormatResult(result=result, clean_snapshot=None))
 
     mocker.patch("pydocformatter.cli.check.concurrent.futures.as_completed", side_effect=lambda futures: reversed(tuple(futures)), autospec=True)
-    results = check_command.format_selected_files(
+    batch = check_command.format_selected_files(
         selected_files, rule_selections=rule_selections, use_stdin=False, fix=False, write=True, parallelism=2.0, executor_factory=cast("check_command._ExecutorFactory", FakeExecutor)
     )
 
     assert completion_order == ["c.py", "b.py", "a.py"]
-    assert [result.path for result in results] == ["a.py", "b.py", "c.py"]
+    assert [result.path for result in batch.results] == ["a.py", "b.py", "c.py"]
 
 
 def test_format_selected_files_runs_real_process_pool_for_disk_files() -> None:
@@ -1050,10 +1064,10 @@ def test_format_selected_files_runs_real_process_pool_for_disk_files() -> None:
         selected_files = (file_selection.SelectedFile(path=str(first), profile=profile), file_selection.SelectedFile(path=str(second), profile=profile))
         rule_selections = {profile.key(): rules_selection.select_rules(profile.settings, profile=profile)}
 
-        results = check_command.format_selected_files(selected_files, rule_selections=rule_selections, use_stdin=False, fix=False, write=True, parallelism=2.0)
+        batch = check_command.format_selected_files(selected_files, rule_selections=rule_selections, use_stdin=False, fix=False, write=True, parallelism=2.0)
 
-    assert [result.path for result in results] == [str(first), str(second)]
-    assert [result.errors for result in results] == [(), ()]
+    assert [result.path for result in batch.results] == [str(first), str(second)]
+    assert [result.errors for result in batch.results] == [(), ()]
 
 
 def test_format_selected_files_keeps_single_disk_file_sequential(mocker: MockerFixture) -> None:
@@ -1061,14 +1075,11 @@ def test_format_selected_files_keeps_single_disk_file_sequential(mocker: MockerF
     selected_files = (file_selection.SelectedFile(path="a.py", profile=profile),)
     rule_selections = {profile.key(): rules_selection.select_rules(profile.settings, profile=profile)}
     mocker.patch("pydocformatter.cli.check.concurrent.futures.ProcessPoolExecutor", side_effect=AssertionError("single file must not use executor"))
-    format_file = mocker.patch(
-        "pydocformatter.formatter.format_file",
-        return_value=FormatterResult(path="a.py", old_source="", new_source="", modified=False, fixed_findings=collections.Counter(), unfixed_findings=(), errors=()),
-        autospec=True,
-    )
-    results = check_command.format_selected_files(selected_files, rule_selections=rule_selections, use_stdin=False, fix=False, write=True, parallelism=2.0)
+    result = FormatterResult(path="a.py", old_source="", new_source="", modified=False, fixed_findings=collections.Counter(), unfixed_findings=(), errors=())
+    format_file = mocker.patch("pydocformatter.formatter.format_disk_file", return_value=formatter.DiskFormatResult(result=result, clean_snapshot=None), autospec=True)
+    batch = check_command.format_selected_files(selected_files, rule_selections=rule_selections, use_stdin=False, fix=False, write=True, parallelism=2.0)
 
-    assert [result.path for result in results] == ["a.py"]
+    assert [result.path for result in batch.results] == ["a.py"]
     format_file.assert_called_once()
 
 
@@ -1078,13 +1089,13 @@ def test_format_selected_files_keeps_stdin_sequential(mocker: MockerFixture) -> 
     rule_selections = {profile.key(): rules_selection.select_rules(profile.settings, profile=profile)}
     mocker.patch("pydocformatter.cli.check.concurrent.futures.ProcessPoolExecutor", side_effect=AssertionError("stdin must not use executor"))
     format_file = mocker.patch(
-        "pydocformatter.formatter.format_file",
+        "pydocformatter.formatter.format_stream",
         return_value=FormatterResult(path="-", old_source="", new_source="", modified=False, fixed_findings=collections.Counter(), unfixed_findings=(), errors=()),
         autospec=True,
     )
-    results = check_command.format_selected_files(selected_files, rule_selections=rule_selections, use_stdin=True, fix=False, write=True, parallelism=2.0)
+    batch = check_command.format_selected_files(selected_files, rule_selections=rule_selections, use_stdin=True, fix=False, write=True, parallelism=2.0)
 
-    assert [result.path for result in results] == ["-"]
+    assert [result.path for result in batch.results] == ["-"]
     assert format_file.call_args.kwargs["file"] is sys.stdin
 
 
@@ -1099,7 +1110,7 @@ def test_pydocfmt_diff_exit_zero_suppresses_diff_exit_status(mocker: MockerFixtu
             return FormatterResult(path=path, old_source="x = 1\n", new_source="x = 2\n", modified=True, fixed_findings=collections.Counter({PDF101_RULE: 1}), unfixed_findings=(), errors=())
 
         argv = ["pydocfmt", "check", "--diff", "--exit-zero", str(target)]
-        mocker.patch("pydocformatter.formatter.format_file", side_effect=fake_format, autospec=True)
+        _patch_disk_formatter(mocker, fake_format)
         result = cli_helpers.run_cli(pydocfmt_cli.main, argv)
 
         assert result.exit_code == 0
@@ -1133,7 +1144,7 @@ def test_pydocfmt_diff_output_file_writes_summary_without_diff(mocker: MockerFix
             )
 
         argv = ["pydocfmt", "check", "--diff", "--output-file", str(output_file), str(target)]
-        mocker.patch("pydocformatter.formatter.format_file", side_effect=fake_format, autospec=True)
+        _patch_disk_formatter(mocker, fake_format)
         result = cli_helpers.run_cli(pydocfmt_cli.main, argv)
 
         assert result.exit_code == 1
@@ -1160,14 +1171,13 @@ def test_pydocfmt_clean_diff_output_file_writes_success_message() -> None:
 def test_pydocfmt_diff_stdin_uses_stdin_filename_in_diff_headers(mocker: MockerFixture) -> None:
     source = "x = 1\n"
 
-    def fake_format(path: str, *, file: TextIO | None = None, settings: CheckSettings, rule_selection: RuleSelection, fix: bool, write: bool) -> FormatterResult:
-        del settings, rule_selection, fix, write
-        assert file is not None
+    def fake_format(path: str, *, file: TextIO, settings: CheckSettings, rule_selection: RuleSelection, fix: bool) -> FormatterResult:
+        del settings, rule_selection, fix
         assert file.read() == source
         return FormatterResult(path=path, old_source=source, new_source="x = 2\n", modified=True, fixed_findings=collections.Counter({PDF101_RULE: 1}), unfixed_findings=(), errors=())
 
     argv = ["pydocfmt", "check", "--fix", "--diff", "--stdin-filename", "virtual.py"]
-    mocker.patch("pydocformatter.formatter.format_file", side_effect=fake_format, autospec=True)
+    mocker.patch("pydocformatter.formatter.format_stream", side_effect=fake_format, autospec=True)
     result = cli_helpers.run_cli(pydocfmt_cli.main, argv, stdin=source)
 
     assert result.exit_code == 1
@@ -1179,15 +1189,14 @@ def test_pydocfmt_stdin_filename_sets_display_path_and_ignores_paths(mocker: Moc
     source = 'def foo():\n    """This is a very long single-line docstring that should be reflowed by the formatter due to line length."""\n    pass\n'
     called_paths: list[str] = []
 
-    def fake_format(path: str, *, file: TextIO | None = None, settings: CheckSettings, rule_selection: RuleSelection, fix: bool, write: bool) -> FormatterResult:
-        del settings, rule_selection, fix, write
+    def fake_format(path: str, *, file: TextIO, settings: CheckSettings, rule_selection: RuleSelection, fix: bool) -> FormatterResult:
+        del settings, rule_selection, fix
         called_paths.append(path)
-        assert file is not None
         assert file.read() == source
         return FormatterResult(path=path, old_source=source, new_source=source, modified=False, fixed_findings=collections.Counter(), unfixed_findings=(), errors=())
 
     argv = ["pydocfmt", "check", "ignored.py", "--stdin-filename", "virtual.py", "--line-length", "72"]
-    mocker.patch("pydocformatter.formatter.format_file", side_effect=fake_format, autospec=True)
+    mocker.patch("pydocformatter.formatter.format_stream", side_effect=fake_format, autospec=True)
     result = cli_helpers.run_cli(pydocfmt_cli.main, argv, stdin=source)
 
     assert result.exit_code == 1
@@ -1209,7 +1218,7 @@ def test_pydocfmt_stdin_filename_force_exclude_does_not_format_excluded_path(moc
     source = "def foo():\n    pass\n"
     format_file = mocker.Mock(return_value=FormatterResult(path="skip.py", old_source=source, new_source=source, modified=False, fixed_findings=collections.Counter(), unfixed_findings=(), errors=()))
     argv = ["pydocfmt", "check", "--stdin-filename", "skip.py", "--force-exclude", "--exclude", "skip.py"]
-    mocker.patch("pydocformatter.formatter.format_file", format_file)
+    mocker.patch("pydocformatter.formatter.format_stream", format_file)
     result = cli_helpers.run_cli(pydocfmt_cli.main, argv, stdin=source)
 
     assert result.exit_code == 0
@@ -1233,16 +1242,14 @@ def test_pydocfmt_fix_stdin_writes_formatted_source_to_stdout(mocker: MockerFixt
     source = 'def foo():\n    """Does something.\n\nArgs:\n    x (int): some parameter.\n    """\n    pass\n'
     formatted_source = 'def foo():\n    """Does something.\n\n    Args:\n        x (int): some parameter.\n    """\n    pass\n'
 
-    def fake_format(path: str, *, file: TextIO | None = None, settings: CheckSettings, rule_selection: RuleSelection, fix: bool, write: bool) -> FormatterResult:
+    def fake_format(path: str, *, file: TextIO, settings: CheckSettings, rule_selection: RuleSelection, fix: bool) -> FormatterResult:
         del path, settings, rule_selection
         assert fix
-        assert write
-        assert file is not None
         assert file.read() == source
         return FormatterResult(path="-", old_source=source, new_source=formatted_source, modified=True, fixed_findings=collections.Counter({PDF101_RULE: 1}), unfixed_findings=(), errors=())
 
     argv = ["pydocfmt", "check", "--fix", "-", "--line-length", "72"]
-    mocker.patch("pydocformatter.formatter.format_file", side_effect=fake_format, autospec=True)
+    mocker.patch("pydocformatter.formatter.format_stream", side_effect=fake_format, autospec=True)
     result = cli_helpers.run_cli(pydocfmt_cli.main, argv, stdin=source)
 
     assert result.exit_code == 0
@@ -1257,16 +1264,14 @@ def test_pydocfmt_fix_stdin_with_output_file_writes_diagnostics_to_file(mocker: 
         source = 'def foo():\n    """Does something."""\n    pass\n'
         formatted_source = 'def foo():\n    """Does something better."""\n    pass\n'
 
-        def fake_format(path: str, *, file: TextIO | None = None, settings: CheckSettings, rule_selection: RuleSelection, fix: bool, write: bool) -> FormatterResult:
+        def fake_format(path: str, *, file: TextIO, settings: CheckSettings, rule_selection: RuleSelection, fix: bool) -> FormatterResult:
             del path, settings, rule_selection
             assert fix
-            assert write
-            assert file is not None
             assert file.read() == source
             return FormatterResult(path="-", old_source=source, new_source=formatted_source, modified=True, fixed_findings=collections.Counter({PDF101_RULE: 1}), unfixed_findings=(), errors=())
 
         argv = ["pydocfmt", "check", "--fix", "-", "--line-length", "72", "--output-file", str(output_file)]
-        mocker.patch("pydocformatter.formatter.format_file", side_effect=fake_format, autospec=True)
+        mocker.patch("pydocformatter.formatter.format_stream", side_effect=fake_format, autospec=True)
         result = cli_helpers.run_cli(pydocfmt_cli.main, argv, stdin=source)
 
         assert result.exit_code == 0

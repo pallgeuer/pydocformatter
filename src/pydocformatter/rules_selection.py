@@ -101,6 +101,19 @@ class PerFileRuleIgnore:
 
 
 @dataclasses.dataclass(frozen=True)
+class RuleExecutionPlan:
+    """Lean rule collection and final ordered rules for one source path.
+
+    Attributes:
+        collection (RuleCollection): Rule collection supplying category and implementation classes.
+        selected_rules (tuple[SelectedRule, ...]): Final path-specific rules after per-file ignores.
+    """
+
+    collection: RuleCollection
+    selected_rules: tuple[SelectedRule, ...]
+
+
+@dataclasses.dataclass(frozen=True)
 class RuleSelection:
     """Effective rule selection for a resolved settings object.
 
@@ -132,6 +145,17 @@ class RuleSelection:
         if not ignored_rule_codes:
             return self.rules
         return tuple(rule for rule in self.rules if rule.rule.code not in ignored_rule_codes)
+
+    def execution_plan_for_path(self, path: str) -> RuleExecutionPlan:
+        """Return the lean execution plan after applying per-file ignores.
+
+        Args:
+            path (str): Source path whose per-file ignore patterns should be evaluated.
+
+        Returns:
+            RuleExecutionPlan: Rule collection and final path-specific rules.
+        """
+        return RuleExecutionPlan(collection=self.collection, selected_rules=self.for_path(path))
 
 
 def select_rules(

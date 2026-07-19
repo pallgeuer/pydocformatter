@@ -16,7 +16,7 @@ from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase
 from pydocformatter.rules.definition_helpers import summary_style
 from pydocformatter.rules.definitions.PDF.PDF import PDF
-from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
+from pydocformatter.rules.models import FixAvailability, RuleCacheBehavior, RuleCheckKind, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
 
 
 if TYPE_CHECKING:
@@ -41,6 +41,7 @@ class PDF302NonImperativeSummary(RuleBase):
         setting_effects=(RuleSettingEffects(setting="docstring_convention", effects=(RuleSettingEffectValues(effect=RuleSettingEffect.IGNORED, values=(DocstringConvention.GOOGLE,)),)),),
         incompatible_with=(),
         check_kind=RuleCheckKind.STANDARD,
+        cache_behavior=RuleCacheBehavior.FILE_LOCAL,
     )
 
     @classmethod

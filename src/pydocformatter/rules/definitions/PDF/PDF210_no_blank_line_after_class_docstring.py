@@ -14,7 +14,7 @@ from pydocformatter.cli import settings_check
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase
 from pydocformatter.rules.definition_helpers import docstring_statement_spacing
-from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
+from pydocformatter.rules.models import FixAvailability, RuleCacheBehavior, RuleCheckKind, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
 
 
 if TYPE_CHECKING:
@@ -39,6 +39,7 @@ class PDF210NoBlankLineAfterClassDocstring(RuleBase):
         setting_effects=(RuleSettingEffects(setting="docstring_convention", effects=(RuleSettingEffectValues(effect=RuleSettingEffect.IGNORED, values=tuple(settings_check.DocstringConvention)),)),),
         incompatible_with=(RuleCode("PDF211"),),
         check_kind=RuleCheckKind.STANDARD,
+        cache_behavior=RuleCacheBehavior.FILE_LOCAL,
     )
 
     @classmethod

@@ -69,6 +69,21 @@ uv run pydocfmt check --fix
 
 Pass files or directories to limit the run, for example `uv run pydocfmt check src tests`. With no paths, pydocformatter checks the current directory. Check mode returns a nonzero exit status when it finds rule violations or operational errors, which makes the same command suitable for CI.
 
+## Persistent cache
+
+pydocformatter caches strict clean proofs for selected disk files by default. A warm hit still discovers the file and verifies its complete raw contents, settings, selected rules, implementation, and package-path semantics, but skips UTF-8 decoding, LibCST parsing, and rule execution. The cache stores hashes and metadata only, never source text or diagnostics. Cache failures fall back to normal analysis without changing status; a missing or non-directory immediate cache parent also emits one warning.
+
+The default cache is `.pydocfmt_cache` below the auto-discovered project root. Disable reuse for diagnostics or untrusted restored cache data, inspect opt-in counters, or remove only pydocfmt-owned cache data with:
+
+```bash
+uv run pydocfmt check --no-cache
+uv run pydocfmt check --cache-stats
+uv run pydocfmt clean
+uv run pydocfmt clean --cache-dir PATH
+```
+
+Use `cache-dir` or `--cache-dir PATH` to choose another location. pydocformatter may create that directory, but its immediate parent must already exist as a directory; it does not create missing ancestors. An owned run cache directory below a checked tree is pruned automatically during file discovery; a non-empty unowned directory receives normal include and exclude handling. The [persistent cache reference](https://pallgeuer.github.io/pydocformatter/reference/cache/) documents invalidation, mode reuse, storage, cleanup, failures, security, statistics, and performance expectations.
+
 ## Configuration
 
 Place project settings in `pyproject.toml`. A small configuration might specify only the shared line length and the project's docstring convention:

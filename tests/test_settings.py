@@ -3,6 +3,7 @@ from __future__ import annotations
 
 # Standard library imports
 import re
+import copy
 import enum
 import json
 import math
@@ -243,6 +244,89 @@ def test_setting_definitions_match_formatter_settings_fields() -> None:
     assert tuple(getattr(CheckSettings(), definition.field) for definition in pydocformatter_settings.SETTINGS_SCHEMA.definitions) == tuple(getattr(CheckSettings(), field) for field in setting_fields)
 
 
+def test_check_setting_definitions_exhaustively_match_schema_and_settings_fields() -> None:
+    definition_fields = tuple(definition.field for definition in pydocformatter_settings.CHECK_SETTING_DEFINITIONS)
+    setting_fields = tuple(field.name for field in dataclasses.fields(CheckSettings))
+
+    assert len(definition_fields) == len(set(definition_fields))
+    assert len(setting_fields) == len(set(setting_fields))
+    assert pydocformatter_settings.SETTINGS_SCHEMA.definitions == pydocformatter_settings.CHECK_SETTING_DEFINITIONS
+    assert set(definition_fields) == set(setting_fields)
+
+
+def test_cache_identity_roles_have_exact_current_field_membership() -> None:
+    expected = {
+        pydocformatter_settings.CacheIdentityRole.DIRECT_ANALYSIS_VALUE: (
+            "line_length",
+            "url_aware_wrapping",
+            "line_ending",
+            "indent_style",
+            "indent_width",
+            "docstring_convention",
+            "docstring_blank_line_style",
+            "docstring_blank_line_after_last_section",
+            "docstring_missing_documentation",
+            "docstring_missing_documentation_public_only",
+            "docstring_require_init_attribute_documentation",
+            "docstring_class_attribute_no_type_base_classes",
+            "docstring_forbidden_function_decorators",
+            "docstring_optional_function_decorators",
+            "docstring_property_decorators",
+            "docstring_parse_list_items",
+            "docstring_parse_headings",
+            "docstring_parse_doctests",
+            "docstring_parse_code_fences",
+            "docstring_parse_block_quotes",
+            "docstring_parse_tables",
+            "docstring_parse_directives",
+            "docstring_parse_literal_blocks",
+            "comment_join_standalone_lines",
+            "comment_format_list_items",
+            "comment_task_marker_mode",
+            "comment_task_markers",
+            "comment_preserve_headings",
+            "comment_preserve_doctests",
+            "comment_preserve_code_fences",
+            "comment_format_block_quotes",
+            "comment_preserve_tables",
+            "comment_preserve_directives",
+            "comment_trailing_extraction_syntax_aware",
+            "comment_trailing_extraction_content_aware",
+            "comment_detect_code",
+            "comment_detect_statements",
+            "comment_detect_expressions",
+        ),
+        pydocformatter_settings.CacheIdentityRole.FINAL_RULE_CODES: ("select", "ignore", "extend_select", "require_explicit", "per_file_ignores", "extend_per_file_ignores"),
+        pydocformatter_settings.CacheIdentityRole.CLEAN_PROOF_IRRELEVANT: ("output_format", "cache", "cache_dir", "parallelism", "fixable", "unfixable", "extend_fixable"),
+        pydocformatter_settings.CacheIdentityRole.DISCOVERY_ONLY: ("include", "extend_include", "exclude", "extend_exclude", "respect_gitignore", "force_exclude"),
+        pydocformatter_settings.CacheIdentityRole.APPLIED_CONFIGURATION: ("per_file_settings",),
+    }
+
+    for role, expected_fields in expected.items():
+        assert tuple(definition.field for definition in pydocformatter_settings.CHECK_SETTING_DEFINITIONS if definition.cache_identity_role is role) == expected_fields
+
+
+def test_settings_group_does_not_determine_cache_identity_role() -> None:
+    definitions = {definition.field: definition for definition in pydocformatter_settings.CHECK_SETTING_DEFINITIONS}
+
+    assert definitions["select"].group is definitions["fixable"].group is SettingsGroup.RULE_SELECTION
+    assert definitions["select"].cache_identity_role is pydocformatter_settings.CacheIdentityRole.FINAL_RULE_CODES
+    assert definitions["fixable"].cache_identity_role is pydocformatter_settings.CacheIdentityRole.CLEAN_PROOF_IRRELEVANT
+
+
+def test_analysis_settings_identity_and_precomputed_definitions_follow_schema_order() -> None:
+    profile = pydocformatter_settings.SETTINGS_SCHEMA.load_profile(global_values=pydocformatter_global_args.GlobalArgs(isolated=True))
+    expected_fields = tuple(
+        definition.field for definition in pydocformatter_settings.CHECK_SETTING_DEFINITIONS if definition.cache_identity_role is pydocformatter_settings.CacheIdentityRole.DIRECT_ANALYSIS_VALUE
+    )
+    identity = pydocformatter_settings.analysis_settings_identity(profile)
+    identity_fields = tuple(field for field, _ in identity)
+
+    assert identity_fields == expected_fields
+    assert len(identity_fields) == len(set(identity_fields))
+    assert tuple(definition.field for definition in pydocformatter_settings.DIRECT_ANALYSIS_DEFINITIONS) == expected_fields
+
+
 def test_setting_definitions_are_iterable_by_group() -> None:
     run_fields = tuple(definition.field for definition in pydocformatter_settings.SETTINGS_SCHEMA.definitions if definition.group == SettingsGroup.RUN)
     formatting_fields = tuple(definition.field for definition in pydocformatter_settings.SETTINGS_SCHEMA.definitions if definition.group == SettingsGroup.FORMATTING)
@@ -252,7 +336,7 @@ def test_setting_definitions_are_iterable_by_group() -> None:
     file_selection_fields = tuple(definition.field for definition in pydocformatter_settings.SETTINGS_SCHEMA.definitions if definition.group == SettingsGroup.FILE_SELECTION)
     configuration_fields = tuple(definition.field for definition in pydocformatter_settings.SETTINGS_SCHEMA.definitions if definition.group == SettingsGroup.CONFIGURATION)
 
-    assert run_fields == ("output_format", "parallelism")
+    assert run_fields == ("output_format", "cache", "cache_dir", "parallelism")
     assert formatting_fields == ("line_length", "url_aware_wrapping", "line_ending", "indent_style", "indent_width")
     assert docstring_formatting_fields == (
         "docstring_convention",
@@ -367,6 +451,410 @@ def test_load_toml_file_does_not_check_exists_before_open(mocker: MockerFixture)
     assert pydocformatter_settings_core._load_toml_file("missing.toml", required=False) is None
 
 
+def test_direct_load_profile_parses_one_auto_config_once_for_discovery_and_application(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture) -> None:
+    config_path = tmp_path / "pyproject.toml"
+    target = tmp_path / "src"
+    target.mkdir()
+    config_path.write_text("[tool.pydocfmt]\nline-length = 91\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    load_toml_file = mocker.spy(pydocformatter_settings_core, "_load_toml_file")
+
+    profile = pydocformatter_settings.SETTINGS_SCHEMA.load_profile(path=str(target))
+
+    assert profile.settings.line_length == 91
+    assert load_toml_file.call_count == 1
+    assert load_toml_file.call_args.args == (str(config_path),)
+
+
+def test_separate_direct_load_profile_calls_are_fresh_and_observe_edits(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture) -> None:
+    config_path = tmp_path / "pyproject.toml"
+    config_path.write_text("[tool.pydocfmt]\nline-length = 91\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    load_toml_file = mocker.spy(pydocformatter_settings_core, "_load_toml_file")
+
+    first = pydocformatter_settings.SETTINGS_SCHEMA.load_profile()
+    config_path.write_text("[tool.pydocfmt]\nline-length = 92\n", encoding="utf-8")
+    second = pydocformatter_settings.SETTINGS_SCHEMA.load_profile()
+
+    assert first.settings.line_length == 91
+    assert second.settings.line_length == 92
+    assert load_toml_file.call_count == 2
+
+
+def test_resolver_reuses_one_parsed_config_and_profile_across_many_directories(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture) -> None:
+    config_path = tmp_path / "pyproject.toml"
+    directories = tuple(tmp_path / name for name in ("a", "b", "c"))
+    for directory in directories:
+        directory.mkdir()
+    config_path.write_text("[tool.pydocfmt]\nline-length = 91\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    load_toml_file = mocker.spy(pydocformatter_settings_core, "_load_toml_file")
+    resolver = pydocformatter_settings.SETTINGS_SCHEMA.resolver()
+
+    profiles = tuple(resolver.profile_for_path(str(directory)) for directory in directories)
+
+    assert all(profile is profiles[0] for profile in profiles)
+    assert load_toml_file.call_count == 1
+    assert len(resolver._profiles_by_start_dir) == len(directories)
+    assert len(resolver._context.profiles_by_source) == 1
+    assert len(resolver._context.parsed_toml_by_path) == 1
+
+
+def test_resolver_context_does_not_change_equality_or_repr_contract() -> None:
+    fields = {field.name: field for field in dataclasses.fields(pydocformatter_settings_core.SettingsResolver)}
+
+    assert fields["_profiles_by_start_dir"].compare
+    assert fields["_profiles_by_start_dir"].repr
+    assert not fields["_context"].compare
+    assert not fields["_context"].repr
+
+
+def test_resolution_context_normalizes_lexical_toml_paths_without_resolving_symlinks(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture) -> None:
+    config_path = tmp_path / "config.toml"
+    intermediate = tmp_path / "intermediate"
+    alias = tmp_path / "alias.toml"
+    intermediate.mkdir()
+    config_path.write_text("line-length = 91\n", encoding="utf-8")
+    alias.symlink_to(config_path)
+    monkeypatch.chdir(tmp_path)
+    load_toml_file = mocker.spy(pydocformatter_settings_core, "_load_toml_file")
+    context = pydocformatter_settings_core._SettingsResolutionContext()
+
+    relative = context.load_toml_file("config.toml", required=True)
+    absolute = context.load_toml_file(str(config_path), required=True)
+    normalized = context.load_toml_file(str(intermediate / ".." / "config.toml"), required=True)
+    symlinked = context.load_toml_file(str(alias), required=True)
+
+    assert relative is absolute is normalized
+    assert symlinked == relative
+    assert symlinked is not relative
+    assert load_toml_file.call_count == 2
+    assert len(context.parsed_toml_by_path) == 2
+
+
+def test_cached_toml_document_is_unchanged_after_repeated_application(tmp_path: Path) -> None:
+    config_path = tmp_path / "pydocfmt.toml"
+    config_path.write_text('line-length = 91\n[docstring]\nconvention = "google"\n', encoding="utf-8")
+    context = pydocformatter_settings_core._SettingsResolutionContext()
+    cached = context.load_toml_file(str(config_path), required=True)
+    assert cached is not None
+    original = copy.deepcopy(cached)
+    base_profile = pydocformatter_settings.SETTINGS_SCHEMA.load_profile(global_values=pydocformatter_global_args.GlobalArgs(isolated=True))
+
+    for _ in range(2):
+        applied = pydocformatter_settings_core._apply_toml_file_profile(
+            pydocformatter_settings.SETTINGS_SCHEMA,
+            base_profile,
+            path=str(config_path),
+            required=True,
+            source_base=str(tmp_path),
+            source_priority=pydocformatter_settings_core.CONFIG_FILE_SOURCE_PRIORITY,
+            context=context,
+        )
+        assert applied.settings.line_length == 91
+
+    assert cached == original
+    assert context.load_toml_file(str(config_path), required=True) is cached
+
+
+def test_nested_auto_configs_use_distinct_profiles_and_closest_values(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    nested = tmp_path / "nested"
+    sibling = tmp_path / "sibling"
+    nested.mkdir()
+    sibling.mkdir()
+    (tmp_path / "pyproject.toml").write_text("[tool.pydocfmt]\nline-length = 91\n", encoding="utf-8")
+    (nested / "pyproject.toml").write_text("[tool.pydocfmt]\nline-length = 92\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    resolver = pydocformatter_settings.SETTINGS_SCHEMA.resolver()
+
+    root_profile = resolver.profile_for_path(str(sibling))
+    nested_profile = resolver.profile_for_path(str(nested))
+
+    assert root_profile is not nested_profile
+    assert root_profile.settings.line_length == 91
+    assert nested_profile.settings.line_length == 92
+    assert len(resolver._context.profiles_by_source) == 2
+
+
+def test_equal_auto_config_values_keep_distinct_project_roots_and_field_bases(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    left = tmp_path / "left"
+    right = tmp_path / "right"
+    left.mkdir()
+    right.mkdir()
+    config = '[tool.pydocfmt]\ninclude = ["*.py"]\n'
+    (left / "pyproject.toml").write_text(config, encoding="utf-8")
+    (right / "pyproject.toml").write_text(config, encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    resolver = pydocformatter_settings.SETTINGS_SCHEMA.resolver()
+
+    left_profile = resolver.profile_for_path(str(left))
+    right_profile = resolver.profile_for_path(str(right))
+
+    assert left_profile.settings == right_profile.settings
+    assert left_profile is not right_profile
+    assert left_profile.project_root == str(left)
+    assert right_profile.project_root == str(right)
+    assert left_profile.base_for_field("include") == str(left)
+    assert right_profile.base_for_field("include") == str(right)
+
+
+def test_resolver_source_identity_tracks_lookup_cwd_while_exact_aliases_remain_cached(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    first_dir = tmp_path / "first"
+    second_dir = tmp_path / "second"
+    first_dir.mkdir()
+    second_dir.mkdir()
+    (tmp_path / "pyproject.toml").write_text("[tool.pydocfmt]\nline-length = 91\n", encoding="utf-8")
+    resolver = pydocformatter_settings.SETTINGS_SCHEMA.resolver()
+
+    monkeypatch.chdir(first_dir)
+    first_profile = resolver.profile_for_path(str(first_dir))
+    monkeypatch.chdir(second_dir)
+    second_profile = resolver.profile_for_path(str(second_dir))
+    cached_first_profile = resolver.profile_for_path(str(first_dir))
+
+    assert first_profile is cached_first_profile
+    assert first_profile is not second_profile
+    assert first_profile.base_for_field("exclude") == str(first_dir)
+    assert second_profile.base_for_field("exclude") == str(second_dir)
+    assert len(resolver._context.profiles_by_source) == 2
+
+
+def test_config_option_containing_equals_is_classified_per_lookup_cwd(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    explicit_cwd = tmp_path / "explicit"
+    inline_cwd = tmp_path / "inline"
+    explicit_cwd.mkdir()
+    inline_cwd.mkdir()
+    option = "line-length=101"
+    (explicit_cwd / option).write_text("line-length = 99\n", encoding="utf-8")
+    resolver = pydocformatter_settings.SETTINGS_SCHEMA.resolver(global_values=pydocformatter_global_args.GlobalArgs(config_options=(option,)))
+
+    monkeypatch.chdir(explicit_cwd)
+    explicit_profile = resolver.profile_for_path(str(explicit_cwd))
+    monkeypatch.chdir(inline_cwd)
+    inline_profile = resolver.profile_for_path(str(inline_cwd))
+
+    assert explicit_profile.settings.line_length == 99
+    assert inline_profile.settings.line_length == 101
+    assert resolver._context.config_inputs_by_cwd[str(explicit_cwd)].explicit_path == option
+    assert resolver._context.config_inputs_by_cwd[str(inline_cwd)].inline_options == (option,)
+
+
+def test_cached_parent_does_not_hide_existing_child_config_on_first_child_lookup(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    child = tmp_path / "child"
+    child.mkdir()
+    (tmp_path / "pyproject.toml").write_text("[tool.pydocfmt]\nline-length = 91\n", encoding="utf-8")
+    (child / "pyproject.toml").write_text("[tool.pydocfmt]\nline-length = 92\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    resolver = pydocformatter_settings.SETTINGS_SCHEMA.resolver()
+
+    root_profile = resolver.profile_for_path(str(tmp_path))
+    child_profile = resolver.profile_for_path(str(child))
+
+    assert root_profile.settings.line_length == 91
+    assert child_profile.settings.line_length == 92
+
+
+def test_discovery_finds_new_config_in_unsearched_child_but_snapshots_searched_directory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    fresh_child = tmp_path / "fresh"
+    searched_child = tmp_path / "searched"
+    searched_grandchild = searched_child / "grandchild"
+    fresh_child.mkdir()
+    searched_grandchild.mkdir(parents=True)
+    (tmp_path / "pyproject.toml").write_text("[tool.pydocfmt]\nline-length = 91\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    resolver = pydocformatter_settings.SETTINGS_SCHEMA.resolver()
+
+    root_profile = resolver.profile_for_path(str(tmp_path))
+    assert resolver.profile_for_path(str(searched_child)) is root_profile
+    (fresh_child / "pyproject.toml").write_text("[tool.pydocfmt]\nline-length = 92\n", encoding="utf-8")
+    (searched_child / "pyproject.toml").write_text("[tool.pydocfmt]\nline-length = 93\n", encoding="utf-8")
+
+    assert resolver.profile_for_path(str(fresh_child)).settings.line_length == 92
+    assert resolver.profile_for_path(str(searched_grandchild)) is root_profile
+    assert pydocformatter_settings.SETTINGS_SCHEMA.resolver().profile_for_path(str(searched_grandchild)).settings.line_length == 93
+
+
+def test_nearer_pyproject_without_settings_table_shares_ancestor_profile(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture) -> None:
+    child = tmp_path / "child"
+    child.mkdir()
+    (tmp_path / "pyproject.toml").write_text("[tool.pydocfmt]\nline-length = 91\n", encoding="utf-8")
+    (child / "pyproject.toml").write_text("[tool.other]\nenabled = true\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    load_toml_file = mocker.spy(pydocformatter_settings_core, "_load_toml_file")
+    resolver = pydocformatter_settings.SETTINGS_SCHEMA.resolver()
+
+    root_profile = resolver.profile_for_path(str(tmp_path))
+    child_profile = resolver.profile_for_path(str(child))
+
+    assert child_profile is root_profile
+    assert child_profile.settings.line_length == 91
+    assert load_toml_file.call_count == 2
+
+
+def test_negative_auto_discovery_reuses_cached_ancestors(tmp_path: Path, mocker: MockerFixture) -> None:
+    first = tmp_path / "common" / "first"
+    second = tmp_path / "common" / "second"
+    first.mkdir(parents=True)
+    second.mkdir()
+    exists = mocker.patch("pydocformatter.settings.os.path.exists", return_value=False, autospec=True)
+    load_toml_file = mocker.patch("pydocformatter.settings._load_toml_file", side_effect=AssertionError("no config should be loaded"), autospec=True)
+    resolver = pydocformatter_settings.SETTINGS_SCHEMA.resolver()
+
+    first_profile = resolver.profile_for_path(str(first))
+    first_exists_calls = exists.call_count
+    second_profile = resolver.profile_for_path(str(second))
+
+    assert second_profile is first_profile
+    assert exists.call_count == first_exists_calls + 1
+    assert not load_toml_file.called
+    assert all(config_path is None for config_path in resolver._context.closest_auto_config_by_start_dir.values())
+
+
+def test_explicit_config_shares_profile_and_never_runs_auto_discovery(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture) -> None:
+    config_path = tmp_path / "pydocfmt.toml"
+    first = tmp_path / "first"
+    second = tmp_path / "second"
+    first.mkdir()
+    second.mkdir()
+    config_path.write_text("line-length = 91\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    mocker.patch("pydocformatter.settings._auto_discovered_pyproject_path_for_path_with_context", side_effect=AssertionError("explicit config must disable discovery"), autospec=True)
+    load_toml_file = mocker.spy(pydocformatter_settings_core, "_load_toml_file")
+    resolver = pydocformatter_settings.SETTINGS_SCHEMA.resolver(global_values=pydocformatter_global_args.GlobalArgs(config_options=(str(config_path),)))
+
+    first_profile = resolver.profile_for_path(str(first))
+    second_profile = resolver.profile_for_path(str(second))
+
+    assert second_profile is first_profile
+    assert first_profile.settings.line_length == 91
+    assert load_toml_file.call_count == 1
+
+
+def test_isolated_mode_shares_profile_applies_all_overrides_and_reads_no_config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture) -> None:
+    first = tmp_path / "first"
+    second = tmp_path / "second"
+    first.mkdir()
+    second.mkdir()
+    monkeypatch.chdir(tmp_path)
+    mocker.patch("pydocformatter.settings._load_toml_file", side_effect=AssertionError("isolated mode must not read config files"), autospec=True)
+    resolver = pydocformatter_settings.SETTINGS_SCHEMA.resolver(
+        global_values=pydocformatter_global_args.GlobalArgs(config_options=("line-length = 91",), isolated=True),
+        args=argparse.Namespace(indent_width=3),
+        field_overrides=CheckSettingsOverrides(line_ending=LineEnding.LF),
+    )
+
+    first_profile = resolver.profile_for_path(str(first))
+    second_profile = resolver.profile_for_path(str(second))
+
+    assert second_profile is first_profile
+    assert first_profile.settings.line_length == 91
+    assert first_profile.settings.indent_width == 3
+    assert first_profile.settings.line_ending is LineEnding.LF
+
+
+def test_inline_argparse_and_field_overrides_are_identical_across_distinct_nested_sources(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    child = tmp_path / "child"
+    child.mkdir()
+    (tmp_path / "pyproject.toml").write_text("[tool.pydocfmt]\nline-length = 89\n", encoding="utf-8")
+    (child / "pyproject.toml").write_text("[tool.pydocfmt]\nline-length = 90\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    resolver = pydocformatter_settings.SETTINGS_SCHEMA.resolver(
+        global_values=pydocformatter_global_args.GlobalArgs(config_options=("line-length = 91",)),
+        args=argparse.Namespace(indent_width=3),
+        field_overrides=CheckSettingsOverrides(line_ending=LineEnding.LF),
+    )
+
+    root_profile = resolver.profile_for_path(str(tmp_path))
+    child_profile = resolver.profile_for_path(str(child))
+
+    assert root_profile is not child_profile
+    assert (root_profile.settings.line_length, root_profile.settings.indent_width, root_profile.settings.line_ending) == (91, 3, LineEnding.LF)
+    assert (child_profile.settings.line_length, child_profile.settings.indent_width, child_profile.settings.line_ending) == (91, 3, LineEnding.LF)
+
+
+def test_resolver_is_snapshot_while_separate_resolver_observes_config_edit(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    config_path = tmp_path / "pyproject.toml"
+    first = tmp_path / "first"
+    second = tmp_path / "second"
+    first.mkdir()
+    second.mkdir()
+    config_path.write_text("[tool.pydocfmt]\nline-length = 91\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    resolver = pydocformatter_settings.SETTINGS_SCHEMA.resolver()
+
+    first_profile = resolver.profile_for_path(str(first))
+    config_path.write_text("[tool.pydocfmt]\nline-length = 92\n", encoding="utf-8")
+    same_resolver_profile = resolver.profile_for_path(str(second))
+    fresh_resolver_profile = pydocformatter_settings.SETTINGS_SCHEMA.resolver().profile_for_path(str(second))
+
+    assert same_resolver_profile is first_profile
+    assert same_resolver_profile.settings.line_length == 91
+    assert fresh_resolver_profile.settings.line_length == 92
+
+
+@pytest.mark.parametrize("initial_content", [None, "not = [valid"])
+def test_missing_or_malformed_explicit_config_is_not_cached_and_can_be_retried(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, initial_content: str | None) -> None:
+    config_path = tmp_path / "pydocfmt.toml"
+    target = tmp_path / "target"
+    target.mkdir()
+    if initial_content is not None:
+        config_path.write_text(initial_content, encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    resolver = pydocformatter_settings.SETTINGS_SCHEMA.resolver(global_values=pydocformatter_global_args.GlobalArgs(config_options=(str(config_path),)))
+
+    with pytest.raises(SettingsError):
+        resolver.profile_for_path(str(target))
+    assert not resolver._context.parsed_toml_by_path
+    assert not resolver._profiles_by_start_dir
+
+    config_path.write_text("line-length = 91\n", encoding="utf-8")
+    profile = resolver.profile_for_path(str(target))
+
+    assert profile.settings.line_length == 91
+    assert len(resolver._context.parsed_toml_by_path) == 1
+
+
+def test_layer_error_precedence_remains_file_then_inline_then_argparse(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    config_path = tmp_path / "pydocfmt.toml"
+    config_path.write_text("not = [valid", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    global_values = pydocformatter_global_args.GlobalArgs(config_options=(str(config_path), "also = [invalid"))
+    args = argparse.Namespace(per_file_ignores=["{invalid"])
+
+    with pytest.raises(SettingsError, match=f"Failed to decode {re.escape(str(config_path))}"):
+        pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=global_values, args=args)
+
+    config_path.write_text("line-length = 91\n", encoding="utf-8")
+    with pytest.raises(SettingsError, match="Failed to decode --config inline TOML"):
+        pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=global_values, args=args)
+
+    valid_global_values = pydocformatter_global_args.GlobalArgs(config_options=(str(config_path), "line-length = 92"))
+    with pytest.raises(tomllib.TOMLDecodeError):
+        pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=valid_global_values, args=args)
+
+
+def test_inline_config_error_precedence_follows_option_order() -> None:
+    global_values = pydocformatter_global_args.GlobalArgs(config_options=("unknown-setting = 1", "line-length = ["), isolated=True)
+
+    with pytest.raises(SettingsError, match=r"^<--config> contains unknown setting\(s\): unknown-setting$"):
+        pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=global_values)
+
+
+def test_settings_resolution_preserves_exact_global_config_errors(tmp_path: Path) -> None:
+    missing = tmp_path / "missing.toml"
+    first = tmp_path / "first.toml"
+    second = tmp_path / "second.toml"
+    first.write_text("line-length = 91\n", encoding="utf-8")
+    second.write_text("line-length = 92\n", encoding="utf-8")
+
+    with pytest.raises(SettingsError, match=f"^Configuration file not found: {re.escape(str(missing))}$"):
+        pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(config_options=(str(missing),)))
+    with pytest.raises(SettingsError, match=re.escape("Only one --config=PATH configuration file can be supplied")):
+        pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(config_options=(str(first), str(second))))
+    with pytest.raises(SettingsError, match=re.escape("The argument --config=PATH cannot be used with --isolated")):
+        pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(config_options=(str(first),), isolated=True))
+
+
 def test_settings_overrides_are_dict_like_and_omit_unspecified_values() -> None:
     overrides = CheckSettingsOverrides(line_length=103)
 
@@ -434,12 +922,30 @@ def test_load_settings_defaults_in_isolated_mode(monkeypatch: pytest.MonkeyPatch
     assert config.per_file_settings == ()
 
 
-def test_default_exclude_matches_ruff_default() -> None:
+def test_default_exclude_extends_ruff_default_with_cache_directory() -> None:
     result = subprocess.run(["uv", "run", "ruff", "config", "exclude"], cwd=_repo_root(), shell=False, check=True, capture_output=True, text=True)
     default_match = re.search(r"^Default value: (?P<value>\[.*\])$", result.stdout, re.MULTILINE)
     assert default_match is not None
 
-    assert tuple(json.loads(default_match.group("value"))) == DEFAULT_EXCLUDE
+    assert tuple(json.loads(default_match.group("value"))) == tuple(directory for directory in DEFAULT_EXCLUDE if directory != ".pydocfmt_cache")
+
+
+def test_programmatic_cache_directory_rejects_embedded_nul() -> None:
+    with pytest.raises(SettingsError, match=r"cache_dir.*NUL"):
+        pydocformatter_settings.SETTINGS_SCHEMA.load(field_overrides=CheckSettingsOverrides(cache_dir="\0"))
+
+
+def test_inline_cache_directory_rejects_embedded_nul_escape() -> None:
+    with pytest.raises(SettingsError, match=r"cache-dir.*NUL"):
+        pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(config_options=('cache-dir = "\\u0000"',), isolated=True))
+
+
+def test_toml_cache_directory_rejects_embedded_nul_escape(tmp_path: Path) -> None:
+    config = tmp_path / "config.toml"
+    config.write_text('cache-dir = "\\u0000"\n', encoding="utf-8")
+
+    with pytest.raises(SettingsError, match=r"cache-dir.*NUL"):
+        pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(config_options=(str(config),)))
 
 
 def test_ty_default_exclude_matches_shared_default_directories() -> None:
@@ -447,7 +953,7 @@ def test_ty_default_exclude_matches_shared_default_directories() -> None:
         root = Path(td)
         (root / "pyproject.toml").write_text('[project]\nname = "ty-default-excludes"\nversion = "0.0.0"\nrequires-python = ">=3.11"\n', encoding="utf-8")
         (root / "kept.py").write_text("x = 1\n", encoding="utf-8")
-        for directory in DEFAULT_EXCLUDE:
+        for directory in (directory for directory in DEFAULT_EXCLUDE if directory != ".pydocfmt_cache"):
             ignored_dir = root / directory
             ignored_dir.mkdir(parents=True)
             (ignored_dir / "ignored.py").write_text("x = 1\n", encoding="utf-8")
@@ -459,7 +965,7 @@ def test_ty_default_exclude_matches_shared_default_directories() -> None:
     assert "Indexed 1 file(s)" in result.stderr
     assert f"Checking file '{root / 'kept.py'}'" in result.stderr
     assert "ignored.py" not in result.stderr
-    for directory in DEFAULT_EXCLUDE:
+    for directory in (directory for directory in DEFAULT_EXCLUDE if directory != ".pydocfmt_cache"):
         assert f"Skipping directory '{root / directory}'" in result.stderr
 
 
@@ -507,8 +1013,8 @@ def test_load_profile_tracks_field_source_priorities(monkeypatch: pytest.MonkeyP
 
 def test_settings_profile_key_is_hashable_and_mapping_order_independent() -> None:
     settings = CheckSettings()
-    first = pydocformatter_settings_core.SettingsProfile(settings=settings, field_bases={"select": "/a", "ignore": "/b"}, field_priorities={"select": 1, "ignore": 2})
-    second = pydocformatter_settings_core.SettingsProfile(settings=settings, field_bases={"ignore": "/b", "select": "/a"}, field_priorities={"ignore": 2, "select": 1})
+    first = pydocformatter_settings_core.SettingsProfile(settings=settings, field_bases={"select": "/a", "ignore": "/b"}, field_priorities={"select": 1, "ignore": 2}, project_root="/project")
+    second = pydocformatter_settings_core.SettingsProfile(settings=settings, field_bases={"ignore": "/b", "select": "/a"}, field_priorities={"ignore": 2, "select": 1}, project_root="/project")
 
     assert isinstance(first.key(), pydocformatter_settings_core.SettingsProfile.Key)
     assert first.key() == second.key()
@@ -594,7 +1100,9 @@ def test_auto_discovered_pyproject_path_skips_files_without_pydocfmt_table(monke
         candidate = root / "pyproject.toml"
         candidate.write_text("[tool.other]\nvalue = true\n", encoding="utf-8")
         monkeypatch.chdir(root)
-        path = pydocformatter_settings_core._auto_discovered_pyproject_path_for_path(None, table_path=("tool", "pydocfmt"))
+        path = pydocformatter_settings_core._auto_discovered_pyproject_path_for_path_with_context(
+            None, table_path=("tool", "pydocfmt"), context=pydocformatter_settings_core._SettingsResolutionContext()
+        )
 
     assert path is not None
     assert path != str(candidate)
@@ -608,7 +1116,9 @@ def test_suite_temporary_directories_stay_below_configuration_boundary() -> None
     with tempfile.TemporaryDirectory() as td:
         nested = Path(td) / "nested"
         nested.mkdir()
-        discovered = pydocformatter_settings_core._auto_discovered_pyproject_path_for_path(str(nested), table_path=("tool", "pydocfmt"))
+        discovered = pydocformatter_settings_core._auto_discovered_pyproject_path_for_path_with_context(
+            str(nested), table_path=("tool", "pydocfmt"), context=pydocformatter_settings_core._SettingsResolutionContext()
+        )
         settings = pydocformatter_settings.SETTINGS_SCHEMA.load_profile(path=str(nested)).settings
 
     assert nested.is_relative_to(boundary)

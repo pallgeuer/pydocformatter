@@ -17,7 +17,7 @@ import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase
 from pydocformatter.rules.definition_helpers import string_literals
-from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata
+from pydocformatter.rules.models import FixAvailability, RuleCacheBehavior, RuleCheckKind, RuleMetadata
 
 
 if TYPE_CHECKING:
@@ -45,6 +45,7 @@ class PDF001DocstringQuoteStyle(RuleBase):
         setting_effects=(),
         incompatible_with=(),
         check_kind=RuleCheckKind.STANDARD,
+        cache_behavior=RuleCacheBehavior.FILE_LOCAL,
     )
 
     @classmethod

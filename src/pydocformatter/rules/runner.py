@@ -36,7 +36,8 @@ if TYPE_CHECKING:
     from pydocformatter.rules.collection import RuleCollection
     from pydocformatter.rules.definition import RuleBase, RuleCategoryBase
     from pydocformatter.rules.models import RuleMetadata
-    from pydocformatter.rules_selection import RuleSelection, SelectedRule
+    from pydocformatter.rules_selection import RuleExecutionPlan, SelectedRule
+    from pydocformatter.source_path import SourcePathContext
 
 
 MAX_FIX_ITERATIONS = 20
@@ -91,23 +92,26 @@ class _ModuleSourceSeed:
     source: str
 
 
-def run_rules(module: cst.Module, *, path: str, settings: CheckSettings, line_ending: str, rule_selection: RuleSelection, fix: bool, source: str | None = None) -> RuleRunResult:
-    """Run selected rule fixes and checks against one parsed module.
+def run_rule_plan(
+    module: cst.Module, *, path: str, settings: CheckSettings, line_ending: str, execution_plan: RuleExecutionPlan, fix: bool, source_path: SourcePathContext, source: str | None = None
+) -> RuleRunResult:
+    """Run one fully resolved rule plan against a parsed module.
 
     Args:
-        module (cst.Module): Parsed LibCST module to check or transform.
-        path (str): Display path used for per-file ignores, diagnostics, and operational errors.
-        settings (CheckSettings): Resolved settings for the current source.
-        line_ending (str): Line ending sequence to use for generated replacement text.
-        rule_selection (RuleSelection): Globally selected rules and per-file ignores for this run.
-        fix (bool): Whether enabled fixes should be applied before the final check pass.
-        source (str | None): Original source text aligned with `module`, used for source-range edits when available.
+        module (cst.Module): Parsed module to check or transform.
+        path (str): Display path used for diagnostics and operational errors.
+        settings (CheckSettings): Effective settings for the current source.
+        line_ending (str): Line ending used for generated replacement text.
+        execution_plan (RuleExecutionPlan): Final ordered rules and their collection.
+        fix (bool): Whether enabled fixes should be applied before the final check.
+        source_path (SourcePathContext): Precomputed path semantics shared with cache identity.
+        source (str | None): Original source aligned with `module` when available.
 
     Returns:
-        RuleRunResult: Final module, fixed and unfixed findings, source-change flag, and operational errors.
+        RuleRunResult: Final module, findings, change state, and operational errors.
     """
     errors: list[str] = []
-    selected_rules = rule_selection.for_path(path)
+    selected_rules = execution_plan.selected_rules
     selected_rule_by_code = {selected_rule.rule.code: selected_rule for selected_rule in selected_rules}
     fixed_findings: list[RuleFinding] = []
     last_iteration_findings: tuple[RuleFinding, ...] = ()
@@ -121,10 +125,11 @@ def run_rules(module: cst.Module, *, path: str, settings: CheckSettings, line_en
             path=path,
             settings=settings,
             line_ending=line_ending,
-            rule_selection=rule_selection,
+            execution_plan=execution_plan,
             selected_rule_by_code=selected_rule_by_code,
             errors=check_errors,
             source_seed=source_seed,
+            source_path=source_path,
         )
 
     if fix:
@@ -135,7 +140,15 @@ def run_rules(module: cst.Module, *, path: str, settings: CheckSettings, line_en
 
         for _ in range(1, MAX_FIX_ITERATIONS + 1):
             module, iteration_findings, changed = _run_fix_pass(
-                module, path=path, settings=settings, line_ending=line_ending, rule_selection=rule_selection, selected_rule_by_code=selected_rule_by_code, errors=errors, source_seed=source_seed
+                module,
+                path=path,
+                settings=settings,
+                line_ending=line_ending,
+                execution_plan=execution_plan,
+                selected_rule_by_code=selected_rule_by_code,
+                errors=errors,
+                source_seed=source_seed,
+                source_path=source_path,
             )
             fixed_findings.extend(iteration_findings)
             last_iteration_findings = iteration_findings
@@ -159,16 +172,17 @@ def _run_fix_pass(
     path: str,
     settings: CheckSettings,
     line_ending: str,
-    rule_selection: RuleSelection,
+    execution_plan: RuleExecutionPlan,
     selected_rule_by_code: dict[RuleCode, SelectedRule],
     errors: list[str],
+    source_path: SourcePathContext,
     source_seed: _ModuleSourceSeed | None = None,
 ) -> tuple[cst.Module, tuple[RuleFinding, ...], bool]:
     """Run one ordered pass of effectively fixable rules."""
     pass_findings: list[RuleFinding] = []
     changed = False
     pass_context: _ModulePassContext | None = None
-    for category_class in rule_selection.collection.categories:
+    for category_class in execution_plan.collection.categories:
         category_rule_classes = tuple(
             rule_class
             for rule_class in category_class.ordered_rules()
@@ -177,7 +191,16 @@ def _run_fix_pass(
         if not category_rule_classes:
             continue
         prepared_category, pass_context = _prepare_category(
-            category_class, module, pass_context, path=path, settings=settings, line_ending=line_ending, rule_collection=rule_selection.collection, errors=errors, source_seed=source_seed
+            category_class,
+            module,
+            pass_context,
+            path=path,
+            settings=settings,
+            line_ending=line_ending,
+            rule_collection=execution_plan.collection,
+            errors=errors,
+            source_seed=source_seed,
+            source_path=source_path,
         )
         if prepared_category is None:
             continue
@@ -185,7 +208,16 @@ def _run_fix_pass(
         for rule_class in category_rule_classes:
             if prepared_category.context.module is not module:
                 prepared_category, pass_context = _prepare_category(
-                    category_class, module, pass_context, path=path, settings=settings, line_ending=line_ending, rule_collection=rule_selection.collection, errors=errors, source_seed=source_seed
+                    category_class,
+                    module,
+                    pass_context,
+                    path=path,
+                    settings=settings,
+                    line_ending=line_ending,
+                    rule_collection=execution_plan.collection,
+                    errors=errors,
+                    source_seed=source_seed,
+                    source_path=source_path,
                 )
                 if prepared_category is None:
                     break
@@ -238,9 +270,10 @@ def _run_check_pass(
     path: str,
     settings: CheckSettings,
     line_ending: str,
-    rule_selection: RuleSelection,
+    execution_plan: RuleExecutionPlan,
     selected_rule_by_code: dict[RuleCode, SelectedRule],
     errors: list[str],
+    source_path: SourcePathContext,
     source_seed: _ModuleSourceSeed | None = None,
 ) -> tuple[RuleFinding, ...]:
     """Run one ordered read-only pass of all selected rules."""
@@ -249,12 +282,21 @@ def _run_check_pass(
     pass_context: _ModulePassContext | None = None
     selected_standard_rule_codes = frozenset(selected_rule.rule.code for selected_rule in selected_rule_by_code.values() if selected_rule.rule.check_kind == RuleCheckKind.STANDARD)
     suppression_audit_rules = tuple(selected_rule for selected_rule in selected_rule_by_code.values() if selected_rule.rule.check_kind == RuleCheckKind.SUPPRESSION_AUDIT)
-    for category_class in rule_selection.collection.categories:
+    for category_class in execution_plan.collection.categories:
         category_rules = tuple((rule_class, selected_rule_by_code[rule_class.meta.code]) for rule_class in category_class.ordered_rules() if rule_class.meta.code in selected_rule_by_code)
         if not category_rules:
             continue
         prepared_category, pass_context = _prepare_category(
-            category_class, module, pass_context, path=path, settings=settings, line_ending=line_ending, rule_collection=rule_selection.collection, errors=errors, source_seed=source_seed
+            category_class,
+            module,
+            pass_context,
+            path=path,
+            settings=settings,
+            line_ending=line_ending,
+            rule_collection=execution_plan.collection,
+            errors=errors,
+            source_seed=source_seed,
+            source_path=source_path,
         )
         if prepared_category is None:
             continue
@@ -276,7 +318,7 @@ def _run_check_pass(
             used_selector_keys.update(suppression_result.used_selector_keys)
             findings.extend(_apply_effective_fixability(violation.finding, selected_rule=selected_rule) for violation in suppression_result.violations)
     if suppression_audit_rules and pass_context is not None:
-        rule_class_by_code = {rule_class.meta.code: rule_class for category_class in rule_selection.collection.categories for rule_class in category_class.ordered_rules()}
+        rule_class_by_code = {rule_class.meta.code: rule_class for category_class in execution_plan.collection.categories for rule_class in category_class.ordered_rules()}
         source_line_count = len(pass_context.source_lines)
         for selected_rule in suppression_audit_rules:
             audit_findings = pass_context.suppression_index.unused_findings(frozenset(used_selector_keys), selected_rule_codes=selected_standard_rule_codes, rule=selected_rule.rule)
@@ -300,12 +342,13 @@ def _prepare_category(
     rule_collection: RuleCollection,
     errors: list[str],
     source_seed: _ModuleSourceSeed | None = None,
+    source_path: SourcePathContext,
 ) -> tuple[_PreparedCategory | None, _ModulePassContext | None]:
     """Run one category preprocessor and return its shared data."""
     current_pass_context: _ModulePassContext | None = None
     try:
         current_pass_context = _pass_context_for(module, pass_context, source_seed=source_seed, collection=rule_collection)
-        context = _category_context(current_pass_context, path=path, settings=settings, line_ending=line_ending)
+        context = _category_context(current_pass_context, path=path, source_path=source_path, settings=settings, line_ending=line_ending)
         return _PreparedCategory(context=context, data=category_class.prepare(context)), current_pass_context
     except Exception as error:
         errors.append(f"{path}: {category_class.meta.prefix} category preparation failed: {error}")
@@ -340,10 +383,11 @@ def _module_aligned_source(source: str) -> str:
     return aligned_source
 
 
-def _category_context(pass_context: _ModulePassContext, *, path: str, settings: CheckSettings, line_ending: str) -> RuleCategoryContext:
+def _category_context(pass_context: _ModulePassContext, *, path: str, source_path: SourcePathContext, settings: CheckSettings, line_ending: str) -> RuleCategoryContext:
     """Build a category context from shared source and metadata."""
     return RuleCategoryContext(
         path=path,
+        source_path=source_path,
         settings=settings,
         module=pass_context.module,
         metadata_wrapper=pass_context.metadata_wrapper,
@@ -360,6 +404,7 @@ def _rule_context(prepared_category: _PreparedCategory) -> RuleContext:
     category_context = prepared_category.context
     return RuleContext(
         path=category_context.path,
+        source_path=category_context.source_path,
         settings=category_context.settings,
         module=category_context.module,
         metadata_wrapper=category_context.metadata_wrapper,

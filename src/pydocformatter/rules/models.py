@@ -44,6 +44,18 @@ class RuleCheckKind(enum.StrEnum):
     SUPPRESSION_AUDIT = "suppression-audit"
 
 
+class RuleCacheBehavior(enum.StrEnum):
+    """Rule dependency behavior for persistent clean-proof caching.
+
+    Attributes:
+        FILE_LOCAL: Findings and fixes depend only on fingerprinted file-local inputs.
+        UNCACHEABLE: Selecting the rule bypasses persistent lookup and population.
+    """
+
+    FILE_LOCAL = "file-local"
+    UNCACHEABLE = "uncacheable"
+
+
 class RuleSettingEffect(enum.StrEnum):
     """Effect of a resolved setting value on rule selection.
 
@@ -117,6 +129,7 @@ class RuleMetadata:
         setting_effects (tuple[RuleSettingEffects, ...]): Selection effects driven by resolved setting values.
         incompatible_with (tuple[RuleCode, ...]): Rule codes that cannot be selected together with this rule.
         check_kind (RuleCheckKind): Check-pass phase used to run the rule.
+        cache_behavior (RuleCacheBehavior): Declared dependency behavior for persistent caching.
     """
 
     code: RuleCode
@@ -127,6 +140,7 @@ class RuleMetadata:
     setting_effects: tuple[RuleSettingEffects, ...]
     incompatible_with: tuple[RuleCode, ...]
     check_kind: RuleCheckKind = dataclasses.field(kw_only=True)
+    cache_behavior: RuleCacheBehavior = dataclasses.field(default=RuleCacheBehavior.UNCACHEABLE, kw_only=True)
 
     def __post_init__(self) -> None:
         """Validate rule metadata fields."""
@@ -136,6 +150,8 @@ class RuleMetadata:
             raise TypeError(f"Expected FixAvailability, got {type(self.fix_availability).__name__}")
         if not isinstance(self.check_kind, RuleCheckKind):
             raise TypeError(f"Expected RuleCheckKind, got {type(self.check_kind).__name__}")
+        if not isinstance(self.cache_behavior, RuleCacheBehavior):
+            raise TypeError(f"Expected RuleCacheBehavior, got {type(self.cache_behavior).__name__}")
         if not self.name:
             raise ValueError(f"{self.code}: Rule name must not be empty")
         if not self.message:

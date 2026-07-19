@@ -88,6 +88,7 @@ Per-file settings intentionally cannot change which files are selected or which 
 - Rule-selection settings, including `select`, `ignore`, `extend-select`, `require-explicit`, per-file ignores, fixability settings, and related selector settings.
 - File-selection settings, including `include`, `extend-include`, `exclude`, `extend-exclude`, `respect-gitignore`, and `force-exclude`.
 - Run-level settings, including `output-format` and `parallelism`.
+- Persistent-cache run settings, including `cache` and `cache-dir`.
 - Nested `per-file-settings`.
 - Any setting referenced by rule metadata `setting_effects`, such as `docstring-convention`.
 
@@ -96,6 +97,32 @@ Only formatting, docstring-formatting, and comment-formatting settings that do n
 Per-file settings carry the source priority of the `per-file-settings` field itself. A matching per-file override applies to a setting only when the `per-file-settings` source priority is greater than or equal to that setting's current source priority. For example, a command-line `--line-length` value overrides a config-file per-file `line-length` value for every file.
 
 `pydocfmt check --show-settings` remains current-working-directory oriented and does not apply path-specific per-file setting overrides.
+
+## Persistent clean-proof cache
+
+The [Persistent cache specification](cache_spec.md) is the user-facing reference for hit validation, population, mode reuse, storage, cleanup, failure handling, trust, statistics, and performance. This section defines the settings and location-resolution behavior.
+
+`cache = true` enables persistent clean-proof lookup and population for selected disk files. `cache-dir = ".pydocfmt_cache"` selects the storage root. Both are run-level settings and cannot appear in `per-file-settings`. `--cache` and `--no-cache` override enablement, while `--cache-dir PATH` accepts a non-empty path without NUL characters. `--cache-stats` is a debugging flag rather than a setting: it prints cache counters to stderr without affecting cache keys, diagnostics, or status.
+
+The default cache directory is relative to the directory containing the auto-discovered current-working-directory `pyproject.toml` with `[tool.pydocfmt]`, or to the current working directory when no such configuration exists. A non-default relative `cache-dir` follows its setting source base: auto-discovered values are config-relative, while explicit config, inline config, and command-line values are current-working-directory relative. Absolute values remain absolute.
+
+pydocformatter may create the cache directory itself, but its immediate parent must already exist as a directory; missing ancestors are not created. When caching is enabled for selected disk files and that parent is unavailable, pydocformatter emits one cache warning and otherwise performs a normal uncached run with unchanged findings, fixes, and status. This warning is not emitted for empty selections, standard input, or disabled caching.
+
+```text
+pydocfmt check: Cache warning: Cache directory parent does not exist or is not a directory; running without persistent cache: <parent>
+```
+
+The current-working-directory profile selects the only cache store and internal cache root for an invocation. Cache locations from nested path profiles do not select or prune additional stores.
+
+The cache stores only a proof that exact raw source bytes previously completed without findings or operational errors under the same effective analysis-affecting setting values, final ordered path-specific rule codes, implementation, runtime platform, and package/module path context. A positive hit always reads and cryptographically hashes the complete current file. Size and nanosecond mtime can reject a candidate early but can never establish equality. Consequently, a same-size edit with a preserved timestamp is reanalyzed, while a harmless timestamp-only change is conservatively reanalyzed as well.
+
+Changing `parallelism` does not require reanalysis of an otherwise valid clean proof; the new value still controls digest-validation threads and miss-analysis processes for the current invocation. Changing fixability also does not require reanalysis when the final ordered rule codes are unchanged, because a clean proof has no finding to relabel or repair.
+
+Clean proofs can be shared across check, fix, and diff modes because a proven-clean source state has nothing to report or rewrite. A changed source is cached only after `--fix` successfully writes a finding-free result. Check or diff results that would change the file, remaining findings, invalid UTF-8 or syntax, rule errors, selector errors, stdin, and any selected rule with unmodeled external dependencies are not cached.
+
+Cache data is best-effort optimization state. Missing, corrupt, incompatible, locked, read-only, or otherwise unusable storage degrades to uncached execution without changing findings, fixes, or exit status. The explicit missing-immediate-parent warning is the only normal-output exception. The versioned SQLite store contains hashes and metadata, not source, diagnostics, or serialized Python objects. A process able to modify the cache can forge a local clean proof, so use `--no-cache` for untrusted shared or restored cache artifacts.
+
+`pydocfmt clean` resolves configuration through the normal global configuration arguments and accepts `--cache-dir PATH` as a direct override. It verifies the exact regular, non-symlinked cache ownership tag and removes only numeric pydocfmt-owned version directories. It keeps the configured root, root-level quarantine-shaped lookalikes, the cache lock, and other unrelated entries, and it refuses unknown or symlinked roots, including empty untagged directories. Entries not reused for 30 days are pruned opportunistically. Runtime writes, lookup, quarantine, incompatible-database replacement, and cleanup require exact ownership; only initial creation may claim an empty untagged directory. Database recovery and cleanup are serialized across processes, and quarantined main, WAL, and shared-memory files are retained and pruned as groups.
 
 ## Setting notes
 
@@ -113,5 +140,6 @@ The `docstring-convention` setting never auto-detects a convention. Google secti
 
 ## Related specifications
 
+- [Persistent cache specification](cache_spec.md) specifies clean-proof validation, population, lifecycle, failure handling, and trust.
 - [File selection specification](file_selection_spec.md) specifies how resolved file-selection settings choose files.
 - [Rule selection specification](rule_selection_spec.md) specifies how resolved rule-selection settings choose active rules, per-file ignores, and fixability.

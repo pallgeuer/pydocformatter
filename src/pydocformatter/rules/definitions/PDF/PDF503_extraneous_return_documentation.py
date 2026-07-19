@@ -14,7 +14,7 @@ from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase
 from pydocformatter.rules.definition_helpers import docstring_conventions, value_documentation
 from pydocformatter.rules.definitions.PDF.PDF import PDF
-from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata
+from pydocformatter.rules.models import FixAvailability, RuleCacheBehavior, RuleCheckKind, RuleMetadata
 
 
 if TYPE_CHECKING:
@@ -39,6 +39,7 @@ class PDF503ExtraneousReturnDocumentation(RuleBase):
         setting_effects=docstring_conventions.convention_setting_effects(disabled=docstring_conventions.UNPARSED_CONVENTIONS),
         incompatible_with=(),
         check_kind=RuleCheckKind.STANDARD,
+        cache_behavior=RuleCacheBehavior.FILE_LOCAL,
     )
 
     @classmethod

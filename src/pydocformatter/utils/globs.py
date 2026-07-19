@@ -50,6 +50,19 @@ class CompiledGlobPattern:
             bool: True if the normalized path matches this pattern.
         """
         path_segments = tuple(segment for segment in normalized_path.split("/") if segment)
+        return self.matches_segments(path_segments, match_parent_segments_for_bare=match_parent_segments_for_bare, match_descendants_for_slash=match_descendants_for_slash)
+
+    def matches_segments(self, path_segments: tuple[str, ...], *, match_parent_segments_for_bare: bool, match_descendants_for_slash: bool) -> bool:
+        """Return whether this pattern matches already split non-empty path segments.
+
+        Args:
+            path_segments (tuple[str, ...]): Non-empty candidate segments shared across pattern evaluation.
+            match_parent_segments_for_bare (bool): Whether a bare pattern can match candidate parent segments.
+            match_descendants_for_slash (bool): Whether a complete slash pattern also accepts descendant segments.
+
+        Returns:
+            bool: Whether this compiled pattern matches the supplied segments.
+        """
         if not path_segments or not self.segments:
             return False
 
@@ -68,12 +81,18 @@ class GlobPatternSet:
     """A compile-once set of glob patterns.
 
     Attributes:
-        patterns (tuple[CompiledGlobPattern, ...]): Compiled glob patterns to evaluate.
+        literal_bare_patterns (frozenset[str]): Non-empty slashless patterns with exact segment semantics.
+        wildcard_bare_patterns (tuple[CompiledGlobPattern, ...]): Ordered non-empty slashless patterns requiring
+            `fnmatchcase()`.
+        slash_patterns (tuple[CompiledGlobPattern, ...]): Ordered non-empty patterns matched against anchored path
+            segments.
         match_parent_segments_for_bare (bool): Whether slashless patterns can match parent directory segments.
         match_descendants_for_slash (bool): Whether slash-containing patterns match descendant paths.
     """
 
-    patterns: tuple[CompiledGlobPattern, ...]
+    literal_bare_patterns: frozenset[str]
+    wildcard_bare_patterns: tuple[CompiledGlobPattern, ...]
+    slash_patterns: tuple[CompiledGlobPattern, ...]
     match_parent_segments_for_bare: bool = False
     match_descendants_for_slash: bool = False
 
@@ -89,8 +108,11 @@ class GlobPatternSet:
         Returns:
             GlobPatternSet: Compiled pattern set configured with the requested matching behavior.
         """
+        compiled_patterns = tuple(CompiledGlobPattern.compile(pattern) for pattern in patterns)
         return cls(
-            patterns=tuple(CompiledGlobPattern.compile(pattern) for pattern in patterns),
+            literal_bare_patterns=frozenset(pattern.pattern for pattern in compiled_patterns if pattern.segments and not pattern.has_slash and not _has_fnmatch_magic(pattern.pattern)),
+            wildcard_bare_patterns=tuple(pattern for pattern in compiled_patterns if pattern.segments and not pattern.has_slash and _has_fnmatch_magic(pattern.pattern)),
+            slash_patterns=tuple(pattern for pattern in compiled_patterns if pattern.segments and pattern.has_slash),
             match_parent_segments_for_bare=match_parent_segments_for_bare,
             match_descendants_for_slash=match_descendants_for_slash,
         )
@@ -104,9 +126,18 @@ class GlobPatternSet:
         Returns:
             bool: True if at least one compiled pattern matches the path.
         """
+        path_segments = tuple(segment for segment in normalized_path.split("/") if segment)
+        if not path_segments:
+            return False
+
+        bare_segments = path_segments if self.match_parent_segments_for_bare else path_segments[-1:]
+        if any(segment in self.literal_bare_patterns for segment in bare_segments):
+            return True
+        if any(fnmatch.fnmatchcase(segment, pattern.pattern) for pattern in self.wildcard_bare_patterns for segment in bare_segments):
+            return True
         return any(
-            pattern.matches(normalized_path, match_parent_segments_for_bare=self.match_parent_segments_for_bare, match_descendants_for_slash=self.match_descendants_for_slash)
-            for pattern in self.patterns
+            pattern.matches_segments(path_segments, match_parent_segments_for_bare=self.match_parent_segments_for_bare, match_descendants_for_slash=self.match_descendants_for_slash)
+            for pattern in self.slash_patterns
         )
 
 
@@ -162,6 +193,18 @@ def base_relative_posix_path(path: str, base_path: str) -> str:
         str: Relative path from `base_path` to `path` using `/` separators.
     """
     return os.path.relpath(os.path.abspath(path), os.path.abspath(base_path)).replace(os.sep, "/")
+
+
+def _has_fnmatch_magic(pattern: str) -> bool:
+    """Return whether a pattern conservatively contains `fnmatch` wildcard syntax.
+
+    Args:
+        pattern (str): Slashless raw pattern to classify.
+
+    Returns:
+        bool: Whether `*`, `?`, or `[` keeps the pattern on the wildcard path.
+    """
+    return any(character in pattern for character in "*?[")
 
 
 def _match_segment_glob(path_segments: tuple[str, ...], pattern_segments: tuple[str, ...], path_index: int, pattern_index: int, *, allow_descendants: bool = False) -> bool:

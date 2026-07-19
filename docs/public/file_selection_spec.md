@@ -6,7 +6,7 @@ This document specifies how `pydocfmt` selects files for processing.
 
 - `include = ["*.py", "*.pyi", "*.pyw"]`
 - `extend-include = []`
-- `exclude = [".bzr", ".direnv", ".eggs", ".git", ".git-rewrite", ".hg", ".mypy_cache", ".nox", ".pants.d", ".pytype", ".ruff_cache", ".svn", ".tox", ".venv", "__pypackages__", "_build", "buck-out", "dist", "node_modules", "venv"]`
+- `exclude = [".bzr", ".direnv", ".eggs", ".git", ".git-rewrite", ".hg", ".mypy_cache", ".nox", ".pants.d", ".pydocfmt_cache", ".pytype", ".ruff_cache", ".svn", ".tox", ".venv", "__pypackages__", "_build", "buck-out", "dist", "node_modules", "venv"]`
 - `extend-exclude = []`
 - `respect-gitignore = true`
 - `force-exclude = false`
@@ -17,7 +17,7 @@ General configuration loading, source priority, and path-pattern bases are speci
 
 Auto-discovered configuration is hierarchical: the single closest config file applies to the file or directory being evaluated, and parent config files are not merged into child config files. During traversal, a parent directory exclude can still prune a child directory before that child directory's config is entered.
 
-`--show-settings` displays settings resolved for the current working directory. The `respect-gitignore` value used during a file-selection run is also resolved from the current working directory, not separately from each traversed path.
+`--show-settings` displays settings resolved for the current working directory. The `respect-gitignore`, `cache`, and `cache-dir` values used for run-level file-selection behavior are also resolved from the current working directory, not separately from each traversed path.
 
 ## File selection algorithm
 
@@ -27,12 +27,13 @@ Given positional CLI paths, defaulting to `.` when no paths are specified:
 2. Treat directory arguments as traversal roots. A directory argument can itself be rejected by exclude rules before traversal starts; otherwise, recursively discover files under it.
 3. Keep deterministic traversal order by sorting directory and file names.
 4. Resolve settings for each traversed directory or file with closest-config semantics.
-5. Prune excluded directories during discovery and record ignored decisions for them.
-6. For discovered files, require a match against `include` or `extend-include`.
-7. Reject files matching `exclude` or `extend-exclude`.
-8. If `respect-gitignore = true` in the settings resolved for the current working directory, reject discovered files matched by the gitignore filter, or abort file selection if gitignore checks fail.
-9. Deduplicate accepted paths that resolve to the same physical file, recording later aliases as ignored duplicate decisions.
-10. Return accepted files and structured decisions for file-selection output.
+5. Prune the safe run-level internal cache directory before entering it and record the distinct `cache-directory` decision reason.
+6. Prune excluded directories during discovery and record ignored decisions for them.
+7. For discovered files, require a match against `include` or `extend-include`.
+8. Reject files matching `exclude` or `extend-exclude`.
+9. If `respect-gitignore = true` in the settings resolved for the current working directory, reject discovered files matched by the gitignore filter, or abort file selection if gitignore checks fail.
+10. Deduplicate accepted paths that resolve to the same physical file, recording later aliases as ignored duplicate decisions.
+11. Return accepted files and structured decisions for file-selection output.
 
 Include and exclude patterns are glob patterns, not regexes. Matching uses normalized POSIX-style paths. Pattern bases follow the source of each setting:
 
@@ -47,6 +48,8 @@ Bare exclude patterns can match file basenames or parent directory segments. Sla
 Explicit files bypass include matching and gitignore filtering. With `force-exclude = true`, explicit files are rejected only when the applicable exclude matcher matches them.
 
 Directory arguments are not explicit files. A directory argument is skipped when the directory path matches the applicable source-base-aware exclude matcher. When `force-exclude = true`, a directory argument is also skipped when the final exclude pattern list matches the CLI path relative to the current working directory. If a directory argument is not skipped, files discovered below it are normal discovered files.
+
+Only the cache root resolved from the current-working-directory profile can receive special internal-cache pruning. Cache roots configured only by profiles discovered below a traversal root do not select additional stores and receive normal include and exclude handling. The run root is pruned when it has the exact pydocfmt ownership tag, even when it is reached through a physical alias such as a symlinked parent and caching is disabled. While caching is enabled, an empty non-symlinked directory that the store can safely claim is also pruned. A non-empty unowned directory and a directory whose final component is a symlink are never specially pruned and instead receive normal include and exclude handling. The cache root does not suppress the traversal root itself if both paths are equal. `--show-files` reports `IGNORED: internal pydocfmt cache directory` for a pruned descendant. The default `.pydocfmt_cache` name remains in the default exclude list independently of this ownership-aware behavior. See [Persistent cache](cache_spec.md) for cache-directory ownership and lifecycle behavior.
 
 `respect-gitignore` is evaluated once from the settings resolved for the current working directory. A closer child config can change include, exclude, and per-file-ignore behavior for files below it, but it does not enable or disable gitignore filtering for that run.
 

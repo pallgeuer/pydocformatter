@@ -16,6 +16,7 @@ from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention
 from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
 from pydocformatter.rules.definition_helpers import source_text
 from pydocformatter.rules.definitions.PDF.PDF import PDF
+from pydocformatter.source_path import SourcePathContext
 
 
 if typing.TYPE_CHECKING:
@@ -106,6 +107,7 @@ def contexts_for(rule_code: str, *, convention: DocstringConvention = DocstringC
         wrapper = cst_metadata.MetadataWrapper(module, unsafe_skip_copy=True)
         category = RuleCategoryContext(
             path="example.py",
+            source_path=SourcePathContext.for_path("example.py"),
             settings=CheckSettings(select=(rule_code,), docstring_convention=convention) if settings is None else settings,
             module=module,
             metadata_wrapper=wrapper,
@@ -117,6 +119,7 @@ def contexts_for(rule_code: str, *, convention: DocstringConvention = DocstringC
         )
         return category, RuleContext(
             path=category.path,
+            source_path=category.source_path,
             settings=category.settings,
             module=category.module,
             metadata_wrapper=category.metadata_wrapper,

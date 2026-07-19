@@ -8,6 +8,7 @@ import pytest
 from pydocformatter import formatter, rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention, DocstringMissingDocumentation
 from pydocformatter.rules.definitions.PDF.PDF510_missing_public_module_attribute_documentation import PDF510MissingPublicModuleAttributeDocumentation
+from pydocformatter.source_path import SourcePathContext
 
 
 def format_source(source: str, *, settings: CheckSettings | None = None, path: str = "example.py") -> formatter.FormatterResult:
@@ -126,6 +127,25 @@ def test_existing_module_path_privacy_ignores_non_package_underscore_parents(tmp
 
     assert_pdf510_lines(source, ((8,),), path=str(public_module))
     assert_pdf510_lines(source, ((8,),), path=str(standalone_module))
+
+
+def test_module_visibility_uses_precomputed_path_context_when_package_markers_change(tmp_path: pathlib.Path) -> None:
+    source = '"""Client defaults.\n\nAttributes:\n    timeout (float): Request timeout.\n"""\n\ntimeout: float\nretries: int\n'
+    private_package = tmp_path / "_private"
+    private_package.mkdir()
+    module = private_package / "public.py"
+    module.write_text(source, encoding="utf-8")
+    source_path = SourcePathContext.for_path(str(module))
+    (private_package / "__init__.py").write_text("", encoding="utf-8")
+    settings = CheckSettings(select=("PDF510",), docstring_convention=DocstringConvention.GOOGLE)
+
+    selection = rules_selection.select_rules(settings)
+    result = formatter._format_source_plan(source, str(module), settings=settings, execution_plan=selection.execution_plan_for_path(str(module)), fix=True, source_path=source_path)
+    fresh_result = formatter.format_source(source, str(module), settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
+
+    assert source_path.public
+    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((8,),)
+    assert not fresh_result.unfixed_findings
 
 
 def test_existing_module_path_privacy_uses_package_suffix(tmp_path: pathlib.Path) -> None:

@@ -20,6 +20,7 @@ from pydocformatter.cli import settings_check
 from pydocformatter.rules import line_endings
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.models import RuleSettingEffect
+from pydocformatter.source_path import SourcePathContext
 from tests import markdown_example_helpers
 
 
@@ -84,9 +85,10 @@ def _assert_clean_example_has_no_hidden_fix_changes(executed: markdown_example_h
         path=executed.path,
         settings=executed.settings,
         line_ending=line_endings.resolve_line_ending(executed.example.input_source, line_ending=executed.settings.line_ending),
-        rule_selection=executed.selection,
+        execution_plan=executed.selection.execution_plan_for_path(executed.path),
         selected_rule_by_code=selected_rule_by_code,
         errors=errors,
+        source_path=SourcePathContext.for_path(executed.path),
     )
 
     assert errors == [], f"{executed.label}: unexpected direct fix errors: {errors}"
@@ -99,8 +101,15 @@ def _assert_initial_check_findings_accounted_after_fixing(executed: markdown_exa
     """Documented examples must account for every initial check finding as fixed or still unfixed."""
     line_ending = line_endings.resolve_line_ending(executed.example.input_source, line_ending=executed.settings.line_ending)
     module = cst.parse_module(executed.example.input_source)
-    fixed_result = rule_runner.run_rules(
-        module, path=executed.path, settings=executed.settings, line_ending=line_ending, rule_selection=executed.selection, fix=True, source=executed.example.input_source
+    fixed_result = rule_runner.run_rule_plan(
+        module,
+        path=executed.path,
+        settings=executed.settings,
+        line_ending=line_ending,
+        execution_plan=executed.selection.execution_plan_for_path(executed.path),
+        fix=True,
+        source_path=SourcePathContext.for_path(executed.path),
+        source=executed.example.input_source,
     )
 
     assert fixed_result.errors == (), f"{executed.label}: unexpected fix errors: {fixed_result.errors}"

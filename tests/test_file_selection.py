@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 # Standard library imports
+import typing
 import argparse
 import tempfile
 import contextlib
@@ -15,6 +16,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 # First-party imports
+import pydocformatter.cache.directory as cache_directory
 from pydocformatter import file_selection
 from pydocformatter.cli.global_args import GlobalArgs
 from pydocformatter.cli.settings_check import SETTINGS_SCHEMA, CheckSettings
@@ -55,6 +57,240 @@ def test_ruff_spec_deterministic_directory_order() -> None:
 
     collected = [Path(decision.path).relative_to(root).as_posix() for decision in selection.decisions]
     assert collected == ["a.py", "b.py", "a_dir/d.py", "z_dir/c.py"]
+
+
+def test_directory_walk_resolves_profiles_per_directory_without_file_lookups(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    first = tmp_path / "first"
+    second = tmp_path / "second"
+    first.mkdir()
+    second.mkdir()
+    (tmp_path / "root.py").write_text("", encoding="utf-8")
+    (first / "first.py").write_text("", encoding="utf-8")
+    (second / "second.py").write_text("", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    profile = SETTINGS_SCHEMA.load_profile(global_values=GlobalArgs(isolated=True), field_overrides={"respect_gitignore": False})
+
+    class CountingResolver:
+        def __init__(self) -> None:
+            self.calls: list[str | None] = []
+
+        def profile_for_path(self, path: str | None = None) -> settings_core.SettingsProfile[CheckSettings]:
+            self.calls.append(path)
+            return profile
+
+    counting_resolver = CountingResolver()
+    resolver = typing.cast("settings_core.SettingsResolver[CheckSettings]", counting_resolver)
+
+    selection = file_selection.select_files([str(tmp_path)], resolver)
+
+    assert _selected_relative_paths(selection, tmp_path) == ("root.py", "first/first.py", "second/second.py")
+    assert counting_resolver.calls == [str(tmp_path), str(tmp_path), str(tmp_path), str(first), str(second)]
+    assert all(path is None or not path.endswith(".py") for path in counting_resolver.calls)
+
+
+def test_walked_files_receive_their_exact_walk_root_profile_with_nested_config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    child = tmp_path / "child"
+    child.mkdir()
+    root_file = tmp_path / "root.py"
+    child_file = child / "child.py"
+    root_file.write_text("", encoding="utf-8")
+    child_file.write_text("", encoding="utf-8")
+    (tmp_path / "pyproject.toml").write_text('[tool.pydocfmt]\ninclude = ["*.py"]\nrespect-gitignore = false\n', encoding="utf-8")
+    (child / "pyproject.toml").write_text('[tool.pydocfmt]\ninclude = ["*.py"]\nline-length = 91\nrespect-gitignore = false\n', encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    resolver = SETTINGS_SCHEMA.resolver()
+
+    selection = file_selection.select_files([str(tmp_path)], resolver)
+
+    assert selection.profile_for_path(str(root_file)) is resolver.profile_for_path(str(tmp_path))
+    assert selection.profile_for_path(str(child_file)) is resolver.profile_for_path(str(child))
+    assert selection.profile_for_path(str(root_file)) is not selection.profile_for_path(str(child_file))
+    assert selection.profile_for_path(str(child_file)).settings.line_length == 91
+
+
+def test_multiple_walked_children_share_root_profile_without_changing_decision_order(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    a_dir = tmp_path / "a_dir"
+    z_dir = tmp_path / "z_dir"
+    a_dir.mkdir()
+    z_dir.mkdir()
+    (tmp_path / "root.py").write_text("", encoding="utf-8")
+    (a_dir / "a.py").write_text("", encoding="utf-8")
+    (z_dir / "z.py").write_text("", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    resolver = _resolver(CheckSettings(respect_gitignore=False))
+
+    selection = file_selection.select_files([str(tmp_path)], resolver)
+
+    assert _selected_relative_paths(selection, tmp_path) == ("root.py", "a_dir/a.py", "z_dir/z.py")
+    profiles = tuple(selected.profile for selected in selection.selected_files)
+    assert all(profile is profiles[0] for profile in profiles)
+
+
+def test_internal_cache_directory_is_resolved_once_from_run_profile(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture) -> None:
+    for name in ("a", "b", "c"):
+        directory = tmp_path / name
+        directory.mkdir()
+        (directory / f"{name}.py").write_text("", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    resolver = _resolver(CheckSettings(respect_gitignore=False))
+    cache_directory_for_profile = mocker.spy(file_selection.cache_directory, "cache_directory_for_profile")
+
+    selection = file_selection.select_files([str(tmp_path)], resolver)
+
+    assert len(selection.accepted_paths) == 3
+    assert cache_directory_for_profile.call_count == 1
+
+
+@pytest.mark.parametrize("source", ["auto", "cli"])
+def test_owned_custom_relative_cache_directories_preserve_source_base_pruning(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, source: str) -> None:
+    cache_root = tmp_path / "runtime" / "cache"
+    cache_root.parent.mkdir()
+    cache_directory.ensure_cache_layout(cache_directory.cache_layout(cache_root))
+    skipped = cache_root / "skipped.py"
+    kept = tmp_path / "kept.py"
+    skipped.write_text("", encoding="utf-8")
+    kept.write_text("", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    if source == "auto":
+        (tmp_path / "pyproject.toml").write_text('[tool.pydocfmt]\ncache-dir = "runtime/cache"\ninclude = ["*.py"]\nrespect-gitignore = false\n', encoding="utf-8")
+        resolver = SETTINGS_SCHEMA.resolver()
+    else:
+        resolver = SETTINGS_SCHEMA.resolver(global_values=GlobalArgs(isolated=True), args=argparse.Namespace(cache_dir="runtime/cache"), field_overrides={"respect_gitignore": False})
+
+    selection = file_selection.select_files([str(tmp_path)], resolver)
+
+    assert selection.accepted_paths == (str(kept),)
+    cache_decisions = tuple(decision for decision in selection.decisions if decision.reason is DecisionReason.CACHE_DIRECTORY)
+    assert tuple(decision.path for decision in cache_decisions) == (str(cache_root),)
+    assert str(skipped) not in tuple(decision.path for decision in selection.decisions)
+
+
+def test_nonempty_unowned_run_cache_directory_is_selected_normally(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    cache_root = tmp_path / "runtime" / "cache"
+    cache_root.mkdir(parents=True)
+    source = cache_root / "source.py"
+    source.write_text("", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    resolver = _resolver(CheckSettings(cache_dir=str(cache_root), exclude=(), respect_gitignore=False))
+
+    selection = file_selection.select_files([str(tmp_path)], resolver)
+
+    assert selection.accepted_paths == (str(source),)
+    assert all(decision.reason is not DecisionReason.CACHE_DIRECTORY for decision in selection.decisions)
+
+
+def test_empty_unowned_run_cache_directory_is_pruned_only_when_enabled(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    cache_root = tmp_path / "cache"
+    cache_root.mkdir()
+    monkeypatch.chdir(tmp_path)
+
+    enabled = file_selection.select_files([str(tmp_path)], _resolver(CheckSettings(cache=True, cache_dir=str(cache_root), exclude=(), respect_gitignore=False)))
+    disabled = file_selection.select_files([str(tmp_path)], _resolver(CheckSettings(cache=False, cache_dir=str(cache_root), exclude=(), respect_gitignore=False)))
+
+    assert tuple(decision.reason for decision in enabled.decisions) == (DecisionReason.CACHE_DIRECTORY,)
+    assert not disabled.decisions
+
+
+def test_owned_run_cache_directory_is_pruned_when_cache_is_disabled(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    cache_root = tmp_path / "cache"
+    cache_directory.ensure_cache_layout(cache_directory.cache_layout(cache_root))
+    hidden = cache_root / "hidden.py"
+    hidden.write_text("", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    resolver = _resolver(CheckSettings(cache=False, cache_dir=str(cache_root), exclude=(), respect_gitignore=False))
+
+    selection = file_selection.select_files([str(tmp_path)], resolver)
+
+    assert tuple(decision.reason for decision in selection.decisions if decision.path == str(cache_root)) == (DecisionReason.CACHE_DIRECTORY,)
+    assert str(hidden) not in tuple(decision.path for decision in selection.decisions)
+
+
+def test_symlinked_run_cache_directory_is_not_internal_cache_pruned(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    target = tmp_path / "cache-target"
+    target.mkdir()
+    cache_root = tmp_path / "cache"
+    try:
+        cache_root.symlink_to(target, target_is_directory=True)
+    except OSError as error:
+        pytest.skip(f"Symlinks unavailable: {error}")
+    monkeypatch.chdir(tmp_path)
+    resolver = _resolver(CheckSettings(cache_dir=str(cache_root), exclude=(), respect_gitignore=False))
+
+    selection = file_selection.select_files([str(tmp_path)], resolver)
+
+    assert all(decision.reason is not DecisionReason.CACHE_DIRECTORY for decision in selection.decisions)
+
+
+def test_owned_cache_directory_is_pruned_through_a_symlinked_parent_alias(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    real = tmp_path / "real"
+    cache_root = real / "cache"
+    alias = tmp_path / "alias"
+    real.mkdir()
+    cache_directory.ensure_cache_layout(cache_directory.cache_layout(cache_root))
+    hidden = cache_root / "hidden.py"
+    hidden.write_text("", encoding="utf-8")
+    try:
+        alias.symlink_to(real, target_is_directory=True)
+    except OSError as error:
+        pytest.skip(f"Symlinks unavailable: {error}")
+    monkeypatch.chdir(tmp_path)
+    resolver = _resolver(CheckSettings(cache_dir=str(cache_root), exclude=(), respect_gitignore=False))
+
+    selection = file_selection.select_files([str(alias)], resolver)
+
+    alias_cache = alias / "cache"
+    assert tuple(decision.path for decision in selection.decisions if decision.reason is DecisionReason.CACHE_DIRECTORY) == (str(alias_cache),)
+    assert str(alias_cache / "hidden.py") not in tuple(decision.path for decision in selection.decisions)
+
+
+def test_only_cwd_profile_cache_root_receives_internal_pruning(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    child = tmp_path / "child"
+    run_cache = tmp_path / "run-cache"
+    nested_cache = child / "nested-cache"
+    child.mkdir()
+    cache_directory.ensure_cache_layout(cache_directory.cache_layout(run_cache))
+    cache_directory.ensure_cache_layout(cache_directory.cache_layout(nested_cache))
+    run_hidden = run_cache / "hidden.py"
+    nested_visible = nested_cache / "visible.py"
+    run_hidden.write_text("", encoding="utf-8")
+    nested_visible.write_text("", encoding="utf-8")
+    (tmp_path / "pyproject.toml").write_text('[tool.pydocfmt]\ncache-dir = "run-cache"\nexclude = []\nrespect-gitignore = false\n', encoding="utf-8")
+    (child / "pyproject.toml").write_text('[tool.pydocfmt]\ncache-dir = "nested-cache"\nexclude = []\nrespect-gitignore = false\n', encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+
+    selection = file_selection.select_files([str(tmp_path)], SETTINGS_SCHEMA.resolver())
+
+    assert str(nested_visible) in selection.accepted_paths
+    assert str(run_hidden) not in tuple(decision.path for decision in selection.decisions)
+    assert tuple(decision.path for decision in selection.decisions if decision.reason is DecisionReason.CACHE_DIRECTORY) == (str(run_cache),)
+
+
+def test_traversal_root_equal_to_configured_cache_directory_remains_selectable(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    target = tmp_path / "target.py"
+    target.write_text("", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    resolver = SETTINGS_SCHEMA.resolver(global_values=GlobalArgs(isolated=True), args=argparse.Namespace(cache_dir=str(tmp_path)), field_overrides={"respect_gitignore": False})
+
+    selection = file_selection.select_files([str(tmp_path)], resolver)
+
+    assert selection.accepted_paths == (str(target),)
+    assert all(decision.reason is not DecisionReason.CACHE_DIRECTORY for decision in selection.decisions)
+
+
+def test_parent_profile_can_still_prune_directory_before_nested_config_is_entered(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    child = tmp_path / "child"
+    child.mkdir()
+    target = child / "target.py"
+    target.write_text("", encoding="utf-8")
+    (tmp_path / "pyproject.toml").write_text('[tool.pydocfmt]\ninclude = ["*.py"]\nexclude = ["child"]\nrespect-gitignore = false\n', encoding="utf-8")
+    (child / "pyproject.toml").write_text('[tool.pydocfmt]\ninclude = ["*.py"]\nexclude = []\nrespect-gitignore = false\n', encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+
+    selection = file_selection.select_files([str(tmp_path)], SETTINGS_SCHEMA.resolver())
+
+    assert selection.accepted_paths == ()
+    assert tuple((Path(decision.path).name, decision.reason) for decision in selection.decisions) == (("child", DecisionReason.EXCLUDED), ("pyproject.toml", DecisionReason.NOT_INCLUDED))
+    assert str(target) not in tuple(decision.path for decision in selection.decisions)
 
 
 def test_selection_displays_real_explicit_paths_as_absolute(monkeypatch: pytest.MonkeyPatch) -> None:

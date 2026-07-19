@@ -569,6 +569,32 @@ def test_default_rule_collection_is_collected_on_import() -> None:
         assert markdown_level_two_headings(explanation) == EXPECTED_RULE_DOCUMENTATION_SECTIONS
 
 
+def test_every_builtin_rule_intentionally_declares_file_local_cache_behavior() -> None:
+    assert rule_collection.RULE_COLLECTION.rules
+    for rule_class in rule_collection.RULE_COLLECTION.rules:
+        assert isinstance(rule_class.meta.cache_behavior, rule_models.RuleCacheBehavior)
+        assert rule_class.meta.cache_behavior is rule_models.RuleCacheBehavior.FILE_LOCAL
+
+
+def test_cacheable_rule_sources_have_no_advisory_external_dependency_markers() -> None:
+    forbidden_modules = {"datetime", "http", "os", "pathlib", "random", "socket", "subprocess", "time", "urllib"}
+    forbidden_calls = {"eval", "exec", "getenv", "open", "popen", "system", "urlopen"}
+    source_roots = (Path(rule_definitions.__file__).parent, Path(rule_definitions.__file__).parent.parent / "definition_helpers")
+    findings: list[str] = []
+    for source_root in source_roots:
+        for path in sorted(source_root.rglob("*.py")):
+            tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Import):
+                    findings.extend(f"{path}: imports {alias.name}" for alias in node.names if alias.name.split(".", 1)[0] in forbidden_modules)
+                elif isinstance(node, ast.ImportFrom) and node.module is not None and node.module.split(".", 1)[0] in forbidden_modules:
+                    findings.append(f"{path}: imports from {node.module}")
+                elif isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id in forbidden_calls:
+                    findings.append(f"{path}: calls {node.func.id}")
+
+    assert findings == []
+
+
 @pytest.mark.parametrize("rule_class", rule_collection.RULE_COLLECTION.rules, ids=lambda rule_class: str(rule_class.meta.code))
 def test_builtin_rule_file_and_class_names_match_rule_content(rule_class: type[RuleBase]) -> None:
     rule = rule_class.meta
@@ -883,8 +909,21 @@ def test_rule_metadata_derives_prefix_and_number_from_code() -> None:
     assert not hasattr(rule_models, "valid_rule_code_tag")
     assert not hasattr(rule_models, "split_rule_code")
     assert rule.stable_since == "1.0.0"
-    assert tuple(field.name for field in dataclasses.fields(RuleMetadata)) == ("code", "name", "message", "fix_availability", "stable_since", "setting_effects", "incompatible_with", "check_kind")
-    assert all(field.default is dataclasses.MISSING for field in dataclasses.fields(RuleMetadata))
+    assert tuple(field.name for field in dataclasses.fields(RuleMetadata)) == (
+        "code",
+        "name",
+        "message",
+        "fix_availability",
+        "stable_since",
+        "setting_effects",
+        "incompatible_with",
+        "check_kind",
+        "cache_behavior",
+    )
+    assert rule.cache_behavior is rule_models.RuleCacheBehavior.UNCACHEABLE
+    assert not hasattr(RuleMetadata, "file_local")
+    assert all(field.default is dataclasses.MISSING for field in dataclasses.fields(RuleMetadata)[:-1])
+    assert dataclasses.fields(RuleMetadata)[-1].default is rule_models.RuleCacheBehavior.UNCACHEABLE
     assert all(field.default_factory is dataclasses.MISSING for field in dataclasses.fields(RuleMetadata))
     assert rule.check_kind == RuleCheckKind.STANDARD
     assert rule.setting_effects == ()

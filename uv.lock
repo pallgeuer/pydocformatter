@@ -752,6 +752,7 @@ wheels = [
 name = "pydocformatter"
 source = { editable = "." }
 dependencies = [
+    { name = "filelock" },
     { name = "libcst" },
 ]
 
@@ -779,7 +780,10 @@ test = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "libcst", specifier = ">=1.8.6" }]
+requires-dist = [
+    { name = "filelock", specifier = ">=3.30.0" },
+    { name = "libcst", specifier = ">=1.8.6" },
+]
 
 [package.metadata.requires-dev]
 dev = [

@@ -15,25 +15,28 @@ import contextlib
 import dataclasses
 import concurrent.futures
 from collections import defaultdict
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from typing import TYPE_CHECKING, TextIO
 
 # First-party imports
 import pydocformatter.settings as settings_core
+import pydocformatter.cache.session as cache_session
 from pydocformatter import file_selection, formatter, rules_selection
+from pydocformatter.cache.models import CacheStats
 from pydocformatter.cli import global_args, settings_check
 from pydocformatter.cli.settings_check import SETTINGS_SCHEMA, CheckSettings, OutputFormat
 from pydocformatter.file_selection import STDIN_VIRTUAL_FILE, FileSelectionError
+from pydocformatter.formatter import FormatterResult
 from pydocformatter.rules.models import FixAvailability
-from pydocformatter.rules_selection import RuleSelection
+from pydocformatter.source_path import SourcePathContextBuilder
 from pydocformatter.utils import argparser, misc
 
 
 if TYPE_CHECKING:
     # First-party imports
     from pydocformatter.file_selection import FileDecision, SelectionResult
-    from pydocformatter.formatter import FormatterResult
     from pydocformatter.rules.models import RuleFinding, RuleMetadata
+    from pydocformatter.rules_selection import RuleSelection
 
 
 _MAX_WINDOWS_PROCESS_POOL_WORKERS = 61
@@ -66,22 +69,18 @@ class CheckRunContext:
 
 
 @dataclasses.dataclass(frozen=True)
-class _SelectedFileFormatRequest:
-    """Resolved inputs for formatting one disk-backed selected file.
+class FormatBatchResult:
+    """Ordered formatting results, cache counters, and invocation warnings.
 
     Attributes:
-        selected_file (file_selection.SelectedFile): Accepted file path and base settings profile from file selection.
-        settings (CheckSettings): Effective formatter settings after matching per-file settings are applied.
-        rule_selection (RuleSelection): Rule selection resolved from the base settings profile.
-        fix (bool): Whether selected fixes should be applied before returning the result.
-        write (bool): Whether fixed disk-backed files should be written in place.
+        results (tuple[FormatterResult, ...]): Formatting results in selected-file order.
+        cache_stats (CacheStats): Final persistent-cache counters.
+        warnings (tuple[str, ...]): Invocation-level cache warnings to print once.
     """
 
-    selected_file: file_selection.SelectedFile
-    settings: CheckSettings
-    rule_selection: RuleSelection
-    fix: bool
-    write: bool
+    results: tuple[FormatterResult, ...]
+    cache_stats: CacheStats
+    warnings: tuple[str, ...]
 
 
 class OutputError(Exception):
@@ -127,6 +126,7 @@ def add_arguments(parser: argparse.ArgumentParser, settings: CheckSettings) -> N
 
     miscellaneous = parser.add_argument_group("Miscellaneous")
     miscellaneous.add_argument("--stdin-filename", default=None, metavar="FILENAME", help="The name of the file when passing it through stdin.")
+    miscellaneous.add_argument("--cache-stats", action="store_true", help="Print concise persistent-cache statistics to stderr.")
     exit_options = miscellaneous.add_mutually_exclusive_group()
     exit_options.add_argument("-e", "--exit-zero", action="store_true", help='Exit with status code "0", even upon detecting formatting violations.')
     exit_options.add_argument("--exit-non-zero-on-fix", action="store_true", help="Exit with a non-zero status code if any files were modified via fix, even if no formatting violations remain.")
@@ -277,9 +277,16 @@ def check_files(*, args: argparse.Namespace, settings_context: CheckRunContext) 
     if use_stdin and len(files.accepted_paths) > 1:
         raise AssertionError(f"Expect at most one accepted path when using stdin: {files.accepted_paths}")
 
-    results = format_selected_files(
-        files.selected_files, rule_selections=rule_selections, use_stdin=use_stdin, fix=args.fix or args.diff, write=not args.diff, parallelism=settings_context.cwd_settings.parallelism
+    batch = format_selected_files(
+        files.selected_files,
+        rule_selections=rule_selections,
+        use_stdin=use_stdin,
+        fix=args.fix or args.diff,
+        write=not args.diff,
+        parallelism=settings_context.cwd_settings.parallelism,
+        cache_profile=settings_context.cwd_profile,
     )
+    results = batch.results
 
     if use_stdin and args.fix and not args.diff and results:
         if len(results) != 1:
@@ -296,6 +303,11 @@ def check_files(*, args: argparse.Namespace, settings_context: CheckRunContext) 
     else:
         with output_stream(args.output_file) as output:
             print_results(errors, results, output_format=settings_context.cwd_settings.output_format, output=output)
+
+    for warning in batch.warnings:
+        print(warning, file=sys.stderr)
+    if args.cache_stats:
+        print_cache_stats(batch.cache_stats, output=sys.stderr)
 
     if args.exit_zero:
         return 0
@@ -364,12 +376,6 @@ def _process_pool_worker_count(parallelism: float, selected_file_count: int) -> 
     return workers
 
 
-def _format_selected_file_worker(request: _SelectedFileFormatRequest) -> FormatterResult:
-    """Format one disk-backed selected file."""
-    selected_file = request.selected_file
-    return formatter.format_file(selected_file.path, settings=request.settings, rule_selection=request.rule_selection, fix=request.fix, write=request.write)
-
-
 def format_selected_files(
     selected_files: tuple[file_selection.SelectedFile, ...],
     *,
@@ -378,8 +384,9 @@ def format_selected_files(
     fix: bool,
     write: bool,
     parallelism: float,
+    cache_profile: settings_core.SettingsProfile[CheckSettings] | None = None,
     executor_factory: _ExecutorFactory = concurrent.futures.ProcessPoolExecutor,
-) -> list[FormatterResult]:
+) -> FormatBatchResult:
     """Format selected files with each file's resolved settings profile.
 
     Args:
@@ -390,47 +397,85 @@ def format_selected_files(
         fix (bool): Whether selected fixes should be applied before returning results.
         write (bool): Whether fixed disk-backed files should be written in place.
         parallelism (float): Configured worker-count value used for disk-backed files.
+        cache_profile (settings_core.SettingsProfile[CheckSettings] | None): Current-working-directory profile
+            controlling run-level cache enablement and location, or None to disable caching for direct callers.
         executor_factory (_ExecutorFactory): Executor constructor used to parallelize disk-backed formatting.
 
     Returns:
-        list[FormatterResult]: Formatting results in the same order as the selected inputs.
+        FormatBatchResult: Ordered formatting results, final cache counters, and invocation warnings.
 
     Raises:
         AssertionError: If stdin mode is requested with more than one selected file.
     """
     if not selected_files:
-        return []
+        return FormatBatchResult(results=(), cache_stats=CacheStats(), warnings=())
     if use_stdin:
         if len(selected_files) > 1:
             raise AssertionError(f"Expect at most one selected file when using stdin: {selected_files}")
         selected_file = selected_files[0]
         effective_profile = settings_check.effective_profile_for_path(selected_file.profile, selected_file.path)
         rule_selection = rule_selections[selected_file.profile.key()]
-        return [formatter.format_file(selected_file.path, file=sys.stdin, settings=effective_profile.settings, rule_selection=rule_selection, fix=fix, write=write)]
+        result = formatter.format_stream(selected_file.path, file=sys.stdin, settings=effective_profile.settings, rule_selection=rule_selection, fix=fix)
+        return FormatBatchResult(results=(result,), cache_stats=CacheStats(uncacheable=1), warnings=())
 
-    workers = _process_pool_worker_count(parallelism, len(selected_files))
-    requests = tuple(
-        _SelectedFileFormatRequest(
-            selected_file=selected_file,
-            settings=settings_check.effective_profile_for_path(selected_file.profile, selected_file.path).settings,
-            rule_selection=rule_selections[selected_file.profile.key()],
-            fix=fix,
-            write=write,
+    session = cache_session.CacheSession.from_profile(cache_profile, parallelism=resolve_parallelism(parallelism))
+    source_path_builder = SourcePathContextBuilder()
+    candidates: list[cache_session.CacheCandidate] = []
+    for index, selected_file in enumerate(selected_files):
+        effective_profile = settings_check.effective_profile_for_path(selected_file.profile, selected_file.path)
+        rule_selection = rule_selections[selected_file.profile.key()]
+        candidates.append(
+            cache_session.CacheCandidate(
+                index=index,
+                path=selected_file.path,
+                profile=effective_profile,
+                execution_plan=rule_selection.execution_plan_for_path(selected_file.path),
+                source_path=source_path_builder.for_path(selected_file.path),
+                selection_succeeded=not rule_selection.errors,
+                fix=fix,
+                write=write,
+            )
         )
-        for selected_file in selected_files
-    )
+    prepared = session.prepare(tuple(candidates))
+    probe = session.probe(prepared)
+    miss_indexes = frozenset(probe.miss_indexes)
+    hit_results = {hit.index: hit.result for hit in probe.hits}
+    ordered_results: list[FormatterResult | None] = [hit_results.get(index) for index in range(len(selected_files))]
+    miss_files = tuple(prepared_file for prepared_file in prepared.files if prepared_file.index in miss_indexes)
+    executions: dict[int, formatter.DiskFormatResult] = {}
+    workers = _process_pool_worker_count(parallelism, len(miss_files)) if miss_files else 0
     if workers == 1:
-        return [_format_selected_file_worker(request) for request in requests]
+        for prepared_file in miss_files:
+            execution = formatter.format_disk_file(prepared_file.format_request)
+            executions[prepared_file.index] = execution
+            ordered_results[prepared_file.index] = execution.result
+    elif workers > 1:
+        with executor_factory(max_workers=workers) as executor:
+            futures = {executor.submit(formatter.format_disk_file, prepared_file.format_request): prepared_file.index for prepared_file in miss_files}
+            for future in concurrent.futures.as_completed(futures):
+                index = futures[future]
+                execution = future.result()
+                executions[index] = execution
+                ordered_results[index] = execution.result
 
-    ordered_results: list[FormatterResult | None] = [None] * len(selected_files)
-    with executor_factory(max_workers=workers) as executor:
-        futures = {executor.submit(_format_selected_file_worker, request): index for index, request in enumerate(requests)}
-        for future in concurrent.futures.as_completed(futures):
-            ordered_results[futures[future]] = future.result()
+    persistence = session.persist(probe, executions)
 
     if any(result is None for result in ordered_results):
         raise AssertionError("Parallel formatting completed without producing a result for every selected file")
-    return [result for result in ordered_results if result is not None]
+    return FormatBatchResult(results=tuple(result for result in ordered_results if result is not None), cache_stats=persistence.stats, warnings=persistence.warnings)
+
+
+def print_cache_stats(stats: CacheStats, *, output: TextIO) -> None:
+    """Print one concise debug-only cache statistics line.
+
+    Args:
+        stats (CacheStats): Internal counters collected by the cache coordinator.
+        output (TextIO): Diagnostic stream that receives the line.
+    """
+    print(
+        f"Cache: candidates={stats.candidates} hits={stats.hits} metadata-rejected={stats.metadata_rejected} digest-rejected={stats.digest_rejected} misses={stats.misses} uncacheable={stats.uncacheable} read-errors={stats.read_errors} writes={stats.writes} store-errors={stats.store_errors}",
+        file=output,
+    )
 
 
 def load_settings(args: argparse.Namespace) -> CheckRunContext | None:
@@ -516,12 +561,12 @@ def print_file_selection_decisions(errors: Iterable[str], decisions: tuple[FileD
             print(f"{decision.path} IGNORED: {decision.message}", file=output)
 
 
-def print_results(errors: Iterable[str], results: list[FormatterResult], *, output_format: OutputFormat, output: TextIO | None) -> None:
+def print_results(errors: Iterable[str], results: Sequence[FormatterResult], *, output_format: OutputFormat, output: TextIO | None) -> None:
     """Print formatter results in the configured output format.
 
     Args:
         errors (Iterable[str]): Operational errors accumulated outside individual formatter results.
-        results (list[FormatterResult]): Formatter results to print.
+        results (Sequence[FormatterResult]): Formatter results to print.
         output_format (OutputFormat): Configured diagnostic output format.
         output (TextIO | None): Output stream, or stdout when None.
 
@@ -534,11 +579,11 @@ def print_results(errors: Iterable[str], results: list[FormatterResult], *, outp
         raise AssertionError(f"Unknown output format: {output_format}")
 
 
-def print_diff_results(results: list[FormatterResult], *, output: TextIO | None) -> None:
+def print_diff_results(results: Sequence[FormatterResult], *, output: TextIO | None) -> None:
     """Print unified diffs for modified formatter results.
 
     Args:
-        results (list[FormatterResult]): Formatter results to diff.
+        results (Sequence[FormatterResult]): Formatter results to diff.
         output (TextIO | None): Output stream, or stdout when None.
     """
     printed_sep = False
@@ -553,24 +598,24 @@ def print_diff_results(results: list[FormatterResult], *, output: TextIO | None)
             print(line, end="" if line.endswith("\n") else "\n", file=output)
 
 
-def print_diff_summary(errors: Iterable[str], results: list[FormatterResult], *, output: TextIO | None) -> None:
+def print_diff_summary(errors: Iterable[str], results: Sequence[FormatterResult], *, output: TextIO | None) -> None:
     """Print diff summary and operational errors.
 
     Args:
         errors (Iterable[str]): Operational errors accumulated outside individual formatter results.
-        results (list[FormatterResult]): Formatter results to summarize.
+        results (Sequence[FormatterResult]): Formatter results to summarize.
         output (TextIO | None): Output stream, or stdout when None.
     """
     num_operational_errors = print_operational_errors(itertools.chain(errors, *(result.errors for result in results)), output=output)
     _print_results_summary(num_operational_errors=num_operational_errors, results=results, would=True, output=output)
 
 
-def print_results_grouped(errors: Iterable[str], results: list[FormatterResult], *, output: TextIO | None) -> None:
+def print_results_grouped(errors: Iterable[str], results: Sequence[FormatterResult], *, output: TextIO | None) -> None:
     """Print remaining findings grouped by file.
 
     Args:
         errors (Iterable[str]): Operational errors accumulated outside individual formatter results.
-        results (list[FormatterResult]): Formatter results to print.
+        results (Sequence[FormatterResult]): Formatter results to print.
         output (TextIO | None): Output stream, or stdout when None.
     """
     num_operational_errors = print_operational_errors(itertools.chain(errors, *(result.errors for result in results)), output=output)
@@ -587,7 +632,7 @@ def print_results_grouped(errors: Iterable[str], results: list[FormatterResult],
     _print_results_summary(num_operational_errors=num_operational_errors, results=results, would=False, output=output)
 
 
-def _print_results_summary(*, num_operational_errors: int, results: list[FormatterResult], would: bool, output: TextIO | None) -> None:
+def _print_results_summary(*, num_operational_errors: int, results: Sequence[FormatterResult], would: bool, output: TextIO | None) -> None:
     """Print result summary lines."""
     num_fixed_findings = sum(result.fixed_findings.total() for result in results)
     num_findings = sum(len(result.unfixed_findings) for result in results)

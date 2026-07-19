@@ -13,6 +13,7 @@ from pydocformatter.cli.settings_check import CheckSettings
 from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
 from pydocformatter.rules.definition_helpers import source_text
 from pydocformatter.rules.definitions.PDF.PDF import PDF
+from pydocformatter.source_path import SourcePathContext
 
 
 def contexts(source: str, *, rule_code: str) -> tuple[RuleCategoryContext, RuleContext]:
@@ -29,6 +30,7 @@ def contexts(source: str, *, rule_code: str) -> tuple[RuleCategoryContext, RuleC
     wrapper = cst_metadata.MetadataWrapper(module, unsafe_skip_copy=True)
     category = RuleCategoryContext(
         path="example.py",
+        source_path=SourcePathContext.for_path("example.py"),
         settings=CheckSettings(select=(rule_code,)),
         module=module,
         metadata_wrapper=wrapper,
@@ -40,6 +42,7 @@ def contexts(source: str, *, rule_code: str) -> tuple[RuleCategoryContext, RuleC
     )
     return category, RuleContext(
         path=category.path,
+        source_path=category.source_path,
         settings=category.settings,
         module=category.module,
         metadata_wrapper=category.metadata_wrapper,

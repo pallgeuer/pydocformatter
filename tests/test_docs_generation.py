@@ -585,6 +585,20 @@ def test_reference_doc_map_covers_all_public_docs() -> None:
     assert all(path.is_relative_to(pathlib.Path("docs/public")) for path in expected)
 
 
+def test_persistent_cache_reference_is_published_with_rewritten_links(generated_site: tuple[pathlib.Path, pathlib.Path]) -> None:
+    """The dedicated cache reference must be copied into the generated public site."""
+    generated_docs_dir, _ = generated_site
+    cache_reference = generated_docs_dir / "reference" / "cache.md"
+
+    assert cache_reference.is_file()
+    text = cache_reference.read_text(encoding="utf-8")
+    assert "## Positive-hit contract" in text
+    assert "## Population and mode reuse" in text
+    assert "## Failures, portability, and trust" in text
+    assert "[Settings specification](settings-spec.md#persistent-clean-proof-cache)" in text
+    assert "[File selection](file-selection.md#file-selection-algorithm)" in text
+
+
 def test_devel_docs_are_not_copied(generated_site: tuple[pathlib.Path, pathlib.Path]) -> None:
     """Development-only docs must not be copied into the generated site."""
     generated_docs_dir, _ = generated_site
@@ -699,6 +713,7 @@ def test_generated_config_uses_expected_nav_labels(generated_site: tuple[pathlib
     reference_nav = next(item["Reference"] for item in nav if "Reference" in item)
     project_nav = next(item["Project"] for item in nav if "Project" in item)
 
+    assert '"Persistent cache"' in text
     assert '"Settings specification"' in text
     assert '"Ruff rule links"' in text
     assert '"GitHub Readme"' in text
@@ -709,6 +724,7 @@ def test_generated_config_uses_expected_nav_labels(generated_site: tuple[pathlib
     assert "reference/ruff-rule-links.md" not in text
     assert "reference/rule-list.md" not in text
     assert "reference/rule-implementation.md" not in text
+    assert reference_nav[0] == {"Persistent cache": "reference/cache.md"}
     assert rules_nav[-1] == {"Ruff rule links": "rules/ruff-rule-links.md"}
     assert {"Ruff rule links": "rules/ruff-rule-links.md"} not in reference_nav
     assert project_nav == [{"GitHub Readme": "project/readme.md"}, {"Contributing": "project/contributing.md"}, {"Changelog": "project/changelog.md"}, {"License": "project/license.md"}]

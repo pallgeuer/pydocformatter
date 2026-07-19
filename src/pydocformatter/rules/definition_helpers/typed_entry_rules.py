@@ -16,7 +16,7 @@ import pydocformatter.rules.definition_helpers.typed_documentation_models as typ
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleContext
 from pydocformatter.rules.definition_helpers import docstring_conventions, typed_documentation
-from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata
+from pydocformatter.rules.models import FixAvailability, RuleCacheBehavior, RuleCheckKind, RuleMetadata
 
 
 TypedDocumentationSubject = typed_models.TypedDocumentationSubject
@@ -58,6 +58,7 @@ def metadata(code: str, name: str, message: str, *, exact_opt_in: bool, incompat
         setting_effects=_EXACT_OPT_IN_EFFECT if exact_opt_in else _SUPPORTED_CONVENTION_EFFECT,
         incompatible_with=tuple(RuleCode(code) for code in incompatible_with),
         check_kind=RuleCheckKind.STANDARD,
+        cache_behavior=RuleCacheBehavior.FILE_LOCAL,
     )
 
 

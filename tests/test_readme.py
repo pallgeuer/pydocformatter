@@ -33,6 +33,7 @@ def test_readme_configuration_links_to_detailed_documentation() -> None:
     assert "pydocfmt config" in readme
     assert "https://pallgeuer.github.io/pydocformatter/configuration/" in readme
     assert "https://pallgeuer.github.io/pydocformatter/settings/" in readme
+    assert "https://pallgeuer.github.io/pydocformatter/reference/cache/" in readme
     assert "https://pallgeuer.github.io/pydocformatter/reference/file-selection/" in readme
     assert "https://pallgeuer.github.io/pydocformatter/reference/rule-selection/" in readme
 

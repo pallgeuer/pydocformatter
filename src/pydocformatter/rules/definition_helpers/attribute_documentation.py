@@ -194,7 +194,7 @@ def is_public_attribute_owner(owner: PDF_definition.DefinitionInfo, *, context: 
         bool: Whether broad public-only missing-attribute checks should inspect this owner.
     """
     if owner.kind is PDF_definition.DefinitionKind.MODULE:
-        return missing_documentation.is_public_module_path(context.path)
+        return missing_documentation.is_public_module_path(context.source_path)
     return missing_documentation.is_public_definition(owner)
 
 
