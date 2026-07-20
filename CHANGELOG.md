@@ -18,6 +18,7 @@ All notable changes to this project are documented here. The format follows [Kee
 
 - **Docstring diagnostics:**
   - Added PDF212 to report nonempty primary and supported attached attribute docstrings without a parsed top-level summary.
+  - Added PDF526 to report parsed parameter documentation that does not follow function signature order.
 - **Persistent caching:**
   - Added strict persistent clean-proof caching for disk-backed checks and fixes, with complete source hashing, semantic analysis-setting and final-rule-code invalidation, shared invocation-local analysis fingerprints, engine/path invalidation, miss-only process execution, bounded parent-side probes, and source-free warm results.
   - Added `cache` and `cache-dir` settings, `--cache`/`--no-cache`, `--cache-dir`, opt-in `--cache-stats`, safe project cache self-pruning, and the ownership-checked `pydocfmt clean` command with its own `--cache-dir` override.
@@ -25,6 +26,8 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Changed
 
+- **Developer documentation:**
+  - Corrected the rule settings audit to distinguish disabled rules from rules ignored only by broad selectors, with metadata-backed regression coverage.
 - **Rule suppressions:**
   - Made inline suppressions after any component token of an implicitly concatenated docstring cover the complete expression for PDF findings while preserving line-local PCF coverage and existing local and standalone attachment boundaries.
 - **Docstring diagnostics:**

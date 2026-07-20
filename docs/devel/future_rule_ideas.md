@@ -3,12 +3,12 @@
 The main remaining opportunities are:
 
 - Parser blind spots: malformed or mixed-convention documentation currently becomes ordinary prose.
-- Ordering and ownership: parameter order, constructor/class documentation, method inventories, and `__all__`.
+- Ordering and ownership: constructor/class documentation, attribute order, method inventories, and `__all__`.
 - Entry completeness: exceptions, warnings, methods, `See Also`, and attached attribute docstrings.
 - Markup safety: inline roles, links, code spans, Markdown hard breaks, and malformed reST/fences.
 - Conservative autofixes for several existing diagnostic-only rules.
 
-There are currently 123 rules: 6 PCF and 117 PDF. Fix availability is 24 always, 3 usually, 18 sometimes, and 78 never.
+There are currently 124 rules: 6 PCF and 118 PDF. Fix availability is 24 always, 3 usually, 18 sometimes, and 79 never.
 
 ## Current coverage audit
 
@@ -90,35 +90,35 @@ Recognized section names and ordering are explicit tables in `docstring_sections
 
 All PDF5xx–7xx rules are diagnostic-only.
 
-| Rules      | Current check                                                                           |
-|------------|-----------------------------------------------------------------------------------------|
-| PDF500/501 | Missing signature parameters and documented names absent from the signature             |
-| PDF502/503 | Missing or extraneous ordinary return documentation based on function-body returns      |
-| PDF504/505 | Missing or extraneous yield documentation based on function-body yields                 |
-| PDF506/507 | Missing or extraneous directly raised exceptions                                        |
-| PDF508/509 | Missing public or extraneous class/instance attribute documentation                     |
-| PDF510/511 | Missing public or extraneous module attribute documentation                             |
-| PDF512/513 | Attribute documentation duplicated between owner and attached docstrings                |
-| PDF514/515 | Private class/module attributes forbidden in owner docstrings                           |
-| PDF516/517 | Private class/module attributes forbidden from attached docstrings                      |
-| PDF518/519 | Public class attributes must use owner versus attached documentation                    |
-| PDF520/521 | Public module attributes must use owner versus attached documentation                   |
-| PDF522/523 | Private class attributes must use owner versus attached documentation                   |
-| PDF524/525 | Private module attributes must use owner versus attached documentation                  |
-| PDF600/601 | Missing public/private package docstrings                                               |
-| PDF602/603 | Missing public/private module docstrings                                                |
-| PDF604/605 | Missing public/private top-level class docstrings                                       |
-| PDF606/607 | Missing public/private nested-class docstrings                                          |
-| PDF608/609 | Missing public/private top-level function docstrings                                    |
-| PDF610/611 | Missing public/private non-dunder method docstrings                                     |
-| PDF612/613 | Missing public/private dunder-method docstrings                                         |
-| PDF614/615 | Missing public/private `__init__` docstrings                                            |
-| PDF616     | Docstrings forbidden by configured decorators, defaulting to overload decorators        |
-| PDF700–703 | Parameter description presence, type required/forbidden, and annotation mismatch        |
-| PDF704–707 | Return description presence, type required/forbidden, and annotation mismatch           |
-| PDF708–711 | Yield description presence, type required/forbidden, and generator-annotation mismatch  |
-| PDF712–715 | Class-attribute description presence, type required/forbidden, and annotation mismatch  |
-| PDF716–719 | Module-attribute description presence, type required/forbidden, and annotation mismatch |
+| Rules          | Current check                                                                           |
+|----------------|-----------------------------------------------------------------------------------------|
+| PDF500/501/526 | Missing or extraneous parameters and documentation order against the signature          |
+| PDF502/503     | Missing or extraneous ordinary return documentation based on function-body returns      |
+| PDF504/505     | Missing or extraneous yield documentation based on function-body yields                 |
+| PDF506/507     | Missing or extraneous directly raised exceptions                                        |
+| PDF508/509     | Missing public or extraneous class/instance attribute documentation                     |
+| PDF510/511     | Missing public or extraneous module attribute documentation                             |
+| PDF512/513     | Attribute documentation duplicated between owner and attached docstrings                |
+| PDF514/515     | Private class/module attributes forbidden in owner docstrings                           |
+| PDF516/517     | Private class/module attributes forbidden from attached docstrings                      |
+| PDF518/519     | Public class attributes must use owner versus attached documentation                    |
+| PDF520/521     | Public module attributes must use owner versus attached documentation                   |
+| PDF522/523     | Private class attributes must use owner versus attached documentation                   |
+| PDF524/525     | Private module attributes must use owner versus attached documentation                  |
+| PDF600/601     | Missing public/private package docstrings                                               |
+| PDF602/603     | Missing public/private module docstrings                                                |
+| PDF604/605     | Missing public/private top-level class docstrings                                       |
+| PDF606/607     | Missing public/private nested-class docstrings                                          |
+| PDF608/609     | Missing public/private top-level function docstrings                                    |
+| PDF610/611     | Missing public/private non-dunder method docstrings                                     |
+| PDF612/613     | Missing public/private dunder-method docstrings                                         |
+| PDF614/615     | Missing public/private `__init__` docstrings                                            |
+| PDF616         | Docstrings forbidden by configured decorators, defaulting to overload decorators        |
+| PDF700–703     | Parameter description presence, type required/forbidden, and annotation mismatch        |
+| PDF704–707     | Return description presence, type required/forbidden, and annotation mismatch           |
+| PDF708–711     | Yield description presence, type required/forbidden, and generator-annotation mismatch  |
+| PDF712–715     | Class-attribute description presence, type required/forbidden, and annotation mismatch  |
+| PDF716–719     | Module-attribute description presence, type required/forbidden, and annotation mismatch |
 
 The category’s exact inventory boundaries—including ignored additional docstrings and unsupported assignment targets—are documented in `PDF.md`.
 
@@ -138,7 +138,7 @@ The category’s exact inventory boundaries—including ignored additional docst
 
 7. **Report sections inappropriate for the owner.** Examples include `Returns`/`Yields` on class or module docstrings, `Parameters` on modules, `Attributes` on ordinary function docstrings, or constructor-only sections at the wrong ownership location.
 
-8. **Check parameter entry order against the signature.** This is deterministic, widely implemented by numpydoc and pydoclint, and catches documentation drift that missing/extraneous checks cannot. It should understand positional-only, keyword-only, and variadic parameters. [Pydoclint configuration](https://jsh9.github.io/pydoclint/config_options.html)
+8. **Implemented as PDF526: Check parameter entry order against the signature.** PDF526 compares the first parsed documentation occurrence of each real signature parameter across the complete docstring and reports late entries without reordering content. [numpydoc validation](https://numpydoc.readthedocs.io/en/stable/validation.html) [Pydoclint configuration](https://jsh9.github.io/pydoclint/config_options.html)
 
 9. **Require exact variadic markers when configured.** PDF500/501 intentionally equate `args` with `*args`; add an opt-in rule requiring `*args` and `**kwargs` to retain their stars. Google’s guide explicitly recommends those spellings. [Google Python style guide](https://google.github.io/styleguide/pyguide.html)
 
@@ -215,10 +215,6 @@ The category’s exact inventory boundaries—including ignored additional docst
 45. **Add opt-in capitalization/punctuation checks for standalone prose comments.** Apply only to clearly sentence-like standalone paragraphs, excluding trailing comments, task markers, labels, directives, headings, code, and fragments. Google’s guide recommends narrative capitalization and punctuation, but this should remain optional because comment fragments are common. [Google Python style guide](https://google.github.io/styleguide/pyguide.html)
 
 ## Highest priority
-
-- **#8 — Check parameter order against the signature**
-
-   High value for almost every project using structured parameter documentation. The expected order is objective, the necessary signature and entry models already exist, and a diagnostic-only implementation should be straightforward. It catches documentation drift that PDF500/501 cannot.
 
 - **#20 and #21 — Make reflow markup-safe and preserve hard breaks**
 

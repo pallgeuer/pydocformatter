@@ -72,6 +72,21 @@ class DocumentedParameter:
     line_numbers: tuple[int, ...]
 
 
+@dataclasses.dataclass(frozen=True)
+class ParameterOrderIssue:
+    """One documented parameter that appears after a later signature parameter.
+
+    Attributes:
+        documented_parameter (DocumentedParameter): Late documentation occurrence that should move earlier.
+        signature_parameter (SignatureParameter): Signature parameter matched by the late documentation occurrence.
+        preceding_signature_parameter (SignatureParameter): Highest-ranked signature parameter documented earlier.
+    """
+
+    documented_parameter: DocumentedParameter
+    signature_parameter: SignatureParameter
+    preceding_signature_parameter: SignatureParameter
+
+
 def signature_parameters(definition: PDF_definition.DefinitionInfo, *, context: RuleContext) -> tuple[SignatureParameter, ...]:
     """Return comparable signature parameters for a function definition.
 
@@ -158,6 +173,35 @@ def documented_parameters(docstring: PDF_definition.DocstringInfo) -> tuple[Docu
         line_numbers = PDF_definition.docstring_line_numbers(docstring, line)
         parameters.extend(DocumentedParameter(name=name, comparison_name=parameter_comparison_name(name), line_numbers=line_numbers) for name in entry.names if name)
     return tuple(parameters)
+
+
+def parameter_order_issues(definition: PDF_definition.DefinitionInfo, docstring: PDF_definition.DocstringInfo, *, context: RuleContext) -> tuple[ParameterOrderIssue, ...]:
+    """Return documented parameters that do not follow signature declaration order.
+
+    Args:
+        definition (PDF_definition.DefinitionInfo): Function definition whose signature provides the canonical order.
+        docstring (PDF_definition.DocstringInfo): Parsed function docstring whose parameter entries should be checked.
+        context (RuleContext): Current file context used to normalize signature parameters.
+
+    Returns:
+        tuple[ParameterOrderIssue, ...]: Late first occurrences paired with their matched and highest-ranked preceding
+            signature parameters.
+    """
+    parameters_by_name = {parameter.comparison_name: (rank, parameter) for rank, parameter in enumerate(signature_parameters(definition, context=context))}
+    seen_names: set[str] = set()
+    greatest_rank_and_parameter: tuple[int, SignatureParameter] | None = None
+    issues: list[ParameterOrderIssue] = []
+    for documented_parameter in documented_parameters(docstring):
+        ranked_parameter = parameters_by_name.get(documented_parameter.comparison_name)
+        if ranked_parameter is None or documented_parameter.comparison_name in seen_names:
+            continue
+        seen_names.add(documented_parameter.comparison_name)
+        rank, signature_parameter = ranked_parameter
+        if greatest_rank_and_parameter is not None and rank < greatest_rank_and_parameter[0]:
+            issues.append(ParameterOrderIssue(documented_parameter=documented_parameter, signature_parameter=signature_parameter, preceding_signature_parameter=greatest_rank_and_parameter[1]))
+            continue
+        greatest_rank_and_parameter = (rank, signature_parameter)
+    return tuple(issues)
 
 
 def parameter_comparison_name(name: str) -> str:
