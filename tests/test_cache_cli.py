@@ -656,6 +656,28 @@ def test_effective_direct_setting_change_misses_and_produces_new_finding(tmp_pat
     assert "writes=0" in second.stderr
 
 
+def test_pdf212_parser_setting_change_invalidates_clean_proof(tmp_path: Path) -> None:
+    target = tmp_path / "module.py"
+    cache = tmp_path / "cache"
+    config = tmp_path / "pyproject.toml"
+    target.write_text('"""- item"""\n', encoding="utf-8")
+    config.write_text('[tool.pydocfmt]\nselect = ["PDF212"]\ndocstring-parse-list-items = false\n', encoding="utf-8")
+    argv = ["pydocfmt", "check", "--cache-dir", str(cache), "--cache-stats", str(target)]
+    first = cli_helpers.run_cli(pydocfmt_cli.main, argv, cwd=tmp_path)
+    config.write_text('[tool.pydocfmt]\nselect = ["PDF212"]\ndocstring-parse-list-items = true\n', encoding="utf-8")
+    second = cli_helpers.run_cli(pydocfmt_cli.main, argv, cwd=tmp_path)
+
+    assert first.exit_code == 0
+    assert "hits=0" in first.stderr
+    assert "misses=1" in first.stderr
+    assert "writes=1" in first.stderr
+    assert second.exit_code == 1
+    assert "PDF212" in second.stdout
+    assert "hits=0" in second.stderr
+    assert "misses=1" in second.stderr
+    assert "writes=0" in second.stderr
+
+
 def test_selector_errors_bypass_cache_and_remain_equivalent(tmp_path: Path) -> None:
     target = tmp_path / "module.py"
     cache = tmp_path / "cache"

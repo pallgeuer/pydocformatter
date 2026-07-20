@@ -6,7 +6,7 @@ Rule suppression directives in source code filter both check findings and automa
 
 ## `# noqa`
 
-Bare `# noqa` follows the conventional same-line shape used by Python tooling. It suppresses pydocfmt findings on the physical line where it appears. If the comment appears after a docstring's closing quotes, it suppresses findings whose full source range is that docstring.
+Bare `# noqa` follows the conventional same-line shape used by Python tooling. It suppresses pydocfmt findings on the physical line where it appears. For PDF findings, an inline comment after any string token in a docstring expression covers the complete expression, including when more implicitly concatenated tokens follow on later lines. PCF findings remain line-local. Ordinary string expressions do not receive complete-expression PDF coverage, so directives on them retain normal same-line behavior.
 
 Blanket `# noqa` is not audited by `PCF006`:
 
@@ -133,7 +133,7 @@ def function():
 
 ## Local `# pydocfmt: ignore[...]`
 
-Standalone `# pydocfmt: ignore[...]` attaches to the immediately following physical line. For docstrings, the target is the following docstring expression. It also suppresses diagnostics semantically owned by that docstring, even when the diagnostic is reported on a signature or body line:
+Standalone `# pydocfmt: ignore[...]` attaches to the immediately following physical line. For docstrings, the target is the following docstring expression when that line begins its first string token. A delimiter-only opening-parenthesis line does not attach the directive to string tokens on later lines. An attached directive also suppresses diagnostics semantically owned by that docstring, even when the diagnostic is reported on a signature or body line:
 
 ```pydocfmt-example
 [settings]
@@ -230,7 +230,7 @@ total = calculate_total(order)  # Generated field copy must stay near the assign
 [output=unchanged]
 ```
 
-Inline `# pydocfmt: ignore[...]` suppresses findings on its own physical line. On a docstring closing line, that covers the whole docstring source range:
+Inline `# pydocfmt: ignore[...]` suppresses findings on its own physical line. For PDF findings, placing it after any component string token covers the complete implicitly concatenated docstring expression. The expression must be a recognized primary or supported attached attribute docstring; ordinary string expressions do not gain expanded coverage. This does not expand PCF coverage, and a standalone directive between string tokens remains line-local:
 
 ```pydocfmt-example
 [settings]
@@ -239,6 +239,20 @@ line-length = 48
 
 [input]
 """This generated module summary must stay on one physical source line for the external checksum."""  # pydocfmt: ignore[PDF101] because generated
+
+[output=unchanged]
+```
+
+The same whole-expression coverage applies before the final component token:
+
+```pydocfmt-example
+[settings]
+select = ["PDF202", "PCF006"]
+
+[input]
+def generated_function():
+    (""  # pydocfmt: ignore[PDF202]
+     " ")
 
 [output=unchanged]
 ```

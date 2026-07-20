@@ -212,3 +212,17 @@ class RuleCategoryBase(Generic[CategoryDataT]):
         """
         del context
         return None
+
+    @classmethod
+    def suppression_expression_ranges(cls, data: CategoryDataT | None) -> tuple[cst_metadata.CodeRange, ...]:
+        """Return exact string-expression ranges eligible for expanded suppression coverage.
+
+        Args:
+            data (CategoryDataT | None): Category-specific data prepared for the current module.
+
+        Returns:
+            tuple[cst_metadata.CodeRange, ...]: String-expression ranges that inline or attached directives may cover as
+                complete expressions for this category.
+        """
+        del data
+        return ()

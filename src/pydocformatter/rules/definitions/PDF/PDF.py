@@ -1002,6 +1002,19 @@ class PDF(RuleCategoryBase[PDFCategoryData]):
         )
 
     @classmethod
+    def suppression_expression_ranges(cls, data: PDFCategoryData | None) -> tuple[cst_metadata.CodeRange, ...]:
+        """Return recognized docstring ranges eligible for complete-expression suppression.
+
+        Args:
+            data (PDFCategoryData | None): Prepared definitions and docstrings for the current module.
+
+        Returns:
+            tuple[cst_metadata.CodeRange, ...]: Exact primary and supported attached docstring expression ranges.
+        """
+        del cls
+        return () if data is None else tuple(docstring.range for docstring in data.docstrings)
+
+    @classmethod
     def require_data(cls, context: RuleContext) -> PDFCategoryData:
         """Return prepared PDF data or raise for an invalid rule context.
 

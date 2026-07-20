@@ -25,6 +25,7 @@ from pydocformatter.rules.definitions.PDF.PDF import (
     DocstringEntryKind,
     DocstringKind,
     escaped_closing_quote_body_source,
+    first_summary_block,
     simple_docstring_body_source_candidates,
 )
 from pydocformatter.source_path import SourcePathContext
@@ -606,6 +607,17 @@ def test_verbatim_blocks_exclude_trailing_blank_lines() -> None:
 
 def test_a_leading_protected_block_prevents_a_later_paragraph_becoming_summary() -> None:
     assert top_level_blocks("```\ncode\n```\nLater prose.") == ((DocstringBlockKind.CODE_FENCE, 0, 3), (DocstringBlockKind.PARAGRAPH, 3, 4))
+
+
+@pytest.mark.parametrize(
+    ("value", "expected_kind"), [("Summary.", DocstringBlockKind.SUMMARY), ("Result:", DocstringBlockKind.COLON_HEADER), ("Accepted values:\nfast and safe.", None), ("- item\n\nLater prose.", None)]
+)
+def test_first_summary_block_uses_the_category_summary_contract(value: str, expected_kind: DocstringBlockKind | None) -> None:
+    source = f'"""{value}"""\n'
+    docstring = PDF.prepare(category_context(source)).docstrings[0]
+    summary = first_summary_block(docstring)
+
+    assert (None if summary is None else summary.kind) is expected_kind
 
 
 @pytest.mark.parametrize("header", ["Arg:", "Args:", "ARGS:", "Argument:", "Arguments", "Keyword Argument:", "Keyword Arguments:", "Other Arg:", "Other Args:", "wARnS:"])

@@ -65,10 +65,12 @@ class RuleRunResult:
 
 @dataclasses.dataclass(frozen=True)
 class _PreparedCategory:
-    """Prepared category context and optional shared data for one module."""
+    """Prepared category prefix, context, shared data, and suppression ranges for one module."""
 
     context: RuleCategoryContext
     data: object | None
+    prefix: str
+    suppression_expression_ranges: frozenset[cst_metadata.CodeRange]
 
 
 @dataclasses.dataclass(frozen=True)
@@ -235,7 +237,9 @@ def _run_fix_pass(
             if pass_context is None:
                 errors.append(f"{path}: {rule_class.meta.code} automatic fix lost source context")
                 continue
-            unsuppressed_violations = pass_context.suppression_index.filter_violations(validated_violations).violations
+            unsuppressed_violations = pass_context.suppression_index.filter_violations(
+                validated_violations, active_category_prefix=prepared_category.prefix, authorized_expression_ranges=prepared_category.suppression_expression_ranges
+            ).violations
             fixable_violations = tuple(violation for violation in unsuppressed_violations if violation.finding.fixable)
             if not fixable_violations:
                 continue
@@ -314,7 +318,9 @@ def _run_check_pass(
             if pass_context is None:
                 errors.append(f"{path}: {rule_class.meta.code} check lost source context")
                 continue
-            suppression_result = pass_context.suppression_index.filter_violations(validated_violations)
+            suppression_result = pass_context.suppression_index.filter_violations(
+                validated_violations, active_category_prefix=prepared_category.prefix, authorized_expression_ranges=prepared_category.suppression_expression_ranges
+            )
             used_selector_keys.update(suppression_result.used_selector_keys)
             findings.extend(_apply_effective_fixability(violation.finding, selected_rule=selected_rule) for violation in suppression_result.violations)
     if suppression_audit_rules and pass_context is not None:
@@ -326,7 +332,7 @@ def _run_check_pass(
             validated_violations = _validated_rule_violations(
                 rule_class_by_code[selected_rule.rule.code], audit_violations, path=path, operation="check", source_line_count=source_line_count, errors=errors
             )
-            audit_filter_result = pass_context.suppression_index.filter_violations(validated_violations)
+            audit_filter_result = pass_context.suppression_index.filter_violations(validated_violations, active_category_prefix=selected_rule.rule.code.prefix)
             findings.extend(_apply_effective_fixability(violation.finding, selected_rule=selected_rule) for violation in audit_filter_result.violations)
     return tuple(findings)
 
@@ -349,7 +355,10 @@ def _prepare_category(
     try:
         current_pass_context = _pass_context_for(module, pass_context, source_seed=source_seed, collection=rule_collection)
         context = _category_context(current_pass_context, path=path, source_path=source_path, settings=settings, line_ending=line_ending)
-        return _PreparedCategory(context=context, data=category_class.prepare(context)), current_pass_context
+        data = category_class.prepare(context)
+        return _PreparedCategory(
+            context=context, data=data, prefix=category_class.meta.prefix, suppression_expression_ranges=frozenset(category_class.suppression_expression_ranges(data))
+        ), current_pass_context
     except Exception as error:
         errors.append(f"{path}: {category_class.meta.prefix} category preparation failed: {error}")
         return None, current_pass_context

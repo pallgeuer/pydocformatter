@@ -1,4 +1,4 @@
-"""PDF202 empty-docstring rule."""
+"""PDF212 missing-summary rule."""
 
 # Future imports
 from __future__ import annotations
@@ -22,19 +22,19 @@ if TYPE_CHECKING:
 
 
 @rule_registration.register_rule_to(PDF)
-class PDF202EmptyDocstring(RuleBase):
-    """Rule implementation for PDF202.
+class PDF212MissingSummary(RuleBase):
+    """Rule implementation for PDF212.
 
     Attributes:
         meta (RuleMetadata): Static metadata used for registration, diagnostics, and rule selection.
     """
 
     meta = RuleMetadata(
-        code=RuleCode("PDF202"),
-        name="empty-docstring",
-        message="Docstring is empty",
+        code=RuleCode("PDF212"),
+        name="missing-summary",
+        message="Docstring is missing a summary",
         fix_availability=FixAvailability.NEVER,
-        stable_since="1.0.0",
+        stable_since="1.1.0",
         setting_effects=(),
         incompatible_with=(),
         check_kind=RuleCheckKind.STANDARD,
@@ -43,7 +43,7 @@ class PDF202EmptyDocstring(RuleBase):
 
     @classmethod
     def violations(cls, context: RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
-        """Return violations for docstrings without meaningful content.
+        """Return violations for nonempty docstrings without a parsed summary.
 
         Args:
             context (RuleContext): Current file context with parsed module, settings, and prepared category data.
@@ -52,4 +52,8 @@ class PDF202EmptyDocstring(RuleBase):
             tuple[rule_violations.RuleViolation, ...]: Rule violations reported for the current source.
         """
         data = PDF.require_data(context)
-        return tuple(rule_violations.diagnostic(cls.meta, PDF_definition.docstring_physical_line_numbers(docstring)) for docstring in data.docstrings if not docstring.value.strip())
+        return tuple(
+            rule_violations.diagnostic(cls.meta, PDF_definition.docstring_physical_line_numbers(docstring))
+            for docstring in data.docstrings
+            if docstring.value.strip() and PDF_definition.first_summary_block(docstring) is None
+        )

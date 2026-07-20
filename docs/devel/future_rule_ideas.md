@@ -8,7 +8,7 @@ The main remaining opportunities are:
 - Markup safety: inline roles, links, code spans, Markdown hard breaks, and malformed reST/fences.
 - Conservative autofixes for several existing diagnostic-only rules.
 
-There are currently 122 rules: 6 PCF and 116 PDF. Fix availability is 24 always, 3 usually, 18 sometimes, and 77 never.
+There are currently 123 rules: 6 PCF and 117 PDF. Fix availability is 24 always, 3 usually, 18 sometimes, and 78 never.
 
 ## Current coverage audit
 
@@ -50,6 +50,7 @@ The comment parser deliberately excludes empty/hash-only lines and protects sheb
 | PDF201     | Safely provable missing separators around summaries, structures, and convention sections |   A |
 | PDF202     | Evaluated docstrings containing no non-whitespace text                                   |   N |
 | PDF203     | Parsed top-level summaries that still occupy multiple logical lines                      |   N |
+| PDF212     | Nonempty collected docstrings without a parsed top-level summary                         |   N |
 | PDF204/205 | Zero versus exactly one blank line before function/method docstrings                     |   A |
 | PDF206/207 | Zero versus exactly one blank line after function/method docstrings                      |   A |
 | PDF208/209 | Zero versus exactly one blank line before class docstrings                               |   A |
@@ -129,7 +130,7 @@ The category’s exact inventory boundaries—including ignored additional docst
 
 3. **Report malformed convention entry syntax.** Detect entry-looking lines inside recognized sections that failed parsing, such as NumPy `value: int`, missing Google entry colons, malformed reST field delimiters, or incorrectly indented entry continuations. This should explain the actual syntax problem instead of causing only a later “missing parameter” finding.
 
-4. **Report missing summaries.** Distinguish a nonempty docstring containing only sections, fields, examples, directives, or other structures from PDF202’s empty docstring. This is the largest basic PEP 257/numpydoc structural gap.
+4. **Implemented as PDF212: Report missing summaries.** PDF212 distinguishes a nonempty docstring containing only sections, fields, examples, directives, or other structures from PDF202’s empty docstring.
 
 5. **Report placeholder docstrings.** Conservatively recognize exact placeholders such as `TODO`, `TBD`, `...`, `FIXME`, or `pass`, after punctuation normalization. Do not attempt an autofix.
 
@@ -214,10 +215,6 @@ The category’s exact inventory boundaries—including ignored additional docst
 45. **Add opt-in capitalization/punctuation checks for standalone prose comments.** Apply only to clearly sentence-like standalone paragraphs, excluding trailing comments, task markers, labels, directives, headings, code, and fragments. Google’s guide recommends narrative capitalization and punctuation, but this should remain optional because comment fragments are common. [Google Python style guide](https://google.github.io/styleguide/pyguide.html)
 
 ## Highest priority
-
-- **#4 — Report missing summaries**
-
-   Probably the best first addition. It is broadly applicable, easy to explain, diagnostic-only, and should be robust because the parser already distinguishes summaries from sections and protected structures. It fills the obvious gap between “empty docstring” and “nonempty but structurally incomplete docstring.”
 
 - **#8 — Check parameter order against the signature**
 

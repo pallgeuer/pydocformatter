@@ -3,6 +3,7 @@ from __future__ import annotations
 
 # Standard library imports
 import typing
+import dataclasses
 from typing import TYPE_CHECKING
 
 # Third-party imports
@@ -328,10 +329,93 @@ def test_suppression_index_filters_violations_and_reports_used_selector_keys() -
     suppressed_violation = rule_violations.diagnostic(rule, (1,))
     unsuppressed_violation = rule_violations.diagnostic(rule, (2,))
 
-    result = index.filter_violations((suppressed_violation, unsuppressed_violation))
+    result = index.filter_violations((suppressed_violation, unsuppressed_violation), active_category_prefix="PDF")
 
     assert result.violations == (unsuppressed_violation,)
     assert result.used_selector_keys == frozenset({(0, 0)})
+
+
+def test_suppression_selector_uses_active_category_authorization_without_prefix_tagging() -> None:
+    pdf_rule = RuleMetadata(
+        code=RuleCode("PDF998"),
+        name="test-pdf-rule",
+        message="PDF message",
+        fix_availability=FixAvailability.NEVER,
+        stable_since="1.0.0",
+        setting_effects=(),
+        incompatible_with=(),
+        check_kind=RuleCheckKind.STANDARD,
+    )
+    pcf_rule = dataclasses.replace(pdf_rule, code=RuleCode("PCF998"), name="test-pcf-rule", message="PCF message")
+    expression_range = cst_metadata.CodeRange(start=cst_metadata.CodePosition(1, 0), end=cst_metadata.CodePosition(2, 1))
+    selector = suppressions.SuppressionSelector(
+        text="ALL", matched_codes=frozenset({pdf_rule.code, pcf_rule.code}), coverage_lines=frozenset({1}), audit=True, candidate_expression_ranges=(expression_range,)
+    )
+    index = suppressions.SuppressionIndex(directives=(suppressions.SuppressionDirective(line=1, selectors=(selector,)),))
+    pdf_violation = rule_violations.diagnostic(pdf_rule, (1, 2))
+    pcf_violation = rule_violations.diagnostic(pcf_rule, (2,))
+
+    unauthorized_result = index.filter_violations((pdf_violation, pcf_violation), active_category_prefix="PDF")
+    pdf_result = index.filter_violations((pdf_violation, pcf_violation), active_category_prefix="PDF", authorized_expression_ranges=frozenset((expression_range,)))
+    pcf_result = index.filter_violations((pdf_violation, pcf_violation), active_category_prefix="PCF", authorized_expression_ranges=frozenset((expression_range,)))
+
+    assert unauthorized_result.violations == (pdf_violation, pcf_violation)
+    assert not unauthorized_result.used_selector_keys
+    assert pdf_result.violations == (pcf_violation,)
+    assert pdf_result.used_selector_keys == frozenset({(0, 0)})
+    assert pcf_result.violations == (pdf_violation,)
+    assert pcf_result.used_selector_keys == frozenset({(0, 0)})
+
+
+def test_suppression_selector_requires_an_exact_authorized_expression_range() -> None:
+    rule = RuleMetadata(
+        code=RuleCode("PDF998"),
+        name="test-pdf-rule",
+        message="PDF message",
+        fix_availability=FixAvailability.NEVER,
+        stable_since="1.0.0",
+        setting_effects=(),
+        incompatible_with=(),
+        check_kind=RuleCheckKind.STANDARD,
+    )
+    candidate_range = cst_metadata.CodeRange(start=cst_metadata.CodePosition(1, 4), end=cst_metadata.CodePosition(2, 8))
+    same_lines_different_columns = cst_metadata.CodeRange(start=cst_metadata.CodePosition(1, 8), end=cst_metadata.CodePosition(2, 12))
+    selector = suppressions.SuppressionSelector(text="PDF998", matched_codes=frozenset((rule.code,)), coverage_lines=frozenset((2,)), audit=True, candidate_expression_ranges=(candidate_range,))
+    finding = rule_violations.diagnostic(rule, (1, 2)).finding
+
+    assert not selector.suppresses(finding, active_category_prefix="PDF", authorized_expression_ranges=frozenset((same_lines_different_columns,)))
+    assert not selector.suppresses(finding, active_category_prefix="PCF", authorized_expression_ranges=frozenset((candidate_range,)))
+    assert selector.suppresses(finding, active_category_prefix="PDF", authorized_expression_ranges=frozenset((candidate_range,)))
+
+
+def test_suppression_source_collector_indexes_only_complete_string_expressions() -> None:
+    component_count = 100
+    source = "value = (\n" + '    "x"\n' * component_count + ")\n"
+    module = cst.parse_module(source)
+    wrapper = cst_metadata.MetadataWrapper(module)
+    collector = suppressions._SourceCollector(wrapper.resolve(cst_metadata.PositionProvider), tuple(source.splitlines(keepends=True)))
+
+    wrapper.module.visit(collector)
+    components_by_end_line = suppressions._string_components_by_end_line(collector.string_components)
+    ranges_by_start_line = suppressions._expression_ranges_by_start_line(collector.string_components)
+
+    assert len(collector.string_components) == component_count
+    assert sum(len(components) for components in components_by_end_line.values()) == component_count
+    assert sum(len(ranges) for ranges in ranges_by_start_line.values()) == 1
+
+
+def test_suppression_string_indexes_retain_distinct_same_line_expressions() -> None:
+    source = 'first = "a"; second = ("b" "c")\n'
+    module = cst.parse_module(source)
+    wrapper = cst_metadata.MetadataWrapper(module)
+    collector = suppressions._SourceCollector(wrapper.resolve(cst_metadata.PositionProvider), tuple(source.splitlines(keepends=True)))
+
+    wrapper.module.visit(collector)
+    components_by_end_line = suppressions._string_components_by_end_line(collector.string_components)
+    ranges_by_start_line = suppressions._expression_ranges_by_start_line(collector.string_components)
+
+    assert tuple(len(components) for components in components_by_end_line.values()) == (3,)
+    assert tuple(len(ranges) for ranges in ranges_by_start_line.values()) == (2,)
 
 
 def test_empty_edits_return_original_module() -> None:

@@ -16,6 +16,8 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Added
 
+- **Docstring diagnostics:**
+  - Added PDF212 to report nonempty primary and supported attached attribute docstrings without a parsed top-level summary.
 - **Persistent caching:**
   - Added strict persistent clean-proof caching for disk-backed checks and fixes, with complete source hashing, semantic analysis-setting and final-rule-code invalidation, shared invocation-local analysis fingerprints, engine/path invalidation, miss-only process execution, bounded parent-side probes, and source-free warm results.
   - Added `cache` and `cache-dir` settings, `--cache`/`--no-cache`, `--cache-dir`, opt-in `--cache-stats`, safe project cache self-pruning, and the ownership-checked `pydocfmt clean` command with its own `--cache-dir` override.
@@ -23,6 +25,10 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Changed
 
+- **Rule suppressions:**
+  - Made inline suppressions after any component token of an implicitly concatenated docstring cover the complete expression for PDF findings while preserving line-local PCF coverage and existing local and standalone attachment boundaries.
+- **Docstring diagnostics:**
+  - Made PDF202 target the complete physical empty-docstring expression, including delimiter-only closing lines, consistently with other whole-docstring diagnostics.
 - **Command performance:**
   - Reused successfully parsed configuration documents, closest-config discovery results, and resolved source profiles within each invocation.
   - Reduced directory-walk resolver calls and repeated cache-root, glob-segment, and literal-pattern preparation without changing file-selection semantics.
@@ -41,6 +47,10 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Fixed
 
+- **Rule suppressions:**
+  - Kept PCF coverage line-local when an inline directive follows the final token of a concatenated string expression.
+  - Limited complete-expression PDF coverage to recognized primary and supported attached docstrings, preventing directives on ordinary strings from suppressing unrelated findings while reducing string-topology storage to linear size.
+  - Made complete-expression candidates category-neutral and indexed string topology by attachment line, avoiding repeated whole-source scans and retaining only complete expression ranges.
 - **Persistent caching:**
   - Prevented a configured cache directory equal to the traversal root from suppressing all input files; an unusable shared or project-root cache now degrades without changing file selection.
   - Fingerprinted symlinked implementation sources and targets without disabling caching for valid symlinked package trees, while rejecting incomplete or cyclic identities.

@@ -68,12 +68,33 @@ def test_reports_empty_concatenated_docstring_on_physical_lines() -> None:
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((2, 3),)
 
 
+def test_reports_delimiter_only_closing_line_as_part_of_empty_docstring() -> None:
+    source = '"""\n"""\n'
+    result = format_source(source)
+
+    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((1, 2),)
+
+
+def test_closing_line_suppression_covers_the_whole_empty_docstring() -> None:
+    source = '"""\n"""  # noqa: PDF202\n'
+
+    assert not format_source(source).unfixed_findings
+
+
 def test_reports_simple_suite_and_concatenated_whitespace_docstrings() -> None:
     source = 'def inline(): ""\n\n\ndef concatenated():\n    (" "\n     "\\t")\n'
     result = format_source(source)
 
     assert result.new_source == source
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((1,), (5, 6))
+
+
+def test_reports_supported_empty_attached_attribute_docstrings() -> None:
+    source = 'module_value = 1\n""""""\n\n\nclass Client:\n    class_value = 1\n    """   """\n\n    def __init__(self):\n        self.instance_value = 1\n        (""\n         "")\n'
+    result = format_source(source)
+
+    assert result.new_source == source
+    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((2,), (7,), (11, 12))
 
 
 def test_does_not_report_content_absent_docstrings_or_non_docstring_strings() -> None:
@@ -87,6 +108,14 @@ def test_does_not_report_content_absent_docstrings_or_non_docstring_strings() ->
 
 def test_reports_escaped_whitespace_but_skips_bytes_and_fstring_first_expressions() -> None:
     source = 'def escaped():\n    """\\t\\n"""\n\n\ndef bytes_expression():\n    b""\n\n\ndef fstring_expression(value):\n    f"{value}"\n'
+    result = format_source(source)
+
+    assert result.new_source == source
+    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((2,),)
+
+
+def test_unicode_whitespace_is_empty_but_zero_width_content_is_not() -> None:
+    source = 'def non_breaking_space():\n    """\\u00a0"""\n\n\ndef zero_width_space():\n    """\\u200b"""\n'
     result = format_source(source)
 
     assert result.new_source == source

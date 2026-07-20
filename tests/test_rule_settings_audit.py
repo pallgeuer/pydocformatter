@@ -5,10 +5,14 @@ from __future__ import annotations
 
 # Standard library imports
 import re
+import ast
+import enum
+import inspect
 import pathlib
 
 # First-party imports
 import pydocformatter.rules.collection as rule_collection
+import pydocformatter.rules.definition as rule_definition
 import pydocformatter.rules.documentation as rule_documentation
 from pydocformatter.cli import settings_check
 
@@ -52,6 +56,38 @@ def test_rule_settings_audit_options_match_rule_docs() -> None:
             assert options_section == "None."
 
 
+def test_rule_settings_audit_selection_effects_match_metadata() -> None:
+    """Check that audited selection effects exactly match rule metadata."""
+    row_by_code = {row["Rule"]: row for row in _audit_rows()}
+
+    for rule_class in rule_collection.RULE_COLLECTION.rules:
+        code = rule_class.meta.code.tag
+        assert row_by_code[code]["Rule-specific selection effects"] == _setting_effects_text(rule_class)
+
+
+def test_rule_settings_audit_covers_direct_rule_settings() -> None:
+    """Check that each rule's direct setting reads appear in its implementation audit."""
+    known_setting_fields = {definition.field for definition in settings_check.SETTINGS_SCHEMA.definitions}
+    shared_bundles = _shared_setting_bundles()
+    row_by_code = {row["Rule"]: row for row in _audit_rows()}
+
+    for rule_class in rule_collection.RULE_COLLECTION.rules:
+        code = rule_class.meta.code.tag
+        source_path_text = inspect.getsourcefile(rule_class)
+        assert source_path_text is not None
+        syntax_tree = ast.parse(pathlib.Path(source_path_text).read_text(encoding="utf-8"))
+        direct_setting_fields = {node.attr for node in ast.walk(syntax_tree) if isinstance(node, ast.Attribute) and node.attr in known_setting_fields}
+        audited_setting_fields: set[str] = set()
+        implementation_tokens = OPTION_CODE_SPAN_RE.findall(row_by_code[code]["Implementation settings used"])
+        unknown_tokens = tuple(token for token in implementation_tokens if token not in shared_bundles and token not in known_setting_fields)
+        for token in implementation_tokens:
+            audited_setting_fields.update(shared_bundles.get(token, (token,)))
+        missing_fields = direct_setting_fields - audited_setting_fields
+
+        assert not unknown_tokens, f"{code}: Unknown fields or bundles in implementation audit: {unknown_tokens}"
+        assert not missing_fields, f"{code}: Direct setting reads missing from implementation audit: {sorted(missing_fields)}"
+
+
 def _audit_rows() -> tuple[dict[str, str], ...]:
     """Return rows from the tracked per-rule settings audit table."""
     lines = AUDIT_PATH.read_text(encoding="utf-8").splitlines()
@@ -66,6 +102,22 @@ def _audit_rows() -> tuple[dict[str, str], ...]:
     headers = _split_markdown_row(table_lines[0])
     assert tuple(headers) == REQUIRED_COLUMNS
     return tuple(dict(zip(headers, cells, strict=True)) for cells in (_split_markdown_row(line) for line in table_lines[2:]))
+
+
+def _shared_setting_bundles() -> dict[str, tuple[str, ...]]:
+    """Return setting fields grouped by the tracked shared bundle names."""
+    lines = AUDIT_PATH.read_text(encoding="utf-8").splitlines()
+    heading_index = lines.index("## Shared setting bundles")
+    table_lines: list[str] = []
+    for line in lines[heading_index + 1 :]:
+        if not line.startswith("|"):
+            if table_lines:
+                break
+            continue
+        table_lines.append(line)
+    headers = _split_markdown_row(table_lines[0])
+    rows = (dict(zip(headers, _split_markdown_row(line), strict=True)) for line in table_lines[2:])
+    return {row["Bundle"].strip("`"): tuple(OPTION_CODE_SPAN_RE.findall(row["Settings"])) for row in rows}
 
 
 def _split_markdown_row(line: str) -> tuple[str, ...]:
@@ -94,6 +146,21 @@ def _documented_options(rule_code: str, section: str) -> tuple[str, ...]:
     documented_options = tuple(keys)
     assert len(set(documented_options)) == len(documented_options), f"{rule_code}: duplicate Options setting bullets"
     return documented_options
+
+
+def _setting_effects_text(rule_class: type[rule_definition.RuleBase]) -> str:
+    """Return the canonical audit text for one rule's metadata setting effects."""
+    effects: list[str] = []
+    for setting_effects in rule_class.meta.setting_effects:
+        for effect_values in setting_effects.effects:
+            values = ", ".join(f"`{_setting_effect_value_text(value)}`" for value in effect_values.values)
+            effects.append(f"`{setting_effects.setting}` {effect_values.effect.value.lower()} for {values}")
+    return "; ".join(effects) if effects else "None"
+
+
+def _setting_effect_value_text(value: object) -> str:
+    """Return a stable display value for one metadata setting-effect trigger."""
+    return str(value.value) if isinstance(value, enum.Enum) else str(value)
 
 
 def _options_section(rule_class: type[object]) -> str:

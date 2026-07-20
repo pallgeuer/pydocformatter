@@ -2118,9 +2118,128 @@ def test_docstring_closing_quote_directive_suppresses_multiline_docstring_interi
     assert result.unfixed_findings == ()
 
 
+@pytest.mark.parametrize("directive", ["# noqa", "# noqa: PDF202", "# noqa: F401, PDF202", "# pydocfmt: ignore[PDF202]", "# pydocfmt: ignore[PDF]"])
+@pytest.mark.parametrize("component", ["first", "middle"])
+def test_inline_directive_on_any_concatenated_docstring_component_suppresses_whole_pdf_finding(directive: str, component: str) -> None:
+    first_suffix = f"  {directive}" if component == "first" else ""
+    middle_suffix = f"  {directive}" if component == "middle" else ""
+    source = f'def function():\n    (""{first_suffix}\n     ""{middle_suffix}\n     " ")\n'
+    settings = CheckSettings(select=("PDF202", "PCF006"))
+    result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=False)
+
+    assert result.new_source == source
+    assert not result.modified
+    assert result.unfixed_findings == ()
+
+
+def test_inline_component_directive_suppresses_whole_expression_fix() -> None:
+    source = 'def function():\n    ("Summary "  # pydocfmt: ignore[PDF000]\n     "continued.")\n'
+    settings = CheckSettings(select=("PDF000", "PCF006"))
+    result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
+
+    assert result.new_source == source
+    assert not result.modified
+    assert result.fixed_findings == collections.Counter()
+    assert result.unfixed_findings == ()
+
+
+def test_inline_component_directive_suppresses_semantically_owned_pdf_finding() -> None:
+    source = 'def function():\n    ("Return a value "  # noqa: PDF502\n     "without a section.")\n    return 1\n'
+    settings = CheckSettings(select=("PDF502", "PCF006"), docstring_convention=DocstringConvention.GOOGLE, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS)
+    result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=False)
+
+    assert result.unfixed_findings == ()
+
+
+def test_inline_component_directive_suppresses_unmapped_entry_pdf_finding() -> None:
+    source = 'def function(value: int):\n    ("Summary.\\n\\n"  # noqa: PDF700\n     "Args:\\n    value (int):")\n'
+    settings = CheckSettings(select=("PDF700", "PCF006"), docstring_convention=DocstringConvention.GOOGLE)
+    result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=False)
+
+    assert result.unfixed_findings == ()
+
+
+def test_inline_all_component_directive_does_not_expand_pcf_coverage() -> None:
+    source = 'def function():\n    (""  # noqa: ALL\n     # This generated explanatory comment is intentionally much too long for the configured line length.\n     " ")\n'
+    settings = CheckSettings(select=("PDF202", "PCF001", "PCF006"), line_length=48)
+    result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=False)
+
+    assert tuple((finding.rule.code.tag, finding.line_numbers) for finding in result.unfixed_findings) == (("PCF001", (3,)),)
+
+
+@pytest.mark.parametrize("directive", ["# noqa: PCF001", "# pydocfmt: ignore[PCF001]"])
+def test_inline_final_component_directive_keeps_pcf_coverage_line_local(directive: str) -> None:
+    source = f'def function():\n    ("Summary."\n     # This generated explanatory comment is intentionally much too long for the configured line length.\n     " Continued."  {directive}\n    )\n'
+    settings = CheckSettings(select=("PCF001", "PCF006"), line_length=48)
+    result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=False)
+
+    assert tuple((finding.rule.code.tag, finding.line_numbers) for finding in result.unfixed_findings) == (("PCF001", (3,)), ("PCF006", (4,)))
+
+
+@pytest.mark.parametrize("directive", ["# noqa: PDF502", "# pydocfmt: ignore[PDF502]"])
+@pytest.mark.parametrize("component", ["middle", "final"])
+def test_inline_ordinary_string_directive_does_not_expand_pdf_coverage(directive: str, component: str) -> None:
+    middle_suffix = f"  {directive}" if component == "middle" else ""
+    final_suffix = f"  {directive}" if component == "final" else ""
+    source = f'def function():\n    """Return a value."""\n    return ("a"\n            "b"{middle_suffix}\n            "c"{final_suffix}\n           )\n'
+    settings = CheckSettings(select=("PDF502", "PCF006"), docstring_convention=DocstringConvention.GOOGLE, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS)
+    result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=False)
+    directive_line = 4 if component == "middle" else 5
+
+    assert tuple((finding.rule.code.tag, finding.line_numbers) for finding in result.unfixed_findings) == (("PDF502", (3,)), ("PCF006", (directive_line,)))
+
+
+def test_local_ordinary_string_directive_does_not_expand_pdf_coverage() -> None:
+    source = 'def function():\n    """Return a value."""\n    # pydocfmt: ignore[PDF502]\n    return ("a"\n            "b")\n'
+    settings = CheckSettings(select=("PDF502", "PCF006"), docstring_convention=DocstringConvention.GOOGLE, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS)
+    result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=False)
+
+    assert tuple((finding.rule.code.tag, finding.line_numbers) for finding in result.unfixed_findings) == (("PDF502", (4,)), ("PCF006", (3,)))
+
+
+def test_inline_component_directive_expands_for_supported_attached_docstring() -> None:
+    source = 'value = 1\n("Notes:\\n"  # noqa: PDF212\n "    Details.")\n'
+    settings = CheckSettings(select=("PDF212", "PCF006"), docstring_convention=DocstringConvention.GOOGLE)
+    result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=False)
+
+    assert result.unfixed_findings == ()
+
+
+def test_local_pdf_directive_before_delimiter_only_parenthesis_remains_unused() -> None:
+    source = 'def function():\n    # pydocfmt: ignore[PDF202]\n    (\n        ""\n        " "\n    )\n'
+    settings = CheckSettings(select=("PDF202", "PCF006"))
+    result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=False)
+
+    assert tuple((finding.rule.code.tag, finding.line_numbers) for finding in result.unfixed_findings) == (("PDF202", (4, 5)), ("PCF006", (2,)))
+
+
+def test_standalone_directive_between_components_remains_line_local() -> None:
+    source = 'def function():\n    (""\n     # noqa: PDF202\n     " ")\n'
+    settings = CheckSettings(select=("PDF202", "PCF006"))
+    result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=False)
+
+    assert tuple((finding.rule.code.tag, finding.line_numbers) for finding in result.unfixed_findings) == (("PDF202", (2, 3, 4)), ("PCF006", (3,)))
+
+
+def test_inline_component_directive_does_not_cover_another_string_expression() -> None:
+    source = 'def first():\n    ("Content"  # noqa: PDF202\n     ".")\n\n\ndef second():\n    (""\n     " ")\n'
+    settings = CheckSettings(select=("PDF202", "PCF006"))
+    result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=False)
+
+    assert tuple((finding.rule.code.tag, finding.line_numbers) for finding in result.unfixed_findings) == (("PDF202", (7, 8)), ("PCF006", (2,)))
+
+
 def test_preceding_pydocfmt_directive_suppresses_immediately_following_docstring() -> None:
     source = 'def function():\n    # pydocfmt: ignore[PDF101]\n    """This is a long summary that needs wrapping into more than one physical line."""\n'
     settings = CheckSettings(select=("PDF101",), line_length=48)
+    result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=False)
+
+    assert result.unfixed_findings == ()
+
+
+def test_local_selector_list_shares_following_expression_candidates() -> None:
+    source = "# pydocfmt: ignore[PDF001, PDF202]\n'''   '''\n"
+    settings = CheckSettings(select=("PDF001", "PDF202", "PCF006"))
     result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=False)
 
     assert result.unfixed_findings == ()
