@@ -268,6 +268,15 @@ def test_fix_preserves_crlf_and_escaped_newline_spelling() -> None:
     assert category.module.config_for_parsing.default_newline == "\r\n"
 
 
+def test_fix_preserves_source_continuation_while_literalizing_escape() -> None:
+    source = 'def function():\n    """first\\\nsecond\\nthird"""\n'
+    _, context = contexts(source)
+
+    result = rule_helpers.rule_fix_result(PDF000DocstringLiteralNormalization, context)
+
+    assert result.module.code == 'def function():\n    """first\\\nsecond\nthird"""\n'
+
+
 def test_fix_leaves_raw_string_and_carriage_return_escape_values_unchanged() -> None:
     _, raw_context = contexts('def raw():\n    r"first\\nsecond"\n')
     _, carriage_return_context = contexts('def carriage_return():\n    """first\\r\\nsecond"""\n')

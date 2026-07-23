@@ -7,18 +7,18 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 # First-party imports
+import pydocformatter.rules.edits as rule_edits
 import pydocformatter.rules.violations as rule_violations
 import pydocformatter.rules.registration as rule_registration
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase
-from pydocformatter.rules.definition_helpers import text_layout
+from pydocformatter.rules.definition_helpers import inline_markup, text_layout
 from pydocformatter.rules.models import FixAvailability, RuleCacheBehavior, RuleCheckKind, RuleMetadata
 
 
 if TYPE_CHECKING:
     # First-party imports
-    import pydocformatter.rules.edits as rule_edits
     from pydocformatter.rules.definition import RuleContext
 
 
@@ -58,22 +58,47 @@ class PDF102DocstringTrailingWhitespace(RuleBase):
 def _planned_changes(context: RuleContext) -> tuple[rule_edits.PlannedSourceChange, ...]:
     """Return all safe trailing-whitespace changes."""
     data = PDF_definition.PDF.require_data(context)
-    return tuple(change for docstring in data.docstrings if (change := _planned_change_for_docstring(docstring, context=context)) is not None)
+    return tuple(change for docstring in data.docstrings if (change := _planned_change_for_docstring(docstring)) is not None)
 
 
-def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo, *, context: RuleContext) -> rule_edits.PlannedSourceChange | None:
+def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo) -> rule_edits.PlannedSourceChange | None:
     """Return one whole-literal replacement for a docstring."""
-    if not PDF_definition.is_safely_mapped_simple_docstring(docstring):
+    if docstring.kind is not PDF_definition.DocstringKind.SIMPLE:
         return None
-    targets: list[str | None] = []
+    source_map = docstring.source_map
+    if source_map is None:
+        return None
+    fragments = source_map.fragments
+    replacements: list[rule_edits.PlannedTextReplacement] = []
+    value_lines = [line.raw_text for line in docstring.structure.lines]
     for line in docstring.structure.lines:
-        target = None
-        if text_layout.has_space_tab_content(line.raw_text) and _has_following_evaluated_newline(docstring, line):
-            stripped = line.raw_text.rstrip(" \t")
-            if stripped != line.raw_text:
-                target = stripped
-        targets.append(target)
-    return PDF_definition.planned_simple_docstring_line_change(docstring, context=context, raw_line_targets=tuple(targets))
+        if not text_layout.has_space_tab_content(line.raw_text) or not _has_following_evaluated_newline(docstring, line):
+            continue
+        trailing_start = len(line.raw_text.rstrip(" \t"))
+        if trailing_start == len(line.raw_text):
+            continue
+        line_fragments = fragments[line.start_offset : line.end_offset]
+        hard_break = inline_markup.terminal_hard_break(line_fragments, has_following_newline=True)
+        if hard_break is not None and hard_break.kind is inline_markup.HardBreakKind.SPACES:
+            preserved_start = hard_break.start
+            removable_start = len(line.raw_text[:preserved_start].rstrip("\t"))
+            if removable_start == preserved_start:
+                continue
+            target_value = f"{line.raw_text[:removable_start]}{line.raw_text[preserved_start:]}"
+            deletion_start = line.start_offset + removable_start
+            deletion_end = line.start_offset + preserved_start
+        else:
+            target_value = line.raw_text[:trailing_start]
+            deletion_start = line.start_offset + trailing_start
+            deletion_end = line.end_offset
+        line_numbers = source_map.physical_line_numbers(deletion_start, deletion_end, first_line_number=docstring.range.start.line)
+        value_lines[line.index] = target_value
+        replacements.append(
+            rule_edits.PlannedTextReplacement(
+                start_offset=deletion_start, end_offset=deletion_end, text=source_map.preserved_source_for_value_deletion(deletion_start, deletion_end), line_numbers=line_numbers
+            )
+        )
+    return PDF_definition.planned_simple_docstring_source_change(docstring, replacements=tuple(replacements), value_lines=value_lines, source_map=source_map)
 
 
 def _has_following_evaluated_newline(docstring: PDF_definition.DocstringInfo, line: PDF_definition.DocstringValueLine) -> bool:

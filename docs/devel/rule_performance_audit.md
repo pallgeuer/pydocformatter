@@ -178,6 +178,45 @@ Potential classifications:
 - **Tests/verification:** Added monkeypatch-backed tests proving ordinary no-unpack signatures do not call `typed_dict_keys_by_name()` and unpacked keyword parameters still call it once when needed. `uv run pytest -n 0 tests/rules/PCF/test_PCF004.py tests/rules/PDF/test_PDF411.py tests/rules/PDF/test_PDF501.py` passed with 160 tests; `uv run pytest tests/rules/PCF tests/rules/PDF` passed with 1512 tests; `uv run mypy` passed.
 - **User decisions needed:** None.
 
+### Finding 6: Inline-markup scanning did avoidable work for plain and markup-heavy prose
+
+- **Status:** Fixed
+- **Potential:** Moderate for long reflow regions.
+- **Affected rows:** `PCF001`, `PCF004`, and `PDF101`.
+- **Files/functions:** `src/pydocformatter/rules/definition_helpers/inline_markup.py::scan_text`; `scan_fragments`
+- **Evidence:** Before the initial implementation, 1000 scans of a delimiter-free 1000-word source-identical string took 3.743s; the first post-fix benchmark took 0.502s. The initially missed source-aware path took 0.700s for 200 scans of 5000 characters, versus 0.129s after extending the fast path and 0.092s through `scan_text()`. Twenty scans of 1000 and 8000 adjacent Markdown links took 0.294s and 2.437s after the original markup-heavy fix, an approximately linear 8.3x increase for 8x input.
+- **Code analysis:** The initial delimiter-free optimization covered `scan_text()`, including PCF004's direct scans, but source-aware layout in PCF001 and PDF101 still called the full `scan_fragments()` delimiter parser. Markup-heavy input had also repeatedly rebuilt immutable punctuation-envelope tuples as adjacent constructs accumulated.
+- **Implemented fix:** Added delimiter-free paths to both scanners. Source-identical fragments use direct whitespace tokenization, while fragments containing escape spellings use a lightweight source-preserving tokenizer. Envelope state accumulates in mutable sets before freezing the final token.
+- **Behavior-risk analysis:** Low. A monkeypatch-backed structural test proves delimiter-free prose bypasses delimiter parsing, existing long adjacent-markup coverage exercises the linear accumulator, and all markup recognition remains on the original scanner path.
+- **Tests/verification:** Focused inline-markup, text-layout, PDF101, PCF001, and PCF004 tests cover the fast path, adjacent constructs, escaped Markdown destinations, and angle-bracket destinations.
+- **User decisions needed:** None.
+
+### Finding 7: Escape and physical-line lookups rescanned prefixes
+
+- **Status:** Fixed
+- **Potential:** Moderate for long escaped inline constructs and heavily queried docstring source maps.
+- **Affected rows:** `PCF001`, `PCF004`, `PDF101`, and rules using simple-string physical line mappings.
+- **Files/functions:** `src/pydocformatter/rules/definition_helpers/inline_markup.py`; `src/pydocformatter/rules/definition_helpers/string_literals.py`
+- **Evidence:** The previous escape test walked backward over each preceding backslash run, and each physical-line query sliced and rescanned the source prefix. Pathological escaped destinations and repeated source-map queries could therefore perform quadratic aggregate work.
+- **Code analysis:** Both results depend only on immutable input text. One forward escape-parity pass and one physical-newline index can answer later checks directly or by binary search.
+- **Implemented fix:** The shared delimiter index now stores escape parity for every source position, while simple-string source maps precompute physical newline end offsets and use binary search for line-number queries. PDF101, PCF001, and PCF004 also reuse one shared semantic-line segmentation and inline scan through wrapping instead of rescanning the same text.
+- **Behavior-risk analysis:** Low. The indices preserve the original parity and newline ownership rules, and the shared layout result makes ambiguity and hard-break boundaries explicit.
+- **Tests/verification:** Focused tests cover a long escaped Markdown destination, indexed physical-line lookup, scan reuse, ambiguity boundaries, hard breaks, and fence-like lines.
+- **User decisions needed:** None.
+
+### Finding 8: PDF preparation eagerly retained per-character simple-string source maps
+
+- **Status:** Fixed
+- **Potential:** Moderate for files containing large docstrings, including when selected rules do not use source rewrites.
+- **Affected rows:** Every PDF rule through shared category preparation.
+- **Files/functions:** `src/pydocformatter/rules/definitions/PDF/PDF.py::DocstringInfo`; `src/pydocformatter/rules/definition_helpers/string_literals.py::source_map_for_simple_string`
+- **Evidence:** Preparing a 100000-character simple docstring retained 209094 bytes after the fix. Accessing its lazy full source map increased retained traced memory by 15294745 bytes, demonstrating the avoided allocation for rules that never request mapping. The same delimiter-free source remains fully mappable on demand.
+- **Code analysis:** Category preparation previously built fragment objects and several full-length tuples for every simple docstring, and repeated LibCST's `ast.literal_eval`-backed value property. Only a subset of PDF rules consumes the full source map.
+- **Implemented fix:** PDF preparation evaluates each literal once and uses an allocation-light source/value validation scan to decide physical-line ownership. `DocstringInfo.source_map` now materializes and caches the existing full map only on first access, and its derived cache is excluded from initialization, representation, and equality.
+- **Behavior-risk analysis:** Low. The lightweight scan shares the existing supported escape parser and preserves the conservative rejection of unsupported escapes and value-producing newline escapes. The full map representation and all rule call sites remain unchanged.
+- **Tests/verification:** Tests cover lazy one-time construction, cached unavailable mappings, representation and equality stability, pre-evaluated values, physical LF and CRLF, continuations, raw strings, supported escapes, unsupported escapes, and escaped logical newlines.
+- **User decisions needed:** None.
+
 ## Possible bug decisions
 
 No possible bug-versus-intended-behavior questions were identified during this audit. Remaining recorded opportunities can be pursued as behavior-preserving optimizations if implemented carefully. Any future `PDF101` change that intentionally changes wrapping output must be treated as a behavior question first.
@@ -193,6 +232,7 @@ No possible bug-versus-intended-behavior questions were identified during this a
 3. Fixed: cache `PDF411` type-like normalization results.
 4. Fixed: replace `PCF004` previous-boundary reverse scans with direct previous-line lookup.
 5. Fixed: defer `PDF501` TypedDict scanning until an unpacked keyword parameter needs it.
+6. Fixed: defer full simple-string source maps until a PDF rule requests one.
 
 ## Completion checklist
 

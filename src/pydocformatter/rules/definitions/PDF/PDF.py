@@ -27,12 +27,12 @@ import pydocformatter.rules.edits as rule_edits
 import pydocformatter.rules.registration as rule_registration
 from pydocformatter import docs_urls
 from pydocformatter.cli import settings_check
-from pydocformatter.rules import line_endings
 from pydocformatter.rules.definition import RuleCategoryBase
 from pydocformatter.rules.definition_helpers import (
     colon_boundaries,
     docstring_sections,
     exception_names,
+    inline_markup,
     module_bindings,
     source_text,
     string_literals,
@@ -46,6 +46,9 @@ from pydocformatter.rules.models import RuleCategoryMetadata
 if typing.TYPE_CHECKING:
     # First-party imports
     from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
+
+
+_SOURCE_MAP_UNSET = object()
 
 
 class DefinitionKind(enum.Enum):
@@ -342,62 +345,6 @@ class DocstringOutputSeparatorFallback(enum.Enum):
 
 
 @dataclasses.dataclass(frozen=True)
-class SimpleDocstringSourceMap:
-    """Evaluated-to-source offsets for one simple docstring.
-
-    Attributes:
-        body_start (int): Absolute source offset where the literal body starts after prefix and opening quotes.
-        source_offsets (tuple[int, ...]): Source-body offsets for each evaluated-value offset, including the final end
-            offset.
-        body_source (str): Literal body source between the opening and closing delimiters.
-    """
-
-    body_start: int
-    source_offsets: tuple[int, ...]
-    body_source: str
-
-    def source_offset(self, value_offset: int) -> int:
-        """Return the source-body offset matching an evaluated-value offset.
-
-        Args:
-            value_offset (int): Evaluated docstring value offset to map.
-
-        Returns:
-            int: Source-body offset corresponding to the evaluated value offset.
-        """
-        return self.source_offsets[value_offset]
-
-    def source_slice(self, *, start_offset: int, end_offset: int) -> str:
-        """Return source spelling for one evaluated-value slice.
-
-        Args:
-            start_offset (int): Evaluated docstring value offset where the slice starts.
-            end_offset (int): Evaluated docstring value offset immediately after the slice.
-
-        Returns:
-            str: Literal source spelling for the evaluated value slice.
-        """
-        return self.body_source[self.source_offset(start_offset) : self.source_offset(end_offset)]
-
-    def source_range(self, *, start_offset: int, end_offset: int, line_bounds: source_text.LineBounds) -> cst_metadata.CodeRange:
-        """Return a source range for one evaluated-value slice.
-
-        Args:
-            start_offset (int): Evaluated docstring value offset where the range starts.
-            end_offset (int): Evaluated docstring value offset immediately after the range.
-            line_bounds (source_text.LineBounds): Absolute source offsets for the current source lines.
-
-        Returns:
-            cst_metadata.CodeRange: Concrete source range that covers the evaluated value slice.
-        """
-        source_start = self.body_start + self.source_offset(start_offset)
-        source_end = self.body_start + self.source_offset(end_offset)
-        start_position = _position_for_offset(source_start, line_bounds=line_bounds)
-        end_position = start_position if source_start == source_end else _position_for_offset(source_end, line_bounds=line_bounds)
-        return cst_metadata.CodeRange(start=start_position, end=end_position)
-
-
-@dataclasses.dataclass(frozen=True)
 class DocstringStructure:
     """Convention-aware semantic structure prepared for one docstring.
 
@@ -524,6 +471,20 @@ class DocstringInfo:
     physical_lines: tuple[DocstringLine, ...]
     value_lines: tuple[str, ...]
     structure: DocstringStructure
+    _source_map: string_literals.SimpleStringSourceMap | object | None = dataclasses.field(default=_SOURCE_MAP_UNSET, init=False, repr=False, compare=False)
+
+    @property
+    def source_map(self) -> string_literals.SimpleStringSourceMap | None:
+        """Lossless simple-string source map, lazily cached.
+
+        Returns:
+            string_literals.SimpleStringSourceMap | None: Body mapping when the source spelling is supported.
+        """
+        cached = self._source_map
+        if cached is _SOURCE_MAP_UNSET:
+            cached = string_literals.source_map_for_simple_string(self.node, value=self.value) if isinstance(self.node, cst.SimpleString) else None
+            object.__setattr__(self, "_source_map", cached)
+        return typing.cast("string_literals.SimpleStringSourceMap | None", cached)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -620,7 +581,6 @@ class PDFCategoryData:
     )
     _module_bindings: module_bindings.ModuleBindings | None = dataclasses.field(default=None, init=False, repr=False, compare=False)
     _type_aliases: type_expressions.TypeAliasMap | None = dataclasses.field(default=None, init=False, repr=False, compare=False)
-    _entry_description_source_maps: dict[int, SimpleDocstringSourceMap | None] = dataclasses.field(default_factory=dict, init=False, repr=False, compare=False)
 
     def docstring_for(self, definition: DefinitionInfo) -> DocstringInfo | None:
         """Return the docstring owned by a definition, if one exists.
@@ -1078,13 +1038,12 @@ def final_convention_section_spacing(docstring: DocstringInfo) -> FinalConventio
     )
 
 
-def docstring_line_source(line: DocstringValueLine, *, fragments: tuple[string_literals.StringValueFragment, ...], strip_docstring_margin: bool) -> str:
+def docstring_line_source(line: DocstringValueLine, *, source_map: string_literals.SimpleStringSourceMap, strip_docstring_margin: bool) -> str:
     """Return source spelling for a logical docstring line.
 
     Args:
         line (DocstringValueLine): Evaluated-value line whose source body slice should be reconstructed.
-        fragments (tuple[string_literals.StringValueFragment, ...]): Simple-string value fragments that map evaluated
-            offsets back to source spelling.
+        source_map (string_literals.SimpleStringSourceMap): Lossless simple-string source mapping.
         strip_docstring_margin (bool): Whether to discard the literal indentation margin and keep only text content with
             virtual indentation.
 
@@ -1092,9 +1051,9 @@ def docstring_line_source(line: DocstringValueLine, *, fragments: tuple[string_l
         Source text for the line body, preserving escapes unless margin stripping is requested.
     """
     if not strip_docstring_margin:
-        return string_literals.source_for_value_slice(fragments, line.start_offset, line.end_offset)
+        return source_map.owned_source_for_value_slice(line.start_offset, line.end_offset)
     start_offset = line.start_offset + line.text_raw_start_column
-    return f"{' ' * line.text_virtual_prefix_length}{string_literals.source_for_value_slice(fragments, start_offset, line.end_offset)}"
+    return f"{' ' * line.text_virtual_prefix_length}{source_map.owned_source_for_value_slice(start_offset, line.end_offset)}"
 
 
 def _final_section_content_line(docstring: DocstringInfo, section: DocstringBlock) -> int | None:
@@ -1130,7 +1089,6 @@ def _first_non_closing_quote_prefix_line(docstring: DocstringInfo, *, start: int
 
 _LIST_RE = re.compile(r"^(?P<indent>[ \t]*)(?P<marker>(?:[-+*]|\d+[.)]))[ \t]+(?P<text>.*)$")
 _BLOCK_QUOTE_RE = re.compile(r"^(?P<indent>[ \t]*)(?P<quote>(?:>[ \t]*)+)(?P<text>.*)$")
-_FENCE_RE = re.compile(r"^[ \t]*(?P<fence>`{3,}|~{3,})(?P<info>.*)$")
 _DIRECTIVE_RE = re.compile(r"^(?P<indent>[ \t]*)\.\.[ \t]+(?P<name>[\w-]+)::(?P<argument>.*)$")
 _REST_FIELD_RE = re.compile(r"^(?P<indent>[ \t]*):(?P<field>[\w-]+)(?:[ \t]+(?P<argument>[^:]*?\S))?[ \t]*:[ \t]*(?P<description>.*)$")
 _GOOGLE_ENTRY_RE = re.compile(r"^(?P<indent>[ \t]+)(?P<name>\*{0,2}[A-Za-z_][\w.]*)(?:[ \t]*\((?P<type>[^)]+)\))?[ \t]*:[ \t]*(?P<description>.*)$")
@@ -1190,7 +1148,7 @@ class _DocstringParser:
                 blocks.append(section_block)
                 self.summary_pending = False
                 continue
-            if self.settings.docstring_parse_code_fences and (fence := _FENCE_RE.match(text)) is not None:
+            if self.settings.docstring_parse_code_fences and (fence := inline_markup.FENCE_RE.match(text)) is not None:
                 block_end = self._fence_end(index, end, fence.group("fence"))
                 blocks.append(DocstringBlock(DocstringBlockKind.CODE_FENCE, index, block_end))
                 index = block_end
@@ -1280,7 +1238,7 @@ class _DocstringParser:
         text = self.lines[index].text
         return (
             self._section_at(index, end) is not None
-            or (self.settings.docstring_parse_code_fences and _FENCE_RE.match(text) is not None)
+            or (self.settings.docstring_parse_code_fences and inline_markup.FENCE_RE.match(text) is not None)
             or (self.settings.docstring_parse_doctests and _is_doctest_prompt(text))
             or (self.settings.docstring_parse_directives and _DIRECTIVE_RE.match(text) is not None)
             or (self.settings.docstring_parse_literal_blocks and text.rstrip().endswith("::") and self._has_indented_body(index, end))
@@ -1659,7 +1617,7 @@ class _DocstringParser:
         """Return the end index for a fenced code block."""
         index = start + 1
         while index < end:
-            match = _FENCE_RE.match(self.lines[index].text)
+            match = inline_markup.FENCE_RE.match(self.lines[index].text)
             if match is not None and match.group("fence")[0] == opening[0] and len(match.group("fence")) >= len(opening) and not match.group("info").strip():
                 return index + 1
             index += 1
@@ -1678,7 +1636,7 @@ class _DocstringParser:
     def _protected_block_end(self, index: int, end: int) -> int | None:
         """Return the end of a protected structure starting at a line index."""
         text = self.lines[index].text
-        if self.settings.docstring_parse_code_fences and (fence := _FENCE_RE.match(text)) is not None:
+        if self.settings.docstring_parse_code_fences and (fence := inline_markup.FENCE_RE.match(text)) is not None:
             return self._fence_end(index, end, fence.group("fence"))
         if self.settings.docstring_parse_doctests and _is_doctest_prompt(text):
             block_end = index + 1
@@ -1973,21 +1931,6 @@ def is_safely_mapped_simple_docstring(docstring: DocstringInfo, *, require_multi
     )
 
 
-def docstring_value_fragments(docstring: DocstringInfo, *, line_ending: str) -> tuple[string_literals.StringValueFragment, ...] | None:
-    """Return source fragments for a safely rewritable simple docstring.
-
-    Args:
-        docstring (DocstringInfo): Docstring whose simple-string node should be decomposed into value/source fragments.
-        line_ending (str): Canonical line ending used when normalizing physical source lines.
-
-    Returns:
-        Fragment mapping for translating evaluated offsets into source slices, or None for non-simple docstring nodes.
-    """
-    if not isinstance(docstring.node, cst.SimpleString):
-        return None
-    return string_literals.value_fragments_for_simple_string(docstring.node, line_ending=line_ending)
-
-
 def docstring_canonical_margin(docstring: DocstringInfo, *, context: RuleContext, source_lines: Sequence[str] | None = None) -> str:
     """Return the raw indentation margin for continuation and aligned blank lines.
 
@@ -2009,12 +1952,11 @@ def docstring_canonical_margin(docstring: DocstringInfo, *, context: RuleContext
     return prefix if prefix.strip() == "" else line_indent
 
 
-def planned_simple_docstring_line_change(docstring: DocstringInfo, *, context: RuleContext, raw_line_targets: tuple[str | None, ...]) -> rule_edits.PlannedSourceChange | None:
+def planned_simple_docstring_line_change(docstring: DocstringInfo, *, raw_line_targets: tuple[str | None, ...]) -> rule_edits.PlannedSourceChange | None:
     """Return one whole-literal replacement for changed raw evaluated lines.
 
     Args:
         docstring (DocstringInfo): Simple docstring whose logical line bodies may be replaced.
-        context (RuleContext): Rule context providing line endings and source formatting settings.
         raw_line_targets (tuple[str | None, ...]): Target raw value text for each logical line, with None preserving the
             existing line.
 
@@ -2035,45 +1977,33 @@ def planned_simple_docstring_line_change(docstring: DocstringInfo, *, context: R
         return None
     # Safe simple docstrings map evaluated line text back to source body text modulo newline spelling.
     value_lines = [target if target is not None else line.raw_text for line, target in zip(docstring.structure.lines, raw_line_targets, strict=True)]
-    return planned_simple_docstring_source_change(docstring, context=context, replacements=tuple(replacements), value_lines=value_lines)
+    return planned_simple_docstring_source_change(docstring, replacements=tuple(replacements), value_lines=value_lines)
 
 
 def planned_simple_docstring_source_change(
-    docstring: DocstringInfo,
-    *,
-    context: RuleContext,
-    replacements: tuple[rule_edits.PlannedTextReplacement, ...],
-    value_lines: list[str],
-    fragments: tuple[string_literals.StringValueFragment, ...] | None = None,
+    docstring: DocstringInfo, *, replacements: tuple[rule_edits.PlannedTextReplacement, ...], value_lines: list[str], source_map: string_literals.SimpleStringSourceMap | None = None
 ) -> rule_edits.PlannedSourceChange | None:
     """Return one whole-literal replacement from evaluated-value replacements.
 
     Args:
         docstring (DocstringInfo): Simple docstring whose body source should be rebuilt from evaluated-value edits.
-        context (RuleContext): Rule context providing the file line ending used to map string fragments.
         replacements (tuple[rule_edits.PlannedTextReplacement, ...]): Evaluated-offset replacements that identify
             changed slices and affected source lines.
         value_lines (list[str]): Complete logical value lines after all replacements, used to verify that the rendered
             literal still evaluates correctly.
-        fragments (tuple[string_literals.StringValueFragment, ...] | None): Optional precomputed fragment mapping for
-            callers that already needed source slices while planning replacements.
+        source_map (string_literals.SimpleStringSourceMap | None): Optional precomputed lossless source map.
 
     Returns:
         Planned replacement for the whole string literal, or None when rendering would be unsafe or unchanged.
     """
     if not replacements:
         return None
-    fragments = docstring_value_fragments(docstring, line_ending=context.line_ending) if fragments is None else fragments
-    if fragments is None or not isinstance(docstring.node, cst.SimpleString):
+    source_map = docstring.source_map if source_map is None else source_map
+    if source_map is None or not isinstance(docstring.node, cst.SimpleString):
         return None
     value = join_docstring_value_lines(docstring, value_lines)
-    source_chunks: list[str] = []
-    cursor = 0
-    for replacement in replacements:
-        source_chunks.extend((string_literals.source_for_value_slice(fragments, cursor, replacement.start_offset), replacement.text))
-        cursor = replacement.end_offset
-    source_chunks.append(string_literals.source_for_value_slice(fragments, cursor, len(fragments)))
-    rendered = string_literals.render_simple_string_from_body_source(docstring.node.prefix, docstring.node.quote, "".join(source_chunks), expected_value=value)
+    body_source = source_map.body_source_with_replacements(tuple((replacement.start_offset, replacement.end_offset, replacement.text) for replacement in replacements))
+    rendered = string_literals.render_simple_string_from_body_source(docstring.node.prefix, docstring.node.quote, body_source, expected_value=value)
     if rendered is None or rendered == docstring.source:
         return None
     return rule_edits.PlannedSourceChange(
@@ -2099,19 +2029,22 @@ def planned_simple_docstring_text_change(
         Planned replacement for the mapped source slice, or None when the source mapping is unsafe.
     """
     line_bounds = line_bounds_for_context(context)
-    source_map = simple_docstring_source_map(docstring, line_bounds=line_bounds)
-    if source_map is None or replacement.start_offset < 0 or replacement.end_offset < replacement.start_offset or replacement.end_offset >= len(source_map.source_offsets):
+    source_map = docstring.source_map
+    if source_map is None or replacement.start_offset < 0 or replacement.end_offset < replacement.start_offset or replacement.end_offset > len(source_map.value):
         return None
-    if expected_source is not None and source_map.source_slice(start_offset=replacement.start_offset, end_offset=replacement.end_offset) != expected_source:
+    if expected_source is not None and source_map.producing_source_for_value_slice(replacement.start_offset, replacement.end_offset) != expected_source:
         return None
-    replacement_body = f"{source_map.body_source[: source_map.source_offset(replacement.start_offset)]}{replacement.text}{source_map.body_source[source_map.source_offset(replacement.end_offset) :]}"
+    replacement_body = source_map.body_source_with_replacements(((replacement.start_offset, replacement.end_offset, replacement.text),))
     if (
         not isinstance(docstring.node, cst.SimpleString)
         or string_literals.render_simple_string_from_body_source(docstring.node.prefix, docstring.node.quote, replacement_body, expected_value=expected_value) is None
     ):
         return None
     return rule_edits.PlannedSourceChange(
-        edit=rule_edits.SourceEdit(range=source_map.source_range(start_offset=replacement.start_offset, end_offset=replacement.end_offset, line_bounds=line_bounds), replacement=replacement.text),
+        edit=rule_edits.SourceEdit(
+            range=simple_docstring_source_range(docstring, source_map=source_map, start_offset=replacement.start_offset, end_offset=replacement.end_offset, line_bounds=line_bounds),
+            replacement=replacement.text,
+        ),
         line_numbers=replacement.line_numbers,
         suppression_line_numbers=(),
     )
@@ -2129,26 +2062,30 @@ def line_bounds_for_context(context: RuleContext) -> source_text.LineBounds:
     return context.line_bounds if context.line_bounds is not None else source_text.line_bounds_from_lines(context.source_lines)
 
 
-def simple_docstring_source_map(docstring: DocstringInfo, *, line_bounds: source_text.LineBounds) -> SimpleDocstringSourceMap | None:
-    """Return evaluated-to-source body offsets for a source-mapped simple docstring.
+def simple_docstring_source_range(
+    docstring: DocstringInfo, *, source_map: string_literals.SimpleStringSourceMap, start_offset: int, end_offset: int, line_bounds: source_text.LineBounds
+) -> cst_metadata.CodeRange:
+    """Return the concrete source range for one evaluated-value slice.
 
     Args:
-        docstring (DocstringInfo): Simple docstring whose literal body should be mapped.
-        line_bounds (source_text.LineBounds): Absolute source offsets for the current source lines.
+        docstring (DocstringInfo): Simple docstring that owns the mapped literal body.
+        source_map (string_literals.SimpleStringSourceMap): Lossless map for the docstring body.
+        start_offset (int): Evaluated offset where the slice starts.
+        end_offset (int): Evaluated offset immediately after the slice.
+        line_bounds (source_text.LineBounds): Absolute source bounds for each physical line.
 
     Returns:
-        SimpleDocstringSourceMap | None: Source map for safe simple docstrings, or None when mapping is unsafe.
+        cst_metadata.CodeRange: Concrete source range matching the evaluated slice.
+
+    Raises:
+        TypeError: If the docstring is not a simple string.
     """
-    if not is_safely_mapped_simple_docstring(docstring) or not isinstance(docstring.node, cst.SimpleString):
-        return None
-    body_source = string_literals.simple_string_body_source(docstring.node)
-    if body_source is None or _has_mixed_physical_line_endings(body_source):
-        return None
-    source_offsets = _simple_string_source_offsets(docstring, body_source=body_source)
-    if source_offsets is None:
-        return None
+    if not isinstance(docstring.node, cst.SimpleString):
+        raise TypeError("A simple docstring source range requires a simple string node")
     body_start = _offset_for_position(docstring.range.start, line_bounds=line_bounds) + len(docstring.node.prefix) + len(docstring.node.quote)
-    return SimpleDocstringSourceMap(body_start=body_start, source_offsets=source_offsets, body_source=body_source)
+    source_start = body_start + source_map.source_offset_for_value_offset(start_offset)
+    source_end = source_start if start_offset == end_offset else body_start + source_map.source_offset_for_value_offset(end_offset, include_leading_zero_value_source=True)
+    return cst_metadata.CodeRange(start=_position_for_offset(source_start, line_bounds=line_bounds), end=_position_for_offset(source_end, line_bounds=line_bounds))
 
 
 def simple_docstring_replacement_is_source_safe(docstring: DocstringInfo, replacement: str) -> bool:
@@ -2164,53 +2101,6 @@ def simple_docstring_replacement_is_source_safe(docstring: DocstringInfo, replac
     if not isinstance(docstring.node, cst.SimpleString) or not replacement.isascii() or "\\" in replacement or "\r" in replacement or "\n" in replacement:
         return False
     return docstring.node.quote not in replacement
-
-
-def _simple_string_source_offsets(docstring: DocstringInfo, *, body_source: str) -> tuple[int, ...] | None:
-    """Return source-body offsets for each evaluated offset in a simple string body."""
-    if "\\" in body_source:
-        fragments = docstring_value_fragments(docstring, line_ending=line_endings.detect_line_ending(docstring.source))
-        if fragments is None:
-            return None
-        source_offsets = [0]
-        for fragment in fragments:
-            source_offsets.append(source_offsets[-1] + len(fragment.source))
-        return tuple(source_offsets)
-    source_offsets = [0]
-    index = 0
-    while index < len(body_source):
-        if body_source[index] == "\r":
-            if index + 1 < len(body_source) and body_source[index + 1] == "\n":
-                index += 2
-            else:
-                index += 1
-        else:
-            index += 1
-        source_offsets.append(index)
-    return tuple(source_offsets)
-
-
-def _has_mixed_physical_line_endings(source: str) -> bool:
-    """Return whether source contains more than one physical line-ending spelling."""
-    endings: set[str] = set()
-    index = 0
-    while index < len(source):
-        char = source[index]
-        if char == "\r":
-            if index + 1 < len(source) and source[index + 1] == "\n":
-                endings.add("\r\n")
-                index += 2
-            else:
-                endings.add("\r")
-                index += 1
-        elif char == "\n":
-            endings.add("\n")
-            index += 1
-        else:
-            index += 1
-        if len(endings) > 1:
-            return True
-    return False
 
 
 def _offset_for_position(position: cst_metadata.CodePosition, *, line_bounds: source_text.LineBounds) -> int:
@@ -2263,11 +2153,11 @@ def planned_simple_docstring_output_change(
     """
     if not isinstance(docstring.node, cst.SimpleString):
         return None
-    fragments = docstring_value_fragments(docstring, line_ending=context.line_ending)
-    if fragments is None:
+    source_map = docstring.source_map
+    if source_map is None:
         return None
     keep_trailing_newline = docstring_value_ends_with_newline(docstring) if preserve_trailing_newline is None else preserve_trailing_newline
-    body_source = _output_body_source(output_lines, fragments=fragments, line_ending=context.line_ending, preserve_trailing_newline=keep_trailing_newline)
+    body_source = _output_body_source(output_lines, source_map=source_map, line_ending=context.line_ending, preserve_trailing_newline=keep_trailing_newline)
     expected_value = _output_expected_value(output_lines, preserve_trailing_newline=keep_trailing_newline)
     rendered = _render_output_with_separator_fallback(docstring, body_source=body_source, expected_value=expected_value, separator_fallback=separator_fallback)
     if rendered is None or rendered == docstring.source:
@@ -2632,7 +2522,7 @@ def _separator_fallback_output(body_source: str, expected_value: str, *, separat
     raise ValueError(f"Unsupported separator fallback: {separator_fallback!r}")
 
 
-def _output_body_source(output_lines: tuple[DocstringOutputLine, ...], *, fragments: tuple[string_literals.StringValueFragment, ...], line_ending: str, preserve_trailing_newline: bool) -> str:
+def _output_body_source(output_lines: tuple[DocstringOutputLine, ...], *, source_map: string_literals.SimpleStringSourceMap, line_ending: str, preserve_trailing_newline: bool) -> str:
     """Return replacement literal body source from output lines."""
     chunks: list[str] = []
     for index, output_line in enumerate(output_lines):
@@ -2643,7 +2533,7 @@ def _output_body_source(output_lines: tuple[DocstringOutputLine, ...], *, fragme
                 raise ValueError("Synthesized output lines require source text")
             chunks.append(output_line.source)
         else:
-            chunks.append(docstring_line_source(output_line.original, fragments=fragments, strip_docstring_margin=output_line.strip_docstring_margin))
+            chunks.append(docstring_line_source(output_line.original, source_map=source_map, strip_docstring_margin=output_line.strip_docstring_margin))
     if preserve_trailing_newline:
         chunks.append(line_ending)
     return "".join(chunks)
@@ -2752,12 +2642,15 @@ def _docstring_sort_key(docstring: DocstringInfo) -> tuple[int, int]:
 def _docstring_info(expression: cst.Expr, statement: cst.SimpleStatementLine | cst.SimpleStatementSuite, *, owner: DocstringOwner, context: RuleCategoryContext) -> DocstringInfo | None:
     """Return docstring metadata for a string expression."""
     node = expression.value
-    if not isinstance(node, (cst.SimpleString, cst.ConcatenatedString)) or not isinstance(node.evaluated_value, str):
+    if not isinstance(node, (cst.SimpleString, cst.ConcatenatedString)):
+        return None
+    value = node.evaluated_value
+    if not isinstance(value, str):
         return None
     code_range = context.positions[node]
     source = source_text.source_for_range(code_range, source_lines=context.source_lines)
     physical_lines = _physical_lines(code_range, source)
-    source_line_number = _simple_docstring_source_line_number(node, source=source, physical_lines=physical_lines, code_range=code_range) if isinstance(node, cst.SimpleString) else None
+    source_line_number = _simple_docstring_source_line_number(node, value=value, physical_lines=physical_lines, code_range=code_range) if isinstance(node, cst.SimpleString) else None
     return DocstringInfo(
         node=node,
         expression=expression,
@@ -2766,11 +2659,11 @@ def _docstring_info(expression: cst.Expr, statement: cst.SimpleStatementLine | c
         kind=DocstringKind.SIMPLE if isinstance(node, cst.SimpleString) else DocstringKind.CONCATENATED,
         range=code_range,
         source=source,
-        value=node.evaluated_value,
+        value=value,
         physical_lines=physical_lines,
-        value_lines=tuple(node.evaluated_value.splitlines()),
+        value_lines=tuple(value.splitlines()),
         structure=_parse_docstring(
-            node.evaluated_value,
+            value,
             settings=context.settings,
             source_line_number=source_line_number,
             source_indent=(
@@ -2877,20 +2770,13 @@ def _first_expression(body: cst.Module | cst.BaseSuite) -> tuple[cst.Expr, cst.S
     return None
 
 
-def _simple_docstring_source_line_number(node: cst.SimpleString, *, source: str, physical_lines: tuple[DocstringLine, ...], code_range: cst_metadata.CodeRange) -> int | None:
+def _simple_docstring_source_line_number(node: cst.SimpleString, *, value: str, physical_lines: tuple[DocstringLine, ...], code_range: cst_metadata.CodeRange) -> int | None:
     """Return the first source line when evaluated lines map unambiguously."""
-    value = node.evaluated_value
-    if not isinstance(value, str):
+    if not string_literals.simple_string_has_direct_line_mapping(node, value=value):
         return None
     logical_line_count = len(_value_lines(value, source_line_number=None, source_indent=None))
     has_separate_trailing_closing_delimiter = value.endswith(("\r\n", "\r", "\n")) and len(physical_lines) == logical_line_count + 1 and physical_lines[-1].source.strip() == node.quote
     if len(physical_lines) != logical_line_count and not has_separate_trailing_closing_delimiter:
-        return None
-    if logical_line_count == 1:
-        return code_range.start.line
-    body_start = len(node.prefix) + len(node.quote)
-    body = source[body_start : -len(node.quote)]
-    if "r" not in node.prefix.lower() and "\\" in body:
         return None
     return code_range.start.line
 

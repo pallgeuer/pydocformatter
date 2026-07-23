@@ -9,11 +9,17 @@ This rule rewrites safely mapped simple string docstrings by replacing the compl
 
 PDF101 treats each reflowable semantic region independently. It joins consecutive physical lines in the same region before wrapping, so a finding can be emitted even when no individual input line is over the configured line length. Blank lines, standalone colon-ended lines, and protected structures remain region boundaries.
 
-The rule intentionally skips docstrings whose evaluated value cannot be mapped back to source text safely. This includes concatenated string docstrings and docstrings whose logical lines come from escape sequences such as `\n`. If a docstring needs reflow but cannot be rendered back with the existing prefix and delimiter without changing its evaluated value, the finding is reported without an automatic fix.
+Within each logical line, PDF101 preserves a conservative set of recognized inline markup as indivisible source-aware tokens: non-empty same-line backtick spans whose opening and closing delimiter runs have equal length; inline and full or collapsed reference-style Markdown links and images; CommonMark-style URI and email autolinks; and boundary-valid reStructuredText interpreted text, prefix and suffix roles, phrase and anonymous references, embedded targets, inline literals, and substitution references. Escaped and nested Markdown labels, empty inline labels or destinations, link titles delimited by `"..."`, `'...'`, or `(...)`, and destination parentheses nested up to three levels are supported. reStructuredText role names use alphanumeric components separated by isolated `-`, `_`, `+`, `:`, or `.` characters. The complete whitespace-delimited punctuation envelope around a recognized construct stays together, and exact source spelling inside the token is retained.
+
+Emphasis, raw HTML or XML, Markdown shortcut references and definitions, and multiline inline constructs are not parsed as safe inline constructs. Generic unmatched brackets, pipes, and angle brackets remain ordinary prose unless stronger syntax identifies an attempted supported construct. A line-leading run of at least three backticks or tildes is treated as ordinary fence-like text rather than ambiguous inline markup, including when an info string follows the opener; whether a complete fenced block is protected is controlled separately by docstring parsing. For a bare single-backtick dialect collision, an escaped inner backtick remains content when a later valid closer exists; otherwise, strong evidence such as a missing closer, incomplete recognized prefix, or excessive destination nesting makes the region ambiguous. PDF101 reports an ambiguous region only when its canonical layout would differ and does not attach an unsafe fix. Safe non-ambiguous regions in the same docstring can still be combined into a separate whole-literal fix.
+
+An evaluated nonblank line ending in at least two ASCII spaces before an evaluated newline is a space hard break. An odd-length terminal evaluated backslash run is a backslash hard break; only its final unescaped backslash establishes the boundary, but the complete run is retained. PDF101 never joins across either boundary, reserves the exact source suffix width while wrapping, and reattaches its original source spelling, including three or more spaces and Python escape spellings such as `\x20\x20`. If tabs occur immediately before a space-break suffix, PDF101 removes only those tabs and preserves any spaces before them. Whitespace-only lines, final lines without an evaluated newline, and even backslash runs are not hard breaks.
+
+PDF101 uses a lossless evaluated-value-to-source map for simple string docstrings. Source continuations outside a changed reflow region remain byte-for-byte unchanged; continuations inside a changed region are canonicalized with the rest of that region. Concatenated docstrings, unsupported escapes, and regions containing value-producing newline escapes such as `\n` cannot be rewritten safely. If any such region needs reflow, PDF101 emits one diagnostic-only finding covering the complete physical docstring while still allowing independent safe regions in the same docstring to be fixed.
 
 PDF101 accounts for the docstring opening and closing delimiters when wrapping generated docstring lines. It does not account for unchanged Python source that follows the closing delimiter on the same physical line, such as `; return None` in a single-line suite.
 
-When `url-aware-wrapping` is enabled, URL tokens remain unbroken but surrounding prose may use less greedy line breaks.
+Recognized markup is always indivisible. When `url-aware-wrapping` is enabled, destination-bearing tokens—bare URLs, autolinks, inline Markdown links or images, and reStructuredText embedded targets—activate balanced line selection around the token. Disabling the setting restores greedy line selection without allowing recognized markup to split.
 
 ## Why is this useful?
 Consistent wrapping keeps docstrings readable in editors, terminals, review diffs, and generated documentation. Reflowing semantic chunks instead of raw line ranges keeps summaries, paragraphs, parameter descriptions, fields, lists, and quoted text readable without disturbing protected examples or code-like content.
@@ -187,6 +193,97 @@ def example():
     """
 ````
 
+Recognized same-line inline markup remains indivisible even when it is wider than the configured line length:
+
+```pydocfmt-example
+[settings]
+line-length = 42
+url-aware-wrapping = false
+
+[input]
+def reference():
+    """Read [the complete reference label](https://example.com/target) before continuing with the remaining prose."""
+
+[output]
+def reference():
+    """Read
+    [the complete reference label](https://example.com/target)
+    before continuing with the remaining
+    prose."""
+```
+
+Enabling URL-aware wrapping changes only line selection around a destination-bearing construct; the complete Markdown link remains the same atomic token in either mode:
+
+```pydocfmt-example
+[settings]
+line-length = 42
+url-aware-wrapping = true
+
+[input]
+def reference():
+    """alpha beta [label](https://example.com/path) alpha after"""
+
+[output]
+def reference():
+    """alpha
+    beta [label](https://example.com/path)
+    alpha after"""
+```
+
+An escaped two-space hard break retains its exact Python source spelling and reserves room on the boundary line while preceding words reflow:
+
+```pydocfmt-example
+[settings]
+line-length = 36
+
+[input]
+def space_break():
+    """Alpha beta gamma delta epsilon\x20\x20
+    zeta eta theta iota.
+    """
+
+[output]
+def space_break():
+    """Alpha beta gamma delta
+    epsilon\x20\x20
+    zeta eta theta iota.
+    """
+```
+
+A backslash hard break remains a semantic boundary while the text on either side wraps independently:
+
+```pydocfmt-example
+[settings]
+line-length = 38
+
+[input]
+def hard_break():
+    r"""Alpha beta gamma delta epsilon\
+    Zeta eta theta iota kappa."""
+
+[output]
+def hard_break():
+    r"""Alpha beta gamma delta
+    epsilon\
+    Zeta eta theta iota kappa."""
+```
+
+Ambiguous markup is reported without an unsafe fix:
+
+```pydocfmt-example
+[settings]
+line-length = 38
+
+[input]
+def ambiguous():
+    """Read [the label](missing destination words that would otherwise wrap."""
+
+[output=unchanged]
+
+[findings]
+PDF101: Line 2: Docstring chunk needs reflow
+```
+
 Standalone colon-ended lines also stop adjacent prose from being joined across the line:
 
 ```pydocfmt-example
@@ -243,6 +340,6 @@ def example():
 
 ## Options
 - `line-length`: Maximum display width used when wrapping generated docstring lines.
-- `url-aware-wrapping`: Keeps URL tokens unbroken while balancing surrounding prose when wrapping.
+- `url-aware-wrapping`: Uses balanced rather than greedy line selection around destination-bearing tokens; recognized markup remains indivisible either way.
 - `indent-style`: Indentation style used for generated continuation indentation.
 - `indent-width`: Tab display width used for wrapping calculations and generated indentation width.

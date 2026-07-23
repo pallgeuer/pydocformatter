@@ -208,7 +208,7 @@ class CheckSettings:
         cache (bool): Whether persistent clean-proof caching is enabled.
         cache_dir (str): Project-relative or source-base-relative persistent cache directory.
         line_length (int): Maximum line length used when wrapping docstrings or comments.
-        url_aware_wrapping (bool): Whether wrapping balances prose around unbroken URL tokens.
+        url_aware_wrapping (bool): Whether destination-bearing tokens activate balanced line selection.
         line_ending (LineEnding): Line ending used when rewriting files.
         indent_style (IndentStyle): Indentation style used for generated and normalized docstring indentation.
         indent_width (int): Number of spaces per generated docstring indentation level, or the visual width of a tab.
@@ -363,7 +363,7 @@ class CheckSettingsOverrides(TypedDict, total=False):
         cache (bool): Whether persistent clean-proof caching is enabled.
         cache_dir (str): Project-relative or source-base-relative persistent cache directory.
         line_length (int): Maximum line length used when wrapping docstrings or comments.
-        url_aware_wrapping (bool): Whether wrapping balances prose around unbroken URL tokens.
+        url_aware_wrapping (bool): Whether destination-bearing tokens activate balanced line selection.
         line_ending (LineEnding): Line ending used when rewriting files.
         indent_style (IndentStyle): Indentation style used for generated and normalized docstring indentation.
         indent_width (int): Number of spaces per generated docstring indentation level, or the visual width of a tab.
@@ -813,8 +813,8 @@ SETTINGS_SCHEMA = SettingsSchema(
             field="url_aware_wrapping",
             value_type=bool,
             group=SettingsGroup.FORMATTING,
-            help="Balance wrapping around URL tokens without splitting URLs.",
-            documentation="Whether comment and docstring wrapping should balance surrounding prose around URL tokens without splitting URLs.",
+            help="Balance wrapping around destination-bearing tokens.",
+            documentation="Whether comment and docstring wrapping should balance line selection around destination-bearing tokens; recognized inline markup remains atomic regardless.",
         ),
         CheckSettingDefinition(
             cache_identity_role=CacheIdentityRole.DIRECT_ANALYSIS_VALUE,

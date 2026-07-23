@@ -50,6 +50,18 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Fixed
 
+- **Markup-aware reflow:**
+  - Preserved recognized inline Markdown and reStructuredText constructs as indivisible source-aware tokens in PDF101, PCF001, and PCF004, while reporting ambiguous constructs without unsafe reflow or extraction fixes.
+  - Recognized angle-bracket Markdown destinations and escaped parentheses in destinations without splitting valid links or images.
+  - Retained space- and backslash-based Markdown hard breaks during PDF101, PDF102, and PCF001 formatting, including exact docstring source spellings.
+  - Preserved zero-value source continuations and original line endings through simple-string fixes, canonicalizing continuations only inside PDF101 regions that are actually reflowed.
+  - Made PDF101 report one whole-docstring diagnostic when required reflow cannot be source-mapped safely, and made PDF102 preserve source continuations inside every exact whitespace deletion.
+  - Capitalized only the first evaluated character for PDF310 fixes so later escapes and source continuations remain unchanged.
+  - Treated line-leading backtick and tilde fence openers with optional info strings consistently across docstring and comment parsing.
+  - Shared semantic-line segmentation and inline scans across PDF101, PCF001, and PCF004 instead of rescanning the same text during wrapping.
+  - Avoided markup-parser work for delimiter-free source-identical and source-aware prose, indexed escape and physical-line lookups, lazily materialized heavyweight string source maps, and removed repeated immutable envelope growth for long markup-heavy text.
+  - Kept ambiguity evidence from identical malformed inline constructs distinct across joined logical lines.
+  - Classified PCF001 and PCF004 as usually fixable because conservative ambiguity findings may intentionally omit fixes.
 - **Rule suppressions:**
   - Kept PCF coverage line-local when an inline directive follows the final token of a concatenated string expression.
   - Limited complete-expression PDF coverage to recognized primary and supported attached docstrings, preventing directives on ordinary strings from suppressing unrelated findings while reducing string-topology storage to linear size.
@@ -79,7 +91,7 @@ All notable changes to this project are documented here. The format follows [Kee
 ### Removed
 
 - **Internal cleanup:**
-  - Removed the full selector and per-file matcher payload from workers, duplicate path-fingerprint helper APIs, contradictory optional cache-evidence states, the parallel cache-role map, duplicate store-side clean-proof validators, the unused source-context display field, the test-only settings-discovery wrapper, cached glob-pattern tuples, optional rule-context path fallbacks, duplicate formatter and rule-runner compatibility entry points, and pass-through CLI worker wrappers.
+  - Removed the full selector and per-file matcher payload from workers, duplicate path-fingerprint helper APIs, contradictory optional cache-evidence states, the parallel cache-role map, duplicate store-side clean-proof validators, the unused source-context display field, the test-only settings-discovery wrapper, cached glob-pattern tuples, optional rule-context path fallbacks, duplicate formatter and rule-runner compatibility entry points, pass-through CLI worker wrappers, dead or misleading string-source helper APIs, an unused inline-token source renderer, and a thin URL-classification facade.
 
 ---
 

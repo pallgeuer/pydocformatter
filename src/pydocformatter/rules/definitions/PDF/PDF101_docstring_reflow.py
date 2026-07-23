@@ -18,7 +18,7 @@ import pydocformatter.rules.registration as rule_registration
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase
-from pydocformatter.rules.definition_helpers import string_literals, text_layout
+from pydocformatter.rules.definition_helpers import inline_markup, string_literals, text_layout
 from pydocformatter.rules.models import FixAvailability, RuleCacheBehavior, RuleCheckKind, RuleMetadata
 
 
@@ -76,39 +76,47 @@ def _docstring_violations(context: RuleContext) -> tuple[rule_violations.RuleVio
     data = PDF_definition.PDF.require_data(context)
     violations: list[rule_violations.RuleViolation] = []
     for docstring in data.docstrings:
-        violation = _docstring_violation(docstring, context=context)
-        if violation is not None:
-            violations.append(violation)
+        violations.extend(_docstring_violations_for_literal(docstring, context=context))
     return tuple(violations)
 
 
-def _docstring_violation(docstring: PDF_definition.DocstringInfo, *, context: RuleContext) -> rule_violations.RuleViolation | None:
-    """Return one reflow violation and any safe whole-literal replacement."""
+def _docstring_violations_for_literal(docstring: PDF_definition.DocstringInfo, *, context: RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
+    """Return safe aggregate and ambiguous-region violations for one literal."""
     if docstring.kind != PDF_definition.DocstringKind.SIMPLE or not isinstance(docstring.node, cst.SimpleString):
-        return None
-    if not docstring.structure.reflow_regions or not _has_safe_source_mapping(docstring):
-        return None
-    source_is_value = _source_body_is_value(docstring)
-    fragments = None if source_is_value else string_literals.value_fragments_for_simple_string(docstring.node, line_ending=context.line_ending)
-
+        return ()
+    if not docstring.structure.reflow_regions:
+        return ()
+    source_map = docstring.source_map
+    fragments = source_map.fragments if source_map is not None else tuple(string_literals.StringValueFragment(value=char, source=char) for char in docstring.value)
     fallback_prefix = _fallback_line_prefix(context.source_lines, docstring=docstring, context=context)
     replacements: list[_RegionReplacement] = []
+    ambiguous_violations: list[rule_violations.RuleViolation] = []
+    unsafe_reflow_needed = False
     for region in docstring.structure.reflow_regions:
-        replacement = _replacement_for_region(docstring, region, context=context, fallback_prefix=fallback_prefix, fragments=fragments, source_is_value=source_is_value)
-        if replacement is None:
+        result = _replacement_for_region(docstring, region, context=context, fallback_prefix=fallback_prefix, fragments=fragments, source_map=source_map)
+        if result is None:
             continue
+        replacement, ambiguous = result
         current = docstring.value[replacement.start_offset : replacement.end_offset]
         if replacement.value_text != current:
-            replacements.append(replacement)
-    if not replacements:
-        return None
-
-    value = docstring.value
-    for replacement in reversed(replacements):
-        value = f"{value[: replacement.start_offset]}{replacement.value_text}{value[replacement.end_offset :]}"
-    line_numbers = tuple(sorted({line_number for replacement in replacements for line_number in replacement.line_numbers}))
-    change = _planned_change_from_replacements(docstring, replacements, fragments=fragments, value=value, source_is_value=source_is_value) if fragments is not None or source_is_value else None
-    return rule_violations.violation_for_optional_planned_source_change(PDF101DocstringReflow.meta, change, line_numbers=line_numbers)
+            if ambiguous:
+                ambiguous_violations.append(rule_violations.diagnostic(PDF101DocstringReflow.meta, replacement.line_numbers))
+            elif source_map is None or source_map.has_escaped_newline(region.start_offset, region.end_offset):
+                unsafe_reflow_needed = True
+            else:
+                replacements.append(replacement)
+    violations: list[rule_violations.RuleViolation] = []
+    if replacements:
+        value = docstring.value
+        for replacement in reversed(replacements):
+            value = f"{value[: replacement.start_offset]}{replacement.value_text}{value[replacement.end_offset :]}"
+        line_numbers = tuple(sorted({line_number for replacement in replacements for line_number in replacement.line_numbers}))
+        change = _planned_change_from_replacements(docstring, replacements, source_map=source_map, value=value)
+        violations.append(rule_violations.violation_for_optional_planned_source_change(PDF101DocstringReflow.meta, change, line_numbers=line_numbers))
+    violations.extend(ambiguous_violations)
+    if unsafe_reflow_needed:
+        violations.append(rule_violations.diagnostic(PDF101DocstringReflow.meta, tuple(line.line_number for line in docstring.physical_lines)))
+    return tuple(violations)
 
 
 def _replacement_for_region(
@@ -117,13 +125,15 @@ def _replacement_for_region(
     *,
     context: RuleContext,
     fallback_prefix: str,
-    fragments: tuple[string_literals.StringValueFragment, ...] | None,
-    source_is_value: bool,
-) -> _RegionReplacement | None:
-    """Return generated evaluated-value text for one reflow region."""
-    source_line_numbers = _source_line_numbers_for_region(docstring, region)
-    if source_line_numbers is None:
-        return None
+    fragments: tuple[string_literals.StringValueFragment, ...],
+    source_map: string_literals.SimpleStringSourceMap | None,
+) -> tuple[_RegionReplacement, bool] | None:
+    """Return generated region text and whether its markup is ambiguous."""
+    source_line_numbers = (
+        tuple(line.line_number for line in docstring.physical_lines)
+        if source_map is None
+        else source_map.physical_line_numbers(region.start_offset, region.end_offset, first_line_number=docstring.range.start.line)
+    )
     initial_base = _line_base_prefix(docstring, region.start_line, first_generated_line=True, fallback_prefix=fallback_prefix)
     subsequent_base = _line_base_prefix(docstring, region.start_line, first_generated_line=False, fallback_prefix=fallback_prefix)
     initial_width = context.settings.line_length - text_layout.display_width(initial_base, tab_width=context.settings.indent_width) - _opening_delimiter_width(docstring, region, context=context)
@@ -131,7 +141,8 @@ def _replacement_for_region(
     final_suffix_width = _closing_delimiter_width(docstring, region)
     width = min(initial_width, subsequent_width)
     if _should_split_google_entry_prefix(region, width=width, tab_width=context.settings.indent_width):
-        wrapped = _wrapped_region_lines(
+        wrapped, ambiguous = _wrapped_region_lines(
+            docstring,
             region,
             initial_width=subsequent_width,
             subsequent_width=subsequent_width,
@@ -140,12 +151,11 @@ def _replacement_for_region(
             subsequent_indent=region.subsequent_indent,
             tab_width=context.settings.indent_width,
             fragments=fragments,
-            source_is_value=source_is_value,
             url_aware=context.settings.url_aware_wrapping,
         )
         if not wrapped:
             return None
-        return _render_region_replacement(
+        replacement = _render_region_replacement(
             docstring,
             region,
             wrapped=(string_literals.WrappedSourceLine(value=region.initial_indent.rstrip(), source=region.initial_indent.rstrip()), *wrapped),
@@ -153,7 +163,9 @@ def _replacement_for_region(
             fallback_prefix=fallback_prefix,
             line_ending=context.line_ending,
         )
-    wrapped = _wrapped_region_lines(
+        return replacement, ambiguous
+    wrapped, ambiguous = _wrapped_region_lines(
+        docstring,
         region,
         initial_width=initial_width,
         subsequent_width=subsequent_width,
@@ -162,12 +174,12 @@ def _replacement_for_region(
         subsequent_indent=region.subsequent_indent,
         tab_width=context.settings.indent_width,
         fragments=fragments,
-        source_is_value=source_is_value,
         url_aware=context.settings.url_aware_wrapping,
     )
     if not wrapped:
         return None
-    return _render_region_replacement(docstring, region, wrapped=wrapped, source_line_numbers=source_line_numbers, fallback_prefix=fallback_prefix, line_ending=context.line_ending)
+    replacement = _render_region_replacement(docstring, region, wrapped=wrapped, source_line_numbers=source_line_numbers, fallback_prefix=fallback_prefix, line_ending=context.line_ending)
+    return replacement, ambiguous
 
 
 def _opening_delimiter_width(docstring: PDF_definition.DocstringInfo, region: PDF_definition.ReflowRegion, *, context: RuleContext) -> int:
@@ -196,18 +208,8 @@ def _should_split_google_entry_prefix(region: PDF_definition.ReflowRegion, *, wi
     return width - text_layout.display_width(region.initial_indent, tab_width=tab_width) < max(8, tab_width * 2)
 
 
-def _source_line_numbers_for_region(docstring: PDF_definition.DocstringInfo, region: PDF_definition.ReflowRegion) -> tuple[int, ...] | None:
-    """Return safe concrete source line numbers for a reflow region."""
-    line_numbers: list[int] = []
-    for index in range(region.start_line, region.end_line):
-        line_number = docstring.structure.lines[index].source_line_number
-        if line_number is None:
-            return None
-        line_numbers.append(line_number)
-    return tuple(line_numbers)
-
-
 def _wrapped_region_lines(
+    docstring: PDF_definition.DocstringInfo,
     region: PDF_definition.ReflowRegion,
     *,
     initial_width: int,
@@ -216,63 +218,50 @@ def _wrapped_region_lines(
     initial_indent: str,
     subsequent_indent: str,
     tab_width: int,
-    fragments: tuple[string_literals.StringValueFragment, ...] | None,
-    source_is_value: bool,
+    fragments: tuple[string_literals.StringValueFragment, ...],
     url_aware: bool,
-) -> tuple[string_literals.WrappedSourceLine, ...]:
-    """Return normalized wrapped region lines."""
-    if source_is_value:
-        return string_literals.wrap_source_words(
-            _source_words_for_region_value(region),
-            width=max(1, min(initial_width, subsequent_width)),
-            initial_indent=initial_indent,
+) -> tuple[tuple[string_literals.WrappedSourceLine, ...], bool]:
+    """Return normalized wrapped region lines and ambiguity state."""
+    layout = _source_layout_segments(docstring, region, fragments=fragments)
+    wrapped_lines: list[string_literals.WrappedSourceLine] = []
+    for index, segment in enumerate(layout.segments):
+        first_segment = index == 0
+        last_segment = index == len(layout.segments) - 1
+        segment_initial_indent = initial_indent if first_segment else subsequent_indent
+        segment_initial_width = initial_width if first_segment else subsequent_width
+        suffix_width = text_layout.display_width(segment.hard_break.source, tab_width=tab_width) if segment.hard_break is not None else final_suffix_width if last_segment else 0
+        wrapped = string_literals.wrap_source_tokens(
+            segment.scan.tokens,
+            width=max(1, min(segment_initial_width, subsequent_width)),
+            initial_indent=segment_initial_indent,
             subsequent_indent=subsequent_indent,
             tab_width=tab_width,
-            initial_width=initial_width,
+            initial_width=segment_initial_width,
             subsequent_width=subsequent_width,
-            final_suffix_width=final_suffix_width,
+            final_suffix_width=suffix_width,
             url_aware=url_aware,
         )
-    if fragments is None:
-        return string_literals.wrap_source_words(
-            tuple(
-                word
-                for line in region.lines
-                for word in string_literals.source_words_for_value_slice(tuple(string_literals.StringValueFragment(value=char, source=char) for char in line.text), 0, len(line.text))
-            ),
-            width=max(1, min(initial_width, subsequent_width)),
-            initial_indent=initial_indent,
-            subsequent_indent=subsequent_indent,
-            tab_width=tab_width,
-            initial_width=initial_width,
-            subsequent_width=subsequent_width,
-            final_suffix_width=final_suffix_width,
-            url_aware=url_aware,
-        )
-    return string_literals.wrap_source_words(
-        _source_words_for_region(region, fragments=fragments),
-        width=max(1, min(initial_width, subsequent_width)),
-        initial_indent=initial_indent,
-        subsequent_indent=subsequent_indent,
-        tab_width=tab_width,
-        initial_width=initial_width,
-        subsequent_width=subsequent_width,
-        final_suffix_width=final_suffix_width,
-        url_aware=url_aware,
-    )
+        if segment.hard_break is not None:
+            final_line = wrapped[-1]
+            wrapped = (*wrapped[:-1], string_literals.WrappedSourceLine(value=f"{final_line.value}{segment.hard_break.value}", source=f"{final_line.source}{segment.hard_break.source}"))
+        wrapped_lines.extend(wrapped)
+    return tuple(wrapped_lines), layout.ambiguous
 
 
-def _source_words_for_region(region: PDF_definition.ReflowRegion, *, fragments: tuple[string_literals.StringValueFragment, ...]) -> tuple[string_literals.SourceWord, ...]:
-    """Return source-aware words for a reflow region."""
-    words: list[string_literals.SourceWord] = []
+def _source_layout_segments(
+    docstring: PDF_definition.DocstringInfo, region: PDF_definition.ReflowRegion, *, fragments: tuple[string_literals.StringValueFragment, ...]
+) -> inline_markup.InlineLayoutScanResult:
+    """Return line-scanned token segments split at semantic hard breaks."""
+    lines: list[inline_markup.InlineLayoutLine] = []
     for region_line in region.lines:
-        words.extend(string_literals.source_words_for_value_slice(fragments, region_line.start_offset, region_line.end_offset))
-    return tuple(words)
-
-
-def _source_words_for_region_value(region: PDF_definition.ReflowRegion) -> tuple[string_literals.SourceWord, ...]:
-    """Return source-aware words when value text is also source text."""
-    return tuple(string_literals.SourceWord(value=word, source=word) for line in region.lines for word in line.text.split())
+        logical_line = docstring.structure.lines[region_line.line_index]
+        line_fragments = fragments[region_line.start_offset : logical_line.end_offset]
+        lines.append(
+            inline_markup.InlineLayoutLine(
+                fragments=line_fragments, content_end=region_line.end_offset - region_line.start_offset, has_following_newline=logical_line.end_offset < len(docstring.value)
+            )
+        )
+    return inline_markup.scan_layout_lines(lines)
 
 
 def _render_region_replacement(
@@ -283,7 +272,7 @@ def _render_region_replacement(
     source_line_numbers: tuple[int, ...],
     fallback_prefix: str,
     line_ending: str,
-) -> _RegionReplacement | None:
+) -> _RegionReplacement:
     """Return replacement text for normalized wrapped region lines."""
     value_lines = [_raw_generated_line(docstring, region.start_line, line.value, first_generated_line=index == 0, fallback_prefix=fallback_prefix) for index, line in enumerate(wrapped)]
     source_lines = [_raw_generated_line(docstring, region.start_line, line.source, first_generated_line=index == 0, fallback_prefix=fallback_prefix) for index, line in enumerate(wrapped)]
@@ -293,21 +282,15 @@ def _render_region_replacement(
 
 
 def _planned_change_from_replacements(
-    docstring: PDF_definition.DocstringInfo, replacements: list[_RegionReplacement], *, fragments: tuple[string_literals.StringValueFragment, ...] | None, value: str, source_is_value: bool
+    docstring: PDF_definition.DocstringInfo, replacements: list[_RegionReplacement], *, source_map: string_literals.SimpleStringSourceMap | None, value: str
 ) -> rule_edits.PlannedSourceChange | None:
     """Return a source edit after applying source-preserving replacements."""
-    if not isinstance(docstring.node, cst.SimpleString):
+    if not isinstance(docstring.node, cst.SimpleString) or source_map is None:
         return None
-    source_chunks: list[str] = []
-    cursor = 0
-    for replacement in sorted(replacements, key=lambda item: item.start_offset):
-        source_chunks.extend((
-            docstring.value[cursor : replacement.start_offset] if source_is_value else string_literals.source_for_value_slice(_require_fragments(fragments), cursor, replacement.start_offset),
-            replacement.source_text,
-        ))
-        cursor = replacement.end_offset
-    source_chunks.append(docstring.value[cursor:] if source_is_value else string_literals.source_for_value_slice(_require_fragments(fragments), cursor, len(_require_fragments(fragments))))
-    rendered = string_literals.render_simple_string_from_body_source(docstring.node.prefix, docstring.node.quote, "".join(source_chunks), expected_value=value)
+    body_source = source_map.body_source_with_replacements(
+        tuple((replacement.start_offset, replacement.end_offset, replacement.source_text) for replacement in replacements), preserve_zero_value_source=False
+    )
+    rendered = string_literals.render_simple_string_from_body_source(docstring.node.prefix, docstring.node.quote, body_source, expected_value=value)
     if rendered is None or rendered == docstring.source:
         return None
     return rule_edits.PlannedSourceChange(
@@ -315,28 +298,6 @@ def _planned_change_from_replacements(
         line_numbers=tuple(sorted({line_number for replacement in replacements for line_number in replacement.line_numbers})),
         suppression_line_numbers=(),
     )
-
-
-def _has_safe_source_mapping(docstring: PDF_definition.DocstringInfo) -> bool:
-    """Return whether evaluated lines can be rewritten as literal body text."""
-    return all(line.source_line_number is not None for line in docstring.structure.lines)
-
-
-def _source_body_is_value(docstring: PDF_definition.DocstringInfo) -> bool:
-    """Return whether the simple-string body source exactly matches its evaluated value."""
-    if not isinstance(docstring.node, cst.SimpleString):
-        return False
-    body_source = string_literals.simple_string_body_source(docstring.node)
-    if body_source is None:
-        return False
-    return body_source == docstring.value and ("r" in docstring.node.prefix.lower() or "\\" not in body_source)
-
-
-def _require_fragments(fragments: tuple[string_literals.StringValueFragment, ...] | None) -> tuple[string_literals.StringValueFragment, ...]:
-    """Return source fragments after narrowing an optional value."""
-    if fragments is None:
-        raise AssertionError("Expected source fragments for non-direct docstring source")
-    return fragments
 
 
 def _line_base_prefix(docstring: PDF_definition.DocstringInfo, line_index: int, *, first_generated_line: bool, fallback_prefix: str) -> str:

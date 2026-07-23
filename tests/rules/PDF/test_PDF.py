@@ -15,7 +15,7 @@ import libcst.metadata as cst_metadata
 from pydocformatter import formatter, rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention
 from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
-from pydocformatter.rules.definition_helpers import source_text, value_documentation
+from pydocformatter.rules.definition_helpers import source_text, string_literals, value_documentation
 from pydocformatter.rules.definitions.PDF.PDF import (
     PDF,
     AttributeInfo,
@@ -32,6 +32,9 @@ from pydocformatter.source_path import SourcePathContext
 
 
 if typing.TYPE_CHECKING:
+    # Third-party imports
+    from pytest_mock import MockerFixture
+
     # First-party imports
     from pydocformatter.rules.definitions.PDF.PDF import DocstringBlock, DocstringStructure, DocstringTextFragment
 
@@ -255,6 +258,24 @@ def test_prepare_preserves_multiline_crlf_source_and_physical_lines() -> None:
     assert docstring.source == 'r"""first\r\n    second"""'
     assert tuple((line.line_number, line.start_column, line.end_column, line.source) for line in docstring.physical_lines) == ((2, 4, 13, 'r"""first'), (3, 0, 13, '    second"""'))
     assert docstring.value_lines == ("first", "    second")
+
+
+@pytest.mark.filterwarnings("ignore:invalid escape sequence.*:DeprecationWarning")
+@pytest.mark.parametrize(("source", "mapping_available"), [('"""supported\\t escape"""', True), (r'"""unsupported \z escape"""', False)])
+def test_prepare_lazily_caches_source_maps_without_changing_value_semantics(source: str, mapping_available: bool, mocker: MockerFixture) -> None:
+    source_map_spy = mocker.spy(string_literals, "source_map_for_simple_string")
+
+    docstring = PDF.prepare(category_context(f"{source}\n")).docstrings[0]
+    equivalent = dataclasses.replace(docstring)
+    original_repr = repr(docstring)
+
+    assert source_map_spy.call_count == 0
+    source_map = docstring.source_map
+    assert (source_map is not None) is mapping_available
+    assert docstring.source_map is source_map
+    assert source_map_spy.call_count == 1
+    assert repr(docstring) == original_repr
+    assert docstring == equivalent
 
 
 def test_prepare_accepts_only_string_valued_first_expressions_as_docstrings() -> None:

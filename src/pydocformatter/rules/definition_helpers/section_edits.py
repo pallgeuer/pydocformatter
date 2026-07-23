@@ -20,7 +20,7 @@ import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 if TYPE_CHECKING:
     # First-party imports
     from pydocformatter.rules.definition import RuleContext
-    from pydocformatter.rules.definition_helpers import source_text
+    from pydocformatter.rules.definition_helpers import source_text, string_literals
     from pydocformatter.rules.models import RuleMetadata
 
 
@@ -190,13 +190,12 @@ def replace_value_line_span(value_lines: list[str], line: PDF_definition.Docstri
 
 
 def planned_replacement_change(
-    docstring: PDF_definition.DocstringInfo, *, context: RuleContext, replacements: tuple[rule_edits.PlannedTextReplacement, ...], value_lines: list[str]
+    docstring: PDF_definition.DocstringInfo, *, replacements: tuple[rule_edits.PlannedTextReplacement, ...], value_lines: list[str]
 ) -> rule_edits.PlannedSourceChange | None:
     """Return a safe whole-docstring replacement for section text replacements.
 
     Args:
         docstring (PDF_definition.DocstringInfo): Parsed docstring to replace as a whole source literal.
-        context (RuleContext): Current file context used to build source edits.
         replacements (tuple[rule_edits.PlannedTextReplacement, ...]): Text replacements that determine diagnostic lines.
         value_lines (list[str]): Updated raw value lines for the replacement docstring body.
 
@@ -206,7 +205,7 @@ def planned_replacement_change(
     """
     if not replacements or not PDF_definition.is_safely_mapped_simple_docstring(docstring):
         return None
-    return PDF_definition.planned_simple_docstring_source_change(docstring, context=context, replacements=replacements, value_lines=value_lines)
+    return PDF_definition.planned_simple_docstring_source_change(docstring, replacements=replacements, value_lines=value_lines)
 
 
 def planned_replacement_changes(
@@ -227,7 +226,7 @@ def planned_replacement_changes(
     direct_changes = _direct_replacement_changes(docstring, context=context, replacements=replacements)
     if direct_changes is not None:
         return direct_changes
-    return planned_replacement_change(docstring, context=context, replacements=replacements, value_lines=value_lines)
+    return planned_replacement_change(docstring, replacements=replacements, value_lines=value_lines)
 
 
 def _direct_replacement_changes(
@@ -237,7 +236,7 @@ def _direct_replacement_changes(
     if not replacements:
         return None
     line_bounds = PDF_definition.line_bounds_for_context(context)
-    source_map = PDF_definition.simple_docstring_source_map(docstring, line_bounds=line_bounds)
+    source_map = docstring.source_map
     if source_map is None:
         return None
     changes: list[rule_edits.PlannedSourceChange] = []
@@ -258,7 +257,7 @@ def _direct_replacement_changes(
 
 
 def _direct_replacement_change(
-    docstring: PDF_definition.DocstringInfo, *, replacement: rule_edits.PlannedTextReplacement, source_map: PDF_definition.SimpleDocstringSourceMap, line_bounds: source_text.LineBounds
+    docstring: PDF_definition.DocstringInfo, *, replacement: rule_edits.PlannedTextReplacement, source_map: string_literals.SimpleStringSourceMap, line_bounds: source_text.LineBounds
 ) -> rule_edits.PlannedSourceChange | None:
     """Return one line-local section edit when source spelling matches raw value text."""
     line = _line_for_replacement(docstring, replacement)
@@ -266,15 +265,18 @@ def _direct_replacement_change(
         return None
     raw_start_column = replacement.start_offset - line.start_offset
     raw_end_column = replacement.end_offset - line.start_offset
-    if replacement.start_offset < 0 or replacement.end_offset < replacement.start_offset or replacement.end_offset >= len(source_map.source_offsets):
+    if replacement.start_offset < 0 or replacement.end_offset < replacement.start_offset or replacement.end_offset > len(source_map.value):
         return None
     if not PDF_definition.simple_docstring_replacement_is_source_safe(docstring, replacement.text):
         return None
     expected_source = line.raw_text[raw_start_column:raw_end_column]
-    if source_map.source_slice(start_offset=replacement.start_offset, end_offset=replacement.end_offset) != expected_source:
+    if source_map.producing_source_for_value_slice(replacement.start_offset, replacement.end_offset) != expected_source:
         return None
     return rule_edits.PlannedSourceChange(
-        edit=rule_edits.SourceEdit(range=source_map.source_range(start_offset=replacement.start_offset, end_offset=replacement.end_offset, line_bounds=line_bounds), replacement=replacement.text),
+        edit=rule_edits.SourceEdit(
+            range=PDF_definition.simple_docstring_source_range(docstring, source_map=source_map, start_offset=replacement.start_offset, end_offset=replacement.end_offset, line_bounds=line_bounds),
+            replacement=replacement.text,
+        ),
         line_numbers=replacement.line_numbers,
         suppression_line_numbers=(),
     )

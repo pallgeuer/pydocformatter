@@ -76,9 +76,10 @@ def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo, *, co
     )
     if not changed_lines:
         return None
-    fragments = PDF_definition.docstring_value_fragments(docstring, line_ending=context.line_ending)
-    if fragments is None:
+    source_map = docstring.source_map
+    if source_map is None:
         return None
+    fragments = source_map.fragments
     replacements: list[rule_edits.PlannedTextReplacement] = []
     for line, target in changed_lines:
         line_number = line.source_line_number
@@ -90,7 +91,7 @@ def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo, *, co
             )
 
     value_lines = [line_targets[line.index].raw_text if line.index > 0 else line.raw_text for line in docstring.structure.lines]
-    return PDF_definition.planned_simple_docstring_source_change(docstring, context=context, replacements=tuple(replacements), value_lines=value_lines, fragments=fragments)
+    return PDF_definition.planned_simple_docstring_source_change(docstring, replacements=tuple(replacements), value_lines=value_lines, source_map=source_map)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -203,7 +204,7 @@ def _source_for_target_line(line: PDF_definition.DocstringValueLine, target: _Li
     if not text_layout.has_space_tab_content(line.raw_text):
         return target.raw_text
     _, raw_index, virtual_prefix = text_layout.strip_indent_with_mapping(line.raw_text, max(target.strip_width, 0))
-    suffix = f"{' ' * virtual_prefix}{string_literals.source_for_value_slice(fragments, line.start_offset + raw_index, line.end_offset)}"
+    suffix = f"{' ' * virtual_prefix}{''.join(fragment.source for fragment in fragments[line.start_offset + raw_index : line.end_offset])}"
     if context.settings.indent_style == settings_check.IndentStyle.SPACE:
         suffix_content = suffix.lstrip(" \t")
         suffix = f"{_style_normalized_indent(suffix, context=context)}{suffix_content}"

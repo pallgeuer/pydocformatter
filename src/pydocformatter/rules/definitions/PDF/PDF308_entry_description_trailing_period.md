@@ -242,7 +242,7 @@ def connect(timeout):
 [output=unchanged]
 ```
 
-Unsafe escaped source mappings are reported but not fixed:
+Safely mapped escapes elsewhere in the docstring do not prevent a source-local fix:
 
 ```pydocfmt-example
 [settings]
@@ -256,9 +256,13 @@ def connect(timeout):
         timeout: timeout in seconds
     """
 
-[output=unchanged]
-[findings]
-PDF308: Lines 2-6: Docstring entry description should end with a period
+[output]
+def connect(timeout):
+    """Connect \u2603.
+
+    Args:
+        timeout: timeout in seconds.
+    """
 ```
 
 ## Options

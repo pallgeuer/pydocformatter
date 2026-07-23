@@ -72,14 +72,13 @@ def test_exact_selection_under_numpy_restores_ignored_broad_default() -> None:
     assert result.fixed_findings[PDF309EntryDescriptionTerminalPunctuation.meta] == 1
 
 
-def test_reports_escaped_source_mapping_without_fixing_when_description_contains_escape() -> None:
+def test_fixes_description_containing_escape() -> None:
     source = 'def connect(timeout):\n    """Connect.\n\n    Args:\n        timeout: timeout \\u2603\n    """\n'
     result = format_source(source)
 
-    assert result.new_source == source
-    assert not result.fixed_findings
-    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((2, 3, 4, 5, 6),)
-    assert not result.unfixed_findings[0].fixable
+    assert result.new_source == source.replace("\\u2603\n", "\\u2603.\n")
+    assert result.fixed_findings[PDF309EntryDescriptionTerminalPunctuation.meta] == 1
+    assert not result.unfixed_findings
 
 
 def test_unfixable_selection_reports_fixable_instance_without_changing_source() -> None:

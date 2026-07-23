@@ -150,12 +150,12 @@ def test_skips_concatenated_escaped_and_non_docstring_strings() -> None:
     assert not result.unfixed_findings
 
 
-def test_skips_multiline_docstring_with_non_raw_escape_source_mapping() -> None:
+def test_moves_opening_quotes_with_non_raw_escape_source_mapping() -> None:
     source = 'def function():\n    """\n    Summary\\t.\n\n    Body.\n    """\n'
     result = format_pdf102(source)
 
-    assert result.new_source == source
-    assert not result.fixed_findings
+    assert result.new_source == 'def function():\n    """Summary\\t.\n\n    Body.\n    """\n'
+    assert result.fixed_findings[PDF106MultilineOpeningQuotesSameLine.meta] == 1
     assert not result.unfixed_findings
 
 

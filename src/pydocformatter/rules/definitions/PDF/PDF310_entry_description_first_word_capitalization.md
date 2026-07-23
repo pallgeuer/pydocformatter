@@ -11,7 +11,7 @@ PDF310 checks Google, NumPy, and reStructuredText entries when the active conven
 
 Empty descriptions, generic reST fields, and reST type-only fields such as `:type:`, `:rtype:`, `:ytype:`, and `:vartype:` are skipped. Like PDF304, PDF310 only fixes lowercase ASCII words that contain lowercase ASCII letters or apostrophes after the first character. This means `timeout`, `don't`, `retry?`, and `retry...` can be fixed, while `"timeout"`, `timeout_value`, `timeout-value`, `URL`, `iOS`, `eBay`, `123`, and non-ASCII starts are left alone.
 
-Unsafe source mappings are reported but not changed. This includes docstrings whose relevant logical text is formed through evaluated escape sequences and cannot be mapped cleanly back to one source slice.
+The fix changes only the first evaluated character of the word and leaves every later source character unchanged. Escapes or source continuations later in the word therefore do not prevent capitalization. An unsafe mapping for the first evaluated character is still reported but not changed.
 
 ## Why is this useful?
 Capitalized entry descriptions scan consistently with summary lines and prose paragraphs.
@@ -253,7 +253,7 @@ def connect(timeout):
 [output=unchanged]
 ```
 
-Unsafe escaped source mappings are reported but not fixed:
+Safely mapped escapes elsewhere in the docstring do not prevent a source-local fix:
 
 ```pydocfmt-example
 [settings]
@@ -267,9 +267,13 @@ def connect(timeout):
         timeout: timeout in seconds.
     """
 
-[output=unchanged]
-[findings]
-PDF310: Lines 2-6: Docstring entry description first word 'timeout' should be capitalized
+[output]
+def connect(timeout):
+    """Connect \u2603.
+
+    Args:
+        timeout: Timeout in seconds.
+    """
 ```
 
 ## Options

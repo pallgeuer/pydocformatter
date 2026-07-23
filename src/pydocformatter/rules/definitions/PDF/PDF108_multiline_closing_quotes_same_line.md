@@ -157,7 +157,7 @@ def raw_backslash() -> None:
     Path \ """
 ```
 
-Already compact docstrings, true one-line docstrings, blank-only docstrings, concatenated docstrings, multiline non-raw literals with escapes, and non-docstring strings are unchanged:
+Already compact docstrings, true one-line docstrings, concatenated docstrings, and non-docstring strings are unchanged. Safely mapped escapes do not prevent moving the closing quotes:
 
 ```pydocfmt-example
 [input]
@@ -168,10 +168,6 @@ def already_compact() -> None:
 
 def true_one_line() -> None:
     """Summary only."""
-
-def blank_only() -> None:
-    """  
-    """
 
 def concatenated() -> None:
     ("Summary.\n"
@@ -190,7 +186,30 @@ def not_docstring() -> None:
     Body.
     """
 
-[output=unchanged]
+[output]
+def already_compact() -> None:
+    """Summary.
+
+    Body."""
+
+def true_one_line() -> None:
+    """Summary only."""
+
+def concatenated() -> None:
+    ("Summary.\n"
+     "Body.\n")
+
+def escaped_multiline() -> None:
+    """Summary.
+
+    Body\t."""
+
+def not_docstring() -> None:
+    value = 1
+    """Summary.
+
+    Body.
+    """
 ```
 
 ## Options

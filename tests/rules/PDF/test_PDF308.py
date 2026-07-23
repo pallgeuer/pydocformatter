@@ -51,7 +51,7 @@ def test_reports_but_does_not_fix_escaped_unicode_ellipsis() -> None:
 
     assert result.new_source == source
     assert not result.fixed_findings
-    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((2, 3, 4, 5, 6),)
+    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((5,),)
     assert not result.unfixed_findings[0].fixable
 
 
@@ -130,14 +130,13 @@ def test_preserves_raw_docstring_prefix_when_fixing_backslash_heavy_description(
     assert not result.unfixed_findings
 
 
-def test_reports_escaped_source_mapping_without_fixing_when_escape_precedes_target() -> None:
+def test_fixes_target_when_escape_precedes_it() -> None:
     source = 'def connect(timeout):\n    """Connect \\u2603.\n\n    Args:\n        timeout: timeout in seconds\n    """\n'
     result = format_source(source)
 
-    assert result.new_source == source
-    assert not result.fixed_findings
-    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((2, 3, 4, 5, 6),)
-    assert not result.unfixed_findings[0].fixable
+    assert result.new_source == source.replace("timeout in seconds\n", "timeout in seconds.\n")
+    assert result.fixed_findings[PDF308EntryDescriptionTrailingPeriod.meta] == 1
+    assert not result.unfixed_findings
 
 
 def test_unfixable_selection_reports_fixable_instance_without_changing_source() -> None:
@@ -159,14 +158,13 @@ def test_skips_empty_type_only_and_generic_rest_field_descriptions() -> None:
     assert not result.unfixed_findings
 
 
-def test_reports_unsafe_source_mapping_without_fixing() -> None:
+def test_fixes_target_with_escaped_logical_newlines() -> None:
     source = 'def connect(timeout):\n    """Connect.\\n\\n    Args:\\n        timeout: timeout in seconds"""\n'
     result = format_source(source)
 
-    assert result.new_source == source
-    assert not result.fixed_findings
-    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((2,),)
-    assert not result.unfixed_findings[0].fixable
+    assert result.new_source == source.replace('seconds"""', 'seconds."""')
+    assert result.fixed_findings[PDF308EntryDescriptionTrailingPeriod.meta] == 1
+    assert not result.unfixed_findings
 
 
 def test_broad_selection_follows_pdf300_google_default() -> None:

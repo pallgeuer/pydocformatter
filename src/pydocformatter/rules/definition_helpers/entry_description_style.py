@@ -64,36 +64,28 @@ class _SourceSafeReplacementPlanner:
     """Plan source-local docstring replacements whose spelling equals their runtime value."""
 
     def __init__(self, context: RuleContext) -> None:
-        """Store shared context and initialize a per-pass docstring source-map cache."""
+        """Store shared context for direct source replacements."""
         self.context = context
         self.line_bounds = PDF_definition.line_bounds_for_context(context)
-        data = PDF_definition.PDF.require_data(context)
-        self._maps = data._entry_description_source_maps
 
     def planned_replacement(self, target: EntryDescriptionLineTarget, *, start_offset: int, end_offset: int, replacement: str, expected_source: str | None) -> rule_edits.PlannedSourceChange | None:
         """Return a direct source replacement for a source-safe evaluated replacement."""
         if not PDF_definition.simple_docstring_replacement_is_source_safe(target.docstring, replacement):
             return None
-        source_map = self._source_map(target.docstring)
-        if source_map is None or start_offset < 0 or end_offset < start_offset or end_offset >= len(source_map.source_offsets):
+        source_map = target.docstring.source_map
+        if source_map is None or start_offset < 0 or end_offset < start_offset or end_offset > len(source_map.value):
             return None
-        if expected_source is not None and source_map.source_slice(start_offset=start_offset, end_offset=end_offset) != expected_source:
+        if expected_source is not None and source_map.producing_source_for_value_slice(start_offset, end_offset) != expected_source:
             return None
         line_numbers = line_numbers_for_offsets(target, start_offset=start_offset, end_offset=end_offset)
         return rule_edits.PlannedSourceChange(
-            edit=rule_edits.SourceEdit(range=source_map.source_range(start_offset=start_offset, end_offset=end_offset, line_bounds=self.line_bounds), replacement=replacement),
+            edit=rule_edits.SourceEdit(
+                range=PDF_definition.simple_docstring_source_range(target.docstring, source_map=source_map, start_offset=start_offset, end_offset=end_offset, line_bounds=self.line_bounds),
+                replacement=replacement,
+            ),
             line_numbers=line_numbers,
             suppression_line_numbers=(),
         )
-
-    def _source_map(self, docstring: PDF_definition.DocstringInfo) -> PDF_definition.SimpleDocstringSourceMap | None:
-        """Return cached source offsets for a simple docstring."""
-        key = id(docstring)
-        if key in self._maps:
-            return self._maps[key]
-        source_map = PDF_definition.simple_docstring_source_map(docstring, line_bounds=self.line_bounds)
-        self._maps[key] = source_map
-        return source_map
 
 
 def first_line_targets(context: RuleContext) -> tuple[EntryDescriptionLineTarget, ...]:
@@ -151,8 +143,8 @@ def capitalization_violations(context: RuleContext, *, rule: RuleMetadata) -> tu
         word = first_word_target(target)
         if word is None or not first_word_capitalization.should_capitalize(word.word):
             continue
-        replacement = f"{word.word[0].upper()}{word.word[1:]}"
-        change = _planned_replacement(word.target, start_offset=word.start_offset, end_offset=word.end_offset, replacement=replacement, context=context, planner=planner)
+        replacement = word.word[0].upper()
+        change = _planned_replacement(word.target, start_offset=word.start_offset, end_offset=word.start_offset + 1, replacement=replacement, context=context, planner=planner)
         violations.append(
             rule_violations.violation_for_optional_planned_source_change(
                 rule, change, line_numbers=line_numbers(word.target), instance_message=f"Docstring entry description first word '{word.word}' should be capitalized"

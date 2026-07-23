@@ -4,19 +4,16 @@
 from __future__ import annotations
 
 # Standard library imports
-import re
 import textwrap
 import dataclasses
 
 # First-party imports
 from pydocformatter.cli import settings_check
+from pydocformatter.rules.definition_helpers import inline_markup
 
 
 _BALANCED_WRAP_MAX_CANDIDATES = 250_000
 _BALANCED_WRAP_MAX_WORDS = 10_000
-_URL_TOKEN_RE = re.compile(r"(?i)^(?:[a-z][a-z0-9+.-]*://|www\.)\S+$")
-_URL_LEADING_PUNCTUATION = "([<{\"'"
-_URL_TRAILING_PUNCTUATION = ".,;:!?)]}>\"'"
 
 
 @dataclasses.dataclass(frozen=True)
@@ -150,19 +147,6 @@ def strip_indent_with_mapping(text: str, width: int) -> tuple[str, int, int]:
     return " " * virtual_prefix + text[index:], index, virtual_prefix
 
 
-def is_url_token(text: str) -> bool:
-    """Return whether text is a URL-like wrapping token.
-
-    Args:
-        text (str): Wrapping token to classify after trimming surrounding punctuation.
-
-    Returns:
-        bool: Whether the token should be kept intact by URL-aware wrapping.
-    """
-    candidate = text.lstrip(_URL_LEADING_PUNCTUATION).rstrip(_URL_TRAILING_PUNCTUATION)
-    return _URL_TOKEN_RE.match(candidate) is not None
-
-
 def wrap_text(text: str, *, width: int, initial_indent: str = "", subsequent_indent: str = "", tab_width: int = 8, url_aware: bool = False) -> tuple[str, ...]:
     """Wrap normalized text using the shared modern-rule wrapping policy.
 
@@ -172,19 +156,150 @@ def wrap_text(text: str, *, width: int, initial_indent: str = "", subsequent_ind
         initial_indent (str): Prefix for the first output line.
         subsequent_indent (str): Prefix for continuation output lines.
         tab_width (int): Tab stop width used when measuring indentation.
-        url_aware (bool): Whether URL tokens should remain intact and line breaks should be balanced around them.
+        url_aware (bool): Whether destination-bearing tokens should use balanced line selection.
 
     Returns:
         tuple[str, ...]: Wrapped output lines including the requested indentation prefixes.
     """
     if width <= 0:
         return (f"{initial_indent}{text}",)
-    words = tuple(text.split())
-    if url_aware and any(is_url_token(word) for word in words):
-        spans = balanced_word_spans(words, width_words=words, width=width, initial_indent=initial_indent, subsequent_indent=subsequent_indent, tab_width=tab_width)
-        return tuple(_render_words(words[span.start : span.end], indent=initial_indent if index == 0 else subsequent_indent) for index, span in enumerate(spans))
-    wrapped = textwrap.wrap(text, width=width, initial_indent=initial_indent, subsequent_indent=subsequent_indent, break_long_words=False, break_on_hyphens=False)
-    return tuple(wrapped) or (initial_indent.rstrip(),)
+    scan = inline_markup.scan_text(text)
+    return wrap_scanned_text(text, scan, width=width, initial_indent=initial_indent, subsequent_indent=subsequent_indent, tab_width=tab_width, url_aware=url_aware)
+
+
+def wrap_scanned_text(
+    text: str, scan: inline_markup.InlineScanResult, *, width: int, initial_indent: str = "", subsequent_indent: str = "", tab_width: int = 8, url_aware: bool = False
+) -> tuple[str, ...]:
+    """Wrap normalized text using an existing inline-markup scan.
+
+    Args:
+        text (str): Whitespace-normalized prose represented by `scan`.
+        scan (inline_markup.InlineScanResult): Existing tokenization and ambiguity evidence for `text`.
+        width (int): Maximum output line width in display columns.
+        initial_indent (str): Prefix for the first output line.
+        subsequent_indent (str): Prefix for continuation output lines.
+        tab_width (int): Tab stop width used when measuring indentation.
+        url_aware (bool): Whether destination-bearing tokens should use balanced line selection.
+
+    Returns:
+        tuple[str, ...]: Wrapped output lines including the requested indentation prefixes.
+    """
+    if width <= 0:
+        return (f"{initial_indent}{text}",)
+    if not any(token.kind is not None or (url_aware and token.url_like) for token in scan.tokens):
+        wrapped = textwrap.wrap(text, width=width, initial_indent=initial_indent, subsequent_indent=subsequent_indent, break_long_words=False, break_on_hyphens=False)
+        return tuple(wrapped) or (initial_indent.rstrip(),)
+    return wrap_inline_tokens(scan.tokens, width=width, initial_indent=initial_indent, subsequent_indent=subsequent_indent, tab_width=tab_width, url_aware=url_aware)
+
+
+def wrap_inline_tokens(
+    tokens: tuple[inline_markup.InlineToken, ...],
+    *,
+    width: int,
+    initial_indent: str = "",
+    subsequent_indent: str = "",
+    tab_width: int,
+    initial_width: int | None = None,
+    subsequent_width: int | None = None,
+    final_suffix_width: int = 0,
+    url_aware: bool = False,
+) -> tuple[str, ...]:
+    """Wrap indivisible inline tokens with shared greedy or balanced layout.
+
+    Args:
+        tokens (tuple[inline_markup.InlineToken, ...]): Indivisible source-aware tokens to group into lines.
+        width (int): Fallback maximum line width in display columns.
+        initial_indent (str): Prefix for the first output line.
+        subsequent_indent (str): Prefix for continuation output lines.
+        tab_width (int): Tab stop width used for source display measurements.
+        initial_width (int | None): Optional first-line budget including `initial_indent`.
+        subsequent_width (int | None): Optional continuation budget including `subsequent_indent`.
+        final_suffix_width (int): Display width reserved on the final output line.
+        url_aware (bool): Whether destination-bearing tokens should use balanced line selection.
+
+    Returns:
+        tuple[str, ...]: Wrapped lines with requested prefixes.
+    """
+    if not tokens:
+        return (initial_indent.rstrip(),)
+    rendered = tuple(token.value for token in tokens)
+    if width <= 0 and initial_width is None and subsequent_width is None:
+        return (f"{initial_indent}{' '.join(rendered)}",)
+    spans = token_spans(
+        tokens,
+        width_words=tuple(token.source for token in tokens),
+        width=width,
+        initial_indent=initial_indent,
+        subsequent_indent=subsequent_indent,
+        tab_width=tab_width,
+        initial_width=initial_width,
+        subsequent_width=subsequent_width,
+        final_suffix_width=final_suffix_width,
+        url_aware=url_aware,
+    )
+    return tuple(_render_words(rendered[span.start : span.end], indent=initial_indent if index == 0 else subsequent_indent) for index, span in enumerate(spans))
+
+
+def token_spans(
+    tokens: tuple[inline_markup.InlineToken, ...],
+    *,
+    width_words: tuple[str, ...],
+    width: int,
+    initial_indent: str = "",
+    subsequent_indent: str = "",
+    tab_width: int,
+    initial_width: int | None = None,
+    subsequent_width: int | None = None,
+    final_suffix_width: int = 0,
+    url_aware: bool = False,
+) -> tuple[WordSpan, ...]:
+    """Return layout spans for indivisible source-aware tokens.
+
+    Args:
+        tokens (tuple[inline_markup.InlineToken, ...]): Tokens carrying destination-bearing classification.
+        width_words (tuple[str, ...]): Source spellings used for display-width calculations.
+        width (int): Fallback maximum line width.
+        initial_indent (str): First-line prefix.
+        subsequent_indent (str): Continuation prefix.
+        tab_width (int): Tab stop width.
+        initial_width (int | None): Optional first-line budget.
+        subsequent_width (int | None): Optional continuation budget.
+        final_suffix_width (int): Width reserved on the final line.
+        url_aware (bool): Whether destination-bearing tokens activate balanced selection.
+
+    Returns:
+        tuple[WordSpan, ...]: Half-open token spans for rendered lines.
+
+    Raises:
+        ValueError: If tokens and source width spellings are not aligned.
+    """
+    if len(tokens) != len(width_words):
+        raise ValueError("tokens and width_words must have the same length")
+    values = tuple(token.value for token in tokens)
+    if url_aware and any(token.url_like for token in tokens):
+        return balanced_word_spans(
+            values,
+            width_words=width_words,
+            width=width,
+            initial_indent=initial_indent,
+            subsequent_indent=subsequent_indent,
+            tab_width=tab_width,
+            initial_width=initial_width,
+            subsequent_width=subsequent_width,
+            final_suffix_width=final_suffix_width,
+            url_words=tuple(token.url_like for token in tokens),
+        )
+    return _greedy_word_spans(
+        values,
+        width_words=width_words,
+        width=width,
+        initial_indent=initial_indent,
+        subsequent_indent=subsequent_indent,
+        tab_width=tab_width,
+        initial_width=initial_width,
+        subsequent_width=subsequent_width,
+        final_suffix_width=final_suffix_width,
+    )
 
 
 def balanced_word_spans(
@@ -198,6 +313,7 @@ def balanced_word_spans(
     initial_width: int | None = None,
     subsequent_width: int | None = None,
     final_suffix_width: int = 0,
+    url_words: tuple[bool, ...] | None = None,
 ) -> tuple[WordSpan, ...]:
     """Return URL-aware balanced word spans without splitting tokens.
 
@@ -211,6 +327,7 @@ def balanced_word_spans(
         initial_width (int | None): Optional precomputed content width for the first output line.
         subsequent_width (int | None): Optional precomputed content width for continuation lines.
         final_suffix_width (int): Display width reserved on the final line for suffix text.
+        url_words (tuple[bool, ...] | None): Optional destination-bearing classification aligned with `words`.
 
     Returns:
         tuple[WordSpan, ...]: Half-open word-index spans for each output line.
@@ -220,6 +337,8 @@ def balanced_word_spans(
     """
     if len(width_words) != len(words):
         raise ValueError("words and width_words must have the same length")
+    if url_words is not None and len(url_words) != len(words):
+        raise ValueError("words and url_words must have the same length")
     if not words:
         return (WordSpan(0, 0),)
     if width <= 0 and initial_width is None and subsequent_width is None:
@@ -237,7 +356,7 @@ def balanced_word_spans(
             final_suffix_width=final_suffix_width,
         )
 
-    url_words = tuple(is_url_token(word) for word in words)
+    url_words = tuple(inline_markup.is_bare_url(word) for word in words) if url_words is None else url_words
     candidate_count = 0
 
     def line_limit(*, first_line: bool, final_line: bool) -> int:

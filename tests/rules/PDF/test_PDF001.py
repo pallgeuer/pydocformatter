@@ -91,6 +91,14 @@ def test_preserves_raw_prefix_when_requoting_is_value_preserving() -> None:
     assert result.fixed_findings[PDF001DocstringQuoteStyle.meta] == 1
 
 
+def test_preserves_source_continuation_when_requoting() -> None:
+    source = "def joined():\n    '''Return alpha\\\nbeta.'''\n"
+    result = format_pdf001(source)
+
+    assert result.new_source == 'def joined():\n    """Return alpha\\\nbeta."""\n'
+    assert result.fixed_findings[PDF001DocstringQuoteStyle.meta] == 1
+
+
 def test_requotes_empty_u_prefixed_and_simple_suite_docstrings() -> None:
     source = "''\n\nclass Empty:\n    ''''''\n\n\ndef inline(): 'Inline doc.'\n\n\ndef unicode_prefix():\n    u'''Caf\\xe9.'''\n"
     result = format_pdf001(source)

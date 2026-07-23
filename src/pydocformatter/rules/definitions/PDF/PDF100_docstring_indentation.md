@@ -343,7 +343,7 @@ def describe(value):
     """
 ```
 
-Unsafe or irrelevant strings are left unchanged:
+Concatenated docstrings, single-line docstrings, and non-docstring strings are left unchanged. Safely mapped escapes do not prevent indentation fixes:
 
 ```pydocfmt-example
 [input]
@@ -365,7 +365,24 @@ def not_a_docstring():
       It is not rewritten.
     """
 
-[output=unchanged]
+[output]
+def single_line():
+    """Single-line docstrings are skipped."""
+
+def concatenated():
+    ("first line "
+     "second line")
+
+def escaped_content():
+    """Summary.
+    \x41 content.
+    """
+
+def not_a_docstring():
+    value = 1
+    """This string expression is not the first statement.
+      It is not rewritten.
+    """
 ```
 
 ## Options

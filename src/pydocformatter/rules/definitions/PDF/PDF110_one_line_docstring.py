@@ -71,7 +71,7 @@ def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo, *, co
     summary_line = _single_summary_line(docstring)
     if summary_line is None:
         return None
-    rendered = _rendered_one_line_docstring(docstring, summary_line, context=context)
+    rendered = _rendered_one_line_docstring(docstring, summary_line)
     if rendered is None or rendered == docstring.source:
         return None
     if not _rendered_line_fits(docstring, rendered, context=context, source_lines=source_lines):
@@ -92,13 +92,13 @@ def _single_summary_line(docstring: PDF_definition.DocstringInfo) -> PDF_definit
     return docstring.structure.lines[block.start_line]
 
 
-def _rendered_one_line_docstring(docstring: PDF_definition.DocstringInfo, summary_line: PDF_definition.DocstringValueLine, *, context: RuleContext) -> str | None:
+def _rendered_one_line_docstring(docstring: PDF_definition.DocstringInfo, summary_line: PDF_definition.DocstringValueLine) -> str | None:
     """Return one-line source for a docstring while preserving safe source spelling."""
-    fragments = PDF_definition.docstring_value_fragments(docstring, line_ending=context.line_ending)
-    if fragments is None:
+    source_map = docstring.source_map
+    if source_map is None:
         return None
     strip_docstring_margin = summary_line.index != 0
-    body_source = PDF_definition.docstring_line_source(summary_line, fragments=fragments, strip_docstring_margin=strip_docstring_margin)
+    body_source = PDF_definition.docstring_line_source(summary_line, source_map=source_map, strip_docstring_margin=strip_docstring_margin)
     expected_value = summary_line.text if strip_docstring_margin else summary_line.raw_text
     return PDF_definition.render_simple_docstring_body_with_separator_fallbacks(docstring, body_source=body_source, expected_value=expected_value)
 

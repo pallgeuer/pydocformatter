@@ -70,7 +70,7 @@ def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo, *, co
         return None
     canonical_margin = PDF_definition.docstring_canonical_margin(docstring, context=context, source_lines=source_lines)
     targets = tuple(_line_target(docstring, line, canonical_margin=canonical_margin, context=context) for line in docstring.structure.lines)
-    return PDF_definition.planned_simple_docstring_line_change(docstring, context=context, raw_line_targets=targets)
+    return PDF_definition.planned_simple_docstring_line_change(docstring, raw_line_targets=targets)
 
 
 def _line_target(docstring: PDF_definition.DocstringInfo, line: PDF_definition.DocstringValueLine, *, canonical_margin: str, context: RuleContext) -> str | None:

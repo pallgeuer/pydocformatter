@@ -94,36 +94,40 @@ def test_preserves_raw_docstring_prefix_when_fixing_backslash_heavy_description(
     assert not result.unfixed_findings
 
 
-def test_reports_escaped_source_mapping_without_fixing_when_escape_precedes_target() -> None:
+def test_fixes_target_when_escape_precedes_it() -> None:
     source = 'def connect(timeout):\n    """Connect \\u2603.\n\n    Args:\n        timeout: timeout in seconds.\n    """\n'
     result = format_source(source)
 
-    assert result.new_source == source
-    assert not result.fixed_findings
-    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((2, 3, 4, 5, 6),)
-    assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring entry description first word 'timeout' should be capitalized",)
-    assert not result.unfixed_findings[0].fixable
+    assert result.new_source == source.replace("timeout: timeout", "timeout: Timeout")
+    assert result.fixed_findings[PDF310EntryDescriptionFirstWordCapitalization.meta] == 1
+    assert not result.unfixed_findings
 
 
-def test_reports_unsafe_source_mapping_without_fixing() -> None:
+def test_fixes_target_with_escaped_logical_newlines() -> None:
     source = 'def connect(timeout):\n    """Connect.\\n\\n    Args:\\n        timeout: timeout in seconds."""\n'
     result = format_source(source)
 
-    assert result.new_source == source
-    assert not result.fixed_findings
-    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((2,),)
-    assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring entry description first word 'timeout' should be capitalized",)
-    assert not result.unfixed_findings[0].fixable
+    assert result.new_source == source.replace("timeout: timeout", "timeout: Timeout")
+    assert result.fixed_findings[PDF310EntryDescriptionFirstWordCapitalization.meta] == 1
+    assert not result.unfixed_findings
 
 
-def test_reports_escaped_first_word_without_fixing_otherwise_simple_docstring() -> None:
+def test_capitalizes_only_the_first_source_character_when_later_word_characters_are_escaped() -> None:
     source = 'def connect(timeout):\n    """Connect.\n\n    Args:\n        timeout: ti\\x6deout in seconds.\n    """\n'
     result = format_source(source)
 
-    assert result.new_source == source
-    assert not result.fixed_findings
-    assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring entry description first word 'timeout' should be capitalized",)
-    assert not result.unfixed_findings[0].fixable
+    assert result.new_source == source.replace("timeout: ti", "timeout: Ti")
+    assert result.fixed_findings[PDF310EntryDescriptionFirstWordCapitalization.meta] == 1
+    assert not result.unfixed_findings
+
+
+def test_capitalizes_only_first_character_when_word_contains_source_continuation() -> None:
+    source = 'def connect(timeout):\n    """Connect.\n\n    Args:\n        timeout: lo\\\nwercase value.\n    """\n'
+    result = format_source(source)
+
+    assert result.new_source == 'def connect(timeout):\n    """Connect.\n\n    Args:\n        timeout: Lo\\\nwercase value.\n    """\n'
+    assert result.fixed_findings[PDF310EntryDescriptionFirstWordCapitalization.meta] == 1
+    assert not result.unfixed_findings
 
 
 def test_unfixable_selection_reports_fixable_instance_without_changing_source() -> None:
@@ -155,16 +159,17 @@ def test_combined_entry_description_style_rules_converge() -> None:
         'def connect(timeout):\n    """Connect.\n\r\n    Args:\r\n        timeout: timeout in seconds\r\n    """\r\n',
     ],
 )
-def test_combined_entry_description_style_rules_do_not_fix_mixed_physical_line_endings(source: str) -> None:
+def test_combined_entry_description_style_rules_preserve_mixed_physical_line_endings(source: str) -> None:
     settings = CheckSettings(select=("PDF308", "PDF309", "PDF310"), docstring_convention=DocstringConvention.GOOGLE)
     result = format_source(source, settings=settings)
 
-    assert result.new_source == source
-    assert not result.modified
+    assert result.new_source == source.replace("timeout: timeout in seconds", "timeout: Timeout in seconds.")
+    assert result.modified
     assert not result.errors
-    assert not result.fixed_findings
-    assert [finding.rule.code.tag for finding in result.unfixed_findings] == ["PDF308", "PDF309", "PDF310"]
-    assert [finding.fixable for finding in result.unfixed_findings] == [False, False, False]
+    assert result.fixed_findings[PDF308EntryDescriptionTrailingPeriod.meta] == 1
+    assert not result.fixed_findings[PDF309EntryDescriptionTerminalPunctuation.meta]
+    assert result.fixed_findings[PDF310EntryDescriptionFirstWordCapitalization.meta] == 1
+    assert not result.unfixed_findings
 
 
 def test_preserves_crlf_line_endings() -> None:

@@ -268,7 +268,7 @@ def value(arg):
 PDF411: Lines 2-4: Docstring type-like token spacing should be normalized
 ```
 
-PDF411 also reports a safely parsed type slot without fixing when the evaluated docstring text cannot be mapped back to an exact source span:
+Safely mapped escapes inside a type slot are normalized with the rest of the slot:
 
 ```pydocfmt-example
 [settings]
@@ -282,9 +282,13 @@ def value(arg):
         arg (Mapping[\x20str, object ]): Input value.
     """
 
-[output=unchanged]
-[findings]
-PDF411: Lines 2-6: Docstring type-like token spacing should be normalized
+[output]
+def value(arg):
+    """Return the value.
+
+    Args:
+        arg (Mapping[str, object]): Input value.
+    """
 ```
 
 ## Options

@@ -8,6 +8,8 @@ import pytest
 import tests.rules.PCF.helpers as pcf_helpers
 from pydocformatter import formatter, rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, CommentTaskMarkerMode, LineEnding
+from pydocformatter.rules.definition_helpers import text_layout
+from pydocformatter.rules.definitions.PCF.PCF004_trailing_comment_extraction import PCF004TrailingCommentExtraction
 
 
 def test_long_trailing_comment_moves_above_code_and_is_independent_of_pcf001() -> None:
@@ -479,6 +481,53 @@ def test_extracted_trailing_comment_stays_separate_from_joined_standalone_paragr
     assert not second.errors
 
 
+def test_direct_extraction_keeps_recognized_markup_indivisible() -> None:
+    source = "value = compute()  # Before [label with several words](target) after.\n"
+    settings = CheckSettings(select=("PCF004",), line_length=24, url_aware_wrapping=False)
+    result = formatter.format_source(source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
+
+    assert result.new_source is not None
+    markup_lines = tuple(line for line in result.new_source.splitlines() if "[label" in line or "several words]" in line)
+    assert markup_lines == ("# [label with several words](target)",)
+    assert result.fixed_findings[PCF004TrailingCommentExtraction.meta] == 1
+
+
+def test_fence_opener_with_info_string_remains_fixable_during_extraction() -> None:
+    source = "value = compute()  # ```python code words that need extraction and wrapping.\n"
+    settings = CheckSettings(select=("PCF004",), line_length=28, comment_trailing_extraction_content_aware=False)
+    result = formatter.format_source(source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
+
+    assert result.new_source is not None
+    assert result.new_source != source
+    assert result.new_source.endswith("value = compute()\n")
+    assert result.fixed_findings[PCF004TrailingCommentExtraction.meta] == 1
+    assert not result.unfixed_findings
+
+
+def test_extraction_wraps_existing_scan_without_calling_text_wrapper(monkeypatch: pytest.MonkeyPatch) -> None:
+    source = "value = compute()  # Ordinary trailing explanation with enough words to require extraction.\n"
+    settings = CheckSettings(select=("PCF004",), line_length=28)
+
+    def unexpected_wrap(*args: object, **kwargs: object) -> tuple[str, ...]:
+        raise AssertionError(f"Unexpected wrap_text call: {args!r}, {kwargs!r}")
+
+    monkeypatch.setattr(text_layout, "wrap_text", unexpected_wrap)
+    result = formatter.format_source(source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
+
+    assert result.fixed_findings[PCF004TrailingCommentExtraction.meta] == 1
+
+
+@pytest.mark.parametrize("content_aware", [False, True])
+def test_ambiguous_trailing_markup_is_reported_without_extraction(content_aware: bool) -> None:
+    source = "value = compute()  # Before [label](missing destination words that require moving.\n"
+    settings = CheckSettings(select=("PCF004",), line_length=28, comment_trailing_extraction_content_aware=content_aware)
+    result = formatter.format_source(source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
+
+    assert result.new_source == source
+    assert not result.fixed_findings
+    assert tuple((finding.line_numbers, finding.fixable) for finding in result.unfixed_findings) == (((1,), False),)
+
+
 @pytest.mark.parametrize(
     ("source", "expected"),
     [
@@ -509,3 +558,49 @@ def test_complex_trailing_extraction_is_idempotent() -> None:
     assert second.new_source == first.new_source
     assert not second.fixed_findings
     assert not second.errors
+
+
+def test_ambiguity_guard_precedes_content_and_task_marker_handling() -> None:
+    sources = ("value = compute()  # - [label](missing destination words that require moving.\n", "value = compute()  # TODO: [label](missing destination words that require moving.\n")
+    for source in sources:
+        settings = CheckSettings(select=("PCF004",), line_length=28, comment_task_marker_mode=CommentTaskMarkerMode.NO_WRAP)
+        result = formatter.format_source(source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
+
+        assert result.new_source == source
+        assert tuple((finding.line_numbers, finding.fixable) for finding in result.unfixed_findings) == (((1,), False),)
+
+
+def test_ambiguity_is_not_reported_before_overlong_and_syntax_eligibility() -> None:
+    short = "x = 1  # [label](missing\n"
+    sensitive = "if enabled:  # [label](missing destination words requiring wrap.\n    pass\n"
+
+    short_result = formatter.format_source(
+        short, "example.py", settings=CheckSettings(select=("PCF004",), line_length=80), rule_selection=rules_selection.select_rules(CheckSettings(select=("PCF004",), line_length=80)), fix=True
+    )
+    sensitive_settings = CheckSettings(select=("PCF004",), line_length=25)
+    sensitive_result = formatter.format_source(sensitive, "example.py", settings=sensitive_settings, rule_selection=rules_selection.select_rules(sensitive_settings), fix=True)
+
+    assert short_result.new_source == short
+    assert not short_result.unfixed_findings
+    assert sensitive_result.new_source == sensitive
+    assert not sensitive_result.unfixed_findings
+
+
+def test_extraction_does_not_turn_trailing_spaces_into_a_hard_break_before_code() -> None:
+    source = "value = compute()  # explanation with enough words to move above code.  \n"
+    settings = CheckSettings(select=("PCF004",), line_length=32)
+    result = formatter.format_source(source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
+
+    assert result.new_source == "# explanation with enough words\n# to move above code.\nvalue = compute()\n"
+    assert result.fixed_findings[PCF004TrailingCommentExtraction.meta] == 1
+
+
+def test_inline_link_destinations_activate_extraction_url_balancing() -> None:
+    source = "value = compute()  # alpha beta [label](https://example.com/path) alpha after\n"
+    disabled_settings = CheckSettings(select=("PCF004",), line_length=40, url_aware_wrapping=False)
+    enabled_settings = CheckSettings(select=("PCF004",), line_length=40, url_aware_wrapping=True)
+    disabled = formatter.format_source(source, "example.py", settings=disabled_settings, rule_selection=rules_selection.select_rules(disabled_settings), fix=True)
+    enabled = formatter.format_source(source, "example.py", settings=enabled_settings, rule_selection=rules_selection.select_rules(enabled_settings), fix=True)
+
+    assert disabled.new_source == "# alpha beta\n# [label](https://example.com/path)\n# alpha after\nvalue = compute()\n"
+    assert enabled.new_source == "# alpha\n# beta [label](https://example.com/path)\n# alpha after\nvalue = compute()\n"

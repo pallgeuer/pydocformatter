@@ -10,7 +10,6 @@ Attributes:
     ATX_HEADING_RE (re.Pattern[str]): Markdown ATX heading detector used to keep standalone heading comments unchanged.
     HEADING_ADORNMENT_RE (re.Pattern[str]): Setext and reStructuredText adornment detector for preserving underlined or
         overlined headings.
-    FENCE_RE (re.Pattern[str]): Markdown code-fence detector used to protect fenced blocks from prose wrapping.
     DIRECTIVE_RE (re.Pattern[str]): ReStructuredText directive opener detector used to preserve directive bodies by
         indentation.
     MARKDOWN_TABLE_DELIMITER_RE (re.Pattern[str]): Markdown pipe-table separator detector used as structural evidence
@@ -36,7 +35,7 @@ from typing import TYPE_CHECKING
 # First-party imports
 import pydocformatter.rules.definitions.PCF.PCF as PCF_definition
 from pydocformatter.cli.settings_check import CommentTaskMarkerMode
-from pydocformatter.rules.definition_helpers import text_layout
+from pydocformatter.rules.definition_helpers import inline_markup, text_layout
 
 
 if TYPE_CHECKING:
@@ -49,7 +48,6 @@ LIST_RE = re.compile(r"^(?P<indent>[ \t]*)(?P<marker>(?:[-+*]|\d+[.)]))[ \t]+(?P
 BLOCK_QUOTE_RE = re.compile(r"^(?P<prefix>(?:>[ \t]*)+)(?P<text>.*)$")
 ATX_HEADING_RE = re.compile(r"^#{1,6}(?:[ \t]+|$)")
 HEADING_ADORNMENT_RE = re.compile(r"^(?P<char>[=\-~`^\"'*+#:._])(?P=char){2,}[ \t]*$")
-FENCE_RE = re.compile(r"^[ \t]*(?P<fence>`{3,}|~{3,})")
 DIRECTIVE_RE = re.compile(r"^(?P<indent>[ \t]*)\.\.\s+[A-Za-z][\w-]*::(?:\s|$)")
 MARKDOWN_TABLE_DELIMITER_RE = re.compile(r"^[ \t]*\|?(?:[ \t]*:?-{3,}:?[ \t]*\|)+[ \t]*:?-{3,}:?[ \t]*\|?[ \t]*$")
 REST_GRID_BORDER_RE = re.compile(r"^[ \t]*\+(?:[-=]+\+)+[ \t]*$")
@@ -103,15 +101,15 @@ def preserved_indices(run: PCF_definition.StandaloneCommentRun, *, settings: Che
     if settings.comment_preserve_code_fences:
         index = 0
         while index < len(bodies):
-            match = FENCE_RE.match(bodies[index])
+            match = inline_markup.FENCE_RE.match(bodies[index])
             if match is None:
                 index += 1
                 continue
             fence = match.group("fence")
             end = index + 1
             while end < len(bodies):
-                closing = FENCE_RE.match(bodies[end])
-                if closing is not None and closing.end() == len(bodies[end]) and closing.group("fence")[0] == fence[0] and len(closing.group("fence")) >= len(fence):
+                closing = inline_markup.FENCE_RE.match(bodies[end])
+                if closing is not None and closing.group("fence")[0] == fence[0] and len(closing.group("fence")) >= len(fence) and not closing.group("info").strip():
                     end += 1
                     break
                 end += 1
@@ -500,7 +498,7 @@ def trailing_content_is_unsafe(content: str, *, settings: CheckSettings) -> bool
         return True
     if settings.comment_preserve_doctests and body.lstrip().startswith(">>>"):
         return True
-    if settings.comment_preserve_code_fences and FENCE_RE.match(body) is not None:
+    if settings.comment_preserve_code_fences and inline_markup.FENCE_RE.match(body) is not None:
         return True
     if settings.comment_preserve_directives and DIRECTIVE_RE.match(body) is not None:
         return True

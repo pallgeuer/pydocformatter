@@ -94,11 +94,12 @@ def _rendered_docstring(docstring: PDF_definition.DocstringInfo, *, line_ending:
             return rendered
         if "r" in docstring.node.prefix.lower():
             return None
-    fragments = string_literals.value_fragments_for_simple_string(docstring.node, line_ending=line_ending)
-    if fragments is None:
+    source_map = docstring.source_map
+    if source_map is None:
         return None
+    fragments = source_map.fragments
     retargeted = string_literals.retarget_fragments(fragments, quote=_TARGET_QUOTE, line_ending=line_ending)
-    body_source = "".join(fragment.source for fragment in retargeted)
+    body_source = source_map.body_source_for_fragments(retargeted)
     return string_literals.render_simple_string_from_body_source(docstring.node.prefix, _TARGET_QUOTE, body_source, expected_value=docstring.value)
 
 

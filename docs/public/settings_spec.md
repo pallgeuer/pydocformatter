@@ -130,7 +130,7 @@ Cache data is best-effort optimization state. Missing, corrupt, incompatible, lo
 
 When `respect-gitignore` is enabled, pydocfmt aborts if gitignore filtering cannot be checked, because continuing without that filter could format files that should stay ignored.
 
-When `url-aware-wrapping` is enabled, pydocfmt may choose less greedy line breaks around URL tokens in comment and docstring prose, but URLs and other long words are still not split.
+When `url-aware-wrapping` is enabled, pydocfmt may choose less greedy line breaks around destination-bearing tokens in comment and docstring prose. Recognized inline markup is atomic regardless of this setting, and other long words are still not split.
 
 The `comment-*` settings affect the rule-based formatter. PCF001 defaults to formatting each standalone physical line independently; joining and structured-markup interpretation are opt-in. PCF004 keeps syntax-sensitive and unsafe-content overlong trailing comments inline by default. See `pydocfmt rule PCF001`, `pydocfmt rule PCF002`, `pydocfmt rule PCF003`, and `pydocfmt rule PCF004` for exact detector precedence, spacing, extraction, and protected-comment behavior.
 

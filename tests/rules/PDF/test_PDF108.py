@@ -154,12 +154,12 @@ def test_escapes_quote_collision_before_same_line_closing_quotes() -> None:
     assert not format_pdf104(result.new_source).modified
 
 
-def test_skips_multiline_docstring_with_non_raw_escape_source_mapping() -> None:
+def test_moves_closing_quotes_with_non_raw_escape_source_mapping() -> None:
     source = 'def function():\n    """Summary.\n\n    Body\\t.\n    """\n'
     result = format_pdf104(source)
 
-    assert result.new_source == source
-    assert not result.fixed_findings
+    assert result.new_source == 'def function():\n    """Summary.\n\n    Body\\t."""\n'
+    assert result.fixed_findings[PDF108MultilineClosingQuotesSameLine.meta] == 1
     assert not result.unfixed_findings
 
 

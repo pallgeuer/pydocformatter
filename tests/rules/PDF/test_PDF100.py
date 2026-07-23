@@ -264,12 +264,12 @@ def test_plain_complex_protected_layouts_keep_relative_indentation() -> None:
     )
 
 
-def test_skips_single_line_concatenated_and_unsafe_escaped_docstrings() -> None:
+def test_skips_unsupported_layouts_and_fixes_safely_mapped_escape_content() -> None:
     source = 'def single():\n    """Summary."""\n\ndef concatenated():\n    ("first " "second")\n\ndef escaped():\n    """first\\n  second"""\n\ndef escaped_content():\n    """Summary.\n      \\x41 content.\n    """\n\ndef continuation():\n    """first\\\n  second"""\n'
     result = format_pdf002(source)
 
-    assert result.new_source == source
-    assert not result.fixed_findings
+    assert result.new_source == source.replace("      \\x41 content.", "    \\x41 content.")
+    assert result.fixed_findings[PDF100DocstringIndentation.meta] == 1
     assert not result.unfixed_findings
 
 

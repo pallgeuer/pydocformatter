@@ -15,7 +15,7 @@ PDF413 only removes a colon immediately after the recognized section name. It do
 NumPy-style section headers are written without trailing colons. Removing the colon keeps the header spelling compatible with tools that expect NumPy docstring syntax.
 
 ## Ruff compatibility
-This rule is intended to replace Ruff's `D406` colon-suffix checks. Pure trailing-whitespace section-name findings from Ruff's `D406` are covered by PDF102.
+This rule is intended to replace Ruff's `D406` colon-suffix checks. Accidental pure trailing-whitespace section-name findings from Ruff's `D406` are covered by PDF102; intentional two-or-more-space Markdown hard breaks are preserved.
 
 ## Examples
 PDF413 removes a superfluous colon from a canonical NumPy section name:
@@ -198,7 +198,7 @@ def value(arg):
 [output=unchanged]
 ```
 
-PDF413 and PDF102 together replace the Ruff `D406` surface: PDF413 removes section-name colons, while PDF102 removes pure trailing whitespace from non-empty docstring lines.
+PDF413 and PDF102 together cover the mechanically safe Ruff `D406` surface: PDF413 removes section-name colons, while PDF102 removes accidental pure trailing whitespace from non-empty docstring lines without deleting intentional Markdown hard breaks.
 
 Section-like text inside parsed entries, prose-adjacent section body lines, and protected structures is not treated as a section name:
 

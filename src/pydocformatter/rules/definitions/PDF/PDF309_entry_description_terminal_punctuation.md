@@ -235,7 +235,7 @@ def connect(timeout):
 [output=unchanged]
 ```
 
-Unsafe escaped source mappings are reported but not fixed:
+Safely mapped escapes in the edited description retain their source spelling:
 
 ```pydocfmt-example
 [settings]
@@ -249,9 +249,13 @@ def connect(timeout):
         timeout: timeout \u2603
     """
 
-[output=unchanged]
-[findings]
-PDF309: Lines 2-6: Docstring entry description should end with terminal punctuation
+[output]
+def connect(timeout):
+    """Connect.
+
+    Args:
+        timeout: timeout \u2603.
+    """
 ```
 
 ## Options

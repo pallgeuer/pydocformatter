@@ -58,10 +58,10 @@ class PDF104OpeningQuotesWhitespace(RuleBase):
 def _planned_changes(context: RuleContext) -> tuple[rule_edits.PlannedSourceChange, ...]:
     """Return all safe opening quote whitespace changes."""
     data = PDF_definition.PDF.require_data(context)
-    return tuple(change for docstring in data.docstrings if (change := _planned_change_for_docstring(docstring, context=context)) is not None)
+    return tuple(change for docstring in data.docstrings if (change := _planned_change_for_docstring(docstring)) is not None)
 
 
-def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo, *, context: RuleContext) -> rule_edits.PlannedSourceChange | None:
+def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo) -> rule_edits.PlannedSourceChange | None:
     """Return one source replacement for opening quote whitespace."""
     if not PDF_definition.is_safely_mapped_simple_docstring(docstring):
         return None
@@ -71,14 +71,10 @@ def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo, *, co
     whitespace_end = len(line.raw_text) - len(line.raw_text.lstrip(" \t"))
     if whitespace_end == 0:
         return None
-    return _validated_change(docstring, line, whitespace_end=whitespace_end, replacement_text="", context=context) or _validated_change(
-        docstring, line, whitespace_end=whitespace_end, replacement_text=" ", context=context
-    )
+    return _validated_change(docstring, line, whitespace_end=whitespace_end, replacement_text="") or _validated_change(docstring, line, whitespace_end=whitespace_end, replacement_text=" ")
 
 
-def _validated_change(
-    docstring: PDF_definition.DocstringInfo, line: PDF_definition.DocstringValueLine, *, whitespace_end: int, replacement_text: str, context: RuleContext
-) -> rule_edits.PlannedSourceChange | None:
+def _validated_change(docstring: PDF_definition.DocstringInfo, line: PDF_definition.DocstringValueLine, *, whitespace_end: int, replacement_text: str) -> rule_edits.PlannedSourceChange | None:
     """Return a validated opening quote whitespace change."""
     if line.source_line_number is None:
         return None
@@ -89,7 +85,6 @@ def _validated_change(
     value_lines[line.index] = target_line
     return PDF_definition.planned_simple_docstring_source_change(
         docstring,
-        context=context,
         replacements=(
             rule_edits.PlannedTextReplacement(start_offset=line.start_offset, end_offset=line.start_offset + whitespace_end, text=replacement_text, line_numbers=(line.source_line_number,)),
         ),

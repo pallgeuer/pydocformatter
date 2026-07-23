@@ -65,7 +65,7 @@ def _violations(context: RuleContext, *, rule: RuleMetadata) -> tuple[rule_viola
         if word is None or not first_word_capitalization.should_capitalize(word.word):
             continue
         capitalized_word = f"{word.word[0].upper()}{word.word[1:]}"
-        change = _planned_change(word, replacement=capitalized_word, context=context)
+        change = _planned_change(word, replacement=capitalized_word)
         violations.append(
             rule_violations.violation_for_optional_planned_source_change(
                 rule, change, line_numbers=summary_style.line_numbers(word), instance_message=f"Docstring summary first word '{word.word}' should be capitalized"
@@ -74,7 +74,7 @@ def _violations(context: RuleContext, *, rule: RuleMetadata) -> tuple[rule_viola
     return tuple(violations)
 
 
-def _planned_change(word: summary_style.SummaryWordTarget, *, replacement: str, context: RuleContext) -> rule_edits.PlannedSourceChange | None:
+def _planned_change(word: summary_style.SummaryWordTarget, *, replacement: str) -> rule_edits.PlannedSourceChange | None:
     """Return a safe replacement for one summary first word."""
     docstring = word.docstring
     line = word.line
@@ -89,4 +89,4 @@ def _planned_change(word: summary_style.SummaryWordTarget, *, replacement: str, 
     raw_end_column = end_offset - line.start_offset
     value_lines[line.index] = f"{line.raw_text[:raw_start_column]}{replacement}{line.raw_text[raw_end_column:]}"
     replacement_edit = rule_edits.PlannedTextReplacement(start_offset=start_offset, end_offset=end_offset, text=replacement, line_numbers=summary_style.line_numbers(word))
-    return PDF_definition.planned_simple_docstring_source_change(docstring, context=context, replacements=(replacement_edit,), value_lines=value_lines)
+    return PDF_definition.planned_simple_docstring_source_change(docstring, replacements=(replacement_edit,), value_lines=value_lines)

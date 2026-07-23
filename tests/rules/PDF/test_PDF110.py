@@ -204,12 +204,12 @@ def test_disabled_single_line_structure_parsing_can_make_structure_collapsible(s
     assert disabled.fixed_findings[PDF110OneLineDocstring.meta] == 1
 
 
-def test_skips_multiline_simple_docstring_when_escaped_source_mapping_is_ambiguous() -> None:
+def test_collapses_multiline_simple_docstring_with_safely_mapped_escape() -> None:
     source = 'def function():\n    """\n    Summary with tab\\t escape.\n    """\n'
     result = format_pdf106(source)
 
-    assert result.new_source == source
-    assert not result.fixed_findings
+    assert result.new_source == 'def function():\n    """Summary with tab\\t escape."""\n'
+    assert result.fixed_findings[PDF110OneLineDocstring.meta] == 1
     assert not result.unfixed_findings
 
 

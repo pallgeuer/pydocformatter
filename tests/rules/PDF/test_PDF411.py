@@ -226,15 +226,13 @@ def test_reports_unsafe_type_like_spacing_without_fixing() -> None:
     assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring type-like token spacing should be normalized",)
 
 
-def test_reports_escaped_type_like_source_span_without_fixing() -> None:
+def test_fixes_escaped_type_like_source_span() -> None:
     source = 'def function(value):\n    """Summary.\n\n    Args:\n        value (Mapping[\\x20str, object ]): Description.\n    """\n'
     result = format_source(source)
 
-    assert result.new_source == source
-    assert not result.fixed_findings
-    assert tuple(finding.rule for finding in result.unfixed_findings) == (PDF411TypeLikeTokenSpacingNormalization.meta,)
-    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((2, 3, 4, 5, 6),)
-    assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring type-like token spacing should be normalized",)
+    assert result.new_source == source.replace("Mapping[\\x20str, object ]", "Mapping[str, object]")
+    assert result.fixed_findings[PDF411TypeLikeTokenSpacingNormalization.meta] == 1
+    assert not result.unfixed_findings
 
 
 def test_ignored_without_supported_convention() -> None:

@@ -230,6 +230,16 @@ def test_protected_blocks_are_unchanged_while_adjacent_prose_reflows() -> None:
     assert result.new_source == 'def function():\n    """Prose before a code fence that is long enough to\n    require wrapping.\n\n    ```python\n    value = compute()\n    ```\n    """\n'
 
 
+def test_fence_opener_with_info_string_remains_fixable_when_fence_parsing_is_disabled() -> None:
+    source = 'def function():\n    """```python code words that make this line deliberately very long."""\n'
+    settings = CheckSettings(select=("PDF101",), line_length=40, docstring_parse_code_fences=False)
+    result = format_pdf001(source, settings=settings)
+
+    assert result.new_source == 'def function():\n    """```python code words that make\n    this line deliberately very long."""\n'
+    assert result.fixed_findings[PDF101DocstringReflow.meta] == 1
+    assert not result.unfixed_findings
+
+
 def test_colon_headers_stop_reflow_across_boundary_while_adjacent_prose_reflows() -> None:
     source = 'def function():\n    """Introductory prose before the colon boundary that is long enough to require wrapping.\n\n    The accepted values are:\n    pending, active, and disabled.\n\n    Trailing prose after the colon boundary that is long enough to require wrapping.\n    """\n'
     result = format_pdf001(source, settings=CheckSettings(select=("PDF101",), line_length=64))
@@ -289,7 +299,7 @@ def test_ambiguous_and_concatenated_docstrings_are_skipped() -> None:
 
     assert result.new_source == source
     assert not result.fixed_findings
-    assert not result.unfixed_findings
+    assert tuple((finding.line_numbers, finding.fixable) for finding in result.unfixed_findings) == (((2,), False),)
 
 
 def test_long_words_are_not_split() -> None:
@@ -446,6 +456,43 @@ def test_unsupported_escape_reports_non_fixable_finding_without_crashing() -> No
     assert [finding.fixable for finding in result.unfixed_findings] == [False]
 
 
+@pytest.mark.filterwarnings("ignore:invalid escape sequence.*:DeprecationWarning")
+def test_multiline_unsupported_escape_reports_when_physical_line_ownership_is_unambiguous() -> None:
+    source = "def function():\n    " + r'"""Bad \z words on the first line' + '\n    continuation words that should join.\n    """\n'
+    result = format_pdf001(source, settings=CheckSettings(select=("PDF101",), line_length=80))
+
+    assert result.new_source == source
+    assert not result.fixed_findings
+    assert tuple((finding.line_numbers, finding.fixable) for finding in result.unfixed_findings) == (((2, 3, 4), False),)
+
+
+def test_balanced_evaluated_and_physical_line_counts_do_not_override_unsafe_escape_mapping() -> None:
+    source = 'def function():\n    """Alpha beta gamma delta\\nBeta gamma delta \\\n    Gamma delta epsilon."""\n'
+    result = format_pdf001(source, settings=CheckSettings(select=("PDF101",), line_length=30))
+
+    assert result.new_source == source
+    assert not result.fixed_findings
+    assert tuple((finding.line_numbers, finding.fixable) for finding in result.unfixed_findings) == (((2, 3), False),)
+
+
+def test_reflow_preserves_source_continuations_outside_the_changed_region() -> None:
+    source = 'def function():\n    """This summary has enough words to require wrapping around the configured width.\n\n    Example::\n\n        some_call(\\\n    argument)\n    """\n'
+    result = format_pdf001(source, settings=CheckSettings(select=("PDF101",), line_length=48))
+
+    assert result.new_source is not None
+    assert "some_call(\\\n    argument)" in result.new_source
+    assert result.fixed_findings[PDF101DocstringReflow.meta] == 1
+
+
+def test_reflow_canonicalizes_source_continuations_inside_the_changed_region() -> None:
+    source = 'def function():\n    """Alpha beta gamma \\\n    delta epsilon zeta eta theta."""\n'
+    result = format_pdf001(source, settings=CheckSettings(select=("PDF101",), line_length=32))
+
+    assert result.new_source is not None
+    assert "\\\n" not in result.new_source
+    assert not format_pdf001(result.new_source, settings=CheckSettings(select=("PDF101",), line_length=32)).modified
+
+
 def test_check_mode_reports_all_reflowable_docstrings_without_modifying_source() -> None:
     source = '"""Module docstring with enough words to require wrapping."""\n\ndef function():\n    """Function docstring with enough words to require wrapping."""\n'
     check_result = format_pdf001(source, settings=CheckSettings(select=("PDF101",), line_length=42), fix=False)
@@ -564,3 +611,132 @@ def test_url_aware_wrapping_balances_rest_field_descriptions_when_enabled() -> N
         default.new_source
         == 'def function(value):\n    """Do work.\n\n    :param value: alpha\n                  beta https://example.com/path\n                  alpha after validating\n                  enough extra text to require\n                  wrapping.\n    """\n'
     )
+
+
+def test_reflow_keeps_markdown_link_and_punctuation_envelope_indivisible() -> None:
+    source = 'def function():\n    """Before ([label with several words](https://example.com/path)), after words that require wrapping."""\n'
+    result = format_pdf001(source, settings=CheckSettings(select=("PDF101",), line_length=42))
+
+    assert result.new_source is not None
+    assert "([label with several words](https://example.com/path))," in result.new_source
+    assert not any("[label with\n" in result.new_source or ("several words](" in line and "[label" not in line) for line in result.new_source.splitlines())
+    assert not format_pdf001(result.new_source, settings=CheckSettings(select=("PDF101",), line_length=42)).modified
+
+
+def test_reflow_preserves_space_hard_break_and_does_not_join_across_it() -> None:
+    source = 'def function():\n    """Alpha beta gamma delta epsilon  \n    zeta eta theta iota kappa."""\n'
+    result = format_pdf001(source, settings=CheckSettings(select=("PDF101",), line_length=36))
+
+    assert result.new_source == 'def function():\n    """Alpha beta gamma delta\n    epsilon  \n    zeta eta theta iota kappa."""\n'
+    assert not format_pdf001(result.new_source, settings=CheckSettings(select=("PDF101",), line_length=36)).modified
+
+
+def test_reflow_preserves_escaped_space_hard_break_source_spelling() -> None:
+    source = 'def function():\n    """Alpha beta gamma delta epsilon\\x20\\x20\n    zeta eta theta."""\n'
+    result = format_pdf001(source, settings=CheckSettings(select=("PDF101",), line_length=36))
+
+    assert result.new_source is not None
+    assert "\\x20\\x20\n" in result.new_source
+    assert result.new_source.count("\\x20") == 2
+    assert not format_pdf001(result.new_source, settings=CheckSettings(select=("PDF101",), line_length=36)).modified
+
+
+def test_reflow_preserves_odd_backslash_hard_break_but_joins_after_even_run() -> None:
+    odd = 'def function():\n    r"""Alpha beta gamma delta\\\n    zeta eta theta."""\n'
+    even = 'def function():\n    r"""Alpha beta gamma delta\\\\\n    zeta eta theta."""\n'
+
+    odd_result = format_pdf001(odd, settings=CheckSettings(select=("PDF101",), line_length=80))
+    even_result = format_pdf001(even, settings=CheckSettings(select=("PDF101",), line_length=80))
+
+    assert odd_result.new_source == odd
+    assert even_result.new_source == 'def function():\n    r"""Alpha beta gamma delta\\\\ zeta eta theta."""\n'
+
+
+def test_ambiguous_inline_markup_reports_without_an_unsafe_reflow_fix() -> None:
+    source = 'def function():\n    """Before [label](missing destination words that would otherwise wrap."""\n'
+    result = format_pdf001(source, settings=CheckSettings(select=("PDF101",), line_length=36))
+
+    assert result.new_source == source
+    assert not result.fixed_findings
+    assert tuple((finding.line_numbers, finding.fixable) for finding in result.unfixed_findings) == (((2,), False),)
+
+
+def test_safe_and_ambiguous_regions_in_one_docstring_have_independent_findings() -> None:
+    source = (
+        'def function():\n    """Safe paragraph with enough ordinary words to require wrapping around the configured line length.\n\n'
+        '    Ambiguous [label](missing destination words that would otherwise wrap around the configured width.\n    """\n'
+    )
+    result = format_pdf001(source, settings=CheckSettings(select=("PDF101",), line_length=48))
+
+    assert result.new_source is not None
+    assert result.fixed_findings[PDF101DocstringReflow.meta] == 1
+    assert tuple((finding.line_numbers, finding.fixable) for finding in result.unfixed_findings) == (((6,), False),)
+    assert "Safe paragraph with enough ordinary words\n" in result.new_source
+    assert "Ambiguous [label](missing destination words that would otherwise wrap around the configured width." in result.new_source
+
+
+def test_ambiguous_markup_with_canonical_layout_does_not_report() -> None:
+    source = 'def function():\n    """Before [label](missing."""\n'
+    result = format_pdf001(source, settings=CheckSettings(select=("PDF101",), line_length=80))
+
+    assert result.new_source == source
+    assert not result.fixed_findings
+    assert not result.unfixed_findings
+
+
+def test_ambiguity_protects_the_complete_joined_paragraph_unit() -> None:
+    source = 'def function():\n    """Safe words on one line\n    followed by [label](missing destination.\n    """\n'
+    result = format_pdf001(source, settings=CheckSettings(select=("PDF101",), line_length=80))
+
+    assert result.new_source == source
+    assert tuple((finding.line_numbers, finding.fixable) for finding in result.unfixed_findings) == (((2, 3), False),)
+
+
+def test_hard_breaks_use_list_quote_and_google_continuation_prefixes() -> None:
+    list_source = 'def function():\n    """- Alpha beta gamma delta epsilon  \n      zeta eta theta iota.\n    """\n'
+    quote_source = 'def function():\n    """> Alpha beta gamma delta epsilon  \n    > zeta eta theta iota.\n    """\n'
+    google_source = 'def function(value):\n    """Do work.\n\n    Args:\n        value: Alpha beta gamma delta epsilon  \n            zeta eta theta iota.\n    """\n'
+
+    list_result = format_pdf001(list_source, settings=CheckSettings(select=("PDF101",), line_length=34))
+    quote_result = format_pdf001(quote_source, settings=CheckSettings(select=("PDF101",), line_length=34))
+    google_result = format_pdf001(google_source, settings=CheckSettings(select=("PDF101",), line_length=42, docstring_convention=DocstringConvention.GOOGLE))
+
+    assert list_result.new_source == 'def function():\n    """- Alpha beta gamma delta\n      epsilon  \n      zeta eta theta iota.\n    """\n'
+    assert quote_result.new_source == 'def function():\n    """> Alpha beta gamma delta\n    > epsilon  \n    > zeta eta theta iota.\n    """\n'
+    assert google_result.new_source == 'def function(value):\n    """Do work.\n\n    Args:\n        value: Alpha beta gamma delta\n            epsilon  \n            zeta eta theta iota.\n    """\n'
+
+
+def test_escaped_hard_break_suffixes_reflow_with_physical_crlf_mapping() -> None:
+    source = 'def function():\r\n    """Alpha beta gamma delta epsilon\\x20\\x20\r\n    zeta eta theta iota.\r\n    """\r\n'
+    settings = CheckSettings(select=("PDF101",), line_length=36, line_ending=LineEnding.CR_LF)
+    fixed = format_pdf001(source, settings=settings)
+    checked = format_pdf001(source, settings=settings, fix=False)
+
+    assert fixed.new_source == 'def function():\r\n    """Alpha beta gamma delta\r\n    epsilon\\x20\\x20\r\n    zeta eta theta iota.\r\n    """\r\n'
+    assert tuple((finding.line_numbers, finding.fixable) for finding in checked.unfixed_findings) == (((2, 3), True),)
+    assert not format_pdf001(fixed.new_source, settings=settings).modified
+
+
+def test_reflow_removes_only_tabs_before_escaped_space_hard_break() -> None:
+    source = 'def function():\n    """Alpha beta gamma delta epsilon \\t\\x20\\x20\n    zeta eta theta.\n    """\n'
+    result = format_pdf001(source, settings=CheckSettings(select=("PDF101",), line_length=80))
+
+    assert result.new_source == 'def function():\n    """Alpha beta gamma delta epsilon \\x20\\x20\n    zeta eta theta.\n    """\n'
+    assert result.fixed_findings[PDF101DocstringReflow.meta] == 1
+
+
+def test_non_raw_backslash_hard_break_keeps_exact_escaped_source() -> None:
+    source = 'def function():\n    """Alpha beta gamma delta epsilon\\\\\n    zeta eta theta iota.\n    """\n'
+    result = format_pdf001(source, settings=CheckSettings(select=("PDF101",), line_length=35))
+
+    assert result.new_source == 'def function():\n    """Alpha beta gamma delta\n    epsilon\\\\\n    zeta eta theta iota.\n    """\n'
+    assert not format_pdf001(result.new_source, settings=CheckSettings(select=("PDF101",), line_length=35)).modified
+
+
+def test_inline_link_destinations_activate_url_balancing_setting() -> None:
+    source = 'def function():\n    """alpha beta [label](https://example.com/path) alpha after"""\n'
+    disabled = format_pdf001(source, settings=CheckSettings(select=("PDF101",), line_length=42, url_aware_wrapping=False))
+    enabled = format_pdf001(source, settings=CheckSettings(select=("PDF101",), line_length=42, url_aware_wrapping=True))
+
+    assert disabled.new_source == 'def function():\n    """alpha beta\n    [label](https://example.com/path)\n    alpha after"""\n'
+    assert enabled.new_source == 'def function():\n    """alpha\n    beta [label](https://example.com/path)\n    alpha after"""\n'

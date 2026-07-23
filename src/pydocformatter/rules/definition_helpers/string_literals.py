@@ -4,14 +4,17 @@
 from __future__ import annotations
 
 # Standard library imports
+import enum
+import bisect
 import string
 import dataclasses
+from collections.abc import Sequence
 
 # Third-party imports
 import libcst as cst
 
 # First-party imports
-from pydocformatter.rules.definition_helpers import text_layout
+from pydocformatter.rules.definition_helpers import inline_markup, text_layout
 
 
 @dataclasses.dataclass(frozen=True)
@@ -25,6 +28,207 @@ class StringValueFragment:
 
     value: str
     source: str
+
+
+class StringNewlineOrigin(enum.Enum):
+    r"""Source origin of an evaluated newline character.
+
+    Attributes:
+        PHYSICAL: A physical LF, CR, or CRLF sequence in the literal body.
+        ESCAPE: A value-producing Python escape such as ``\\n``.
+    """
+
+    PHYSICAL = "physical"
+    ESCAPE = "escape"
+
+
+@dataclasses.dataclass(frozen=True)
+class SimpleStringSourceMap:
+    """Lossless mapping between evaluated characters and literal body source.
+
+    Attributes:
+        body_source (str): Exact source between the literal delimiters.
+        value (str): Evaluated string value represented by the map.
+        fragments (tuple[StringValueFragment, ...]): One source-aware fragment per evaluated character.
+        owned_source_starts (tuple[int, ...]): Body offsets where source owned by each evaluated offset begins.
+        producing_source_starts (tuple[int, ...]): Body offsets where each character-producing source spelling begins.
+        newline_origins (tuple[StringNewlineOrigin | None, ...]): Source origin for each evaluated newline character.
+        physical_newline_ends (tuple[int, ...]): Exclusive body offsets of physical LF, CR, and CRLF sequences.
+    """
+
+    body_source: str
+    value: str
+    fragments: tuple[StringValueFragment, ...]
+    owned_source_starts: tuple[int, ...]
+    producing_source_starts: tuple[int, ...]
+    newline_origins: tuple[StringNewlineOrigin | None, ...]
+    physical_newline_ends: tuple[int, ...]
+
+    def owned_source_for_value_slice(self, start_offset: int, end_offset: int) -> str:
+        """Return exact source owned by an evaluated-value slice.
+
+        Args:
+            start_offset (int): Evaluated offset where the slice starts.
+            end_offset (int): Evaluated offset immediately after the slice.
+
+        Returns:
+            str: Original source spelling owned by the slice.
+
+        Raises:
+            ValueError: If the slice is outside the evaluated value.
+        """
+        self._validate_value_slice(start_offset, end_offset)
+        source_end = len(self.body_source) if end_offset == len(self.fragments) else self.owned_source_starts[end_offset]
+        return self.body_source[self.owned_source_starts[start_offset] : source_end]
+
+    def source_offset_for_value_offset(self, value_offset: int, *, include_leading_zero_value_source: bool = False) -> int:
+        """Return the body-source offset matching an evaluated-value offset.
+
+        Args:
+            value_offset (int): Evaluated offset to map.
+            include_leading_zero_value_source (bool): Whether preceding zero-value source belongs to the mapped offset.
+
+        Returns:
+            int: Corresponding offset in the literal body source.
+
+        Raises:
+            ValueError: If the offset is outside the evaluated value.
+        """
+        if not 0 <= value_offset <= len(self.fragments):
+            raise ValueError("String source-map offset is outside the evaluated value")
+        if value_offset == len(self.fragments):
+            return self.owned_source_starts[value_offset] if include_leading_zero_value_source else len(self.body_source)
+        return self.owned_source_starts[value_offset] if include_leading_zero_value_source else self.producing_source_starts[value_offset]
+
+    def producing_source_for_value_slice(self, start_offset: int, end_offset: int) -> str:
+        """Return character-producing source for an evaluated-value slice.
+
+        Args:
+            start_offset (int): Evaluated offset where the slice starts.
+            end_offset (int): Evaluated offset immediately after the slice.
+
+        Returns:
+            str: Concatenated source spelling that produces the slice characters.
+
+        Raises:
+            ValueError: If the slice is outside the evaluated value.
+        """
+        self._validate_value_slice(start_offset, end_offset)
+        return "".join(fragment.source for fragment in self.fragments[start_offset:end_offset])
+
+    def preserved_source_for_value_deletion(self, start_offset: int, end_offset: int) -> str:
+        """Return internal zero-value source that must survive a value deletion.
+
+        Args:
+            start_offset (int): Evaluated offset where the deletion starts.
+            end_offset (int): Evaluated offset immediately after the deletion.
+
+        Returns:
+            str: Zero-value source occurring between deleted evaluated characters.
+
+        Raises:
+            ValueError: If the slice is outside the evaluated value.
+        """
+        self._validate_value_slice(start_offset, end_offset)
+        return "".join(self.body_source[self.owned_source_starts[index] : self.producing_source_starts[index]] for index in range(start_offset + 1, end_offset))
+
+    def body_source_with_replacements(self, replacements: Sequence[tuple[int, int, str]], *, preserve_zero_value_source: bool = True) -> str:
+        """Return body source after sorted non-overlapping evaluated-value replacements.
+
+        Args:
+            replacements (Sequence[tuple[int, int, str]]): Evaluated start, end, and replacement-source triples.
+            preserve_zero_value_source (bool): Whether source continuations adjacent to replacements remain unchanged.
+
+        Returns:
+            str: Literal body source with the replacements applied.
+
+        Raises:
+            ValueError: If a replacement is invalid, out of order, or overlapping.
+        """
+        chunks: list[str] = []
+        cursor_offset = 0
+        cursor_source = 0
+        for start_offset, end_offset, text in replacements:
+            self._validate_value_slice(start_offset, end_offset)
+            if start_offset < cursor_offset:
+                raise ValueError("String source-map replacements must be sorted and non-overlapping")
+            replacement_source_start = self.source_offset_for_value_offset(start_offset, include_leading_zero_value_source=not preserve_zero_value_source)
+            replacement_source_end = replacement_source_start if start_offset == end_offset else self.source_offset_for_value_offset(end_offset, include_leading_zero_value_source=True)
+            chunks.extend((self.body_source[cursor_source:replacement_source_start], text))
+            cursor_offset = end_offset
+            cursor_source = replacement_source_end
+        chunks.append(self.body_source[cursor_source:])
+        return "".join(chunks)
+
+    def body_source_for_fragments(self, fragments: Sequence[StringValueFragment]) -> str:
+        """Return body source with transformed character fragments and preserved zero-value source.
+
+        Args:
+            fragments (Sequence[StringValueFragment]): Replacement fragment for every evaluated character.
+
+        Returns:
+            str: Literal body source containing the transformed fragments.
+
+        Raises:
+            ValueError: If the replacement fragment count differs from the mapped value length.
+        """
+        if len(fragments) != len(self.fragments):
+            raise ValueError("Transformed fragments must match the source map's evaluated value length")
+        chunks: list[str] = []
+        for index, fragment in enumerate(fragments):
+            chunks.extend((self.body_source[self.owned_source_starts[index] : self.producing_source_starts[index]], fragment.source))
+        chunks.append(self.body_source[self.owned_source_starts[-1] :])
+        return "".join(chunks)
+
+    def physical_line_numbers(self, start_offset: int, end_offset: int, *, first_line_number: int) -> tuple[int, ...]:
+        """Return physical source lines touched by an evaluated-value slice.
+
+        Args:
+            start_offset (int): Evaluated offset where the slice starts.
+            end_offset (int): Evaluated offset immediately after the slice.
+            first_line_number (int): Physical source line containing the literal body start.
+
+        Returns:
+            tuple[int, ...]: One-based physical source lines owned by the slice.
+
+        Raises:
+            ValueError: If the slice is outside the evaluated value.
+        """
+        self._validate_value_slice(start_offset, end_offset)
+        source_start = self.owned_source_starts[start_offset]
+        source_end = len(self.body_source) if end_offset == len(self.fragments) else self.owned_source_starts[end_offset]
+        start_line = first_line_number + bisect.bisect_right(self.physical_newline_ends, source_start)
+        end_line = first_line_number + bisect.bisect_right(self.physical_newline_ends, source_end)
+        return tuple(range(start_line, end_line + 1))
+
+    def has_escaped_newline(self, start_offset: int, end_offset: int) -> bool:
+        """Return whether a value slice contains a value-producing newline escape.
+
+        Args:
+            start_offset (int): Evaluated offset where the slice starts.
+            end_offset (int): Evaluated offset immediately after the slice.
+
+        Returns:
+            bool: Whether the slice contains an escaped logical newline.
+
+        Raises:
+            ValueError: If the slice is outside the evaluated value.
+        """
+        self._validate_value_slice(start_offset, end_offset)
+        return any(origin is StringNewlineOrigin.ESCAPE for origin in self.newline_origins[start_offset:end_offset])
+
+    def _validate_value_slice(self, start_offset: int, end_offset: int) -> None:
+        """Validate one half-open evaluated-value slice.
+
+        Args:
+            start_offset (int): Evaluated offset where the slice starts.
+            end_offset (int): Evaluated offset immediately after the slice.
+
+        Raises:
+            ValueError: If the slice is outside the evaluated value.
+        """
+        if not 0 <= start_offset <= end_offset <= len(self.fragments):
+            raise ValueError("String source-map slice is outside the evaluated value")
 
 
 @dataclasses.dataclass(frozen=True)
@@ -43,19 +247,6 @@ class StringEscape:
 
 
 @dataclasses.dataclass(frozen=True)
-class SourceWord:
-    """One whitespace-delimited evaluated word with source spelling.
-
-    Attributes:
-        value (str): Evaluated word text used for wrapping decisions.
-        source (str): Source spelling of the same word used for literal-preserving output.
-    """
-
-    value: str
-    source: str
-
-
-@dataclasses.dataclass(frozen=True)
 class WrappedSourceLine:
     """One wrapped line in evaluated and source-literal forms.
 
@@ -68,21 +259,20 @@ class WrappedSourceLine:
     source: str
 
 
-def _source_line(indent: str, words: tuple[SourceWord, ...]) -> WrappedSourceLine:
+def _source_line(indent: str, tokens: tuple[inline_markup.InlineToken, ...]) -> WrappedSourceLine:
     """Render one source-aware wrapped line."""
-    return WrappedSourceLine(value=f"{indent}{' '.join(word.value for word in words)}", source=f"{indent}{' '.join(word.source for word in words)}")
+    return WrappedSourceLine(value=f"{indent}{' '.join(token.value for token in tokens)}", source=f"{indent}{' '.join(token.source for token in tokens)}")
 
 
 _SIMPLE_ESCAPES = {"\\": "\\", "'": "'", '"': '"', "a": "\a", "b": "\b", "f": "\f", "n": "\n", "r": "\r", "t": "\t", "v": "\v"}
 _SIMPLE_ESCAPE_SOURCES = {value: f"\\{source}" for source, value in _SIMPLE_ESCAPES.items() if source not in {"'", '"', "n"}}
 
 
-def value_fragments_for_simple_string(node: cst.SimpleString, *, line_ending: str) -> tuple[StringValueFragment, ...] | None:
+def value_fragments_for_simple_string(node: cst.SimpleString) -> tuple[StringValueFragment, ...] | None:
     """Return source spellings for each evaluated character in a simple string.
 
     Args:
         node (cst.SimpleString): Simple string literal to decompose.
-        line_ending (str): Canonical line ending to associate with physical newline fragments.
 
     Returns:
         tuple[StringValueFragment, ...] | None: Evaluated characters paired with original source spelling, or None for
@@ -91,37 +281,139 @@ def value_fragments_for_simple_string(node: cst.SimpleString, *, line_ending: st
     Raises:
         AssertionError: If an escape parser returns more than one evaluated character for a single fragment.
     """
+    source_map = source_map_for_simple_string(node)
+    return None if source_map is None else source_map.fragments
+
+
+def source_map_for_simple_string(node: cst.SimpleString, *, value: str | None = None) -> SimpleStringSourceMap | None:
+    """Return a lossless evaluated-value/source map for a simple string.
+
+    Unsupported escape spellings deliberately return ``None`` even when the running Python version still evaluates them,
+    keeping rewrite behavior conservative.
+
+    Args:
+        node (cst.SimpleString): Simple string literal to map.
+        value (str | None): Optional previously evaluated string value.
+
+    Returns:
+        SimpleStringSourceMap | None: Lossless map, or None when the literal cannot be mapped conservatively.
+
+    Raises:
+        AssertionError: If a supported escape produces more than one evaluated character.
+    """
     body = simple_string_body_source(node)
-    if body is None:
+    if value is None:
+        try:
+            evaluated_value = node.evaluated_value
+        except (SyntaxError, ValueError):
+            return None
+        value = evaluated_value if isinstance(evaluated_value, str) else None
+    if body is None or not isinstance(value, str):
         return None
     raw = "r" in node.prefix.lower()
     fragments: list[StringValueFragment] = []
+    owned_source_starts: list[int] = []
+    producing_source_starts: list[int] = []
+    newline_origins: list[StringNewlineOrigin | None] = []
+    pending_source_start = 0
     index = 0
     while index < len(body):
+        fragment_source_start = index
         char = body[index]
+        origin: StringNewlineOrigin | None = None
         if char == "\r":
-            if index + 1 < len(body) and body[index + 1] == "\n":
-                fragments.append(StringValueFragment(value="\n", source=line_ending))
-                index += 2
-            else:
-                fragments.append(StringValueFragment(value="\n", source=line_ending))
-                index += 1
+            source = "\r\n" if index + 1 < len(body) and body[index + 1] == "\n" else "\r"
+            fragment_value = "\n"
+            index += len(source)
+            origin = StringNewlineOrigin.PHYSICAL
         elif char == "\n":
-            fragments.append(StringValueFragment(value="\n", source=line_ending))
+            source = "\n"
+            fragment_value = "\n"
             index += 1
+            origin = StringNewlineOrigin.PHYSICAL
         elif char != "\\" or raw:
-            fragments.append(StringValueFragment(value=char, source=char))
+            source = char
+            fragment_value = char
             index += 1
         else:
             parsed = parse_simple_string_escape(body, index)
             if parsed is None:
                 return None
+            source = parsed.source
+            fragment_value = parsed.value
             index = parsed.end
-            if parsed.value:
-                if len(parsed.value) != 1:
-                    raise AssertionError(f"Expected a single-character escape value, got {parsed.value!r}")
-                fragments.append(StringValueFragment(value=parsed.value, source=parsed.source))
-    return tuple(fragments)
+            if not fragment_value:
+                continue
+            if fragment_value in {"\r", "\n"}:
+                origin = StringNewlineOrigin.ESCAPE
+        if len(fragment_value) != 1:
+            raise AssertionError(f"Expected a single-character escape value, got {fragment_value!r}")
+        owned_source_starts.append(pending_source_start)
+        producing_source_starts.append(fragment_source_start)
+        fragments.append(StringValueFragment(value=fragment_value, source=source))
+        newline_origins.append(origin)
+        pending_source_start = index
+    owned_source_starts.append(pending_source_start)
+    mapped_value = "".join(fragment.value for fragment in fragments)
+    if mapped_value != value:
+        return None
+    return SimpleStringSourceMap(
+        body_source=body,
+        value=value,
+        fragments=tuple(fragments),
+        owned_source_starts=tuple(owned_source_starts),
+        producing_source_starts=tuple(producing_source_starts),
+        newline_origins=tuple(newline_origins),
+        physical_newline_ends=_physical_newline_ends(body),
+    )
+
+
+def simple_string_has_direct_line_mapping(node: cst.SimpleString, *, value: str) -> bool:
+    """Return whether a simple string maps logical lines directly to physical lines.
+
+    Args:
+        node (cst.SimpleString): Simple string literal to inspect.
+        value (str): Previously evaluated string value.
+
+    Returns:
+        bool: Whether supported source spellings produce `value` without value-producing newline escapes.
+
+    Raises:
+        AssertionError: If a supported escape produces more than one evaluated character.
+    """
+    body = simple_string_body_source(node)
+    if body is None:
+        return False
+    raw = "r" in node.prefix.lower()
+    source_index = 0
+    value_index = 0
+    while source_index < len(body):
+        char = body[source_index]
+        if char == "\r":
+            fragment_value = "\n"
+            source_index += 2 if source_index + 1 < len(body) and body[source_index + 1] == "\n" else 1
+        elif char == "\n":
+            fragment_value = "\n"
+            source_index += 1
+        elif char != "\\" or raw:
+            fragment_value = char
+            source_index += 1
+        else:
+            parsed = parse_simple_string_escape(body, source_index)
+            if parsed is None:
+                return False
+            fragment_value = parsed.value
+            source_index = parsed.end
+            if not fragment_value:
+                continue
+            if fragment_value in {"\r", "\n"}:
+                return False
+        if len(fragment_value) != 1:
+            raise AssertionError(f"Expected a single-character escape value, got {fragment_value!r}")
+        if value_index >= len(value) or value[value_index] != fragment_value:
+            return False
+        value_index += 1
+    return value_index == len(value)
 
 
 def simple_string_body_source(node: cst.SimpleString) -> str | None:
@@ -154,6 +446,26 @@ def render_simple_string_from_fragments(node: cst.SimpleString, fragments: tuple
         str | None: Rendered literal source, or None when parsing or value validation fails.
     """
     body = "".join(fragment.source for fragment in fragments)
+    effective_prefix = node.prefix if prefix is None else prefix
+    return render_simple_string_from_body_source(effective_prefix, node.quote, body, expected_value=expected_value)
+
+
+def render_simple_string_from_source_map(
+    node: cst.SimpleString, source_map: SimpleStringSourceMap, fragments: tuple[StringValueFragment, ...], *, expected_value: str, prefix: str | None = None
+) -> str | None:
+    """Render transformed fragments while preserving zero-value source spans.
+
+    Args:
+        node (cst.SimpleString): Original simple string supplying its delimiter.
+        source_map (SimpleStringSourceMap): Lossless map supplying zero-value source spans.
+        fragments (tuple[StringValueFragment, ...]): Replacement fragment for every evaluated character.
+        expected_value (str): Evaluated value required from the rendered literal.
+        prefix (str | None): Optional replacement literal prefix.
+
+    Returns:
+        str | None: Rendered literal source, or None when validation fails.
+    """
+    body = source_map.body_source_for_fragments(fragments)
     effective_prefix = node.prefix if prefix is None else prefix
     return render_simple_string_from_body_source(effective_prefix, node.quote, body, expected_value=expected_value)
 
@@ -243,50 +555,8 @@ def serialize_string_body(value: str, *, quote: str, line_ending: str = "\n", es
     return "".join(_escape_char(char, quote=quote, line_ending=line_ending, escape_non_ascii=escape_non_ascii) for char in value)
 
 
-def source_for_value_slice(fragments: tuple[StringValueFragment, ...], start_offset: int, end_offset: int) -> str:
-    """Return source spelling for one evaluated-value slice.
-
-    Args:
-        fragments (tuple[StringValueFragment, ...]): Source-aware fragments indexed by evaluated-character offset.
-        start_offset (int): Inclusive evaluated-character start offset.
-        end_offset (int): Exclusive evaluated-character end offset.
-
-    Returns:
-        str: Concatenated original source spelling for the selected evaluated-value slice.
-    """
-    return "".join(fragment.source for fragment in fragments[start_offset:end_offset])
-
-
-def source_words_for_value_slice(fragments: tuple[StringValueFragment, ...], start_offset: int, end_offset: int) -> tuple[SourceWord, ...]:
-    """Return whitespace-delimited source-aware words from one evaluated-value slice.
-
-    Args:
-        fragments (tuple[StringValueFragment, ...]): Source-aware fragments indexed by evaluated-character offset.
-        start_offset (int): Inclusive evaluated-character start offset.
-        end_offset (int): Exclusive evaluated-character end offset.
-
-    Returns:
-        tuple[SourceWord, ...]: Non-whitespace words preserving both evaluated text and source spelling.
-    """
-    words: list[SourceWord] = []
-    value_parts: list[str] = []
-    source_parts: list[str] = []
-    for fragment in fragments[start_offset:end_offset]:
-        if fragment.value.isspace():
-            if value_parts:
-                words.append(SourceWord(value="".join(value_parts), source="".join(source_parts)))
-                value_parts = []
-                source_parts = []
-        else:
-            value_parts.append(fragment.value)
-            source_parts.append(fragment.source)
-    if value_parts:
-        words.append(SourceWord(value="".join(value_parts), source="".join(source_parts)))
-    return tuple(words)
-
-
-def wrap_source_words(
-    words: tuple[SourceWord, ...],
+def wrap_source_tokens(
+    tokens: tuple[inline_markup.InlineToken, ...],
     *,
     width: int,
     initial_indent: str = "",
@@ -297,13 +567,13 @@ def wrap_source_words(
     final_suffix_width: int = 0,
     url_aware: bool = False,
 ) -> tuple[WrappedSourceLine, ...]:
-    """Wrap words using their final source spelling for width calculations.
+    """Wrap inline tokens using their source spelling for width calculations.
 
     When variable budgets are supplied, `width` is only the fallback for unspecified initial or subsequent widths, and
     `final_suffix_width` is reserved on the final generated line.
 
     Args:
-        words (tuple[SourceWord, ...]): Source-aware words to group into output lines.
+        tokens (tuple[inline_markup.InlineToken, ...]): Source-aware tokens to group into output lines.
         width (int): Fallback maximum line width in display columns.
         initial_indent (str): Prefix to add to the first output line.
         subsequent_indent (str): Prefix to add to continuation output lines.
@@ -311,115 +581,27 @@ def wrap_source_words(
         initial_width (int | None): Optional content width for the first output line.
         subsequent_width (int | None): Optional content width for continuation lines.
         final_suffix_width (int): Display width reserved on the final output line.
-        url_aware (bool): Whether URL tokens should remain intact and use balanced wrapping.
+        url_aware (bool): Whether destination-bearing tokens should use balanced wrapping.
 
     Returns:
         tuple[WrappedSourceLine, ...]: Wrapped lines preserving source spelling for each word.
     """
-    if url_aware and any(text_layout.is_url_token(word.value) for word in words):
-        return _wrap_source_words_with_balanced_spans(
-            words,
-            width=width,
-            initial_width=initial_width,
-            subsequent_width=subsequent_width,
-            final_suffix_width=final_suffix_width,
-            initial_indent=initial_indent,
-            subsequent_indent=subsequent_indent,
-            tab_width=tab_width,
-        )
-    if initial_width is not None or subsequent_width is not None or final_suffix_width:
-        return _wrap_source_words_with_variable_widths(
-            words,
-            initial_width=width if initial_width is None else initial_width,
-            subsequent_width=width if subsequent_width is None else subsequent_width,
-            final_suffix_width=final_suffix_width,
-            initial_indent=initial_indent,
-            subsequent_indent=subsequent_indent,
-            tab_width=tab_width,
-        )
-    if not words:
+    if not tokens:
         stripped = initial_indent.rstrip()
         return (WrappedSourceLine(value=stripped, source=stripped),)
-    if width <= 0:
-        return tuple(
-            WrappedSourceLine(value=f"{initial_indent if index == 0 else subsequent_indent}{word.value}", source=f"{initial_indent if index == 0 else subsequent_indent}{word.source}")
-            for index, word in enumerate(words)
-        )
-
-    lines: list[WrappedSourceLine] = []
-    current_indent = initial_indent
-    current_words: list[SourceWord] = []
-
-    def current_source(candidate_words: list[SourceWord]) -> str:
-        return f"{current_indent}{' '.join(word.source for word in candidate_words)}"
-
-    for word in words:
-        candidate = [*current_words, word]
-        if current_words and text_layout.display_width(current_source(candidate), tab_width=tab_width) > width:
-            lines.append(_source_line(current_indent, tuple(current_words)))
-            current_indent = subsequent_indent
-            current_words = [word]
-        else:
-            current_words = candidate
-    if current_words:
-        lines.append(_source_line(current_indent, tuple(current_words)))
-    return tuple(lines)
-
-
-def _wrap_source_words_with_balanced_spans(
-    words: tuple[SourceWord, ...], *, width: int, initial_width: int | None, subsequent_width: int | None, final_suffix_width: int, initial_indent: str, subsequent_indent: str, tab_width: int
-) -> tuple[WrappedSourceLine, ...]:
-    """Wrap source words with shared URL-aware balanced spans."""
-    if not words:
-        stripped = initial_indent.rstrip()
-        return (WrappedSourceLine(value=stripped, source=stripped),)
-    spans = text_layout.balanced_word_spans(
-        tuple(word.value for word in words),
-        width_words=tuple(word.source for word in words),
+    spans = text_layout.token_spans(
+        tokens,
+        width_words=tuple(token.source for token in tokens),
         width=width,
-        initial_width=initial_width,
-        subsequent_width=subsequent_width,
-        final_suffix_width=final_suffix_width,
         initial_indent=initial_indent,
         subsequent_indent=subsequent_indent,
         tab_width=tab_width,
+        initial_width=initial_width,
+        subsequent_width=subsequent_width,
+        final_suffix_width=final_suffix_width,
+        url_aware=url_aware,
     )
-    return tuple(_source_line(initial_indent if index == 0 else subsequent_indent, words[span.start : span.end]) for index, span in enumerate(spans))
-
-
-def _wrap_source_words_with_variable_widths(
-    words: tuple[SourceWord, ...], *, initial_width: int, subsequent_width: int, final_suffix_width: int, initial_indent: str, subsequent_indent: str, tab_width: int
-) -> tuple[WrappedSourceLine, ...]:
-    """Wrap words when first, continuation, or final physical lines have different budgets."""
-    if not words:
-        stripped = initial_indent.rstrip()
-        return (WrappedSourceLine(value=stripped, source=stripped),)
-
-    lines: list[WrappedSourceLine] = []
-    start = 0
-    first_line = True
-    while start < len(words):
-        indent = initial_indent if first_line else subsequent_indent
-        column = text_layout.display_width(indent, tab_width=tab_width)
-        chosen_end = start + 1
-        for end in range(start + 1, len(words) + 1):
-            if end > start + 1:
-                column += 1
-            column = text_layout.advance_display_column(column, words[end - 1].source, tab_width=tab_width)
-            final_line = end == len(words)
-            limit = initial_width if first_line else subsequent_width
-            if final_line:
-                limit -= final_suffix_width
-            single_word = end == start + 1
-            if single_word or (limit > 0 and column <= limit):
-                chosen_end = end
-            elif final_suffix_width >= 0:
-                # Once a prefix overflows, longer prefixes cannot fit under nonnegative suffix reservation.
-                break
-        lines.append(_source_line(indent, words[start:chosen_end]))
-        start = chosen_end
-        first_line = False
-    return tuple(lines)
+    return tuple(_source_line(initial_indent if index == 0 else subsequent_indent, tokens[span.start : span.end]) for index, span in enumerate(spans))
 
 
 def fragments_for_concatenated_string(node: cst.ConcatenatedString, *, target_quote: str, line_ending: str) -> tuple[StringValueFragment, ...] | None:
@@ -439,7 +621,7 @@ def fragments_for_concatenated_string(node: cst.ConcatenatedString, *, target_qu
     if parts is None:
         return None
     for part in parts:
-        part_fragments = value_fragments_for_simple_string(part, line_ending=line_ending)
+        part_fragments = value_fragments_for_simple_string(part)
         if part_fragments is None:
             return None
         fragments.extend(_retarget_fragment(fragment, quote=target_quote, line_ending=line_ending) for fragment in part_fragments)
@@ -478,10 +660,10 @@ def parse_simple_string_escape(body: str, start: int) -> StringEscape | None:
     escaped = body[start + 1]
     if escaped == "\r":
         if start + 2 < len(body) and body[start + 2] == "\n":
-            return StringEscape(value="", source="", end=start + 3)
-        return StringEscape(value="", source="", end=start + 2)
+            return StringEscape(value="", source=body[start : start + 3], end=start + 3)
+        return StringEscape(value="", source=body[start : start + 2], end=start + 2)
     if escaped == "\n":
-        return StringEscape(value="", source="", end=start + 2)
+        return StringEscape(value="", source=body[start : start + 2], end=start + 2)
     if escaped in _SIMPLE_ESCAPES:
         return StringEscape(value=_SIMPLE_ESCAPES[escaped], source=body[start : start + 2], end=start + 2)
     if escaped == "x" and _has_hex_digits(body, start + 2, 2):
@@ -518,6 +700,22 @@ def parse_simple_string_escape(body: str, start: int) -> StringEscape | None:
 def _has_hex_digits(text: str, start: int, length: int) -> bool:
     """Return whether a text span contains exactly the requested number of hex digits."""
     return start + length <= len(text) and all(char in string.hexdigits for char in text[start : start + length])
+
+
+def _physical_newline_ends(text: str) -> tuple[int, ...]:
+    """Return exclusive offsets of physical LF, CR, and CRLF sequences."""
+    ends: list[int] = []
+    index = 0
+    while index < len(text):
+        if text[index] == "\r":
+            index += 2 if index + 1 < len(text) and text[index + 1] == "\n" else 1
+            ends.append(index)
+        elif text[index] == "\n":
+            index += 1
+            ends.append(index)
+        else:
+            index += 1
+    return tuple(ends)
 
 
 def _retarget_fragment(fragment: StringValueFragment, *, quote: str, line_ending: str) -> StringValueFragment:

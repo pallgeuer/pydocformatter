@@ -61,10 +61,10 @@ class PDF105ClosingQuotesWhitespace(RuleBase):
 def _planned_changes(context: RuleContext) -> tuple[rule_edits.PlannedSourceChange, ...]:
     """Return all safe closing quote whitespace changes."""
     data = PDF_definition.PDF.require_data(context)
-    return tuple(change for docstring in data.docstrings if (change := _planned_change_for_docstring(docstring, context=context)) is not None)
+    return tuple(change for docstring in data.docstrings if (change := _planned_change_for_docstring(docstring)) is not None)
 
 
-def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo, *, context: RuleContext) -> rule_edits.PlannedSourceChange | None:
+def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo) -> rule_edits.PlannedSourceChange | None:
     """Return one source replacement for closing quote whitespace."""
     if not PDF_definition.is_safely_mapped_simple_docstring(docstring):
         return None
@@ -75,13 +75,13 @@ def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo, *, co
     if content_end == len(line.raw_text):
         return None
     return (
-        _validated_change(docstring, line, content_end=content_end, replacement_text="", context=context)
-        or _escaped_quote_change(docstring, line, content_end=content_end, context=context)
-        or _validated_change(docstring, line, content_end=content_end, replacement_text=" ", context=context)
+        _validated_change(docstring, line, content_end=content_end, replacement_text="")
+        or _escaped_quote_change(docstring, line, content_end=content_end)
+        or _validated_change(docstring, line, content_end=content_end, replacement_text=" ")
     )
 
 
-def _escaped_quote_change(docstring: PDF_definition.DocstringInfo, line: PDF_definition.DocstringValueLine, *, content_end: int, context: RuleContext) -> rule_edits.PlannedSourceChange | None:
+def _escaped_quote_change(docstring: PDF_definition.DocstringInfo, line: PDF_definition.DocstringValueLine, *, content_end: int) -> rule_edits.PlannedSourceChange | None:
     """Return a value-preserving closing quote escape change."""
     if line.source_line_number is None or not isinstance(docstring.node, cst.SimpleString):
         return None
@@ -94,7 +94,6 @@ def _escaped_quote_change(docstring: PDF_definition.DocstringInfo, line: PDF_def
     value_lines[line.index] = target_value_line
     return PDF_definition.planned_simple_docstring_source_change(
         docstring,
-        context=context,
         replacements=(
             rule_edits.PlannedTextReplacement(
                 start_offset=line.start_offset + replacement_start, end_offset=line.end_offset, text=target_source_line[replacement_start:], line_numbers=(line.source_line_number,)
@@ -104,9 +103,7 @@ def _escaped_quote_change(docstring: PDF_definition.DocstringInfo, line: PDF_def
     )
 
 
-def _validated_change(
-    docstring: PDF_definition.DocstringInfo, line: PDF_definition.DocstringValueLine, *, content_end: int, replacement_text: str, context: RuleContext
-) -> rule_edits.PlannedSourceChange | None:
+def _validated_change(docstring: PDF_definition.DocstringInfo, line: PDF_definition.DocstringValueLine, *, content_end: int, replacement_text: str) -> rule_edits.PlannedSourceChange | None:
     """Return a validated closing quote whitespace change."""
     if line.source_line_number is None:
         return None
@@ -117,7 +114,6 @@ def _validated_change(
     value_lines[line.index] = target_line
     return PDF_definition.planned_simple_docstring_source_change(
         docstring,
-        context=context,
         replacements=(rule_edits.PlannedTextReplacement(start_offset=line.start_offset + content_end, end_offset=line.end_offset, text=replacement_text, line_numbers=(line.source_line_number,)),),
         value_lines=value_lines,
     )

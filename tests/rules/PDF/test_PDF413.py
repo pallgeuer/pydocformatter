@@ -265,7 +265,7 @@ def test_converges_with_numpy_section_name_and_underline_rules() -> None:
 
 
 def test_pdf102_and_pdf413_cover_distinct_d406_shapes_together() -> None:
-    source = 'def function(value):\n    """Summary.\n\n    Parameters:   \n    ----------\n    value : int\n        Description.\n\n    Returns   \n    -------\n    int\n        Result.\n    """\n'
+    source = 'def function(value):\n    """Summary.\n\n    Parameters:   \n    ----------\n    value : int\n        Description.\n\n    Returns \n    -------\n    int\n        Result.\n    """\n'
     settings = CheckSettings(select=("PDF102", "PDF413"), docstring_convention=DocstringConvention.NUMPY)
     result = format_source(source, settings=settings)
 

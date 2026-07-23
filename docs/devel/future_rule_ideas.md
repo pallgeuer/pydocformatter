@@ -5,10 +5,10 @@ The main remaining opportunities are:
 - Parser blind spots: malformed or mixed-convention documentation currently becomes ordinary prose.
 - Ordering and ownership: constructor/class documentation, attribute order, method inventories, and `__all__`.
 - Entry completeness: exceptions, warnings, methods, `See Also`, and attached attribute docstrings.
-- Markup safety: inline roles, links, code spans, Markdown hard breaks, and malformed reST/fences.
+- Markup safety: unsupported or malformed inline markup and malformed reST/fences.
 - Conservative autofixes for several existing diagnostic-only rules.
 
-There are currently 124 rules: 6 PCF and 118 PDF. Fix availability is 24 always, 3 usually, 18 sometimes, and 79 never.
+There are currently 124 rules: 6 PCF and 118 PDF. Fix availability is 22 always, 5 usually, 18 sometimes, and 79 never.
 
 ## Current coverage audit
 
@@ -16,31 +16,31 @@ Fix abbreviations: A = always, U = usually, S = sometimes, N = never.
 
 ### Comments
 
-| Rule   | Reports and automatic behavior                                                                                                                                | Fix |
-|--------|---------------------------------------------------------------------------------------------------------------------------------------------------------------|----:|
-| PCF001 | Noncanonical standalone-comment hashes/spaces/trailing whitespace/wrapping; understands configured lists, tasks, quotes, preserved markup, and code detection |   A |
-| PCF002 | Trailing-comment delimiter spacing, ordinary marker spacing, and trailing whitespace; protected directive bodies remain intact                                |   A |
-| PCF003 | Safe spelling and spacing normalization for recognized type/tool directives and comma/bracket payloads                                                        |   A |
-| PCF004 | Overlong ordinary trailing comments that can safely move above code; extracts and wraps them                                                                  |   A |
-| PCF005 | Literal non-ASCII source in any Python comment, including protected comments                                                                                  |   N |
-| PCF006 | Invalid, unknown, or unused selected pydocfmt suppression selectors                                                                                           |   N |
+| Rule   | Reports and automatic behavior                                                                                                                             | Fix |
+|--------|------------------------------------------------------------------------------------------------------------------------------------------------------------|----:|
+| PCF001 | Formats standalone comments; preserves recognized markup and hard breaks; reports ambiguity without unsafe fixes                                           |   U |
+| PCF002 | Trailing-comment delimiter spacing, ordinary marker spacing, and trailing whitespace; protected directive bodies remain intact                             |   A |
+| PCF003 | Safe spelling and spacing normalization for recognized type/tool directives and comma/bracket payloads                                                     |   A |
+| PCF004 | Overlong ordinary trailing comments that can safely move above code; atomically wraps recognized inline markup and rejects ambiguous extraction candidates |   U |
+| PCF005 | Literal non-ASCII source in any Python comment, including protected comments                                                                               |   N |
+| PCF006 | Invalid, unknown, or unused selected pydocfmt suppression selectors                                                                                        |   N |
 
 The comment parser deliberately excludes empty/hash-only lines and protects shebangs, encoding cookies, type comments, and known directives; see `PCF.md`.
 
 ### Literal and source formatting
 
-| Rules      | Reports and automatic behavior                                                                      | Fix |
-|------------|-----------------------------------------------------------------------------------------------------|----:|
-| PDF000     | Concatenated literals, no-op `u` prefixes, and safely literalizable whitespace escapes              |   U |
-| PDF001     | Anything other than triple double quotes, where value-preserving conversion may be possible         |   S |
-| PDF002     | Non-raw source containing reportable backslashes; adds `r` only when value-preserving               |   S |
-| PDF003     | Literal non-ASCII docstring source; escapes characters when value-preserving                        |   U |
-| PDF100     | Incorrect multiline indentation, including convention-specific entry indentation                    |   A |
-| PDF101     | Noncanonical wrapping of summaries, prose, entries, fields, lists, and block quotes                 |   U |
-| PDF102–105 | Nonblank trailing whitespace, blank-line whitespace, and opening-/closing-quote-adjacent whitespace |   A |
-| PDF106/107 | Multiline opening quotes/content on the same line versus separate lines                             |   A |
-| PDF108/109 | Multiline closing quotes/content on the same line versus separate lines                             |   A |
-| PDF110     | Summary-only multiline docstrings that fit as one physical line                                     |   A |
+| Rules      | Reports and automatic behavior                                                                                 | Fix |
+|------------|----------------------------------------------------------------------------------------------------------------|----:|
+| PDF000     | Concatenated literals, no-op `u` prefixes, and safely literalizable whitespace escapes                         |   U |
+| PDF001     | Anything other than triple double quotes, where value-preserving conversion may be possible                    |   S |
+| PDF002     | Non-raw source containing reportable backslashes; adds `r` only when value-preserving                          |   S |
+| PDF003     | Literal non-ASCII docstring source; escapes characters when value-preserving                                   |   U |
+| PDF100     | Incorrect multiline indentation, including convention-specific entry indentation                               |   A |
+| PDF101     | Reflows supported regions; preserves recognized markup and hard breaks; reports ambiguity without unsafe fixes |   U |
+| PDF102–105 | Whitespace normalization; PDF102 preserves recognized hard breaks                                              |   A |
+| PDF106/107 | Multiline opening quotes/content on the same line versus separate lines                                        |   A |
+| PDF108/109 | Multiline closing quotes/content on the same line versus separate lines                                        |   A |
+| PDF110     | Summary-only multiline docstrings that fit as one physical line                                                |   A |
 
 ### Blank lines and summaries
 
@@ -162,9 +162,9 @@ The category’s exact inventory boundaries—including ignored additional docst
 
 19. **Resolve imported exception aliases.** Normalize `raise BadInput` imported from another module against qualified documentation when the binding is statically unambiguous.
 
-20. **Make reflow aware of inline markup.** PDF101 and PCF001 should treat Markdown links, autolinks, code spans, reST roles, interpreted-text spans, substitutions, and explicit references as atomic wrapping tokens. Current URL awareness is narrower.
+20. **Implemented: Make reflow aware of inline markup.** PDF101, PCF001, and PCF004 preserve the documented conservative subset of Markdown and reST inline constructs as atomic source-aware tokens. Unsupported or malformed constructs remain an opportunity for narrower diagnostics.
 
-21. **Preserve or canonicalize Markdown hard line breaks.** Unconditional trailing-whitespace cleanup can erase the semantic meaning of two trailing spaces. Under Markdown-aware parsing, either preserve them or replace them with an explicit safe line-break spelling.
+21. **Implemented: Preserve Markdown hard line breaks.** PDF101, PDF102, and PCF001 preserve evaluated two-or-more-space and unescaped-backslash hard breaks, including their exact Python source spelling.
 
 22. **Report suspicious invisible Unicode separately from ASCII-only policy.** Catch zero-width characters, bidi controls, nonbreaking spaces in indentation, and unexpected control characters while still allowing ordinary non-ASCII prose. Safe whitespace replacements could be fixed.
 
@@ -215,16 +215,6 @@ The category’s exact inventory boundaries—including ignored additional docst
 45. **Add opt-in capitalization/punctuation checks for standalone prose comments.** Apply only to clearly sentence-like standalone paragraphs, excluding trailing comments, task markers, labels, directives, headings, code, and fragments. Google’s guide recommends narrative capitalization and punctuation, but this should remain optional because comment fragments are common. [Google Python style guide](https://google.github.io/styleguide/pyguide.html)
 
 ## Highest priority
-
-- **#20 and #21 — Make reflow markup-safe and preserve hard breaks**
-
-   These are the most important safety fixes. A formatter should not split inline code, roles, links, or remove intentional Markdown hard breaks. They are more complex than #4 or #8, but preventing semantic damage should take priority over adding stylistic checks.
-
-   I would initially:
-
-   - Protect recognized inline constructs as atomic tokens.
-   - Exempt intentional two-space Markdown breaks from whitespace cleanup.
-   - Add extensive value-preservation and idempotence tests before considering broader markup normalization.
 
 - **#3 — Report malformed convention entries**
 

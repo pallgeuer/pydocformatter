@@ -4,7 +4,10 @@ import pytest
 # First-party imports
 import tests.rules.PCF.helpers as pcf_helpers
 import pydocformatter.rules.definition_helpers.comments as comment_helpers
+from pydocformatter import formatter, rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, CommentTaskMarkerMode, LineEnding
+from pydocformatter.rules.definition_helpers import inline_markup
+from pydocformatter.rules.definitions.PCF.PCF001_standalone_comment_formatting import PCF001StandaloneCommentFormatting
 
 
 def test_default_standalone_formatting_processes_physical_lines_independently() -> None:
@@ -203,8 +206,8 @@ def test_comment_edits_preserve_untouched_mixed_endings_and_use_configured_gener
 @pytest.mark.parametrize(
     ("source", "line_length", "expected"),
     [
-        ("#bad spacing   \n", 80, "# bad spacing\n"),
-        ("#    excessive leading and trailing spacing    \n", 80, "# excessive leading and trailing spacing\n"),
+        ("#bad spacing   \n", 80, "# bad spacing   \n"),
+        ("#    excessive leading and trailing spacing    \n", 80, "# excessive leading and trailing spacing    \n"),
         ("    #indented comment", 80, "    # indented comment"),
         ("# supercalifragilisticexpialidocious", 12, "# supercalifragilisticexpialidocious"),
         ("# alpha-beta-gamma-delta", 12, "# alpha-beta-gamma-delta"),
@@ -419,6 +422,18 @@ def test_code_fence_preservation_can_be_disabled() -> None:
     assert result.new_source == "# ```python\n# ordinary words\n# requiring\n# wrapping\n# ```\n"
 
 
+def test_standalone_layout_reuses_shared_fragment_scans(monkeypatch: pytest.MonkeyPatch) -> None:
+    source = "# Ordinary standalone words requiring wrapping.\n"
+
+    def unexpected_scan(text: str) -> inline_markup.InlineScanResult:
+        raise AssertionError(f"Unexpected text rescan of {text!r}")
+
+    monkeypatch.setattr(inline_markup, "scan_text", unexpected_scan)
+    result = pcf_helpers.format_pcf(source, line_length=24, comment_detect_statements=False)
+
+    assert result.new_source == "# Ordinary standalone\n# words requiring\n# wrapping.\n"
+
+
 def test_table_detection_requires_structure_and_does_not_preserve_arbitrary_pipes_or_dashes() -> None:
     source = "# prose | with | pipes and enough words to wrap\n# not | a | delimiter\n# --- only one border\n"
     result = pcf_helpers.format_pcf(source, line_length=24, comment_detect_statements=False)
@@ -623,3 +638,134 @@ def test_complex_standalone_formatting_is_idempotent(source: str, line_length: i
     assert second.new_source == first.new_source
     assert not second.fixed_findings
     assert not second.errors
+
+
+def test_recognized_inline_markup_is_indivisible_even_without_url_balancing() -> None:
+    source = "# Before [label with several words](target) after words.\n"
+    result = pcf_helpers.format_pcf(source, line_length=24, url_aware_wrapping=False)
+
+    assert result.new_source is not None
+    markup_lines = tuple(line for line in result.new_source.splitlines() if "[label" in line or "several words]" in line)
+    assert markup_lines == ("# [label with several words](target)",)
+    assert not pcf_helpers.format_pcf(result.new_source, line_length=24, url_aware_wrapping=False).modified
+
+
+def test_joined_comments_preserve_space_and_backslash_hard_breaks() -> None:
+    source = "# Alpha beta gamma delta  \n# Epsilon zeta eta.\\\n# Theta iota.\n"
+    result = pcf_helpers.format_pcf(source, line_length=28, comment_join_standalone_lines=True)
+
+    assert result.new_source == source
+    assert not result.fixed_findings
+
+
+def test_hard_break_suffix_reserves_space_during_wrapping() -> None:
+    source = "# Alpha beta gamma delta epsilon  \n# Zeta eta.\n"
+    result = pcf_helpers.format_pcf(source, line_length=26, comment_join_standalone_lines=True)
+
+    assert result.new_source == "# Alpha beta gamma delta\n# epsilon  \n# Zeta eta.\n"
+    assert not pcf_helpers.format_pcf(result.new_source, line_length=26, comment_join_standalone_lines=True).modified
+
+
+def test_ambiguous_markup_reports_without_rewriting_semantic_body() -> None:
+    source = "# Before [label](missing destination words that require wrapping.\n"
+    settings = CheckSettings(select=("PCF001",), line_length=28)
+    result = formatter.format_source(source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
+
+    assert result.new_source == source
+    assert tuple((finding.line_numbers, finding.fixable) for finding in result.unfixed_findings) == (((1,), False),)
+
+
+def test_ambiguous_markup_allows_marker_only_partial_fix_then_stabilizes() -> None:
+    source = "#Before [label](missing destination words that require wrapping.\r\n"
+    settings = CheckSettings(select=("PCF001",), line_length=28)
+    first = formatter.format_source(source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
+    assert first.new_source is not None
+    second = formatter.format_source(first.new_source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
+
+    assert first.new_source == "# Before [label](missing destination words that require wrapping.\r\n"
+    assert first.fixed_findings[PCF001StandaloneCommentFormatting.meta] == 1
+    assert second.new_source == first.new_source
+    assert tuple((finding.line_numbers, finding.fixable) for finding in second.unfixed_findings) == (((1,), False),)
+
+
+def test_ambiguous_markup_with_canonical_layout_does_not_report() -> None:
+    source = "# Before [label](missing.\n"
+    result = pcf_helpers.format_pcf(source, line_length=80)
+
+    assert result.new_source == source
+    assert not result.fixed_findings
+    assert not result.unfixed_findings
+
+
+def test_hard_breaks_switch_list_and_task_units_to_continuation_prefixes() -> None:
+    list_source = "# - Alpha beta gamma delta epsilon  \n#   Zeta eta theta iota.\n"
+    task_source = "# TODO: Alpha beta gamma  \n#       Zeta eta.\n"
+
+    list_result = pcf_helpers.format_pcf(list_source, line_length=28, comment_join_standalone_lines=True)
+    task_result = pcf_helpers.format_pcf(task_source, line_length=24, comment_task_marker_mode=CommentTaskMarkerMode.HANGING)
+
+    assert list_result.new_source == "# - Alpha beta gamma delta\n#   epsilon  \n#   Zeta eta theta iota.\n"
+    assert task_result.new_source == "# TODO: Alpha beta\n#       gamma  \n#       Zeta eta.\n"
+
+
+def test_block_quote_setting_controls_hard_break_continuation_prefixes() -> None:
+    source = "# > Alpha beta gamma delta epsilon  \n# > Zeta eta theta iota.\n"
+    disabled = pcf_helpers.format_pcf(source, line_length=28, comment_join_standalone_lines=True, comment_format_block_quotes=False)
+    enabled = pcf_helpers.format_pcf(source, line_length=28, comment_join_standalone_lines=True, comment_format_block_quotes=True)
+
+    assert disabled.new_source == "# > Alpha beta gamma delta\n# epsilon  \n# > Zeta eta theta iota.\n"
+    assert enabled.new_source == "# > Alpha beta gamma delta\n# > epsilon  \n# > Zeta eta theta iota.\n"
+
+
+def test_no_wrap_task_markers_preserve_hard_breaks_but_not_final_line_suffixes() -> None:
+    source = "# TODO: Alpha beta  \n# TODO: Gamma delta  "
+    result = pcf_helpers.format_pcf(source, line_length=12, comment_task_marker_mode=CommentTaskMarkerMode.NO_WRAP)
+
+    assert result.new_source == "# TODO: Alpha beta  \n# TODO: Gamma delta"
+    assert result.fixed_findings[PCF001StandaloneCommentFormatting.meta] == 1
+
+
+def test_tabs_before_comment_hard_break_are_removed_without_losing_the_space_run() -> None:
+    source = "# Alpha beta \t  \n# Gamma.\n"
+    result = pcf_helpers.format_pcf(source, line_length=80, comment_join_standalone_lines=True)
+
+    assert result.new_source == "# Alpha beta   \n# Gamma.\n"
+    assert not pcf_helpers.format_pcf(result.new_source, line_length=80, comment_join_standalone_lines=True).modified
+
+
+def test_ambiguous_joined_unit_marker_fix_preserves_every_body_and_mixed_line_ending() -> None:
+    source = "#First [label](missing words that wrap.\r\n#Second continuation words.\n"
+    settings = CheckSettings(select=("PCF001",), line_length=20, comment_join_standalone_lines=True)
+    first = formatter.format_source(source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
+    assert first.new_source is not None
+    second = formatter.format_source(first.new_source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
+
+    assert first.new_source == "# First [label](missing words that wrap.\r\n# Second continuation words.\n"
+    assert first.fixed_findings[PCF001StandaloneCommentFormatting.meta] == 1
+    assert second.new_source == first.new_source
+    assert tuple((finding.line_numbers, finding.fixable) for finding in second.unfixed_findings) == (((1, 2), False),)
+
+
+def test_ambiguity_inside_preserved_fence_does_not_block_adjacent_prose_formatting() -> None:
+    source = "# Prose before fence with enough words to wrap.\n# ```text\n# [label](missing destination\n# ```\n"
+    result = pcf_helpers.format_pcf(source, line_length=28)
+
+    assert result.new_source == "# Prose before fence with\n# enough words to wrap.\n# ```text\n# [label](missing destination\n# ```\n"
+    assert not result.unfixed_findings
+
+
+def test_inline_link_destinations_activate_comment_url_balancing() -> None:
+    source = "# alpha beta [label](https://example.com/path) alpha after\n"
+    disabled = pcf_helpers.format_pcf(source, line_length=40, url_aware_wrapping=False)
+    enabled = pcf_helpers.format_pcf(source, line_length=40, url_aware_wrapping=True)
+
+    assert disabled.new_source == "# alpha beta\n# [label](https://example.com/path)\n# alpha after\n"
+    assert enabled.new_source == "# alpha\n# beta [label](https://example.com/path)\n# alpha after\n"
+
+
+def test_task_markers_end_preceding_list_and_joined_paragraph_units() -> None:
+    source = "# - List item words\n#   continuation words\n# TODO: task payload\n# Ordinary paragraph words\n# FIXME: second task payload\n"
+    result = pcf_helpers.format_pcf(source, line_length=80, comment_join_standalone_lines=True, comment_task_marker_mode=CommentTaskMarkerMode.HANGING)
+
+    assert result.new_source == "# - List item words continuation words\n# TODO: task payload\n# Ordinary paragraph words\n# FIXME: second task payload\n"
+    assert result.fixed_findings[PCF001StandaloneCommentFormatting.meta] == 1

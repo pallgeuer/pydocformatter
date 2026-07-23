@@ -112,7 +112,7 @@ def _results(context: RuleContext, *, rule: RuleMetadata) -> tuple[rule_violatio
         fixable_targets.sort(key=lambda target: target.replacement.start_offset)
         unfixable_targets.sort(key=lambda target: target.line_numbers)
         replacements = tuple(target.replacement for target in fixable_targets)
-        change = section_edits.planned_replacement_change(docstring, context=context, replacements=replacements, value_lines=value_lines)
+        change = section_edits.planned_replacement_change(docstring, replacements=replacements, value_lines=value_lines)
         results.extend(
             section_edits.replacement_results(
                 rule,

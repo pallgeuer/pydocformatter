@@ -107,18 +107,19 @@ def _rendered_simple_docstring(node: cst.SimpleString, *, expected_value: str, l
     """Return normalized source for a simple docstring."""
     if _simple_docstring_source_is_already_normal(node, line_ending=line_ending):
         return None
-    fragments = string_literals.value_fragments_for_simple_string(node, line_ending=line_ending)
-    if fragments is None:
+    source_map = string_literals.source_map_for_simple_string(node)
+    if source_map is None:
         return None
+    fragments = source_map.fragments
     prefix = _normalized_simple_docstring_prefix(node)
     literalized = string_literals.literalized_whitespace_fragments(fragments, line_ending=line_ending)
     if literalized == fragments and prefix == node.prefix:
         return None
-    rendered = string_literals.render_simple_string_from_fragments(node, literalized, expected_value=expected_value, prefix=prefix)
+    rendered = string_literals.render_simple_string_from_source_map(node, source_map, literalized, expected_value=expected_value, prefix=prefix)
     if rendered is not None:
         return rendered
     retargeted = string_literals.retarget_fragments(literalized, quote='"""', line_ending=line_ending)
-    rendered = string_literals.render_simple_string_from_fragments(cst.SimpleString('""""""'), retargeted, expected_value=expected_value)
+    rendered = string_literals.render_simple_string_from_body_source("", '"""', source_map.body_source_for_fragments(retargeted), expected_value=expected_value)
     if rendered is not None:
         return rendered
     return string_literals.render_value_as_simple_string(expected_value, line_ending=line_ending, escape_non_ascii=escape_non_ascii)

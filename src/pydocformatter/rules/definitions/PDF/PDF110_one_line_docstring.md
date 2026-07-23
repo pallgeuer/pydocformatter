@@ -225,7 +225,7 @@ def quoted() -> None:
     """\"quoted\""""
 ```
 
-Concatenated docstrings and ambiguous escaped multiline simple strings are skipped because their evaluated lines cannot be rewritten safely:
+Concatenated docstrings are skipped. Safely mapped escapes remain exact when a multiline docstring is collapsed:
 
 ```pydocfmt-example
 [input]
@@ -238,7 +238,13 @@ def escaped() -> None:
     Summary with tab\t escape.
     """
 
-[output=unchanged]
+[output]
+def concatenated() -> None:
+    ("Summary "
+     "text.")
+
+def escaped() -> None:
+    """Summary with tab\t escape."""
 ```
 
 ## Options

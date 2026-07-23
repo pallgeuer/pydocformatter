@@ -1,6 +1,6 @@
 # trailing-comment-extraction (PCF004)
 
-Fix is always available.
+Fix is usually available.
 
 ## What it does
 Checks overlong ordinary trailing comments after canonical spacing. When the complete canonical code-plus-comment line exceeds `line-length`, PCF004 can remove whitespace immediately before the comment, move the comment directly above the physical code line at the code line's indentation, and wrap it as a standalone block.
@@ -13,7 +13,11 @@ When `comment-task-marker-mode` is `no-wrap` or `hanging`, extracted task-marker
 
 When a moved block would directly follow an existing same-indent standalone comment, a blank line keeps the independently authored comments separate. The rule generates the complete canonical block itself and therefore works when PCF001 is disabled.
 
-Widths use tab-expanded columns with `indent-width` as the tab size. If indentation leaves no positive wrapping width, a non-empty overlong comment is still moved above the code but its text remains on one unwrapped line. Long words are not split. Source outside the replacement retains mixed line endings and the file's final-newline state. When `url-aware-wrapping` is enabled, URL tokens remain unbroken but surrounding prose may use less greedy line breaks.
+That directly generated block uses the same unconditional atomic inline-markup recognition as PDF101 and PCF001. Non-empty same-line backtick spans with matching delimiter runs, supported Markdown links and images, CommonMark-style autolinks, and boundary-valid reStructuredText interpreted text, roles, references, embedded targets, literals, and substitutions are never split internally. Markdown link support includes escaped or nested labels, empty inline components, all three standard title delimiters, and destination parentheses nested up to three levels. Emphasis, raw HTML or XML, shortcut references, definitions, and multiline constructs are not recognized as atomic inline markup. A line-leading run of at least three backticks or tildes is fence-like ordinary text rather than ambiguous inline markup, including when an info string follows the opener; the content-aware structure checks can still keep it inline when configured to preserve fences. `url-aware-wrapping` only selects balanced rather than greedy breaks around destination-bearing constructs.
+
+After ordinary-comment, overlong-line, and syntax-position eligibility checks, strong evidence of incomplete or over-bounded inline markup produces an unfixable finding instead of extraction. Generic unmatched delimiters without stronger supported-markup evidence remain ordinary comment text. This ambiguity guard runs before the configurable content-awareness filter, is always active, and is not disabled by `comment-trailing-extraction-content-aware = false`. Trailing-comment whitespace is normalized rather than interpreted as a hard break because extraction does not create a semantic line relationship with the code moved below it.
+
+Widths use tab-expanded columns with `indent-width` as the tab size. If indentation leaves no positive wrapping width, a non-empty overlong comment is still moved above the code but its text remains on one unwrapped line. Long words and recognized markup are not split. Source outside the replacement retains mixed line endings and the file's final-newline state. When `url-aware-wrapping` is enabled, destination-bearing tokens can trigger balanced line selection; disabling it restores greedy selection without making those tokens splittable.
 
 ## Why is this useful?
 Extracting ordinary long comments prevents explanatory text from obscuring code, while rule selection and safety settings let projects keep harmless spacing normalization without enabling comment movement.
@@ -202,10 +206,43 @@ if enabled:
 value = compute()
 ```
 
+PCF004 generates markup-aware wrapping itself, so selecting it without PCF001 still keeps a complete inline link indivisible. With URL-aware wrapping enabled, it can balance the surrounding words to avoid isolating the destination-bearing token:
+
+```pydocfmt-example
+[settings]
+line-length = 40
+url-aware-wrapping = true
+
+[input]
+value = compute()  # alpha beta [label](https://example.com/path) alpha after
+
+[output]
+# alpha
+# beta [label](https://example.com/path)
+# alpha after
+value = compute()
+```
+
+Ambiguous inline markup is reported without moving the comment, even when content-aware extraction is disabled:
+
+```pydocfmt-example
+[settings]
+line-length = 32
+comment-trailing-extraction-content-aware = false
+
+[input]
+value = compute()  # Read [the label](missing destination words that need moving.
+
+[output=unchanged]
+
+[findings]
+PCF004: Line 1: Trailing comment should be extracted
+```
+
 ## Options
 - `line-length`: Maximum display width used to decide whether a canonical trailing comment is overlong and to wrap extracted standalone comments.
 - `indent-width`: Tab display width used when measuring inline comments and standalone comment width.
-- `url-aware-wrapping`: Keeps URL tokens unbroken while balancing surrounding prose in extracted standalone comments.
+- `url-aware-wrapping`: Uses balanced rather than greedy line selection around destination-bearing tokens; recognized markup remains indivisible either way.
 - `comment-task-marker-mode`: Controls whether recognized task markers in extracted comments are normalized without wrapping or wrapped with hanging indentation.
 - `comment-task-markers`: Defines the uppercase task marker labels recognized before `:`.
 - `comment-trailing-extraction-syntax-aware`: Keeps overlong trailing comments inline in syntax-sensitive positions.

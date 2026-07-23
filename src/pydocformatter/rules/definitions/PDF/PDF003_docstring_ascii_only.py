@@ -93,14 +93,15 @@ def _rendered_docstring(docstring: PDF_definition.DocstringInfo, *, line_ending:
         return None
     if "\\" in body_source and (PDF002.reportable_backslash_line_numbers(docstring) or "r" in docstring.node.prefix.lower()):
         return None
-    fragments = string_literals.value_fragments_for_simple_string(docstring.node, line_ending=line_ending)
-    if fragments is None:
+    source_map = docstring.source_map
+    if source_map is None:
         return None
+    fragments = source_map.fragments
     rendered_fragments = tuple(_ascii_fragment(fragment, quote=docstring.node.quote, line_ending=line_ending) for fragment in fragments)
     prefix = _ascii_prefix(docstring.node.prefix)
     if prefix is None:
         return None
-    return string_literals.render_simple_string_from_fragments(docstring.node, rendered_fragments, expected_value=docstring.value, prefix=prefix)
+    return string_literals.render_simple_string_from_source_map(docstring.node, source_map, rendered_fragments, expected_value=docstring.value, prefix=prefix)
 
 
 def _ascii_fragment(fragment: string_literals.StringValueFragment, *, quote: str, line_ending: str) -> string_literals.StringValueFragment:
