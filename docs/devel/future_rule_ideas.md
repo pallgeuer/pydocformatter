@@ -2,13 +2,13 @@
 
 The main remaining opportunities are:
 
-- Parser blind spots: malformed or mixed-convention documentation currently becomes ordinary prose.
+- Parser blind spots: mixed conventions, unknown sections, and malformed structures outside the conservative PDF414/PDF415 entry checks can still become ordinary prose.
 - Ordering and ownership: constructor/class documentation, attribute order, method inventories, and `__all__`.
 - Entry completeness: exceptions, warnings, methods, `See Also`, and attached attribute docstrings.
 - Markup safety: unsupported or malformed inline markup and malformed reST/fences.
 - Conservative autofixes for several existing diagnostic-only rules.
 
-There are currently 124 rules: 6 PCF and 118 PDF. Fix availability is 22 always, 5 usually, 18 sometimes, and 79 never.
+There are currently 126 rules: 6 PCF and 120 PDF. Fix availability is 22 always, 5 usually, 18 sometimes, and 81 never.
 
 ## Current coverage audit
 
@@ -83,8 +83,10 @@ The comment parser deliberately excludes empty/hash-only lines and protects sheb
 | PDF411 | AST-safe whitespace inside parsed type-like slots                     |   S |
 | PDF412 | Repeated named entries across an entire docstring                     |   N |
 | PDF413 | Superfluous NumPy section colon                                       |   S |
+| PDF414 | High-confidence malformed convention entry syntax                     |   N |
+| PDF415 | High-confidence Google and NumPy entry indentation                    |   N |
 
-Recognized section names and ordering are explicit tables in `docstring_sections.py`. Anything outside them can silently fall back to prose.
+Recognized section names and ordering are explicit tables in `docstring_sections.py`. PDF414 and PDF415 diagnose a conservative subset of malformed entry syntax and indentation; other unrecognized structures can still silently fall back to prose.
 
 ### Semantic consistency and ownership
 
@@ -128,7 +130,7 @@ The category’s exact inventory boundaries—including ignored additional docst
 
 2. **Report unknown or likely misspelled section names.** At clear section boundaries, flag near-matches such as `Paramters` or convention-inappropriate aliases. A unique case-insensitive/edit-distance match could be safely auto-fixed. Numpydoc has an established “unknown section” check, supporting its broad usefulness. [Numpydoc validation](https://numpydoc.readthedocs.io/en/stable/validation.html)
 
-3. **Report malformed convention entry syntax.** Detect entry-looking lines inside recognized sections that failed parsing, such as NumPy `value: int`, missing Google entry colons, malformed reST field delimiters, or incorrectly indented entry continuations. This should explain the actual syntax problem instead of causing only a later “missing parameter” finding.
+3. **Implemented as PDF414/PDF415: Report malformed convention entries.** PDF414 reports high-confidence Google, NumPy, and reST entry syntax defects, while PDF415 separately reports high-confidence Google and NumPy entry indentation defects. Both remain diagnostic-only and use owner inventories or strong syntax evidence to avoid diagnosing arbitrary prose.
 
 4. **Implemented as PDF212: Report missing summaries.** PDF212 distinguishes a nonempty docstring containing only sections, fields, examples, directives, or other structures from PDF202’s empty docstring.
 
@@ -216,10 +218,6 @@ The category’s exact inventory boundaries—including ignored additional docst
 
 ## Highest priority
 
-- **#3 — Report malformed convention entries**
-
-   Very useful because malformed entries currently fall out of the semantic parser and can produce misleading secondary findings—or no finding at all. Start with highly certain patterns inside already recognized sections, such as a NumPy entry missing the required space before `:`. Avoid trying to diagnose arbitrary prose.
-
 - **#11 — Require descriptions for exceptions and warnings**
 
    A natural and clearly scoped completion of PDF700/704/708. The entries are already parsed, so this should mostly reuse existing missing-description infrastructure. It prevents nearly content-free documentation such as `ValueError:`.
@@ -248,7 +246,7 @@ The category’s exact inventory boundaries—including ignored additional docst
 
 - **#13/#14 — `See Also` and method inventory checks**
 
-   Good follow-ons once malformed-entry handling is established. `See Also` description validation is mature and objective; method inventory checks should activate only when a `Methods` section already exists.
+   Malformed-entry handling is now established by PDF414/PDF415. `See Also` description validation is mature and objective; method inventory checks should activate only when a `Methods` section already exists.
 
 - **#27 — Typed checks for attached attribute docstrings**
 

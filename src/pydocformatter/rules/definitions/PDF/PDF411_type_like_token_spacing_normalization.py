@@ -134,13 +134,13 @@ def _google_replacement(line: PDF_definition.DocstringValueLine, entry: PDF_defi
     """Return a replacement for a Google entry type token."""
     if entry.kind not in _TYPE_TEXT_ENTRY_KINDS:
         return None
-    match = PDF_definition._GOOGLE_ENTRY_RE.match(line.text)
-    if match is not None and match.group("type") is not None and entry.type_text is not None:
-        return _normalized_replacement(line, match.start("type"), match.end("type"), entry.type_text, normalized_type_cache=normalized_type_cache)
+    match = PDF_definition._match_google_entry(line.text)
+    if match is not None and match.type_start is not None and match.type_end is not None and entry.type_text is not None:
+        return _normalized_replacement(line, match.type_start, match.type_end, entry.type_text, normalized_type_cache=normalized_type_cache)
     if entry.kind in {PDF_definition.DocstringEntryKind.RETURN, PDF_definition.DocstringEntryKind.YIELD}:
-        generic_match = PDF_definition._GENERIC_ENTRY_RE.match(line.text)
+        generic_match = PDF_definition._match_generic_entry(line.text)
         if generic_match is not None and entry.type_text is not None:
-            return _normalized_replacement(line, generic_match.start("name"), generic_match.end("name"), entry.type_text, normalized_type_cache=normalized_type_cache)
+            return _normalized_replacement(line, generic_match.name_start, generic_match.name_end, entry.type_text, normalized_type_cache=normalized_type_cache)
     return None
 
 

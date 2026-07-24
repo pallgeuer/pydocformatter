@@ -12,6 +12,9 @@ import pytest
 import libcst.metadata as cst_metadata
 
 # First-party imports
+import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
+import pydocformatter.rules.definitions.PDF.PDF414_malformed_convention_entry as PDF414_definition
+import pydocformatter.rules.definitions.PDF.PDF415_convention_entry_indentation as PDF415_definition
 from pydocformatter import formatter, rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention
 from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
@@ -19,6 +22,7 @@ from pydocformatter.rules.definition_helpers import source_text, string_literals
 from pydocformatter.rules.definitions.PDF.PDF import (
     PDF,
     AttributeInfo,
+    ConventionEntryIssueKind,
     DefinitionInfo,
     DefinitionKind,
     DocstringBlockKind,
@@ -161,6 +165,42 @@ def test_prepare_collects_attribute_docstrings_and_owner_metadata() -> None:
     with pytest.raises(TypeError):
         typing.cast("dict[str, tuple[object, ...]]", attached_docstrings)["other"] = ()
     assert data._attached_attribute_docstrings_by_owner_id is not None
+
+
+def test_convention_entry_issue_metadata_covers_every_kind() -> None:
+    """Keep precedence and rule ownership exhaustive as issue kinds evolve."""
+    issue_kinds = set(ConventionEntryIssueKind)
+
+    assert issue_kinds == set(PDF_definition._CONVENTION_ENTRY_ISSUE_PRECEDENCE)
+    assert PDF414_definition._ISSUE_KINDS.isdisjoint(PDF415_definition._ISSUE_KINDS)
+    assert issue_kinds == PDF414_definition._ISSUE_KINDS | PDF415_definition._ISSUE_KINDS
+
+
+def test_prepare_parses_docstrings_after_building_complete_owner_name_inventories() -> None:
+    source = 'class Client:\n    """Client values.\n\n    Attributes:\n        value Stored value.\n\n    Methods:\n        run Execute the client.\n    """\n\n    value = 1\n\n    def run(self):\n        """Run the client."""\n'
+    settings = CheckSettings(docstring_convention=DocstringConvention.GOOGLE)
+    structure = PDF.prepare(category_context(source, settings=settings)).docstrings[0].structure
+
+    assert tuple((issue.kind, issue.names) for issue in structure.convention_entry_issues) == (
+        (ConventionEntryIssueKind.GOOGLE_MISSING_SEPARATOR, ("value",)),
+        (ConventionEntryIssueKind.GOOGLE_MISSING_SEPARATOR, ("run",)),
+    )
+
+
+def test_prepare_uses_complete_function_parameter_inventory_case_sensitively() -> None:
+    source = 'def convert(receiver, /, value, *args, option, **kwargs):\n    """Convert values.\n\n    Args:\n        receiver Receiver.\n        value Value.\n        *args Positional values.\n        option Option.\n        **kwargs Keyword values.\n        Value Different case.\n    """\n'
+    settings = CheckSettings(docstring_convention=DocstringConvention.GOOGLE)
+    structure = PDF.prepare(category_context(source, settings=settings)).docstrings[0].structure
+
+    assert tuple(issue.names for issue in structure.convention_entry_issues) == (("receiver",), ("value",), ("*args",), ("option",), ("**kwargs",))
+
+
+@pytest.mark.parametrize("convention", [DocstringConvention.NONE, DocstringConvention.PEP257, DocstringConvention.REST])
+def test_prepare_skips_malformed_entry_member_inventories_for_irrelevant_conventions(convention: DocstringConvention, monkeypatch: pytest.MonkeyPatch) -> None:
+    source = 'class Client:\n    """Client values."""\n\n    value = 1\n\n    def run(self):\n        """Run the client."""\n'
+    monkeypatch.setattr(PDF_definition, "_malformed_entry_inventories", pytest.fail)
+
+    PDF.prepare(category_context(source, settings=CheckSettings(docstring_convention=convention)))
 
 
 def test_attached_attribute_docstrings_by_name_deduplicates_repeated_assignment_targets() -> None:
@@ -724,6 +764,45 @@ def test_google_parameter_entries_support_mild_spacing_around_type_and_colon() -
     assert tuple((entry.names, entry.type_text, entry.description, entry.start_line, entry.end_line) for entry in structure.entries) == ((("value",), "int", "Description.", 1, 2),)
 
 
+def test_google_parameter_entries_support_balanced_nested_type_delimiters() -> None:
+    value = 'Args:\n    callback (Callable[[tuple[int, str]], Literal[")"]]): Description.'
+    structure = structure_for(value, settings=CheckSettings(docstring_convention=DocstringConvention.GOOGLE))
+    assert tuple((entry.names, entry.type_text, entry.description, entry.start_line, entry.end_line) for entry in structure.entries) == (
+        (("callback",), 'Callable[[tuple[int, str]], Literal[")"]]', "Description.", 1, 2),
+    )
+
+
+def test_malformed_google_entry_is_not_added_to_semantic_entries() -> None:
+    source = 'def convert(value):\n    """Convert a value.\n\n    Args:\n        value Value.\n    """\n'
+    settings = CheckSettings(docstring_convention=DocstringConvention.GOOGLE)
+    structure = PDF.prepare(category_context(source, settings=settings)).docstrings[0].structure
+
+    assert not structure.entries
+    assert tuple(issue.kind for issue in structure.convention_entry_issues) == (ConventionEntryIssueKind.GOOGLE_MISSING_SEPARATOR,)
+
+
+def test_malformed_numpy_entries_are_distinct_non_reflowable_section_blocks() -> None:
+    source = 'def combine(first, second):\n    """Combine values.\n\n    Parameters\n    ----------\n    first tuple[int, int]\n    second list[str]\n    """\n'
+    settings = CheckSettings(docstring_convention=DocstringConvention.NUMPY)
+    structure = PDF.prepare(category_context(source, settings=settings)).docstrings[0].structure
+
+    assert tuple((child.kind, child.start_line, child.end_line) for child in structure.blocks[-1].children) == (
+        (DocstringBlockKind.SECTION_HEADER, 2, 4),
+        (DocstringBlockKind.CONVENTION_ENTRY_ISSUE, 4, 5),
+        (DocstringBlockKind.CONVENTION_ENTRY_ISSUE, 5, 6),
+        (DocstringBlockKind.BLANK, 6, 7),
+    )
+    assert all(region.start_line not in {4, 5} for region in structure.reflow_regions)
+
+
+def test_malformed_entry_detection_skips_protected_google_content() -> None:
+    source = 'def convert(value):\n    """Convert a value.\n\n    Args:\n        ```text\n        value Value.\n        ```\n    """\n'
+    settings = CheckSettings(docstring_convention=DocstringConvention.GOOGLE)
+    structure = PDF.prepare(category_context(source, settings=settings)).docstrings[0].structure
+
+    assert not structure.convention_entry_issues
+
+
 @pytest.mark.parametrize(
     ("section", "entry_text", "expected_kind", "expected_names", "expected_type"),
     [
@@ -1142,31 +1221,48 @@ def test_rest_return_yield_and_raise_fields_preserve_generic_looking_type_text(f
 
 
 @pytest.mark.parametrize(
-    ("field", "expected_kind"),
+    ("field_text", "expected_kind"),
     [
-        ("param", DocstringEntryKind.PARAMETER),
-        ("parameter", DocstringEntryKind.PARAMETER),
-        ("arg", DocstringEntryKind.PARAMETER),
-        ("argument", DocstringEntryKind.PARAMETER),
-        ("key", DocstringEntryKind.PARAMETER),
-        ("keyword", DocstringEntryKind.PARAMETER),
-        ("kwarg", DocstringEntryKind.PARAMETER),
-        ("return", DocstringEntryKind.RETURN),
-        ("returns", DocstringEntryKind.RETURN),
-        ("rtype", DocstringEntryKind.RETURN),
-        ("yield", DocstringEntryKind.YIELD),
-        ("yields", DocstringEntryKind.YIELD),
-        ("ytype", DocstringEntryKind.YIELD),
-        ("raise", DocstringEntryKind.EXCEPTION),
-        ("raises", DocstringEntryKind.EXCEPTION),
-        ("except", DocstringEntryKind.EXCEPTION),
-        ("exception", DocstringEntryKind.EXCEPTION),
-        ("custom", DocstringEntryKind.FIELD),
+        (":param value:", DocstringEntryKind.PARAMETER),
+        (":parameter value:", DocstringEntryKind.PARAMETER),
+        (":arg value:", DocstringEntryKind.PARAMETER),
+        (":argument value:", DocstringEntryKind.PARAMETER),
+        (":key value:", DocstringEntryKind.PARAMETER),
+        (":keyword value:", DocstringEntryKind.PARAMETER),
+        (":kwarg value:", DocstringEntryKind.PARAMETER),
+        (":return:", DocstringEntryKind.RETURN),
+        (":returns:", DocstringEntryKind.RETURN),
+        (":rtype:", DocstringEntryKind.RETURN),
+        (":yield:", DocstringEntryKind.YIELD),
+        (":yields:", DocstringEntryKind.YIELD),
+        (":ytype:", DocstringEntryKind.YIELD),
+        (":raise ValueError:", DocstringEntryKind.EXCEPTION),
+        (":raises ValueError:", DocstringEntryKind.EXCEPTION),
+        (":except ValueError:", DocstringEntryKind.EXCEPTION),
+        (":exception ValueError:", DocstringEntryKind.EXCEPTION),
+        (":custom:", DocstringEntryKind.FIELD),
     ],
 )
-def test_all_rest_field_aliases_are_classified(field: str, expected_kind: DocstringEntryKind) -> None:
-    entry = structure_for(f":{field}: Description.", settings=CheckSettings(docstring_convention=DocstringConvention.REST)).entries[0]
+def test_all_rest_field_aliases_are_classified(field_text: str, expected_kind: DocstringEntryKind) -> None:
+    entry = structure_for(f"{field_text} Description.", settings=CheckSettings(docstring_convention=DocstringConvention.REST)).entries[0]
     assert entry.kind == expected_kind
+
+
+@pytest.mark.parametrize(
+    ("value", "expected_kind"),
+    [
+        (":param: Description.", ConventionEntryIssueKind.REST_MISSING_ARGUMENT),
+        (":raises: Description.", ConventionEntryIssueKind.REST_MISSING_ARGUMENT),
+        (":returns result: Description.", ConventionEntryIssueKind.REST_UNEXPECTED_ARGUMENT),
+        (":rtype result: Description.", ConventionEntryIssueKind.REST_UNEXPECTED_ARGUMENT),
+    ],
+)
+def test_invalid_rest_field_arity_remains_structural_but_not_semantic(value: str, expected_kind: ConventionEntryIssueKind) -> None:
+    structure = structure_for(value, settings=CheckSettings(docstring_convention=DocstringConvention.REST))
+
+    assert not structure.entries
+    assert tuple((block.kind, block.start_line, block.end_line) for block in structure.blocks) == ((DocstringBlockKind.REST_FIELD, 0, 1),)
+    assert tuple(issue.kind for issue in structure.convention_entry_issues) == (expected_kind,)
 
 
 def test_rest_field_continuation_and_tabbed_prefix_have_exact_reflow_indentation() -> None:

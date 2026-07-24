@@ -19,6 +19,7 @@ All notable changes to this project are documented here. The format follows [Kee
 - **Docstring diagnostics:**
   - Added PDF212 to report nonempty primary and supported attached attribute docstrings without a parsed top-level summary.
   - Added PDF526 to report parsed parameter documentation that does not follow function signature order.
+  - Added PDF414 and PDF415 to report high-confidence malformed Google, NumPy, and reStructuredText entry syntax and Google or NumPy entry indentation without unsafe fixes.
 - **Persistent caching:**
   - Added strict persistent clean-proof caching for disk-backed checks and fixes, with complete source hashing, semantic analysis-setting and final-rule-code invalidation, shared invocation-local analysis fingerprints, engine/path invalidation, miss-only process execution, bounded parent-side probes, and source-free warm results.
   - Added `cache` and `cache-dir` settings, `--cache`/`--no-cache`, `--cache-dir`, opt-in `--cache-stats`, safe project cache self-pruning, and the ownership-checked `pydocfmt clean` command with its own `--cache-dir` override.
@@ -32,9 +33,12 @@ All notable changes to this project are documented here. The format follows [Kee
   - Made inline suppressions after any component token of an implicitly concatenated docstring cover the complete expression for PDF findings while preserving line-local PCF coverage and existing local and standalone attachment boundaries.
 - **Docstring diagnostics:**
   - Made PDF202 target the complete physical empty-docstring expression, including delimiter-only closing lines, consistently with other whole-docstring diagnostics.
+  - Parse docstrings after collecting complete owner parameter, attribute, and method inventories, and keep invalid standard reStructuredText field arity structural but outside semantic entry collections.
 - **Command performance:**
   - Reused successfully parsed configuration documents, closest-config discovery results, and resolved source profiles within each invocation.
   - Reduced directory-walk resolver calls and repeated cache-root, glob-segment, and literal-pattern preparation without changing file-selection semantics.
+  - Preindexed direct class attributes and methods once for malformed-entry confidence and skipped those inventories for conventions that cannot use them.
+  - Removed redundant token validation from AST-backed type comparison while preserving conservative comment rejection, parser recursion handling, and iterative AST traversal.
 - **Caching performance:**
   - Reused resolved package ancestry and canonical sibling path encodings within each invocation while preserving exact cache identities and rule-facing path semantics.
   - Batched complete-source proof validation with worker-proportional task submission and pending futures while preserving full-content hashing, ordered results, and the all-hit no-analysis-pool path.
@@ -50,6 +54,12 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Fixed
 
+- **Convention parsing:**
+  - Made PDF414 and PDF415 require owner-inventory evidence for ambiguous bare Google and empty-type NumPy candidates, use field arity to limit reStructuredText missing-delimiter findings, and distinguish valid NumPy return, yield, and exception peers from malformed continuations.
+  - Required balanced nested delimiters and quotes for every parenthesized Google type, and validated PDF414 NumPy type candidates with a newline-aware iterative token grammar so deeply nested input does not enter Python's recursive expression parser.
+  - Preserved sequence-shaped type state through grouping parentheses, preventing invalid NumPy type candidates from triggering missing-separator diagnostics.
+  - Kept every PDF414 and PDF415 issue line as a distinct non-reflowable structural boundary so PDF101 cannot merge malformed entries or erase their diagnostics.
+  - Compared convention indentation using raw evaluated whitespace, replaced regex-compatible entry matching with explicit match data, and centralized exhaustive issue precedence and message ownership without changing diagnostic identities.
 - **Markup-aware reflow:**
   - Preserved recognized inline Markdown and reStructuredText constructs as indivisible source-aware tokens in PDF101, PCF001, and PCF004, while reporting ambiguous constructs without unsafe reflow or extraction fixes.
   - Recognized angle-bracket Markdown destinations and escaped parentheses in destinations without splitting valid links or images.

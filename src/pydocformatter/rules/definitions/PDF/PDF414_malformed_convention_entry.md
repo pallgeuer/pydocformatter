@@ -1,0 +1,136 @@
+# malformed-convention-entry (PDF414)
+
+Fix is not available.
+
+Rule is disabled if `docstring-convention` is `none` or `pep257`.
+
+## What it does
+PDF414 reports high-confidence malformed entry syntax for the configured Google, NumPy, or reStructuredText convention:
+
+- For Google sections, it detects an unbalanced parenthesized type and a missing colon between an entry head and its description. Parameter, attribute, and method names can be confirmed from the complete owning function or class inventory. A closed, balanced parenthesized type is also strong entry evidence and may contain nested parentheses, brackets, braces, or quoted delimiters. Exception entries can be recognized from one or more comma- or pipe-separated qualified names whose final components end in `Error`, `Exception`, or `Warning`.
+- For NumPy sections, it detects a colon with no following type and a missing colon between one or more entry names and a conservative type expression. Both checks require every name to match the relevant parameter, attribute, or method inventory. Type candidates are validated with an iterative token grammar before any general Python expression parsing, including for deeply nested candidates. Top-level line breaks are rejected, while line breaks inside brackets or parentheses and explicit backslash continuations remain valid.
+- For reStructuredText fields, it detects a missing closing colon on a standard field name when the remaining text matches the field's expected arity. Named parameter, exception, and attribute fields require a credible first argument; exception arguments must use a conventional exception suffix. Owner-wide fields are reported only when no trailing text follows the field name. The rule also requires arguments on complete parameter, exception, and attribute fields and rejects arguments on complete owner-wide return fields. Yield fields intentionally allow both named and owner-wide forms.
+
+The rule follows only the configured convention. It does not reinterpret syntax belonging to another convention. Candidates inside parser-recognized protected structures, such as code fences, doctests, directives, literal blocks, and list items, remain part of those structures rather than convention entries.
+
+Malformed Google and NumPy candidates are reported only when their names or syntax provide strong evidence that they are intended entries. Ordinary prose and weak, unknown names are left alone. A malformed entry remains structural section or field content but is excluded from the semantic entry inventory, so it cannot incorrectly satisfy parameter, return, or exception documentation checks. Diagnosed lines are also excluded from PDF101 prose reflow, preventing an unrelated formatting fix from merging or rewriting uncertain entry syntax.
+
+PDF414 is diagnostic only. Inserting a missing delimiter or closing a type expression can change meaning, so the rule does not guess a replacement.
+
+## Why is this useful?
+Malformed entries can silently disappear from generated documentation and semantic validation. A single missing colon can make real parameter documentation look like prose, while an invalid field argument can falsely appear to document an owner-wide value. Reporting only high-confidence defects exposes these mistakes without imposing convention grammar on unrelated narrative text.
+
+## Ruff compatibility
+None.
+
+## Examples
+PDF414 reports malformed Google parameter syntax:
+
+```pydocfmt-example
+[settings]
+docstring-convention = "google"
+
+[input]
+def convert(value):
+    """Convert a value.
+
+    Args:
+        value (int) The value.
+    """
+
+[output=unchanged]
+[findings]
+PDF414: Line 5: Google docstring entry 'value' is missing the colon before its description
+```
+
+PDF414 can report distinct Google defects in the same docstring. Complete exception lists are retained in the finding:
+
+```pydocfmt-example
+[settings]
+docstring-convention = "google"
+
+[input]
+def collect(value):
+    """Collect a value.
+
+    Args:
+        value (list[str]: Value to collect.
+
+    Raises:
+        ValueError | pkg.CustomError Collection failed.
+    """
+
+[output=unchanged]
+[findings]
+PDF414: Line 5: Google docstring entry 'value' has an unbalanced parenthesized type
+PDF414: Line 8: Google docstring entry 'ValueError', 'pkg.CustomError' is missing the colon before its description
+```
+
+PDF414 reports both a missing NumPy separator and an explicitly empty type. Multi-name entries are diagnosed as one entry:
+
+```pydocfmt-example
+[settings]
+docstring-convention = "numpy"
+
+[input]
+def combine(first, second):
+    """Combine values.
+
+    Parameters
+    ----------
+    first tuple[int, int]
+    second :
+    """
+
+[output=unchanged]
+[findings]
+PDF414: Line 6: NumPy docstring entry 'first' is missing the colon before its type
+PDF414: Line 7: NumPy docstring entry 'second' is missing its type after the colon
+```
+
+PDF414 applies the argument contract only to standard reStructuredText fields. The named `yield` field in this example is valid:
+
+```pydocfmt-example
+[settings]
+docstring-convention = "rest"
+
+[input]
+def convert(value):
+    """Convert a value.
+
+    :param value The value.
+    :type: int
+    :returns result: The result.
+    :yield item: A later value.
+    """
+
+[output=unchanged]
+[findings]
+PDF414: Line 4: reStructuredText field ':param:' is missing its closing colon
+PDF414: Line 5: reStructuredText field ':type:' is missing its required argument
+PDF414: Line 6: reStructuredText field ':returns:' has an unexpected argument
+```
+
+Weak entry-like prose is not enough to trigger PDF414. Here, `unknown` is not a function parameter and `Problem` is not a conventionally named exception:
+
+```pydocfmt-example
+[settings]
+docstring-convention = "google"
+
+[input]
+def convert(value):
+    """Convert a value.
+
+    Args:
+        unrelated prose about conversion.
+        unknown (int: Ambiguous unknown text.
+
+    Raises:
+        Problem Ambiguous failure text.
+    """
+
+[output=unchanged]
+```
+
+## Options
+None.

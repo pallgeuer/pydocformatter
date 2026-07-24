@@ -8,7 +8,11 @@ Attributes:
 from __future__ import annotations
 
 # Standard library imports
+import io
 import ast
+import keyword
+import tokenize
+import dataclasses
 from typing import TYPE_CHECKING
 
 # First-party imports
@@ -21,6 +25,29 @@ if TYPE_CHECKING:
 
 
 TypeAliasMap = module_bindings.TypeAliasMap
+
+
+@dataclasses.dataclass
+class _TypeContext:
+    """One non-recursive conservative type-expression parsing context."""
+
+    kind: str
+    allow_sequence: bool
+    opened_as_trailer: bool = False
+    expect_value: bool = True
+    expect_attribute: bool = False
+    saw_value: bool = False
+    has_comma: bool = False
+    union_active: bool = False
+    value_is_sequence: bool = False
+
+
+@dataclasses.dataclass(frozen=True)
+class _ValidatedTypeTokens:
+    """Validated significant tokens and normalization facts for a type expression."""
+
+    tokens: tuple[tokenize.TokenInfo, ...]
+    has_grouping: bool
 
 
 def module_type_aliases(module: cst.Module) -> TypeAliasMap:
@@ -46,18 +73,57 @@ def parse_type_like_expr(text: str, *, aliases: TypeAliasMap | None = None) -> a
         ast.Expression | None: Parsed expression when the text is syntactically valid and type-like, or None.
     """
     stripped = text.strip()
-    if not stripped:
+    if not stripped or "#" in stripped:
         return None
-    try:
-        parsed = ast.parse(stripped, mode="eval")
-    except SyntaxError:
-        return None
-    if not is_type_like_node(parsed.body, allow_sequence=False):
+    parsed = _parse_type_like_ast(stripped)
+    if parsed is None:
         return None
     if aliases:
         parsed = ast.Expression(body=_normalize_type_aliases(parsed.body, aliases))
-        ast.fix_missing_locations(parsed)
     return parsed
+
+
+def is_type_like_text(text: str) -> bool:
+    """Return whether text follows the conservative type-expression grammar.
+
+    Args:
+        text (str): Candidate type expression text.
+
+    Returns:
+        bool: Whether the token stream is structurally type-like without invoking the Python parser.
+    """
+    stripped = text.strip()
+    if stripped == "None":
+        return True
+    parts = stripped.split(".")
+    if parts and all(part.isidentifier() and not keyword.iskeyword(part) for part in parts):
+        return True
+    return _validated_type_tokens(stripped) is not None
+
+
+def is_quoted_type_like_text(text: str) -> bool:
+    """Return whether text is one quoted conservative forward reference.
+
+    Args:
+        text (str): Candidate quoted forward-reference expression.
+
+    Returns:
+        bool: Whether text is one string literal whose value is type-like.
+    """
+    stripped = text.strip()
+    try:
+        tokens = tuple(
+            token_info for token_info in tokenize.generate_tokens(io.StringIO(stripped).readline) if token_info.type not in {tokenize.ENCODING, tokenize.NL, tokenize.NEWLINE, tokenize.ENDMARKER}
+        )
+    except (IndentationError, SyntaxError, tokenize.TokenError):
+        return False
+    if len(tokens) != 1 or tokens[0].type != tokenize.STRING:
+        return False
+    try:
+        value = ast.literal_eval(tokens[0].string)
+    except (SyntaxError, ValueError):
+        return False
+    return isinstance(value, str) and is_type_like_text(value)
 
 
 def normalized_type_like_text(text: str) -> str | None:
@@ -71,15 +137,18 @@ def normalized_type_like_text(text: str) -> str | None:
             unchanged.
     """
     stripped = text.strip()
-    parsed = parse_type_like_expr(stripped)
+    validated = _validated_type_tokens(stripped)
+    if validated is None or validated.has_grouping:
+        return None
+    parsed = _parse_type_like_ast(stripped)
     if parsed is None:
         return None
-    normalized = ast.unparse(parsed)
+    normalized = _normalized_token_text(validated.tokens)
     if normalized == stripped:
         return None
     if without_whitespace(normalized) != without_whitespace(stripped):
         return None
-    reparsed = parse_type_like_expr(normalized)
+    reparsed = _parse_type_like_ast(normalized)
     if reparsed is None or ast_dump(parsed) != ast_dump(reparsed):
         return None
     return normalized
@@ -111,7 +180,36 @@ def ast_dump(parsed: ast.Expression) -> str:
     Returns:
         str: Stable AST dump without line, column, or end-position attributes.
     """
-    return ast.dump(parsed, include_attributes=False)
+    values: dict[int, str] = {}
+    stack: list[tuple[ast.AST, bool]] = [(parsed, False)]
+    while stack:
+        node, visited = stack.pop()
+        if not visited:
+            stack.append((node, True))
+            stack.extend((child, False) for child in reversed(tuple(ast.iter_child_nodes(node))))
+            continue
+        if isinstance(node, ast.Expression):
+            value = f"Expression({values[id(node.body)]})"
+        elif isinstance(node, ast.Name):
+            value = f"Name({node.id!r})"
+        elif isinstance(node, ast.Attribute):
+            value = f"Attribute({values[id(node.value)]},{node.attr!r})"
+        elif isinstance(node, ast.Subscript):
+            value = f"Subscript({values[id(node.value)]},{values[id(node.slice)]})"
+        elif isinstance(node, ast.Tuple):
+            value = f"Tuple({','.join(values[id(element)] for element in node.elts)})"
+        elif isinstance(node, ast.List):
+            value = f"List({','.join(values[id(element)] for element in node.elts)})"
+        elif isinstance(node, ast.BinOp) and isinstance(node.op, ast.BitOr):
+            value = f"Union({values[id(node.left)]},{values[id(node.right)]})"
+        elif isinstance(node, ast.Constant) and node.value is None:
+            value = "None"
+        elif isinstance(node, ast.Constant) and node.value is Ellipsis:
+            value = "Ellipsis"
+        else:
+            value = type(node).__name__
+        values[id(node)] = value
+    return values[id(parsed)]
 
 
 def without_whitespace(text: str) -> str:
@@ -136,39 +234,208 @@ def is_type_like_node(node: ast.AST, *, allow_sequence: bool) -> bool:
     Returns:
         bool: Whether the node uses only the small expression subset accepted for static docstring type comparison.
     """
-    if isinstance(node, ast.Name):
-        return True
-    if isinstance(node, ast.Attribute):
-        return is_type_like_node(node.value, allow_sequence=False)
-    if isinstance(node, ast.Subscript):
-        return is_type_like_node(node.value, allow_sequence=False) and is_type_like_node(node.slice, allow_sequence=True)
-    if isinstance(node, ast.Tuple | ast.List) and allow_sequence:
-        return all(is_type_like_node(element, allow_sequence=True) for element in node.elts)
-    if isinstance(node, ast.BinOp):
-        return isinstance(node.op, ast.BitOr) and is_type_like_node(node.left, allow_sequence=False) and is_type_like_node(node.right, allow_sequence=False)
-    if isinstance(node, ast.Constant):
-        return node.value is None or node.value is Ellipsis
-    return False
+    pending: list[tuple[ast.AST, bool]] = [(node, allow_sequence)]
+    while pending:
+        current, current_allow_sequence = pending.pop()
+        if isinstance(current, ast.Name):
+            continue
+        if isinstance(current, ast.Attribute):
+            pending.append((current.value, False))
+            continue
+        if isinstance(current, ast.Subscript):
+            pending.extend(((current.value, False), (current.slice, True)))
+            continue
+        if isinstance(current, ast.Tuple | ast.List) and current_allow_sequence:
+            pending.extend((element, True) for element in current.elts)
+            continue
+        if isinstance(current, ast.BinOp) and isinstance(current.op, ast.BitOr):
+            pending.extend(((current.left, False), (current.right, False)))
+            continue
+        if isinstance(current, ast.Constant) and (current.value is None or current.value is Ellipsis):
+            continue
+        return False
+    return True
 
 
 def _normalize_type_aliases(node: ast.expr, aliases: TypeAliasMap) -> ast.expr:
     """Return a copy of a parsed type expression with safe aliases expanded."""
-    if isinstance(node, ast.Name):
-        return _alias_node(aliases.get(node.id)) or node
+    normalized: dict[int, ast.expr] = {}
+    stack: list[tuple[ast.expr, bool]] = [(node, False)]
+    while stack:
+        current, visited = stack.pop()
+        if not visited:
+            stack.append((current, True))
+            stack.extend((child, False) for child in reversed(_type_expression_children(current)))
+            continue
+        if isinstance(current, ast.Name):
+            replacement = _alias_node(aliases.get(current.id))
+            normalized[id(current)] = current if replacement is None else ast.copy_location(replacement, current)
+        elif isinstance(current, ast.Attribute):
+            normalized_value = normalized[id(current.value)]
+            normalized[id(current)] = current if normalized_value is current.value else ast.copy_location(ast.Attribute(value=normalized_value, attr=current.attr, ctx=current.ctx), current)
+        elif isinstance(current, ast.Subscript):
+            normalized[id(current)] = ast.copy_location(ast.Subscript(value=normalized[id(current.value)], slice=normalized[id(current.slice)], ctx=current.ctx), current)
+        elif isinstance(current, ast.Tuple):
+            normalized[id(current)] = ast.copy_location(ast.Tuple(elts=[normalized[id(element)] for element in current.elts], ctx=current.ctx), current)
+        elif isinstance(current, ast.List):
+            normalized[id(current)] = ast.copy_location(ast.List(elts=[normalized[id(element)] for element in current.elts], ctx=current.ctx), current)
+        elif isinstance(current, ast.BinOp):
+            normalized[id(current)] = ast.copy_location(ast.BinOp(left=normalized[id(current.left)], op=current.op, right=normalized[id(current.right)]), current)
+        else:
+            normalized[id(current)] = current
+    return normalized[id(node)]
+
+
+def _parse_type_like_ast(text: str) -> ast.Expression | None:
+    """Parse and validate a conservative type expression."""
+    try:
+        parsed = ast.parse(text, mode="eval")
+    except (RecursionError, SyntaxError):
+        return None
+    return parsed if is_type_like_node(parsed.body, allow_sequence=False) else None
+
+
+def _validated_type_tokens(text: str) -> _ValidatedTypeTokens | None:
+    """Return significant tokens when text follows the conservative type grammar."""
+    if not text:
+        return None
+    tokens = _significant_type_tokens(text)
+    if not tokens or any(token_info.type not in {tokenize.NAME, tokenize.OP} for token_info in tokens):
+        return None
+    contexts = [_TypeContext(kind="root", allow_sequence=False)]
+    has_grouping = False
+    for token_info in tokens:
+        context = contexts[-1]
+        value = token_info.string
+        if context.expect_attribute:
+            if token_info.type != tokenize.NAME or keyword.iskeyword(value):
+                return None
+            context.expect_attribute = False
+            continue
+        if context.expect_value:
+            if token_info.type == tokenize.NAME:
+                if keyword.iskeyword(value) and value != "None":
+                    return None
+                context.expect_value = False
+                context.saw_value = True
+                context.value_is_sequence = False
+                continue
+            if token_info.type == tokenize.OP and value == "...":
+                context.expect_value = False
+                context.saw_value = True
+                context.value_is_sequence = False
+                continue
+            if token_info.type == tokenize.OP and value == "(":
+                contexts.append(_TypeContext(kind="paren", allow_sequence=True))
+                has_grouping = True
+                continue
+            if token_info.type == tokenize.OP and value == "[" and context.allow_sequence:
+                contexts.append(_TypeContext(kind="list", allow_sequence=True))
+                continue
+            if token_info.type != tokenize.OP or value not in {")", "]"}:
+                return None
+        if token_info.type != tokenize.OP:
+            return None
+        if value == ".":
+            if context.value_is_sequence:
+                return None
+            context.expect_attribute = True
+            continue
+        if value == "[":
+            if context.value_is_sequence:
+                return None
+            contexts.append(_TypeContext(kind="subscript", allow_sequence=True, opened_as_trailer=True))
+            continue
+        if value == "|":
+            if context.value_is_sequence:
+                return None
+            context.expect_value = True
+            context.union_active = True
+            continue
+        if value == ",":
+            if not context.allow_sequence or (context.union_active and context.value_is_sequence):
+                return None
+            context.expect_value = True
+            context.has_comma = True
+            context.union_active = False
+            continue
+        if value not in {")", "]"} or len(contexts) == 1:
+            return None
+        if (context.kind == "paren" and value != ")") or (context.kind in {"list", "subscript"} and value != "]"):
+            return None
+        if context.expect_attribute or (context.expect_value and context.saw_value and not context.has_comma):
+            return None
+        if context.kind == "subscript" and not context.saw_value:
+            return None
+        if context.union_active and context.value_is_sequence:
+            return None
+        is_sequence = context.value_is_sequence or context.kind == "list" or (context.kind == "paren" and (context.has_comma or not context.saw_value))
+        contexts.pop()
+        parent = contexts[-1]
+        if context.opened_as_trailer:
+            continue
+        if is_sequence and not parent.allow_sequence:
+            return None
+        parent.expect_value = False
+        parent.saw_value = True
+        parent.value_is_sequence = is_sequence
+    root = contexts[0]
+    if len(contexts) != 1 or root.expect_value or root.expect_attribute or (root.union_active and root.value_is_sequence) or root.value_is_sequence:
+        return None
+    return _ValidatedTypeTokens(tokens=tokens, has_grouping=has_grouping)
+
+
+def _significant_type_tokens(text: str) -> tuple[tokenize.TokenInfo, ...] | None:
+    """Return significant tokens while rejecting a continued top-level statement."""
+    try:
+        generated_tokens = tokenize.generate_tokens(io.StringIO(text).readline)
+        tokens: list[tokenize.TokenInfo] = []
+        terminated = False
+        for token_info in generated_tokens:
+            if token_info.type in {tokenize.ENCODING, tokenize.NL, tokenize.ENDMARKER}:
+                continue
+            if token_info.type == tokenize.NEWLINE:
+                terminated = True
+                continue
+            if terminated:
+                return None
+            tokens.append(token_info)
+    except (IndentationError, SyntaxError, tokenize.TokenError):
+        return None
+    return tuple(tokens)
+
+
+def _normalized_token_text(tokens: tuple[tokenize.TokenInfo, ...]) -> str:
+    """Return canonical spacing for validated type-expression tokens."""
+    pieces: list[str] = []
+    previous = ""
+    for token_info in tokens:
+        value = token_info.string
+        if value == "|":
+            pieces.append(" | ")
+        elif value == ",":
+            pieces.append(", ")
+        elif value in {".", "[", "]", "(", ")"}:
+            pieces.append(value)
+        else:
+            if previous and previous not in {".", "[", "(", "|", ","} and not pieces[-1].endswith((" ", ".", "[", "(")):
+                pieces.append(" ")
+            pieces.append(value)
+        previous = value
+    return "".join(pieces).rstrip()
+
+
+def _type_expression_children(node: ast.expr) -> tuple[ast.expr, ...]:
+    """Return child expressions of one accepted type-expression node."""
     if isinstance(node, ast.Attribute):
-        normalized_value = _normalize_type_aliases(node.value, aliases)
-        if normalized_value is node.value:
-            return node
-        return ast.copy_location(ast.Attribute(value=normalized_value, attr=node.attr, ctx=node.ctx), node)
+        return (node.value,)
     if isinstance(node, ast.Subscript):
-        return ast.copy_location(ast.Subscript(value=_normalize_type_aliases(node.value, aliases), slice=_normalize_type_aliases(node.slice, aliases), ctx=node.ctx), node)
-    if isinstance(node, ast.Tuple):
-        return ast.copy_location(ast.Tuple(elts=[_normalize_type_aliases(element, aliases) for element in node.elts], ctx=node.ctx), node)
-    if isinstance(node, ast.List):
-        return ast.copy_location(ast.List(elts=[_normalize_type_aliases(element, aliases) for element in node.elts], ctx=node.ctx), node)
+        return node.value, node.slice
+    if isinstance(node, ast.Tuple | ast.List):
+        return tuple(node.elts)
     if isinstance(node, ast.BinOp):
-        return ast.copy_location(ast.BinOp(left=_normalize_type_aliases(node.left, aliases), op=node.op, right=_normalize_type_aliases(node.right, aliases)), node)
-    return node
+        return node.left, node.right
+    return ()
 
 
 def _alias_node(qualified_name: str | None) -> ast.expr | None:

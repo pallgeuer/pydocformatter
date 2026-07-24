@@ -114,15 +114,15 @@ def _canonical_exception_entry_line(convention: DocstringConvention, text: str, 
 
 def _canonical_google_exception_entry_line(text: str, entry: PDF_definition.DocstringEntry) -> str | None:
     """Return the canonical Google exception entry spelling."""
-    if PDF_definition._GOOGLE_ENTRY_RE.match(text) is not None:
+    if PDF_definition._match_google_entry(text) is not None:
         return None
-    match = PDF_definition._GENERIC_ENTRY_RE.match(text)
+    match = PDF_definition._match_generic_entry(text)
     if match is None:
         return None
-    description = match.group("description").strip()
+    description = match.description.strip()
     if description == ":" and text.rstrip().endswith("::"):
         return None
-    return f"{match.group('indent')}{', '.join(entry.names)}:{f' {description}' if description else ''}"
+    return f"{match.indent}{', '.join(entry.names)}:{f' {description}' if description else ''}"
 
 
 def _canonical_numpy_exception_entry_line(text: str, entry: PDF_definition.DocstringEntry) -> str | None:

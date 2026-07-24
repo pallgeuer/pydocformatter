@@ -169,7 +169,7 @@ def test_preserves_crlf_and_reports_the_same_physical_lines() -> None:
     [
         ('def function(value):\n    """:param value: Description."""\n', DocstringConvention.REST, True),
         ('def function(value):\n    """:param value: Description."""\n', DocstringConvention.PEP257, False),
-        ('def function(value):\n    """:param value missing terminator"""\n', DocstringConvention.REST, False),
+        ('def function(value):\n    """:param value missing terminator"""\n', DocstringConvention.REST, True),
         ('def function(value):\n    """Args:\n        value: Description.\n    """\n', DocstringConvention.PEP257, True),
         ('def function(value):\n    """Parameters\n    ----------\n    value : int\n        Description.\n    """\n', DocstringConvention.GOOGLE, True),
         ('def function(value):\n    """Args\n        value: Description.\n    """\n', DocstringConvention.GOOGLE, True),

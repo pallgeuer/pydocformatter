@@ -111,18 +111,18 @@ def _canonical_entry_line(convention: DocstringConvention, text: str, entry: PDF
 
 def _canonical_google_entry_line(text: str, entry: PDF_definition.DocstringEntry) -> str | None:
     """Return the canonical Google entry line for spacing normalization."""
-    match = PDF_definition._GOOGLE_ENTRY_RE.match(text)
+    match = PDF_definition._match_google_entry(text)
     if match is None and entry.kind in {PDF_definition.DocstringEntryKind.RETURN, PDF_definition.DocstringEntryKind.YIELD, PDF_definition.DocstringEntryKind.EXCEPTION}:
-        match = PDF_definition._GENERIC_ENTRY_RE.match(text)
+        match = PDF_definition._match_generic_entry(text)
     if match is None:
         return None
-    head = _google_entry_head(entry, original_name=match.group("name").strip(), original_type=match.groupdict().get("type"))
+    head = _google_entry_head(entry, original_name=match.name.strip(), original_type=match.type_text)
     if head is None:
         return None
-    description = match.group("description").strip()
+    description = match.description.strip()
     if description == ":" and text.rstrip().endswith("::"):
         return None
-    return f"{match.group('indent')}{head}:{f' {description}' if description else ''}"
+    return f"{match.indent}{head}:{f' {description}' if description else ''}"
 
 
 def _google_entry_head(entry: PDF_definition.DocstringEntry, *, original_name: str, original_type: str | None) -> str | None:

@@ -89,6 +89,7 @@ class DocstringBlockKind(enum.Enum):
         SECTION: A recognized convention section including its header and body.
         SECTION_HEADER: The heading line or underline that names a section.
         SECTION_ENTRY: One parsed Google or NumPy section entry.
+        CONVENTION_ENTRY_ISSUE: One diagnosed convention entry line protected from prose reflow.
         COLON_HEADER: A standalone colon-ended line protected as a structure boundary.
         LIST_ITEM: A Markdown or reStructuredText list item.
         HEADING: A Markdown or reStructuredText heading protected from prose reflow.
@@ -108,6 +109,7 @@ class DocstringBlockKind(enum.Enum):
     SECTION = "section"
     SECTION_HEADER = "section-header"
     SECTION_ENTRY = "section-entry"
+    CONVENTION_ENTRY_ISSUE = "convention-entry-issue"
     COLON_HEADER = "colon-header"
     LIST_ITEM = "list-item"
     HEADING = "heading"
@@ -141,6 +143,65 @@ class DocstringEntryKind(enum.Enum):
     ATTRIBUTE = "attribute"
     METHOD = "method"
     FIELD = "field"
+
+
+class ConventionEntryIssueKind(enum.Enum):
+    """Kinds of high-confidence malformed convention entries.
+
+    Attributes:
+        GOOGLE_UNBALANCED_TYPE: Google entry with an unbalanced parenthesized type.
+        GOOGLE_MISSING_SEPARATOR: Google entry without the colon before its description.
+        GOOGLE_ENTRY_INDENTATION: Complete Google entry not indented beyond its section header.
+        GOOGLE_CONTINUATION_INDENTATION: Google description line not indented beyond its entry.
+        NUMPY_MISSING_TYPE: NumPy entry with a colon but no following type.
+        NUMPY_MISSING_SEPARATOR: NumPy entry without the colon before its type.
+        NUMPY_CONTINUATION_INDENTATION: NumPy description line not indented beyond its entry.
+        REST_MISSING_CLOSING_DELIMITER: Recognized reStructuredText field without its closing colon.
+        REST_MISSING_ARGUMENT: Recognized named reStructuredText field without an entry name.
+        REST_UNEXPECTED_ARGUMENT: Owner-wide reStructuredText field with an entry name.
+    """
+
+    GOOGLE_UNBALANCED_TYPE = "google-unbalanced-type"
+    GOOGLE_MISSING_SEPARATOR = "google-missing-separator"
+    GOOGLE_ENTRY_INDENTATION = "google-entry-indentation"
+    GOOGLE_CONTINUATION_INDENTATION = "google-continuation-indentation"
+    NUMPY_MISSING_TYPE = "numpy-missing-type"
+    NUMPY_MISSING_SEPARATOR = "numpy-missing-separator"
+    NUMPY_CONTINUATION_INDENTATION = "numpy-continuation-indentation"
+    REST_MISSING_CLOSING_DELIMITER = "rest-missing-closing-delimiter"
+    REST_MISSING_ARGUMENT = "rest-missing-argument"
+    REST_UNEXPECTED_ARGUMENT = "rest-unexpected-argument"
+
+
+@dataclasses.dataclass(frozen=True)
+class ConventionEntryIssue:
+    """One high-confidence convention entry syntax or indentation issue.
+
+    Attributes:
+        kind (ConventionEntryIssueKind): Stable issue classification used by diagnostic rules.
+        start_line (int): Logical docstring line containing the issue.
+        names (tuple[str, ...]): Confidently recovered entry names in source order.
+        field_name (str | None): Normalized reStructuredText field name, without colons.
+    """
+
+    kind: ConventionEntryIssueKind
+    start_line: int
+    names: tuple[str, ...] = ()
+    field_name: str | None = None
+
+
+_CONVENTION_ENTRY_ISSUE_PRECEDENCE: Mapping[ConventionEntryIssueKind, int] = MappingProxyType({
+    ConventionEntryIssueKind.GOOGLE_UNBALANCED_TYPE: 1,
+    ConventionEntryIssueKind.GOOGLE_MISSING_SEPARATOR: 2,
+    ConventionEntryIssueKind.GOOGLE_ENTRY_INDENTATION: 3,
+    ConventionEntryIssueKind.GOOGLE_CONTINUATION_INDENTATION: 4,
+    ConventionEntryIssueKind.NUMPY_MISSING_TYPE: 1,
+    ConventionEntryIssueKind.NUMPY_MISSING_SEPARATOR: 2,
+    ConventionEntryIssueKind.NUMPY_CONTINUATION_INDENTATION: 3,
+    ConventionEntryIssueKind.REST_MISSING_CLOSING_DELIMITER: 1,
+    ConventionEntryIssueKind.REST_MISSING_ARGUMENT: 2,
+    ConventionEntryIssueKind.REST_UNEXPECTED_ARGUMENT: 3,
+})
 
 
 @dataclasses.dataclass(frozen=True)
@@ -354,6 +415,8 @@ class DocstringStructure:
         blocks (tuple[DocstringBlock, ...]): Top-level semantic blocks parsed from the docstring.
         sections (tuple[DocstringSection, ...]): Recognized convention sections in source order.
         entries (tuple[DocstringEntry, ...]): Parsed documentation entries from sections and fields.
+        convention_entry_issues (tuple[ConventionEntryIssue, ...]): High-confidence malformed convention entries that
+            remain outside semantic entry collections.
         reflow_regions (tuple[ReflowRegion, ...]): Text regions that rules may safely reflow.
     """
 
@@ -362,6 +425,7 @@ class DocstringStructure:
     blocks: tuple[DocstringBlock, ...]
     sections: tuple[DocstringSection, ...]
     entries: tuple[DocstringEntry, ...]
+    convention_entry_issues: tuple[ConventionEntryIssue, ...]
     reflow_regions: tuple[ReflowRegion, ...]
 
 
@@ -649,10 +713,28 @@ class PDFCategoryData:
 
 @dataclasses.dataclass(frozen=True)
 class _AttributeCollection:
-    """Attributes and docstrings collected from adjacent attribute string literals."""
+    """Attributes and docstring targets collected from adjacent attribute string literals."""
 
     attributes: tuple[AttributeInfo, ...]
-    docstrings: tuple[DocstringInfo, ...]
+    docstring_targets: tuple[_DocstringTarget, ...]
+
+
+@dataclasses.dataclass(frozen=True)
+class _DocstringTarget:
+    """One possible docstring expression awaiting owner-aware parsing."""
+
+    expression: cst.Expr
+    statement: cst.SimpleStatementLine | cst.SimpleStatementSuite
+    owner: DocstringOwner
+
+
+@dataclasses.dataclass(frozen=True)
+class _MalformedEntryConfidence:
+    """Owner names that can make malformed entry syntax high-confidence."""
+
+    parameter_names: frozenset[str] = frozenset()
+    attribute_names: frozenset[str] = frozenset()
+    method_names: frozenset[str] = frozenset()
 
 
 @dataclasses.dataclass(frozen=True)
@@ -695,7 +777,7 @@ class _DefinitionCollector(cst.CSTVisitor):
         self.context = context
         self.source_lines = context.source_lines
         self.definitions: list[DefinitionInfo] = []
-        self.docstrings: list[DocstringInfo] = []
+        self.docstring_targets: list[_DocstringTarget] = []
         self.function_facts_by_definition_id: dict[int, FunctionFacts] = {}
         self.function_fact_stack: list[_MutableFunctionFacts] = []
         self.lambda_depth = 0
@@ -821,9 +903,8 @@ class _DefinitionCollector(cst.CSTVisitor):
         if first_expression is None:
             return
         expression, statement = first_expression
-        docstring = _docstring_info(expression, statement, owner=owner, context=self.context)
-        if docstring is not None:
-            self.docstrings.append(docstring)
+        if isinstance(expression.value, (cst.SimpleString, cst.ConcatenatedString)):
+            self.docstring_targets.append(_DocstringTarget(expression=expression, statement=statement, owner=owner))
 
 
 class _AttributeDocstringCollector:
@@ -834,13 +915,13 @@ class _AttributeDocstringCollector:
         self.context = context
         self.definitions_by_node_id = {id(definition.node): definition for definition in definitions}
         self._attributes: list[AttributeInfo] = []
-        self._docstrings: list[DocstringInfo] = []
+        self._docstring_targets: list[_DocstringTarget] = []
 
     def collect(self) -> _AttributeCollection:
         """Return collected attribute inventory and docstrings in source order."""
         module_definition = self.definitions_by_node_id[id(self.context.module)]
         self._scan_statements(self.context.module.body, module_definition)
-        return _AttributeCollection(attributes=tuple(self._attributes), docstrings=tuple(self._docstrings))
+        return _AttributeCollection(attributes=tuple(self._attributes), docstring_targets=tuple(self._docstring_targets))
 
     def _scan_suite(self, suite: cst.BaseSuite, owner: DefinitionInfo) -> None:
         """Scan a simple or indented suite for attribute docstring patterns."""
@@ -877,11 +958,9 @@ class _AttributeDocstringCollector:
 
     def _collect_after_assignment(self, expression: cst.Expr, statement: cst.SimpleStatementLine | cst.SimpleStatementSuite, assignment: AttributeInfo | None) -> None:
         """Collect a string expression immediately following an attribute assignment."""
-        if assignment is None:
+        if assignment is None or not isinstance(expression.value, (cst.SimpleString, cst.ConcatenatedString)):
             return
-        docstring = _docstring_info(expression, statement, owner=assignment, context=self.context)
-        if docstring is not None:
-            self._docstrings.append(docstring)
+        self._docstring_targets.append(_DocstringTarget(expression=expression, statement=statement, owner=assignment))
 
     def _scan_compound_statement(self, statement: cst.BaseStatement, owner: DefinitionInfo) -> None:
         """Recurse into compound statements that can contain attribute docstrings."""
@@ -951,9 +1030,35 @@ class PDF(RuleCategoryBase[PDFCategoryData]):
         context.module.visit(collector)
         attribute_collector = _AttributeDocstringCollector(context, collector.definitions)
         attribute_collection = attribute_collector.collect()
-        docstrings = tuple(sorted((*collector.docstrings, *attribute_collection.docstrings), key=_docstring_sort_key))
+        definitions = tuple(collector.definitions)
+        targets = (*collector.docstring_targets, *attribute_collection.docstring_targets)
+        if context.settings.docstring_convention in {settings_check.DocstringConvention.GOOGLE, settings_check.DocstringConvention.NUMPY}:
+            attribute_names_by_parent_id, method_names_by_parent_id = _malformed_entry_inventories(definitions=definitions, attributes=attribute_collection.attributes)
+        else:
+            attribute_names_by_parent_id, method_names_by_parent_id = {}, {}
+        docstrings = tuple(
+            sorted(
+                (
+                    docstring
+                    for target in targets
+                    if (
+                        docstring := _docstring_info(
+                            target.expression,
+                            target.statement,
+                            owner=target.owner,
+                            context=context,
+                            malformed_entry_confidence=_malformed_entry_confidence(
+                                target.owner, attribute_names_by_parent_id=attribute_names_by_parent_id, method_names_by_parent_id=method_names_by_parent_id
+                            ),
+                        )
+                    )
+                    is not None
+                ),
+                key=_docstring_sort_key,
+            )
+        )
         return PDFCategoryData(
-            definitions=tuple(collector.definitions),
+            definitions=definitions,
             attributes=attribute_collection.attributes,
             docstrings=docstrings,
             summary_line_targets=summary_first_line_targets(docstrings),
@@ -1091,30 +1196,189 @@ _LIST_RE = re.compile(r"^(?P<indent>[ \t]*)(?P<marker>(?:[-+*]|\d+[.)]))[ \t]+(?
 _BLOCK_QUOTE_RE = re.compile(r"^(?P<indent>[ \t]*)(?P<quote>(?:>[ \t]*)+)(?P<text>.*)$")
 _DIRECTIVE_RE = re.compile(r"^(?P<indent>[ \t]*)\.\.[ \t]+(?P<name>[\w-]+)::(?P<argument>.*)$")
 _REST_FIELD_RE = re.compile(r"^(?P<indent>[ \t]*):(?P<field>[\w-]+)(?:[ \t]+(?P<argument>[^:]*?\S))?[ \t]*:[ \t]*(?P<description>.*)$")
-_GOOGLE_ENTRY_RE = re.compile(r"^(?P<indent>[ \t]+)(?P<name>\*{0,2}[A-Za-z_][\w.]*)(?:[ \t]*\((?P<type>[^)]+)\))?[ \t]*:[ \t]*(?P<description>.*)$")
-_GENERIC_ENTRY_RE = re.compile(r"^(?P<indent>[ \t]+)(?P<name>[^:]+):[ \t]*(?P<description>.*)$")
+_GOOGLE_FLAT_ENTRY_RE = re.compile(r"^(?P<indent>[ \t]*)(?P<name>\*{0,2}[A-Za-z_][\w.]*)(?:[ \t]*\((?P<type>[^)]+)\))?[ \t]*:[ \t]*(?P<description>.*)$")
+_GOOGLE_CANDIDATE_RE = re.compile(r"^(?P<indent>[ \t]*)(?P<name>\*{0,2}[A-Za-z_][\w.]*)(?P<tail>.*)$")
+_GENERIC_ENTRY_PATTERN = re.compile(r"^(?P<indent>[ \t]*)(?P<name>[^:]+):[ \t]*(?P<description>.*)$")
 _NUMPY_ENTRY_RE = re.compile(r"^(?P<indent>[ \t]*)(?P<name>\*{0,2}[A-Za-z_][\w., ]*?)[ \t]*:[ \t]*(?P<type>.+)$")
 _NUMPY_EXCEPTION_ENTRY_RE = re.compile(r"^(?P<indent>[ \t]*)(?P<name>[^:]+?)[ \t]*:[ \t]*(?P<description>.*)$")
+_ENTRY_NAME_RE = re.compile(r"\*{0,2}[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*")
+_NUMPY_NAME_LIST_RE = re.compile(r"\*{0,2}[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*(?:[ \t]*,[ \t]*\*{0,2}[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*)*")
+_NUMPY_MISSING_SEPARATOR_RE = re.compile(rf"(?P<names>{_NUMPY_NAME_LIST_RE.pattern})[ \t]+(?P<type>.+)")
 _EXCEPTION_NAME_RE = re.compile(r"[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*")
 _EXCEPTION_NAME_SEPARATOR_RE = re.compile(r"\s*(?:,|\|)\s*")
 _ATX_HEADING_RE = re.compile(r"^[ \t]{0,3}#{1,6}[ \t]+\S")
 _MARKDOWN_TABLE_DELIMITER_RE = re.compile(r"^[ \t]*\|?[ \t]*:?-{3,}:?[ \t]*(?:\|[ \t]*:?-{3,}:?[ \t]*)+\|?[ \t]*$")
 _REST_GRID_BORDER_RE = re.compile(r"^[ \t]*\+(?:[-=]+\+)+[ \t]*$")
 _REST_SIMPLE_BORDER_RE = re.compile(r"^[ \t]*={3,}(?:[ \t]+={3,})+[ \t]*$")
+_REST_STANDARD_FIELDS = (
+    docstring_sections.REST_PARAMETER_VALUE_FIELDS
+    | docstring_sections.REST_PARAMETER_TYPE_FIELDS
+    | docstring_sections.REST_RETURN_VALUE_FIELDS
+    | docstring_sections.REST_RETURN_TYPE_FIELDS
+    | docstring_sections.REST_YIELD_VALUE_FIELDS
+    | docstring_sections.REST_YIELD_TYPE_FIELDS
+    | docstring_sections.REST_EXCEPTION_FIELDS
+    | docstring_sections.REST_ATTRIBUTE_VALUE_FIELDS
+    | docstring_sections.REST_ATTRIBUTE_TYPE_FIELDS
+)
+_REST_REQUIRED_ARGUMENT_FIELDS = (
+    docstring_sections.REST_PARAMETER_VALUE_FIELDS
+    | docstring_sections.REST_PARAMETER_TYPE_FIELDS
+    | docstring_sections.REST_EXCEPTION_FIELDS
+    | docstring_sections.REST_ATTRIBUTE_VALUE_FIELDS
+    | docstring_sections.REST_ATTRIBUTE_TYPE_FIELDS
+)
+_REST_UNEXPECTED_ARGUMENT_FIELDS = docstring_sections.REST_RETURN_VALUE_FIELDS | docstring_sections.REST_RETURN_TYPE_FIELDS
+
+
+@dataclasses.dataclass(frozen=True)
+class _ConventionEntryMatch:
+    """Recovered fields from one convention entry declaration.
+
+    Attributes:
+        indent (str): Leading whitespace before the entry name.
+        name (str): Entry name or generic declaration head.
+        name_start (int): Zero-based source column where the entry name begins.
+        name_end (int): Zero-based exclusive source column where the entry name ends.
+        type_text (str | None): Parenthesized Google type without delimiters, when present.
+        type_start (int | None): Zero-based source column where the type begins.
+        type_end (int | None): Zero-based exclusive source column where the type ends.
+        description (str): Inline description after the declaration separator.
+        description_start (int): Zero-based source column where the description begins.
+    """
+
+    indent: str
+    name: str
+    name_start: int
+    name_end: int
+    type_text: str | None
+    type_start: int | None
+    type_end: int | None
+    description: str
+    description_start: int
+
+
+def _match_google_entry(text: str, *, require_indent: bool = True) -> _ConventionEntryMatch | None:
+    """Return explicit fields when text is a complete Google entry."""
+    regex_match = _GOOGLE_FLAT_ENTRY_RE.match(text)
+    if regex_match is not None and (not require_indent or bool(regex_match.group("indent"))):
+        type_text = regex_match.group("type")
+        if type_text is None:
+            return _entry_match_from_regex(regex_match)
+        opening = regex_match.start("type") - 1
+        if opening >= 0 and text[opening] == "(" and _balanced_delimiter_end(text, opening) == regex_match.end("type"):
+            return _entry_match_from_regex(regex_match)
+    candidate = _GOOGLE_CANDIDATE_RE.match(text)
+    if candidate is None or (require_indent and not candidate.group("indent")):
+        return None
+    tail_start = candidate.start("tail")
+    opening = tail_start
+    while opening < len(text) and text[opening] in " \t":
+        opening += 1
+    if opening >= len(text) or text[opening] != "(":
+        return None
+    closing = _balanced_delimiter_end(text, opening)
+    if closing is None or not text[opening + 1 : closing].strip():
+        return None
+    colon = closing + 1
+    while colon < len(text) and text[colon] in " \t":
+        colon += 1
+    if colon >= len(text) or text[colon] != ":":
+        return None
+    description_start = colon + 1
+    while description_start < len(text) and text[description_start] in " \t":
+        description_start += 1
+    return _ConventionEntryMatch(
+        indent=candidate.group("indent"),
+        name=candidate.group("name"),
+        name_start=candidate.start("name"),
+        name_end=candidate.end("name"),
+        type_text=text[opening + 1 : closing],
+        type_start=opening + 1,
+        type_end=closing,
+        description=text[description_start:],
+        description_start=description_start,
+    )
+
+
+def _match_generic_entry(text: str, *, require_indent: bool = True) -> _ConventionEntryMatch | None:
+    """Return explicit fields when text is a generic colon-separated entry."""
+    regex_match = _GENERIC_ENTRY_PATTERN.match(text)
+    if regex_match is None or (require_indent and not regex_match.group("indent")):
+        return None
+    return _entry_match_from_regex(regex_match)
+
+
+def _entry_match_from_regex(regex_match: re.Match[str]) -> _ConventionEntryMatch:
+    """Return explicit convention fields recovered by an entry regex."""
+    type_text = regex_match.groupdict().get("type")
+    return _ConventionEntryMatch(
+        indent=regex_match.group("indent"),
+        name=regex_match.group("name"),
+        name_start=regex_match.start("name"),
+        name_end=regex_match.end("name"),
+        type_text=type_text,
+        type_start=regex_match.start("type") if type_text is not None else None,
+        type_end=regex_match.end("type") if type_text is not None else None,
+        description=regex_match.group("description"),
+        description_start=regex_match.start("description"),
+    )
+
+
+def _balanced_delimiter_end(text: str, opening: int) -> int | None:
+    """Return the closing index for a quote-aware nested delimiter expression."""
+    pairs = {"(": ")", "[": "]", "{": "}"}
+    closings = frozenset(pairs.values())
+    stack = [text[opening]]
+    quote = ""
+    triple = False
+    index = opening + 1
+    while index < len(text):
+        character = text[index]
+        if quote:
+            if character == "\\":
+                index += 2
+                continue
+            width = 3 if triple else 1
+            if text.startswith(quote * width, index):
+                quote = ""
+                triple = False
+                index += width
+                continue
+            index += 1
+            continue
+        if character in {"'", '"'}:
+            quote = character
+            triple = text.startswith(character * 3, index)
+            index += 3 if triple else 1
+            continue
+        if character in pairs:
+            stack.append(character)
+        elif character in closings:
+            if pairs[stack[-1]] != character:
+                return None
+            stack.pop()
+            if not stack:
+                return index
+        index += 1
+    return None
 
 
 class _DocstringParser:
     """Parse one evaluated docstring value into conservative semantic blocks."""
 
-    def __init__(self, value: str, *, settings: settings_check.CheckSettings, source_line_number: int | None, source_indent: int | None) -> None:
+    def __init__(self, value: str, *, settings: settings_check.CheckSettings, source_line_number: int | None, source_indent: int | None, malformed_entry_confidence: _MalformedEntryConfidence) -> None:
         """Prepare parser state for one evaluated docstring value."""
         self.value = value
         self.settings = settings
+        self.malformed_entry_confidence = malformed_entry_confidence
         self.lines = _value_lines(value, source_line_number=source_line_number, source_indent=source_indent)
         self.blocks: list[DocstringBlock] = []
         self.sections: list[DocstringSection] = []
         self.entries: list[DocstringEntry] = []
+        self.convention_entry_issues: dict[int, ConventionEntryIssue] = {}
         self.reflow_regions: list[ReflowRegion] = []
+        self.missing_separator_type_cache: dict[str, bool] = {}
         self.summary_pending = True
 
     def parse(self) -> DocstringStructure:
@@ -1126,6 +1390,7 @@ class _DocstringParser:
             blocks=tuple(self.blocks),
             sections=tuple(sorted(self.sections, key=lambda section: (section.start_line, section.end_line))),
             entries=tuple(sorted(self.entries, key=lambda entry: (entry.start_line, entry.end_line))),
+            convention_entry_issues=tuple(sorted(self.convention_entry_issues.values(), key=lambda issue: issue.start_line)),
             reflow_regions=tuple(sorted(self.reflow_regions, key=lambda region: (region.start_line, region.end_line))),
         )
 
@@ -1185,7 +1450,15 @@ class _DocstringParser:
                 index = block_end
                 self.summary_pending = False
                 continue
-            if self._parses_rest_fields() and (field_match := _REST_FIELD_RE.match(text)) is not None:
+            parses_rest_fields = self._parses_rest_fields()
+            if parses_rest_fields:
+                self._record_missing_rest_delimiter(index)
+            if index in self.convention_entry_issues:
+                blocks.append(DocstringBlock(DocstringBlockKind.CONVENTION_ENTRY_ISSUE, index, index + 1))
+                index += 1
+                self.summary_pending = False
+                continue
+            if parses_rest_fields and (field_match := _REST_FIELD_RE.match(text)) is not None:
                 block, index = self._parse_rest_field(index, end, field_match)
                 blocks.append(block)
                 self.summary_pending = False
@@ -1236,6 +1509,7 @@ class _DocstringParser:
     def _starts_special(self, index: int, end: int) -> bool:
         """Return whether a line begins a structure that should stop paragraph collection."""
         text = self.lines[index].text
+        parses_rest_fields = self._parses_rest_fields()
         return (
             self._section_at(index, end) is not None
             or (self.settings.docstring_parse_code_fences and inline_markup.FENCE_RE.match(text) is not None)
@@ -1244,7 +1518,9 @@ class _DocstringParser:
             or (self.settings.docstring_parse_literal_blocks and text.rstrip().endswith("::") and self._has_indented_body(index, end))
             or (self.settings.docstring_parse_tables and self._table_end(index, end) is not None)
             or (self.settings.docstring_parse_headings and self._is_heading(index, end))
-            or (self._parses_rest_fields() and _REST_FIELD_RE.match(text) is not None)
+            or index in self.convention_entry_issues
+            or (parses_rest_fields and self._missing_rest_delimiter_issue(index) is not None)
+            or (parses_rest_fields and _REST_FIELD_RE.match(text) is not None)
             or (self.settings.docstring_parse_list_items and _LIST_RE.match(text) is not None)
             or (self.settings.docstring_parse_block_quotes and _BLOCK_QUOTE_RE.match(text) is not None)
         )
@@ -1286,7 +1562,8 @@ class _DocstringParser:
         if content_start < end and _is_adornment(self.lines[content_start].text):
             content_start += 1
         section_end = self._section_end(content_start, end, text_layout.leading_width(self.lines[start].text))
-        entries = self._section_entries(name, content_start, section_end)
+        section_indent = text_layout.leading_width(self.lines[start].raw_indent)
+        entries = self._section_entries(name, content_start, section_end, section_indent=section_indent)
         children: list[DocstringBlock] = [DocstringBlock(DocstringBlockKind.SECTION_HEADER, start, content_start)]
         if entries:
             entry_by_start = {entry.start_line: entry for entry in entries}
@@ -1313,41 +1590,61 @@ class _DocstringParser:
         self.entries.extend(entries)
         return DocstringBlock(DocstringBlockKind.SECTION, start, section_end, children=tuple(children)), section_end
 
-    def _section_entries(self, name: str, start: int, end: int) -> tuple[DocstringEntry, ...]:
+    def _section_entries(self, name: str, start: int, end: int, *, section_indent: int) -> tuple[DocstringEntry, ...]:
         """Return entries parsed from a convention section body."""
         if self.settings.docstring_convention == settings_check.DocstringConvention.GOOGLE:
-            return self._google_entries(name, start, end)
+            return self._google_entries(name, start, end, section_indent=section_indent)
         if self.settings.docstring_convention == settings_check.DocstringConvention.NUMPY:
             return self._numpy_entries(name, start, end)
         return ()
 
-    def _google_entries(self, section_name: str, start: int, end: int) -> tuple[DocstringEntry, ...]:
+    def _google_entries(self, section_name: str, start: int, end: int, *, section_indent: int) -> tuple[DocstringEntry, ...]:
         """Return Google-style entries parsed from a section body."""
         entries: list[DocstringEntry] = []
         index = start
         kind = _entry_kind(self.settings.docstring_convention, section_name)
+        detects_malformed = kind in {DocstringEntryKind.PARAMETER, DocstringEntryKind.ATTRIBUTE, DocstringEntryKind.METHOD, DocstringEntryKind.EXCEPTION}
         while index < end:
             protected_end = self._protected_block_end(index, end)
             if protected_end is not None:
                 index = protected_end
                 continue
-            match = _GOOGLE_ENTRY_RE.match(self.lines[index].text)
+            text = self.lines[index].text
+            match = _match_google_entry(text)
             if match is None and kind in {DocstringEntryKind.RETURN, DocstringEntryKind.YIELD, DocstringEntryKind.EXCEPTION}:
-                match = _GENERIC_ENTRY_RE.match(self.lines[index].text)
+                match = _match_generic_entry(text)
+            if match is not None and kind is DocstringEntryKind.EXCEPTION and _exception_names(match.name.strip()) is None:
+                self._record_google_head_issue(index, kind=kind)
+                index = self._entry_end(index, end, text_layout.leading_width(match.indent))
+                continue
+            complete_match = _match_google_entry(text, require_indent=False)
+            if complete_match is None and kind is DocstringEntryKind.EXCEPTION:
+                complete_match = _match_generic_entry(text, require_indent=False)
+            if detects_malformed and complete_match is not None and text_layout.leading_width(self.lines[index].raw_indent) <= section_indent:
+                names = _entry_names(kind, complete_match.name.strip())
+                credible = names is not None and (
+                    (kind is DocstringEntryKind.EXCEPTION and all(_is_exception_like_name(name) for name in names))
+                    or (len(names) == 1 and self._google_name_is_credible(kind, names[0], closed_parenthesized=complete_match.type_text is not None))
+                )
+                if credible:
+                    self._record_convention_entry_issue(ConventionEntryIssue(kind=ConventionEntryIssueKind.GOOGLE_ENTRY_INDENTATION, start_line=index, names=names))
+                match = None
             if match is None:
-                none_entry = _google_none_value_entry(kind, self.lines[index].text, start=index)
+                if detects_malformed:
+                    self._record_google_head_issue(index, kind=kind)
+                none_entry = _google_none_value_entry(kind, text, start=index)
                 if none_entry is not None:
                     entries.append(none_entry)
                     index = none_entry.end_line
                     continue
                 index += 1
                 continue
-            entry_end = self._entry_end(index, end, text_layout.leading_width(match.group("indent")))
-            name = match.group("name").strip()
-            type_text = match.groupdict().get("type")
-            first_description = match.group("description").strip()
+            entry_end = self._entry_end(index, end, text_layout.leading_width(match.indent))
+            name = match.name.strip()
+            type_text = match.type_text
+            first_description = match.description.strip()
             description_fragments = []
-            first_description_line = self._reflow_line_from_text_span(index, match.start("description"), len(self.lines[index].text))
+            first_description_line = self._reflow_line_from_text_span(index, match.description_start, len(self.lines[index].text))
             if first_description_line is not None and first_description_line.text:
                 description_fragments.append(first_description_line)
             description_fragments.extend(self._stripped_reflow_lines(index + 1, entry_end, skip_empty=True))
@@ -1369,8 +1666,10 @@ class _DocstringParser:
                 end_line=entry_end,
             )
             entries.append(entry)
+            if not first_description and entry_end == index + 1:
+                self._record_google_continuation_issue(index + 1, end, entry=entry, entry_indent=text_layout.leading_width(self.lines[index].raw_indent))
             unit = text_layout.indent_unit(self.settings)
-            prefix = f"{unit}{self.lines[index].text[len(match.group('indent')) : match.start('description')]}"
+            prefix = f"{unit}{self.lines[index].text[len(match.indent) : match.description_start]}"
             if description_lines and not first_description and not prefix.endswith((" ", "\t")):
                 prefix = f"{prefix} "
             self._add_reflow(DocstringBlockKind.SECTION_ENTRY, index, entry_end, lines=tuple(description_fragments), initial_indent=prefix, subsequent_indent=unit * 2)
@@ -1382,6 +1681,7 @@ class _DocstringParser:
         entries: list[DocstringEntry] = []
         index = start
         kind = _entry_kind(self.settings.docstring_convention, section_name)
+        detects_malformed = kind in {DocstringEntryKind.PARAMETER, DocstringEntryKind.ATTRIBUTE, DocstringEntryKind.METHOD}
         while index < end:
             protected_end = self._protected_block_end(index, end)
             if protected_end is not None:
@@ -1399,11 +1699,12 @@ class _DocstringParser:
                         description_fragments.append(first_description_line)
                     description_fragments.extend(self._stripped_reflow_lines(index + 1, entry_end, skip_empty=True))
                     description_lines = [line.text for line in description_fragments]
-                    entries.append(
-                        DocstringEntry(
-                            kind=kind, names=names, type_text=None, description=" ".join(description_lines), description_lines=tuple(description_fragments), start_line=index, end_line=entry_end
-                        )
+                    entry = DocstringEntry(
+                        kind=kind, names=names, type_text=None, description=" ".join(description_lines), description_lines=tuple(description_fragments), start_line=index, end_line=entry_end
                     )
+                    entries.append(entry)
+                    if not description_lines and entry_end == index + 1:
+                        self._record_numpy_continuation_issue(index + 1, end, entry=entry, entry_indent=text_layout.leading_width(self.lines[index].raw_indent))
                     if description_lines:
                         self._add_reflow(
                             DocstringBlockKind.SECTION_ENTRY,
@@ -1434,6 +1735,8 @@ class _DocstringParser:
                     end_line=entry_end,
                 )
                 entries.append(entry)
+                if not description_lines and entry_end == index + 1:
+                    self._record_numpy_continuation_issue(index + 1, end, entry=entry, entry_indent=text_layout.leading_width(self.lines[index].raw_indent))
                 if description_lines:
                     self._add_reflow(
                         DocstringBlockKind.SECTION_ENTRY,
@@ -1445,6 +1748,8 @@ class _DocstringParser:
                     )
                 index = entry_end
                 continue
+            if detects_malformed:
+                self._record_numpy_head_issue(index, kind=kind)
             if kind in {DocstringEntryKind.RETURN, DocstringEntryKind.YIELD, DocstringEntryKind.EXCEPTION} and text.strip():
                 entry_end = self._entry_end(index, end, text_layout.leading_width(text))
                 description_fragments = list(self._stripped_reflow_lines(index + 1, entry_end, skip_empty=True))
@@ -1456,17 +1761,18 @@ class _DocstringParser:
                         continue
                 else:
                     names = ()
-                entries.append(
-                    DocstringEntry(
-                        kind=kind,
-                        names=names,
-                        type_text=None if kind == DocstringEntryKind.EXCEPTION else text.strip(),
-                        description=" ".join(description_lines),
-                        description_lines=tuple(description_fragments),
-                        start_line=index,
-                        end_line=entry_end,
-                    )
+                entry = DocstringEntry(
+                    kind=kind,
+                    names=names,
+                    type_text=None if kind == DocstringEntryKind.EXCEPTION else text.strip(),
+                    description=" ".join(description_lines),
+                    description_lines=tuple(description_fragments),
+                    start_line=index,
+                    end_line=entry_end,
                 )
+                entries.append(entry)
+                if not description_lines and entry_end == index + 1:
+                    self._record_numpy_continuation_issue(index + 1, end, entry=entry, entry_indent=text_layout.leading_width(self.lines[index].raw_indent))
                 if description_lines:
                     self._add_reflow(
                         DocstringBlockKind.SECTION_ENTRY,
@@ -1480,6 +1786,154 @@ class _DocstringParser:
                 continue
             index += 1
         return tuple(entries)
+
+    def _record_google_head_issue(self, index: int, *, kind: DocstringEntryKind) -> None:
+        """Record a high-confidence malformed Google entry head."""
+        match = _GOOGLE_CANDIDATE_RE.match(self.lines[index].text)
+        if (
+            kind is DocstringEntryKind.EXCEPTION
+            and (match is None or not match.group("tail").lstrip(" \t").startswith("("))
+            and (exception_names := _google_exception_missing_separator_names(self.lines[index].text)) is not None
+        ):
+            self._record_convention_entry_issue(ConventionEntryIssue(kind=ConventionEntryIssueKind.GOOGLE_MISSING_SEPARATOR, start_line=index, names=exception_names))
+            return
+        if match is None:
+            return
+        name = match.group("name")
+        tail = match.group("tail").lstrip(" \t")
+        names = (name,)
+        if not tail.startswith("("):
+            if kind is DocstringEntryKind.EXCEPTION or tail.startswith(":") or not self._google_name_is_credible(kind, name, closed_parenthesized=False):
+                return
+            issue_kind = ConventionEntryIssueKind.GOOGLE_MISSING_SEPARATOR
+        else:
+            closing = _balanced_delimiter_end(tail, 0)
+            if closing is None:
+                if not self._google_name_is_credible(kind, name, closed_parenthesized=False):
+                    return
+                issue_kind = ConventionEntryIssueKind.GOOGLE_UNBALANCED_TYPE
+            else:
+                after_type = tail[closing + 1 :].lstrip(" \t")
+                if after_type.startswith(":") or not self._google_name_is_credible(kind, name, closed_parenthesized=True):
+                    return
+                issue_kind = ConventionEntryIssueKind.GOOGLE_MISSING_SEPARATOR
+        self._record_convention_entry_issue(ConventionEntryIssue(kind=issue_kind, start_line=index, names=names))
+
+    def _google_name_is_credible(self, kind: DocstringEntryKind, name: str, *, closed_parenthesized: bool) -> bool:
+        """Return whether a recovered Google name is sufficiently entry-like."""
+        confidence = self.malformed_entry_confidence
+        if kind is DocstringEntryKind.PARAMETER:
+            return closed_parenthesized or name.lstrip("*") in confidence.parameter_names
+        if kind is DocstringEntryKind.ATTRIBUTE:
+            return closed_parenthesized or name in confidence.attribute_names
+        if kind is DocstringEntryKind.METHOD:
+            return closed_parenthesized or name in confidence.method_names
+        if kind is DocstringEntryKind.EXCEPTION:
+            names = _exception_names(name)
+            return names is not None and all(_is_exception_like_name(exception_name) for exception_name in names)
+        return False
+
+    def _record_google_continuation_issue(self, index: int, end: int, *, entry: DocstringEntry, entry_indent: int) -> None:
+        """Record an under-indented immediate Google entry description."""
+        if index < end:
+            text = self.lines[index].text
+            generic_match = _match_generic_entry(text, require_indent=False) if entry.kind is DocstringEntryKind.EXCEPTION else None
+            if _match_google_entry(text, require_indent=False) is not None or (generic_match is not None and _exception_names(generic_match.name) is not None):
+                return
+        if not self._is_incorrect_continuation(index, end, entry_indent=entry_indent):
+            return
+        self._record_convention_entry_issue(ConventionEntryIssue(kind=ConventionEntryIssueKind.GOOGLE_CONTINUATION_INDENTATION, start_line=index, names=entry.names))
+
+    def _record_numpy_head_issue(self, index: int, *, kind: DocstringEntryKind) -> None:
+        """Record a high-confidence malformed NumPy entry head."""
+        text = self.lines[index].text
+        stripped = text.strip()
+        missing_type = re.fullmatch(r"(?P<names>.+?)[ \t]*:[ \t]*", stripped)
+        if missing_type is not None and (names := _strict_numpy_names(missing_type.group("names"))) is not None and self._numpy_names_are_credible(kind, names):
+            self._record_convention_entry_issue(ConventionEntryIssue(kind=ConventionEntryIssueKind.NUMPY_MISSING_TYPE, start_line=index, names=names))
+            return
+        candidate = _NUMPY_MISSING_SEPARATOR_RE.fullmatch(stripped)
+        if (
+            candidate is None
+            or (names := _strict_numpy_names(candidate.group("names"))) is None
+            or not self._numpy_names_are_credible(kind, names)
+            or not self._is_missing_separator_type(candidate.group("type"))
+        ):
+            return
+        self._record_convention_entry_issue(ConventionEntryIssue(kind=ConventionEntryIssueKind.NUMPY_MISSING_SEPARATOR, start_line=index, names=names))
+
+    def _numpy_names_are_credible(self, kind: DocstringEntryKind, names: tuple[str, ...]) -> bool:
+        """Return whether recovered NumPy names match their owner inventory."""
+        confidence = self.malformed_entry_confidence
+        if kind is DocstringEntryKind.PARAMETER:
+            return all(name.lstrip("*") in confidence.parameter_names for name in names)
+        if kind is DocstringEntryKind.ATTRIBUTE:
+            return all(name in confidence.attribute_names for name in names)
+        if kind is DocstringEntryKind.METHOD:
+            return all(name in confidence.method_names for name in names)
+        return False
+
+    def _record_numpy_continuation_issue(self, index: int, end: int, *, entry: DocstringEntry, entry_indent: int) -> None:
+        """Record an under-indented immediate NumPy entry description."""
+        if index < end:
+            text = self.lines[index].text
+            if (
+                _NUMPY_ENTRY_RE.match(text) is not None
+                or (entry.kind is DocstringEntryKind.EXCEPTION and _is_numpy_exception_entry(text))
+                or (entry.kind in {DocstringEntryKind.RETURN, DocstringEntryKind.YIELD} and self._is_missing_separator_type(text.strip()))
+            ):
+                return
+        if not self._is_incorrect_continuation(index, end, entry_indent=entry_indent):
+            return
+        self._record_convention_entry_issue(ConventionEntryIssue(kind=ConventionEntryIssueKind.NUMPY_CONTINUATION_INDENTATION, start_line=index, names=entry.names))
+
+    def _is_missing_separator_type(self, text: str) -> bool:
+        """Return a docstring-local cached conservative type classification."""
+        cached = self.missing_separator_type_cache.get(text)
+        if cached is None:
+            cached = _is_missing_separator_type(text)
+            self.missing_separator_type_cache[text] = cached
+        return cached
+
+    def _is_incorrect_continuation(self, index: int, end: int, *, entry_indent: int) -> bool:
+        """Return whether one immediate line is a certain under-indented continuation."""
+        if index >= end:
+            return False
+        line = self.lines[index]
+        text = line.text
+        if not text.strip() or text_layout.leading_width(line.raw_indent) > entry_indent:
+            return False
+        if self._section_at(index, end) is not None or self._protected_block_end(index, end) is not None or _is_adornment(text):
+            return False
+        return any(character.isalnum() for character in text)
+
+    def _record_missing_rest_delimiter(self, index: int) -> None:
+        """Record a recognized reStructuredText field without its closing delimiter."""
+        issue = self._missing_rest_delimiter_issue(index)
+        if issue is not None:
+            self._record_convention_entry_issue(issue)
+
+    def _missing_rest_delimiter_issue(self, index: int) -> ConventionEntryIssue | None:
+        """Return a recognized reStructuredText field missing its closing delimiter."""
+        text = self.lines[index].text.lstrip(" \t")
+        if not text.startswith(":") or text.startswith("::"):
+            return None
+        field_match = re.match(r":(?P<field>[\w-]+)(?=$|[ \t])", text)
+        if field_match is None or ":" in text[field_match.end() :]:
+            return None
+        field = field_match.group("field").lower()
+        if field not in _REST_STANDARD_FIELDS:
+            return None
+        tail = text[field_match.end() :].strip()
+        if not _rest_missing_delimiter_is_credible(field, tail):
+            return None
+        return ConventionEntryIssue(kind=ConventionEntryIssueKind.REST_MISSING_CLOSING_DELIMITER, start_line=index, field_name=field)
+
+    def _record_convention_entry_issue(self, issue: ConventionEntryIssue) -> None:
+        """Record the highest-priority malformed entry issue for one line."""
+        existing = self.convention_entry_issues.get(issue.start_line)
+        if existing is None or _CONVENTION_ENTRY_ISSUE_PRECEDENCE[issue.kind] < _CONVENTION_ENTRY_ISSUE_PRECEDENCE[existing.kind]:
+            self.convention_entry_issues[issue.start_line] = issue
 
     def _parse_rest_field(self, start: int, end: int, match: re.Match[str]) -> tuple[DocstringBlock, int]:
         """Parse one reStructuredText field and any indented continuation lines."""
@@ -1508,19 +1962,24 @@ class _DocstringParser:
         else:
             reflow_runs.extend(continuation_runs)
         description_lines = [line.text for line in description_fragments]
-        kind, names, type_text = _rest_entry_metadata(field, argument)
-        entry = DocstringEntry(
-            kind=kind,
-            names=names,
-            type_text=type_text,
-            description=" ".join(description_lines).strip(),
-            description_lines=tuple(description_fragments),
-            start_line=start,
-            end_line=block_end,
-            field_name=field,
-            field_argument=argument or None,
-        )
-        self.entries.append(entry)
+        issue_kind = _rest_field_arity_issue(field, argument)
+        entry: DocstringEntry | None = None
+        if issue_kind is None:
+            kind, names, type_text = _rest_entry_metadata(field, argument)
+            entry = DocstringEntry(
+                kind=kind,
+                names=names,
+                type_text=type_text,
+                description=" ".join(description_lines).strip(),
+                description_lines=tuple(description_fragments),
+                start_line=start,
+                end_line=block_end,
+                field_name=field,
+                field_argument=argument or None,
+            )
+            self.entries.append(entry)
+        else:
+            self._record_convention_entry_issue(ConventionEntryIssue(kind=issue_kind, start_line=start, field_name=field))
         prefix = self.lines[start].text[: match.start("description")]
         subsequent_indent = " " * len(prefix.expandtabs(self.settings.indent_width))
         if reflow_runs and reflow_runs[0].start_line == start and (first_description_line is None or not first_description_line.text) and not prefix.endswith((" ", "\t")):
@@ -1758,9 +2217,11 @@ class _DocstringParser:
         return _ATX_HEADING_RE.match(self.lines[index].text) is not None or (index + 1 < end and bool(self.lines[index].text.strip()) and _is_adornment(self.lines[index + 1].text))
 
 
-def _parse_docstring(value: str, *, settings: settings_check.CheckSettings, source_line_number: int | None, source_indent: int | None) -> DocstringStructure:
+def _parse_docstring(
+    value: str, *, settings: settings_check.CheckSettings, source_line_number: int | None, source_indent: int | None, malformed_entry_confidence: _MalformedEntryConfidence
+) -> DocstringStructure:
     """Return semantic structure for an evaluated docstring value."""
-    return _DocstringParser(value, settings=settings, source_line_number=source_line_number, source_indent=source_indent).parse()
+    return _DocstringParser(value, settings=settings, source_line_number=source_line_number, source_indent=source_indent, malformed_entry_confidence=malformed_entry_confidence).parse()
 
 
 def _value_lines(value: str, *, source_line_number: int | None, source_indent: int | None) -> tuple[DocstringValueLine, ...]:
@@ -1861,6 +2322,60 @@ def _entry_names(kind: DocstringEntryKind, text: str) -> tuple[str, ...] | None:
     return tuple(part.strip() for part in text.split(","))
 
 
+def _strict_numpy_names(text: str) -> tuple[str, ...] | None:
+    """Return a strict comma-separated NumPy name list."""
+    stripped = text.strip()
+    if _NUMPY_NAME_LIST_RE.fullmatch(stripped) is None:
+        return None
+    names = tuple(part.strip() for part in stripped.split(","))
+    return names if names and all(_ENTRY_NAME_RE.fullmatch(name) is not None for name in names) else None
+
+
+def _is_missing_separator_type(text: str) -> bool:
+    """Return whether text is a conservative type or quoted forward reference."""
+    return type_expressions.is_type_like_text(text) or type_expressions.is_quoted_type_like_text(text)
+
+
+def _is_numpy_exception_entry(text: str) -> bool:
+    """Return whether text is a bare or colon-form NumPy exception entry."""
+    match = _NUMPY_EXCEPTION_ENTRY_RE.match(text)
+    return _exception_names(match.group("name") if match is not None else text.strip()) is not None
+
+
+def _google_exception_missing_separator_names(text: str) -> tuple[str, ...] | None:
+    """Return a complete exception-like name list followed by description text."""
+    stripped = text.strip()
+    names: list[str] = []
+    position = 0
+    while True:
+        if position < len(stripped) and stripped[position] == "`":
+            closing = stripped.find("`", position + 1)
+            if closing < 0:
+                return None
+            name = stripped[position + 1 : closing]
+            if _EXCEPTION_NAME_RE.fullmatch(name) is None:
+                return None
+            position = closing + 1
+        else:
+            match = _EXCEPTION_NAME_RE.match(stripped, position)
+            if match is None:
+                return None
+            name = match.group()
+            position = match.end()
+        names.append(name)
+        after_whitespace = position
+        while after_whitespace < len(stripped) and stripped[after_whitespace].isspace():
+            after_whitespace += 1
+        if after_whitespace < len(stripped) and stripped[after_whitespace] in {",", "|"}:
+            position = after_whitespace + 1
+            while position < len(stripped) and stripped[position].isspace():
+                position += 1
+            continue
+        if after_whitespace == position or after_whitespace == len(stripped):
+            return None
+        return tuple(names) if all(_is_exception_like_name(name) for name in names) else None
+
+
 def _exception_names(text: str) -> tuple[str, ...] | None:
     """Return validated exception names from a comma- or pipe-separated entry."""
     stripped = _strip_exception_code_span(text.strip())
@@ -1871,6 +2386,33 @@ def _exception_names(text: str) -> tuple[str, ...] | None:
     if not names or any(not _EXCEPTION_NAME_RE.fullmatch(name) for name in names):
         return None
     return names
+
+
+def _is_exception_like_name(name: str) -> bool:
+    """Return whether a qualified name has a conventional exception suffix."""
+    return name.rpartition(".")[2].endswith(("Error", "Exception", "Warning"))
+
+
+def _rest_field_arity_issue(field: str, argument: str) -> ConventionEntryIssueKind | None:
+    """Return a malformed reStructuredText field arity issue."""
+    if field in _REST_REQUIRED_ARGUMENT_FIELDS and not argument:
+        return ConventionEntryIssueKind.REST_MISSING_ARGUMENT
+    if field in _REST_UNEXPECTED_ARGUMENT_FIELDS and argument:
+        return ConventionEntryIssueKind.REST_UNEXPECTED_ARGUMENT
+    return None
+
+
+def _rest_missing_delimiter_is_credible(field: str, tail: str) -> bool:
+    """Return whether a delimiter-free standard field has credible arity."""
+    if field not in _REST_REQUIRED_ARGUMENT_FIELDS:
+        return not tail
+    if not tail:
+        return False
+    argument = tail.split(None, 1)[0]
+    if field in docstring_sections.REST_EXCEPTION_FIELDS:
+        names = _exception_names(argument)
+        return names is not None and all(_is_exception_like_name(name) for name in names)
+    return _ENTRY_NAME_RE.fullmatch(argument) is not None
 
 
 def _strip_exception_code_span(text: str) -> str:
@@ -2639,7 +3181,9 @@ def _docstring_sort_key(docstring: DocstringInfo) -> tuple[int, int]:
     return docstring.range.start.line, docstring.range.start.column
 
 
-def _docstring_info(expression: cst.Expr, statement: cst.SimpleStatementLine | cst.SimpleStatementSuite, *, owner: DocstringOwner, context: RuleCategoryContext) -> DocstringInfo | None:
+def _docstring_info(
+    expression: cst.Expr, statement: cst.SimpleStatementLine | cst.SimpleStatementSuite, *, owner: DocstringOwner, context: RuleCategoryContext, malformed_entry_confidence: _MalformedEntryConfidence
+) -> DocstringInfo | None:
     """Return docstring metadata for a string expression."""
     node = expression.value
     if not isinstance(node, (cst.SimpleString, cst.ConcatenatedString)):
@@ -2671,8 +3215,49 @@ def _docstring_info(expression: cst.Expr, statement: cst.SimpleStatementLine | c
                 if isinstance(node, cst.SimpleString)
                 else None
             ),
+            malformed_entry_confidence=malformed_entry_confidence,
         ),
     )
+
+
+def _malformed_entry_inventories(*, definitions: tuple[DefinitionInfo, ...], attributes: tuple[AttributeInfo, ...]) -> tuple[Mapping[int, frozenset[str]], Mapping[int, frozenset[str]]]:
+    """Return direct attribute and method names indexed by parent identity."""
+    mutable_attribute_names: dict[int, set[str]] = {}
+    for attribute in attributes:
+        mutable_attribute_names.setdefault(id(attribute.parent), set()).update(attribute.targets)
+    mutable_method_names: dict[int, set[str]] = {}
+    for definition in definitions:
+        if definition.kind is DefinitionKind.FUNCTION and definition.parent is not None and definition.parent.kind is DefinitionKind.CLASS:
+            mutable_method_names.setdefault(id(definition.parent), set()).add(definition.name)
+    return (
+        MappingProxyType({parent_id: frozenset(names) for parent_id, names in mutable_attribute_names.items()}),
+        MappingProxyType({parent_id: frozenset(names) for parent_id, names in mutable_method_names.items()}),
+    )
+
+
+def _malformed_entry_confidence(
+    owner: DocstringOwner, *, attribute_names_by_parent_id: Mapping[int, frozenset[str]], method_names_by_parent_id: Mapping[int, frozenset[str]]
+) -> _MalformedEntryConfidence:
+    """Return owner names usable for high-confidence malformed entry detection."""
+    if isinstance(owner, AttributeInfo):
+        return _MalformedEntryConfidence(attribute_names=frozenset(owner.targets))
+    parameter_names = frozenset(_parameter_names(owner.parameters)) if owner.kind is DefinitionKind.FUNCTION else frozenset()
+    attribute_names = attribute_names_by_parent_id.get(id(owner), frozenset()) if owner.kind in {DefinitionKind.MODULE, DefinitionKind.CLASS} else frozenset()
+    method_names = method_names_by_parent_id.get(id(owner), frozenset()) if owner.kind is DefinitionKind.CLASS else frozenset()
+    return _MalformedEntryConfidence(parameter_names=parameter_names, attribute_names=attribute_names, method_names=method_names)
+
+
+def _parameter_names(parameters: cst.Parameters | None) -> tuple[str, ...]:
+    """Return normalized names from every parameter category."""
+    if parameters is None:
+        return ()
+    raw_parameters = [*parameters.posonly_params, *parameters.params]
+    if isinstance(parameters.star_arg, cst.Param):
+        raw_parameters.append(parameters.star_arg)
+    raw_parameters.extend(parameters.kwonly_params)
+    if isinstance(parameters.star_kwarg, cst.Param):
+        raw_parameters.append(parameters.star_kwarg)
+    return tuple(parameter.name.value for parameter in raw_parameters)
 
 
 def _attribute_info(statement: cst.BaseSmallStatement, owner: DefinitionInfo, *, context: RuleCategoryContext) -> AttributeInfo | None:
