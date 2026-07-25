@@ -7,7 +7,7 @@ Rule is disabled if `docstring-convention` is `none` or `pep257`.
 ## What it does
 PDF412 reports parsed docstring entries that repeat within one docstring. It checks Google, NumPy, and named reStructuredText entries under the active convention, across the whole docstring rather than only within one section.
 
-For parameter entries, leading `*` markers are ignored when comparing names, so `args` and `*args` match. Attribute, method, generic named field, and exception entries use the exact parsed name. Entries with multiple parsed names are checked name by name.
+For parameter entries, leading `*` markers are ignored when comparing names, so `args` and `*args` match. Attribute, method, generic named field, exception, and warning entries use the exact parsed name. Entries with multiple parsed names are checked name by name. Raised exceptions and emitted warnings are separate duplicate families, so the same name may appear once in each family.
 
 For reStructuredText fields, value fields and type fields are separate duplicate families. For example, `:param value:` and `:type value:` may appear together, but repeated `:param value:` or repeated `:type value:` entries are reported.
 
@@ -138,6 +138,63 @@ def value(arg):
 [output=unchanged]
 [findings]
 PDF412: Line 7: Docstring exception entry 'ValueError' repeats earlier entry
+```
+
+Raised exceptions and emitted warnings are checked independently:
+
+```pydocfmt-example
+[settings]
+docstring-convention = "google"
+
+[input]
+def value(arg):
+    """Return the value.
+
+    Raises:
+        RuntimeWarning: Raised as an exception.
+
+    Warns:
+        RuntimeWarning: Emitted as a warning.
+        RuntimeWarning: Emitted again.
+    """
+
+[output=unchanged]
+[findings]
+PDF412: Line 9: Docstring warning entry 'RuntimeWarning' repeats earlier entry
+```
+
+The same exception and warning separation applies to NumPy sections, including repeated sections elsewhere in the docstring:
+
+```pydocfmt-example
+[settings]
+docstring-convention = "numpy"
+
+[input]
+def value(arg):
+    """Return the value.
+
+    Raises
+    ------
+    RuntimeWarning
+        Raised as an exception.
+
+    Warns
+    -----
+    RuntimeWarning
+        Emitted as a warning.
+    RuntimeWarning
+        Emitted again.
+
+    Raises
+    ------
+    RuntimeWarning
+        Raised again.
+    """
+
+[output=unchanged]
+[findings]
+PDF412: Line 13: Docstring warning entry 'RuntimeWarning' repeats earlier entry
+PDF412: Line 18: Docstring exception entry 'RuntimeWarning' repeats earlier entry
 ```
 
 NumPy entries with multiple parsed names are checked name by name:

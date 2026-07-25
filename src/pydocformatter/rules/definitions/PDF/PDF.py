@@ -130,7 +130,8 @@ class DocstringEntryKind(enum.Enum):
         PARAMETER: Documentation for one function parameter.
         RETURN: Documentation for a returned value.
         YIELD: Documentation for a yielded value.
-        EXCEPTION: Documentation for raised exceptions or warnings.
+        EXCEPTION: Documentation for raised exceptions.
+        WARNING: Documentation for emitted warnings.
         ATTRIBUTE: Documentation for an instance or class attribute.
         METHOD: Documentation for a method entry in a class docstring.
         FIELD: A generic or unclassified reStructuredText field.
@@ -140,9 +141,22 @@ class DocstringEntryKind(enum.Enum):
     RETURN = "return"
     YIELD = "yield"
     EXCEPTION = "exception"
+    WARNING = "warning"
     ATTRIBUTE = "attribute"
     METHOD = "method"
     FIELD = "field"
+
+
+def is_exception_name_entry_kind(kind: DocstringEntryKind) -> bool:
+    """Return whether an entry kind uses exception-name syntax.
+
+    Args:
+        kind (DocstringEntryKind): Semantic entry kind to classify.
+
+    Returns:
+        bool: Whether the kind shares exception-name entry semantics.
+    """
+    return kind is DocstringEntryKind.EXCEPTION or kind is DocstringEntryKind.WARNING
 
 
 class ConventionEntryIssueKind(enum.Enum):
@@ -240,7 +254,8 @@ class DocstringEntry:
 
     Attributes:
         kind (DocstringEntryKind): Semantic documentation role inferred from the section or field name.
-        names (tuple[str, ...]): Parameter, exception, attribute, or field argument names documented by this entry.
+        names (tuple[str, ...]): Parameter, exception, warning, attribute, or field argument names documented by this
+            entry.
         type_text (str | None): Parsed type annotation text supplied by the docstring convention, if present.
         description (str): Entry description text after the entry head.
         description_lines (tuple[DocstringTextFragment, ...]): Source-mapped fragments that make up the parsed entry
@@ -1602,8 +1617,8 @@ class _DocstringParser:
         """Return Google-style entries parsed from a section body."""
         entries: list[DocstringEntry] = []
         index = start
-        kind = _entry_kind(self.settings.docstring_convention, section_name)
-        detects_malformed = kind in {DocstringEntryKind.PARAMETER, DocstringEntryKind.ATTRIBUTE, DocstringEntryKind.METHOD, DocstringEntryKind.EXCEPTION}
+        kind = _entry_kind(section_name)
+        detects_malformed = kind in {DocstringEntryKind.PARAMETER, DocstringEntryKind.ATTRIBUTE, DocstringEntryKind.METHOD} or is_exception_name_entry_kind(kind)
         while index < end:
             protected_end = self._protected_block_end(index, end)
             if protected_end is not None:
@@ -1611,19 +1626,19 @@ class _DocstringParser:
                 continue
             text = self.lines[index].text
             match = _match_google_entry(text)
-            if match is None and kind in {DocstringEntryKind.RETURN, DocstringEntryKind.YIELD, DocstringEntryKind.EXCEPTION}:
+            if match is None and (kind in {DocstringEntryKind.RETURN, DocstringEntryKind.YIELD} or is_exception_name_entry_kind(kind)):
                 match = _match_generic_entry(text)
-            if match is not None and kind is DocstringEntryKind.EXCEPTION and _exception_names(match.name.strip()) is None:
+            if match is not None and is_exception_name_entry_kind(kind) and _exception_names(match.name.strip()) is None:
                 self._record_google_head_issue(index, kind=kind)
                 index = self._entry_end(index, end, text_layout.leading_width(match.indent))
                 continue
             complete_match = _match_google_entry(text, require_indent=False)
-            if complete_match is None and kind is DocstringEntryKind.EXCEPTION:
+            if complete_match is None and is_exception_name_entry_kind(kind):
                 complete_match = _match_generic_entry(text, require_indent=False)
             if detects_malformed and complete_match is not None and text_layout.leading_width(self.lines[index].raw_indent) <= section_indent:
                 names = _entry_names(kind, complete_match.name.strip())
                 credible = names is not None and (
-                    (kind is DocstringEntryKind.EXCEPTION and all(_is_exception_like_name(name) for name in names))
+                    (is_exception_name_entry_kind(kind) and all(_is_exception_like_name(name) for name in names))
                     or (len(names) == 1 and self._google_name_is_credible(kind, names[0], closed_parenthesized=complete_match.type_text is not None))
                 )
                 if credible:
@@ -1680,7 +1695,7 @@ class _DocstringParser:
         """Return NumPy-style entries parsed from a section body."""
         entries: list[DocstringEntry] = []
         index = start
-        kind = _entry_kind(self.settings.docstring_convention, section_name)
+        kind = _entry_kind(section_name)
         detects_malformed = kind in {DocstringEntryKind.PARAMETER, DocstringEntryKind.ATTRIBUTE, DocstringEntryKind.METHOD}
         while index < end:
             protected_end = self._protected_block_end(index, end)
@@ -1688,7 +1703,7 @@ class _DocstringParser:
                 index = protected_end
                 continue
             text = self.lines[index].text
-            exception_match = _NUMPY_EXCEPTION_ENTRY_RE.match(text) if kind is DocstringEntryKind.EXCEPTION else None
+            exception_match = _NUMPY_EXCEPTION_ENTRY_RE.match(text) if is_exception_name_entry_kind(kind) else None
             if exception_match is not None:
                 entry_end = self._entry_end(index, end, text_layout.leading_width(exception_match.group("indent")))
                 names = _exception_names(exception_match.group("name"))
@@ -1750,11 +1765,11 @@ class _DocstringParser:
                 continue
             if detects_malformed:
                 self._record_numpy_head_issue(index, kind=kind)
-            if kind in {DocstringEntryKind.RETURN, DocstringEntryKind.YIELD, DocstringEntryKind.EXCEPTION} and text.strip():
+            if (kind in {DocstringEntryKind.RETURN, DocstringEntryKind.YIELD} or is_exception_name_entry_kind(kind)) and text.strip():
                 entry_end = self._entry_end(index, end, text_layout.leading_width(text))
                 description_fragments = list(self._stripped_reflow_lines(index + 1, entry_end, skip_empty=True))
                 description_lines = [line.text for line in description_fragments]
-                if kind == DocstringEntryKind.EXCEPTION:
+                if is_exception_name_entry_kind(kind):
                     names = _exception_names(text.strip())
                     if names is None:
                         index = entry_end
@@ -1764,7 +1779,7 @@ class _DocstringParser:
                 entry = DocstringEntry(
                     kind=kind,
                     names=names,
-                    type_text=None if kind == DocstringEntryKind.EXCEPTION else text.strip(),
+                    type_text=None if is_exception_name_entry_kind(kind) else text.strip(),
                     description=" ".join(description_lines),
                     description_lines=tuple(description_fragments),
                     start_line=index,
@@ -1791,7 +1806,7 @@ class _DocstringParser:
         """Record a high-confidence malformed Google entry head."""
         match = _GOOGLE_CANDIDATE_RE.match(self.lines[index].text)
         if (
-            kind is DocstringEntryKind.EXCEPTION
+            is_exception_name_entry_kind(kind)
             and (match is None or not match.group("tail").lstrip(" \t").startswith("("))
             and (exception_names := _google_exception_missing_separator_names(self.lines[index].text)) is not None
         ):
@@ -1803,7 +1818,7 @@ class _DocstringParser:
         tail = match.group("tail").lstrip(" \t")
         names = (name,)
         if not tail.startswith("("):
-            if kind is DocstringEntryKind.EXCEPTION or tail.startswith(":") or not self._google_name_is_credible(kind, name, closed_parenthesized=False):
+            if is_exception_name_entry_kind(kind) or tail.startswith(":") or not self._google_name_is_credible(kind, name, closed_parenthesized=False):
                 return
             issue_kind = ConventionEntryIssueKind.GOOGLE_MISSING_SEPARATOR
         else:
@@ -1828,7 +1843,7 @@ class _DocstringParser:
             return closed_parenthesized or name in confidence.attribute_names
         if kind is DocstringEntryKind.METHOD:
             return closed_parenthesized or name in confidence.method_names
-        if kind is DocstringEntryKind.EXCEPTION:
+        if is_exception_name_entry_kind(kind):
             names = _exception_names(name)
             return names is not None and all(_is_exception_like_name(exception_name) for exception_name in names)
         return False
@@ -1837,7 +1852,7 @@ class _DocstringParser:
         """Record an under-indented immediate Google entry description."""
         if index < end:
             text = self.lines[index].text
-            generic_match = _match_generic_entry(text, require_indent=False) if entry.kind is DocstringEntryKind.EXCEPTION else None
+            generic_match = _match_generic_entry(text, require_indent=False) if is_exception_name_entry_kind(entry.kind) else None
             if _match_google_entry(text, require_indent=False) is not None or (generic_match is not None and _exception_names(generic_match.name) is not None):
                 return
         if not self._is_incorrect_continuation(index, end, entry_indent=entry_indent):
@@ -1879,7 +1894,7 @@ class _DocstringParser:
             text = self.lines[index].text
             if (
                 _NUMPY_ENTRY_RE.match(text) is not None
-                or (entry.kind is DocstringEntryKind.EXCEPTION and _is_numpy_exception_entry(text))
+                or (is_exception_name_entry_kind(entry.kind) and _is_numpy_exception_entry(text))
                 or (entry.kind in {DocstringEntryKind.RETURN, DocstringEntryKind.YIELD} and self._is_missing_separator_type(text.strip()))
             ):
                 return
@@ -2264,7 +2279,7 @@ def _value_lines(value: str, *, source_line_number: int | None, source_indent: i
     return tuple(lines)
 
 
-def _entry_kind(convention: settings_check.DocstringConvention, section_name: str) -> DocstringEntryKind:
+def _entry_kind(section_name: str) -> DocstringEntryKind:
     """Return the semantic entry kind for a convention section."""
     normalized = section_name.lower()
     if normalized in docstring_sections.PARAMETER_SECTION_NAMES:
@@ -2273,8 +2288,10 @@ def _entry_kind(convention: settings_check.DocstringConvention, section_name: st
         return DocstringEntryKind.RETURN
     if normalized in {"yield", "yields"}:
         return DocstringEntryKind.YIELD
-    if normalized in {"raise", "raises", "warn", "warns"} or (convention == settings_check.DocstringConvention.NUMPY and normalized in {"warning", "warnings"}):
+    if normalized in {"raise", "raises"}:
         return DocstringEntryKind.EXCEPTION
+    if normalized in {"warn", "warns"}:
+        return DocstringEntryKind.WARNING
     if normalized in {"attribute", "attributes"}:
         return DocstringEntryKind.ATTRIBUTE
     if normalized in {"method", "methods"}:
@@ -2317,7 +2334,7 @@ def _rest_entry_metadata(field: str, argument: str) -> tuple[DocstringEntryKind,
 
 def _entry_names(kind: DocstringEntryKind, text: str) -> tuple[str, ...] | None:
     """Return parsed entry names for a convention entry."""
-    if kind is DocstringEntryKind.EXCEPTION:
+    if is_exception_name_entry_kind(kind):
         return _exception_names(text)
     return tuple(part.strip() for part in text.split(","))
 

@@ -223,6 +223,22 @@ def test_numpy_parameter_return_yield_and_attribute_rules() -> None:
     assert codes(result) == ("PDF700", "PDF703", "PDF708", "PDF711", "PDF712", "PDF715", "PDF716", "PDF719")
 
 
+def test_protected_only_descriptions_are_missing_for_every_typed_description_rule() -> None:
+    source = (
+        '"""Module.\n\nAttributes:\n    module_value:\n        ```text\n        protected only\n        ```\n"""\nmodule_value = 1\n\n\n'
+        'class Client:\n    """Client.\n\n    Attributes:\n        class_value:\n            ```text\n            protected only\n            ```\n    """\n\n    class_value = 1\n\n\n'
+        'def transform(parameter) -> int:\n    """Transform a value.\n\n    Args:\n        parameter:\n            ```text\n            protected only\n            ```\n\n    Returns:\n        int:\n            ```text\n            protected only\n            ```\n    """\n    return 1\n\n\n'
+        'def generate() -> Iterator[int]:\n    """Generate values.\n\n    Yields:\n        int:\n            ```text\n            protected only\n            ```\n    """\n    yield 1\n'
+    )
+    selected = ("PDF700", "PDF704", "PDF708", "PDF712", "PDF716")
+    protected = check(source, select=selected)
+    settings = CheckSettings(select=selected, docstring_convention=DocstringConvention.GOOGLE, docstring_parse_code_fences=False)
+    unprotected = formatter.format_source(source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=False)
+
+    assert codes(protected) == selected
+    assert codes(unprotected) == ()
+
+
 def test_numpy_multi_name_parameter_entries_check_each_signature_annotation() -> None:
     source = 'def function(x: int, y: str):\n    """Process values.\n\n    Parameters\n    ----------\n    x, y : int\n        Values.\n    """\n'
     result = check(source, select=("PDF703",), convention=DocstringConvention.NUMPY)

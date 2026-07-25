@@ -19,6 +19,17 @@ def test_normalizes_google_entry_spacing() -> None:
     assert not format_source(result.new_source).modified
 
 
+def test_normalizes_google_and_numpy_warning_entry_spacing() -> None:
+    google = 'def function():\n    """Summary.\n\n    Warns:\n        RuntimeWarning   :\n    """\n'
+    numpy = 'def function():\n    """Summary.\n\n    Warns\n    -----\n    RuntimeWarning   :\n    """\n'
+    google_result = format_source(google)
+    numpy_settings = CheckSettings(select=("PDF409",), docstring_convention=DocstringConvention.NUMPY)
+    numpy_result = format_source(numpy, settings=numpy_settings)
+
+    assert google_result.new_source == 'def function():\n    """Summary.\n\n    Warns:\n        RuntimeWarning:\n    """\n'
+    assert numpy_result.new_source == 'def function():\n    """Summary.\n\n    Warns\n    -----\n    RuntimeWarning:\n    """\n'
+
+
 def test_normalizes_google_star_dotted_yield_and_exception_entries() -> None:
     source = 'def function(*args, **kwargs):\n    """Summary.\n\n    Args:\n        *args   ( tuple[str, ...] ) : Positional values.\n        **kwargs   ( dict[str, object] ) :\n        model.value : Dotted value.\n\n    Yields:\n        tuple[ int, int ] : Pair.\n\n    Raises:\n        ValueError   : Bad value.\n    """\n'
     result = format_source(source)

@@ -181,3 +181,20 @@ def test_nameless_rest_exception_field_is_not_comparable_documentation() -> None
     source = 'def function():\n    """Validate.\n\n    :raises: If the value is bad.\n    """\n'
 
     assert_pdf507_lines(source, (), settings=CheckSettings(select=("PDF507",), docstring_convention=DocstringConvention.REST))
+
+
+def test_mixed_exception_and_warning_entries_only_compare_raised_exceptions() -> None:
+    source = 'def function():\n    """Validate.\n\n    Warns:\n        ValueError: Emitted warning.\n\n    Raises:\n        TypeError: Stale raised exception.\n    """\n    raise ValueError("bad")\n'
+    result = format_source(source)
+
+    assert_pdf507_lines(source, ((8,),))
+    assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring documents exception 'TypeError' that is not explicitly raised",)
+
+
+def test_numpy_warning_entries_do_not_become_stale_exception_documentation() -> None:
+    source = 'def function():\n    """Validate.\n\n    Warns\n    -----\n    RuntimeWarning\n        Runtime risk.\n\n    Raises\n    ------\n    TypeError\n        Stale raised exception.\n    """\n'
+    settings = CheckSettings(select=("PDF507",), docstring_convention=DocstringConvention.NUMPY)
+    result = format_source(source, settings=settings)
+
+    assert_pdf507_lines(source, ((11,),), settings=settings)
+    assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring documents exception 'TypeError' that is not explicitly raised",)

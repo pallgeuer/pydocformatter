@@ -1,3 +1,6 @@
+# Third-party imports
+import pytest
+
 # First-party imports
 from pydocformatter import formatter, rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention, DocstringMissingDocumentation
@@ -164,3 +167,18 @@ def test_numpy_warnings_section_is_not_exception_documentation() -> None:
         settings=CheckSettings(select=("PDF506",), docstring_convention=DocstringConvention.NUMPY, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS),
     )
     assert_pdf506_lines(extraneous_source, (), settings=CheckSettings(select=("PDF506",), docstring_convention=DocstringConvention.NUMPY))
+
+
+@pytest.mark.parametrize(
+    ("convention", "body"),
+    [
+        (DocstringConvention.GOOGLE, "Warns:\n        RuntimeWarning: Runtime risk."),
+        (DocstringConvention.NUMPY, "Warn\n    ----\n    RuntimeWarning\n        Runtime risk."),
+        (DocstringConvention.NUMPY, "Warnings\n    --------\n    RuntimeWarning\n        Runtime risk."),
+    ],
+)
+def test_warning_only_sections_do_not_activate_default_missing_exception_policy(convention: DocstringConvention, body: str) -> None:
+    source = f'def function():\n    """Validate.\n\n    {body}\n    """\n    raise ValueError("bad")\n'
+    settings = CheckSettings(select=("PDF506",), docstring_convention=convention)
+
+    assert_pdf506_lines(source, (), settings=settings)

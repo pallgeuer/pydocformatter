@@ -92,7 +92,7 @@ def _entry_keys(entry: PDF_definition.DocstringEntry) -> tuple[EntryKey, ...]:
         return tuple(
             EntryKey(("parameter", parameter_documentation.parameter_comparison_name(name)), parameter_documentation.parameter_comparison_name(name), "parameter") for name in entry.names if name
         )
-    if entry.kind in {PDF_definition.DocstringEntryKind.ATTRIBUTE, PDF_definition.DocstringEntryKind.METHOD, PDF_definition.DocstringEntryKind.EXCEPTION}:
+    if entry.kind in {PDF_definition.DocstringEntryKind.ATTRIBUTE, PDF_definition.DocstringEntryKind.METHOD} or PDF_definition.is_exception_name_entry_kind(entry.kind):
         return tuple(EntryKey((entry.kind.value, name), name, entry.kind.value) for name in entry.names if name)
     if entry.kind is PDF_definition.DocstringEntryKind.FIELD:
         return tuple(EntryKey(("field", name), name, "field") for name in entry.names if name)

@@ -45,7 +45,7 @@ class PDF410ExceptionEntryNormalization(RuleBase):
 
     @classmethod
     def violations(cls, context: RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
-        """Return violations for non-canonical exception entry spelling.
+        """Return violations for non-canonical exception and warning entry spelling.
 
         Args:
             context (RuleContext): Current file context with parsed module, settings, and prepared category data.
@@ -57,7 +57,7 @@ class PDF410ExceptionEntryNormalization(RuleBase):
 
 
 def _results(context: RuleContext, *, rule: RuleMetadata) -> tuple[rule_violations.RuleViolation, ...]:
-    """Return violations for exception entry normalization."""
+    """Return violations for exception and warning entry normalization."""
     data = PDF_definition.PDF.require_data(context)
     results: list[rule_violations.RuleViolation] = []
     for docstring in data.docstrings:
@@ -68,20 +68,21 @@ def _results(context: RuleContext, *, rule: RuleMetadata) -> tuple[rule_violatio
         replacement_messages: list[str] = []
         unfixable_messages: list[str] = []
         for entry in docstring.structure.entries:
-            if entry.kind is not PDF_definition.DocstringEntryKind.EXCEPTION:
+            if not PDF_definition.is_exception_name_entry_kind(entry.kind):
                 continue
             line = docstring.structure.lines[entry.start_line]
-            canonical = _canonical_exception_entry_line(docstring.structure.convention, line.text, entry)
+            canonical = _canonical_exception_or_warning_entry_line(docstring.structure.convention, line.text, entry)
             if canonical is None or canonical == line.text:
                 continue
+            message = "Docstring warning entry should use canonical spelling" if entry.kind is PDF_definition.DocstringEntryKind.WARNING else rule.message
             replacement = section_edits.text_replacement(line, 0, len(line.text), canonical)
             if replacement is None:
                 unfixable_line_numbers.extend(section_edits.line_numbers(docstring, line))
-                unfixable_messages.append(rule.message)
+                unfixable_messages.append(message)
                 continue
             replacements.append(replacement)
             replacement_line_numbers.extend(section_edits.line_numbers(docstring, line))
-            replacement_messages.append(rule.message)
+            replacement_messages.append(message)
             section_edits.replace_value_line_span(value_lines, line, replacement, canonical)
         if not replacements and not unfixable_line_numbers:
             continue
@@ -99,21 +100,21 @@ def _results(context: RuleContext, *, rule: RuleMetadata) -> tuple[rule_violatio
     return tuple(results)
 
 
-def _canonical_exception_entry_line(convention: DocstringConvention, text: str, entry: PDF_definition.DocstringEntry) -> str | None:
-    """Return the canonical exception entry line for a docstring convention."""
+def _canonical_exception_or_warning_entry_line(convention: DocstringConvention, text: str, entry: PDF_definition.DocstringEntry) -> str | None:
+    """Return the canonical exception or warning entry line for a docstring convention."""
     if not entry.names:
         return None
     if convention is DocstringConvention.GOOGLE:
-        return _canonical_google_exception_entry_line(text, entry)
+        return _canonical_google_exception_or_warning_entry_line(text, entry)
     if convention is DocstringConvention.NUMPY:
-        return _canonical_numpy_exception_entry_line(text, entry)
+        return _canonical_numpy_exception_or_warning_entry_line(text, entry)
     if convention is DocstringConvention.REST:
         return _canonical_rest_exception_entry_line(text, entry)
     return None
 
 
-def _canonical_google_exception_entry_line(text: str, entry: PDF_definition.DocstringEntry) -> str | None:
-    """Return the canonical Google exception entry spelling."""
+def _canonical_google_exception_or_warning_entry_line(text: str, entry: PDF_definition.DocstringEntry) -> str | None:
+    """Return the canonical Google exception or warning entry spelling."""
     if PDF_definition._match_google_entry(text) is not None:
         return None
     match = PDF_definition._match_generic_entry(text)
@@ -125,12 +126,12 @@ def _canonical_google_exception_entry_line(text: str, entry: PDF_definition.Docs
     return f"{match.indent}{', '.join(entry.names)}:{f' {description}' if description else ''}"
 
 
-def _canonical_numpy_exception_entry_line(text: str, entry: PDF_definition.DocstringEntry) -> str | None:
-    """Return the canonical NumPy exception entry spelling."""
-    exception_match = PDF_definition._NUMPY_EXCEPTION_ENTRY_RE.match(text)
-    if exception_match is not None:
-        description = exception_match.group("description").strip()
-        return f"{exception_match.group('indent')}{', '.join(entry.names)}:{f' {description}' if description else ''}"
+def _canonical_numpy_exception_or_warning_entry_line(text: str, entry: PDF_definition.DocstringEntry) -> str | None:
+    """Return the canonical NumPy exception or warning entry spelling."""
+    entry_match = PDF_definition._NUMPY_EXCEPTION_ENTRY_RE.match(text)
+    if entry_match is not None:
+        description = entry_match.group("description").strip()
+        return f"{entry_match.group('indent')}{', '.join(entry.names)}:{f' {description}' if description else ''}"
     indent = text[: len(text) - len(text.lstrip(" \t"))]
     return f"{indent}{', '.join(entry.names)}"
 

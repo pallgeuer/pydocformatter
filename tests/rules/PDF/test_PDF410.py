@@ -5,13 +5,13 @@ from pydocformatter.rules.definitions.PDF.PDF409_docstring_entry_spacing import 
 from pydocformatter.rules.definitions.PDF.PDF410_exception_entry_normalization import PDF410ExceptionEntryNormalization
 
 
-def format_source(source: str, *, settings: CheckSettings | None = None) -> formatter.FormatterResult:
-    """Format source with PDF410 selected."""
+def format_source(source: str, *, settings: CheckSettings | None = None, fix: bool = True) -> formatter.FormatterResult:
+    """Format source with PDF410 selected and optional fixes."""
     resolved_settings = CheckSettings(select=("PDF410",), docstring_convention=DocstringConvention.GOOGLE) if settings is None else settings
-    return formatter.format_source(source, "example.py", settings=resolved_settings, rule_selection=rules_selection.select_rules(resolved_settings), fix=True)
+    return formatter.format_source(source, "example.py", settings=resolved_settings, rule_selection=rules_selection.select_rules(resolved_settings), fix=fix)
 
 
-def test_normalizes_google_raises_and_warns_exception_entries() -> None:
+def test_normalizes_google_exception_and_warning_entries() -> None:
     source = 'def function(value):\n    """Summary.\n\n    Raises:\n        `ValueError` | mypkg.CustomError , TypeError   : Bad value.\n\n    Warns:\n        `RuntimeWarning`|UserWarning : Bad warning.\n    """\n'
     result = format_source(source)
 
@@ -21,6 +21,28 @@ def test_normalizes_google_raises_and_warns_exception_entries() -> None:
     )
     assert result.fixed_findings[PDF410ExceptionEntryNormalization.meta] == 1
     assert not format_source(result.new_source).modified
+
+
+def test_uses_entry_kind_specific_messages_without_fixing() -> None:
+    source = 'def function():\n    """Summary.\n\n    Raises:\n        ValueError | TypeError: Bad value.\n\n    Warns:\n        RuntimeWarning | UserWarning: Bad warning.\n    """\n'
+    result = format_source(source, fix=False)
+
+    assert result.new_source == source
+    assert not result.fixed_findings
+    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((5, 8),)
+    assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring exception entry should use canonical spelling; Docstring warning entry should use canonical spelling",)
+
+
+def test_warning_normalization_ignores_other_parsed_entry_families_in_mixed_docstring() -> None:
+    source = 'def function(value):\n    """Summary.\n\n    Args:\n        value (tuple[int, int]): Keep parameter spelling.\n\n    Returns:\n        tuple[int, int]: Keep return spelling.\n\n    Warns:\n        `RuntimeWarning` | UserWarning : Normalize warning spelling.\n    """\n'
+    result = format_source(source)
+
+    assert (
+        result.new_source
+        == 'def function(value):\n    """Summary.\n\n    Args:\n        value (tuple[int, int]): Keep parameter spelling.\n\n    Returns:\n        tuple[int, int]: Keep return spelling.\n\n    Warns:\n        RuntimeWarning, UserWarning: Normalize warning spelling.\n    """\n'
+    )
+    assert result.fixed_findings[PDF410ExceptionEntryNormalization.meta] == 1
+    assert not result.unfixed_findings
 
 
 def test_leaves_canonical_google_exception_with_parenthetical_unchanged() -> None:
@@ -53,13 +75,13 @@ def test_pdf409_and_pdf410_converge_on_overlapping_google_exception_entry() -> N
 
 
 def test_normalizes_numpy_raises_and_warning_entries() -> None:
-    source = 'def function(value):\n    """Summary.\n\n    Raises\n    ------\n    `ValueError` | errors.CustomError\n        Bad value.\n\n    Warnings\n    --------\n    `RuntimeWarning`,UserWarning\n        Bad warning.\n    """\n'
+    source = 'def function(value):\n    """Summary.\n\n    Raises\n    ------\n    `ValueError` | errors.CustomError\n        Bad value.\n\n    Warns\n    -----\n    `RuntimeWarning`,UserWarning\n        Bad warning.\n    """\n'
     settings = CheckSettings(select=("PDF410",), docstring_convention=DocstringConvention.NUMPY)
     result = format_source(source, settings=settings)
 
     assert (
         result.new_source
-        == 'def function(value):\n    """Summary.\n\n    Raises\n    ------\n    ValueError, errors.CustomError\n        Bad value.\n\n    Warnings\n    --------\n    RuntimeWarning, UserWarning\n        Bad warning.\n    """\n'
+        == 'def function(value):\n    """Summary.\n\n    Raises\n    ------\n    ValueError, errors.CustomError\n        Bad value.\n\n    Warns\n    -----\n    RuntimeWarning, UserWarning\n        Bad warning.\n    """\n'
     )
     assert result.fixed_findings[PDF410ExceptionEntryNormalization.meta] == 1
     assert not format_source(result.new_source, settings=settings).modified
@@ -190,6 +212,17 @@ def test_reports_unsafe_exception_entry_without_fixing() -> None:
     assert tuple(finding.rule for finding in result.unfixed_findings) == (PDF410ExceptionEntryNormalization.meta,)
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((2, 3, 4),)
     assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring exception entry should use canonical spelling",)
+
+
+def test_reports_unsafe_warning_entry_with_warning_message() -> None:
+    source = 'def function(value):\n    ("Summary.\\n\\n"\n     "Warns:\\n"\n     "    `RuntimeWarning` | UserWarning : Bad warning.")\n'
+    result = format_source(source)
+
+    assert result.new_source == source
+    assert not result.fixed_findings
+    assert tuple(finding.rule for finding in result.unfixed_findings) == (PDF410ExceptionEntryNormalization.meta,)
+    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((2, 3, 4),)
+    assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring warning entry should use canonical spelling",)
 
 
 def test_ignored_without_supported_convention() -> None:

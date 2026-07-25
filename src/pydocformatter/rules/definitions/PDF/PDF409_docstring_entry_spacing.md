@@ -7,9 +7,9 @@ Rule is disabled if `docstring-convention` is `none` or `pep257`.
 ## What it does
 PDF409 reports recognized convention entries and reST fields whose nominal prefix spacing is not canonical for the active docstring convention.
 
-For Google docstrings, the fix normalizes parsed parameter, attribute, method, field, return, yield, and exception entry prefixes. Starred parameters and dotted names are preserved. For NumPy docstrings, the fix normalizes comma-separated entry names and spacing around the name/type colon. For reST docstrings, the fix normalizes spacing around field names, field arguments, colons, and same-line descriptions.
+For Google docstrings, the fix normalizes parsed parameter, attribute, method, field, return, yield, exception, and warning entry prefixes. Starred parameters and dotted names are preserved. For NumPy docstrings, the fix normalizes comma-separated entry names and spacing around the name/type colon, including exception and warning entries that use a same-line description. For reST docstrings, the fix normalizes spacing around field names, field arguments, colons, and same-line descriptions.
 
-The rule only targets entries and fields parsed under the active convention. It does not normalize arbitrary prose or malformed entry-like text, reflow continuation lines, or semantically rewrite type expressions beyond trimming leading and trailing whitespace around parsed type text. For parsed exception entries, PDF409 normalizes prefix spacing but preserves exception-list spelling such as backticks and pipe separators; PDF410 handles canonical exception-name spelling. Concatenated docstrings and source mappings that cannot be safely rewritten are reported without a fix.
+The rule only targets entries and fields parsed under the active convention. It does not normalize arbitrary prose or malformed entry-like text, reflow continuation lines, or semantically rewrite type expressions beyond trimming leading and trailing whitespace around parsed type text. For parsed exception and warning entries, PDF409 normalizes prefix spacing but preserves exception-list spelling such as backticks and pipe separators; PDF410 handles canonical exception-name spelling. Concatenated docstrings and source mappings that cannot be safely rewritten are reported without a fix.
 
 ## Why is this useful?
 Consistent entry-prefix spacing makes convention-aware docstrings easier to scan and avoids low-value diffs from hand-spaced parameter, type, and field syntax.
@@ -41,7 +41,7 @@ def value(arg):
     """
 ```
 
-PDF409 preserves Google entry semantics while normalizing starred parameters, dotted names, return and yield types, and exceptions:
+PDF409 preserves Google entry semantics while normalizing starred parameters, dotted names, return and yield types, raised exceptions, and emitted warnings:
 
 ```pydocfmt-example
 [settings]
@@ -61,6 +61,9 @@ def collect(*args, **kwargs):
 
     Raises:
         ValueError   : Bad value.
+
+    Warns:
+        `RuntimeWarning` | UserWarning   : Possibly unstable.
     """
 
 [output]
@@ -77,10 +80,13 @@ def collect(*args, **kwargs):
 
     Raises:
         ValueError: Bad value.
+
+    Warns:
+        `RuntimeWarning` | UserWarning: Possibly unstable.
     """
 ```
 
-PDF409 normalizes NumPy comma-separated parameter names and type separators, but leaves continuation descriptions alone:
+PDF409 normalizes NumPy comma-separated parameter names and type separators plus warning-entry prefix spacing, but leaves continuation descriptions alone:
 
 ```pydocfmt-example
 [settings]
@@ -95,6 +101,10 @@ def value(first, second):
     first,second:int
         The values.
         Keep   description   spacing.
+
+    Warns
+    -----
+    `RuntimeWarning` | UserWarning  :  Possibly unstable.
     """
 
 [output]
@@ -106,6 +116,10 @@ def value(first, second):
     first, second : int
         The values.
         Keep   description   spacing.
+
+    Warns
+    -----
+    `RuntimeWarning` | UserWarning: Possibly unstable.
     """
 ```
 
@@ -142,7 +156,7 @@ def value(arg, other):
     """
 ```
 
-PDF409 normalizes spacing around parsed exception entries but leaves exception-list spelling to PDF410:
+PDF409 normalizes spacing around parsed exception and warning entries but leaves exception-name list spelling to PDF410:
 
 ```pydocfmt-example
 [settings]

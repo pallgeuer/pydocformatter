@@ -112,7 +112,7 @@ def _canonical_entry_line(convention: DocstringConvention, text: str, entry: PDF
 def _canonical_google_entry_line(text: str, entry: PDF_definition.DocstringEntry) -> str | None:
     """Return the canonical Google entry line for spacing normalization."""
     match = PDF_definition._match_google_entry(text)
-    if match is None and entry.kind in {PDF_definition.DocstringEntryKind.RETURN, PDF_definition.DocstringEntryKind.YIELD, PDF_definition.DocstringEntryKind.EXCEPTION}:
+    if match is None and (entry.kind in {PDF_definition.DocstringEntryKind.RETURN, PDF_definition.DocstringEntryKind.YIELD} or PDF_definition.is_exception_name_entry_kind(entry.kind)):
         match = PDF_definition._match_generic_entry(text)
     if match is None:
         return None
@@ -129,7 +129,7 @@ def _google_entry_head(entry: PDF_definition.DocstringEntry, *, original_name: s
     """Return the canonical Google entry head before the description colon."""
     if entry.kind in {PDF_definition.DocstringEntryKind.RETURN, PDF_definition.DocstringEntryKind.YIELD} and not entry.names:
         return entry.type_text.strip() if entry.type_text else None
-    if entry.kind is PDF_definition.DocstringEntryKind.EXCEPTION:
+    if PDF_definition.is_exception_name_entry_kind(entry.kind):
         if original_type:
             return f"{original_name} ({original_type.strip()})"
         return original_name
@@ -143,7 +143,7 @@ def _google_entry_head(entry: PDF_definition.DocstringEntry, *, original_name: s
 
 def _canonical_numpy_entry_line(text: str, entry: PDF_definition.DocstringEntry) -> str | None:
     """Return the canonical NumPy entry line for spacing normalization."""
-    if entry.kind is PDF_definition.DocstringEntryKind.EXCEPTION and (exception_match := PDF_definition._NUMPY_EXCEPTION_ENTRY_RE.match(text)) is not None:
+    if PDF_definition.is_exception_name_entry_kind(entry.kind) and (exception_match := PDF_definition._NUMPY_EXCEPTION_ENTRY_RE.match(text)) is not None:
         description = exception_match.group("description").strip()
         return f"{exception_match.group('indent')}{exception_match.group('name').strip()}:{f' {description}' if description else ''}"
     match = PDF_definition._NUMPY_ENTRY_RE.match(text)

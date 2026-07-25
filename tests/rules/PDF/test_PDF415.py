@@ -139,6 +139,18 @@ def test_valid_generic_google_exception_peer_is_not_mistaken_for_a_continuation(
     assert_pdf415(source, (), (), convention=DocstringConvention.GOOGLE)
 
 
+def test_valid_google_warning_peer_is_not_mistaken_for_a_continuation() -> None:
+    """Keep exception-like peer recognition for the warning entry family."""
+    source = 'def convert():\n    """Convert a value.\n\n    Warns:\n        RuntimeWarning:\n        `UserWarning` | FutureWarning: The conversion may be unstable.\n    """\n'
+    assert_pdf415(source, (), (), convention=DocstringConvention.GOOGLE)
+
+
+def test_under_indented_google_warning_entry_retains_warning_confidence() -> None:
+    """Diagnose a complete warning head outside its required section indentation."""
+    source = 'def convert():\n    """Convert a value.\n\n    Warns:\n    RuntimeWarning: The conversion may be unstable.\n    """\n'
+    assert_pdf415(source, ((5,),), ("Google docstring entry 'RuntimeWarning' should be indented beyond its section header",), convention=DocstringConvention.GOOGLE)
+
+
 def test_valid_numpy_exception_peer_is_not_mistaken_for_a_continuation() -> None:
     """Accept a second exception entry after an exception with no description."""
     source = 'def convert():\n    """Convert a value.\n\n    Raises\n    ------\n    ValueError\n    pkg.CustomError\n        The conversion failed.\n    """\n'
@@ -161,6 +173,18 @@ def test_colon_numpy_exception_checks_its_immediate_continuation_indentation() -
     """Report an aligned description following an empty colon-form exception entry."""
     source = 'def convert():\n    """Convert a value.\n\n    Raises\n    ------\n    ValueError:\n    Failure detail.\n    """\n'
     assert_pdf415(source, ((7,),), ("NumPy docstring entry 'ValueError' description should be indented beyond the entry",), convention=DocstringConvention.NUMPY)
+
+
+def test_numpy_warning_checks_its_immediate_continuation_indentation() -> None:
+    """Keep continuation diagnostics for NumPy warning entries."""
+    source = 'def convert():\n    """Convert a value.\n\n    Warns\n    -----\n    RuntimeWarning\n    Warning detail.\n    """\n'
+    assert_pdf415(source, ((7,),), ("NumPy docstring entry 'RuntimeWarning' description should be indented beyond the entry",), convention=DocstringConvention.NUMPY)
+
+
+def test_valid_numpy_warning_peer_is_not_mistaken_for_a_continuation() -> None:
+    """Accept an adjacent warning entry after an empty warning entry."""
+    source = 'def convert():\n    """Convert a value.\n\n    Warns\n    -----\n    RuntimeWarning\n    UserWarning\n        The conversion may be unstable.\n    """\n'
+    assert_pdf415(source, (), (), convention=DocstringConvention.NUMPY)
 
 
 @pytest.mark.parametrize("section", ["Returns", "Yields"])

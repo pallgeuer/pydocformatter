@@ -917,6 +917,21 @@ def test_pydocfmt_check_prints_success_message_for_clean_file() -> None:
         assert result.stdout == "All checks passed!\n"
 
 
+def test_pydocfmt_check_reports_warning_specific_pdf410_message() -> None:
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        target = root / "warning.py"
+        source = 'def function():\n    """Summary.\n\n    Warns:\n        RuntimeWarning | UserWarning: Bad warning.\n    """\n'
+        target.write_text(source, encoding="utf-8")
+        argv = ["pydocfmt", "check", "--isolated", "--no-cache", "--no-fix", "--select", "PDF410", "--docstring-convention", "google", str(target)]
+        result = cli_helpers.run_cli(pydocfmt_cli.main, argv)
+
+        assert result.exit_code == 1
+        assert target.read_text(encoding="utf-8") == source
+        assert f"{target}:" in result.stdout
+        assert "PDF410* Docstring warning entry should use canonical spelling. Line 5" in result.stdout
+
+
 def test_pydocfmt_diff_prints_unified_diff_without_writing_file(mocker: MockerFixture) -> None:
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)

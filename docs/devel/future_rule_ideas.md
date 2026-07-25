@@ -4,11 +4,11 @@ The main remaining opportunities are:
 
 - Parser blind spots: mixed conventions, unknown sections, and malformed structures outside the conservative PDF414/PDF415 entry checks can still become ordinary prose.
 - Ordering and ownership: constructor/class documentation, attribute order, method inventories, and `__all__`.
-- Entry completeness: exceptions, warnings, methods, `See Also`, and attached attribute docstrings.
+- Entry completeness: methods, `See Also`, and attached attribute docstrings.
 - Markup safety: unsupported or malformed inline markup and malformed reST/fences.
 - Conservative autofixes for several existing diagnostic-only rules.
 
-There are currently 126 rules: 6 PCF and 120 PDF. Fix availability is 22 always, 5 usually, 18 sometimes, and 81 never.
+There are currently 128 rules: 6 PCF and 122 PDF. Fix availability is 22 always, 5 usually, 18 sometimes, and 83 never.
 
 ## Current coverage audit
 
@@ -121,6 +121,7 @@ All PDF5xx–7xx rules are diagnostic-only.
 | PDF708–711     | Yield description presence, type required/forbidden, and generator-annotation mismatch  |
 | PDF712–715     | Class-attribute description presence, type required/forbidden, and annotation mismatch  |
 | PDF716–719     | Module-attribute description presence, type required/forbidden, and annotation mismatch |
+| PDF720/721     | Raised-exception and emitted-warning description presence                               |
 
 The category’s exact inventory boundaries—including ignored additional docstrings and unsupported assignment targets—are documented in `PDF.md`.
 
@@ -146,7 +147,7 @@ The category’s exact inventory boundaries—including ignored additional docst
 
 10. **Support constructor documentation ownership.** Add mutually exclusive policies for documenting constructor parameters/raises in the class docstring versus `__init__`, and make PDF500–507 compare the chosen docstring with `__init__`. This is especially important for NumPy style.
 
-11. **Check exception and warning entries for missing descriptions.** PDF308–310 style existing descriptions, but PDF7xx has no analogue to PDF700/704/708 for `Raises` or `Warns`.
+11. **Implemented as PDF720/PDF721: Check exception and warning entries for missing descriptions.** PDF720 checks named raised-exception entries under Google, NumPy, and reStructuredText conventions. PDF721 separately checks emitted-warning entries under Google and NumPy conventions, without treating Google warning admonitions as emitted-warning documentation.
 
 12. **Check method entries for missing descriptions.** `Methods` entries are parsed and styled, but there is no completeness rule for their prose.
 
@@ -217,10 +218,6 @@ The category’s exact inventory boundaries—including ignored additional docst
 45. **Add opt-in capitalization/punctuation checks for standalone prose comments.** Apply only to clearly sentence-like standalone paragraphs, excluding trailing comments, task markers, labels, directives, headings, code, and fragments. Google’s guide recommends narrative capitalization and punctuation, but this should remain optional because comment fragments are common. [Google Python style guide](https://google.github.io/styleguide/pyguide.html)
 
 ## Highest priority
-
-- **#11 — Require descriptions for exceptions and warnings**
-
-   A natural and clearly scoped completion of PDF700/704/708. The entries are already parsed, so this should mostly reuse existing missing-description infrastructure. It prevents nearly content-free documentation such as `ValueError:`.
 
 - **#22 — Report suspicious invisible Unicode**
 

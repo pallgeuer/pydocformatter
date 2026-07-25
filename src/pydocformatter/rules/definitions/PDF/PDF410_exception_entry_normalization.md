@@ -9,7 +9,7 @@ PDF410 reports parsed exception and warning entries whose exception-name lists a
 
 The canonical spelling uses simple or dotted exception names without backtick code spans, with multiple exception names separated by commas. The fix removes single-backtick code spans around individual exception names or around a whole parsed exception-name list, converts pipe separators to commas, and normalizes unambiguous spacing around the parsed exception entry prefix.
 
-Google `Raise`/`Raises` and `Warn`/`Warns` entries, NumPy exception and warning entries, and reST `raise`/`raises`/`except`/`exception` fields are supported under their matching conventions. Google `Warning` and `Warnings` admonition sections are not exception-entry sections for this rule. Nameless reST exception fields such as `:raises:` are left unchanged because their body is prose, not a parsed exception-name list.
+Google `Raise`/`Raises` and `Warn`/`Warns` entries, NumPy exception and `Warn`/`Warns` entries, and reST `raise`/`raises`/`except`/`exception` fields are supported under their matching conventions. Google and NumPy `Warning` and `Warnings` caution sections are not exception-entry sections for this rule. Nameless reST exception fields such as `:raises:` are left unchanged because their body is prose, not a parsed exception-name list.
 
 The rule only rewrites entries that parse as simple or dotted exception names. It does not normalize arbitrary prose, malformed exception lists, double-backtick code spans, return/yield type expressions, or description text. Concatenated docstrings and source mappings that cannot be safely rewritten are reported without a fix.
 
@@ -109,8 +109,8 @@ def value(arg):
     -----
     LookupError,KeyError : Missing value.
 
-    Warnings
-    --------
+    Warns
+    -----
     `RuntimeWarning`
         Bad warning.
     UserWarning
@@ -132,8 +132,8 @@ def value(arg):
     -----
     LookupError, KeyError: Missing value.
 
-    Warnings
-    --------
+    Warns
+    -----
     RuntimeWarning
         Bad warning.
     UserWarning
@@ -206,7 +206,7 @@ def value(arg):
 [output=unchanged]
 ```
 
-PDF410 reports unsafe source mappings without applying a fix:
+PDF410 reports unsafe source mappings without applying a fix. Exception and warning entries retain their specific diagnostic subjects:
 
 ```pydocfmt-example
 [settings]
@@ -221,6 +221,21 @@ def value(arg):
 [output=unchanged]
 [findings]
 PDF410: Lines 2-4: Docstring exception entry should use canonical spelling
+```
+
+```pydocfmt-example
+[settings]
+docstring-convention = "google"
+
+[input]
+def value(arg):
+    ("Return the value.\n\n"
+     "Warns:\n"
+     "    `RuntimeWarning` | UserWarning : Bad warning.")
+
+[output=unchanged]
+[findings]
+PDF410: Lines 2-4: Docstring warning entry should use canonical spelling
 ```
 
 ## Options

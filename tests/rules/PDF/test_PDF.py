@@ -176,6 +176,11 @@ def test_convention_entry_issue_metadata_covers_every_kind() -> None:
     assert issue_kinds == PDF414_definition._ISSUE_KINDS | PDF415_definition._ISSUE_KINDS
 
 
+def test_exception_name_entry_kind_capability_is_exhaustive() -> None:
+    """Keep exception-name syntax shared only by exceptions and warnings."""
+    assert {kind for kind in DocstringEntryKind if PDF_definition.is_exception_name_entry_kind(kind)} == {DocstringEntryKind.EXCEPTION, DocstringEntryKind.WARNING}
+
+
 def test_prepare_parses_docstrings_after_building_complete_owner_name_inventories() -> None:
     source = 'class Client:\n    """Client values.\n\n    Attributes:\n        value Stored value.\n\n    Methods:\n        run Execute the client.\n    """\n\n    value = 1\n\n    def run(self):\n        """Run the client."""\n'
     settings = CheckSettings(docstring_convention=DocstringConvention.GOOGLE)
@@ -812,8 +817,8 @@ def test_malformed_entry_detection_skips_protected_google_content() -> None:
         ("Yield", "tuple[int, int]: Pair.", DocstringEntryKind.YIELD, (), "tuple[int, int]"),
         ("Raises", "ValueError: Invalid value.", DocstringEntryKind.EXCEPTION, ("ValueError",), None),
         ("Raise", "ValueError: Invalid value.", DocstringEntryKind.EXCEPTION, ("ValueError",), None),
-        ("Warns", "RuntimeWarning: Possibly unstable.", DocstringEntryKind.EXCEPTION, ("RuntimeWarning",), None),
-        ("Warn", "RuntimeWarning: Possibly unstable.", DocstringEntryKind.EXCEPTION, ("RuntimeWarning",), None),
+        ("Warns", "RuntimeWarning: Possibly unstable.", DocstringEntryKind.WARNING, ("RuntimeWarning",), None),
+        ("Warn", "RuntimeWarning: Possibly unstable.", DocstringEntryKind.WARNING, ("RuntimeWarning",), None),
         ("Warnings", "RuntimeWarning: Possibly unstable.", DocstringEntryKind.FIELD, ("RuntimeWarning",), None),
         ("Attributes", "name (str): Public name.", DocstringEntryKind.ATTRIBUTE, ("name",), "str"),
         ("Attribute", "name (str): Public name.", DocstringEntryKind.ATTRIBUTE, ("name",), "str"),
@@ -1076,9 +1081,8 @@ def test_numpy_section_headers_and_entries_inside_code_fences_are_opaque() -> No
         ("Yield", "Iterator[int]", DocstringEntryKind.YIELD, (), "Iterator[int]"),
         ("Raises", "ValueError", DocstringEntryKind.EXCEPTION, ("ValueError",), None),
         ("Raise", "ValueError", DocstringEntryKind.EXCEPTION, ("ValueError",), None),
-        ("Warnings", "RuntimeWarning", DocstringEntryKind.EXCEPTION, ("RuntimeWarning",), None),
-        ("Warning", "RuntimeWarning", DocstringEntryKind.EXCEPTION, ("RuntimeWarning",), None),
-        ("Warn", "RuntimeWarning", DocstringEntryKind.EXCEPTION, ("RuntimeWarning",), None),
+        ("Warns", "RuntimeWarning", DocstringEntryKind.WARNING, ("RuntimeWarning",), None),
+        ("Warn", "RuntimeWarning", DocstringEntryKind.WARNING, ("RuntimeWarning",), None),
         ("Attributes", "name : str", DocstringEntryKind.ATTRIBUTE, ("name",), "str"),
         ("Attribute", "name : str", DocstringEntryKind.ATTRIBUTE, ("name",), "str"),
         ("Methods", "run : Callable[[], None]", DocstringEntryKind.METHOD, ("run",), "Callable[[], None]"),
@@ -1094,6 +1098,14 @@ def test_numpy_section_names_determine_entry_semantics(section: str, entry_text:
     structure = structure_for(f"{section}\n{'-' * len(section)}\n{entry_text}\n    Description.", settings=CheckSettings(docstring_convention=DocstringConvention.NUMPY))
     entry = structure.entries[0]
     assert (entry.kind, entry.names, entry.type_text, entry.description) == (expected_kind, expected_names, expected_type, "Description.")
+
+
+@pytest.mark.parametrize("section", ["Warning", "Warnings"])
+def test_numpy_warning_caution_sections_are_narrative(section: str) -> None:
+    structure = structure_for(f"{section}\n{'-' * len(section)}\nExperimental", settings=CheckSettings(docstring_convention=DocstringConvention.NUMPY))
+
+    assert tuple(parsed_section.name for parsed_section in structure.sections) == (section,)
+    assert structure.entries == ()
 
 
 def test_numpy_colon_header_is_not_misclassified_as_a_section() -> None:

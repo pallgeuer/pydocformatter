@@ -79,6 +79,43 @@ def test_google_exception_entries_compare_exact_parsed_names() -> None:
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((7,),)
 
 
+def test_exception_and_warning_entries_are_distinct_repetition_families() -> None:
+    source = 'def function():\n    """Summary.\n\n    Raises:\n        RuntimeWarning: Raised first.\n\n    Warns:\n        RuntimeWarning: Emitted first.\n        RuntimeWarning: Emitted again.\n\n    Raises:\n        RuntimeWarning: Raised again.\n    """\n'
+    result = format_source(source)
+
+    assert result.new_source == source
+    assert not result.fixed_findings
+    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((9,), (12,))
+    assert tuple(finding.message for finding in result.unfixed_findings) == (
+        "Docstring warning entry 'RuntimeWarning' repeats earlier entry",
+        "Docstring exception entry 'RuntimeWarning' repeats earlier entry",
+    )
+
+
+def test_reports_all_repeated_names_from_one_warning_entry_in_one_message() -> None:
+    source = 'def function():\n    """Summary.\n\n    Warn:\n        RuntimeWarning, UserWarning: First warnings.\n\n    Warns:\n        `RuntimeWarning` | UserWarning | FutureWarning: Repeated warnings.\n    """\n'
+    result = format_source(source)
+
+    assert result.new_source == source
+    assert not result.fixed_findings
+    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((8,),)
+    assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring warning entry repeats earlier entries: 'RuntimeWarning', 'UserWarning'",)
+
+
+def test_numpy_exception_and_warning_entries_repeat_only_within_their_own_families() -> None:
+    source = 'def function():\n    """Summary.\n\n    Raises\n    ------\n    RuntimeWarning\n        Raised first.\n\n    Warns\n    -----\n    RuntimeWarning\n        Emitted first.\n    RuntimeWarning\n        Emitted again.\n\n    Raises\n    ------\n    RuntimeWarning\n        Raised again.\n    """\n'
+    settings = CheckSettings(select=("PDF412",), docstring_convention=DocstringConvention.NUMPY)
+    result = format_source(source, settings=settings)
+
+    assert result.new_source == source
+    assert not result.fixed_findings
+    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((13,), (18,))
+    assert tuple(finding.message for finding in result.unfixed_findings) == (
+        "Docstring warning entry 'RuntimeWarning' repeats earlier entry",
+        "Docstring exception entry 'RuntimeWarning' repeats earlier entry",
+    )
+
+
 def test_reports_repeated_generic_named_google_entries() -> None:
     source = 'def function():\n    """Summary.\n\n    See Also:\n        helper: Related helper.\n        helper: More helper detail.\n    """\n'
     result = format_source(source)

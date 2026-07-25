@@ -23,7 +23,7 @@ import libcst as cst
 import pydocformatter.rules.violations as rule_violations
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 import pydocformatter.rules.definition_helpers.typed_documentation_models as typed_models
-from pydocformatter.rules.definition_helpers import attribute_documentation, docstring_sections, parameter_documentation, static_names, type_expressions, value_documentation
+from pydocformatter.rules.definition_helpers import attribute_documentation, docstring_sections, entry_completeness, parameter_documentation, static_names, type_expressions, value_documentation
 
 
 if typing.TYPE_CHECKING:
@@ -70,18 +70,6 @@ class _RestEntryPart:
     order: int
 
 
-def entry_has_description(entry: TypedDocstringEntry) -> bool:
-    """Return whether a logical entry has semantic prose description.
-
-    Args:
-        entry (TypedDocstringEntry): Logical docstring entry to inspect.
-
-    Returns:
-        bool: Whether the entry has non-blank prose description text after excluding type-only reST fields.
-    """
-    return bool(entry.description.strip())
-
-
 def missing_description_violations(targets: tuple[TypedDocumentationTarget, ...], *, meta: RuleMetadata, label: str) -> tuple[rule_violations.RuleViolation, ...]:
     """Return diagnostics for documented targets without prose descriptions.
 
@@ -96,7 +84,7 @@ def missing_description_violations(targets: tuple[TypedDocumentationTarget, ...]
     return sort_violations(
         rule_violations.diagnostic(meta, target.entry.line_numbers, instance_message=f"{label} '{target.name}' docstring entry is missing a description")
         for target in targets
-        if not entry_has_description(target.entry)
+        if not entry_completeness.has_prose_description(target.entry)
     )
 
 

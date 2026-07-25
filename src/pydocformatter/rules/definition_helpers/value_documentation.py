@@ -85,19 +85,13 @@ def documented_entries(docstring: PDF_definition.DocstringInfo, kind: PDF_defini
         tuple[DocumentedEntry, ...]: Matching entries with names, line targets, and content flags.
     """
     entries: list[DocumentedEntry] = []
-    skipped_exception_entries = _non_exception_documentation_entries(docstring) if kind is PDF_definition.DocstringEntryKind.EXCEPTION else set()
     for entry in docstring.structure.entries:
-        if entry.kind is not kind or entry in skipped_exception_entries or (require_content and not _entry_has_content(entry)):
+        if entry.kind is not kind or (require_content and not _entry_has_content(entry)):
             continue
         line = docstring.structure.lines[entry.start_line]
         names = entry.names or (None,)
         entries.extend(DocumentedEntry(name=name, line_numbers=PDF_definition.docstring_line_numbers(docstring, line), has_content=_entry_has_content(entry)) for name in names)
     return tuple(entries)
-
-
-def _non_exception_documentation_entries(docstring: PDF_definition.DocstringInfo) -> set[PDF_definition.DocstringEntry]:
-    """Return entries nested under sections that are not exception documentation sections."""
-    return {entry for section in docstring.structure.sections if section.name.lower() not in {"raise", "raises"} for entry in section.entries}
 
 
 def has_exception_documentation(docstring: PDF_definition.DocstringInfo) -> bool:

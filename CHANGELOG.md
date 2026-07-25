@@ -20,6 +20,7 @@ All notable changes to this project are documented here. The format follows [Kee
   - Added PDF212 to report nonempty primary and supported attached attribute docstrings without a parsed top-level summary.
   - Added PDF526 to report parsed parameter documentation that does not follow function signature order.
   - Added PDF414 and PDF415 to report high-confidence malformed Google, NumPy, and reStructuredText entry syntax and Google or NumPy entry indentation without unsafe fixes.
+  - Added PDF720 and PDF721 to report named raised-exception and emitted-warning entries without prose descriptions.
 - **Persistent caching:**
   - Added strict persistent clean-proof caching for disk-backed checks and fixes, with complete source hashing, semantic analysis-setting and final-rule-code invalidation, shared invocation-local analysis fingerprints, engine/path invalidation, miss-only process execution, bounded parent-side probes, and source-free warm results.
   - Added `cache` and `cache-dir` settings, `--cache`/`--no-cache`, `--cache-dir`, opt-in `--cache-stats`, safe project cache self-pruning, and the ownership-checked `pydocfmt clean` command with its own `--cache-dir` override.
@@ -54,7 +55,11 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Fixed
 
+- **Docstring diagnostics:**
+  - Reported PDF410 warning normalization findings as warning entries while retaining exception-specific messages for raised exceptions.
 - **Convention parsing:**
+  - Kept NumPy `Warning` and `Warnings` caution sections as narrative content instead of treating their text as emitted-warning entries.
+  - Kept raised exceptions and emitted warnings as separate semantic entry families, preventing PDF412 from conflating the same name across `Raises` and `Warns` sections.
   - Made PDF414 and PDF415 require owner-inventory evidence for ambiguous bare Google and empty-type NumPy candidates, use field arity to limit reStructuredText missing-delimiter findings, and distinguish valid NumPy return, yield, and exception peers from malformed continuations.
   - Required balanced nested delimiters and quotes for every parenthesized Google type, and validated PDF414 NumPy type candidates with a newline-aware iterative token grammar so deeply nested input does not enter Python's recursive expression parser.
   - Preserved sequence-shaped type state through grouping parentheses, preventing invalid NumPy type candidates from triggering missing-separator diagnostics.

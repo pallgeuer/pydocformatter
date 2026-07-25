@@ -114,6 +114,18 @@ def test_google_exception_list_requires_every_explicit_name_to_be_exception_like
     )
 
 
+def test_google_warning_missing_separator_retains_malformed_entry_coverage() -> None:
+    """Diagnose warning entry syntax after warnings gain their own semantic kind."""
+    source = 'def convert():\n    """Convert values.\n\n    Warns:\n        RuntimeWarning Warning detail.\n    """\n'
+    assert_pdf414(source, ((5,),), ("Google docstring entry 'RuntimeWarning' is missing the colon before its description",), convention=DocstringConvention.GOOGLE)
+
+
+def test_google_warning_list_requires_every_name_to_be_warning_like() -> None:
+    """Recover complete warning lists without diagnosing ambiguous narrative names."""
+    source = 'def convert():\n    """Convert values.\n\n    Warns:\n        RuntimeWarning | pkg.CustomWarning Warning detail.\n        FutureWarning | Problem Ambiguous detail.\n    """\n'
+    assert_pdf414(source, ((5,),), ("Google docstring entry 'RuntimeWarning', 'pkg.CustomWarning' is missing the colon before its description",), convention=DocstringConvention.GOOGLE)
+
+
 def test_google_exception_parenthesized_type_preserves_unbalanced_type_precedence() -> None:
     """Keep the more precise type diagnostic ahead of exception missing-separator recovery."""
     source = 'def convert():\n    """Convert values.\n\n    Raises:\n        ValueError (str: Failure detail.\n        TypeError (str) Other failure detail.\n    """\n'
