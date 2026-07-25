@@ -77,12 +77,13 @@ def test_whitespace_only_opening_quote_line_belongs_to_pdf004() -> None:
     assert not result.unfixed_findings
 
 
-def test_non_space_tab_whitespace_counts_as_content() -> None:
+def test_suspicious_unicode_defers_opening_quote_whitespace_rewrite() -> None:
     source = 'def function():\n    """ \t\xa0  Summary."""\n'
     result = format_pdf005(source)
 
-    assert result.new_source == 'def function():\n    """\xa0  Summary."""\n'
-    assert result.fixed_findings[PDF104OpeningQuotesWhitespace.meta] == 1
+    assert result.new_source == source
+    assert not result.fixed_findings
+    assert not result.unfixed_findings
 
 
 def test_trims_before_leading_delimiter_quotes() -> None:

@@ -69,13 +69,13 @@ def test_removes_space_tab_only_lines_before_first_content() -> None:
     assert not format_pdf102(result.new_source).modified
 
 
-def test_non_space_tab_whitespace_is_content_when_choosing_first_line() -> None:
+def test_suspicious_unicode_defers_moving_summary_to_first_line() -> None:
     source = 'def function():\n    """\n    \xa0\n    Body.\n    """\n'
     result = format_pdf102(source)
 
-    assert result.new_source == 'def function():\n    """\xa0\n    Body.\n    """\n'
-    assert result.fixed_findings[PDF106MultilineOpeningQuotesSameLine.meta] == 1
-    assert not format_pdf102(result.new_source).modified
+    assert result.new_source == source
+    assert not result.fixed_findings
+    assert not result.unfixed_findings
 
 
 def test_preserves_raw_prefix_quote_delimiter_and_rewrites_nested_decorated_async_docstrings() -> None:

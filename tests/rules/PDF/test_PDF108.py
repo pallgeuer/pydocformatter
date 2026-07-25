@@ -69,13 +69,13 @@ def test_removes_multiple_trailing_space_tab_only_lines_before_closing_quotes() 
     assert not format_pdf104(result.new_source).modified
 
 
-def test_non_space_tab_whitespace_is_content_when_choosing_final_line() -> None:
+def test_suspicious_unicode_defers_moving_closing_quotes() -> None:
     source = 'def function():\n    """Summary.\n\n    \xa0\n    """\n'
     result = format_pdf104(source)
 
-    assert result.new_source == 'def function():\n    """Summary.\n\n    \xa0"""\n'
-    assert result.fixed_findings[PDF108MultilineClosingQuotesSameLine.meta] == 1
-    assert not format_pdf104(result.new_source).modified
+    assert result.new_source == source
+    assert not result.fixed_findings
+    assert not result.unfixed_findings
 
 
 def test_moves_closing_quotes_onto_single_content_line() -> None:

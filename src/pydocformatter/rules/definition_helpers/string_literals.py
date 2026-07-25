@@ -7,6 +7,7 @@ from __future__ import annotations
 import enum
 import bisect
 import string
+import warnings
 import dataclasses
 from collections.abc import Sequence
 
@@ -232,6 +233,26 @@ class SimpleStringSourceMap:
 
 
 @dataclasses.dataclass(frozen=True)
+class SimpleStringPart:
+    """One evaluated simple-string leaf of a string expression.
+
+    Attributes:
+        node (cst.SimpleString): Simple-string syntax leaf.
+        value_start (int): Inclusive offset of the leaf in the complete evaluated value.
+        value_end (int): Exclusive offset of the leaf in the complete evaluated value.
+        value (str): Evaluated value of the leaf.
+        source_map (SimpleStringSourceMap | None): Lossless mapping for the leaf body, or None when its source spelling
+            is unsupported.
+    """
+
+    node: cst.SimpleString
+    value_start: int
+    value_end: int
+    value: str
+    source_map: SimpleStringSourceMap | None
+
+
+@dataclasses.dataclass(frozen=True)
 class StringEscape:
     """One parsed escape sequence in a simple string body.
 
@@ -366,6 +387,40 @@ def source_map_for_simple_string(node: cst.SimpleString, *, value: str | None = 
         newline_origins=tuple(newline_origins),
         physical_newline_ends=_physical_newline_ends(body),
     )
+
+
+def simple_string_parts(node: cst.SimpleString | cst.ConcatenatedString, *, value: str | None = None) -> tuple[SimpleStringPart, ...] | None:
+    """Return evaluated simple-string leaves and complete-value offsets.
+
+    Args:
+        node (cst.SimpleString | cst.ConcatenatedString): String expression to flatten.
+        value (str | None): Optional expected value of the complete expression.
+
+    Returns:
+        tuple[SimpleStringPart, ...] | None: Ordered evaluated leaves with optional source maps, or None for unsupported
+            syntax, evaluation, or a mismatched complete value.
+    """
+    leaves = simple_string_leaves(node)
+    if leaves is None:
+        return None
+    parts: list[SimpleStringPart] = []
+    value_start = 0
+    for leaf in leaves:
+        try:
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", DeprecationWarning)
+                leaf_value = leaf.evaluated_value
+        except (SyntaxError, ValueError):
+            return None
+        if not isinstance(leaf_value, str):
+            return None
+        source_map = source_map_for_simple_string(leaf, value=leaf_value)
+        value_end = value_start + len(leaf_value)
+        parts.append(SimpleStringPart(node=leaf, value_start=value_start, value_end=value_end, value=leaf_value, source_map=source_map))
+        value_start = value_end
+    if value is not None and "".join(part.value for part in parts) != value:
+        return None
+    return tuple(parts)
 
 
 def simple_string_has_direct_line_mapping(node: cst.SimpleString, *, value: str) -> bool:
@@ -617,19 +672,25 @@ def fragments_for_concatenated_string(node: cst.ConcatenatedString, *, target_qu
             unsupported parts.
     """
     fragments: list[StringValueFragment] = []
-    parts = _iter_simple_string_parts(node)
+    parts = simple_string_parts(node)
     if parts is None:
         return None
     for part in parts:
-        part_fragments = value_fragments_for_simple_string(part)
-        if part_fragments is None:
+        if part.source_map is None:
             return None
-        fragments.extend(_retarget_fragment(fragment, quote=target_quote, line_ending=line_ending) for fragment in part_fragments)
+        fragments.extend(_retarget_fragment(fragment, quote=target_quote, line_ending=line_ending) for fragment in part.source_map.fragments)
     return tuple(fragments)
 
 
-def _iter_simple_string_parts(node: cst.ConcatenatedString) -> tuple[cst.SimpleString, ...] | None:
-    """Return all simple-string leaves in a concatenation tree."""
+def simple_string_leaves(node: cst.SimpleString | cst.ConcatenatedString) -> tuple[cst.SimpleString, ...] | None:
+    """Return all simple-string leaves in a string expression.
+
+    Args:
+        node (cst.SimpleString | cst.ConcatenatedString): String expression to traverse.
+
+    Returns:
+        tuple[cst.SimpleString, ...] | None: Ordered leaves, or None when a non-simple expression is encountered.
+    """
     parts: list[cst.SimpleString] = []
 
     def visit(part: cst.BaseExpression) -> bool:

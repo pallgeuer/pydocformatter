@@ -209,3 +209,13 @@ def test_pdf000_can_literalize_escaped_blank_line_before_pdf004_normalizes_it() 
     assert result.new_source == 'def function():\n    """Summary.\n\nBody."""\n'
     assert result.fixed_findings[PDF103DocstringBlankLineWhitespace.meta] == 1
     assert not formatter.format_source(result.new_source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True).modified
+
+
+def test_suspicious_unicode_blocks_whole_literal_blank_line_reconstruction() -> None:
+    source = 'def function():\n    """Summary\u202e.\n      \n    Body.\n    """\n'
+
+    result = format_pdf004(source)
+
+    assert result.new_source == source
+    assert not result.fixed_findings
+    assert not result.unfixed_findings

@@ -63,7 +63,7 @@ def _planned_changes(context: RuleContext) -> tuple[rule_edits.PlannedSourceChan
 
 def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo) -> rule_edits.PlannedSourceChange | None:
     """Return one source replacement for opening quote whitespace."""
-    if not PDF_definition.is_safely_mapped_simple_docstring(docstring):
+    if not PDF_definition.can_canonically_rewrite_simple_docstring(docstring):
         return None
     line = docstring.structure.lines[0]
     if not text_layout.has_space_tab_content(line.raw_text):

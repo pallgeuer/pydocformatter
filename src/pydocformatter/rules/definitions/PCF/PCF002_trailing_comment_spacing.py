@@ -62,7 +62,9 @@ def _planned_changes(context: RuleContext) -> tuple[rule_edits.PlannedSourceChan
         if comment.kind not in {PCF_definition.CommentKind.REGULAR, PCF_definition.CommentKind.TYPE_DIRECTIVE, PCF_definition.CommentKind.TOOL_DIRECTIVE}:
             continue
         code = comment.line_prefix.rstrip(" \t\f")
-        if comment.kind == PCF_definition.CommentKind.REGULAR:
+        if comment.unicode_occurrences:
+            replacement = f"{code}  {comment.text}"
+        elif comment.kind == PCF_definition.CommentKind.REGULAR:
             replacement = PCF_definition.render_inline_trailing_comment(code, comment.content)
         else:
             directive_text = comment.text.rstrip(" \t\f")

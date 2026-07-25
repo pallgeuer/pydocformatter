@@ -14,11 +14,15 @@ import dataclasses
 from collections.abc import Sequence
 from typing import Protocol
 
+# First-party imports
+from pydocformatter.rules.definition_helpers import unicode_safety
+
 
 _BARE_URL_RE = re.compile(r"(?i)^(?:[a-z][a-z0-9+.-]*://|www\.)\S+$")
 _AUTOLINK_URI_RE = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]{1,31}:[^\x00-\x20<>]*$")
 _AUTOLINK_EMAIL_RE = re.compile(r"^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+$")
 _ROLE_NAME_RE = re.compile(r"[A-Za-z0-9]+(?:[-_+:.][A-Za-z0-9]+)*")
+_PLAIN_SCAN_SPECIAL_RE = re.compile(f"[{re.escape('[<`|' + ''.join(chr(code_point) for code_point in sorted(unicode_safety.EVERYWHERE_CODE_POINTS | unicode_safety.INDENTATION_ONLY_CODE_POINTS)))}]")
 FENCE_RE = re.compile(r"^[ \t]*(?P<fence>`{3,}|~{3,})(?P<info>.*)$")
 _URL_LEADING_PUNCTUATION = "([<{\"'"
 _URL_TRAILING_PUNCTUATION = ".,;:!?)]}>\"'"
@@ -63,6 +67,50 @@ class InlineMarkupKind(enum.Enum):
     MIXED = "mixed"
 
 
+class InlineRewriteBarrierKind(enum.Enum):
+    """Reasons that prevent safe canonical inline rewriting.
+
+    Attributes:
+        SUSPICIOUS_UNICODE: Explicit suspicious Unicode policy evidence.
+        INCOMPLETE_MARKDOWN_IMAGE_LABEL: Unterminated Markdown image label.
+        INCOMPLETE_MARKDOWN_INLINE_DESTINATION: Unterminated Markdown inline destination.
+        MALFORMED_MARKDOWN_ANGLE_DESTINATION: Invalid Markdown angle-bracket destination.
+        INCOMPLETE_MARKDOWN_ANGLE_DESTINATION: Unterminated Markdown angle-bracket destination.
+        MARKDOWN_DESTINATION_NESTING_EXCEEDED: Markdown destination nesting beyond the supported depth.
+        MALFORMED_MARKDOWN_INLINE_DESTINATION: Invalid Markdown inline destination.
+        UNSUPPORTED_MARKDOWN_LINK_TITLE: Markdown link title using an unsupported delimiter.
+        MALFORMED_MARKDOWN_LINK_TITLE: Invalid Markdown link title.
+        INCOMPLETE_MARKDOWN_LINK_TITLE: Unterminated Markdown link title.
+        INCOMPLETE_MARKDOWN_INLINE_LINK: Unterminated Markdown inline link.
+        INCOMPLETE_MARKDOWN_REFERENCE_LABEL: Unterminated Markdown reference label.
+        INCOMPLETE_AUTOLINK: Unterminated URI or email autolink.
+        INCOMPLETE_REST_PREFIX_ROLE: Unterminated reStructuredText prefix role.
+        MALFORMED_REST_PREFIX_ROLE: Invalid reStructuredText prefix role.
+        UNCLOSED_INLINE_BACKTICK_SPAN: Inline backtick span without a closer.
+        EMPTY_INLINE_BACKTICK_SPAN: Inline backtick span without content.
+        INCOMPLETE_REST_SUFFIX_ROLE: Unterminated reStructuredText suffix role.
+    """
+
+    SUSPICIOUS_UNICODE = "suspicious-unicode"
+    INCOMPLETE_MARKDOWN_IMAGE_LABEL = "incomplete Markdown image label"
+    INCOMPLETE_MARKDOWN_INLINE_DESTINATION = "incomplete Markdown inline destination"
+    MALFORMED_MARKDOWN_ANGLE_DESTINATION = "malformed Markdown angle destination"
+    INCOMPLETE_MARKDOWN_ANGLE_DESTINATION = "incomplete Markdown angle destination"
+    MARKDOWN_DESTINATION_NESTING_EXCEEDED = "Markdown destination nesting exceeds the supported depth"
+    MALFORMED_MARKDOWN_INLINE_DESTINATION = "malformed Markdown inline destination"
+    UNSUPPORTED_MARKDOWN_LINK_TITLE = "unsupported Markdown link title"
+    MALFORMED_MARKDOWN_LINK_TITLE = "malformed Markdown link title"
+    INCOMPLETE_MARKDOWN_LINK_TITLE = "incomplete Markdown link title"
+    INCOMPLETE_MARKDOWN_INLINE_LINK = "incomplete Markdown inline link"
+    INCOMPLETE_MARKDOWN_REFERENCE_LABEL = "incomplete Markdown reference label"
+    INCOMPLETE_AUTOLINK = "incomplete autolink"
+    INCOMPLETE_REST_PREFIX_ROLE = "incomplete reStructuredText prefix role"
+    MALFORMED_REST_PREFIX_ROLE = "malformed reStructuredText prefix role"
+    UNCLOSED_INLINE_BACKTICK_SPAN = "unclosed inline backtick span"
+    EMPTY_INLINE_BACKTICK_SPAN = "empty inline backtick span"
+    INCOMPLETE_REST_SUFFIX_ROLE = "incomplete reStructuredText suffix role"
+
+
 class HardBreakKind(enum.Enum):
     """Supported explicit line-boundary markers.
 
@@ -93,42 +141,42 @@ class InlineToken:
 
 
 @dataclasses.dataclass(frozen=True)
-class MarkupAmbiguity:
-    """Evidence that a source span resembles unsupported or incomplete markup.
+class InlineRewriteBarrier:
+    """Evidence that a source span prevents safe canonical rewriting.
 
     Attributes:
         start (int): Inclusive evaluated-text offset where evidence begins.
         end (int): Exclusive evaluated-text offset covered by the evidence.
-        reason (str): Stable internal explanation of the conservative classification.
+        kind (InlineRewriteBarrierKind): Typed reason for blocking canonical rewriting.
         line_index (int): Zero-based input-line index containing the evidence.
     """
 
     start: int
     end: int
-    reason: str
+    kind: InlineRewriteBarrierKind
     line_index: int = 0
 
 
 @dataclasses.dataclass(frozen=True)
 class InlineScanResult:
-    """Wrapping tokens and ambiguity evidence for one logical line.
+    """Wrapping tokens and rewrite barriers for one logical line.
 
     Attributes:
         tokens (tuple[InlineToken, ...]): Indivisible source-aware tokens in source order.
-        ambiguities (tuple[MarkupAmbiguity, ...]): Evidence that prevents a safe canonical rewrite.
+        barriers (tuple[InlineRewriteBarrier, ...]): Evidence that prevents a safe canonical rewrite.
     """
 
     tokens: tuple[InlineToken, ...]
-    ambiguities: tuple[MarkupAmbiguity, ...] = ()
+    barriers: tuple[InlineRewriteBarrier, ...] = ()
 
     @property
-    def ambiguous(self) -> bool:
-        """Whether any conservative ambiguity evidence was found.
+    def rewrite_blocked(self) -> bool:
+        """Whether any evidence prevents canonical rewriting.
 
         Returns:
-            bool: Whether ambiguity prevents a safe canonical rewrite.
+            bool: Whether canonical rewriting is blocked.
         """
-        return bool(self.ambiguities)
+        return bool(self.barriers)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -170,7 +218,7 @@ class InlineLayoutSegment:
 
     Attributes:
         text (str): Whitespace-normalized source-identical text used by ordinary wrapping.
-        scan (InlineScanResult): Indivisible tokens and ambiguity evidence accumulated across joined logical lines.
+        scan (InlineScanResult): Indivisible tokens and rewrite barriers accumulated across joined logical lines.
         hard_break (HardBreak | None): Exact suffix that terminates the segment.
     """
 
@@ -181,24 +229,24 @@ class InlineLayoutSegment:
 
 @dataclasses.dataclass(frozen=True)
 class InlineLayoutScanResult:
-    """Shared layout segments and aggregate ambiguity evidence.
+    """Shared layout segments and aggregate rewrite barriers.
 
     Attributes:
         segments (tuple[InlineLayoutSegment, ...]): Ordered segments split at semantic hard breaks.
-        ambiguities (tuple[MarkupAmbiguity, ...]): Stable unique ambiguity evidence across every segment.
+        barriers (tuple[InlineRewriteBarrier, ...]): Stable unique rewrite barriers across every segment.
     """
 
     segments: tuple[InlineLayoutSegment, ...]
-    ambiguities: tuple[MarkupAmbiguity, ...]
+    barriers: tuple[InlineRewriteBarrier, ...]
 
     @property
-    def ambiguous(self) -> bool:
-        """Whether any ambiguity prevents a safe canonical rewrite.
+    def rewrite_blocked(self) -> bool:
+        """Whether any barrier prevents a safe canonical rewrite.
 
         Returns:
-            bool: Whether at least one segment contains ambiguity evidence.
+            bool: Whether at least one segment contains a rewrite barrier.
         """
-        return bool(self.ambiguities)
+        return bool(self.barriers)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -216,7 +264,7 @@ class _ParseResult:
     """One scanner decision at a candidate delimiter."""
 
     construct: _Construct | None = None
-    ambiguity: MarkupAmbiguity | None = None
+    barrier: InlineRewriteBarrier | None = None
 
 
 @dataclasses.dataclass(frozen=True)
@@ -247,9 +295,9 @@ def scan_text(text: str) -> InlineScanResult:
         text (str): Same-line prose to split into indivisible wrapping tokens.
 
     Returns:
-        InlineScanResult: Recognized tokens and conservative ambiguity evidence.
+        InlineScanResult: Recognized tokens and conservative rewrite barriers.
     """
-    if not any(char in text for char in "[<`|"):
+    if _PLAIN_SCAN_SPECIAL_RE.search(text) is None:
         return InlineScanResult(tokens=tuple(InlineToken(value=word, source=word, url_like=is_bare_url(word)) for word in text.split()))
     return scan_fragments(tuple(_TextFragment(value=char, source=char) for char in text))
 
@@ -261,27 +309,26 @@ def scan_fragments(fragments: Sequence[SourceFragment]) -> InlineScanResult:
         fragments (Sequence[SourceFragment]): One-character evaluated fragments aligned with exact source spellings.
 
     Returns:
-        InlineScanResult: Indivisible tokens and evidence-gated ambiguity information.
+        InlineScanResult: Indivisible tokens and evidence-gated rewrite barriers.
 
     Raises:
         ValueError: If a fragment does not represent exactly one evaluated character.
     """
-    source_is_value = True
     for fragment in fragments:
         if len(fragment.value) != 1:
             raise ValueError("Inline-markup fragments must each represent one evaluated character")
-        source_is_value = source_is_value and fragment.source == fragment.value
     text = "".join(fragment.value for fragment in fragments)
+    unicode_barriers = tuple(
+        InlineRewriteBarrier(start=occurrence.offset, end=occurrence.offset + 1, kind=InlineRewriteBarrierKind.SUSPICIOUS_UNICODE) for occurrence in unicode_safety.suspicious_unicode_occurrences(text)
+    )
     if not any(char in text for char in "[<`|"):
-        if source_is_value:
-            return InlineScanResult(tokens=tuple(InlineToken(value=word, source=word, url_like=is_bare_url(word)) for word in text.split()))
-        return InlineScanResult(tokens=_plain_tokens(fragments, text=text))
+        return InlineScanResult(tokens=_plain_tokens(fragments, text=text), barriers=unicode_barriers)
     if FENCE_RE.fullmatch(text) is not None:
-        return InlineScanResult(tokens=_tokens_for_constructs(fragments, text=text, constructs=[]))
+        return InlineScanResult(tokens=_tokens_for_constructs(fragments, text=text, constructs=[]), barriers=unicode_barriers)
     delimiter_index = _delimiter_index(text)
     first_nonwhitespace = len(text) - len(text.lstrip())
     constructs: list[_Construct] = []
-    ambiguities: list[MarkupAmbiguity] = []
+    barriers: list[InlineRewriteBarrier] = list(unicode_barriers)
     index = 0
     while index < len(text):
         if text[index] == "`" and not delimiter_index.escaped[index]:
@@ -294,12 +341,12 @@ def scan_fragments(fragments: Sequence[SourceFragment]) -> InlineScanResult:
             constructs.append(result.construct)
             index = result.construct.end
             continue
-        if result.ambiguity is not None:
-            ambiguities.append(result.ambiguity)
-            index = result.ambiguity.end
+        if result.barrier is not None:
+            barriers.append(result.barrier)
+            index = result.barrier.end
             continue
         index += 1
-    return InlineScanResult(tokens=_tokens_for_constructs(fragments, text=text, constructs=constructs), ambiguities=tuple(_deduplicate_ambiguities(ambiguities)))
+    return InlineScanResult(tokens=_tokens_for_constructs(fragments, text=text, constructs=constructs), barriers=tuple(_deduplicate_barriers(barriers)))
 
 
 def terminal_hard_break(fragments: Sequence[SourceFragment], *, has_following_newline: bool) -> HardBreak | None:
@@ -349,9 +396,9 @@ def layout_line_for_text(text: str, *, has_following_newline: bool) -> InlineLay
     Returns:
         InlineLayoutLine: Source-identical fragments and the trimmed semantic-content boundary.
     """
-    text = text.lstrip()
+    text = _strip_layout_separators(text, left=True, right=False)
     fragments = tuple(_TextFragment(value=char, source=char) for char in text)
-    return InlineLayoutLine(fragments=fragments, content_end=len(text.rstrip()), has_following_newline=has_following_newline)
+    return InlineLayoutLine(fragments=fragments, content_end=len(_strip_layout_separators(text, left=False, right=True)), has_following_newline=has_following_newline)
 
 
 def scan_layout_lines(lines: Sequence[InlineLayoutLine]) -> InlineLayoutScanResult:
@@ -361,7 +408,7 @@ def scan_layout_lines(lines: Sequence[InlineLayoutLine]) -> InlineLayoutScanResu
         lines (Sequence[InlineLayoutLine]): Ordered logical lines with semantic content boundaries.
 
     Returns:
-        InlineLayoutScanResult: Joined token segments and aggregate ambiguity evidence.
+        InlineLayoutScanResult: Joined token segments and aggregate rewrite barriers.
 
     Raises:
         ValueError: If a content boundary is outside its fragment sequence.
@@ -369,8 +416,8 @@ def scan_layout_lines(lines: Sequence[InlineLayoutLine]) -> InlineLayoutScanResu
     segments: list[InlineLayoutSegment] = []
     tokens: list[InlineToken] = []
     text_parts: list[str] = []
-    segment_ambiguities: list[MarkupAmbiguity] = []
-    all_ambiguities: list[MarkupAmbiguity] = []
+    segment_barriers: list[InlineRewriteBarrier] = []
+    all_barriers: list[InlineRewriteBarrier] = []
     for line_index, line in enumerate(lines):
         if not 0 <= line.content_end <= len(line.fragments):
             raise ValueError("Inline-layout content boundary is outside the fragment sequence")
@@ -392,23 +439,21 @@ def scan_layout_lines(lines: Sequence[InlineLayoutLine]) -> InlineLayoutScanResu
                 else:
                     hard_break = None
         scan = scan_fragments(line.fragments[:scan_end])
-        ambiguities = tuple(dataclasses.replace(ambiguity, line_index=line_index) for ambiguity in scan.ambiguities)
+        barriers = tuple(dataclasses.replace(barrier, line_index=line_index) for barrier in scan.barriers)
         tokens.extend(scan.tokens)
-        segment_ambiguities.extend(ambiguities)
-        all_ambiguities.extend(ambiguities)
-        text = "".join(fragment.value for fragment in line.fragments[:scan_end]).strip()
+        segment_barriers.extend(barriers)
+        all_barriers.extend(barriers)
+        text = _strip_layout_separators("".join(fragment.value for fragment in line.fragments[:scan_end]))
         if text:
             text_parts.append(text)
         if hard_break is not None:
-            segments.append(
-                InlineLayoutSegment(text=" ".join(text_parts), scan=InlineScanResult(tokens=tuple(tokens), ambiguities=tuple(_deduplicate_ambiguities(segment_ambiguities))), hard_break=hard_break)
-            )
+            segments.append(InlineLayoutSegment(text=" ".join(text_parts), scan=InlineScanResult(tokens=tuple(tokens), barriers=tuple(_deduplicate_barriers(segment_barriers))), hard_break=hard_break))
             tokens = []
             text_parts = []
-            segment_ambiguities = []
+            segment_barriers = []
     if tokens or text_parts or not segments:
-        segments.append(InlineLayoutSegment(text=" ".join(text_parts), scan=InlineScanResult(tokens=tuple(tokens), ambiguities=tuple(_deduplicate_ambiguities(segment_ambiguities))), hard_break=None))
-    return InlineLayoutScanResult(segments=tuple(segments), ambiguities=tuple(_deduplicate_ambiguities(all_ambiguities)))
+        segments.append(InlineLayoutSegment(text=" ".join(text_parts), scan=InlineScanResult(tokens=tuple(tokens), barriers=tuple(_deduplicate_barriers(segment_barriers))), hard_break=None))
+    return InlineLayoutScanResult(segments=tuple(segments), barriers=tuple(_deduplicate_barriers(all_barriers)))
 
 
 @dataclasses.dataclass(frozen=True)
@@ -420,7 +465,7 @@ class _TextFragment:
 
 
 def _parse_at(text: str, start: int, *, delimiter_index: _DelimiterIndex) -> _ParseResult:
-    """Return the strongest construct or ambiguity beginning at an offset."""
+    """Return the strongest construct or rewrite barrier beginning at an offset."""
     if text[start] not in "[<:`|" and not text.startswith("![", start):
         return _ParseResult()
     if delimiter_index.escaped[start]:
@@ -431,7 +476,7 @@ def _parse_at(text: str, start: int, *, delimiter_index: _DelimiterIndex) -> _Pa
         return _parse_autolink(text, start, delimiter_index=delimiter_index)
     if text[start] == ":":
         role = _parse_prefix_role(text, start, delimiter_index=delimiter_index)
-        if role.construct is not None or role.ambiguity is not None:
+        if role.construct is not None or role.barrier is not None:
             return role
     if text[start] == "`":
         return _parse_backticks(text, start, delimiter_index=delimiter_index)
@@ -446,44 +491,46 @@ def _parse_markdown_link(text: str, start: int, *, delimiter_index: _DelimiterIn
     label_end = delimiter_index.bracket_closers.get(label_open)
     if label_end is None:
         if text.startswith("![", start):
-            return _ambiguous(start, len(text), "incomplete Markdown image label")
+            return _blocked(start, len(text), InlineRewriteBarrierKind.INCOMPLETE_MARKDOWN_IMAGE_LABEL)
         return _ParseResult()
     suffix_start = label_end + 1
     if suffix_start >= len(text):
         return _ParseResult()
     if text[suffix_start] == "(":
-        inline_end, reason = _markdown_inline_end(text, suffix_start, delimiter_index=delimiter_index)
+        inline_end, barrier_kind = _markdown_inline_end(text, suffix_start, delimiter_index=delimiter_index)
         if inline_end is None:
-            return _ambiguous(start, len(text), reason)
+            if barrier_kind is None:
+                raise RuntimeError("Missing rewrite barrier kind for incomplete Markdown link")
+            return _blocked(start, len(text), barrier_kind)
         return _recognized(start, inline_end, InlineMarkupKind.MARKDOWN_LINK, url_like=True)
     if text[suffix_start] == "[":
         reference_end = delimiter_index.bracket_closers.get(suffix_start)
         if reference_end is None:
-            return _ambiguous(start, len(text), "incomplete Markdown reference label")
+            return _blocked(start, len(text), InlineRewriteBarrierKind.INCOMPLETE_MARKDOWN_REFERENCE_LABEL)
         return _recognized(start, reference_end + 1, InlineMarkupKind.MARKDOWN_LINK)
     return _ParseResult()
 
 
-def _markdown_inline_end(text: str, opening: int, *, delimiter_index: _DelimiterIndex) -> tuple[int | None, str]:
+def _markdown_inline_end(text: str, opening: int, *, delimiter_index: _DelimiterIndex) -> tuple[int | None, InlineRewriteBarrierKind | None]:
     """Return the end of a bounded Markdown inline-link destination and title."""
     index = opening + 1
     while index < len(text) and text[index] in " \t":
         index += 1
     if index >= len(text):
-        return None, "incomplete Markdown inline destination"
+        return None, InlineRewriteBarrierKind.INCOMPLETE_MARKDOWN_INLINE_DESTINATION
     if text[index] == ")":
-        return index + 1, ""
+        return index + 1, None
     if text[index] == "<":
         index += 1
         while index < len(text) and (text[index] != ">" or delimiter_index.escaped[index]):
             if text[index].isspace() or text[index] in "\r\n<":
-                return None, "malformed Markdown angle destination"
+                return None, InlineRewriteBarrierKind.MALFORMED_MARKDOWN_ANGLE_DESTINATION
             index += 1
         if index >= len(text):
-            return None, "incomplete Markdown angle destination"
+            return None, InlineRewriteBarrierKind.INCOMPLETE_MARKDOWN_ANGLE_DESTINATION
         index += 1
         if index < len(text) and text[index] == ")":
-            return index + 1, ""
+            return index + 1, None
     else:
         depth = 0
         destination_start = index
@@ -494,43 +541,43 @@ def _markdown_inline_end(text: str, opening: int, *, delimiter_index: _Delimiter
             elif char == "(":
                 depth += 1
                 if depth > _MARKDOWN_DESTINATION_MAX_DEPTH:
-                    return None, "Markdown destination nesting exceeds the supported depth"
+                    return None, InlineRewriteBarrierKind.MARKDOWN_DESTINATION_NESTING_EXCEEDED
             elif char == ")":
                 if depth == 0:
-                    return index + 1, ""
+                    return index + 1, None
                 depth -= 1
             elif char.isspace():
                 break
             index += 1
         if index == destination_start:
-            return None, "malformed Markdown inline destination"
+            return None, InlineRewriteBarrierKind.MALFORMED_MARKDOWN_INLINE_DESTINATION
     if index >= len(text):
-        return None, "incomplete Markdown inline destination"
+        return None, InlineRewriteBarrierKind.INCOMPLETE_MARKDOWN_INLINE_DESTINATION
     if not text[index].isspace():
-        return None, "malformed Markdown inline destination"
+        return None, InlineRewriteBarrierKind.MALFORMED_MARKDOWN_INLINE_DESTINATION
     while index < len(text) and text[index] in " \t":
         index += 1
     if index >= len(text):
-        return None, "incomplete Markdown inline destination"
+        return None, InlineRewriteBarrierKind.INCOMPLETE_MARKDOWN_INLINE_DESTINATION
     if text[index] == ")":
-        return index + 1, ""
+        return index + 1, None
     opener = text[index]
     if opener not in "\"'(":
-        return None, "unsupported Markdown link title"
+        return None, InlineRewriteBarrierKind.UNSUPPORTED_MARKDOWN_LINK_TITLE
     closer = ")" if opener == "(" else opener
     index += 1
     while index < len(text) and (text[index] != closer or delimiter_index.escaped[index]):
         if text[index] in "\r\n" or (opener == "(" and text[index] == "("):
-            return None, "malformed Markdown link title"
+            return None, InlineRewriteBarrierKind.MALFORMED_MARKDOWN_LINK_TITLE
         index += 1
     if index >= len(text):
-        return None, "incomplete Markdown link title"
+        return None, InlineRewriteBarrierKind.INCOMPLETE_MARKDOWN_LINK_TITLE
     index += 1
     while index < len(text) and text[index] in " \t":
         index += 1
     if index >= len(text) or text[index] != ")":
-        return None, "incomplete Markdown inline link"
-    return index + 1, ""
+        return None, InlineRewriteBarrierKind.INCOMPLETE_MARKDOWN_INLINE_LINK
+    return index + 1, None
 
 
 def _parse_autolink(text: str, start: int, *, delimiter_index: _DelimiterIndex) -> _ParseResult:
@@ -541,7 +588,7 @@ def _parse_autolink(text: str, start: int, *, delimiter_index: _DelimiterIndex) 
     if end == len(text):
         candidate = text[start + 1 :]
         if _looks_like_autolink_prefix(candidate):
-            return _ambiguous(start, len(text), "incomplete autolink")
+            return _blocked(start, len(text), InlineRewriteBarrierKind.INCOMPLETE_AUTOLINK)
         return _ParseResult()
     candidate = text[start + 1 : end]
     if _AUTOLINK_URI_RE.fullmatch(candidate) is not None or _AUTOLINK_EMAIL_RE.fullmatch(candidate) is not None:
@@ -567,10 +614,10 @@ def _parse_prefix_role(text: str, start: int, *, delimiter_index: _DelimiterInde
         return _ParseResult()
     close = delimiter_index.backtick_closers.get(backtick)
     if close is None:
-        return _ambiguous(start, len(text), "incomplete reStructuredText prefix role")
+        return _blocked(start, len(text), InlineRewriteBarrierKind.INCOMPLETE_REST_PREFIX_ROLE)
     end = close + 1
     if close == backtick + 1 or not _valid_rest_end(text, end):
-        return _ambiguous(start, end, "malformed reStructuredText prefix role")
+        return _blocked(start, end, InlineRewriteBarrierKind.MALFORMED_REST_PREFIX_ROLE)
     return _recognized(start, end, InlineMarkupKind.REST_ROLE)
 
 
@@ -579,10 +626,10 @@ def _parse_backticks(text: str, start: int, *, delimiter_index: _DelimiterIndex)
     run_length = _delimiter_run_length(text, start, "`")
     close = delimiter_index.backtick_closers.get(start)
     if close is None:
-        return _ambiguous(start, min(len(text), start + run_length), "unclosed inline backtick span")
+        return _blocked(start, min(len(text), start + run_length), InlineRewriteBarrierKind.UNCLOSED_INLINE_BACKTICK_SPAN)
     content_start = start + run_length
     if close == content_start:
-        return _ambiguous(start, close + run_length, "empty inline backtick span")
+        return _blocked(start, close + run_length, InlineRewriteBarrierKind.EMPTY_INLINE_BACKTICK_SPAN)
     end = close + run_length
     if run_length == 2 and _valid_rest_start(text, start) and _valid_rest_end(text, end):
         return _recognized(start, end, InlineMarkupKind.REST_LITERAL)
@@ -593,7 +640,7 @@ def _parse_backticks(text: str, start: int, *, delimiter_index: _DelimiterIndex)
         if end < len(text) and text[end] == ":":
             role_match = _ROLE_NAME_RE.match(text, end + 1)
             if role_match is not None:
-                return _ambiguous(start, role_match.end(), "incomplete reStructuredText suffix role")
+                return _blocked(start, role_match.end(), InlineRewriteBarrierKind.INCOMPLETE_REST_SUFFIX_ROLE)
         reference_end = end + 2 if text.startswith("__", end) else end + 1 if text.startswith("_", end) else None
         if reference_end is not None and _valid_rest_end(text, reference_end):
             return _recognized(start, reference_end, InlineMarkupKind.REST_INTERPRETED, url_like=_has_rest_embedded_target(text, content_start, close, delimiter_index=delimiter_index))
@@ -707,9 +754,9 @@ def _recognized(start: int, end: int, kind: InlineMarkupKind, *, url_like: bool 
     return _ParseResult(construct=_Construct(start=start, end=end, kind=kind, url_like=url_like))
 
 
-def _ambiguous(start: int, end: int, reason: str) -> _ParseResult:
-    """Return a conservative ambiguity result."""
-    return _ParseResult(ambiguity=MarkupAmbiguity(start=start, end=max(start + 1, end), reason=reason))
+def _blocked(start: int, end: int, kind: InlineRewriteBarrierKind) -> _ParseResult:
+    """Return a conservative rewrite-barrier result."""
+    return _ParseResult(barrier=InlineRewriteBarrier(start=start, end=max(start + 1, end), kind=kind))
 
 
 def _plain_tokens(fragments: Sequence[SourceFragment], *, text: str) -> tuple[InlineToken, ...]:
@@ -717,11 +764,11 @@ def _plain_tokens(fragments: Sequence[SourceFragment], *, text: str) -> tuple[In
     tokens: list[InlineToken] = []
     index = 0
     while index < len(text):
-        if text[index].isspace():
+        if unicode_safety.is_layout_separator(text[index]):
             index += 1
             continue
         end = index + 1
-        while end < len(text) and not text[end].isspace():
+        while end < len(text) and not unicode_safety.is_layout_separator(text[end]):
             end += 1
         value = text[index:end]
         tokens.append(InlineToken(value=value, source="".join(fragment.source for fragment in fragments[index:end]), url_like=is_bare_url(value)))
@@ -734,14 +781,14 @@ def _tokens_for_constructs(fragments: Sequence[SourceFragment], *, text: str, co
     left_boundaries = [0] * len(text)
     run_start = 0
     for index, char in enumerate(text):
-        if char.isspace():
+        if unicode_safety.is_layout_separator(char):
             run_start = index + 1
         else:
             left_boundaries[index] = run_start
     right_boundaries = [len(text)] * len(text)
     run_end = len(text)
     for index in range(len(text) - 1, -1, -1):
-        if text[index].isspace():
+        if unicode_safety.is_layout_separator(text[index]):
             run_end = index
         else:
             right_boundaries[index] = run_end
@@ -760,7 +807,7 @@ def _tokens_for_constructs(fragments: Sequence[SourceFragment], *, text: str, co
     envelope_index = 0
     index = 0
     while index < len(text):
-        if text[index].isspace():
+        if unicode_safety.is_layout_separator(text[index]):
             index += 1
             continue
         if envelope_index < len(envelopes) and index == envelopes[envelope_index].start:
@@ -777,7 +824,7 @@ def _tokens_for_constructs(fragments: Sequence[SourceFragment], *, text: str, co
             envelope_index += 1
             continue
         next_whitespace = index + 1
-        while next_whitespace < len(text) and not text[next_whitespace].isspace():
+        while next_whitespace < len(text) and not unicode_safety.is_layout_separator(text[next_whitespace]):
             next_whitespace += 1
         next_envelope = envelopes[envelope_index].start if envelope_index < len(envelopes) else len(text)
         end = min(next_whitespace, next_envelope)
@@ -800,13 +847,26 @@ def is_bare_url(text: str) -> bool:
     return _BARE_URL_RE.fullmatch(candidate) is not None
 
 
-def _deduplicate_ambiguities(ambiguities: list[MarkupAmbiguity]) -> list[MarkupAmbiguity]:
-    """Return stable unique ambiguity records."""
-    unique: list[MarkupAmbiguity] = []
-    seen: set[tuple[int, int, str, int]] = set()
-    for ambiguity in ambiguities:
-        key = (ambiguity.start, ambiguity.end, ambiguity.reason, ambiguity.line_index)
+def _strip_layout_separators(text: str, *, left: bool = True, right: bool = True) -> str:
+    """Strip wrapping separators while preserving nonbreaking prose spaces."""
+    start = 0
+    end = len(text)
+    if left:
+        while start < end and unicode_safety.is_layout_separator(text[start]):
+            start += 1
+    if right:
+        while end > start and unicode_safety.is_layout_separator(text[end - 1]):
+            end -= 1
+    return text[start:end]
+
+
+def _deduplicate_barriers(barriers: list[InlineRewriteBarrier]) -> list[InlineRewriteBarrier]:
+    """Return stable unique rewrite barriers."""
+    unique: list[InlineRewriteBarrier] = []
+    seen: set[tuple[int, int, InlineRewriteBarrierKind, int]] = set()
+    for barrier in barriers:
+        key = (barrier.start, barrier.end, barrier.kind, barrier.line_index)
         if key not in seen:
             seen.add(key)
-            unique.append(ambiguity)
+            unique.append(barrier)
     return unique

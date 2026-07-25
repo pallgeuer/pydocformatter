@@ -417,3 +417,14 @@ def test_pdf100_and_pdf101_converge_with_configured_final_section_blank_cases(so
     assert result.new_source == expected
     assert result.new_source is not None
     assert not format_source(result.new_source, settings=settings).modified
+
+
+def test_suspicious_unicode_blocks_inserting_section_separator() -> None:
+    source = 'def function(value):\n    """Summary\u202e.\n    Args:\n        value: Description.\n    """\n'
+    settings = CheckSettings(select=("PDF201",), docstring_convention=DocstringConvention.GOOGLE)
+
+    result = format_source(source, settings=settings)
+
+    assert result.new_source == source
+    assert not result.fixed_findings
+    assert not result.unfixed_findings

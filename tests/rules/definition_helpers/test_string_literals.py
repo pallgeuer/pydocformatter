@@ -79,6 +79,47 @@ def test_concatenated_fragments_preserve_component_escape_spellings_in_target_li
     assert rendered == '"""é \\xe9 \\u00e9"""'
 
 
+def test_simple_string_parts_map_complete_concatenated_value_offsets() -> None:
+    node = concatenated_string('"first" r"second" "\\u00a0third"')
+
+    parts = string_literals.simple_string_parts(node, value="firstsecond\u00a0third")
+
+    assert parts is not None
+    assert all(part.source_map is not None for part in parts)
+    assert tuple((part.value_start, part.value_end, part.value) for part in parts) == ((0, 5, "first"), (5, 11, "second"), (11, 17, "\u00a0third"))
+    assert parts[2].source_map is not None
+    assert parts[2].source_map.fragments[0].source == "\\u00a0"
+
+
+def test_simple_string_parts_map_single_and_empty_nested_leaves_without_offset_drift() -> None:
+    single = simple_string(r'"""a\u00a0b"""')
+    nested = concatenated_string('"" "first" "" "\\u00a0" "last"')
+
+    single_parts = string_literals.simple_string_parts(single, value="a\u00a0b")
+    nested_parts = string_literals.simple_string_parts(nested, value="first\u00a0last")
+
+    assert single_parts is not None
+    assert single_parts[0].source_map is not None
+    assert tuple((part.value_start, part.value_end) for part in single_parts) == ((0, 3),)
+    assert single_parts[0].source_map.fragments[1].source == "\\u00a0"
+    assert nested_parts is not None
+    assert tuple((part.value_start, part.value_end, part.value) for part in nested_parts) == ((0, 0, ""), (0, 5, "first"), (5, 5, ""), (5, 6, "\u00a0"), (6, 10, "last"))
+
+
+def test_simple_string_parts_reject_mismatched_expected_value() -> None:
+    assert string_literals.simple_string_parts(simple_string('"value"'), value="different") is None
+
+
+def test_simple_string_parts_retain_unmapped_leaves_and_complete_value_offsets() -> None:
+    node = concatenated_string(r'"first" "bad \z escape" "last"')
+
+    parts = string_literals.simple_string_parts(node)
+
+    assert parts is not None
+    assert tuple((part.value_start, part.value_end, part.value, part.source_map is not None) for part in parts) == ((0, 5, "first", True), (5, 18, "bad \\z escape", False), (18, 22, "last", True))
+    assert string_literals.fragments_for_concatenated_string(node, target_quote='"""', line_ending="\n") is None
+
+
 def test_retarget_fragments_escapes_target_delimiter_without_reescaping_literal_whitespace() -> None:
     fragments = (
         string_literals.StringValueFragment(value="\n", source="\n"),

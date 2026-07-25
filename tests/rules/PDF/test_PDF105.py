@@ -205,3 +205,13 @@ def test_pdf005_and_pdf006_can_normalize_both_sides() -> None:
 
     assert result.new_source == 'def function():\n    """Summary."""\n'
     assert result.fixed_findings[PDF105ClosingQuotesWhitespace.meta] == 1
+
+
+def test_suspicious_unicode_blocks_whole_literal_closing_whitespace_reconstruction() -> None:
+    source = 'def function():\n    """Summary\\u202e.  """\n'
+
+    result = format_pdf006(source)
+
+    assert result.new_source == source
+    assert not result.fixed_findings
+    assert not result.unfixed_findings

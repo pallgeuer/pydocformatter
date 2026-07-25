@@ -19,7 +19,7 @@ import pydocformatter.rules.edits as rule_edits
 import pydocformatter.rules.registration as rule_registration
 from pydocformatter import docs_urls
 from pydocformatter.rules.definition import RuleCategoryBase
-from pydocformatter.rules.definition_helpers import source_text, text_layout
+from pydocformatter.rules.definition_helpers import source_text, text_layout, unicode_safety
 from pydocformatter.rules.models import RuleCategoryMetadata
 
 
@@ -77,6 +77,8 @@ class CommentInfo:
         indent (str): Leading whitespace before a standalone comment marker.
         line_prefix (str): Source text before the comment on its physical line.
         text (str): Exact comment token text, including the leading hash.
+        unicode_occurrences (tuple[unicode_safety.SuspiciousUnicodeOccurrence, ...]): Suspicious Unicode classification
+            reused by comment formatting and diagnostic rules.
         syntax_sensitive (bool): Whether moving this trailing comment could alter syntax around decorators, arguments,
             continuations, or compound headers.
     """
@@ -88,6 +90,7 @@ class CommentInfo:
     indent: str
     line_prefix: str
     text: str
+    unicode_occurrences: tuple[unicode_safety.SuspiciousUnicodeOccurrence, ...]
     syntax_sensitive: bool = False
 
     @property
@@ -346,6 +349,7 @@ def _comment_info(node: cst.Comment, *, positions: Mapping[cst.CSTNode, cst_meta
         indent=indent,
         line_prefix=line_prefix,
         text=node.value,
+        unicode_occurrences=unicode_safety.suspicious_unicode_occurrences(node.value.removeprefix("#")),
         syntax_sensitive=syntax_sensitive if placement == CommentPlacement.TRAILING else False,
     )
 

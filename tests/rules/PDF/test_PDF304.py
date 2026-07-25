@@ -210,3 +210,13 @@ def test_check_and_fix_false_findings_agree() -> None:
     assert tuple(finding.line_numbers for finding in fixed.fixed_findings) == ((2,),)
     assert fixed.module.code == 'def function():\n    """Return value."""\n'
     assert tuple(finding.line_numbers for finding in check_only.unfixed_findings) == ((2,),)
+
+
+def test_suspicious_unicode_blocks_first_word_capitalization() -> None:
+    source = 'def function():\n    """return\u202e value."""\n'
+
+    result = format_source(source)
+
+    assert result.new_source == source
+    assert not result.fixed_findings
+    assert not result.unfixed_findings

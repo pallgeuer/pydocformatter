@@ -18,7 +18,7 @@ import pydocformatter.rules.definitions.PDF.PDF415_convention_entry_indentation 
 from pydocformatter import formatter, rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention
 from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
-from pydocformatter.rules.definition_helpers import source_text, string_literals, value_documentation
+from pydocformatter.rules.definition_helpers import source_text, string_literals, unicode_safety, value_documentation
 from pydocformatter.rules.definitions.PDF.PDF import (
     PDF,
     AttributeInfo,
@@ -308,19 +308,67 @@ def test_prepare_preserves_multiline_crlf_source_and_physical_lines() -> None:
 @pytest.mark.filterwarnings("ignore:invalid escape sequence.*:DeprecationWarning")
 @pytest.mark.parametrize(("source", "mapping_available"), [('"""supported\\t escape"""', True), (r'"""unsupported \z escape"""', False)])
 def test_prepare_lazily_caches_source_maps_without_changing_value_semantics(source: str, mapping_available: bool, mocker: MockerFixture) -> None:
+    parts_spy = mocker.spy(string_literals, "simple_string_parts")
     source_map_spy = mocker.spy(string_literals, "source_map_for_simple_string")
 
     docstring = PDF.prepare(category_context(f"{source}\n")).docstrings[0]
     equivalent = dataclasses.replace(docstring)
     original_repr = repr(docstring)
 
+    assert parts_spy.call_count == 0
     assert source_map_spy.call_count == 0
+    parts = docstring.simple_string_parts
+    assert parts is not None
+    assert docstring.simple_string_parts is parts
+    assert parts_spy.call_count == 1
+    assert source_map_spy.call_count == 1
     source_map = docstring.source_map
     assert (source_map is not None) is mapping_available
     assert docstring.source_map is source_map
+    assert parts_spy.call_count == 1
     assert source_map_spy.call_count == 1
     assert repr(docstring) == original_repr
     assert docstring == equivalent
+
+
+@pytest.mark.parametrize(("source", "expected_code_points"), [('"""plain text"""\n', ()), ('"""hazard\u202e"""\n', (0x202E,))])
+def test_prepare_lazily_caches_unicode_occurrences_without_changing_value_semantics(source: str, expected_code_points: tuple[int, ...], mocker: MockerFixture) -> None:
+    occurrence_spy = mocker.spy(unicode_safety, "suspicious_unicode_occurrences")
+
+    docstring = PDF.prepare(category_context(source)).docstrings[0]
+    equivalent = dataclasses.replace(docstring)
+    original_repr = repr(docstring)
+
+    assert occurrence_spy.call_count == 0
+    occurrences = docstring.unicode_occurrences
+    assert tuple(occurrence.code_point for occurrence in occurrences) == expected_code_points
+    assert docstring.unicode_occurrences is occurrences
+    assert docstring.has_unicode_rewrite_barrier is bool(expected_code_points)
+    assert occurrence_spy.call_count == 1
+    assert repr(docstring) == original_repr
+    assert docstring == equivalent
+
+
+def test_prepare_lazily_caches_concatenated_string_parts(mocker: MockerFixture) -> None:
+    parts_spy = mocker.spy(string_literals, "simple_string_parts")
+    docstring = PDF.prepare(category_context('"first" "\\u00a0second"\n')).docstrings[0]
+
+    assert parts_spy.call_count == 0
+    parts = docstring.simple_string_parts
+    assert parts is not None
+    assert tuple(part.value for part in parts) == ("first", "\u00a0second")
+    assert docstring.simple_string_parts is parts
+    assert docstring.source_map is None
+    assert parts_spy.call_count == 1
+
+
+def test_mapping_capability_is_separate_from_canonical_rewrite_policy() -> None:
+    safe, hazardous = PDF.prepare(category_context('"""safe"""\n"""ignored additional"""\nvalue = 1\n"""hazard\u202e"""\n')).docstrings
+
+    assert PDF_definition.is_safely_mapped_simple_docstring(safe)
+    assert PDF_definition.can_canonically_rewrite_simple_docstring(safe)
+    assert PDF_definition.is_safely_mapped_simple_docstring(hazardous)
+    assert not PDF_definition.can_canonically_rewrite_simple_docstring(hazardous)
 
 
 def test_prepare_accepts_only_string_valued_first_expressions_as_docstrings() -> None:

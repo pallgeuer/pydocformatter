@@ -313,12 +313,13 @@ def test_retained_blank_line_whitespace_is_left_for_pdf004() -> None:
     assert not format_pdf100(result.new_source, settings=settings).modified
 
 
-def test_non_ascii_whitespace_only_lines_are_blank_for_pdf100() -> None:
+def test_suspicious_unicode_defers_blank_line_removal() -> None:
     source = 'def function():\n    """Summary.\n\n\xa0\n\u2003\n    Body.\n    """\n'
     result = format_pdf100(source)
 
-    assert result.new_source == 'def function():\n    """Summary.\n\n    Body.\n    """\n'
-    assert result.fixed_findings[PDF200TooManyBlankLines.meta] == 1
+    assert result.new_source == source
+    assert not result.fixed_findings
+    assert not result.unfixed_findings
 
 
 def test_skips_concatenated_escaped_newline_and_non_docstring_strings() -> None:

@@ -10,7 +10,7 @@ import libcst.metadata as cst_metadata
 from pydocformatter import formatter, rules_selection
 from pydocformatter.cli.settings_check import CheckSettings
 from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
-from pydocformatter.rules.definition_helpers import source_text
+from pydocformatter.rules.definition_helpers import source_text, unicode_safety
 from pydocformatter.rules.definitions.PCF.PCF import PCF, CommentKind, CommentPlacement, available_comment_width, render_comment
 from pydocformatter.source_path import SourcePathContext
 
@@ -127,6 +127,23 @@ def test_prepare_skips_module_visit_when_source_has_no_hash(monkeypatch: pytest.
     assert data.comments == ()
     assert data.standalone_runs == ()
     assert data.trailing_comments == ()
+
+
+def test_prepare_classifies_suspicious_unicode_once_per_comment(monkeypatch: pytest.MonkeyPatch) -> None:
+    source = "# plain\n# hazard\u202e\nvalue = 1  #\u00a0indent\n"
+    classified: list[str] = []
+    original = unicode_safety.suspicious_unicode_occurrences
+
+    def classify(text: str) -> tuple[unicode_safety.SuspiciousUnicodeOccurrence, ...]:
+        classified.append(text)
+        return original(text)
+
+    monkeypatch.setattr(unicode_safety, "suspicious_unicode_occurrences", classify)
+
+    data = PCF.prepare(category_context(source))
+
+    assert classified == [" plain", " hazard\u202e", "\u00a0indent"]
+    assert tuple(tuple(occurrence.code_point for occurrence in comment.unicode_occurrences) for comment in data.comments) == ((), (0x202E,), (0x00A0,))
 
 
 def test_prepare_keeps_conservative_visit_when_hash_appears_inside_string(monkeypatch: pytest.MonkeyPatch) -> None:

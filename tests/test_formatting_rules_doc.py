@@ -152,7 +152,7 @@ def test_rule_list_ruff_replacement_mappings_are_bidirectional() -> None:
     replaced_by_ruff_rule: dict[str, list[str]] = {}
 
     for row in pydocformatter_rows:
-        for ruff_code in _codes_for_mapping_label(row.get("Ruff rules", ""), "Disable ", r"(?:D|DOC|E|W)\d{3}"):
+        for ruff_code in _codes_for_mapping_label(row.get("Ruff rules", ""), "Disable ", r"(?:D|DOC|E|W)\d{3}|(?:PLE)\d{4}|(?:RUF)\d{3}"):
             disabled_by_ruff_rule.setdefault(ruff_code, []).append(row["Code"])
 
     for row in ruff_rows:
@@ -171,7 +171,7 @@ def test_rule_list_ruff_related_mappings_are_bidirectional() -> None:
     related_by_pydocformatter_rule: dict[str, list[str]] = {}
 
     for row in pydocformatter_rows:
-        for ruff_code in _codes_for_mapping_label(row.get("Ruff rules", ""), "Related to ", r"(?:D|DOC|E|W)\d{3}"):
+        for ruff_code in _codes_for_mapping_label(row.get("Ruff rules", ""), "Related to ", r"(?:D|DOC|E|W)\d{3}|(?:PLE)\d{4}|(?:RUF)\d{3}"):
             related_by_ruff_rule.setdefault(ruff_code, []).append(row["Code"])
 
     for row in ruff_rows:

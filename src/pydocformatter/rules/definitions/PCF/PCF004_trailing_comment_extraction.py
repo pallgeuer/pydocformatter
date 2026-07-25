@@ -69,8 +69,11 @@ def _violations(context: RuleContext) -> tuple[rule_violations.RuleViolation, ..
             continue
         if context.settings.comment_trailing_extraction_syntax_aware and comment.syntax_sensitive:
             continue
+        if comment.unicode_occurrences:
+            violations.append(rule_violations.diagnostic(PCF004TrailingCommentExtraction.meta, (comment.range.start.line,)))
+            continue
         scan = inline_markup.scan_text(comment.content)
-        if scan.ambiguous:
+        if scan.rewrite_blocked:
             violations.append(rule_violations.diagnostic(PCF004TrailingCommentExtraction.meta, (comment.range.start.line,)))
             continue
         if context.settings.comment_trailing_extraction_content_aware and comment_helpers.trailing_content_is_unsafe(comment.body, settings=context.settings):

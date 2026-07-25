@@ -245,7 +245,7 @@ def _wrapped_region_lines(
             final_line = wrapped[-1]
             wrapped = (*wrapped[:-1], string_literals.WrappedSourceLine(value=f"{final_line.value}{segment.hard_break.value}", source=f"{final_line.source}{segment.hard_break.source}"))
         wrapped_lines.extend(wrapped)
-    return tuple(wrapped_lines), layout.ambiguous
+    return tuple(wrapped_lines), layout.rewrite_blocked
 
 
 def _source_layout_segments(

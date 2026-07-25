@@ -327,3 +327,12 @@ def test_preserves_raw_prefix_quote_delimiter_non_ascii_and_crlf_line_endings() 
     result = format_pdf002(source, settings=CheckSettings(select=("PDF100",), line_ending=LineEnding.CR_LF))
 
     assert result.new_source == "def function():\r\n    r'''Summary.\r\n    caf\xe9 and \\n text.\r\n    '''\r\n"
+
+
+def test_normalizes_disjoint_indentation_without_reconstructing_suspicious_unicode() -> None:
+    source = 'def function():\n    """Summary.\n      First.\n      Safe\\u202ebarrier.\n        Second.\n    """\n'
+
+    result = format_pdf002(source)
+
+    assert result.new_source == 'def function():\n    """Summary.\n    First.\n    Safe\\u202ebarrier.\n      Second.\n    """\n'
+    assert result.fixed_findings[PDF100DocstringIndentation.meta] == 1

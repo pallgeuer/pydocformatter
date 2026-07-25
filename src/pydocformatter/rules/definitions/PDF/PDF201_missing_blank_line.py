@@ -69,7 +69,7 @@ def _planned_changes(context: RuleContext) -> tuple[rule_edits.PlannedSourceChan
 
 def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo, *, context: RuleContext, source_lines: Sequence[str]) -> rule_edits.PlannedSourceChange | None:
     """Return one whole-literal replacement for a docstring."""
-    if not PDF_definition.is_safely_mapped_simple_docstring(docstring):
+    if not PDF_definition.can_canonically_rewrite_simple_docstring(docstring):
         return None
     if not isinstance(docstring.node, cst.SimpleString):
         return None

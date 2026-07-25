@@ -11,6 +11,8 @@ PDF104 only handles quote-adjacent whitespace when the first evaluated line also
 
 PDF104 only rewrites safely mapped simple docstring literals. It skips concatenated docstrings and simple literals where evaluated lines cannot be mapped back to physical source lines safely, such as docstrings that contain escaped newline sequences.
 
+PDF104 also defers a whole-literal rewrite when the evaluated docstring contains a character reportable by PDF004. This prevents opening-whitespace cleanup from consuming or respelling suspicious source. Nonbreaking spaces inside prose are accepted by PDF004 and remain ordinary preserved content for PDF104.
+
 ## Why is this useful?
 Removing accidental leading whitespace gives docstrings a predictable shape and avoids leading spaces in rendered docstring text.
 
@@ -76,16 +78,26 @@ def area(radius: float) -> float:
 [output=unchanged]
 ```
 
-Spaces and tabs are the only characters PDF104 removes. Other evaluated whitespace next to the opening quotes is preserved as content:
+Suspicious Unicode defers the complete payload rewrite so PDF004 can report or fix it first:
 
 ```pydocfmt-example
 [input]
 def area(radius: float) -> float:
     """   \u00a0Return the area."""
 
+[output=unchanged]
+```
+
+An interior nonbreaking space is accepted, so PDF104 can still remove unrelated opening whitespace while preserving it:
+
+```pydocfmt-example
+[input]
+def area(radius: float) -> float:
+    """   Keep no-break spacing."""
+
 [output]
 def area(radius: float) -> float:
-    """\u00a0Return the area."""
+    """Keep no-break spacing."""
 ```
 
 Module, class, parenthesized, and simple-suite docstrings are all handled when they are simple safely mapped literals:

@@ -740,3 +740,12 @@ def test_inline_link_destinations_activate_url_balancing_setting() -> None:
 
     assert disabled.new_source == 'def function():\n    """alpha beta\n    [label](https://example.com/path)\n    alpha after"""\n'
     assert enabled.new_source == 'def function():\n    """alpha\n    beta [label](https://example.com/path)\n    alpha after"""\n'
+
+
+def test_unicode_barrier_blocks_only_its_own_chunk_while_safe_chunks_reflow() -> None:
+    source = 'def function():\n    """Safe  paragraph.\n\n    Unsafe  ab\\u202ecd.\n\n    Other  safe.\n    """\n'
+    result = format_pdf001(source)
+
+    assert result.new_source == 'def function():\n    """Safe paragraph.\n\n    Unsafe  ab\\u202ecd.\n\n    Other safe.\n    """\n'
+    assert result.fixed_findings[PDF101DocstringReflow.meta] == 1
+    assert tuple((finding.line_numbers, finding.fixable) for finding in result.unfixed_findings) == (((4,), False),)

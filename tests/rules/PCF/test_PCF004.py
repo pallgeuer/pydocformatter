@@ -604,3 +604,64 @@ def test_inline_link_destinations_activate_extraction_url_balancing() -> None:
 
     assert disabled.new_source == "# alpha beta\n# [label](https://example.com/path)\n# alpha after\nvalue = compute()\n"
     assert enabled.new_source == "# alpha\n# beta [label](https://example.com/path)\n# alpha after\nvalue = compute()\n"
+
+
+def test_unicode_barrier_is_ignored_below_limit_and_diagnostic_when_extraction_is_needed() -> None:
+    short_source = "value = 1  # short\u202e\n"
+    long_source = "value = compute()  # explanation\u202e with enough words to require extraction\n"
+    short_settings = CheckSettings(select=("PCF004",), line_length=80)
+    long_settings = CheckSettings(select=("PCF004",), line_length=32)
+
+    short_result = formatter.format_source(short_source, "example.py", settings=short_settings, rule_selection=rules_selection.select_rules(short_settings), fix=True)
+    long_result = formatter.format_source(long_source, "example.py", settings=long_settings, rule_selection=rules_selection.select_rules(long_settings), fix=True)
+
+    assert short_result.new_source == short_source
+    assert not short_result.unfixed_findings
+    assert long_result.new_source == long_source
+    assert tuple((finding.line_numbers, finding.fixable) for finding in long_result.unfixed_findings) == (((1,), False),)
+
+
+def test_unicode_barrier_width_uses_canonical_comment_spacing() -> None:
+    source = "value = 1                              # hazard\u202e\n"
+    extraction_settings = CheckSettings(select=("PCF004",), line_length=30)
+    combined_settings = CheckSettings(select=("PCF002", "PCF004"), line_length=30)
+
+    extraction = formatter.format_source(source, "example.py", settings=extraction_settings, rule_selection=rules_selection.select_rules(extraction_settings), fix=False)
+    checked = formatter.format_source(source, "example.py", settings=combined_settings, rule_selection=rules_selection.select_rules(combined_settings), fix=False)
+    fixed = formatter.format_source(source, "example.py", settings=combined_settings, rule_selection=rules_selection.select_rules(combined_settings), fix=True)
+
+    assert not extraction.unfixed_findings
+    assert tuple(finding.rule.code.tag for finding in checked.unfixed_findings) == ("PCF002",)
+    assert fixed.new_source == "value = 1  # hazard\u202e\n"
+    assert {rule.code.tag: count for rule, count in fixed.fixed_findings.items()} == {"PCF002": 1}
+    assert not fixed.unfixed_findings
+
+
+@pytest.mark.parametrize(("indent_width", "expected_finding"), [(2, False), (8, True)])
+def test_unicode_barrier_width_uses_configured_tab_width(indent_width: int, expected_finding: bool) -> None:
+    source = "if enabled:\n\tvalue = 1  # hazard\u202e\n"
+    settings = CheckSettings(select=("PCF004",), line_length=26, indent_width=indent_width)
+    result = formatter.format_source(source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
+
+    assert result.new_source == source
+    assert bool(result.unfixed_findings) is expected_finding
+    if result.unfixed_findings:
+        assert tuple((finding.line_numbers, finding.fixable) for finding in result.unfixed_findings) == (((2,), False),)
+
+
+def test_unicode_barrier_honors_syntax_aware_extraction() -> None:
+    source = "if enabled:  # hazard\u202e words long enough to exceed the configured limit\n    pass\n"
+    settings = CheckSettings(select=("PCF004",), line_length=32, comment_trailing_extraction_syntax_aware=True)
+    result = formatter.format_source(source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
+
+    assert result.new_source == source
+    assert not result.unfixed_findings
+
+
+def test_unicode_barrier_remains_diagnostic_before_content_aware_extraction() -> None:
+    source = "value = 1  # - [label](missing\u202e destination words beyond limit\n"
+    settings = CheckSettings(select=("PCF004",), line_length=32, comment_trailing_extraction_content_aware=True)
+    result = formatter.format_source(source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
+
+    assert result.new_source == source
+    assert tuple((finding.line_numbers, finding.fixable) for finding in result.unfixed_findings) == (((1,), False),)

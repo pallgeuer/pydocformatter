@@ -10,12 +10,9 @@ from __future__ import annotations
 
 # Standard library imports
 from collections.abc import Sequence
-from typing import TYPE_CHECKING
 
-
-if TYPE_CHECKING:
-    # Third-party imports
-    import libcst.metadata as cst_metadata
+# Third-party imports
+import libcst.metadata as cst_metadata
 
 
 LineBounds = tuple[tuple[int, int], ...]
@@ -82,6 +79,42 @@ def source_for_range(code_range: cst_metadata.CodeRange, *, source_lines: Sequen
     lines.extend(source_lines[first_index + 1 : last_index])
     lines.append(source_lines[last_index][: code_range.end.column])
     return "".join(lines)
+
+
+def offset_for_position(position: cst_metadata.CodePosition, *, line_bounds: LineBounds) -> int:
+    """Return the absolute source offset for a LibCST position.
+
+    Args:
+        position (cst_metadata.CodePosition): One-based line and zero-based column to convert.
+        line_bounds (LineBounds): Absolute source offsets for physical lines.
+
+    Returns:
+        int: Absolute source offset matching the position.
+    """
+    line_start, _ = line_bounds[position.line - 1]
+    return line_start + position.column
+
+
+def position_for_offset(offset: int, *, line_bounds: LineBounds) -> cst_metadata.CodePosition:
+    """Return the LibCST position for an absolute source offset.
+
+    Args:
+        offset (int): Absolute source offset to convert.
+        line_bounds (LineBounds): Absolute source offsets for physical lines.
+
+    Returns:
+        cst_metadata.CodePosition: One-based line and zero-based column matching the offset.
+    """
+    low = 0
+    high = len(line_bounds)
+    while low < high:
+        middle = (low + high) // 2
+        if line_bounds[middle][0] <= offset:
+            low = middle + 1
+        else:
+            high = middle
+    line_index = max(0, low - 1)
+    return cst_metadata.CodePosition(line=line_index + 1, column=offset - line_bounds[line_index][0])
 
 
 def first_non_ascii_code_point(text: str) -> str:

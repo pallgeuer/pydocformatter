@@ -21,6 +21,8 @@ All notable changes to this project are documented here. The format follows [Kee
   - Added PDF526 to report parsed parameter documentation that does not follow function signature order.
   - Added PDF414 and PDF415 to report high-confidence malformed Google, NumPy, and reStructuredText entry syntax and Google or NumPy entry indentation without unsafe fixes.
   - Added PDF720 and PDF721 to report named raised-exception and emitted-warning entries without prose descriptions.
+- **Unicode safety:**
+  - Added PDF004 and PCF007 to report explicit suspicious bidi, invisible-format, control, and separator characters in evaluated docstrings and literal comments, with exact fixes for nonbreaking indentation spaces.
 - **Persistent caching:**
   - Added strict persistent clean-proof caching for disk-backed checks and fixes, with complete source hashing, semantic analysis-setting and final-rule-code invalidation, shared invocation-local analysis fingerprints, engine/path invalidation, miss-only process execution, bounded parent-side probes, and source-free warm results.
   - Added `cache` and `cache-dir` settings, `--cache`/`--no-cache`, `--cache-dir`, opt-in `--cache-stats`, safe project cache self-pruning, and the ownership-checked `pydocfmt clean` command with its own `--cache-dir` override.
@@ -77,6 +79,10 @@ All notable changes to this project are documented here. The format follows [Kee
   - Avoided markup-parser work for delimiter-free source-identical and source-aware prose, indexed escape and physical-line lookups, lazily materialized heavyweight string source maps, and removed repeated immutable envelope growth for long markup-heavy text.
   - Kept ambiguity evidence from identical malformed inline constructs distinct across joined logical lines.
   - Classified PCF001 and PCF004 as usually fixable because conservative ambiguity findings may intentionally omit fixes.
+- **Unicode safety:**
+  - Preserved diagnostic Unicode hazards through docstring and comment formatting, including protected comment structures and diagnostic whitespace at docstring boundaries; deferred unsafe payload reconstruction, kept accepted interior nonbreaking spaces indivisible during wrapping, and stabilized partial-mapping diagnostic order.
+  - Reused prepared comment classifications and binary-searched source-position mapping while retaining canonical PCF004 width and syntax eligibility.
+  - Cached docstring Unicode classifications and shared simple-string mappings, separated mapping capability from canonical rewrite policy, derived reportable membership from exhaustive diagnostic labels, and made inline rewrite barriers typed.
 - **Rule suppressions:**
   - Kept PCF coverage line-local when an inline directive follows the final token of a concatenated string expression.
   - Limited complete-expression PDF coverage to recognized primary and supported attached docstrings, preventing directives on ordinary strings from suppressing unrelated findings while reducing string-topology storage to linear size.

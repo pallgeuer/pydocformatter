@@ -5,6 +5,7 @@ import pytest
 import tests.rules.PCF.helpers as pcf_helpers
 from pydocformatter import formatter, rules_selection
 from pydocformatter.cli.settings_check import CheckSettings
+from pydocformatter.rules.definitions.PCF.PCF003_comment_directive_normalization import PCF003CommentDirectiveNormalization
 
 
 @pytest.mark.parametrize(
@@ -176,3 +177,12 @@ def test_trailing_directive_spacing_and_normalization_report_separate_defects_in
     result = formatter.format_source(source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=False)
     assert result.new_source == source
     assert tuple((finding.rule.code.tag, finding.line_numbers) for finding in result.unfixed_findings) == (("PCF002", (1,)), ("PCF002", (3,)), ("PCF003", (2,)), ("PCF003", (3,)))
+
+
+def test_directive_normalization_skips_only_payloads_containing_unicode_barriers() -> None:
+    source = "first = 1#NOQA\nsecond = 2#NOQA\u2060\n#RUFF : noqa\u2060\n#TYPE : ignore\nthird = 3#TYPE : ignore\n"
+    settings = CheckSettings(select=("PCF003",))
+    result = formatter.format_source(source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
+
+    assert result.new_source == "first = 1# noqa\nsecond = 2#NOQA\u2060\n#RUFF : noqa\u2060\n# type: ignore\nthird = 3# type: ignore\n"
+    assert result.fixed_findings[PCF003CommentDirectiveNormalization.meta] == 3

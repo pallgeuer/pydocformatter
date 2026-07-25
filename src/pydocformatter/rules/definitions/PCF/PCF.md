@@ -1,7 +1,7 @@
 # pydocformatter comment formatting (PCF)
 
 ## What it does
-The PCF category formats standalone and trailing Python comments. It collects comments losslessly with LibCST, classifies comments that must be protected from ordinary prose formatting, and provides physical placement and source-range information to the individual rules.
+The PCF category formats standalone and trailing Python comments and checks them for suspicious Unicode. It collects comments losslessly with LibCST, classifies comments that must be protected from ordinary prose formatting, and provides physical placement and source-range information to the individual rules.
 
 PCF rules never format shebangs or valid first- or second-line encoding cookies. Type comments and recognized tool directives are protected from ordinary comment formatting; trailing-comment spacing may still normalize the delimiter before `#`, and directive normalization may normalize safe marker spacing and machine-readable syntax from `#` onward in recognized directives. Protected tool directives include `noqa`, `nosec`, `nosemgrep`, `pydocfmt`, `pylint`, `pyright`, `mypy`, `ty:`, `ruff`, `flake8`, `fmt:`, `isort:`, `pragma`, PyCharm `noinspection`, PyCharm `language=`, and PyCharm `@formatter:` marker comments.
 
@@ -11,19 +11,19 @@ Comment widths use tab-expanded display columns. `indent-width` supplies the tab
 Comments remain readable and consistently spaced without rewriting directives or requiring Ruff to perform transformations outside its formatter scope. Separate standalone and trailing rules allow either behavior to be selected or disabled independently.
 
 ## Rules
-Rules in this category cover regular standalone comment formatting, regular trailing-comment spacing, safe directive normalization, syntax-aware extraction of overlong trailing comments, and unused pydocfmt suppression directives. Standalone formatting is conservative by default, while optional settings enable paragraph joining, structured-markup handling, and broader disabled-code detection. Inline markup recognition is unconditional; `url-aware-wrapping` changes only balanced line selection. Ambiguous inline markup that would change is reported without an unsafe semantic-body rewrite, making PCF001 and PCF004 usually fixable. Trailing-comment extraction only moves comments when the surrounding syntax and comment content are safe to rewrite, and its ambiguity guard remains active when content awareness is disabled.
+Rules in this category cover regular standalone comment formatting, regular trailing-comment spacing, safe directive normalization, syntax-aware extraction of overlong trailing comments, unused pydocfmt suppression directives, and suspicious Unicode safety. Standalone formatting is conservative by default, while optional settings enable paragraph joining, structured-markup handling, and broader disabled-code detection. Inline markup recognition is unconditional; `url-aware-wrapping` changes only balanced line selection. Ambiguous inline markup or suspicious Unicode on an otherwise extraction-eligible overlong line is reported without an unsafe semantic-body rewrite, making PCF001 and PCF004 usually fixable. Trailing-comment extraction only moves comments when the surrounding syntax and comment content are safe to rewrite, and its ambiguity guard remains active when content awareness is disabled.
 
 Physical standalone runs contain consecutive, same-indent, regular, non-empty comments. Empty comments, hash-only separators, protected comments, indentation changes, and nonconsecutive source lines end a run. Standalone formatting may subdivide a run further according to its enabled structure settings.
 
 ## Related tooling
-Ruff can report comment line-length and whitespace issues, but does not provide equivalent configurable comment reflow and trailing-comment extraction.
+Ruff can report comment line-length, whitespace, ambiguous Unicode, and selected invalid characters, but does not provide equivalent configurable comment reflow, trailing-comment extraction, or PCF007's explicit policy and indentation fixes.
 
 ## Code ranges
-PCF rules currently occupy one contiguous range because the category covers comment formatting only.
+PCF rules currently occupy one contiguous range for comment formatting and safety.
 
-| Range    | Topic              | Notes                                             |
-|:---------|:-------------------|:--------------------------------------------------|
-| `PCF0xx` | Comment formatting | Standalone and trailing comment formatting rules. |
+| Range    | Topic                         | Notes                                                                              |
+|:---------|:------------------------------|:-----------------------------------------------------------------------------------|
+| `PCF0xx` | Comment formatting and safety | Standalone and trailing comment formatting, suppression, and Unicode safety rules. |
 
 ## Options
 Standalone paragraph joining remains disabled by default, so ordinary prose comments are formatted one physical line at a time. The options below control comment wrapping, structure handling, preservation, extraction safety, and code detection.

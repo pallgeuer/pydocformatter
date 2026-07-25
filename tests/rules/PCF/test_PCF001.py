@@ -769,3 +769,39 @@ def test_task_markers_end_preceding_list_and_joined_paragraph_units() -> None:
 
     assert result.new_source == "# - List item words continuation words\n# TODO: task payload\n# Ordinary paragraph words\n# FIXME: second task payload\n"
     assert result.fixed_findings[PCF001StandaloneCommentFormatting.meta] == 1
+
+
+def test_unicode_barrier_preserves_marker_only_and_mixed_joined_comment_bodies() -> None:
+    source = "#\u202e\n#Safe words.\n# Keep  unsafe\u2060words.\n#More safe words.\n"
+    settings = CheckSettings(select=("PCF001",), comment_join_standalone_lines=True)
+    result = formatter.format_source(source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
+
+    assert result.new_source == "# \u202e\n# Safe words.\n# Keep  unsafe\u2060words.\n# More safe words.\n"
+    assert result.fixed_findings[PCF001StandaloneCommentFormatting.meta] == 3
+
+
+@pytest.mark.parametrize(
+    ("source", "settings"),
+    [
+        ("#>>> value = function()\u200b\n#expected output\n", CheckSettings(select=("PCF001",), comment_preserve_doctests=True)),
+        ("#```python\n#value = function()\u200b\n#```\n", CheckSettings(select=("PCF001",), comment_preserve_code_fences=True)),
+        ("#Name | Value\n#---- | -----\n#one\u200b | two\n", CheckSettings(select=("PCF001",), comment_preserve_tables=True)),
+        ("#.. note::\n#   preserved\u200b directive body\n# ordinary prose\n", CheckSettings(select=("PCF001",), comment_preserve_directives=True)),
+    ],
+)
+def test_unicode_barriers_do_not_override_semantically_preserved_regions(source: str, settings: CheckSettings) -> None:
+    result = formatter.format_source(source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
+
+    assert result.new_source == source
+    assert not result.fixed_findings
+    assert not result.unfixed_findings
+
+
+@pytest.mark.parametrize("diagnostic_whitespace", ["\v", "\u0085"])
+def test_leading_diagnostic_whitespace_is_preserved_when_marker_spacing_is_fixed(diagnostic_whitespace: str) -> None:
+    source = f"#{diagnostic_whitespace}payload\n"
+    settings = CheckSettings(select=("PCF001",))
+    result = formatter.format_source(source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
+
+    assert result.new_source == f"# {diagnostic_whitespace}payload\n"
+    assert result.fixed_findings[PCF001StandaloneCommentFormatting.meta] == 1

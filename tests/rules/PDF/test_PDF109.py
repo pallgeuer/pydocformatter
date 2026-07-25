@@ -181,3 +181,13 @@ def test_fix_noops_for_blank_and_single_content_docstrings() -> None:
 
     assert fixed.module.code == source
     assert fixed.fixed_findings == ()
+
+
+def test_suspicious_unicode_blocks_moving_closing_quotes() -> None:
+    source = 'def function():\n    """Summary\u202e.\n\n    Body."""\n'
+
+    result = format_pdf105(source)
+
+    assert result.new_source == source
+    assert not result.fixed_findings
+    assert not result.unfixed_findings

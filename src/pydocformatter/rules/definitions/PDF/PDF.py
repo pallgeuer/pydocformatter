@@ -39,6 +39,7 @@ from pydocformatter.rules.definition_helpers import (
     text_layout,
     type_expressions,
     typed_documentation_models,
+    unicode_safety,
 )
 from pydocformatter.rules.models import RuleCategoryMetadata
 
@@ -48,7 +49,7 @@ if typing.TYPE_CHECKING:
     from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
 
 
-_SOURCE_MAP_UNSET = object()
+_SIMPLE_STRING_PARTS_UNSET = object()
 
 
 class DefinitionKind(enum.Enum):
@@ -550,20 +551,54 @@ class DocstringInfo:
     physical_lines: tuple[DocstringLine, ...]
     value_lines: tuple[str, ...]
     structure: DocstringStructure
-    _source_map: string_literals.SimpleStringSourceMap | object | None = dataclasses.field(default=_SOURCE_MAP_UNSET, init=False, repr=False, compare=False)
+    _simple_string_parts: tuple[string_literals.SimpleStringPart, ...] | object | None = dataclasses.field(default=_SIMPLE_STRING_PARTS_UNSET, init=False, repr=False, compare=False)
+    _unicode_occurrences: tuple[unicode_safety.SuspiciousUnicodeOccurrence, ...] | None = dataclasses.field(default=None, init=False, repr=False, compare=False)
+
+    @property
+    def simple_string_parts(self) -> tuple[string_literals.SimpleStringPart, ...] | None:
+        """Evaluated simple-string leaves and source maps, lazily cached.
+
+        Returns:
+            tuple[string_literals.SimpleStringPart, ...] | None: Ordered evaluated leaves with source maps when the
+                expression can be analyzed.
+        """
+        cached = self._simple_string_parts
+        if cached is _SIMPLE_STRING_PARTS_UNSET:
+            cached = string_literals.simple_string_parts(self.node, value=self.value)
+            object.__setattr__(self, "_simple_string_parts", cached)
+        return typing.cast("tuple[string_literals.SimpleStringPart, ...] | None", cached)
 
     @property
     def source_map(self) -> string_literals.SimpleStringSourceMap | None:
-        """Lossless simple-string source map, lazily cached.
+        """Lossless source map for a single simple-string docstring.
 
         Returns:
             string_literals.SimpleStringSourceMap | None: Body mapping when the source spelling is supported.
         """
-        cached = self._source_map
-        if cached is _SOURCE_MAP_UNSET:
-            cached = string_literals.source_map_for_simple_string(self.node, value=self.value) if isinstance(self.node, cst.SimpleString) else None
-            object.__setattr__(self, "_source_map", cached)
-        return typing.cast("string_literals.SimpleStringSourceMap | None", cached)
+        parts = self.simple_string_parts
+        return parts[0].source_map if isinstance(self.node, cst.SimpleString) and parts is not None and len(parts) == 1 else None
+
+    @property
+    def unicode_occurrences(self) -> tuple[unicode_safety.SuspiciousUnicodeOccurrence, ...]:
+        """Suspicious Unicode classifications, lazily cached.
+
+        Returns:
+            tuple[unicode_safety.SuspiciousUnicodeOccurrence, ...]: Reportable occurrences in evaluated-value order.
+        """
+        cached = self._unicode_occurrences
+        if cached is None:
+            cached = unicode_safety.suspicious_unicode_occurrences(self.value)
+            object.__setattr__(self, "_unicode_occurrences", cached)
+        return cached
+
+    @property
+    def has_unicode_rewrite_barrier(self) -> bool:
+        """Whether canonical payload rewriting must preserve the value unchanged.
+
+        Returns:
+            bool: Whether any suspicious Unicode occurrence blocks reconstruction.
+        """
+        return bool(self.unicode_occurrences)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -2077,9 +2112,9 @@ class _DocstringParser:
     def _reflow_line_from_text_span(self, line_index: int, start_column: int, end_column: int) -> DocstringTextFragment | None:
         """Return a reflow line from a trimmed column span in evaluated text."""
         line = self.lines[line_index]
-        while start_column < end_column and line.text[start_column].isspace():
+        while start_column < end_column and unicode_safety.is_layout_separator(line.text[start_column]):
             start_column += 1
-        while end_column > start_column and line.text[end_column - 1].isspace():
+        while end_column > start_column and unicode_safety.is_layout_separator(line.text[end_column - 1]):
             end_column -= 1
         if start_column > end_column:
             return None
@@ -2471,7 +2506,7 @@ def is_same_line_closing_delimiter_prefix(docstring: DocstringInfo, line: Docstr
 
 
 def is_safely_mapped_simple_docstring(docstring: DocstringInfo, *, require_multiline: bool = False) -> bool:
-    """Return whether a simple docstring can be safely rewritten by evaluated line.
+    """Return whether a simple docstring is safely mapped by evaluated line.
 
     Args:
         docstring (DocstringInfo): Docstring candidate whose source mapping must be a LibCST simple string with mapped
@@ -2480,7 +2515,7 @@ def is_safely_mapped_simple_docstring(docstring: DocstringInfo, *, require_multi
             multiline layouts.
 
     Returns:
-        True when every parsed value line maps back to a concrete source line and whole-literal replacement can preserve spelling safely.
+        bool: Whether every parsed value line maps to concrete source and source-preserving edits can retain spelling.
     """
     return (
         docstring.kind is DocstringKind.SIMPLE
@@ -2488,6 +2523,19 @@ def is_safely_mapped_simple_docstring(docstring: DocstringInfo, *, require_multi
         and (not require_multiline or len(docstring.physical_lines) > 1)
         and all(line.source_line_number is not None for line in docstring.structure.lines)
     )
+
+
+def can_canonically_rewrite_simple_docstring(docstring: DocstringInfo, *, require_multiline: bool = False) -> bool:
+    """Return whether a simple docstring permits canonical payload reconstruction.
+
+    Args:
+        docstring (DocstringInfo): Docstring candidate whose evaluated lines and Unicode policy must permit rewriting.
+        require_multiline (bool): Whether single-line simple strings should be rejected.
+
+    Returns:
+        bool: Whether mapped source can be reconstructed without consuming suspicious Unicode.
+    """
+    return is_safely_mapped_simple_docstring(docstring, require_multiline=require_multiline) and not docstring.has_unicode_rewrite_barrier
 
 
 def docstring_canonical_margin(docstring: DocstringInfo, *, context: RuleContext, source_lines: Sequence[str] | None = None) -> str:
@@ -2641,10 +2689,10 @@ def simple_docstring_source_range(
     """
     if not isinstance(docstring.node, cst.SimpleString):
         raise TypeError("A simple docstring source range requires a simple string node")
-    body_start = _offset_for_position(docstring.range.start, line_bounds=line_bounds) + len(docstring.node.prefix) + len(docstring.node.quote)
+    body_start = source_text.offset_for_position(docstring.range.start, line_bounds=line_bounds) + len(docstring.node.prefix) + len(docstring.node.quote)
     source_start = body_start + source_map.source_offset_for_value_offset(start_offset)
     source_end = source_start if start_offset == end_offset else body_start + source_map.source_offset_for_value_offset(end_offset, include_leading_zero_value_source=True)
-    return cst_metadata.CodeRange(start=_position_for_offset(source_start, line_bounds=line_bounds), end=_position_for_offset(source_end, line_bounds=line_bounds))
+    return cst_metadata.CodeRange(start=source_text.position_for_offset(source_start, line_bounds=line_bounds), end=source_text.position_for_offset(source_end, line_bounds=line_bounds))
 
 
 def simple_docstring_replacement_is_source_safe(docstring: DocstringInfo, replacement: str) -> bool:
@@ -2660,29 +2708,6 @@ def simple_docstring_replacement_is_source_safe(docstring: DocstringInfo, replac
     if not isinstance(docstring.node, cst.SimpleString) or not replacement.isascii() or "\\" in replacement or "\r" in replacement or "\n" in replacement:
         return False
     return docstring.node.quote not in replacement
-
-
-def _offset_for_position(position: cst_metadata.CodePosition, *, line_bounds: source_text.LineBounds) -> int:
-    """Return absolute source offset for a LibCST position."""
-    line_start, _ = line_bounds[position.line - 1]
-    return line_start + position.column
-
-
-def _position_for_offset(offset: int, *, line_bounds: source_text.LineBounds) -> cst_metadata.CodePosition:
-    """Return a LibCST position for an absolute source offset."""
-    low = 0
-    high = len(line_bounds)
-    while low < high:
-        middle = (low + high) // 2
-        line_start, line_end = line_bounds[middle]
-        if offset < line_start:
-            high = middle
-        elif offset > line_end:
-            low = middle + 1
-        else:
-            return cst_metadata.CodePosition(line=middle + 1, column=offset - line_start)
-    line_number = len(line_bounds)
-    return cst_metadata.CodePosition(line=line_number, column=max(0, offset - line_bounds[-1][0]))
 
 
 def planned_simple_docstring_output_change(

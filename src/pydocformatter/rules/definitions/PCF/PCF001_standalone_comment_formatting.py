@@ -85,12 +85,12 @@ class _FormattedUnit:
     Attributes:
         end (int): Exclusive comment index where the unit ends.
         output_lines (tuple[str, ...]): Canonical comment payload lines.
-        ambiguous (bool): Whether conservative markup evidence prohibits the canonical rewrite.
+        rewrite_blocked (bool): Whether conservative evidence prohibits the canonical rewrite.
     """
 
     end: int
     output_lines: tuple[str, ...]
-    ambiguous: bool
+    rewrite_blocked: bool
 
 
 def _violations(context: RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
@@ -99,24 +99,33 @@ def _violations(context: RuleContext) -> tuple[rule_violations.RuleViolation, ..
     violations: list[rule_violations.RuleViolation] = []
     for run in data.standalone_runs:
         preserved = comment_helpers.preserved_indices(run, settings=context.settings)
-        if comment_helpers.run_contains_code(run, preserved=preserved, settings=context.settings, ignore_task_markers=True):
+        unicode_barriers = {index for index, comment in enumerate(run.comments) if comment.unicode_occurrences}
+        formatting_barriers = preserved | unicode_barriers
+        if comment_helpers.run_contains_code(run, preserved=formatting_barriers, settings=context.settings, ignore_task_markers=True):
             continue
         index = 0
         while index < len(run.comments):
             if index in preserved:
                 index += 1
                 continue
+            if index in unicode_barriers:
+                comment = run.comments[index]
+                marker_change = _marker_only_change(data, (comment,))
+                if marker_change is not None:
+                    violations.append(rule_violations.violation_for_planned_source_change(PCF001StandaloneCommentFormatting.meta, marker_change))
+                index += 1
+                continue
             task_marker_match = comment_helpers.task_marker_match(run.comments[index].body.rstrip(), settings=context.settings)
             list_match = comment_helpers.LIST_RE.match(run.comments[index].body.rstrip()) if context.settings.comment_format_list_items else None
             quote_match = comment_helpers.BLOCK_QUOTE_RE.match(run.comments[index].body.rstrip()) if context.settings.comment_format_block_quotes else None
             if task_marker_match is not None:
-                formatted = _format_task_marker(data, run, index, match=task_marker_match, preserved=preserved, settings=context.settings)
+                formatted = _format_task_marker(data, run, index, match=task_marker_match, preserved=formatting_barriers, settings=context.settings)
             elif list_match is not None:
-                formatted = _format_list_item(data, run, index, match=list_match, preserved=preserved, settings=context.settings)
+                formatted = _format_list_item(data, run, index, match=list_match, preserved=formatting_barriers, settings=context.settings)
             elif quote_match is not None:
-                formatted = _format_block_quote(data, run, index, match=quote_match, preserved=preserved, settings=context.settings)
+                formatted = _format_block_quote(data, run, index, match=quote_match, preserved=formatting_barriers, settings=context.settings)
             elif context.settings.comment_join_standalone_lines:
-                end = _ordinary_paragraph_end(run, index, preserved=preserved, settings=context.settings)
+                end = _ordinary_paragraph_end(run, index, preserved=formatting_barriers, settings=context.settings)
                 formatted = dataclasses.replace(_format_plain(data, run.comments[index:end], indent=run.indent, settings=context.settings), end=end)
             else:
                 end = index + 1
@@ -124,7 +133,7 @@ def _violations(context: RuleContext) -> tuple[rule_violations.RuleViolation, ..
             comments = run.comments[index : formatted.end]
             canonical_change = _change_for_unit(data, comments, output_lines=formatted.output_lines, indent=run.indent, line_ending=context.line_ending)
             if canonical_change is not None:
-                if formatted.ambiguous:
+                if formatted.rewrite_blocked:
                     marker_change = _marker_only_change(data, comments)
                     violations.append(
                         rule_violations.violation_for_optional_planned_source_change(
@@ -155,9 +164,9 @@ def _change_for_unit(
 def _format_plain(data: PCF_definition.PCFCategoryData, comments: tuple[PCF_definition.CommentInfo, ...], *, indent: str, settings: CheckSettings) -> _FormattedUnit:
     """Return canonical output for ordinary comment payload lines."""
     width = PCF_definition.available_comment_width(indent, line_length=settings.line_length, tab_width=settings.indent_width)
-    lines = tuple(_SemanticLine(text=comment.body.lstrip(), has_following_newline=_has_following_newline(data, comment)) for comment in comments)
-    output, ambiguous = _format_semantic_lines(lines, width=width, initial_prefix="", subsequent_prefix="", settings=settings)
-    return _FormattedUnit(end=0, output_lines=output, ambiguous=ambiguous)
+    lines = tuple(_SemanticLine(text=comment.body.lstrip(" \t\f"), has_following_newline=_has_following_newline(data, comment)) for comment in comments)
+    output, rewrite_blocked = _format_semantic_lines(lines, width=width, initial_prefix="", subsequent_prefix="", settings=settings)
+    return _FormattedUnit(end=0, output_lines=output, rewrite_blocked=rewrite_blocked)
 
 
 def _format_task_marker(
@@ -177,11 +186,11 @@ def _format_task_marker(
         end += 1
     normalized_texts = tuple(line.text.rstrip() for line in texts)
     if settings.comment_task_marker_mode == CommentTaskMarkerMode.NO_WRAP or comment_helpers.task_marker_texts_are_code_like(normalized_texts, settings=settings):
-        output, ambiguous = _format_unwrapped_semantic_lines(texts, initial_prefix=f"{match.marker}: ", subsequent_prefix=" " * len(f"{match.marker}: "))
+        output, rewrite_blocked = _format_unwrapped_semantic_lines(texts, initial_prefix=f"{match.marker}: ", subsequent_prefix=" " * len(f"{match.marker}: "))
     else:
         width = PCF_definition.available_comment_width(run.indent, line_length=settings.line_length, tab_width=settings.indent_width)
-        output, ambiguous = _format_semantic_lines(tuple(texts), width=width, initial_prefix=f"{match.marker}: ", subsequent_prefix=" " * len(f"{match.marker}: "), settings=settings)
-    return _FormattedUnit(end=end, output_lines=output, ambiguous=ambiguous)
+        output, rewrite_blocked = _format_semantic_lines(tuple(texts), width=width, initial_prefix=f"{match.marker}: ", subsequent_prefix=" " * len(f"{match.marker}: "), settings=settings)
+    return _FormattedUnit(end=end, output_lines=output, rewrite_blocked=rewrite_blocked)
 
 
 def _format_list_item(
@@ -203,8 +212,8 @@ def _format_list_item(
         end += 1
     width = settings.line_length - text_layout.display_width(f"{run.indent}# ", tab_width=settings.indent_width)
     subsequent = " " * len(prefix)
-    lines, ambiguous = _format_semantic_lines(tuple(texts), width=width, initial_prefix=prefix, subsequent_prefix=subsequent, settings=settings)
-    return _FormattedUnit(end=end, output_lines=lines, ambiguous=ambiguous)
+    lines, rewrite_blocked = _format_semantic_lines(tuple(texts), width=width, initial_prefix=prefix, subsequent_prefix=subsequent, settings=settings)
+    return _FormattedUnit(end=end, output_lines=lines, rewrite_blocked=rewrite_blocked)
 
 
 def _format_block_quote(
@@ -221,8 +230,8 @@ def _format_block_quote(
         texts.append(_SemanticLine(text=run.comments[end].body[next_match.start("text") :], has_following_newline=_has_following_newline(data, run.comments[end])))
         end += 1
     width = settings.line_length - text_layout.display_width(f"{run.indent}# ", tab_width=settings.indent_width)
-    lines, ambiguous = _format_semantic_lines(tuple(texts), width=width, initial_prefix=prefix, subsequent_prefix=prefix, settings=settings)
-    return _FormattedUnit(end=end, output_lines=lines, ambiguous=ambiguous)
+    lines, rewrite_blocked = _format_semantic_lines(tuple(texts), width=width, initial_prefix=prefix, subsequent_prefix=prefix, settings=settings)
+    return _FormattedUnit(end=end, output_lines=lines, rewrite_blocked=rewrite_blocked)
 
 
 def _format_semantic_lines(lines: tuple[_SemanticLine, ...], *, width: int, initial_prefix: str, subsequent_prefix: str, settings: CheckSettings) -> tuple[tuple[str, ...], bool]:
@@ -249,24 +258,24 @@ def _format_semantic_lines(lines: tuple[_SemanticLine, ...], *, width: int, init
         if segment.hard_break is not None:
             wrapped = (*wrapped[:-1], f"{wrapped[-1]}{segment.hard_break.value}")
         output.extend(wrapped)
-    return tuple(output), layout.ambiguous
+    return tuple(output), layout.rewrite_blocked
 
 
 def _format_unwrapped_semantic_lines(lines: list[_SemanticLine], *, initial_prefix: str, subsequent_prefix: str) -> tuple[tuple[str, ...], bool]:
     """Normalize task-marker lines without prose wrapping or line joining."""
     output: list[str] = []
-    ambiguous = False
+    rewrite_blocked = False
     for index, line in enumerate(lines):
         layout = inline_markup.scan_layout_lines((inline_markup.layout_line_for_text(line.text, has_following_newline=line.has_following_newline),))
         segment = layout.segments[0]
-        ambiguous = ambiguous or layout.ambiguous
+        rewrite_blocked = rewrite_blocked or layout.rewrite_blocked
         prefix = initial_prefix if index == 0 else subsequent_prefix
         normalized = " ".join(token.value for token in segment.scan.tokens)
         rendered = prefix.rstrip() if not normalized else f"{prefix}{normalized}"
         if segment.hard_break is not None:
             rendered = f"{rendered}{segment.hard_break.value}"
         output.append(rendered)
-    return tuple(output), ambiguous
+    return tuple(output), rewrite_blocked
 
 
 def _marker_only_change(data: PCF_definition.PCFCategoryData, comments: tuple[PCF_definition.CommentInfo, ...]) -> rule_edits.PlannedSourceChange | None:

@@ -5,6 +5,7 @@ import pytest
 import tests.rules.PCF.helpers as pcf_helpers
 from pydocformatter import formatter, rules_selection
 from pydocformatter.cli.settings_check import CheckSettings
+from pydocformatter.rules.definitions.PCF.PCF002_trailing_comment_spacing import PCF002TrailingCommentSpacing
 
 
 def test_trailing_comment_spacing_and_empty_comment_are_canonicalized() -> None:
@@ -105,3 +106,12 @@ def test_spacing_check_reports_original_line() -> None:
     settings = CheckSettings(select=("PCF002",))
     checked = formatter.format_source(source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=False)
     assert tuple(finding.line_numbers for finding in checked.unfixed_findings) == ((1,),)
+
+
+def test_spacing_fixes_preserve_unicode_barriers_in_regular_and_directive_payloads() -> None:
+    source = "regular = 1#Keep\u202epayload  \ndirective = 2#noqa\u2060  \n"
+    settings = CheckSettings(select=("PCF002",))
+    result = formatter.format_source(source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
+
+    assert result.new_source == "regular = 1  #Keep\u202epayload  \ndirective = 2  #noqa\u2060  \n"
+    assert result.fixed_findings[PCF002TrailingCommentSpacing.meta] == 2

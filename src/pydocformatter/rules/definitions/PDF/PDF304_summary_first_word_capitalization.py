@@ -78,7 +78,7 @@ def _planned_change(word: summary_style.SummaryWordTarget, *, replacement: str) 
     """Return a safe replacement for one summary first word."""
     docstring = word.docstring
     line = word.line
-    if not PDF_definition.is_safely_mapped_simple_docstring(docstring):
+    if not PDF_definition.can_canonically_rewrite_simple_docstring(docstring):
         return None
     start_offset = PDF_definition.value_offset_for_text_column(line, word.text_start_column, require_source_text=True)
     end_offset = PDF_definition.value_offset_for_text_column(line, word.text_end_column, require_source_text=True)

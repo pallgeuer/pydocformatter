@@ -33,7 +33,7 @@ if TYPE_CHECKING:
 _RULE_SELECTION_SETTING_KEYS = frozenset(definition.key for definition in settings_check.SETTINGS_SCHEMA.definitions if definition.group == settings_check.SettingsGroup.RULE_SELECTION)
 _REQUIRE_EXPLICIT_NOTICE = "Rule must by default be explicitly selected, unless it is removed from `require-explicit`."
 _FENCED_CODE_BLOCK_RE = re.compile(r"^(`{3,}|~{3,}).*?^\1\s*$", re.DOTALL | re.MULTILINE)
-_RUFF_RULE_REFERENCE_RE = re.compile(r"\b(?:D|DOC|E|W)\d{3}\b")
+_RUFF_RULE_REFERENCE_RE = re.compile(r"\b(?:(?:D|DOC|E|W|RUF)\d{3}|PLE\d{4})\b")
 _PYDOCFORMATTER_RULE_REFERENCE_RE = re.compile(r"\bP[CD]F\d{3}\b")
 _MARKDOWN_TABLE_SEPARATOR_RE = re.compile(r":?-{3,}:?")
 _TEMPLATE_PLACEHOLDERS = ("Describe the rule's check", "This line says", "CODE101", "related-setting", "Topic name", "Briefly describe")

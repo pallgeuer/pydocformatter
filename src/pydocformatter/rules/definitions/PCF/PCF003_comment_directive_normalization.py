@@ -80,6 +80,8 @@ def _planned_changes(context: RuleContext) -> tuple[rule_edits.PlannedSourceChan
     for comment in data.comments:
         if comment.kind not in {PCF_definition.CommentKind.TYPE_DIRECTIVE, PCF_definition.CommentKind.TOOL_DIRECTIVE}:
             continue
+        if comment.unicode_occurrences:
+            continue
         content = _normalized_directive_content(comment.content)
         if comment.placement == PCF_definition.CommentPlacement.TRAILING:
             replacement = f"{comment.line_prefix}{PCF_definition.render_comment(content, include_indent=False)}"

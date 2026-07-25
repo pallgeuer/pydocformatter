@@ -28,7 +28,7 @@ from pydocformatter.rules.definition_helpers import inline_markup, string_litera
 def test_scanner_recognizes_supported_same_line_constructs(text: str, kind: inline_markup.InlineMarkupKind, url_like: bool) -> None:
     result = inline_markup.scan_text(text)
 
-    assert not result.ambiguous
+    assert not result.rewrite_blocked
     markup = tuple(token for token in result.tokens if token.kind is not None)
     assert len(markup) == 1
     assert markup[0].kind is kind
@@ -39,7 +39,7 @@ def test_scanner_recognizes_supported_same_line_constructs(text: str, kind: inli
 def test_markdown_inline_links_accept_all_title_delimiters(title: str) -> None:
     result = inline_markup.scan_text(f"before [label](target {title}) after")
 
-    assert not result.ambiguous
+    assert not result.rewrite_blocked
     assert tuple(token.kind for token in result.tokens) == (None, inline_markup.InlineMarkupKind.MARKDOWN_LINK, None)
 
 
@@ -47,7 +47,7 @@ def test_markdown_inline_links_accept_all_title_delimiters(title: str) -> None:
 def test_markdown_angle_destinations_accept_an_immediate_outer_closer(text: str) -> None:
     result = inline_markup.scan_text(text)
 
-    assert not result.ambiguous
+    assert not result.rewrite_blocked
     assert result.tokens[0].kind is inline_markup.InlineMarkupKind.MARKDOWN_LINK
 
 
@@ -55,7 +55,7 @@ def test_markdown_angle_destinations_accept_an_immediate_outer_closer(text: str)
 def test_escaped_destination_characters_do_not_skip_the_following_character(text: str) -> None:
     result = inline_markup.scan_text(text)
 
-    assert not result.ambiguous
+    assert not result.rewrite_blocked
     assert tuple(token.value for token in result.tokens) == (text,)
     assert result.tokens[0].kind is inline_markup.InlineMarkupKind.MARKDOWN_LINK
 
@@ -70,6 +70,18 @@ def test_plain_text_scanning_bypasses_delimiter_indexing(monkeypatch: pytest.Mon
 
     assert tuple(token.value for token in result.tokens) == ("plain", "prose", "and", "www.example.com")
     assert result.tokens[-1].url_like
+
+
+@pytest.mark.parametrize("text", ["plain ASCII prose", "ordinary caf\xe9 prose"])
+def test_plain_text_fast_path_bypasses_source_aware_scanning(text: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    def unexpected_source_aware_scan(fragments: object) -> None:
+        raise AssertionError(f"Unexpected source-aware scan for {fragments!r}")
+
+    monkeypatch.setattr(inline_markup, "scan_fragments", unexpected_source_aware_scan)
+
+    result = inline_markup.scan_text(text)
+
+    assert tuple(token.value for token in result.tokens) == tuple(text.split())
 
 
 def test_plain_source_aware_scanning_bypasses_delimiter_indexing(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -87,11 +99,56 @@ def test_plain_source_aware_scanning_bypasses_delimiter_indexing(monkeypatch: py
     assert result.tokens[-1].url_like
 
 
+def test_plain_scanning_preserves_interior_nonbreaking_space_as_one_token() -> None:
+    result = inline_markup.scan_text("first second\u00a0third")
+
+    assert tuple(token.value for token in result.tokens) == ("first", "second\u00a0third")
+    assert not result.rewrite_blocked
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("before [label](target)\u00a0after", ("before", "[label](target)\u00a0after")),
+        ("before\u202f[label](target) after", ("before\u202f[label](target)", "after")),
+        ("before `code`\u2007after", ("before", "`code`\u2007after")),
+    ],
+)
+def test_nonbreaking_spaces_keep_recognized_markup_attached_to_adjacent_prose(text: str, expected: tuple[str, ...]) -> None:
+    result = inline_markup.scan_text(text)
+
+    assert tuple(token.value for token in result.tokens) == expected
+    assert not result.rewrite_blocked
+
+
+def test_plain_scanning_marks_suspicious_unicode_as_rewrite_barrier() -> None:
+    result = inline_markup.scan_text("first\u202esecond")
+
+    assert tuple(token.value for token in result.tokens) == ("first\u202esecond",)
+    assert result.rewrite_blocked
+    assert result.barriers[0].kind is inline_markup.InlineRewriteBarrierKind.SUSPICIOUS_UNICODE
+
+
+@pytest.mark.parametrize("text", ["```\u202e", "~~~text\u2060"])
+def test_fence_shaped_lines_still_expose_suspicious_unicode_barriers(text: str) -> None:
+    result = inline_markup.scan_text(text)
+
+    assert result.rewrite_blocked
+    assert tuple(barrier.kind for barrier in result.barriers) == (inline_markup.InlineRewriteBarrierKind.SUSPICIOUS_UNICODE,)
+
+
+def test_suspicious_unicode_and_malformed_markup_are_reported_independently() -> None:
+    result = inline_markup.scan_text("before\u202e [label](missing")
+
+    assert result.rewrite_blocked
+    assert {barrier.kind for barrier in result.barriers} == {inline_markup.InlineRewriteBarrierKind.SUSPICIOUS_UNICODE, inline_markup.InlineRewriteBarrierKind.INCOMPLETE_MARKDOWN_INLINE_DESTINATION}
+
+
 @pytest.mark.parametrize("role", ["py-class", "py_class", "py+class", "py:class", "py.class"])
 def test_rest_roles_accept_supported_isolated_internal_punctuation(role: str) -> None:
     result = inline_markup.scan_text(f"before :{role}:`value` after")
 
-    assert not result.ambiguous
+    assert not result.rewrite_blocked
     assert result.tokens[1].kind is inline_markup.InlineMarkupKind.REST_ROLE
 
 
@@ -113,24 +170,27 @@ def test_adjacent_constructs_share_one_indivisible_envelope() -> None:
 def test_markdown_destination_allows_three_nested_parenthesis_levels() -> None:
     result = inline_markup.scan_text("before [label](a(b(c(d)))) after")
 
-    assert not result.ambiguous
+    assert not result.rewrite_blocked
     assert result.tokens[1].kind is inline_markup.InlineMarkupKind.MARKDOWN_LINK
 
 
 @pytest.mark.parametrize(
-    "text",
+    ("text", "expected_kind"),
     [
-        "before [label](a(b(c(d(e))))) after",
-        "before [label](missing after",
-        "before [label][missing after",
-        "before <https://example.com/missing after",
-        "before `missing after",
-        "before :py:class:`missing after",
-        "before `value`:py-class after",
+        ("before [label](a(b(c(d(e))))) after", inline_markup.InlineRewriteBarrierKind.MARKDOWN_DESTINATION_NESTING_EXCEEDED),
+        ("before [label](missing after", inline_markup.InlineRewriteBarrierKind.UNSUPPORTED_MARKDOWN_LINK_TITLE),
+        ("before [label][missing after", inline_markup.InlineRewriteBarrierKind.INCOMPLETE_MARKDOWN_REFERENCE_LABEL),
+        ("before <https://example.com/missing after", inline_markup.InlineRewriteBarrierKind.INCOMPLETE_AUTOLINK),
+        ("before `missing after", inline_markup.InlineRewriteBarrierKind.UNCLOSED_INLINE_BACKTICK_SPAN),
+        ("before :py:class:`missing after", inline_markup.InlineRewriteBarrierKind.INCOMPLETE_REST_PREFIX_ROLE),
+        ("before `value`:py-class after", inline_markup.InlineRewriteBarrierKind.INCOMPLETE_REST_SUFFIX_ROLE),
     ],
 )
-def test_scanner_reports_evidence_gated_ambiguity(text: str) -> None:
-    assert inline_markup.scan_text(text).ambiguous
+def test_scanner_reports_evidence_gated_ambiguity(text: str, expected_kind: inline_markup.InlineRewriteBarrierKind) -> None:
+    result = inline_markup.scan_text(text)
+
+    assert result.rewrite_blocked
+    assert tuple(barrier.kind for barrier in result.barriers) == (expected_kind,)
 
 
 @pytest.mark.parametrize(
@@ -140,14 +200,14 @@ def test_scanner_reports_evidence_gated_ambiguity(text: str) -> None:
 def test_scanner_leaves_excluded_or_generic_syntax_as_prose(text: str) -> None:
     result = inline_markup.scan_text(text)
 
-    assert not result.ambiguous
+    assert not result.rewrite_blocked
     assert all(token.kind is None for token in result.tokens)
 
 
 def test_escaped_inner_backtick_is_content_when_a_later_close_exists() -> None:
     result = inline_markup.scan_text(r"before `literal \` content` after")
 
-    assert not result.ambiguous
+    assert not result.rewrite_blocked
     assert result.tokens[1].value == r"`literal \` content`"
 
 
@@ -155,7 +215,7 @@ def test_escaped_inner_backtick_is_content_when_a_later_close_exists() -> None:
 def test_scanner_handles_large_unmatched_delimiter_runs_as_ordinary_prose(text: str) -> None:
     result = inline_markup.scan_text(text)
 
-    assert not result.ambiguous
+    assert not result.rewrite_blocked
     assert tuple(token.value for token in result.tokens) == (text,)
 
 
@@ -163,7 +223,7 @@ def test_scanner_handles_many_adjacent_recognized_constructs_as_one_envelope() -
     text = "/".join(["`value`"] * 2_000)
     result = inline_markup.scan_text(text)
 
-    assert not result.ambiguous
+    assert not result.rewrite_blocked
     assert tuple(token.value for token in result.tokens) == (text,)
     assert result.tokens[0].kind is inline_markup.InlineMarkupKind.REST_INTERPRETED
 
@@ -172,7 +232,7 @@ def test_scanner_handles_many_adjacent_recognized_constructs_as_one_envelope() -
 def test_scanner_treats_line_leading_fence_openers_with_info_strings_as_ordinary(text: str) -> None:
     result = inline_markup.scan_text(text)
 
-    assert not result.ambiguous
+    assert not result.rewrite_blocked
     assert all(token.kind is None for token in result.tokens)
 
 
@@ -180,34 +240,37 @@ def test_scanner_handles_long_escaped_markdown_destination_in_linear_indexed_pas
     text = "[label](" + "\\" * 20_000 + "target)"
     result = inline_markup.scan_text(text)
 
-    assert not result.ambiguous
+    assert not result.rewrite_blocked
     assert result.tokens[0].kind is inline_markup.InlineMarkupKind.MARKDOWN_LINK
 
 
 @pytest.mark.parametrize(
-    "text",
+    ("text", "expected_kind"),
     [
-        "![incomplete image",
-        "[label](   ",
-        "[label](<target with space>)",
-        "[label](<unterminated)",
-        "[label](target unsupported-title)",
-        "[label](target 'unterminated)",
-        "[label](target (nested(title)))",
-        "[label](target 'title' trailing)",
+        ("![incomplete image", inline_markup.InlineRewriteBarrierKind.INCOMPLETE_MARKDOWN_IMAGE_LABEL),
+        ("[label](   ", inline_markup.InlineRewriteBarrierKind.INCOMPLETE_MARKDOWN_INLINE_DESTINATION),
+        ("[label](<target with space>)", inline_markup.InlineRewriteBarrierKind.MALFORMED_MARKDOWN_ANGLE_DESTINATION),
+        ("[label](<unterminated)", inline_markup.InlineRewriteBarrierKind.INCOMPLETE_MARKDOWN_ANGLE_DESTINATION),
+        ("[label](target unsupported-title)", inline_markup.InlineRewriteBarrierKind.UNSUPPORTED_MARKDOWN_LINK_TITLE),
+        ("[label](target 'unterminated)", inline_markup.InlineRewriteBarrierKind.INCOMPLETE_MARKDOWN_LINK_TITLE),
+        ("[label](target (nested(title)))", inline_markup.InlineRewriteBarrierKind.MALFORMED_MARKDOWN_LINK_TITLE),
+        ("[label](target 'title' trailing)", inline_markup.InlineRewriteBarrierKind.INCOMPLETE_MARKDOWN_INLINE_LINK),
     ],
 )
-def test_scanner_rejects_distinct_strong_malformed_markdown_shapes(text: str) -> None:
-    assert inline_markup.scan_text(text).ambiguous
+def test_scanner_rejects_distinct_strong_malformed_markdown_shapes(text: str, expected_kind: inline_markup.InlineRewriteBarrierKind) -> None:
+    result = inline_markup.scan_text(text)
+
+    assert result.rewrite_blocked
+    assert tuple(barrier.kind for barrier in result.barriers) == (expected_kind,)
 
 
 def test_scanner_accepts_escaped_destination_whitespace_and_keeps_inline_markdown_code_inside_words_atomic() -> None:
     link = inline_markup.scan_text(r"before [label](target\ with\ spaces) after")
     code = inline_markup.scan_text("before prefix`code with spaces`suffix after")
 
-    assert not link.ambiguous
+    assert not link.rewrite_blocked
     assert link.tokens[1].kind is inline_markup.InlineMarkupKind.MARKDOWN_LINK
-    assert not code.ambiguous
+    assert not code.rewrite_blocked
     assert code.tokens[1].value == "prefix`code with spaces`suffix"
     assert code.tokens[1].kind is inline_markup.InlineMarkupKind.MARKDOWN_CODE
 
@@ -215,7 +278,7 @@ def test_scanner_accepts_escaped_destination_whitespace_and_keeps_inline_markdow
 def test_generic_nested_angle_text_and_complete_shortcut_reference_remain_ordinary() -> None:
     for text in ("<http://first<second>", "[label]"):
         result = inline_markup.scan_text(text)
-        assert not result.ambiguous
+        assert not result.rewrite_blocked
         assert all(token.kind is None for token in result.tokens)
 
 
@@ -281,16 +344,24 @@ def test_layout_scanning_joins_lines_and_splits_at_exact_hard_breaks() -> None:
     assert tuple(token.value for token in result.segments[0].scan.tokens) == ("alpha", "beta", "gamma")
     assert result.segments[0].hard_break is not None
     assert result.segments[0].hard_break.value == "   "
-    assert not result.ambiguous
+    assert not result.rewrite_blocked
 
 
-def test_layout_scanning_preserves_line_identity_for_duplicate_ambiguities() -> None:
+def test_layout_scanning_preserves_line_identity_for_duplicate_barriers() -> None:
     result = inline_markup.scan_layout_lines((
         inline_markup.layout_line_for_text("[label](missing  ", has_following_newline=True),
         inline_markup.layout_line_for_text("ordinary words", has_following_newline=True),
         inline_markup.layout_line_for_text("[label](missing", has_following_newline=False),
     ))
 
-    assert result.ambiguous
-    assert tuple(ambiguity.line_index for ambiguity in result.ambiguities) == (0, 2)
-    assert tuple(tuple(ambiguity.line_index for ambiguity in segment.scan.ambiguities) for segment in result.segments) == ((0,), (2,))
+    assert result.rewrite_blocked
+    assert tuple(barrier.line_index for barrier in result.barriers) == (0, 2)
+    assert tuple(tuple(barrier.line_index for barrier in segment.scan.barriers) for segment in result.segments) == ((0,), (2,))
+
+
+def test_layout_scanning_does_not_strip_or_join_at_diagnostic_whitespace() -> None:
+    result = inline_markup.scan_layout_lines((inline_markup.layout_line_for_text("alpha\v", has_following_newline=True), inline_markup.layout_line_for_text("\u0085beta", has_following_newline=False)))
+
+    assert result.rewrite_blocked
+    assert tuple(barrier.kind for barrier in result.barriers) == (inline_markup.InlineRewriteBarrierKind.SUSPICIOUS_UNICODE, inline_markup.InlineRewriteBarrierKind.SUSPICIOUS_UNICODE)
+    assert tuple(segment.text for segment in result.segments) == ("alpha\v \u0085beta",)

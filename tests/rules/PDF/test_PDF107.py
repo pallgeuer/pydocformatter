@@ -69,13 +69,13 @@ def test_strips_quote_adjacent_space_tabs_from_moved_first_line() -> None:
     assert not format_pdf103(result.new_source).modified
 
 
-def test_preserves_quote_adjacent_non_space_tab_whitespace_on_moved_first_line() -> None:
+def test_suspicious_unicode_defers_moving_summary_below_opening_quotes() -> None:
     source = 'def function():\n    """\xa0Summary.\n\n    Body.\n    """\n'
     result = format_pdf103(source)
 
-    assert result.new_source == 'def function():\n    """\n    \xa0Summary.\n\n    Body.\n    """\n'
-    assert result.fixed_findings[PDF107MultilineOpeningQuotesSeparateLine.meta] == 1
-    assert not format_pdf103(result.new_source).modified
+    assert result.new_source == source
+    assert not result.fixed_findings
+    assert not result.unfixed_findings
 
 
 def test_moves_single_content_line_below_opening_quotes() -> None:

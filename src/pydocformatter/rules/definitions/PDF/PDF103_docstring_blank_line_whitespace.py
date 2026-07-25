@@ -66,7 +66,7 @@ def _planned_changes(context: RuleContext) -> tuple[rule_edits.PlannedSourceChan
 
 def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo, *, context: RuleContext, source_lines: Sequence[str]) -> rule_edits.PlannedSourceChange | None:
     """Return one whole-literal replacement for a docstring."""
-    if not PDF_definition.is_safely_mapped_simple_docstring(docstring):
+    if not PDF_definition.can_canonically_rewrite_simple_docstring(docstring):
         return None
     canonical_margin = PDF_definition.docstring_canonical_margin(docstring, context=context, source_lines=source_lines)
     targets = tuple(_line_target(docstring, line, canonical_margin=canonical_margin, context=context) for line in docstring.structure.lines)
