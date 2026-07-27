@@ -52,6 +52,7 @@ _ALTERNATE_DIRECT_ANALYSIS_VALUES = {
     "docstring_class_attribute_no_type_base_classes": ("project.Enum",),
     "docstring_forbidden_function_decorators": ("project.forbidden",),
     "docstring_optional_function_decorators": ("project.optional",),
+    "docstring_placeholder_markers": ("WIP",),
     "docstring_property_decorators": ("project.property",),
     "docstring_parse_list_items": False,
     "docstring_parse_headings": False,

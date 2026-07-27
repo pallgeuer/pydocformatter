@@ -13,7 +13,7 @@
         "no_edits": true,
         "prompt_vars": {},
         "prompt": "Audit the organization and scope of all rule implementation code and related tests. Rules should be implemented in their respective rule Python files. Only genuinely reusable building blocks that feasibly serve multiple specific rules (now or in the future) should live as generic helpers under `definition_helpers/` or, when specifically justified by category-level preprocessing, in a rule category implementation module such as `PCF.py` or `PDF.py`. Code unlikely ever to be needed by more than one specific rule should remain in that rule's own file, unless there is a good reason. Reevaluate every helper boundary, including whether each helper under `definition_helpers/` belongs there, whether its containing helper module has a cohesive and accurate name, and whether any helper in a category implementation module should move into a rule file or a focused generic helper module. Apply an especially high bar to essentially generic helpers living in `PDF.py` or another category module, and identify disconnected helpers that make category modules unnecessarily long or obscure their category-specific preprocessing role. Also inspect associated tests and identify the exact test moves or test-file renames that each proposed code move would require. Produce an enumerated list of findings. For each finding, identify the helper and current location, its actual callers and plausible reuse scope, the recommended destination and name, why that boundary is better, and the associated test reorganization. Do not list helpers whose current placement is justified unless needed to explain a broader finding.",
-        "interactive": "preferred",
+        "requires_interactive": false,
         "custom_codex_args": [],
         "notes": ""
       }
@@ -29,7 +29,7 @@
         "no_edits": true,
         "prompt_vars": {},
         "prompt": "Inspect every currently implemented rule's default `RuleMetadata.message` and every possible instance-message construction path, including messages assembled by shared helpers, to determine the diagnostic message variants each rule can emit. Review every rule, but report only identified issues. Look for wording and style inconsistencies across rules, inconsistencies between default and instance messages, rules that would benefit from instance-specific messages but do not use them, overly specific instance messages, and any other message-related issue or nit. Produce an enumerated list of findings. For each finding, name the affected rule or rules, quote or precisely describe the relevant message variants, explain the issue, and recommend exact corrective wording or behavior. Do not include entries for rules with no message-related concern.",
-        "interactive": "preferred",
+        "requires_interactive": false,
         "custom_codex_args": [],
         "notes": ""
       }
@@ -45,7 +45,7 @@
         "no_edits": true,
         "prompt_vars": {},
         "prompt": "Audit how the pydocformatter repository configures and uses pydocformatter on its own codebase. Identify every implemented rule, setting, and relevant feature that is not currently enabled or exercised by the repository's effective pydocformatter configuration, excluding only choices that are fundamentally incompatible with rules or settings already selected. Verify the effective configuration and account for selection groups, defaults, explicit overrides, per-file behavior, and any other mechanism that affects what actually runs. Produce an enumerated list of all non-enabled rules, settings, and features. For each item, describe precisely what it does, explain why it is currently inactive, identify any incompatibility or behavioral tradeoff, and recommend whether it could and should be enabled for this repository. Clearly distinguish fundamentally incompatible options from compatible but undesirable, redundant, convention-specific, or merely not-yet-enabled options. Conclude with the maximal suitable configuration changes you recommend so that the repository enables and exercises as much of pydocformatter's applicable functionality as reasonably possible, but do not modify the configuration or any files.",
-        "interactive": "preferred",
+        "requires_interactive": false,
         "custom_codex_args": [],
         "notes": ""
       }
@@ -61,7 +61,7 @@
         "no_edits": false,
         "prompt_vars": {},
         "prompt": "Audit every pydocformatter rule category and rule implementation for unnecessarily or avoidably slow code. First update every inventory table in docs/devel/rule_performance_audit.md from the latest Git-tracked rule category and rule implementation files, because rules may have been added, removed, renamed, or substantially changed since the rule inventory up-to-date commit recorded at the top of the file. Then measure or otherwise characterize performance, analyze the implementation code for behavior-preserving speedups, and maintain docs/devel/rule_performance_audit.md continuously as the source of truth. Do not implement fixes during the audit. Do not recommend externally visible behavior changes unless they are confirmed bugs; if an apparent speedup depends on changing behavior, record the bug-versus-intended-behavior question in the plan and plan to ask me to confirm before treating it as an optimization. The goal is complete only when every category and every rule row in the plan has performance evidence, code-analysis notes, potential speedup classification, and any detailed findings or no-finding rationale recorded.",
-        "interactive": "allowed",
+        "requires_interactive": false,
         "custom_codex_args": [],
         "notes": ""
       }
@@ -77,7 +77,7 @@
         "no_edits": false,
         "prompt_vars": {},
         "prompt": "Audit the complete pydocformatter test set for unnecessarily or avoidably slow tests, fixtures, helpers, and testing approaches without significantly weakening any tests. First update every inventory table in docs/devel/test_performance_audit.md from the latest Git-tracked tests and test-support files, because tests may have been added, removed, renamed, or substantially changed since the test inventory up-to-date commit recorded at the top of the file. Also check whether src/pydocformatter/rules/definitions/**/*.py has changed since docs/devel/rule_performance_audit.md was last updated, and record in docs/devel/rule_performance_audit.md which rule categories or rules need to be rechecked before relying on that rule-performance audit. Then measure or otherwise characterize test performance, analyze the test code for coverage-preserving speedups, and maintain docs/devel/test_performance_audit.md continuously as the source of truth. Do not implement fixes during the audit unless I explicitly ask for an implementation pass. Do not significantly weaken tests: do not delete meaningful cases, relax assertions, skip tests, mark tests xfail, reduce fixture realism, narrow parametrization, or replace end-to-end coverage with narrower coverage unless the same behavior remains protected elsewhere and that equivalence is documented. The goal is complete only when every test file and every shared helper/fixture row in the plan has performance evidence, code-analysis notes, potential speedup classification, and any detailed findings or no-finding rationale recorded. Keep the goal command in the markdown for possible future re-runs when tests have changed/added.",
-        "interactive": "allowed",
+        "requires_interactive": false,
         "custom_codex_args": [],
         "notes": ""
       }
@@ -93,7 +93,7 @@
         "no_edits": true,
         "prompt_vars": {},
         "prompt": "Starting with `docs/public/ruff_rule_links.md`, inspect every currently implemented rule's documentation and implementation to determine exactly what it checks, which findings it can report, and what it can automatically fix. Assess whether the existing rule set is essentially complete in how it checks, formats, and canonicalizes Python docstrings and comments. Identify behavior that is not currently checked, standardized, or canonicalized but would benefit a large proportion of Python projects. Favor simple, broadly useful additions over niche, highly opinionated, or overly specific policies. Produce an enumerated list of every reasonable new-rule suggestion and every reasonable modification that would make an existing rule more powerful. Consult `docs/devel/future_rule_ideas.md` as additional context, merge duplicate concepts where appropriate, and do not present an already-recorded idea as newly discovered. For each enumerated item, identify any affected existing rules, summarize the uncovered behavior, explain why it is broadly useful, and recommend whether it should be a new rule or an extension of an existing rule.",
-        "interactive": "preferred",
+        "requires_interactive": false,
         "custom_codex_args": [],
         "notes": ""
       }
@@ -109,7 +109,7 @@
         "no_edits": true,
         "prompt_vars": {},
         "prompt": "Adversarially investigate whether pydocformatter's auto-fixes always converge. Study the complete set of fixable rules and their interactions, then craft and execute targeted input snippets designed to make one rule's fix create a new finding for another rule, eventually returning to an earlier source state or finding state. Try hard to identify at least one genuine fix loop, and preferably multiple distinct loops involving different rule combinations. Produce an enumerated list of confirmed loops and credible near misses. For each confirmed loop, name every involved rule, provide the minimal reproducing input and relevant settings, show the ordered sequence of source or finding states across formatter passes until the cycle repeats, and explain the underlying interaction. Clearly distinguish proven cycles from hypotheses.",
-        "interactive": "preferred",
+        "requires_interactive": false,
         "custom_codex_args": [],
         "notes": ""
       }
@@ -125,7 +125,7 @@
         "no_edits": true,
         "prompt_vars": {},
         "prompt": "Carefully read every individual rule Markdown file through the end of its `## What it does` section, stopping at the `## Why is this useful?` heading. Compare the documented scopes and behavior of all rules to identify complete or partial overlap and situations where rules can compete, produce conflicting or redundant findings or fixes, or otherwise interact confusingly. Produce an enumerated finding for every identified overlap or competition. For each finding, name the rule codes and names involved, describe the exact intersecting behavior and the conditions under which it occurs, and recommend whether any rule should change or whether the interaction is unavoidable, intentional, or otherwise reasonable. Evaluate whether each rule remains consistently scoped and independently understandable to users.",
-        "interactive": "preferred",
+        "requires_interactive": false,
         "custom_codex_args": [],
         "notes": ""
       }
@@ -141,7 +141,7 @@
         "no_edits": false,
         "prompt_vars": {},
         "prompt": "Inspect every rule category documentation Markdown file and compare it with the current category implementation, implemented rule inventory, rule metadata, settings, and behavior. Ensure each category document is complete, accurate, internally consistent, and fully up to date. Correct genuinely outdated, incorrect, or missing content, but do not change a Markdown file merely for the sake of making a change when its existing content is already correct and complete. Preserve the project templates and documentation conventions, and run the relevant documentation and Markdown-example tests after making any edits.",
-        "interactive": "allowed",
+        "requires_interactive": false,
         "custom_codex_args": [],
         "notes": ""
       }
@@ -157,7 +157,7 @@
         "no_edits": false,
         "prompt_vars": {},
         "prompt": "Ensure every rule Markdown documentation file modified by the current uncommitted changes is detailed, explicit, and completely up to date. Expand the examples section with enough varied, qualitative examples to convey each rule's most important and common behavior. The first example must be a canonical example of the rule. You may combine multiple expected fixes or findings in a single example block when that keeps the section compact and clear. Run pytest afterward to verify that every example exactly reflects the rule's behavior.",
-        "interactive": "allowed",
+        "requires_interactive": false,
         "custom_codex_args": [],
         "notes": ""
       }
@@ -173,7 +173,7 @@
         "no_edits": false,
         "prompt_vars": {},
         "prompt": "Inspect the tests that currently cover every rule modified by the current uncommitted changes. Think critically and add meaningful tests that lock in each rule's complete behavior and every relevant setting. Do not merely retest existing behavior with superficially different inputs. Cover conceivable unusual, complex, mixed, special, and edge cases, and deliberately include cases likely to expose failures in the current implementation. Consider code coverage when identifying gaps. Run the relevant tests. If an expectation test fails, carefully determine whether the test expectation or the current rule implementation is correct, and fix the appropriate side.",
-        "interactive": "allowed",
+        "requires_interactive": false,
         "custom_codex_args": [],
         "notes": ""
       }
@@ -189,7 +189,7 @@
         "no_edits": false,
         "prompt_vars": {},
         "prompt": "Carefully read and follow `RELEASE.md` in order to fully release the current state of code as a new version. Decide on the appropriate next version number based on the changelog and the diff relative to the previous release; see also `docs_site/versioning.md`. Be meticulous in following all required steps, and check that you have done everything required at the end of each section. If anything is unclear or requires user decisions or user input, immediately end your turn after stating what clarifications or actions you need from the user. Check `PYPI_API_TOKEN` in an interactive Bash session in case it is available and needed.",
-        "interactive": "required",
+        "requires_interactive": true,
         "custom_codex_args": [],
         "notes": ""
       }

@@ -68,6 +68,18 @@ def test_reports_repeated_google_method_entries() -> None:
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((6,),)
 
 
+def test_reports_repeated_method_names_across_different_signatures() -> None:
+    """Use the method name rather than the opaque signature as repetition identity."""
+    google_source = 'class Example:\n    """Summary.\n\n    Methods:\n        run(value): Start the operation.\n        run(value, mode="safe"): Start it again.\n    """\n'
+    numpy_source = 'class Example:\n    """Summary.\n\n    Methods\n    -------\n    run(value)\n        Start the operation.\n    run(value, mode="safe")\n        Start it again.\n    """\n'
+    google_result = format_source(google_source)
+    numpy_settings = CheckSettings(select=("PDF412",), docstring_convention=DocstringConvention.NUMPY)
+    numpy_result = format_source(numpy_source, settings=numpy_settings)
+
+    assert tuple(finding.line_numbers for finding in google_result.unfixed_findings) == ((6,),)
+    assert tuple(finding.line_numbers for finding in numpy_result.unfixed_findings) == ((8,),)
+
+
 def test_google_exception_entries_compare_exact_parsed_names() -> None:
     source = (
         'def function():\n    """Summary.\n\n    Raises:\n        ValueError: First value error.\n        valueError: Distinct spelling.\n        `ValueError`: Same parsed value error.\n    """\n'

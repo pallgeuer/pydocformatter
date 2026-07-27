@@ -85,8 +85,62 @@ def test_inserts_period_for_attribute_docstring_summary() -> None:
     assert not format_source(result.new_source).modified
 
 
-@pytest.mark.parametrize("punctuation", [",", "?", "!", ":", ";"])
-def test_reports_but_does_not_fix_other_punctuation(punctuation: str) -> None:
+@pytest.mark.parametrize("punctuation", [",", ";"])
+def test_replaces_comma_and_semicolon_with_period(punctuation: str) -> None:
+    source = f'def function():\n    """Return value{punctuation}"""\n'
+    result = format_source(source)
+
+    assert result.new_source == 'def function():\n    """Return value."""\n'
+    assert result.fixed_findings[PDF300SummaryTrailingPeriod.meta] == 1
+    assert not result.unfixed_findings
+    assert not format_source(result.new_source).modified
+
+
+def test_reports_comma_before_structured_content_without_fixing() -> None:
+    source = 'def function():\n    """Choose one,\n\n    - first\n    - second\n    """\n'
+    result = format_source(source)
+
+    assert result.new_source == source
+    assert not result.fixed_findings
+    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((2,),)
+    assert not result.unfixed_findings[0].fixable
+
+
+@pytest.mark.parametrize(
+    ("source", "expected"),
+    [
+        ('def function():\n    r"""Return \\d+ values,"""\n', 'def function():\n    r"""Return \\d+ values."""\n'),
+        ('def function():\n    """Return \\u2603,"""\n', 'def function():\n    """Return \\u2603."""\n'),
+        ('def function():\n    """Return value\n    continued;   \n    """\n', 'def function():\n    """Return value\n    continued.   \n    """\n'),
+        ('value = 1\n"""summary without period,"""\n', 'value = 1\n"""summary without period."""\n'),
+    ],
+)
+def test_replacement_preserves_safe_literal_layout(source: str, expected: str) -> None:
+    """Replace only the terminal source character across safe literal layouts."""
+    result = format_source(source)
+
+    assert result.new_source == expected
+    assert result.fixed_findings[PDF300SummaryTrailingPeriod.meta] == 1
+    assert not result.unfixed_findings
+    assert result.new_source is not None
+    assert not format_source(result.new_source).modified
+
+
+@pytest.mark.parametrize(
+    ("source", "expected"),
+    [('def function():\n    R"""Return value,"""\n', 'def function():\n    R"""Return value."""\n'), ('def function():\n    U"""Return value"""\n', 'def function():\n    U"""Return value."""\n')],
+)
+def test_summary_fix_preserves_uppercase_literal_prefix(source: str, expected: str) -> None:
+    """Preserve exact prefix spelling for terminal insertion and replacement."""
+    result = format_source(source)
+
+    assert result.new_source == expected
+    assert result.fixed_findings[PDF300SummaryTrailingPeriod.meta] == 1
+    assert not result.unfixed_findings
+
+
+@pytest.mark.parametrize("punctuation", ["?", "!", ":"])
+def test_reports_but_does_not_fix_expressive_or_structural_punctuation(punctuation: str) -> None:
     source = f'def function():\n    """Return value{punctuation}"""\n'
     result = format_source(source)
 
@@ -94,6 +148,27 @@ def test_reports_but_does_not_fix_other_punctuation(punctuation: str) -> None:
     assert not result.fixed_findings
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((2,),)
     assert [finding.fixable for finding in result.unfixed_findings] == [False]
+
+
+def test_reports_escaped_comma_as_nonfixable() -> None:
+    source = 'def function():\n    """Return value\\x2c"""\n'
+    result = format_source(source)
+
+    assert result.new_source == source
+    assert not result.fixed_findings
+    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((2,),)
+    assert not result.unfixed_findings[0].fixable
+
+
+@pytest.mark.parametrize("source", ['def function():\n    ("Return " "value,")\n', 'def function():\n    """Return \\\nvalue;"""\n'])
+def test_reports_source_mapping_barrier_terminal_punctuation_as_nonfixable(source: str) -> None:
+    """Do not replace punctuation across concatenation or a physical source continuation."""
+    result = format_source(source)
+
+    assert result.new_source == source
+    assert not result.fixed_findings
+    assert len(result.unfixed_findings) == 1
+    assert not result.unfixed_findings[0].fixable
 
 
 def test_colon_header_with_following_content_is_not_summary_punctuation_target() -> None:
@@ -253,6 +328,16 @@ def test_preserves_crlf_line_endings() -> None:
 
     assert result.new_source == 'def function():\r\n    """Return value\r\n    continued.\r\n    """\r\n'
     assert result.fixed_findings[PDF300SummaryTrailingPeriod.meta] == 1
+
+
+def test_replaces_terminal_semicolon_without_normalizing_crlf_line_endings() -> None:
+    """Keep CRLF source unchanged outside the replaced punctuation character."""
+    source = 'def function():\r\n    """Return value\r\n    continued;\r\n    """\r\n'
+    result = format_source(source, settings=CheckSettings(select=("PDF300",), line_ending=LineEnding.CR_LF))
+
+    assert result.new_source == 'def function():\r\n    """Return value\r\n    continued.\r\n    """\r\n'
+    assert result.fixed_findings[PDF300SummaryTrailingPeriod.meta] == 1
+    assert not result.unfixed_findings
 
 
 def test_unfixable_selection_reports_fixable_instance_without_changing_source() -> None:

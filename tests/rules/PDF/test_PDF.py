@@ -362,6 +362,30 @@ def test_prepare_lazily_caches_concatenated_string_parts(mocker: MockerFixture) 
     assert parts_spy.call_count == 1
 
 
+def test_prepare_lazily_caches_entry_description_targets_and_structural_adjacency(mocker: MockerFixture) -> None:
+    """Share prepared style targets while retaining summary and entry adjacency."""
+    target_spy = mocker.spy(PDF_definition, "_entry_description_line_targets")
+    adjacency_spy = mocker.spy(PDF_definition, "_blocks_with_following_nonblank_kind")
+    source = 'def choose(value):\n    """Choose one,\n\n    - first\n\n    Args:\n        value: Choose one,\n            - fast\n    """\n'
+    data = PDF.prepare(category_context(source, settings=CheckSettings(docstring_convention=DocstringConvention.GOOGLE)))
+
+    first_targets = data.entry_description_first_line_targets()
+    assert adjacency_spy.call_count == 0
+    terminal_targets = data.entry_description_terminal_line_targets()
+    summary_target = data.summary_terminal_line_targets[0]
+    adjacency_calls = adjacency_spy.call_count
+    following_summary_kind = summary_target.following_block_kind
+
+    assert data.entry_description_first_line_targets() is first_targets
+    assert data.entry_description_terminal_line_targets() is terminal_targets
+    assert target_spy.call_count == 2
+    assert tuple(target.following_block_kinds for target in first_targets) == ((),)
+    assert tuple(target.following_block_kinds for target in terminal_targets) == ((DocstringBlockKind.LIST_ITEM,),)
+    assert following_summary_kind is DocstringBlockKind.LIST_ITEM
+    assert summary_target.following_block_kind is following_summary_kind
+    assert adjacency_spy.call_count == adjacency_calls + 1
+
+
 def test_mapping_capability_is_separate_from_canonical_rewrite_policy() -> None:
     safe, hazardous = PDF.prepare(category_context('"""safe"""\n"""ignored additional"""\nvalue = 1\n"""hazard\u202e"""\n')).docstrings
 
@@ -882,6 +906,21 @@ def test_google_section_names_determine_entry_semantics(section: str, entry_text
     assert (entry.kind, entry.names, entry.type_text) == (expected_kind, expected_names, expected_type)
 
 
+def test_google_method_signatures_are_names_with_opaque_balanced_arguments() -> None:
+    """Parse method signatures without exposing their arguments as type text."""
+    structure = structure_for(
+        """Methods:
+    run(): Execute it.
+    convert(value: tuple[int, str], *, mode=Literal[")", "safe"]): Convert it.""",
+        settings=CheckSettings(docstring_convention=DocstringConvention.GOOGLE),
+    )
+
+    assert tuple((entry.kind, entry.names, entry.type_text, entry.description) for entry in structure.entries) == (
+        (DocstringEntryKind.METHOD, ("run",), None, "Execute it."),
+        (DocstringEntryKind.METHOD, ("convert",), None, "Convert it."),
+    )
+
+
 @pytest.mark.parametrize(
     ("section", "entry_text", "expected_kind"),
     [("Returns", "None", DocstringEntryKind.RETURN), ("Returns", "None.", DocstringEntryKind.RETURN), ("Yields", "None", DocstringEntryKind.YIELD), ("Yields", "None.", DocstringEntryKind.YIELD)],
@@ -1146,6 +1185,24 @@ def test_numpy_section_names_determine_entry_semantics(section: str, entry_text:
     structure = structure_for(f"{section}\n{'-' * len(section)}\n{entry_text}\n    Description.", settings=CheckSettings(docstring_convention=DocstringConvention.NUMPY))
     entry = structure.entries[0]
     assert (entry.kind, entry.names, entry.type_text, entry.description) == (expected_kind, expected_names, expected_type, "Description.")
+
+
+def test_numpy_method_signatures_are_names_with_opaque_balanced_arguments() -> None:
+    """Parse canonical NumPy method signatures and their continuation descriptions."""
+    structure = structure_for(
+        """Methods
+-------
+colorspace(c='rgb')
+    Represent the photo.
+convert(value: tuple[int, str], mode=Literal[")", "safe"])
+    Convert it.""",
+        settings=CheckSettings(docstring_convention=DocstringConvention.NUMPY),
+    )
+
+    assert tuple((entry.kind, entry.names, entry.type_text, entry.description) for entry in structure.entries) == (
+        (DocstringEntryKind.METHOD, ("colorspace",), None, "Represent the photo."),
+        (DocstringEntryKind.METHOD, ("convert",), None, "Convert it."),
+    )
 
 
 @pytest.mark.parametrize("section", ["Warning", "Warnings"])

@@ -16,6 +16,8 @@ Attributes:
         should not include docstring types.
     DEFAULT_DOCSTRING_OPTIONAL_FUNCTION_DECORATORS (tuple[str, ...]): Function decorators whose definitions may omit
         docstrings.
+    DEFAULT_DOCSTRING_PLACEHOLDER_MARKERS (tuple[str, ...]): Whole-docstring marker labels recognized as placeholders by
+        default.
     DEFAULT_DOCSTRING_PROPERTY_DECORATORS (tuple[str, ...]): Function decorators whose definitions should be treated as
         properties.
     DEFAULT_COMMENT_TASK_MARKERS (tuple[str, ...]): Task marker labels recognized by default in comments.
@@ -95,10 +97,12 @@ DEFAULT_REQUIRE_EXPLICIT = (
 DEFAULT_DOCSTRING_FORBIDDEN_FUNCTION_DECORATORS = ("typing.overload", "typing_extensions.overload")
 DEFAULT_DOCSTRING_CLASS_ATTRIBUTE_NO_TYPE_BASE_CLASSES = ("enum.Enum", "enum.IntEnum", "enum.StrEnum", "enum.Flag", "enum.IntFlag", "enum.ReprEnum")
 DEFAULT_DOCSTRING_OPTIONAL_FUNCTION_DECORATORS = ("typing.override", "typing_extensions.override")
+DEFAULT_DOCSTRING_PLACEHOLDER_MARKERS = ("TODO", "TBD", "FIXME", "pass", "XXX", "HACK", "NotImplemented", "...")
 DEFAULT_DOCSTRING_PROPERTY_DECORATORS = ("builtins.property", "enum.property", "functools.cached_property", "abc.abstractproperty", "types.DynamicClassAttribute")
 DEFAULT_COMMENT_TASK_MARKERS = ("TODO", "FIXME", "XXX", "HACK", "BUG", "DEBUG", "NOTE", "OPTIMIZE", "REVIEW")
 PARALLELISM_CONSTRAINT_MESSAGE = "must be 0, a fractional value greater than 0 and less than 1, or a whole number greater than or equal to 1"
 _MAX_DOCUMENTED_STRING_LIST_DEFAULT_LENGTH = 50
+_PLACEHOLDER_MARKER_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_-]*$")
 _TASK_MARKER_RE = re.compile(r"^[A-Z][A-Z0-9_-]*$")
 _validate_non_negative_float = settings_core.validate_float(min_value=0)
 
@@ -229,6 +233,7 @@ class CheckSettings:
             not have docstrings.
         docstring_optional_function_decorators (StringList): Exact function decorator names whose definitions may omit
             docstrings.
+        docstring_placeholder_markers (StringList): Exact whole-docstring marker labels recognized as placeholders.
         docstring_property_decorators (StringList): Exact function decorator names whose definitions should be treated
             as properties.
         docstring_parse_list_items (bool): Whether list items are parsed as distinct docstring structures.
@@ -295,6 +300,7 @@ class CheckSettings:
     docstring_class_attribute_no_type_base_classes: StringList = DEFAULT_DOCSTRING_CLASS_ATTRIBUTE_NO_TYPE_BASE_CLASSES
     docstring_forbidden_function_decorators: StringList = DEFAULT_DOCSTRING_FORBIDDEN_FUNCTION_DECORATORS
     docstring_optional_function_decorators: StringList = DEFAULT_DOCSTRING_OPTIONAL_FUNCTION_DECORATORS
+    docstring_placeholder_markers: StringList = DEFAULT_DOCSTRING_PLACEHOLDER_MARKERS
     docstring_property_decorators: StringList = DEFAULT_DOCSTRING_PROPERTY_DECORATORS
     docstring_parse_list_items: bool = True
     docstring_parse_headings: bool = True
@@ -384,6 +390,7 @@ class CheckSettingsOverrides(TypedDict, total=False):
             not have docstrings.
         docstring_optional_function_decorators (StringList): Exact function decorator names whose definitions may omit
             docstrings.
+        docstring_placeholder_markers (StringList): Exact whole-docstring marker labels recognized as placeholders.
         docstring_property_decorators (StringList): Exact function decorator names whose definitions should be treated
             as properties.
         docstring_parse_list_items (bool): Whether list items are parsed as distinct docstring structures.
@@ -450,6 +457,7 @@ class CheckSettingsOverrides(TypedDict, total=False):
     docstring_class_attribute_no_type_base_classes: StringList
     docstring_forbidden_function_decorators: StringList
     docstring_optional_function_decorators: StringList
+    docstring_placeholder_markers: StringList
     docstring_property_decorators: StringList
     docstring_parse_list_items: bool
     docstring_parse_headings: bool
@@ -602,6 +610,37 @@ def validate_comment_task_markers(value: object, context: str) -> StringList:
     invalid = [marker for marker in markers if _TASK_MARKER_RE.fullmatch(marker) is None]
     if invalid:
         raise settings_core.SettingsError(f"{context} entries must match [A-Z][A-Z0-9_-]*: {', '.join(invalid)}")
+    return markers
+
+
+def validate_docstring_placeholder_markers(value: object, context: str) -> StringList:
+    """Validate configured whole-docstring placeholder markers.
+
+    Args:
+        value (object): Raw marker-list value from configuration or the CLI.
+        context (str): User-facing setting label included in validation errors.
+
+    Returns:
+        StringList: Validated marker labels in configured order and spelling.
+
+    Raises:
+        settings_core.SettingsError: If the value is not a string list, contains ASCII case-insensitive duplicates, or
+            contains an unsupported marker.
+    """
+    markers = settings_core.validate_string_list(value, context)
+    invalid = [marker for marker in markers if marker != "..." and _PLACEHOLDER_MARKER_RE.fullmatch(marker) is None]
+    if invalid:
+        raise settings_core.SettingsError(f"{context} entries must be '...' or match [A-Za-z][A-Za-z0-9_-]*: {', '.join(invalid)}")
+    seen: set[str] = set()
+    duplicates: set[str] = set()
+    for marker in markers:
+        normalized = marker.upper()
+        if normalized in seen:
+            duplicates.add(marker)
+        seen.add(normalized)
+    sorted_duplicates = sorted(duplicates, key=lambda marker: (marker.upper(), marker))
+    if sorted_duplicates:
+        raise settings_core.SettingsError(f"{context} must not contain ASCII case-insensitive duplicate markers: {', '.join(sorted_duplicates)}")
     return markers
 
 
@@ -933,6 +972,17 @@ SETTINGS_SCHEMA = SettingsSchema(
             cli={"metavar": "DECORATOR"},
             documentation="Function decorator names whose definitions may omit docstrings. Calls are unwrapped before matching, and dotted names also match import aliases resolved statically by LibCST; unqualified names are syntactic-only.",
             example='docstring-optional-function-decorators = ["typing.override", "typing_extensions.override"]',
+        ),
+        CheckSettingDefinition(
+            cache_identity_role=CacheIdentityRole.DIRECT_ANALYSIS_VALUE,
+            field="docstring_placeholder_markers",
+            value_type=StringList,
+            group=SettingsGroup.DOCSTRING_FORMATTING,
+            help="Whole-docstring marker labels recognized as placeholders.",
+            validator=validate_docstring_placeholder_markers,
+            cli={"metavar": "MARKER"},
+            documentation=f"Whole-docstring placeholder markers recognized by PDF213 after ASCII case-insensitive label matching and narrow terminal-punctuation normalization; {_setting_default_clause('docstring_placeholder_markers', StringList)}. Use an empty list to suppress placeholder findings without changing rule selection.",
+            example='docstring-placeholder-markers = ["TODO", "NotImplemented", "..."]',
         ),
         CheckSettingDefinition(
             cache_identity_role=CacheIdentityRole.DIRECT_ANALYSIS_VALUE,

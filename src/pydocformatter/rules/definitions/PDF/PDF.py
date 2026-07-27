@@ -50,6 +50,7 @@ if typing.TYPE_CHECKING:
 
 
 _SIMPLE_STRING_PARTS_UNSET = object()
+_FOLLOWING_BLOCK_KIND_UNSET = object()
 
 
 class DefinitionKind(enum.Enum):
@@ -165,9 +166,11 @@ class ConventionEntryIssueKind(enum.Enum):
 
     Attributes:
         GOOGLE_UNBALANCED_TYPE: Google entry with an unbalanced parenthesized type.
+        GOOGLE_UNBALANCED_METHOD_SIGNATURE: Google method entry with an unbalanced signature.
         GOOGLE_MISSING_SEPARATOR: Google entry without the colon before its description.
         GOOGLE_ENTRY_INDENTATION: Complete Google entry not indented beyond its section header.
         GOOGLE_CONTINUATION_INDENTATION: Google description line not indented beyond its entry.
+        NUMPY_UNBALANCED_METHOD_SIGNATURE: NumPy method entry with an unbalanced signature.
         NUMPY_MISSING_TYPE: NumPy entry with a colon but no following type.
         NUMPY_MISSING_SEPARATOR: NumPy entry without the colon before its type.
         NUMPY_CONTINUATION_INDENTATION: NumPy description line not indented beyond its entry.
@@ -177,9 +180,11 @@ class ConventionEntryIssueKind(enum.Enum):
     """
 
     GOOGLE_UNBALANCED_TYPE = "google-unbalanced-type"
+    GOOGLE_UNBALANCED_METHOD_SIGNATURE = "google-unbalanced-method-signature"
     GOOGLE_MISSING_SEPARATOR = "google-missing-separator"
     GOOGLE_ENTRY_INDENTATION = "google-entry-indentation"
     GOOGLE_CONTINUATION_INDENTATION = "google-continuation-indentation"
+    NUMPY_UNBALANCED_METHOD_SIGNATURE = "numpy-unbalanced-method-signature"
     NUMPY_MISSING_TYPE = "numpy-missing-type"
     NUMPY_MISSING_SEPARATOR = "numpy-missing-separator"
     NUMPY_CONTINUATION_INDENTATION = "numpy-continuation-indentation"
@@ -207,9 +212,11 @@ class ConventionEntryIssue:
 
 _CONVENTION_ENTRY_ISSUE_PRECEDENCE: Mapping[ConventionEntryIssueKind, int] = MappingProxyType({
     ConventionEntryIssueKind.GOOGLE_UNBALANCED_TYPE: 1,
+    ConventionEntryIssueKind.GOOGLE_UNBALANCED_METHOD_SIGNATURE: 1,
     ConventionEntryIssueKind.GOOGLE_MISSING_SEPARATOR: 2,
     ConventionEntryIssueKind.GOOGLE_ENTRY_INDENTATION: 3,
     ConventionEntryIssueKind.GOOGLE_CONTINUATION_INDENTATION: 4,
+    ConventionEntryIssueKind.NUMPY_UNBALANCED_METHOD_SIGNATURE: 1,
     ConventionEntryIssueKind.NUMPY_MISSING_TYPE: 1,
     ConventionEntryIssueKind.NUMPY_MISSING_SEPARATOR: 2,
     ConventionEntryIssueKind.NUMPY_CONTINUATION_INDENTATION: 3,
@@ -263,6 +270,8 @@ class DocstringEntry:
             description.
         start_line (int): First logical docstring line occupied by the entry.
         end_line (int): Last logical docstring line occupied by the entry.
+        following_description_block_kind (DocstringBlockKind | None): Protected structural block immediately after the
+            final parsed description fragment but still owned by the entry.
         field_name (str | None): Original reStructuredText field name, without the surrounding colons.
         field_argument (str | None): Original reStructuredText field argument, if the field syntax supplied one.
     """
@@ -274,6 +283,7 @@ class DocstringEntry:
     description_lines: tuple[DocstringTextFragment, ...]
     start_line: int
     end_line: int
+    following_description_block_kind: DocstringBlockKind | None = None
     field_name: str | None = None
     field_argument: str | None = None
 
@@ -614,6 +624,45 @@ class SummaryLineTarget:
     docstring: DocstringInfo
     block: DocstringBlock
     line: DocstringValueLine
+    _following_block_kind: DocstringBlockKind | object | None = dataclasses.field(default=_FOLLOWING_BLOCK_KIND_UNSET, init=False, repr=False, compare=False)
+
+    @property
+    def following_block_kind(self) -> DocstringBlockKind | None:
+        """Cached next nonblank top-level block kind.
+
+        Returns:
+            Next nonblank top-level block kind, or None when the summary is final.
+        """
+        kind = self._following_block_kind
+        if kind is _FOLLOWING_BLOCK_KIND_UNSET:
+            kind = next((following_kind for block, following_kind in _blocks_with_following_nonblank_kind(self.docstring.structure.blocks, recursive=False) if block is self.block), None)
+            object.__setattr__(self, "_following_block_kind", kind)
+        return typing.cast("DocstringBlockKind | None", kind)
+
+
+@dataclasses.dataclass(frozen=True)
+class EntryDescriptionLineTarget:
+    """One source-mapped documentation entry description fragment.
+
+    Attributes:
+        docstring (DocstringInfo): Parsed docstring that owns the entry.
+        fragment (DocstringTextFragment): Source-mapped description fragment selected for a style check.
+        following_block_kinds (tuple[DocstringBlockKind, ...]): Structural block kinds immediately following the
+            description.
+    """
+
+    docstring: DocstringInfo
+    fragment: DocstringTextFragment
+    following_block_kinds: tuple[DocstringBlockKind, ...] = ()
+
+    @property
+    def line(self) -> DocstringValueLine:
+        """Logical docstring line containing the fragment.
+
+        Returns:
+            Logical docstring value line that owns the source-mapped description fragment.
+        """
+        return self.docstring.structure.lines[self.fragment.line_index]
 
 
 @dataclasses.dataclass(frozen=True)
@@ -695,6 +744,8 @@ class PDFCategoryData:
     )
     _module_bindings: module_bindings.ModuleBindings | None = dataclasses.field(default=None, init=False, repr=False, compare=False)
     _type_aliases: type_expressions.TypeAliasMap | None = dataclasses.field(default=None, init=False, repr=False, compare=False)
+    _entry_description_first_line_targets: tuple[EntryDescriptionLineTarget, ...] | None = dataclasses.field(default=None, init=False, repr=False, compare=False)
+    _entry_description_terminal_line_targets: tuple[EntryDescriptionLineTarget, ...] | None = dataclasses.field(default=None, init=False, repr=False, compare=False)
 
     def docstring_for(self, definition: DefinitionInfo) -> DocstringInfo | None:
         """Return the docstring owned by a definition, if one exists.
@@ -759,6 +810,30 @@ class PDFCategoryData:
             })
             object.__setattr__(self, "_attached_attribute_docstrings_by_owner_id", docstrings_by_owner_id)
         return docstrings_by_owner_id.get(id(owner), MappingProxyType({}))
+
+    def entry_description_first_line_targets(self) -> tuple[EntryDescriptionLineTarget, ...]:
+        """Return cached first nonempty entry-description fragments.
+
+        Returns:
+            Entry description targets used by first-word style rules.
+        """
+        targets = self._entry_description_first_line_targets
+        if targets is None:
+            targets = _entry_description_line_targets(self.docstrings, first=True)
+            object.__setattr__(self, "_entry_description_first_line_targets", targets)
+        return targets
+
+    def entry_description_terminal_line_targets(self) -> tuple[EntryDescriptionLineTarget, ...]:
+        """Return cached final nonempty entry-description fragments.
+
+        Returns:
+            Entry description targets used by terminal-punctuation rules.
+        """
+        targets = self._entry_description_terminal_line_targets
+        if targets is None:
+            targets = _entry_description_line_targets(self.docstrings, first=False)
+            object.__setattr__(self, "_entry_description_terminal_line_targets", targets)
+        return targets
 
 
 @dataclasses.dataclass(frozen=True)
@@ -1248,6 +1323,7 @@ _DIRECTIVE_RE = re.compile(r"^(?P<indent>[ \t]*)\.\.[ \t]+(?P<name>[\w-]+)::(?P<
 _REST_FIELD_RE = re.compile(r"^(?P<indent>[ \t]*):(?P<field>[\w-]+)(?:[ \t]+(?P<argument>[^:]*?\S))?[ \t]*:[ \t]*(?P<description>.*)$")
 _GOOGLE_FLAT_ENTRY_RE = re.compile(r"^(?P<indent>[ \t]*)(?P<name>\*{0,2}[A-Za-z_][\w.]*)(?:[ \t]*\((?P<type>[^)]+)\))?[ \t]*:[ \t]*(?P<description>.*)$")
 _GOOGLE_CANDIDATE_RE = re.compile(r"^(?P<indent>[ \t]*)(?P<name>\*{0,2}[A-Za-z_][\w.]*)(?P<tail>.*)$")
+_METHOD_ENTRY_CANDIDATE_RE = re.compile(r"^(?P<indent>[ \t]*)(?P<name>[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*)(?P<tail>.*)$")
 _GENERIC_ENTRY_PATTERN = re.compile(r"^(?P<indent>[ \t]*)(?P<name>[^:]+):[ \t]*(?P<description>.*)$")
 _NUMPY_ENTRY_RE = re.compile(r"^(?P<indent>[ \t]*)(?P<name>\*{0,2}[A-Za-z_][\w., ]*?)[ \t]*:[ \t]*(?P<type>.+)$")
 _NUMPY_EXCEPTION_ENTRY_RE = re.compile(r"^(?P<indent>[ \t]*)(?P<name>[^:]+?)[ \t]*:[ \t]*(?P<description>.*)$")
@@ -1274,6 +1350,7 @@ class _ConventionEntryMatch:
         type_text (str | None): Parenthesized Google type without delimiters, when present.
         type_start (int | None): Zero-based source column where the type begins.
         type_end (int | None): Zero-based exclusive source column where the type ends.
+        signature_text (str | None): Balanced method signature including its outer parentheses, when present.
         description (str): Inline description after the declaration separator.
         description_start (int): Zero-based source column where the description begins.
     """
@@ -1285,6 +1362,7 @@ class _ConventionEntryMatch:
     type_text: str | None
     type_start: int | None
     type_end: int | None
+    signature_text: str | None
     description: str
     description_start: int
 
@@ -1327,9 +1405,83 @@ def _match_google_entry(text: str, *, require_indent: bool = True) -> _Conventio
         type_text=text[opening + 1 : closing],
         type_start=opening + 1,
         type_end=closing,
+        signature_text=None,
         description=text[description_start:],
         description_start=description_start,
     )
+
+
+def _match_google_entry_for_kind(text: str, kind: DocstringEntryKind, *, require_indent: bool = True) -> _ConventionEntryMatch | None:
+    """Return a Google entry match using method-signature syntax for method sections."""
+    if kind is DocstringEntryKind.METHOD and (method_match := _match_google_method_entry(text, require_indent=require_indent)) is not None:
+        return method_match
+    return _match_google_entry(text, require_indent=require_indent)
+
+
+def _match_google_method_entry(text: str, *, require_indent: bool = True) -> _ConventionEntryMatch | None:
+    """Return explicit fields for a balanced Google method-signature entry."""
+    signature = _match_method_signature_head(text, require_indent=require_indent)
+    if signature is None:
+        return None
+    candidate, opening, closing = signature
+    colon = closing + 1
+    while colon < len(text) and text[colon] in " \t":
+        colon += 1
+    if colon >= len(text) or text[colon] != ":":
+        return None
+    description_start = colon + 1
+    while description_start < len(text) and text[description_start] in " \t":
+        description_start += 1
+    return _ConventionEntryMatch(
+        indent=candidate.group("indent"),
+        name=candidate.group("name"),
+        name_start=candidate.start("name"),
+        name_end=candidate.end("name"),
+        type_text=None,
+        type_start=None,
+        type_end=None,
+        signature_text=text[opening : closing + 1],
+        description=text[description_start:],
+        description_start=description_start,
+    )
+
+
+def _match_numpy_method_entry(text: str) -> _ConventionEntryMatch | None:
+    """Return explicit fields for a balanced NumPy method-signature entry."""
+    signature = _match_method_signature_head(text, require_indent=False)
+    if signature is None:
+        return None
+    candidate, opening, closing = signature
+    if text[closing + 1 :].strip():
+        return None
+    return _ConventionEntryMatch(
+        indent=candidate.group("indent"),
+        name=candidate.group("name"),
+        name_start=candidate.start("name"),
+        name_end=candidate.end("name"),
+        type_text=None,
+        type_start=None,
+        type_end=None,
+        signature_text=text[opening : closing + 1],
+        description="",
+        description_start=len(text),
+    )
+
+
+def _match_method_signature_head(text: str, *, require_indent: bool) -> tuple[re.Match[str], int, int] | None:
+    """Return a method candidate and its balanced signature bounds."""
+    candidate = _METHOD_ENTRY_CANDIDATE_RE.match(text)
+    if candidate is None or (require_indent and not candidate.group("indent")):
+        return None
+    opening = candidate.start("tail")
+    while opening < len(text) and text[opening] in " \t":
+        opening += 1
+    if opening >= len(text) or text[opening] != "(":
+        return None
+    closing = _balanced_delimiter_end(text, opening)
+    if closing is None:
+        return None
+    return candidate, opening, closing
 
 
 def _match_generic_entry(text: str, *, require_indent: bool = True) -> _ConventionEntryMatch | None:
@@ -1351,6 +1503,7 @@ def _entry_match_from_regex(regex_match: re.Match[str]) -> _ConventionEntryMatch
         type_text=type_text,
         type_start=regex_match.start("type") if type_text is not None else None,
         type_end=regex_match.end("type") if type_text is not None else None,
+        signature_text=None,
         description=regex_match.group("description"),
         description_start=regex_match.start("description"),
     )
@@ -1641,21 +1794,21 @@ class _DocstringParser:
                 index = protected_end
                 continue
             text = self.lines[index].text
-            match = _match_google_entry(text)
+            match = _match_google_entry_for_kind(text, kind)
             if match is None and (kind in {DocstringEntryKind.RETURN, DocstringEntryKind.YIELD} or is_exception_name_entry_kind(kind)):
                 match = _match_generic_entry(text)
             if match is not None and is_exception_name_entry_kind(kind) and _exception_names(match.name.strip()) is None:
                 self._record_google_head_issue(index, kind=kind)
                 index = self._entry_end(index, end, text_layout.leading_width(match.indent))
                 continue
-            complete_match = _match_google_entry(text, require_indent=False)
+            complete_match = _match_google_entry_for_kind(text, kind, require_indent=False)
             if complete_match is None and is_exception_name_entry_kind(kind):
                 complete_match = _match_generic_entry(text, require_indent=False)
             if detects_malformed and complete_match is not None and text_layout.leading_width(self.lines[index].raw_indent) <= section_indent:
                 names = _entry_names(kind, complete_match.name.strip())
                 credible = names is not None and (
                     (is_exception_name_entry_kind(kind) and all(_is_exception_like_name(name) for name in names))
-                    or (len(names) == 1 and self._google_name_is_credible(kind, names[0], closed_parenthesized=complete_match.type_text is not None))
+                    or (len(names) == 1 and self._google_name_is_credible(kind, names[0], closed_parenthesized=complete_match.type_text is not None or complete_match.signature_text is not None))
                 )
                 if credible:
                     self._record_convention_entry_issue(ConventionEntryIssue(kind=ConventionEntryIssueKind.GOOGLE_ENTRY_INDENTATION, start_line=index, names=names))
@@ -1747,37 +1900,21 @@ class _DocstringParser:
                         )
                 index = entry_end
                 continue
+            method_match = _match_numpy_method_entry(text) if kind is DocstringEntryKind.METHOD else None
+            if method_match is not None:
+                entry = self._numpy_continuation_entry(index, end, kind=kind, names=(method_match.name.strip(),), type_text=None, entry_indent=text_layout.leading_width(method_match.indent))
+                entries.append(entry)
+                index = entry.end_line
+                continue
             match = _NUMPY_ENTRY_RE.match(text)
             if match is not None:
-                entry_end = self._entry_end(index, end, text_layout.leading_width(match.group("indent")))
-                description_fragments = list(self._stripped_reflow_lines(index + 1, entry_end, skip_empty=True))
-                description_lines = [line.text for line in description_fragments]
                 names = _entry_names(kind, match.group("name"))
                 if names is None:
-                    index = entry_end
+                    index = self._entry_end(index, end, text_layout.leading_width(match.group("indent")))
                     continue
-                entry = DocstringEntry(
-                    kind=kind,
-                    names=names,
-                    type_text=match.group("type").strip(),
-                    description=" ".join(description_lines),
-                    description_lines=tuple(description_fragments),
-                    start_line=index,
-                    end_line=entry_end,
-                )
+                entry = self._numpy_continuation_entry(index, end, kind=kind, names=names, type_text=match.group("type").strip(), entry_indent=text_layout.leading_width(match.group("indent")))
                 entries.append(entry)
-                if not description_lines and entry_end == index + 1:
-                    self._record_numpy_continuation_issue(index + 1, end, entry=entry, entry_indent=text_layout.leading_width(self.lines[index].raw_indent))
-                if description_lines:
-                    self._add_reflow(
-                        DocstringBlockKind.SECTION_ENTRY,
-                        index + 1,
-                        entry_end,
-                        lines=tuple(description_fragments),
-                        initial_indent=text_layout.indent_unit(self.settings),
-                        subsequent_indent=text_layout.indent_unit(self.settings),
-                    )
-                index = entry_end
+                index = entry.end_line
                 continue
             if detects_malformed:
                 self._record_numpy_head_issue(index, kind=kind)
@@ -1818,9 +1955,28 @@ class _DocstringParser:
             index += 1
         return tuple(entries)
 
+    def _numpy_continuation_entry(self, index: int, end: int, *, kind: DocstringEntryKind, names: tuple[str, ...], type_text: str | None, entry_indent: int) -> DocstringEntry:
+        """Parse a NumPy entry whose description begins on a continuation line."""
+        entry_end = self._entry_end(index, end, entry_indent)
+        description_fragments = tuple(self._stripped_reflow_lines(index + 1, entry_end, skip_empty=True))
+        description_lines = tuple(line.text for line in description_fragments)
+        entry = DocstringEntry(kind=kind, names=names, type_text=type_text, description=" ".join(description_lines), description_lines=description_fragments, start_line=index, end_line=entry_end)
+        if not description_lines and entry_end == index + 1:
+            self._record_numpy_continuation_issue(index + 1, end, entry=entry, entry_indent=text_layout.leading_width(self.lines[index].raw_indent))
+        if description_lines:
+            self._add_reflow(
+                DocstringBlockKind.SECTION_ENTRY,
+                index + 1,
+                entry_end,
+                lines=description_fragments,
+                initial_indent=text_layout.indent_unit(self.settings),
+                subsequent_indent=text_layout.indent_unit(self.settings),
+            )
+        return entry
+
     def _record_google_head_issue(self, index: int, *, kind: DocstringEntryKind) -> None:
         """Record a high-confidence malformed Google entry head."""
-        match = _GOOGLE_CANDIDATE_RE.match(self.lines[index].text)
+        match = (_METHOD_ENTRY_CANDIDATE_RE if kind is DocstringEntryKind.METHOD else _GOOGLE_CANDIDATE_RE).match(self.lines[index].text)
         if (
             is_exception_name_entry_kind(kind)
             and (match is None or not match.group("tail").lstrip(" \t").startswith("("))
@@ -1842,7 +1998,7 @@ class _DocstringParser:
             if closing is None:
                 if not self._google_name_is_credible(kind, name, closed_parenthesized=False):
                     return
-                issue_kind = ConventionEntryIssueKind.GOOGLE_UNBALANCED_TYPE
+                issue_kind = ConventionEntryIssueKind.GOOGLE_UNBALANCED_METHOD_SIGNATURE if kind is DocstringEntryKind.METHOD else ConventionEntryIssueKind.GOOGLE_UNBALANCED_TYPE
             else:
                 after_type = tail[closing + 1 :].lstrip(" \t")
                 if after_type.startswith(":") or not self._google_name_is_credible(kind, name, closed_parenthesized=True):
@@ -1869,7 +2025,7 @@ class _DocstringParser:
         if index < end:
             text = self.lines[index].text
             generic_match = _match_generic_entry(text, require_indent=False) if is_exception_name_entry_kind(entry.kind) else None
-            if _match_google_entry(text, require_indent=False) is not None or (generic_match is not None and _exception_names(generic_match.name) is not None):
+            if _match_google_entry_for_kind(text, entry.kind, require_indent=False) is not None or (generic_match is not None and _exception_names(generic_match.name) is not None):
                 return
         if not self._is_incorrect_continuation(index, end, entry_indent=entry_indent):
             return
@@ -1879,6 +2035,11 @@ class _DocstringParser:
         """Record a high-confidence malformed NumPy entry head."""
         text = self.lines[index].text
         stripped = text.strip()
+        if kind is DocstringEntryKind.METHOD and (method_candidate := _METHOD_ENTRY_CANDIDATE_RE.fullmatch(text)) is not None:
+            tail = method_candidate.group("tail").lstrip(" \t")
+            if tail.startswith("(") and _balanced_delimiter_end(tail, 0) is None and self._numpy_names_are_credible(kind, (method_candidate.group("name"),)):
+                self._record_convention_entry_issue(ConventionEntryIssue(kind=ConventionEntryIssueKind.NUMPY_UNBALANCED_METHOD_SIGNATURE, start_line=index, names=(method_candidate.group("name"),)))
+                return
         missing_type = re.fullmatch(r"(?P<names>.+?)[ \t]*:[ \t]*", stripped)
         if missing_type is not None and (names := _strict_numpy_names(missing_type.group("names"))) is not None and self._numpy_names_are_credible(kind, names):
             self._record_convention_entry_issue(ConventionEntryIssue(kind=ConventionEntryIssueKind.NUMPY_MISSING_TYPE, start_line=index, names=names))
@@ -1910,6 +2071,7 @@ class _DocstringParser:
             text = self.lines[index].text
             if (
                 _NUMPY_ENTRY_RE.match(text) is not None
+                or (entry.kind is DocstringEntryKind.METHOD and _match_numpy_method_entry(text) is not None)
                 or (is_exception_name_entry_kind(entry.kind) and _is_numpy_exception_entry(text))
                 or (entry.kind in {DocstringEntryKind.RETURN, DocstringEntryKind.YIELD} and self._is_missing_separator_type(text.strip()))
             ):
@@ -1976,7 +2138,7 @@ class _DocstringParser:
         reflow_runs: list[ReflowRegionRun] = []
         if first_description_line is not None and first_description_line.text:
             description_fragments.append(first_description_line)
-        continuation_runs = self._rest_field_description_reflow_runs(start + 1, block_end)
+        continuation_runs, following_description_block_kind = self._rest_field_description_reflow_runs(start + 1, block_end)
         description_fragments.extend(line for run in continuation_runs for line in run.lines)
         if first_description_line is not None and first_description_line.text:
             if continuation_runs and continuation_runs[0].start_line == start + 1:
@@ -2005,6 +2167,7 @@ class _DocstringParser:
                 description_lines=tuple(description_fragments),
                 start_line=start,
                 end_line=block_end,
+                following_description_block_kind=following_description_block_kind,
                 field_name=field,
                 field_argument=argument or None,
             )
@@ -2022,30 +2185,35 @@ class _DocstringParser:
             self._add_reflow(DocstringBlockKind.REST_FIELD, run.start_line, run.end_line, lines=run.lines, initial_indent=run_indent, subsequent_indent=run_subsequent_indent)
         return DocstringBlock(DocstringBlockKind.REST_FIELD, start, block_end, entry=entry), block_end
 
-    def _rest_field_description_reflow_runs(self, start: int, end: int) -> tuple[ReflowRegionRun, ...]:
-        """Return reflowable runs from a reStructuredText field description body."""
+    def _rest_field_description_reflow_runs(self, start: int, end: int) -> tuple[tuple[ReflowRegionRun, ...], DocstringBlockKind | None]:
+        """Return reflowable runs and trailing protected structure from a reStructuredText field description body."""
         runs: list[ReflowRegionRun] = []
         run_start: int | None = None
         run_lines: list[DocstringTextFragment] = []
+        following_description_block_kind: DocstringBlockKind | None = None
         index = start
         while index < end:
-            protected_end = self._protected_block_end(index, end)
-            if protected_end is not None:
+            protected = self._protected_block_kind_and_end(index, end)
+            if protected is not None:
+                protected_kind, protected_end = protected
                 if run_start is not None and run_lines:
                     runs.append(ReflowRegionRun(start_line=run_start, end_line=index, lines=tuple(run_lines)))
                     run_start = None
                     run_lines = []
+                if following_description_block_kind is None:
+                    following_description_block_kind = protected_kind
                 index = protected_end
                 continue
             line = self._reflow_line_from_text_span(index, 0, len(self.lines[index].text))
             if line is not None and line.text:
                 if run_start is None:
                     run_start = index
+                    following_description_block_kind = None
                 run_lines.append(line)
             index += 1
         if run_start is not None and run_lines:
             runs.append(ReflowRegionRun(start_line=run_start, end_line=end, lines=tuple(run_lines)))
-        return tuple(runs)
+        return tuple(runs), following_description_block_kind
 
     def _parse_list_item(self, start: int, end: int, match: re.Match[str]) -> tuple[DocstringBlock, int]:
         """Parse a Markdown-style list item and register its reflow region."""
@@ -2125,29 +2293,34 @@ class _DocstringParser:
 
     def _protected_block_end(self, index: int, end: int) -> int | None:
         """Return the end of a protected structure starting at a line index."""
+        protected = self._protected_block_kind_and_end(index, end)
+        return None if protected is None else protected[1]
+
+    def _protected_block_kind_and_end(self, index: int, end: int) -> tuple[DocstringBlockKind, int] | None:
+        """Return the kind and end of a protected structure starting at a line index."""
         text = self.lines[index].text
         if self.settings.docstring_parse_code_fences and (fence := inline_markup.FENCE_RE.match(text)) is not None:
-            return self._fence_end(index, end, fence.group("fence"))
+            return DocstringBlockKind.CODE_FENCE, self._fence_end(index, end, fence.group("fence"))
         if self.settings.docstring_parse_doctests and _is_doctest_prompt(text):
             block_end = index + 1
             while block_end < end and self.lines[block_end].text.strip():
                 block_end += 1
-            return block_end
+            return DocstringBlockKind.DOCTEST, block_end
         if self.settings.docstring_parse_directives and (directive := _DIRECTIVE_RE.match(text)) is not None:
-            return self._indented_body_end(index, end, text_layout.leading_width(directive.group("indent")))
+            return DocstringBlockKind.DIRECTIVE, self._indented_body_end(index, end, text_layout.leading_width(directive.group("indent")))
         if self.settings.docstring_parse_literal_blocks and text.rstrip().endswith("::") and self._has_indented_body(index, end):
-            return self._indented_body_end(index, end, text_layout.leading_width(text))
+            return DocstringBlockKind.LITERAL_BLOCK, self._indented_body_end(index, end, text_layout.leading_width(text))
         if self.settings.docstring_parse_tables and (table_end := self._table_end(index, end)) is not None:
-            return table_end
+            return DocstringBlockKind.TABLE, table_end
         if self.settings.docstring_parse_headings and self._is_heading(index, end):
-            return index + 2 if index + 1 < end and _is_adornment(self.lines[index + 1].text) else index + 1
+            return DocstringBlockKind.HEADING, index + 2 if index + 1 < end and _is_adornment(self.lines[index + 1].text) else index + 1
         if self._parses_rest_fields() and (field_match := _REST_FIELD_RE.match(text)) is not None:
-            return self._continuation_end(index, end, text_layout.leading_width(field_match.group("indent")))
+            return DocstringBlockKind.REST_FIELD, self._continuation_end(index, end, text_layout.leading_width(field_match.group("indent")))
         if self.settings.docstring_parse_list_items and (list_match := _LIST_RE.match(text)) is not None:
-            return self._list_item_end(index, end, list_match)
+            return DocstringBlockKind.LIST_ITEM, self._list_item_end(index, end, list_match)
         if self.settings.docstring_parse_block_quotes and (quote_match := _BLOCK_QUOTE_RE.match(text)) is not None:
             prefix = f"{quote_match.group('indent')}{quote_match.group('quote')}"
-            return self._block_quote_end(index, end, prefix)
+            return DocstringBlockKind.BLOCK_QUOTE, self._block_quote_end(index, end, prefix)
         return None
 
     def _list_item_end(self, start: int, end: int, match: re.Match[str]) -> int:
@@ -2806,6 +2979,53 @@ def summary_terminal_line_targets(docstrings: tuple[DocstringInfo, ...]) -> tupl
         if line is not None:
             targets.append(SummaryLineTarget(docstring=docstring, block=block, line=line))
     return tuple(targets)
+
+
+def _entry_description_line_targets(docstrings: tuple[DocstringInfo, ...], *, first: bool) -> tuple[EntryDescriptionLineTarget, ...]:
+    """Return source-mapped first or final entry-description fragments.
+
+    Args:
+        docstrings (tuple[DocstringInfo, ...]): Parsed docstrings whose semantic entries should be inspected.
+        first (bool): Whether to target the first fragment instead of the final fragment.
+
+    Returns:
+        Entry description targets in docstring and source order.
+    """
+    targets: list[EntryDescriptionLineTarget] = []
+    for docstring in docstrings:
+        following_block_kinds = (
+            {} if first else {block.entry.start_line: kind for block, kind in _blocks_with_following_nonblank_kind(docstring.structure.blocks, recursive=True) if block.entry is not None}
+        )
+        for entry in docstring.structure.entries:
+            if entry.kind is DocstringEntryKind.FIELD or docstring_sections.is_rest_type_field(entry.field_name) or not entry.description:
+                continue
+            fragments = tuple(fragment for fragment in entry.description_lines if fragment.text.strip())
+            if not fragments:
+                continue
+            following_kinds = () if first else tuple(kind for kind in (entry.following_description_block_kind, following_block_kinds.get(entry.start_line)) if kind is not None)
+            targets.append(EntryDescriptionLineTarget(docstring=docstring, fragment=fragments[0] if first else fragments[-1], following_block_kinds=following_kinds))
+    return tuple(targets)
+
+
+def _blocks_with_following_nonblank_kind(blocks: tuple[DocstringBlock, ...], *, recursive: bool) -> Iterator[tuple[DocstringBlock, DocstringBlockKind]]:
+    """Yield blocks paired with their next nonblank sibling kind.
+
+    Args:
+        blocks (tuple[DocstringBlock, ...]): Sibling blocks in source order.
+        recursive (bool): Whether to inspect every nested sibling group.
+
+    Yields:
+        Blocks and the kind of their next nonblank sibling.
+    """
+    if recursive:
+        for block in blocks:
+            yield from _blocks_with_following_nonblank_kind(block.children, recursive=True)
+    next_nonblank: DocstringBlock | None = None
+    for block in reversed(blocks):
+        if next_nonblank is not None:
+            yield block, next_nonblank.kind
+        if block.kind is not DocstringBlockKind.BLANK:
+            next_nonblank = block
 
 
 def first_summary_block(docstring: DocstringInfo) -> DocstringBlock | None:

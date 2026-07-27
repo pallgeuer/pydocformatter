@@ -143,6 +143,32 @@ def test_google_balanced_type_delimiters_do_not_create_false_unbalanced_type_fin
     assert_pdf414(source, ((5,),), ("Google docstring entry 'value' is missing the colon before its description",), convention=DocstringConvention.GOOGLE)
 
 
+def test_reports_unbalanced_google_method_signatures_with_method_specific_wording() -> None:
+    """Distinguish malformed method signatures from parenthesized entry types."""
+    source = 'class Client:\n    """Describe the client.\n\n    Methods:\n        run(value: tuple[int, str]:\n    """\n\n    def run(self):\n        pass\n'
+    assert_pdf414(source, ((5,),), ("Google docstring method entry 'run' has an unbalanced signature",), convention=DocstringConvention.GOOGLE)
+
+
+def test_reports_unbalanced_numpy_method_signatures_with_method_specific_wording() -> None:
+    """Diagnose a canonical NumPy method head whose signature never closes."""
+    source = 'class Client:\n    """Describe the client.\n\n    Methods\n    -------\n    run(value: tuple[int, str]\n    """\n\n    def run(self):\n        pass\n'
+    assert_pdf414(source, ((6,),), ("NumPy docstring method entry 'run' has an unbalanced signature",), convention=DocstringConvention.NUMPY)
+
+
+@pytest.mark.parametrize(
+    ("convention", "section"),
+    [
+        (DocstringConvention.GOOGLE, "Methods:\n        Note (see the class documentation for\n        unknown(value: int"),
+        (DocstringConvention.NUMPY, "Methods\n    -------\n    Note (see the class documentation for\n    unknown(value: int"),
+    ],
+)
+def test_unknown_unbalanced_method_candidates_are_not_reported(convention: DocstringConvention, section: str) -> None:
+    """Require direct method inventory evidence for unbalanced signatures."""
+    source = f'class Client:\n    """Describe the client.\n\n    {section}\n    """\n'
+
+    assert_pdf414(source, (), (), convention=convention)
+
+
 @pytest.mark.parametrize("type_text", ["list[int", "dict{str]", '"unterminated', "tuple[(int]"])
 def test_google_flat_matches_require_balanced_nested_type_syntax(type_text: str) -> None:
     """Reject flat-regex matches with unbalanced delimiters or quotes."""

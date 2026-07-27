@@ -36,6 +36,22 @@ def test_normalizes_google_parameter_return_and_yield_type_spacing() -> None:
     assert not format_source(result.new_source).modified
 
 
+def test_leaves_google_and_numpy_method_signature_arguments_unchanged() -> None:
+    """Do not normalize type-like tokens embedded inside opaque method signatures."""
+    google_source = 'class Client:\n    """Summary.\n\n    Methods:\n        convert(value: Mapping[ str, object ]): Convert it.\n    """\n'
+    numpy_source = 'class Client:\n    """Summary.\n\n    Methods\n    -------\n    convert(value: Mapping[ str, object ])\n        Convert it.\n    """\n'
+    numpy_settings = CheckSettings(select=("PDF411",), docstring_convention=DocstringConvention.NUMPY)
+    google_result = format_source(google_source)
+    numpy_result = format_source(numpy_source, settings=numpy_settings)
+
+    assert google_result.new_source == google_source
+    assert numpy_result.new_source == numpy_source
+    assert not google_result.fixed_findings
+    assert not numpy_result.fixed_findings
+    assert not google_result.unfixed_findings
+    assert not numpy_result.unfixed_findings
+
+
 def test_normalizes_attribute_entry_type_spacing_in_attribute_docstring() -> None:
     source = 'value = 1\n"""Summary.\n\nAttributes:\n    child ( Mapping[ str, object ] ): Child.\n"""\n'
     result = format_source(source)

@@ -17,6 +17,8 @@ All notable changes to this project are documented here. The format follows [Kee
 ### Added
 
 - **Docstring diagnostics:**
+  - Added PDF213 to report complete evaluated docstrings that match configurable placeholder markers.
+  - Added PDF723 to report method entries without prose descriptions in class-owned Google and NumPy docstrings.
   - Added PDF212 to report nonempty primary and supported attached attribute docstrings without a parsed top-level summary.
   - Added PDF526 to report parsed parameter documentation that does not follow function signature order.
   - Added PDF414 and PDF415 to report high-confidence malformed Google, NumPy, and reStructuredText entry syntax and Google or NumPy entry indentation without unsafe fixes.
@@ -37,10 +39,14 @@ All notable changes to this project are documented here. The format follows [Kee
 - **Rule suppressions:**
   - Made inline suppressions after any component token of an implicitly concatenated docstring cover the complete expression for PDF findings while preserving line-local PCF coverage and existing local and standalone attachment boundaries.
 - **Docstring diagnostics:**
+  - Made PDF300, PDF301, PDF308, and PDF309 safely replace terminal semicolons and standalone commas with periods when the source mapping is exact, while leaving commas before recognized structured content diagnostic-only.
+  - Preserved commas before protected nested content owned by reStructuredText field entries, including lists, fences, doctests, directives, literal blocks, tables, headings, and block quotes.
   - Made PDF202 target the complete physical empty-docstring expression, including delimiter-only closing lines, consistently with other whole-docstring diagnostics.
   - Parse docstrings after collecting complete owner parameter, attribute, and method inventories, and keep invalid standard reStructuredText field arity structural but outside semantic entry collections.
   - Required reStructuredText value fields for parameter, return, yield, and attribute documentation coverage, while keeping orphan type fields available to type, duplicate, empty, extraneous, and PDF722 checks without indirect missing-description findings.
 - **Command performance:**
+  - Centralized lazy entry-description target caches for PDF308, PDF309, and PDF310 so PDF308 and PDF309 share each parsed entry's following structural block and terminal target once per analyzed file, retaining a measured 31% improvement on a 10,000-entry punctuation benchmark without regressing smaller cases.
+  - Normalized the configured PDF213 placeholder marker inventory once per analyzed file instead of once per docstring.
   - Reused successfully parsed configuration documents, closest-config discovery results, and resolved source profiles within each invocation.
   - Reduced directory-walk resolver calls and repeated cache-root, glob-segment, and literal-pattern preparation without changing file-selection semantics.
   - Preindexed direct class attributes and methods once for malformed-entry confidence and skipped those inventories for conventions that cannot use them.
@@ -54,16 +60,25 @@ All notable changes to this project are documented here. The format follows [Kee
   - Reduced worker requests to immutable path-specific rule execution plans, returned frozen batch results, made probe and persistence outcomes explicit, aggregated cache statistics once per phase, and touched each engine retention row once with its maximum observed day.
   - Deferred engine, path-builder, and store construction until at least one selected file is cacheable, so disabled and wholly uncacheable runs avoid cache-only fingerprint work.
 - **Rule and path contracts:**
+  - Validated terminal-punctuation policies at construction so contradictory classifications and unusable canonical endings fail immediately.
+  - Centralized the shared trailing-period and terminal-punctuation policies and kept comma-introduced structure classification in the punctuation helper rather than the PDF parser core.
   - Centralized package, module, symlink-target, and public/private path semantics in a precomputed rule context shared with cache invalidation.
   - Made rule cache dependencies explicit and fail closed, with every built-in rule audited as file-local and new external dependency kinds requiring canonical invalidation before cache use.
 - **Configuration:**
+  - Added `docstring-placeholder-markers` for configuring the exact marker inventory used by PDF213, including an empty-list opt-out that does not change rule selection.
   - Extended settings profiles with the auto-discovered project root so default cache locations are stable across nested paths and relocated workspaces.
 
 ### Fixed
 
+- **Configuration:**
+  - Made ASCII case-insensitive duplicate `docstring-placeholder-markers` diagnostics deterministic when multiple configured spellings have the same normalized value.
+  - Reported invalid `docstring-placeholder-markers` entries before checking ASCII case-insensitive duplicates, so Unicode case-folding collisions receive the relevant syntax error.
 - **Docstring diagnostics:**
+  - Preserved exact string-prefix spelling when PDF300 and PDF301 insert or replace summary punctuation.
   - Reported PDF410 warning normalization findings as warning entries while retaining exception-specific messages for raised exceptions.
 - **Convention parsing:**
+  - Parsed balanced Google and NumPy method signatures as opaque method entry heads for PDF723 and related structural rules while preserving legacy Google colon-only and NumPy type-bearing entries.
+  - Reported direct-method unbalanced Google and NumPy signatures with method-specific PDF414 diagnostics instead of treating signature contents as docstring type syntax, while leaving unknown prose-like candidates alone.
   - Kept NumPy `Warning` and `Warnings` caution sections as narrative content instead of treating their text as emitted-warning entries.
   - Kept raised exceptions and emitted warnings as separate semantic entry families, preventing PDF412 from conflating the same name across `Raises` and `Warns` sections.
   - Made PDF414 and PDF415 require owner-inventory evidence for ambiguous bare Google and empty-type NumPy candidates, use field arity to limit reStructuredText missing-delimiter findings, and distinguish valid NumPy return, yield, and exception peers from malformed continuations.

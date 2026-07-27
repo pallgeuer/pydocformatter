@@ -22,8 +22,10 @@ if TYPE_CHECKING:
 
 
 _ISSUE_KINDS = {
+    PDF_definition.ConventionEntryIssueKind.GOOGLE_UNBALANCED_METHOD_SIGNATURE,
     PDF_definition.ConventionEntryIssueKind.GOOGLE_UNBALANCED_TYPE,
     PDF_definition.ConventionEntryIssueKind.GOOGLE_MISSING_SEPARATOR,
+    PDF_definition.ConventionEntryIssueKind.NUMPY_UNBALANCED_METHOD_SIGNATURE,
     PDF_definition.ConventionEntryIssueKind.NUMPY_MISSING_TYPE,
     PDF_definition.ConventionEntryIssueKind.NUMPY_MISSING_SEPARATOR,
     PDF_definition.ConventionEntryIssueKind.REST_MISSING_CLOSING_DELIMITER,
@@ -74,10 +76,14 @@ class PDF414MalformedConventionEntry(RuleBase):
 def _instance_message(issue: PDF_definition.ConventionEntryIssue) -> str:
     """Return the syntax diagnostic for one malformed entry."""
     names = ", ".join(f"'{name}'" for name in issue.names)
+    if issue.kind is PDF_definition.ConventionEntryIssueKind.GOOGLE_UNBALANCED_METHOD_SIGNATURE:
+        return f"Google docstring method entry {names} has an unbalanced signature"
     if issue.kind is PDF_definition.ConventionEntryIssueKind.GOOGLE_UNBALANCED_TYPE:
         return f"Google docstring entry {names} has an unbalanced parenthesized type"
     if issue.kind is PDF_definition.ConventionEntryIssueKind.GOOGLE_MISSING_SEPARATOR:
         return f"Google docstring entry {names} is missing the colon before its description"
+    if issue.kind is PDF_definition.ConventionEntryIssueKind.NUMPY_UNBALANCED_METHOD_SIGNATURE:
+        return f"NumPy docstring method entry {names} has an unbalanced signature"
     if issue.kind is PDF_definition.ConventionEntryIssueKind.NUMPY_MISSING_TYPE:
         return f"NumPy docstring entry {names} is missing its type after the colon"
     if issue.kind is PDF_definition.ConventionEntryIssueKind.NUMPY_MISSING_SEPARATOR:

@@ -271,6 +271,7 @@ def test_cache_identity_roles_have_exact_current_field_membership() -> None:
             "docstring_class_attribute_no_type_base_classes",
             "docstring_forbidden_function_decorators",
             "docstring_optional_function_decorators",
+            "docstring_placeholder_markers",
             "docstring_property_decorators",
             "docstring_parse_list_items",
             "docstring_parse_headings",
@@ -348,6 +349,7 @@ def test_setting_definitions_are_iterable_by_group() -> None:
         "docstring_class_attribute_no_type_base_classes",
         "docstring_forbidden_function_decorators",
         "docstring_optional_function_decorators",
+        "docstring_placeholder_markers",
         "docstring_property_decorators",
         "docstring_parse_list_items",
         "docstring_parse_headings",
@@ -888,6 +890,7 @@ def test_load_settings_defaults_in_isolated_mode(monkeypatch: pytest.MonkeyPatch
     assert config.indent_width == 4
     assert config.parallelism == 0.0  # noqa: RUF069
     assert config.docstring_convention is pydocformatter_settings.DocstringConvention.PEP257
+    assert config.docstring_placeholder_markers == pydocformatter_settings.DEFAULT_DOCSTRING_PLACEHOLDER_MARKERS
     assert not config.comment_join_standalone_lines
     assert config.comment_format_list_items
     assert config.comment_task_marker_mode is CommentTaskMarkerMode.NO_WRAP
@@ -988,6 +991,7 @@ def test_setting_documentation_omits_long_string_list_defaults() -> None:
     assert pydocformatter_settings._documented_default_text(f"{short_default}x", pydocformatter_settings_core.StringList) is None
     assert pydocformatter_settings._setting_default_text("select", pydocformatter_settings_core.StringList) == '["ALL"]'
     assert pydocformatter_settings._setting_default_text("comment_task_markers", pydocformatter_settings_core.StringList) is None
+    assert pydocformatter_settings._setting_default_text("docstring_placeholder_markers", pydocformatter_settings_core.StringList) is None
     assert pydocformatter_settings._setting_default_text("require_explicit", pydocformatter_settings_core.StringList) is None
     assert "has a default value" in pydocformatter_settings._setting_default_clause("require_explicit", pydocformatter_settings_core.StringList)
     assert "defaults to" not in pydocformatter_settings._setting_default_clause("require_explicit", pydocformatter_settings_core.StringList)
@@ -1145,7 +1149,7 @@ def test_nested_docstring_table_settings_are_loaded_from_pyproject(monkeypatch: 
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
         (root / "pyproject.toml").write_text(
-            '[tool.pydocfmt.docstring]\nconvention = "google"\nblank-line-style = "aligned"\nblank-line-after-last-section = true\nproperty-decorators = ["project.Property"]\nparse-tables = false\n',
+            '[tool.pydocfmt.docstring]\nconvention = "google"\nblank-line-style = "aligned"\nblank-line-after-last-section = true\nplaceholder-markers = ["WIP", "..."]\nproperty-decorators = ["project.Property"]\nparse-tables = false\n',
             encoding="utf-8",
         )
         monkeypatch.chdir(root)
@@ -1154,6 +1158,7 @@ def test_nested_docstring_table_settings_are_loaded_from_pyproject(monkeypatch: 
     assert config.docstring_convention == pydocformatter_settings.DocstringConvention.GOOGLE
     assert config.docstring_blank_line_style == pydocformatter_settings.DocstringBlankLineStyle.ALIGNED
     assert config.docstring_blank_line_after_last_section
+    assert config.docstring_placeholder_markers == ("WIP", "...")
     assert config.docstring_property_decorators == ("project.Property",)
     assert not config.docstring_parse_tables
 
@@ -1404,6 +1409,25 @@ def test_comment_task_marker_setting_validation() -> None:
         pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(isolated=True, config_options=("comment-format-task-markers = false",)))
 
 
+def test_docstring_placeholder_marker_setting_validation() -> None:
+    valid = pydocformatter_settings.SETTINGS_SCHEMA.load(
+        global_values=pydocformatter_global_args.GlobalArgs(isolated=True, config_options=('docstring-placeholder-markers = ["TODO", "NotImplemented", "..."]',))
+    )
+    empty = pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(isolated=True, config_options=("docstring-placeholder-markers = []",)))
+
+    assert valid.docstring_placeholder_markers == ("TODO", "NotImplemented", "...")
+    assert empty.docstring_placeholder_markers == ()
+    for invalid in ('["TODO", "todo"]', '["Not implemented"]', '["TODO."]', '["\u00d6"]', '["...."]'):
+        with pytest.raises(SettingsError):
+            pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(isolated=True, config_options=(f"docstring-placeholder-markers = {invalid}",)))
+    with pytest.raises(SettingsError, match=r"entries must be.*\N{LATIN SMALL LETTER SHARP S}"):
+        pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(isolated=True, config_options=('docstring-placeholder-markers = ["ss", "\u00df"]',)))
+    with pytest.raises(SettingsError, match="ASCII case-insensitive duplicate markers: todo"):
+        pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(isolated=True, config_options=('docstring-placeholder-markers = ["TODO", "todo"]',)))
+    with pytest.raises(SettingsError, match="ASCII case-insensitive duplicate markers: ToDo, todo"):
+        pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(isolated=True, config_options=('docstring-placeholder-markers = ["TODO", "todo", "ToDo"]',)))
+
+
 def test_docstring_parsing_settings_are_loaded_and_validated() -> None:
     definition = next(definition for definition in pydocformatter_settings.SETTINGS_SCHEMA.definitions if definition.field == "docstring_convention")
     assert definition.cli is not None
@@ -1423,7 +1447,7 @@ def test_docstring_parsing_settings_are_loaded_and_validated() -> None:
         global_values=pydocformatter_global_args.GlobalArgs(
             isolated=True,
             config_options=(
-                'docstring-convention = "google"\ndocstring-blank-line-style = "aligned"\ndocstring-blank-line-after-last-section = true\ndocstring-missing-documentation = "all-docstrings"\ndocstring-missing-documentation-public-only = false\ndocstring-require-init-attribute-documentation = true\ndocstring-class-attribute-no-type-base-classes = ["enum.Enum"]\ndocstring-forbidden-function-decorators = ["project.overload"]\ndocstring-optional-function-decorators = ["project.override"]\ndocstring-property-decorators = ["project.Property"]\ndocstring-parse-tables = false',
+                'docstring-convention = "google"\ndocstring-blank-line-style = "aligned"\ndocstring-blank-line-after-last-section = true\ndocstring-missing-documentation = "all-docstrings"\ndocstring-missing-documentation-public-only = false\ndocstring-require-init-attribute-documentation = true\ndocstring-class-attribute-no-type-base-classes = ["enum.Enum"]\ndocstring-forbidden-function-decorators = ["project.overload"]\ndocstring-optional-function-decorators = ["project.override"]\ndocstring-placeholder-markers = ["TODO", "NotImplemented", "..."]\ndocstring-property-decorators = ["project.Property"]\ndocstring-parse-tables = false',
             ),
         )
     )
@@ -1439,6 +1463,7 @@ def test_docstring_parsing_settings_are_loaded_and_validated() -> None:
             docstring_class_attribute_no_type_base_classes=("Flag,enum.Flag",),
             docstring_forbidden_function_decorators=("typing.overload,overload",),
             docstring_optional_function_decorators=("typing.override,override",),
+            docstring_placeholder_markers=("WIP,NotImplemented",),
             docstring_property_decorators=("property,project.Property",),
             docstring_parse_tables=False,
         ),
@@ -1452,6 +1477,7 @@ def test_docstring_parsing_settings_are_loaded_and_validated() -> None:
     assert configured.docstring_class_attribute_no_type_base_classes == ("enum.Enum",)
     assert configured.docstring_forbidden_function_decorators == ("project.overload",)
     assert configured.docstring_optional_function_decorators == ("project.override",)
+    assert configured.docstring_placeholder_markers == ("TODO", "NotImplemented", "...")
     assert configured.docstring_property_decorators == ("project.Property",)
     assert not configured.docstring_parse_tables
     assert overridden.docstring_convention == pydocformatter_settings.DocstringConvention.NUMPY
@@ -1463,6 +1489,7 @@ def test_docstring_parsing_settings_are_loaded_and_validated() -> None:
     assert overridden.docstring_class_attribute_no_type_base_classes == ("Flag", "enum.Flag")
     assert overridden.docstring_forbidden_function_decorators == ("typing.overload", "overload")
     assert overridden.docstring_optional_function_decorators == ("typing.override", "override")
+    assert overridden.docstring_placeholder_markers == ("WIP", "NotImplemented")
     assert overridden.docstring_property_decorators == ("property", "project.Property")
     assert not overridden.docstring_parse_tables
 
@@ -1470,12 +1497,14 @@ def test_docstring_parsing_settings_are_loaded_and_validated() -> None:
         field_overrides={
             "docstring_forbidden_function_decorators": (),
             "docstring_optional_function_decorators": (),
+            "docstring_placeholder_markers": (),
             "docstring_property_decorators": (),
             "docstring_class_attribute_no_type_base_classes": (),
         }
     )
     assert empty_decorator_config.docstring_forbidden_function_decorators == ()
     assert empty_decorator_config.docstring_optional_function_decorators == ()
+    assert empty_decorator_config.docstring_placeholder_markers == ()
     assert empty_decorator_config.docstring_property_decorators == ()
     assert empty_decorator_config.docstring_class_attribute_no_type_base_classes == ()
 

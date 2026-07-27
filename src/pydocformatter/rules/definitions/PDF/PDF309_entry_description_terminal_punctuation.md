@@ -7,9 +7,9 @@ Rule is disabled if `docstring-convention` is `none` or `pep257`, and ignored by
 ## What it does
 Checks that parsed docstring entry descriptions end with terminal punctuation.
 
-PDF309 checks Google, NumPy, and reStructuredText entries when the active convention parses them. It accepts periods, question marks, exclamation points, and Unicode ellipses (`\u2026`). For entries with multiline descriptions, the target is the final non-empty parsed description line. Protected nested structures such as lists and fenced code blocks are not folded into the entry description target.
+PDF309 checks Google, NumPy, and reStructuredText entries when the active convention parses them. It accepts periods, question marks, exclamation points, and Unicode ellipses (`\u2026`). For entries with multiline descriptions, the target is the final non-empty parsed description line. Protected nested structures such as lists and fenced code blocks are not folded into the entry description target. This protection also applies when the structure is indented inside a reStructuredText field body and therefore remains owned by that field entry.
 
-Empty descriptions, generic reST fields, and reST type-only fields such as `:type:`, `:rtype:`, `:ytype:`, and `:vartype:` are skipped. Descriptions ending with a backslash are also skipped so path-like examples are not rewritten. The automatic fix inserts a period when punctuation is missing; descriptions ending with `,`, `:`, or `;` are reported but not changed because appending a period would produce questionable punctuation.
+Empty descriptions, generic reST fields, and reST type-only fields such as `:type:`, `:rtype:`, `:ytype:`, and `:vartype:` are skipped. Descriptions ending with a backslash are also skipped so path-like examples are not rewritten. The automatic fix inserts a period when punctuation is missing, replaces a safely mapped final semicolon, and replaces a safely mapped final comma when the entry's next nonblank sibling is not recognized structured content. A final colon or a comma that may introduce protected entry content is reported but not changed.
 
 Unsafe source mappings are reported but not changed. This includes docstrings whose relevant logical text is formed through evaluated escape sequences and cannot be mapped cleanly back to one source slice.
 
@@ -177,7 +177,7 @@ def connect(timeout):
     """
 ```
 
-Comma, colon, and semicolon endings are reported but not changed:
+Standalone safely mapped comma and semicolon endings are replaced with periods, while a final colon is reported but not changed:
 
 ```pydocfmt-example
 [settings]
@@ -193,11 +193,78 @@ def connect(timeout, retries, backoff):
         backoff: backoff seconds;
     """
 
+[output]
+def connect(timeout, retries, backoff):
+    """Connect.
+
+    Args:
+        timeout: timeout in seconds.
+        retries: retry count:
+        backoff: backoff seconds.
+    """
+
+[findings]
+PDF309: Line 6: Docstring entry description should end with terminal punctuation
+```
+
+A comma before recognized nested content is reported but not changed because it may introduce that content:
+
+```pydocfmt-example
+[settings]
+docstring-convention = "google"
+
+[input]
+def connect(mode):
+    """Connect.
+
+    Args:
+        mode: choose one,
+            - fast
+            - safe
+    """
+
 [output=unchanged]
 [findings]
 PDF309: Line 5: Docstring entry description should end with terminal punctuation
-PDF309: Line 6: Docstring entry description should end with terminal punctuation
-PDF309: Line 7: Docstring entry description should end with terminal punctuation
+```
+
+The same protection applies to nested content inside a reStructuredText field body:
+
+```pydocfmt-example
+[settings]
+docstring-convention = "rest"
+
+[input]
+def connect(mode):
+    """Connect.
+
+    :param mode: choose one,
+        - fast
+        - safe
+    """
+
+[output=unchanged]
+[findings]
+PDF309: Line 4: Docstring entry description should end with terminal punctuation
+```
+
+An escaped terminal semicolon has no exact one-character source mapping, so the finding remains non-fixable:
+
+```pydocfmt-example
+[settings]
+docstring-convention = "google"
+
+[input]
+def connect(timeout):
+    """Connect.
+
+    Args:
+        timeout: timeout in seconds\x3b
+    """
+
+[output=unchanged]
+[findings]
+PDF309: Line 5: Docstring entry description should end with terminal punctuation
 ```
 
 Descriptions ending with a backslash are skipped:

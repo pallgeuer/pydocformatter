@@ -16,6 +16,7 @@
 - Use pytest for running tests. Pytest uses pytest-xdist multiprocessing by default; pass `-n 0` for serial debugging or focused runs where worker startup is slower.
 - Use `uv run ty check` for type checking, `uv run ruff ...` for code formatting/linting, and `uv run pydocfmt check --fix` to format docstrings/comments.
 - Do not run pydocfmt on Markdown files; it only parses Python source and will fail on Markdown.
+- Use `uv run python tools/fix_markdown_tables.py` as the canonical Markdown table formatter, especially when `tests/test_markdown_tables.py` fails.
 - Do not run `tools/docs/generate_zensical.py` and `zensical build` in parallel; the build reads the generated tree that the generator refreshes.
 
 ## Tests

@@ -111,12 +111,12 @@ def _canonical_entry_line(convention: DocstringConvention, text: str, entry: PDF
 
 def _canonical_google_entry_line(text: str, entry: PDF_definition.DocstringEntry) -> str | None:
     """Return the canonical Google entry line for spacing normalization."""
-    match = PDF_definition._match_google_entry(text)
+    match = PDF_definition._match_google_entry_for_kind(text, entry.kind)
     if match is None and (entry.kind in {PDF_definition.DocstringEntryKind.RETURN, PDF_definition.DocstringEntryKind.YIELD} or PDF_definition.is_exception_name_entry_kind(entry.kind)):
         match = PDF_definition._match_generic_entry(text)
     if match is None:
         return None
-    head = _google_entry_head(entry, original_name=match.name.strip(), original_type=match.type_text)
+    head = _google_entry_head(entry, original_name=match.name.strip(), original_type=match.type_text, original_signature=match.signature_text)
     if head is None:
         return None
     description = match.description.strip()
@@ -125,8 +125,10 @@ def _canonical_google_entry_line(text: str, entry: PDF_definition.DocstringEntry
     return f"{match.indent}{head}:{f' {description}' if description else ''}"
 
 
-def _google_entry_head(entry: PDF_definition.DocstringEntry, *, original_name: str, original_type: str | None) -> str | None:
+def _google_entry_head(entry: PDF_definition.DocstringEntry, *, original_name: str, original_type: str | None, original_signature: str | None) -> str | None:
     """Return the canonical Google entry head before the description colon."""
+    if entry.kind is PDF_definition.DocstringEntryKind.METHOD and original_signature is not None:
+        return f"{original_name}{original_signature}"
     if entry.kind in {PDF_definition.DocstringEntryKind.RETURN, PDF_definition.DocstringEntryKind.YIELD} and not entry.names:
         return entry.type_text.strip() if entry.type_text else None
     if PDF_definition.is_exception_name_entry_kind(entry.kind):

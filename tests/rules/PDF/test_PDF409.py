@@ -19,6 +19,16 @@ def test_normalizes_google_entry_spacing() -> None:
     assert not format_source(result.new_source).modified
 
 
+def test_normalizes_google_method_separator_spacing_without_rewriting_signature_arguments() -> None:
+    """Treat method arguments as opaque signature text rather than a type expression."""
+    source = 'class Client:\n    """Summary.\n\n    Methods:\n        convert ( value: tuple[ int, str ], mode=Literal[")", "safe"] )  :  Convert it.\n    """\n'
+    result = format_source(source)
+
+    assert result.new_source == 'class Client:\n    """Summary.\n\n    Methods:\n        convert( value: tuple[ int, str ], mode=Literal[")", "safe"] ): Convert it.\n    """\n'
+    assert result.fixed_findings[PDF409DocstringEntrySpacing.meta] == 1
+    assert not format_source(result.new_source).modified
+
+
 def test_normalizes_google_and_numpy_warning_entry_spacing() -> None:
     google = 'def function():\n    """Summary.\n\n    Warns:\n        RuntimeWarning   :\n    """\n'
     numpy = 'def function():\n    """Summary.\n\n    Warns\n    -----\n    RuntimeWarning   :\n    """\n'

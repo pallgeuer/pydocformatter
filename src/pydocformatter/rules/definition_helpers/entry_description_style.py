@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 import pydocformatter.rules.edits as rule_edits
 import pydocformatter.rules.violations as rule_violations
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
-from pydocformatter.rules.definition_helpers import docstring_sections, first_word_capitalization, terminal_punctuation
+from pydocformatter.rules.definition_helpers import first_word_capitalization, terminal_punctuation
 
 
 if TYPE_CHECKING:
@@ -22,39 +22,17 @@ if TYPE_CHECKING:
 
 
 @dataclasses.dataclass(frozen=True)
-class EntryDescriptionLineTarget:
-    """One source-mapped documentation entry description fragment.
-
-    Attributes:
-        docstring (PDF_definition.DocstringInfo): Parsed docstring that owns the entry.
-        fragment (PDF_definition.DocstringTextFragment): Source-mapped description fragment selected for a style check.
-    """
-
-    docstring: PDF_definition.DocstringInfo
-    fragment: PDF_definition.DocstringTextFragment
-
-    @property
-    def line(self) -> PDF_definition.DocstringValueLine:
-        """Logical docstring line containing the fragment.
-
-        Returns:
-            Logical docstring value line that owns the source-mapped description fragment.
-        """
-        return self.docstring.structure.lines[self.fragment.line_index]
-
-
-@dataclasses.dataclass(frozen=True)
 class EntryDescriptionWordTarget:
     """One first word in a documentation entry description.
 
     Attributes:
-        target (EntryDescriptionLineTarget): Description fragment that contains the word.
+        target (PDF_definition.EntryDescriptionLineTarget): Description fragment that contains the word.
         word (str): First whitespace-delimited word selected for capitalization.
         start_offset (int): Evaluated docstring value offset where the word starts.
         end_offset (int): Evaluated docstring value offset immediately after the word.
     """
 
-    target: EntryDescriptionLineTarget
+    target: PDF_definition.EntryDescriptionLineTarget
     word: str
     start_offset: int
     end_offset: int
@@ -68,7 +46,9 @@ class _SourceSafeReplacementPlanner:
         self.context = context
         self.line_bounds = PDF_definition.line_bounds_for_context(context)
 
-    def planned_replacement(self, target: EntryDescriptionLineTarget, *, start_offset: int, end_offset: int, replacement: str, expected_source: str | None) -> rule_edits.PlannedSourceChange | None:
+    def planned_replacement(
+        self, target: PDF_definition.EntryDescriptionLineTarget, *, start_offset: int, end_offset: int, replacement: str, expected_source: str | None
+    ) -> rule_edits.PlannedSourceChange | None:
         """Return a direct source replacement for a source-safe evaluated replacement."""
         if not PDF_definition.simple_docstring_replacement_is_source_safe(target.docstring, replacement):
             return None
@@ -88,7 +68,7 @@ class _SourceSafeReplacementPlanner:
         )
 
 
-def first_line_targets(context: RuleContext) -> tuple[EntryDescriptionLineTarget, ...]:
+def first_line_targets(context: RuleContext) -> tuple[PDF_definition.EntryDescriptionLineTarget, ...]:
     """Return first non-empty parsed entry description fragments.
 
     Args:
@@ -97,10 +77,10 @@ def first_line_targets(context: RuleContext) -> tuple[EntryDescriptionLineTarget
     Returns:
         Entry description targets pointing at first description fragments.
     """
-    return _description_targets(context, first=True)
+    return PDF_definition.PDF.require_data(context).entry_description_first_line_targets()
 
 
-def terminal_line_targets(context: RuleContext) -> tuple[EntryDescriptionLineTarget, ...]:
+def terminal_line_targets(context: RuleContext) -> tuple[PDF_definition.EntryDescriptionLineTarget, ...]:
     """Return final non-empty parsed entry description fragments.
 
     Args:
@@ -109,7 +89,7 @@ def terminal_line_targets(context: RuleContext) -> tuple[EntryDescriptionLineTar
     Returns:
         Entry description targets pointing at final description fragments.
     """
-    return _description_targets(context, first=False)
+    return PDF_definition.PDF.require_data(context).entry_description_terminal_line_targets()
 
 
 def punctuation_violations(context: RuleContext, *, rule: RuleMetadata, policy: terminal_punctuation.TerminalPunctuationPolicy) -> tuple[rule_violations.RuleViolation, ...]:
@@ -118,7 +98,8 @@ def punctuation_violations(context: RuleContext, *, rule: RuleMetadata, policy: 
     Args:
         context (RuleContext): Current file context with prepared PDF data.
         rule (RuleMetadata): Rule metadata used for diagnostics and fixes.
-        policy (terminal_punctuation.TerminalPunctuationPolicy): Valid and non-fixable terminal punctuation policy.
+        policy (terminal_punctuation.TerminalPunctuationPolicy): Valid, replaceable, and non-fixable terminal
+            punctuation policy.
 
     Returns:
         Entry-description punctuation violations for eligible entries.
@@ -153,11 +134,12 @@ def capitalization_violations(context: RuleContext, *, rule: RuleMetadata) -> tu
     return tuple(violations)
 
 
-def first_word_target(target: EntryDescriptionLineTarget) -> EntryDescriptionWordTarget | None:
+def first_word_target(target: PDF_definition.EntryDescriptionLineTarget) -> EntryDescriptionWordTarget | None:
     """Return the first whitespace-delimited word in an entry description fragment.
 
     Args:
-        target (EntryDescriptionLineTarget): Entry description fragment whose first word should be selected.
+        target (PDF_definition.EntryDescriptionLineTarget): Entry description fragment whose first word should be
+            selected.
 
     Returns:
         First word target and evaluated-value offsets, or None for an empty fragment.
@@ -168,11 +150,11 @@ def first_word_target(target: EntryDescriptionLineTarget) -> EntryDescriptionWor
     return EntryDescriptionWordTarget(target=target, word=match.group(0), start_offset=target.fragment.start_offset + match.start(), end_offset=target.fragment.start_offset + match.end())
 
 
-def line_numbers(target: EntryDescriptionLineTarget) -> tuple[int, ...]:
+def line_numbers(target: PDF_definition.EntryDescriptionLineTarget) -> tuple[int, ...]:
     """Return concrete source lines for an entry description target.
 
     Args:
-        target (EntryDescriptionLineTarget): Entry description fragment to map back to source lines.
+        target (PDF_definition.EntryDescriptionLineTarget): Entry description fragment to map back to source lines.
 
     Returns:
         Concrete one-based source lines occupied by the target fragment.
@@ -180,12 +162,12 @@ def line_numbers(target: EntryDescriptionLineTarget) -> tuple[int, ...]:
     return PDF_definition.docstring_line_numbers(target.docstring, target.line)
 
 
-def line_numbers_for_offsets(target: EntryDescriptionLineTarget, *, start_offset: int, end_offset: int) -> tuple[int, ...]:
+def line_numbers_for_offsets(target: PDF_definition.EntryDescriptionLineTarget, *, start_offset: int, end_offset: int) -> tuple[int, ...]:
     """Return source lines covered by an evaluated-offset replacement.
 
     Args:
-        target (EntryDescriptionLineTarget): Entry description fragment whose owning docstring supplies logical
-            source-line mappings.
+        target (PDF_definition.EntryDescriptionLineTarget): Entry description fragment whose owning docstring supplies
+            logical source-line mappings.
         start_offset (int): Evaluated docstring value offset where the replacement starts.
         end_offset (int): Evaluated docstring value offset immediately after the replacement target.
 
@@ -200,31 +182,8 @@ def line_numbers_for_offsets(target: EntryDescriptionLineTarget, *, start_offset
     return line_numbers(target)
 
 
-def _description_targets(context: RuleContext, *, first: bool) -> tuple[EntryDescriptionLineTarget, ...]:
-    """Return parsed entry description targets in source order."""
-    data = PDF_definition.PDF.require_data(context)
-    targets: list[EntryDescriptionLineTarget] = []
-    for docstring in data.docstrings:
-        for entry in docstring.structure.entries:
-            if not _should_check_entry(entry):
-                continue
-            fragments = tuple(fragment for fragment in entry.description_lines if fragment.text.strip())
-            if not fragments:
-                continue
-            fragment = fragments[0] if first else fragments[-1]
-            targets.append(EntryDescriptionLineTarget(docstring=docstring, fragment=fragment))
-    return tuple(targets)
-
-
-def _should_check_entry(entry: PDF_definition.DocstringEntry) -> bool:
-    """Return whether an entry has a prose description checked by entry-description style rules."""
-    if entry.kind is PDF_definition.DocstringEntryKind.FIELD or docstring_sections.is_rest_type_field(entry.field_name):
-        return False
-    return bool(entry.description)
-
-
 def _punctuation_violation(
-    target: EntryDescriptionLineTarget, *, context: RuleContext, rule: RuleMetadata, policy: terminal_punctuation.TerminalPunctuationPolicy, planner: _SourceSafeReplacementPlanner
+    target: PDF_definition.EntryDescriptionLineTarget, *, context: RuleContext, rule: RuleMetadata, policy: terminal_punctuation.TerminalPunctuationPolicy, planner: _SourceSafeReplacementPlanner
 ) -> rule_violations.RuleViolation | None:
     """Return one entry-description punctuation violation."""
     return terminal_punctuation.violation(
@@ -232,12 +191,23 @@ def _punctuation_violation(
         policy=policy,
         rule=rule,
         line_numbers=line_numbers(target),
-        planned_change=lambda: _planned_replacement(target, start_offset=target.fragment.end_offset, end_offset=target.fragment.end_offset, replacement=".", context=context, planner=planner),
+        planned_change=lambda expected_terminal, replacement: (
+            None
+            if expected_terminal == "," and any(terminal_punctuation.comma_may_introduce_block(kind) for kind in target.following_block_kinds)
+            else _planned_replacement(
+                target,
+                start_offset=target.fragment.end_offset if expected_terminal is None else target.fragment.end_offset - 1,
+                end_offset=target.fragment.end_offset,
+                replacement=replacement,
+                context=context,
+                planner=planner,
+            )
+        ),
     )
 
 
 def _planned_replacement(
-    target: EntryDescriptionLineTarget, *, start_offset: int, end_offset: int, replacement: str, context: RuleContext, planner: _SourceSafeReplacementPlanner
+    target: PDF_definition.EntryDescriptionLineTarget, *, start_offset: int, end_offset: int, replacement: str, context: RuleContext, planner: _SourceSafeReplacementPlanner
 ) -> rule_edits.PlannedSourceChange | None:
     """Return a safe source change for one entry description fragment replacement."""
     docstring = target.docstring

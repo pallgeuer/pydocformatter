@@ -95,15 +95,106 @@ def test_accepts_existing_terminal_punctuation(punctuation: str) -> None:
     assert not result.unfixed_findings
 
 
-@pytest.mark.parametrize("punctuation", [",", ":", ";"])
-def test_reports_but_does_not_fix_non_terminal_punctuation(punctuation: str) -> None:
+@pytest.mark.parametrize("punctuation", [",", ";"])
+def test_replaces_comma_and_semicolon_with_period(punctuation: str) -> None:
     source = f'def function():\n    """Return value{punctuation}"""\n'
+    result = format_source(source)
+
+    assert result.new_source == 'def function():\n    """Return value."""\n'
+    assert result.fixed_findings[PDF301SummaryTerminalPunctuation.meta] == 1
+    assert not result.unfixed_findings
+    assert not format_source(result.new_source).modified
+
+
+@pytest.mark.parametrize(
+    "structured_content",
+    [
+        "    - red\n    - blue",
+        "    ```text\n    red\n    ```",
+        "    >>> choose()",
+        "    .. note::\n        red",
+        "    Example::\n\n        red",
+        "    | Color | Value |\n    | --- | --- |\n    | red | 1 |",
+        "    Colors\n    ------",
+        "    > red",
+        "    Colors:\n    red",
+        "        raw text",
+    ],
+)
+def test_reports_comma_before_every_structured_content_kind_without_fixing(structured_content: str) -> None:
+    """Keep a comma that may introduce recognized structured content."""
+    source = f'def function():\n    """Choose one,\n\n{structured_content}\n    """\n'
+    result = format_source(source)
+
+    assert result.new_source == source
+    assert not result.fixed_findings
+    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((2,),)
+    assert not result.unfixed_findings[0].fixable
+
+
+def test_fixes_comma_before_convention_section() -> None:
+    """Treat a following convention section as independent from the summary."""
+    source = 'def function(value):\n    """Return value,\n\n    Args:\n        value: Input value.\n    """\n'
+    settings = CheckSettings(select=("PDF301",), docstring_convention=DocstringConvention.GOOGLE)
+    result = format_source(source, settings=settings)
+
+    assert result.new_source == source.replace("Return value,", "Return value.")
+    assert result.fixed_findings[PDF301SummaryTerminalPunctuation.meta] == 1
+    assert not result.unfixed_findings
+
+
+def test_disabled_structure_parser_allows_comma_fix() -> None:
+    """Guard commas only when the following syntax is parsed as structure."""
+    source = 'def function():\n    """Choose one,\n\n    - red\n    - blue\n    """\n'
+    result = format_source(source, settings=CheckSettings(select=("PDF301",), docstring_parse_list_items=False))
+
+    assert result.new_source == source.replace("Choose one,", "Choose one.")
+    assert result.fixed_findings[PDF301SummaryTerminalPunctuation.meta] == 1
+    assert not result.unfixed_findings
+
+
+def test_replacement_preserves_raw_prefix_trailing_whitespace_and_crlf_line_endings() -> None:
+    source = 'def function():\r\n    r"""Return \\d+ values; \t"""\r\n'
+    settings = CheckSettings(select=("PDF301",), line_ending=LineEnding.CR_LF)
+    result = format_source(source, settings=settings)
+
+    assert result.new_source == 'def function():\r\n    r"""Return \\d+ values. \t"""\r\n'
+    assert result.fixed_findings[PDF301SummaryTerminalPunctuation.meta] == 1
+    assert not result.unfixed_findings
+    assert not format_source(result.new_source, settings=settings).modified
+
+
+def test_reports_but_does_not_fix_final_colon() -> None:
+    source = 'def function():\n    """Return value:"""\n'
     result = format_source(source)
 
     assert result.new_source == source
     assert not result.fixed_findings
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((2,),)
     assert [finding.fixable for finding in result.unfixed_findings] == [False]
+
+
+def test_reports_escaped_semicolon_as_nonfixable() -> None:
+    source = 'def function():\n    """Return value\\x3b"""\n'
+    result = format_source(source)
+
+    assert result.new_source == source
+    assert not result.fixed_findings
+    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((2,),)
+    assert not result.unfixed_findings[0].fixable
+
+
+def test_combined_summary_punctuation_rules_replace_once_and_converge() -> None:
+    """Let the earlier strict rule own a shared safe replacement."""
+    source = 'def function():\n    """Return value;"""\n'
+    settings = CheckSettings(select=("PDF300", "PDF301"))
+    result = format_source(source, settings=settings)
+
+    assert result.new_source == 'def function():\n    """Return value."""\n'
+    assert result.fixed_findings[PDF300SummaryTrailingPeriod.meta] == 1
+    assert not result.fixed_findings[PDF301SummaryTerminalPunctuation.meta]
+    assert not result.unfixed_findings
+    assert not format_source(result.new_source, settings=settings).modified
 
 
 def test_skips_empty_sections_fields_and_backslash_ending_targets() -> None:

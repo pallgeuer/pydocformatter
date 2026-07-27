@@ -22,9 +22,6 @@ if TYPE_CHECKING:
     from pydocformatter.rules.definition import RuleContext
 
 
-_POLICY = terminal_punctuation.TerminalPunctuationPolicy(valid_endings=".", nonfixable_endings=",:;?!\u2026")
-
-
 @rule_registration.register_rule_to(PDF)
 class PDF300SummaryTrailingPeriod(RuleBase):
     """Rule implementation for PDF300.
@@ -55,4 +52,4 @@ class PDF300SummaryTrailingPeriod(RuleBase):
         Returns:
             tuple[rule_violations.RuleViolation, ...]: Rule violations reported for the current source.
         """
-        return summary_terminal_punctuation.results(context, rule=cls.meta, policy=_POLICY)
+        return summary_terminal_punctuation.results(context, rule=cls.meta, policy=terminal_punctuation.TRAILING_PERIOD_POLICY)

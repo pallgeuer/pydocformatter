@@ -7,9 +7,9 @@ Rule is disabled if `docstring-convention` is `none` or `pep257`, and ignored by
 ## What it does
 Checks that parsed docstring entry descriptions end with a period.
 
-PDF308 checks Google, NumPy, and reStructuredText entries when the active convention parses them. It targets parameter, return, yield, exception, attribute, and method entry descriptions. For entries with multiline descriptions, the target is the final non-empty parsed description line. Protected nested structures such as lists and fenced code blocks are not folded into the entry description target.
+PDF308 checks Google, NumPy, and reStructuredText entries when the active convention parses them. It targets parameter, return, yield, exception, attribute, and method entry descriptions. For entries with multiline descriptions, the target is the final non-empty parsed description line. Protected nested structures such as lists and fenced code blocks are not folded into the entry description target. This protection also applies when the structure is indented inside a reStructuredText field body and therefore remains owned by that field entry.
 
-Empty descriptions, generic reST fields, and reST type-only fields such as `:type:`, `:rtype:`, `:ytype:`, and `:vartype:` are skipped. Descriptions ending with a backslash are also skipped so path-like examples are not rewritten. The automatic fix only inserts a period at the end of the trimmed description target; descriptions ending with `,`, `?`, `!`, `:`, `;`, or `\u2026` are reported but not changed because appending another period would produce questionable punctuation.
+Empty descriptions, generic reST fields, and reST type-only fields such as `:type:`, `:rtype:`, `:ytype:`, and `:vartype:` are skipped. Descriptions ending with a backslash are also skipped so path-like examples are not rewritten. The automatic fix inserts a period when punctuation is absent, replaces a safely mapped final semicolon, and replaces a safely mapped final comma when the entry's next nonblank sibling is not recognized structured content. Question marks, exclamation points, colons, Unicode ellipses (`\u2026`), and commas that may introduce protected entry content are reported but not changed.
 
 Unsafe source mappings are reported but not changed. This includes docstrings whose relevant logical text is formed through evaluated escape sequences and cannot be mapped cleanly back to one source slice.
 
@@ -186,25 +186,97 @@ def connect(timeout):
     """
 ```
 
-Descriptions ending with non-period punctuation are reported but not changed:
+Standalone safely mapped commas and semicolons are replaced with periods, while expressive or structural punctuation is reported but not changed:
 
 ```pydocfmt-example
 [settings]
 docstring-convention = "google"
 
 [input]
-def connect(timeout, retries):
+def connect(timeout, retries, backoff, mode):
     """Connect.
 
     Args:
         timeout: timeout in seconds?
-        retries: retry count;
+        retries: retry count,
+        backoff: backoff seconds;
+        mode: selected mode:
+    """
+
+[output]
+def connect(timeout, retries, backoff, mode):
+    """Connect.
+
+    Args:
+        timeout: timeout in seconds?
+        retries: retry count.
+        backoff: backoff seconds.
+        mode: selected mode:
+    """
+
+[findings]
+PDF308: Line 5: Docstring entry description should end with a period
+PDF308: Line 8: Docstring entry description should end with a period
+```
+
+A comma before recognized nested content is reported but not changed because it may introduce that content:
+
+```pydocfmt-example
+[settings]
+docstring-convention = "google"
+
+[input]
+def connect(mode):
+    """Connect.
+
+    Args:
+        mode: choose one,
+            - fast
+            - safe
     """
 
 [output=unchanged]
 [findings]
 PDF308: Line 5: Docstring entry description should end with a period
-PDF308: Line 6: Docstring entry description should end with a period
+```
+
+The same protection applies to nested content inside a reStructuredText field body:
+
+```pydocfmt-example
+[settings]
+docstring-convention = "rest"
+
+[input]
+def connect(mode):
+    """Connect.
+
+    :param mode: choose one,
+        - fast
+        - safe
+    """
+
+[output=unchanged]
+[findings]
+PDF308: Line 4: Docstring entry description should end with a period
+```
+
+An escaped terminal comma has no exact one-character source mapping, so the finding remains non-fixable:
+
+```pydocfmt-example
+[settings]
+docstring-convention = "google"
+
+[input]
+def connect(timeout):
+    """Connect.
+
+    Args:
+        timeout: timeout in seconds\x2c
+    """
+
+[output=unchanged]
+[findings]
+PDF308: Line 5: Docstring entry description should end with a period
 ```
 
 Descriptions ending with a backslash are skipped:

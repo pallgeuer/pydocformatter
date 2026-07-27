@@ -42,7 +42,9 @@ def has_prose_description(entry: DescribedEntry) -> bool:
     return bool(entry.description.strip())
 
 
-def missing_raw_entry_description_violations(context: RuleContext, *, meta: RuleMetadata, kind: PDF_definition.DocstringEntryKind, label: str) -> tuple[rule_violations.RuleViolation, ...]:
+def missing_raw_entry_description_violations(
+    context: RuleContext, *, meta: RuleMetadata, kind: PDF_definition.DocstringEntryKind, label: str, owner_kind: PDF_definition.DefinitionKind | None = None
+) -> tuple[rule_violations.RuleViolation, ...]:
     """Return diagnostics for named raw entries without parsed prose.
 
     Args:
@@ -50,6 +52,7 @@ def missing_raw_entry_description_violations(context: RuleContext, *, meta: Rule
         meta (RuleMetadata): Metadata for the concrete completeness rule.
         kind (PDF_definition.DocstringEntryKind): Semantic entry kind to inspect.
         label (str): Human-readable entry label used in diagnostic messages.
+        owner_kind (PDF_definition.DefinitionKind | None): Optional docstring owner kind required for matching entries.
 
     Returns:
         tuple[rule_violations.RuleViolation, ...]: Diagnostics for matching named entries without parsed prose.
@@ -63,5 +66,5 @@ def missing_raw_entry_description_violations(context: RuleContext, *, meta: Rule
         )
         for docstring in data.docstrings
         for entry in docstring.structure.entries
-        if entry.kind is kind and entry.names and not has_prose_description(entry)
+        if (owner_kind is None or docstring.owner.kind is owner_kind) and entry.kind is kind and entry.names and not has_prose_description(entry)
     )

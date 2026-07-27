@@ -7,7 +7,9 @@ Rule is ignored if `docstring-convention` is `pep257` or `numpy`.
 ## What it does
 Checks that the docstring summary punctuation target ends with terminal punctuation: a period, question mark, exclamation point, or Unicode ellipsis (`\u2026`).
 
-The target is the final non-adornment line of the first logical summary paragraph. Empty docstrings, parser-recognized section-only docstrings, reST field-only docstrings under the reST convention, and targets ending with a backslash are skipped. Underlined title-style summaries are skipped when `docstring-parse-headings` is enabled. The automatic fix only inserts a period at the end of the trimmed target line; summaries ending with `,`, `:`, or `;` are reported but not changed.
+The target is the final non-adornment line of the first logical summary paragraph. Empty docstrings, parser-recognized section-only docstrings, reST field-only docstrings under the reST convention, and targets ending with a backslash are skipped. Underlined title-style summaries are skipped when `docstring-parse-headings` is enabled. The automatic fix inserts a period when punctuation is absent, replaces a safely mapped final semicolon, and replaces a safely mapped final comma when the next nonblank block is not recognized structured content. A final colon or a comma that may introduce structured content is reported but not changed.
+
+Replacement requires the final evaluated punctuation character to correspond exactly to the same source character. A comma or semicolon produced by an escape sequence is reported but not changed. Automatic fixes edit only the mapped punctuation source slice and preserve all other literal spelling, including prefix case.
 
 ## Why is this useful?
 Terminal punctuation keeps summary lines sentence-like without forcing every valid question or exclamation into a period.
@@ -66,7 +68,7 @@ def multiline():
     """
 ```
 
-Commas, colons, and semicolons are reported but not changed because adding a period would produce questionable punctuation:
+Standalone safely mapped commas and semicolons are replaced with periods, while a final colon is reported but not changed:
 
 ```pydocfmt-example
 [input]
@@ -81,11 +83,48 @@ def colon():
 def semicolon():
     """Return the value;"""
 
+[output]
+def comma():
+    """Return the value."""
+
+
+def colon():
+    """Return the value:"""
+
+
+def semicolon():
+    """Return the value."""
+
+[findings]
+PDF301: Line 6: Docstring summary should end with terminal punctuation
+```
+
+A comma before recognized structured content is reported but not changed because it may introduce that content:
+
+```pydocfmt-example
+[input]
+def choose():
+    """Choose one,
+
+    - first
+    - second
+    """
+
 [output=unchanged]
 [findings]
 PDF301: Line 2: Docstring summary should end with terminal punctuation
-PDF301: Line 6: Docstring summary should end with terminal punctuation
-PDF301: Line 10: Docstring summary should end with terminal punctuation
+```
+
+An escaped terminal semicolon has no exact one-character source mapping, so the finding remains non-fixable:
+
+```pydocfmt-example
+[input]
+def value():
+    """Return the value\x3b"""
+
+[output=unchanged]
+[findings]
+PDF301: Line 2: Docstring summary should end with terminal punctuation
 ```
 
 Empty docstrings, parser-recognized section-only docstrings, and summaries ending with a backslash are skipped. With heading parsing enabled, underlined title-style summaries are also skipped. Recognized NumPy section headings such as `Parameters` followed by an underline are section headers, not summaries:

@@ -2,13 +2,13 @@
 
 The main remaining opportunities are:
 
-- Entry completeness and substance: placeholder docstrings, method descriptions, and generic descriptions.
+- Entry substance: generic descriptions.
 - Convention exactness: variadic markers, reST directive introducers, NumPy return-entry shape, and obvious type spelling defects.
 - Inventory and ordering: attribute declaration order and literal `__slots__` members.
-- Conservative autofixes: terminal punctuation, whitespace-only empty comments, and duplicate directive selectors.
+- Conservative autofixes: whitespace-only empty comments and duplicate directive selectors.
 - Optional semantic coverage: treating `assert` as a possible documented `AssertionError`.
 
-There are currently 131 rules: 7 PCF and 124 PDF. Fix availability is 22 always, 5 usually, 20 sometimes, and 84 never.
+There are currently 133 rules: 7 PCF and 126 PDF. Fix availability is 22 always, 5 usually, 20 sometimes, and 86 never.
 
 ## Current coverage audit
 
@@ -46,26 +46,27 @@ The comment parser deliberately excludes empty/hash-only lines and protects sheb
 
 ### Blank lines and summaries
 
-| Rules      | Reports and automatic behavior                                                           | Fix |
-|------------|------------------------------------------------------------------------------------------|----:|
-| PDF200     | Leading, trailing, repeated, section-internal, and inter-block excess blank lines        |   A |
-| PDF201     | Safely provable missing separators around summaries, structures, and convention sections |   A |
-| PDF202     | Evaluated docstrings containing no non-whitespace text                                   |   N |
-| PDF203     | Parsed top-level summaries that still occupy multiple logical lines                      |   N |
-| PDF212     | Nonempty collected docstrings without a parsed top-level summary                         |   N |
-| PDF204/205 | Zero versus exactly one blank line before function/method docstrings                     |   A |
-| PDF206/207 | Zero versus exactly one blank line after function/method docstrings                      |   A |
-| PDF208/209 | Zero versus exactly one blank line before class docstrings                               |   A |
-| PDF210/211 | Zero versus exactly one blank line after class docstrings                                |   A |
-| PDF300/301 | Period-only versus general terminal punctuation for summaries                            |   S |
-| PDF302     | Known non-imperative first words in function/method summaries                            |   N |
-| PDF303     | Function name immediately followed by `(` in a summary                                   |   N |
-| PDF304     | Safely capitalizable lowercase ASCII summary first words                                 |   S |
-| PDF305     | Summaries whose normalized first word is “this”                                          |   N |
-| PDF306/307 | Conservative generic parameter or attribute descriptions                                 |   N |
-| PDF308/309 | Period-only versus general terminal punctuation for parsed entry descriptions            |   S |
-| PDF310     | Safely capitalizable entry-description first words                                       |   S |
-| PDF311     | Property summaries beginning with a small action-verb list                               |   N |
+| Rules      | Reports and automatic behavior                                                                                                  | Fix |
+|------------|---------------------------------------------------------------------------------------------------------------------------------|----:|
+| PDF200     | Leading, trailing, repeated, section-internal, and inter-block excess blank lines                                               |   A |
+| PDF201     | Safely provable missing separators around summaries, structures, and convention sections                                        |   A |
+| PDF202     | Evaluated docstrings containing no non-whitespace text                                                                          |   N |
+| PDF203     | Parsed top-level summaries that still occupy multiple logical lines                                                             |   N |
+| PDF212     | Nonempty collected docstrings without a parsed top-level summary                                                                |   N |
+| PDF213     | Complete evaluated docstrings matching configured placeholder markers                                                           |   N |
+| PDF204/205 | Zero versus exactly one blank line before function/method docstrings                                                            |   A |
+| PDF206/207 | Zero versus exactly one blank line after function/method docstrings                                                             |   A |
+| PDF208/209 | Zero versus exactly one blank line before class docstrings                                                                      |   A |
+| PDF210/211 | Zero versus exactly one blank line after class docstrings                                                                       |   A |
+| PDF300/301 | Period-only versus general terminal punctuation for summaries; safely replaces semicolons and standalone commas                 |   S |
+| PDF302     | Known non-imperative first words in function/method summaries                                                                   |   N |
+| PDF303     | Function name immediately followed by `(` in a summary                                                                          |   N |
+| PDF304     | Safely capitalizable lowercase ASCII summary first words                                                                        |   S |
+| PDF305     | Summaries whose normalized first word is “this”                                                                                 |   N |
+| PDF306/307 | Conservative generic parameter or attribute descriptions                                                                        |   N |
+| PDF308/309 | Period-only versus general terminal punctuation for parsed entry descriptions; safely replaces semicolons and standalone commas |   S |
+| PDF310     | Safely capitalizable entry-description first words                                                                              |   S |
+| PDF311     | Property summaries beginning with a small action-verb list                                                                      |   N |
 
 ### Convention structure
 
@@ -125,16 +126,13 @@ All PDF5xx–7xx rules are diagnostic-only.
 | PDF716–719     | Module-attribute description presence, type required/forbidden, and annotation mismatch |
 | PDF720/721     | Raised-exception and emitted-warning description presence                               |
 | PDF722         | Orphan reStructuredText type fields without corresponding value fields                  |
+| PDF723         | Method-entry description presence in class docstrings                                   |
 
 The category’s exact inventory boundaries are documented in `PDF.md`.
 
 ## Proposed additions and extensions
 
-1. **Report placeholder docstrings.** Conservatively recognize exact placeholders such as `TODO`, `TBD`, `...`, `FIXME`, or `pass` after narrow punctuation normalization. Do not attempt an autofix.
-
-2. **Check method entries for missing descriptions.** `Methods` entries are parsed and styled, but there is no completeness rule for their prose.
-
-3. **Strengthen punctuation fixes.** PDF300/301/308/309 could optionally replace a final comma or semicolon with the configured terminal punctuation. A final colon should remain non-fixable because it may introduce content.
+Ideas #1–#3 were implemented and removed from this list; the remaining idea numbers are retained for stable cross-references.
 
 4. **Require exact variadic markers when configured.** PDF500/501 intentionally equate `args` with `*args`; add an opt-in rule requiring `*args` and `**kwargs` to retain their stars. Google's guide explicitly recommends those spellings. [Google Python style guide](https://google.github.io/styleguide/pyguide.html)
 
@@ -158,7 +156,7 @@ The category’s exact inventory boundaries are documented in `PDF.md`.
 
 ## Recommended implementation sequence
 
-- **Highest priority:** #1 placeholder docstrings, #2 method-entry descriptions, #3 stronger punctuation fixes, #4 exact variadic markers, and #5 empty-comment normalization combine robust detection or fixes with highly localized implementation work.
+- **Highest priority:** #4 exact variadic markers and #5 empty-comment normalization combine robust detection or fixes with highly localized implementation work.
 - **Strong follow-up:** #6 NumPy return-entry shape, #7 optional `AssertionError` documentation, #8 obvious type spelling, #9 generic descriptions, and #10 reST directive introducers remain well-bounded and materially extend current coverage.
 - **Focused refinements:** #11 literal `__slots__` inventory, #12 directive deduplication, and #13 attribute ordering have narrower reach or more preference-sensitive policy but remain worthwhile.
 
@@ -182,9 +180,6 @@ The Ruff comparison was checked against the official [rule catalog](https://docs
 
 | Idea | Proposed change                                          | Implementation locality | Robustness | Broad agreement | Scope clarity | Check-time efficiency | Reach | Implementation straightforwardness | Added value beyond Ruff | Weighted average | Overall recommendation | Existing-code and design assessment                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 |------|----------------------------------------------------------|------------------------:|-----------:|----------------:|--------------:|----------------------:|------:|-----------------------------------:|------------------------:|-----------------:|-----------------------:|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| #1   | Report placeholder docstrings                            |                       5 |          5 |               4 |             5 |                     5 |     4 |                                  5 |                       5 |             4.80 |                      5 | `PDFCategoryData` already contains every primary and attached docstring, parsed summary targets, evaluated values, and source locations. Exact normalized whole-docstring matches for `TODO`, `TBD`, `FIXME`, `...`, or `pass` can be checked without parser or model changes and without risking ordinary prose; punctuation stripping should stay deliberately narrow. Ruff's D419 checks empty docstrings but not non-empty placeholders, so this is a cheap and distinct completeness diagnostic.                                                                                                          |
-| #2   | Check method entries for missing descriptions            |                       5 |          5 |               5 |             5 |                     5 |     2 |                                  5 |                       5 |             4.55 |                      4 | `DocstringEntryKind.METHOD` is already emitted by Google and NumPy section parsing, and `entry_completeness.missing_raw_entry_description_violations()` is a generic helper already used for exception and warning completeness. A thin rule can select named method entries with empty parsed prose and inherit established line mapping, protected-structure handling, and convention gating. Reach is limited to projects that maintain `Methods` sections, but the behavior is objective and absent from Ruff.                                                                                             |
-| #3   | Strengthen punctuation fixes                             |                       5 |          5 |               3 |             5 |                     5 |     4 |                                  5 |                       3 |             4.45 |                      4 | `terminal_punctuation.violation()` already distinguishes valid, non-fixable, and fixable endings, and summary and entry helpers already have source-safe insertion planners. Replacing a final comma or semicolon requires only passing the terminal-character span to the existing mapping machinery instead of inserting a period; colons can remain diagnostic-only. The change is technically precise and cheap, although whether replacement is stylistically desirable is preference-dependent. Ruff D400/D415 already fix missing punctuation, so the gain is narrower exact replacement behavior.      |
 | #4   | Require exact variadic markers when configured           |                       4 |          5 |               3 |             5 |                     5 |     3 |                                  5 |                       4 |             4.35 |                      4 | `SignatureParameter.display_name` already preserves `*` and `**`, parsed Google and NumPy entry names accept those prefixes, and only `parameter_comparison_name()` deliberately strips them for PDF500, PDF501, and PDF526 matching. An opt-in diagnostic can compare the raw documented spelling with the matched signature parameter without changing existing equivalence semantics. The rule is technically crisp and cheap, though some established documentation styles omit stars; Ruff D417 can ignore variadics but does not enforce their exact spelling.                                           |
 | #5   | Canonicalize whitespace-only empty comments              |                       5 |          5 |               4 |             5 |                     5 |     3 |                                  5 |                       3 |             4.35 |                      4 | `CommentInfo.is_empty` and `is_hash_only` already classify the target, but `_standalone_runs()` deliberately excludes it, while PCF002 only canonicalizes empty trailing comments. A standalone-only change from `#   ` to `#` can be implemented as an isolated exact token replacement and must leave multi-hash separators unchanged. The result is nearly risk-free and cheap; Ruff may normalize some comment whitespace through formatting, but pydocfmt would make the policy independently selectable and complete across placements.                                                                  |
 | #6   | Validate NumPy return-entry shape                        |                       4 |          4 |               5 |             4 |                     5 |     3 |                                  4 |                       5 |             4.15 |                      4 | `_numpy_entries()` currently accepts both bare return-type lines and any `name: type` entries, records their source order, and does not validate whether one versus multiple returned values uses the convention's expected shape. A NumPy-only rule can reason over the existing section and entry tuples without runtime inference, but must define named tuple-like returns, comma-separated types, `None`, generator sections, and malformed peers already handled by PDF414. The rule is mature in numpydoc and has no Ruff counterpart.                                                                  |
