@@ -14,18 +14,8 @@ Attributes:
         terminology when PDF402 is selected.
     NUMPY_SECTION_TERM_NAMES (dict[str, str]): NumPy heading synonyms that should normalize to the preferred terminology
         when PDF402 is selected.
-    REST_PARAMETER_VALUE_FIELDS (frozenset[str]): ReStructuredText field names that provide parameter descriptions.
-    REST_PARAMETER_TYPE_FIELDS (frozenset[str]): ReStructuredText field names that provide parameter type descriptions.
-    REST_RETURN_VALUE_FIELDS (frozenset[str]): ReStructuredText field names that document return values.
-    REST_RETURN_TYPE_FIELDS (frozenset[str]): ReStructuredText field names that document return value types.
-    REST_YIELD_VALUE_FIELDS (frozenset[str]): ReStructuredText field names that document yielded values.
-    REST_YIELD_TYPE_FIELDS (frozenset[str]): ReStructuredText field names that document yielded value types.
-    REST_EXCEPTION_FIELDS (frozenset[str]): ReStructuredText field names that document raised exceptions.
-    REST_ATTRIBUTE_VALUE_FIELDS (frozenset[str]): ReStructuredText field names that document class, instance, or module
-        attributes.
-    REST_ATTRIBUTE_TYPE_FIELDS (frozenset[str]): ReStructuredText field names that document attribute types.
-    REST_TYPE_DESCRIPTION_FIELDS (frozenset[str]): ReStructuredText type-only fields whose descriptions are paired with
-        value documentation entries.
+    REST_FIELD_FAMILIES (tuple[RestFieldFamily, ...]): Standard semantic reStructuredText field families and their
+        parsing, pairing, and diagnostic metadata.
     GOOGLE_ORDER_RANKS (dict[str, int]): Relative Google entry-section ordering used by PDF407 while leaving narrative
         sections unordered.
     NUMPY_ORDER_RANKS (dict[str, int]): Relative NumPy section ordering used by PDF407.
@@ -38,8 +28,72 @@ Attributes:
 # Future imports
 from __future__ import annotations
 
+# Standard library imports
+import enum
+import dataclasses
+
 # First-party imports
 from pydocformatter.cli import settings_check
+
+
+class RestFieldRole(enum.Enum):
+    """Semantic role of one standard reStructuredText field spelling.
+
+    Attributes:
+        VALUE: A field that provides value or description documentation.
+        TYPE: A field that provides separate type documentation.
+    """
+
+    VALUE = "value"
+    TYPE = "type"
+
+
+class RestFieldArgumentPolicy(enum.Enum):
+    """Argument arity accepted by one standard reStructuredText field family.
+
+    Attributes:
+        REQUIRED: Every field in the family requires an argument.
+        OPTIONAL: Fields in the family accept either named or owner-wide forms.
+        FORBIDDEN: Fields in the family must use owner-wide forms without arguments.
+    """
+
+    REQUIRED = "required"
+    OPTIONAL = "optional"
+    FORBIDDEN = "forbidden"
+
+
+@dataclasses.dataclass(frozen=True)
+class RestFieldFamily:
+    """One semantic family of standard reStructuredText field spellings.
+
+    Attributes:
+        kind (str): Semantic docstring-entry kind value used by the PDF parser.
+        label (str): User-facing value-field family label used in diagnostics.
+        value_fields (frozenset[str]): Field spellings that provide value or description documentation.
+        type_fields (frozenset[str]): Field spellings that provide separate type documentation.
+        argument_policy (RestFieldArgumentPolicy): Whether fields in the family require, allow, or forbid arguments.
+        strip_name_prefix_stars (bool): Whether pairing keys ignore leading variadic marker stars.
+    """
+
+    kind: str
+    label: str
+    value_fields: frozenset[str]
+    type_fields: frozenset[str]
+    argument_policy: RestFieldArgumentPolicy
+    strip_name_prefix_stars: bool = False
+
+    def pairing_key(self, name: str | None) -> str | None:
+        """Return the normalized value/type pairing key for a field occurrence.
+
+        Args:
+            name (str | None): Parsed field name, or None for an owner-wide field.
+
+        Returns:
+            str | None: Name used for value/type pairing.
+        """
+        if name is not None and self.strip_name_prefix_stars:
+            return name.lstrip("*")
+        return name
 
 
 GOOGLE_SECTIONS = {
@@ -176,16 +230,67 @@ NUMPY_SECTION_PLURAL_NAMES = {
 }
 GOOGLE_SECTION_TERM_NAMES = {"arguments": "Args", "keyword arguments": "Keyword Args", "other arguments": "Other Args"}
 NUMPY_SECTION_TERM_NAMES = {"other params": "Other Parameters"}
-REST_PARAMETER_VALUE_FIELDS = frozenset({"param", "parameter", "arg", "argument", "key", "keyword", "kwarg"})
-REST_PARAMETER_TYPE_FIELDS = frozenset({"type"})
-REST_RETURN_VALUE_FIELDS = frozenset({"return", "returns"})
-REST_RETURN_TYPE_FIELDS = frozenset({"rtype"})
-REST_YIELD_VALUE_FIELDS = frozenset({"yield", "yields"})
-REST_YIELD_TYPE_FIELDS = frozenset({"ytype"})
-REST_EXCEPTION_FIELDS = frozenset({"raise", "raises", "except", "exception"})
-REST_ATTRIBUTE_VALUE_FIELDS = frozenset({"ivar", "cvar", "var"})
-REST_ATTRIBUTE_TYPE_FIELDS = frozenset({"vartype"})
-REST_TYPE_DESCRIPTION_FIELDS = REST_PARAMETER_TYPE_FIELDS | REST_RETURN_TYPE_FIELDS | REST_YIELD_TYPE_FIELDS | REST_ATTRIBUTE_TYPE_FIELDS
+REST_FIELD_FAMILIES = (
+    RestFieldFamily(
+        kind="parameter",
+        label="parameter",
+        value_fields=frozenset({"param", "parameter", "arg", "argument", "key", "keyword", "kwarg"}),
+        type_fields=frozenset({"type"}),
+        argument_policy=RestFieldArgumentPolicy.REQUIRED,
+        strip_name_prefix_stars=True,
+    ),
+    RestFieldFamily(kind="return", label="return", value_fields=frozenset({"return", "returns"}), type_fields=frozenset({"rtype"}), argument_policy=RestFieldArgumentPolicy.FORBIDDEN),
+    RestFieldFamily(kind="yield", label="yield", value_fields=frozenset({"yield", "yields"}), type_fields=frozenset({"ytype"}), argument_policy=RestFieldArgumentPolicy.OPTIONAL),
+    RestFieldFamily(kind="exception", label="exception", value_fields=frozenset({"raise", "raises", "except", "exception"}), type_fields=frozenset(), argument_policy=RestFieldArgumentPolicy.REQUIRED),
+    RestFieldFamily(kind="attribute", label="attribute", value_fields=frozenset({"ivar", "cvar", "var"}), type_fields=frozenset({"vartype"}), argument_policy=RestFieldArgumentPolicy.REQUIRED),
+)
+_REST_FIELD_FAMILY_BY_KIND = {family.kind: family for family in REST_FIELD_FAMILIES}
+_REST_FIELD_METADATA_BY_NAME = {
+    field_name: (family, role)
+    for family in REST_FIELD_FAMILIES
+    for role, field_names in ((RestFieldRole.VALUE, family.value_fields), (RestFieldRole.TYPE, family.type_fields))
+    for field_name in field_names
+}
+
+
+def rest_field_family_for_kind(kind: str) -> RestFieldFamily | None:
+    """Return standard reStructuredText field-family metadata for a semantic kind.
+
+    Args:
+        kind (str): Semantic docstring-entry kind value.
+
+    Returns:
+        RestFieldFamily | None: Matching family metadata, or None for a nonstandard kind.
+    """
+    return _REST_FIELD_FAMILY_BY_KIND.get(kind)
+
+
+def rest_field_metadata(field_name: str | None) -> tuple[RestFieldFamily, RestFieldRole] | None:
+    """Return standard reStructuredText family and role metadata for a field spelling.
+
+    Args:
+        field_name (str | None): Parsed field spelling without surrounding colons.
+
+    Returns:
+        tuple[RestFieldFamily, RestFieldRole] | None: Matching family and role, or None for a nonstandard field.
+    """
+    if field_name is None:
+        return None
+    return _REST_FIELD_METADATA_BY_NAME.get(field_name)
+
+
+def is_rest_type_field(field_name: str | None) -> bool:
+    """Return whether a field spelling provides separate reStructuredText type documentation.
+
+    Args:
+        field_name (str | None): Parsed field spelling without surrounding colons.
+
+    Returns:
+        bool: Whether the field belongs to the type role of a standard family.
+    """
+    metadata = rest_field_metadata(field_name)
+    return metadata is not None and metadata[1] is RestFieldRole.TYPE
+
 
 # Google style defines entry-section ordering, but does not define a canonical order for narrative admonition sections.
 GOOGLE_ORDER_RANKS = {

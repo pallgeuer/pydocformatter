@@ -7,7 +7,7 @@ Rule is disabled if `docstring-convention` is `none` or `pep257`, and ignored by
 ## What it does
 Checks that public module attributes are documented either in the module docstring attribute documentation or by an adjacent attribute docstring.
 
-The rule compares supported module-level assignments against names documented in Google `Attributes` sections, NumPy `Attributes` sections, reStructuredText `:ivar:`, `:cvar:`, `:var:`, and `:vartype:` fields, and adjacent attribute docstrings. Module assignments, annotated assignments, multi-target assignments, and tuple-unpacked assignment leaves are inventoried. Private module attributes are never required.
+The rule compares supported module-level assignments against names documented in Google `Attributes` sections, NumPy `Attributes` sections, reStructuredText `:ivar:`, `:cvar:`, and `:var:` value fields, and adjacent attribute docstrings. A type-only `:vartype:` field activates the consistency check but does not document the attribute value. Module assignments, annotated assignments, multi-target assignments, and tuple-unpacked assignment leaves are inventoried. Private module attributes are never required.
 
 PDF510 checks whether public module attributes have any recognized documentation. It does not care whether that documentation is in the module docstring or attached to the assignment; use PDF520 or PDF521 for a location policy, PDF511 for stale module docstring entries, and PDF513 for duplicated module attribute documentation.
 
@@ -119,7 +119,7 @@ retries: int
 PDF510: Line 10: Public module attribute 'retries' is missing docstring documentation
 ```
 
-reStructuredText attribute fields are parsed under the `rest` convention:
+Under the reST convention, a type-only field activates the consistency check but does not document any inventory attribute. An empty value field does document its named attribute for PDF510; description quality is handled by PDF716:
 
 ```pydocfmt-example
 [settings]
@@ -128,7 +128,8 @@ docstring-convention = "rest"
 [input]
 """Client defaults.
 
-:ivar timeout: Request timeout.
+:vartype removed: int
+:var retries:
 """
 
 timeout: float
@@ -136,7 +137,7 @@ retries: int
 
 [output=unchanged]
 [findings]
-PDF510: Line 7: Public module attribute 'retries' is missing docstring documentation
+PDF510: Line 7: Public module attribute 'timeout' is missing docstring documentation
 ```
 
 The `non-summary-docstrings` policy reports missing attributes for public modules whose docstring has more than a summary, even without an attribute section:
@@ -157,6 +158,40 @@ timeout: float
 [output=unchanged]
 [findings]
 PDF510: Line 6: Public module attribute 'timeout' is missing docstring documentation
+```
+
+Private module paths are skipped by broad checks while `docstring-missing-documentation-public-only` is enabled:
+
+```pydocfmt-example
+[settings]
+docstring-convention = "google"
+docstring-missing-documentation = "all-docstrings"
+docstring-missing-documentation-public-only = true
+
+[input=_internal.py]
+"""Client defaults."""
+
+timeout: float
+
+[output=unchanged]
+```
+
+Disabling the public-only setting applies the same broad policy to private module paths:
+
+```pydocfmt-example
+[settings]
+docstring-convention = "google"
+docstring-missing-documentation = "all-docstrings"
+docstring-missing-documentation-public-only = false
+
+[input=_internal.py]
+"""Client defaults."""
+
+timeout: float
+
+[output=unchanged]
+[findings]
+PDF510: Line 3: Public module attribute 'timeout' is missing docstring documentation
 ```
 
 ## Options

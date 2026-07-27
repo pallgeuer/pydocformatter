@@ -62,10 +62,35 @@ def test_accepts_numpy_and_rest_attribute_documentation() -> None:
     assert_pdf508_lines(rest, ((8,),), settings=CheckSettings(select=("PDF508",), docstring_convention=DocstringConvention.REST))
 
 
-def test_rest_cvar_and_vartype_document_class_attributes() -> None:
+def test_rest_vartype_activates_check_without_documenting_class_attribute() -> None:
     source = 'class Client:\n    """HTTP client.\n\n    :cvar timeout: Request timeout.\n    :vartype retries: int\n    """\n\n    timeout: float\n    retries: int\n    stale: str\n'
 
-    assert_pdf508_lines(source, ((10,),), settings=CheckSettings(select=("PDF508",), docstring_convention=DocstringConvention.REST))
+    assert_pdf508_lines(source, ((9,), (10,)), settings=CheckSettings(select=("PDF508",), docstring_convention=DocstringConvention.REST))
+
+
+def test_unrelated_orphan_vartype_activates_class_attribute_check_without_documenting_inventory() -> None:
+    source = 'class Client:\n    """HTTP client.\n\n    :vartype removed: int\n    """\n\n    timeout: float\n    retries: int\n'
+
+    assert_pdf508_lines(source, ((7,), (8,)), settings=CheckSettings(select=("PDF508",), docstring_convention=DocstringConvention.REST))
+
+
+def test_empty_rest_attribute_value_field_documents_class_attribute_but_vartype_does_not() -> None:
+    source = 'class Client:\n    """HTTP client.\n\n    :vartype timeout: float\n    :var retries:\n    """\n\n    timeout: float\n    retries: int\n'
+
+    assert_pdf508_lines(source, ((8,),), settings=CheckSettings(select=("PDF508",), docstring_convention=DocstringConvention.REST))
+
+
+def test_attached_docstring_satisfies_class_attribute_even_when_owner_has_orphan_vartype() -> None:
+    source = 'class Client:\n    """HTTP client.\n\n    :vartype timeout: float\n    """\n\n    timeout: float\n    """Request timeout."""\n'
+
+    assert_pdf508_lines(source, (), settings=CheckSettings(select=("PDF508",), docstring_convention=DocstringConvention.REST))
+
+
+def test_orphan_vartype_does_not_document_init_attribute_when_requirement_is_enabled() -> None:
+    source = 'class Client:\n    """HTTP client.\n\n    :vartype retries: int\n    """\n\n    def __init__(self):\n        self.retries = 3\n'
+    settings = CheckSettings(select=("PDF508",), docstring_convention=DocstringConvention.REST, docstring_require_init_attribute_documentation=True)
+
+    assert_pdf508_lines(source, ((8,),), settings=settings)
 
 
 def test_numpy_comma_separated_attribute_entry_documents_multiple_class_attributes() -> None:

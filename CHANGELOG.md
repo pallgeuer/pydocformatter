@@ -21,6 +21,7 @@ All notable changes to this project are documented here. The format follows [Kee
   - Added PDF526 to report parsed parameter documentation that does not follow function signature order.
   - Added PDF414 and PDF415 to report high-confidence malformed Google, NumPy, and reStructuredText entry syntax and Google or NumPy entry indentation without unsafe fixes.
   - Added PDF720 and PDF721 to report named raised-exception and emitted-warning entries without prose descriptions.
+  - Added PDF722 to report reStructuredText type fields without one-to-one corresponding value fields.
 - **Unicode safety:**
   - Added PDF004 and PCF007 to report explicit suspicious bidi, invisible-format, control, and separator characters in evaluated docstrings and literal comments, with exact fixes for nonbreaking indentation spaces.
 - **Persistent caching:**
@@ -32,15 +33,18 @@ All notable changes to this project are documented here. The format follows [Kee
 
 - **Developer documentation:**
   - Corrected the rule settings audit to distinguish disabled rules from rules ignored only by broad selectors, with metadata-backed regression coverage.
+  - Reworked the future rule ideas inventory into a code-informed, future-only backlog with benefit-oriented scores and weighted prioritization across implementation risk, runtime cost, Ruff overlap, and reach.
 - **Rule suppressions:**
   - Made inline suppressions after any component token of an implicitly concatenated docstring cover the complete expression for PDF findings while preserving line-local PCF coverage and existing local and standalone attachment boundaries.
 - **Docstring diagnostics:**
   - Made PDF202 target the complete physical empty-docstring expression, including delimiter-only closing lines, consistently with other whole-docstring diagnostics.
   - Parse docstrings after collecting complete owner parameter, attribute, and method inventories, and keep invalid standard reStructuredText field arity structural but outside semantic entry collections.
+  - Required reStructuredText value fields for parameter, return, yield, and attribute documentation coverage, while keeping orphan type fields available to type, duplicate, empty, extraneous, and PDF722 checks without indirect missing-description findings.
 - **Command performance:**
   - Reused successfully parsed configuration documents, closest-config discovery results, and resolved source profiles within each invocation.
   - Reduced directory-walk resolver calls and repeated cache-root, glob-segment, and literal-pattern preparation without changing file-selection semantics.
   - Preindexed direct class attributes and methods once for malformed-entry confidence and skipped those inventories for conventions that cannot use them.
+  - Centralized semantic reStructuredText field-family metadata and paired all supported value/type families in one pass for orphan-field checks.
   - Removed redundant token validation from AST-backed type comparison while preserving conservative comment rejection, parser recursion handling, and iterative AST traversal.
 - **Caching performance:**
   - Reused resolved package ancestry and canonical sibling path encodings within each invocation while preserving exact cache identities and rule-facing path semantics.

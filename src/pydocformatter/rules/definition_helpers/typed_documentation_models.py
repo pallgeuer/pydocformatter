@@ -50,6 +50,7 @@ class TypedDocstringEntry:
         name (str | None): Documented item name, when the subject has named entries.
         type_sources (tuple[TypedDocstringTypeSource, ...]): Parsed type spellings associated with the entry.
         description (str): Description prose from value documentation, excluding type-only reST fields.
+        has_value_entry (bool): Whether the logical entry includes a value or description-bearing entry.
         line_numbers (tuple[int, ...]): Source lines occupied by the value entry, or type-only entry when no value entry
             is present.
     """
@@ -57,6 +58,7 @@ class TypedDocstringEntry:
     name: str | None
     type_sources: tuple[TypedDocstringTypeSource, ...]
     description: str
+    has_value_entry: bool
     line_numbers: tuple[int, ...]
 
 

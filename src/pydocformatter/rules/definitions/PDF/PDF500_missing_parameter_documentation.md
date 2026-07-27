@@ -9,6 +9,8 @@ Checks that function signature parameters are documented in parsed docstring par
 
 By default, this rule reports missing parameters only when the docstring already has recognized parameter documentation. This makes the rule a consistency check for docstrings that have opted into parameter documentation. Broader modes can require parameter documentation for public docstrings with body content, or for all public docstrings.
 
+Under the reST convention, type-only `:type name:` fields activate the consistency check but do not document the parameter value. A corresponding parameter value field is required.
+
 Functions without docstrings are left to missing-docstring rules and are not reported by PDF500.
 
 The rule compares positional-only, positional-or-keyword, keyword-only, `*args`, and `**kwargs` parameters. Leading `*` characters are ignored for matching, so `args` documents `*args` and `kwargs` documents `**kwargs`. Parameter names are otherwise matched exactly and case-sensitively.
@@ -41,7 +43,7 @@ def value(first, second):
 PDF500: Line 1: Function parameter 'second' is missing docstring documentation
 ```
 
-The default mode uses all parsed parameter documentation for the docstring. Protected example text is not treated as parameter documentation:
+The default mode uses recognized parameter documentation to activate the check. Protected example text is not treated as parameter documentation:
 
 ````pydocfmt-example
 [settings]
@@ -65,22 +67,24 @@ def value(first, second, third):
 PDF500: Line 1: Function parameter 'third' is missing docstring documentation
 ````
 
-reST parameter fields are recognized under the reST convention:
+reST type fields activate the check, but only parameter value fields satisfy it. PDF500 checks whether the value field exists, so an empty value field still documents the parameter for this rule; PDF700 separately checks its missing description:
 
 ```pydocfmt-example
 [settings]
 docstring-convention = "rest"
 
 [input]
-def value(first, second):
+def value(first, second, third):
     """Return the value.
 
-    :param first: First value.
+    :type first: int
+    :param second:
+    :param str third: Third value.
     """
 
 [output=unchanged]
 [findings]
-PDF500: Line 1: Function parameter 'second' is missing docstring documentation
+PDF500: Line 1: Function parameter 'first' is missing docstring documentation
 ```
 
 In `has-section` mode, `docstring-missing-documentation-public-only` does not suppress explicit parameter-section consistency checks. A private docstring without parameter documentation is still ignored, while a private docstring with incomplete parameter documentation is reported:
@@ -89,7 +93,7 @@ In `has-section` mode, `docstring-missing-documentation-public-only` does not su
 [settings]
 docstring-convention = "google"
 docstring-missing-documentation = "has-section"
-docstring-missing-documentation-public-only = false
+docstring-missing-documentation-public-only = true
 
 [input]
 def _private_without_section(first):

@@ -13,7 +13,7 @@ import libcst as cst
 # First-party imports
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 import pydocformatter.rules.definition_helpers.decorators as decorator_helpers
-from pydocformatter.rules.definition_helpers import exception_names
+from pydocformatter.rules.definition_helpers import docstring_sections, exception_names
 
 
 if TYPE_CHECKING:
@@ -30,11 +30,13 @@ class DocumentedEntry:
         name (str | None): Documented return, yield, or exception name, when the convention supplies one.
         line_numbers (tuple[int, ...]): One-based source lines occupied by the documented entry.
         has_content (bool): Whether the entry or section contains a documented name, type, or description payload.
+        has_value_entry (bool): Whether the target is a value/description entry rather than a type-only reST field.
     """
 
     name: str | None
     line_numbers: tuple[int, ...]
     has_content: bool
+    has_value_entry: bool
 
 
 _ABSTRACT_DECORATOR_NAMES = {"abstractmethod", "abstractclassmethod", "abstractstaticmethod", "abstractproperty"}
@@ -90,7 +92,15 @@ def documented_entries(docstring: PDF_definition.DocstringInfo, kind: PDF_defini
             continue
         line = docstring.structure.lines[entry.start_line]
         names = entry.names or (None,)
-        entries.extend(DocumentedEntry(name=name, line_numbers=PDF_definition.docstring_line_numbers(docstring, line), has_content=_entry_has_content(entry)) for name in names)
+        entries.extend(
+            DocumentedEntry(
+                name=name,
+                line_numbers=PDF_definition.docstring_line_numbers(docstring, line),
+                has_content=_entry_has_content(entry),
+                has_value_entry=not docstring_sections.is_rest_type_field(entry.field_name),
+            )
+            for name in names
+        )
     return tuple(entries)
 
 
@@ -124,14 +134,21 @@ def value_documentation_targets(docstring: PDF_definition.DocstringInfo, kind: P
             continue
         section_has_content = _section_has_content(docstring, section)
         line = docstring.structure.lines[section.header_line]
-        entries.append(DocumentedEntry(name=None, line_numbers=PDF_definition.docstring_line_numbers(docstring, line), has_content=section_has_content))
+        entries.append(DocumentedEntry(name=None, line_numbers=PDF_definition.docstring_line_numbers(docstring, line), has_content=section_has_content, has_value_entry=True))
     section_entries = {entry for section in docstring.structure.sections for entry in section.entries}
     for entry in docstring.structure.entries:
         if entry in section_entries or entry.kind is not kind:
             continue
         entry_has_content = _entry_has_content(entry)
         line = docstring.structure.lines[entry.start_line]
-        entries.append(DocumentedEntry(name=None, line_numbers=PDF_definition.docstring_line_numbers(docstring, line), has_content=entry_has_content))
+        entries.append(
+            DocumentedEntry(
+                name=None,
+                line_numbers=PDF_definition.docstring_line_numbers(docstring, line),
+                has_content=entry_has_content,
+                has_value_entry=not docstring_sections.is_rest_type_field(entry.field_name),
+            )
+        )
     return tuple(entries)
 
 

@@ -218,7 +218,7 @@ def _description_targets(context: RuleContext, *, first: bool) -> tuple[EntryDes
 
 def _should_check_entry(entry: PDF_definition.DocstringEntry) -> bool:
     """Return whether an entry has a prose description checked by entry-description style rules."""
-    if entry.kind is PDF_definition.DocstringEntryKind.FIELD or entry.field_name in docstring_sections.REST_TYPE_DESCRIPTION_FIELDS:
+    if entry.kind is PDF_definition.DocstringEntryKind.FIELD or docstring_sections.is_rest_type_field(entry.field_name):
         return False
     return bool(entry.description)
 

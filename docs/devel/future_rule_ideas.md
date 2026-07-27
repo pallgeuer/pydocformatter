@@ -2,13 +2,13 @@
 
 The main remaining opportunities are:
 
-- Parser blind spots: mixed conventions, unknown sections, and malformed structures outside the conservative PDF414/PDF415 entry checks can still become ordinary prose.
-- Ordering and ownership: constructor/class documentation, attribute order, method inventories, and `__all__`.
-- Entry completeness: methods, `See Also`, and attached attribute docstrings.
-- Markup safety: unsupported or malformed inline markup and malformed reST/fences.
-- Conservative autofixes for several existing diagnostic-only rules.
+- Entry completeness and substance: placeholder docstrings, method descriptions, and generic descriptions.
+- Convention exactness: variadic markers, reST directive introducers, NumPy return-entry shape, and obvious type spelling defects.
+- Inventory and ordering: attribute declaration order and literal `__slots__` members.
+- Conservative autofixes: terminal punctuation, whitespace-only empty comments, and duplicate directive selectors.
+- Optional semantic coverage: treating `assert` as a possible documented `AssertionError`.
 
-There are currently 130 rules: 7 PCF and 123 PDF. Fix availability is 22 always, 5 usually, 20 sometimes, and 83 never.
+There are currently 131 rules: 7 PCF and 124 PDF. Fix availability is 22 always, 5 usually, 20 sometimes, and 84 never.
 
 ## Current coverage audit
 
@@ -88,7 +88,7 @@ The comment parser deliberately excludes empty/hash-only lines and protects sheb
 | PDF414 | High-confidence malformed convention entry syntax                     |   N |
 | PDF415 | High-confidence Google and NumPy entry indentation                    |   N |
 
-Recognized section names and ordering are explicit tables in `docstring_sections.py`. PDF414 and PDF415 diagnose a conservative subset of malformed entry syntax and indentation; other unrecognized structures can still silently fall back to prose.
+Recognized section names and ordering are explicit tables in `docstring_sections.py`. PDF414 and PDF415 intentionally diagnose only high-confidence malformed entry syntax and indentation so arbitrary prose remains untouched.
 
 ### Semantic consistency and ownership
 
@@ -124,149 +124,74 @@ All PDF5xx–7xx rules are diagnostic-only.
 | PDF712–715     | Class-attribute description presence, type required/forbidden, and annotation mismatch  |
 | PDF716–719     | Module-attribute description presence, type required/forbidden, and annotation mismatch |
 | PDF720/721     | Raised-exception and emitted-warning description presence                               |
+| PDF722         | Orphan reStructuredText type fields without corresponding value fields                  |
 
-The category’s exact inventory boundaries—including ignored additional docstrings and unsupported assignment targets—are documented in `PDF.md`.
+The category’s exact inventory boundaries are documented in `PDF.md`.
 
-## Recommended rule additions and extensions
+## Proposed additions and extensions
 
-1. **Report docstring-convention mismatch or mixing.** Detect strong Google, NumPy, or reST markers that conflict with the configured convention. This prevents all downstream rules silently treating real documentation as prose. Keep it diagnostic-only and require multiple unambiguous signals.
+1. **Report placeholder docstrings.** Conservatively recognize exact placeholders such as `TODO`, `TBD`, `...`, `FIXME`, or `pass` after narrow punctuation normalization. Do not attempt an autofix.
 
-2. **Report unknown or likely misspelled section names.** At clear section boundaries, flag near-matches such as `Paramters` or convention-inappropriate aliases. A unique case-insensitive/edit-distance match could be safely auto-fixed. Numpydoc has an established “unknown section” check, supporting its broad usefulness. [Numpydoc validation](https://numpydoc.readthedocs.io/en/stable/validation.html)
+2. **Check method entries for missing descriptions.** `Methods` entries are parsed and styled, but there is no completeness rule for their prose.
 
-3. **Implemented as PDF414/PDF415: Report malformed convention entries.** PDF414 reports high-confidence Google, NumPy, and reST entry syntax defects, while PDF415 separately reports high-confidence Google and NumPy entry indentation defects. Both remain diagnostic-only and use owner inventories or strong syntax evidence to avoid diagnosing arbitrary prose.
+3. **Strengthen punctuation fixes.** PDF300/301/308/309 could optionally replace a final comma or semicolon with the configured terminal punctuation. A final colon should remain non-fixable because it may introduce content.
 
-4. **Implemented as PDF212: Report missing summaries.** PDF212 distinguishes a nonempty docstring containing only sections, fields, examples, directives, or other structures from PDF202’s empty docstring.
+4. **Require exact variadic markers when configured.** PDF500/501 intentionally equate `args` with `*args`; add an opt-in rule requiring `*args` and `**kwargs` to retain their stars. Google's guide explicitly recommends those spellings. [Google Python style guide](https://google.github.io/styleguide/pyguide.html)
 
-5. **Report placeholder docstrings.** Conservatively recognize exact placeholders such as `TODO`, `TBD`, `...`, `FIXME`, or `pass`, after punctuation normalization. Do not attempt an autofix.
+5. **Canonicalize whitespace-only empty comments.** Normalize `#   ` to `#`. Do not alter deliberate hash separators such as `#####`.
 
-6. **Add generic owner-documentation detection.** Extend PDF306/307’s conservative philosophy to summaries like `Foo class`, `The foo function`, `Foo method`, or a summary that only repeats the qualified name. Make convention-specific patterns opt-in.
+6. **Validate NumPy return-entry shape.** Check that a single return entry starts with a type and that multiple returned values use valid multi-entry structure. This corresponds to a mature numpydoc rule without requiring runtime inference.
 
-7. **Report sections inappropriate for the owner.** Examples include `Returns`/`Yields` on class or module docstrings, `Parameters` on modules, `Attributes` on ordinary function docstrings, or constructor-only sections at the wrong ownership location.
+7. **Treat `assert` as a possible documented `AssertionError`.** This could extend PDF506 behind a setting; pydoclint exposes a corresponding check. Avoid enabling it broadly because assertions are often internal invariants.
 
-8. **Implemented as PDF526: Check parameter entry order against the signature.** PDF526 compares the first parsed documentation occurrence of each real signature parameter across the complete docstring and reports late entries without reordering content. [numpydoc validation](https://numpydoc.readthedocs.io/en/stable/validation.html) [Pydoclint configuration](https://jsh9.github.io/pydoclint/config_options.html)
+8. **Canonicalize obvious docstring type spelling defects.** Examples include a trailing period in a type slot, lowercase `none`, or redundant outer whitespace or parentheses when normalization is AST-proven. Avoid broader `List` versus `list` policy because target-version preferences differ.
 
-9. **Require exact variadic markers when configured.** PDF500/501 intentionally equate `args` with `*args`; add an opt-in rule requiring `*args` and `**kwargs` to retain their stars. Google’s guide explicitly recommends those spellings. [Google Python style guide](https://google.github.io/styleguide/pyguide.html)
+9. **Extend generic-description checks.** Conservatively flag `The return value`, `The yielded value`, `The exception`, `The method`, and similarly content-free warning descriptions.
 
-10. **Support constructor documentation ownership.** Add mutually exclusive policies for documenting constructor parameters/raises in the class docstring versus `__init__`, and make PDF500–507 compare the chosen docstring with `__init__`. This is especially important for NumPy style.
+10. **Validate reST directive introducers.** Report directive-looking lines using one colon instead of `.. name::`, corresponding to numpydoc's broadly useful GL10 check.
 
-11. **Implemented as PDF720/PDF721: Check exception and warning entries for missing descriptions.** PDF720 checks named raised-exception entries under Google, NumPy, and reStructuredText conventions. PDF721 separately checks emitted-warning entries under Google and NumPy conventions, without treating Google warning admonitions as emitted-warning documentation.
+11. **Inventory literal `__slots__` members.** When `__slots__` is a statically known string, tuple, or list, include those instance attributes in class documentation checks.
 
-12. **Check method entries for missing descriptions.** `Methods` entries are parsed and styled, but there is no completeness rule for their prose.
+12. **Deduplicate directive selectors and codes.** PCF003 can safely remove exact duplicate entries from `noqa`, `pydocfmt`, `ruff`, `pylint`, `type: ignore`, and similar comma or bracket lists. Sorting should be optional; deduplication is semantics-preserving.
 
-13. **Fully parse `See Also` entries.** Add missing-description, capitalization, punctuation, duplicate-reference, and entry-spacing checks. Numpydoc already treats these as common validation targets.
+13. **Check attribute entry order against declaration order.** This complements PDF508–513. It should be opt-in because conceptual ordering is sometimes intentional.
 
-14. **Check documented method inventory.** When a class has a `Methods` section, compare it with actual public methods: missing, extraneous, duplicated, and optionally wrong order. Use the same “has-section” activation policy as PDF500 to avoid requiring such sections universally.
+## Recommended implementation sequence
 
-15. **Check attribute entry order against declaration order.** This complements PDF508–513. It should be opt-in because conceptual ordering is sometimes intentional.
+- **Highest priority:** #1 placeholder docstrings, #2 method-entry descriptions, #3 stronger punctuation fixes, #4 exact variadic markers, and #5 empty-comment normalization combine robust detection or fixes with highly localized implementation work.
+- **Strong follow-up:** #6 NumPy return-entry shape, #7 optional `AssertionError` documentation, #8 obvious type spelling, #9 generic descriptions, and #10 reST directive introducers remain well-bounded and materially extend current coverage.
+- **Focused refinements:** #11 literal `__slots__` inventory, #12 directive deduplication, and #13 attribute ordering have narrower reach or more preference-sensitive policy but remain worthwhile.
 
-16. **Respect statically known `__all__` when deciding public API.** Use simple literal `__all__` assignments to refine PDF5xx/PDF6xx public/private classification. Fall back to underscore naming when `__all__` is dynamic.
+## Scored assessment
 
-17. **Add `warnings.warn` documentation consistency.** Match statically resolvable warning categories against `Warns` entries, analogous to PDF506/507. Treat extraneous-warning checking as opt-in for the same reason PDF507 is opt-in.
+Every individual score uses a benefit-oriented scale where 1 is worst and 5 is best:
 
-18. **Treat `assert` as a possible documented `AssertionError`.** This could extend PDF506 behind a setting; pydoclint exposes a corresponding check. Avoid enabling it broadly because assertions are often internal invariants.
+- **Implementation locality:** 1 means cross-cutting parser, model, settings, runner, or rule-family changes; 5 means a highly isolated rule or helper change.
+- **Robustness:** 1 means difficult to make reliably false-positive-free; 5 means a bullet-proof implementation is readily achievable.
+- **Broad agreement:** 1 means strongly preference-dependent; 5 means broad agreement is likely.
+- **Scope clarity:** 1 means the boundary is inherently fuzzy; 5 means the target is crisp and easily bounded.
+- **Check-time efficiency:** 1 means substantial additional uncached runtime work; 5 means negligible additional uncached runtime work.
+- **Reach:** 1 means few users or projects benefit; 5 means broadly useful.
+- **Implementation straightforwardness:** 1 means many non-obvious design decisions; 5 means the implementation path is direct.
+- **Added value beyond Ruff:** 1 means Ruff already covers the same behavior well; 5 means the proposal is materially distinct, more exact, or better integrated with pydocfmt.
+- **Overall recommendation:** 1 means reject or indefinitely defer; 5 means prioritize.
 
-19. **Resolve imported exception aliases.** Normalize `raise BadInput` imported from another module against qualified documentation when the binding is statically unambiguous.
+The **weighted average** is the arithmetic mean of the eight individual dimension scores after applying these weights: robustness 20%; scope clarity, reach, and added value beyond Ruff 15% each; implementation locality, check-time efficiency, and implementation straightforwardness 10% each; and broad agreement 5%. This prioritizes reliable behavior and clear user value while giving less weight to consensus because an opt-in rule can still be worthwhile when preferences differ. The overall recommendation is an independent synthesis and is not included in the weighted average. Rows are sorted by descending weighted average, then by descending overall recommendation and ascending idea number to break ties.
 
-20. **Implemented: Make reflow aware of inline markup.** PDF101, PCF001, and PCF004 preserve the documented conservative subset of Markdown and reST inline constructs as atomic source-aware tokens. Unsupported or malformed constructs remain an opportunity for narrower diagnostics.
+The Ruff comparison was checked against the official [rule catalog](https://docs.astral.sh/ruff/rules/), [pydoclint rules](https://docs.astral.sh/ruff/rules/#pydoclint-doc), [pydocstyle rules](https://docs.astral.sh/ruff/rules/#pydocstyle-d), [task-comment rules](https://docs.astral.sh/ruff/rules/invalid-todo-capitalization/), [suppression rules](https://docs.astral.sh/ruff/rules/unused-noqa/), and [docstring code formatting](https://docs.astral.sh/ruff/formatter/#docstring-formatting) on 2026-07-27.
 
-21. **Implemented: Preserve Markdown hard line breaks.** PDF101, PDF102, and PCF001 preserve evaluated two-or-more-space and unescaped-backslash hard breaks, including their exact Python source spelling.
-
-22. **Implemented as PDF004/PCF007: Report suspicious invisible Unicode separately from ASCII-only policy.** PDF004 checks evaluated primary and attached docstrings with exact simple and concatenated-literal mapping, while PCF007 checks literal comments. Both rules report an explicit bidi, invisible-format, control, and separator policy; fix mapped nonbreaking indentation spaces; and prevent earlier formatters from erasing diagnostic characters.
-
-23. **Validate reST directive introducers.** Report directive-looking lines using one colon instead of `.. name::`, corresponding to numpydoc’s broadly useful GL10 check.
-
-24. **Report unbalanced fenced/inline markup.** Cover unclosed code fences, unmatched inline-code delimiters, malformed reST roles, and dangling Markdown links when recognition is unambiguous.
-
-25. **Validate protected Python examples syntactically.** Parse doctest inputs and explicitly Python-tagged fenced blocks without executing them. Report invalid Python or malformed doctest prompts; leave actual formatting to Ruff or another formatter.
-
-26. **Report orphan reST type fields explicitly.** Diagnose `:type name:` without `:param name:`, `:rtype:` without a return field, `:ytype:` without a yield field, and `:vartype:` without attribute documentation. Current missing-description rules catch some cases indirectly but give a less precise diagnosis.
-
-27. **Extend typed-entry rules to attached attribute docstrings.** Parse common `Type: description` attached-docstring forms and offer description presence, type policy, and annotation mismatch checks. PDF712–719 currently cover only owner-docstring entries.
-
-28. **Extend annotation-based checks to stubs and abstract methods.** When there is no executable body, a non-`None` return annotation or recognized generator annotation can still support missing/type-mismatch validation. Keep body-dependent exception checks disabled.
-
-29. **Broaden conservative type equivalence.** Support quoted forward references, `Optional[T]` versus `T | None`, `Union`, `Annotated`, `Literal` values, `Required`/`NotRequired`, and other common typing wrappers. The current accepted AST subset is intentionally small; see [type_expressions.py](/home/allgeuer/Code/PythonTools/pydocformatter/src/pydocformatter/rules/definition_helpers/type_expressions.py:38).
-
-30. **Canonicalize obvious docstring type spelling defects.** Examples: a trailing period in a type slot, lowercase `none`, or redundant outer whitespace/parentheses when normalization is AST-proven. Avoid broader `List` versus `list` policy because target-version preferences differ.
-
-31. **Validate NumPy return-entry shape.** Check that a single return entry starts with a type and that multiple returned values use valid multi-entry structure. This corresponds to a mature numpydoc rule without requiring runtime inference.
-
-32. **Extend generic-description checks.** Conservatively flag `The return value`, `The yielded value`, `The exception`, `The method`, and similarly content-free warning descriptions.
-
-33. **Normalize task-marker spelling.** Recognize configured markers case-insensitively and fix `todo`, `TODO `, or `TODO -` to a configured canonical `TODO:` form while excluding prose uses of the word. Keep issue-link requirements out of the base rule.
-
-34. **Canonicalize whitespace-only empty comments.** Normalize `#   ` to `#`. Do not alter deliberate hash separators such as `#####`.
-
-35. **Deduplicate directive selectors and codes.** PCF003 can safely remove exact duplicate entries from `noqa`, `pydocfmt`, `ruff`, `pylint`, `type: ignore`, and similar comma/bracket lists. Sorting should be optional; deduplication is semantics-preserving.
-
-36. **Make PCF006 usually auto-fixable.** Remove an individual unused selector while preserving used selectors and rationale text; remove the whole directive only when nothing meaningful remains and placement is unambiguous.
-
-37. **Make forbidden-type rules sometimes fixable.** PDF702/706/710/714/718 can remove a redundant type from Google or reST syntax when a valid description-bearing entry remains. NumPy cases may remain diagnostic-only because its entry grammar expects a type slot.
-
-38. **Add conservative fixes to PDF407.** Reorder complete, independently parsed section/field blocks while preserving their content. Do not fix when unordered narrative material creates ambiguity.
-
-39. **Add conservative fixes to PDF406/408/412.** Remove a wholly empty section and remove later byte-equivalent duplicate sections or entries. Semantically different duplicates should remain diagnostic-only.
-
-40. **Strengthen punctuation fixes.** PDF300/301/308/309 could optionally replace a final comma or semicolon with the configured terminal punctuation. A final colon should remain non-fixable because it may introduce content.
-
-41. **Capitalize through simple inline markup.** Extend PDF304/PDF310 to safely capitalize inside one unambiguous leading code/emphasis/reference wrapper while preserving delimiters.
-
-42. **Support PEP 257 additional docstrings.** Apply mechanical formatting to string literals immediately following a primary docstring. The project explicitly excludes these now, although PEP 257 recognizes them as documentation. [PEP 257](https://peps.python.org/pep-0257/)
-
-43. **Add property-versus-Attributes documentation policies.** Optionally treat properties as class attributes and detect missing, duplicate, or wrong-location property documentation. This should be separate from ordinary stored attributes because major conventions differ.
-
-44. **Inventory literal `__slots__` members.** When `__slots__` is a statically known string/tuple/list, include those instance attributes in class documentation checks.
-
-45. **Add opt-in capitalization/punctuation checks for standalone prose comments.** Apply only to clearly sentence-like standalone paragraphs, excluding trailing comments, task markers, labels, directives, headings, code, and fragments. Google’s guide recommends narrative capitalization and punctuation, but this should remain optional because comment fragments are common. [Google Python style guide](https://google.github.io/styleguide/pyguide.html)
-
-## Highest priority
-
-- **#26 — Report orphan reST type fields explicitly**
-
-   Narrower reach, but exceptionally clear and robust. The parser already pairs value and type fields. A precise “`:type x:` has no corresponding `:param x:`” diagnostic is far better than indirectly reporting a missing description.
-
-## Strong second wave
-
-- **#2 — Unknown or misspelled sections**
-
-   Valuable, especially because an unknown heading becomes prose, but implement conservatively. Only report at unambiguous section boundaries and auto-fix only a unique, very close match. Custom headings must remain valid.
-
-- **#16 — Respect static `__all__`**
-
-   Important for semantic correctness of all public-documentation rules. Restrict support initially to simple literal assignments and perhaps simple `+=` extensions. Dynamic forms should fall back to current underscore-based behavior.
-
-- **#10 — Constructor documentation ownership**
-
-   A major correctness improvement for NumPy-style projects, where constructor parameters are often documented on the class. It is more architectural than a simple rule because PDF500–507 need a configurable effective owner, but it closes a real convention-level gap.
-
-- **#13/#14 — `See Also` and method inventory checks**
-
-   Malformed-entry handling is now established by PDF414/PDF415. `See Also` description validation is mature and objective; method inventory checks should activate only when a `Methods` section already exists.
-
-- **#27 — Typed checks for attached attribute docstrings**
-
-   Important because attached docstrings are first-class documentation elsewhere in the tool but excluded from PDF712–719. Start with description presence; type extraction and mismatch checks can follow.
-
-## Good low-cost refinements
-
-These are worthwhile as a small cleanup batch, though none individually has the reach of the items above:
-
-- **#30:** Reject or normalize an obvious trailing period in a type slot.
-- **#34:** Normalize whitespace-only empty comments.
-- **#35:** Deduplicate directive selectors without sorting them.
-- **#36:** Auto-fix unused suppression selectors while preserving rationale text.
-- **#39:** Remove empty sections and byte-equivalent duplicate entries in narrowly proven cases.
-
-Of these, **#36** offers the best user experience improvement, while **#34** is likely the simplest implementation.
-
-## Useful, but defer
-
-I would defer these until the earlier parser and safety work is complete:
-
-- **#1 convention mismatch:** valuable, but heuristic and prone to cascading false positives.
-- **#17 warning-call consistency:** requires reliable import/call/category resolution.
-- **#25 Python example validation:** useful, but overlaps Ruff and raises questions about supported doctest syntax.
-- **#29 broader type equivalence:** valuable but can grow into a substantial type-normalization subsystem.
-- **#38 section-order autofix:** moving large semantic blocks deserves more caution than merely diagnosing their order.
-- **#40/#41 punctuation and capitalization extensions:** comparatively stylistic.
-- **#42 additional docstrings, #43 properties, #44 `__slots__`:** legitimate coverage, but lower reach.
+| Idea | Proposed change                                          | Implementation locality | Robustness | Broad agreement | Scope clarity | Check-time efficiency | Reach | Implementation straightforwardness | Added value beyond Ruff | Weighted average | Overall recommendation | Existing-code and design assessment                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+|------|----------------------------------------------------------|------------------------:|-----------:|----------------:|--------------:|----------------------:|------:|-----------------------------------:|------------------------:|-----------------:|-----------------------:|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| #1   | Report placeholder docstrings                            |                       5 |          5 |               4 |             5 |                     5 |     4 |                                  5 |                       5 |             4.80 |                      5 | `PDFCategoryData` already contains every primary and attached docstring, parsed summary targets, evaluated values, and source locations. Exact normalized whole-docstring matches for `TODO`, `TBD`, `FIXME`, `...`, or `pass` can be checked without parser or model changes and without risking ordinary prose; punctuation stripping should stay deliberately narrow. Ruff's D419 checks empty docstrings but not non-empty placeholders, so this is a cheap and distinct completeness diagnostic.                                                                                                          |
+| #2   | Check method entries for missing descriptions            |                       5 |          5 |               5 |             5 |                     5 |     2 |                                  5 |                       5 |             4.55 |                      4 | `DocstringEntryKind.METHOD` is already emitted by Google and NumPy section parsing, and `entry_completeness.missing_raw_entry_description_violations()` is a generic helper already used for exception and warning completeness. A thin rule can select named method entries with empty parsed prose and inherit established line mapping, protected-structure handling, and convention gating. Reach is limited to projects that maintain `Methods` sections, but the behavior is objective and absent from Ruff.                                                                                             |
+| #3   | Strengthen punctuation fixes                             |                       5 |          5 |               3 |             5 |                     5 |     4 |                                  5 |                       3 |             4.45 |                      4 | `terminal_punctuation.violation()` already distinguishes valid, non-fixable, and fixable endings, and summary and entry helpers already have source-safe insertion planners. Replacing a final comma or semicolon requires only passing the terminal-character span to the existing mapping machinery instead of inserting a period; colons can remain diagnostic-only. The change is technically precise and cheap, although whether replacement is stylistically desirable is preference-dependent. Ruff D400/D415 already fix missing punctuation, so the gain is narrower exact replacement behavior.      |
+| #4   | Require exact variadic markers when configured           |                       4 |          5 |               3 |             5 |                     5 |     3 |                                  5 |                       4 |             4.35 |                      4 | `SignatureParameter.display_name` already preserves `*` and `**`, parsed Google and NumPy entry names accept those prefixes, and only `parameter_comparison_name()` deliberately strips them for PDF500, PDF501, and PDF526 matching. An opt-in diagnostic can compare the raw documented spelling with the matched signature parameter without changing existing equivalence semantics. The rule is technically crisp and cheap, though some established documentation styles omit stars; Ruff D417 can ignore variadics but does not enforce their exact spelling.                                           |
+| #5   | Canonicalize whitespace-only empty comments              |                       5 |          5 |               4 |             5 |                     5 |     3 |                                  5 |                       3 |             4.35 |                      4 | `CommentInfo.is_empty` and `is_hash_only` already classify the target, but `_standalone_runs()` deliberately excludes it, while PCF002 only canonicalizes empty trailing comments. A standalone-only change from `#   ` to `#` can be implemented as an isolated exact token replacement and must leave multi-hash separators unchanged. The result is nearly risk-free and cheap; Ruff may normalize some comment whitespace through formatting, but pydocfmt would make the policy independently selectable and complete across placements.                                                                  |
+| #6   | Validate NumPy return-entry shape                        |                       4 |          4 |               5 |             4 |                     5 |     3 |                                  4 |                       5 |             4.15 |                      4 | `_numpy_entries()` currently accepts both bare return-type lines and any `name: type` entries, records their source order, and does not validate whether one versus multiple returned values uses the convention's expected shape. A NumPy-only rule can reason over the existing section and entry tuples without runtime inference, but must define named tuple-like returns, comma-separated types, `None`, generator sections, and malformed peers already handled by PDF414. The rule is mature in numpydoc and has no Ruff counterpart.                                                                  |
+| #7   | Treat `assert` as a possible documented `AssertionError` |                       4 |          5 |               2 |             5 |                     5 |     2 |                                  5 |                       4 |             4.15 |                      3 | `_DefinitionCollector` can record `cst.Assert` beside `visit_Raise()` with the same nested-function and lambda exclusions, and PDF506 can include a synthetic `AssertionError` behind a setting. The static fact is unambiguous, although optimized Python can remove assertions and many projects regard them as internal invariants rather than public exceptions. Ruff can flag assert usage through S101, but its DOC501 rule documents explicitly raised exceptions and does not turn assertions into documentation obligations.                                                                          |
+| #8   | Canonicalize obvious docstring type spelling defects     |                       4 |          4 |               4 |             4 |                     5 |     3 |                                  4 |                       5 |             4.10 |                      4 | PDF411 and `normalized_type_like_text()` already prove AST-preserving internal whitespace normalization, but `DocstringEntry` does not retain source offsets for the complete type slot and punctuation such as a trailing period prevents type parsing. A narrow pre-parse cleanup or stored type-span model can handle a final period, lowercase `none`, and provably redundant outer grouping without adopting version-sensitive `List` versus `list` policy. The cases are bounded and absent from Ruff's docstring rules, though fixes must retain the project's exact source-mapping guarantees.         |
+| #9   | Extend generic-description checks                        |                       4 |          4 |               3 |             4 |                     5 |     3 |                                  4 |                       5 |             4.05 |                      4 | `documentation_style.DocumentedValueStylePolicy` already token-normalizes descriptions and detects content-free parameter and attribute phrases, and the parser exposes return, yield, exception, warning, and method entry descriptions. New subject-specific noun sets and target collectors can reuse that machinery with little cost. The main risk is overreaching on short but meaningful phrases such as “The result” in a tightly scoped API, so patterns should remain exact and conservative. Ruff has no semantic generic-description family.                                                       |
+| #10  | Validate reST directive introducers                      |                       4 |          4 |               5 |             4 |                     5 |     2 |                                  4 |                       5 |             4.00 |                      4 | `_DIRECTIVE_RE` recognizes only valid `.. name::` openers, and invalid directive-looking lines otherwise become prose or colon headers. A focused diagnostic can inspect clear line boundaries for one-colon or missing-dot variants while excluding field lists, literal blocks, ellipses, examples, and ordinary prose; no semantic body rewrite is required. The syntax is standardized and numpydoc's GL10 demonstrates usefulness, though reach is mostly reST and NumPy documentation. Ruff has no corresponding directive-introducer rule.                                                              |
+| #11  | Inventory literal `__slots__` members                    |                       3 |          4 |               4 |             5 |                     5 |     2 |                                  3 |                       5 |             3.90 |                      4 | `_AttributeDocstringCollector` inventories ordinary class assignments and `self.name` writes in `__init__`, but a literal `__slots__` assignment is currently just the attribute named `__slots__`. A bounded evaluator for a string, tuple, or list can add member names to the owning class inventory with declaration order, while rejecting dynamic expressions; name mangling, invalid slot values, duplicates, `__dict__`, `__weakref__`, and overlap with actual assignments need explicit handling. Ruff can sort `__slots__` through RUF023 but does not connect slots to documentation completeness. |
+| #12  | Deduplicate directive selectors and codes                |                       4 |          4 |               5 |             4 |                     5 |     3 |                                  4 |                       3 |             3.85 |                      4 | PCF003 already parses and canonicalizes the relevant comma and bracket list families through `_normalized_comma_list()`, preserving rationale tails and rejecting unsafe token shapes. Stable first-occurrence deduplication is a small extension, but semantics should be audited separately for action pairs, `type: ignore` namespaces, case normalization, empty selectors, and tools where repeated tokens might carry unusual meaning. Ruff has strong suppression validation for its own directives, while pydocfmt's multi-tool directive coverage remains broader.                                    |
+| #13  | Check attribute entry order against declaration order    |                       4 |          4 |               2 |             4 |                     5 |     2 |                                  4 |                       5 |             3.85 |                      3 | `PDFCategoryData.attributes_for()` preserves collected assignment order, and parsed attribute entries preserve docstring order, so first-occurrence rank comparison can closely follow `parameter_order_issues()`. Multiple-target assignments, repeated declarations, instance attributes discovered through branches, and attached-versus-owner documentation need deterministic collapsing, but the technical boundary is manageable. Conceptual grouping is often intentional, making this appropriately opt-in and less broadly recommendable despite no Ruff equivalent.                                 |

@@ -1,7 +1,9 @@
 # First-party imports
+import tests.rules.PDF.helpers as pdf_helpers
 from pydocformatter import formatter, rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention, DocstringMissingDocumentation
 from pydocformatter.rules.definitions.PDF.PDF500_missing_parameter_documentation import PDF500MissingParameterDocumentation
+from tests import rule_helpers
 
 
 def format_source(source: str, *, settings: CheckSettings | None = None) -> formatter.FormatterResult:
@@ -109,10 +111,34 @@ def test_typed_rest_parameter_field_satisfies_signature_parameter() -> None:
     assert_pdf500_lines(source, (), settings=CheckSettings(select=("PDF500",), docstring_convention=DocstringConvention.REST))
 
 
-def test_type_only_rest_field_satisfies_signature_parameter() -> None:
+def test_type_only_rest_field_activates_check_without_documenting_parameter() -> None:
     source = 'def function(first):\n    """Summary.\n\n    :type first: int\n    """\n'
 
-    assert_pdf500_lines(source, (), settings=CheckSettings(select=("PDF500",), docstring_convention=DocstringConvention.REST))
+    assert_pdf500_lines(source, ((1,),), settings=CheckSettings(select=("PDF500",), docstring_convention=DocstringConvention.REST))
+
+
+def test_type_only_rest_fields_do_not_document_variadic_parameters_regardless_of_star_spelling() -> None:
+    source = 'def function(*args, **kwargs):\n    """Summary.\n\n    :type args: tuple[object, ...]\n    :type **kwargs: dict[str, object]\n    """\n'
+
+    assert_pdf500_lines(source, ((1,), (1,)), settings=CheckSettings(select=("PDF500",), docstring_convention=DocstringConvention.REST))
+
+
+def test_empty_rest_value_field_documents_parameter_while_type_only_field_does_not() -> None:
+    source = 'def function(first, second, third):\n    """Summary.\n\n    :type first: int\n    :param second:\n    :type third: str\n    :argument third: Third.\n    """\n'
+
+    assert_pdf500_lines(source, ((1,),), settings=CheckSettings(select=("PDF500",), docstring_convention=DocstringConvention.REST))
+
+
+def test_private_type_only_rest_field_explicitly_activates_check_under_public_only_policy() -> None:
+    source = 'def _function(first):\n    """Summary.\n\n    :type first: int\n    """\n'
+    settings = CheckSettings(
+        select=("PDF500",),
+        docstring_convention=DocstringConvention.REST,
+        docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS,
+        docstring_missing_documentation_public_only=True,
+    )
+
+    assert_pdf500_lines(source, ((1,),), settings=settings)
 
 
 def test_reports_missing_parameter_from_rest_keyword_field() -> None:
@@ -132,6 +158,16 @@ def test_none_and_pep257_conventions_keep_missing_parameter_documentation_inert(
 
     for convention in (DocstringConvention.NONE, DocstringConvention.PEP257):
         assert_pdf500_lines(source, (), settings=CheckSettings(select=("PDF500",), docstring_convention=convention, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS))
+
+
+def test_direct_rule_hook_remains_inert_for_unparsed_conventions() -> None:
+    source = 'def function(first):\n    """Summary.\n\n    :type first: int\n    """\n'
+    contexts = pdf_helpers.contexts_for("PDF500")
+
+    for convention in (DocstringConvention.NONE, DocstringConvention.PEP257):
+        _, context = contexts(source, settings=CheckSettings(select=("PDF500",), docstring_convention=convention, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS))
+
+        assert not rule_helpers.rule_findings(PDF500MissingParameterDocumentation, context)
 
 
 def test_rest_fields_do_not_satisfy_google_parameter_documentation() -> None:

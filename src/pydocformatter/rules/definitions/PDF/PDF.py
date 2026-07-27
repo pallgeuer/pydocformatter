@@ -1260,25 +1260,6 @@ _ATX_HEADING_RE = re.compile(r"^[ \t]{0,3}#{1,6}[ \t]+\S")
 _MARKDOWN_TABLE_DELIMITER_RE = re.compile(r"^[ \t]*\|?[ \t]*:?-{3,}:?[ \t]*(?:\|[ \t]*:?-{3,}:?[ \t]*)+\|?[ \t]*$")
 _REST_GRID_BORDER_RE = re.compile(r"^[ \t]*\+(?:[-=]+\+)+[ \t]*$")
 _REST_SIMPLE_BORDER_RE = re.compile(r"^[ \t]*={3,}(?:[ \t]+={3,})+[ \t]*$")
-_REST_STANDARD_FIELDS = (
-    docstring_sections.REST_PARAMETER_VALUE_FIELDS
-    | docstring_sections.REST_PARAMETER_TYPE_FIELDS
-    | docstring_sections.REST_RETURN_VALUE_FIELDS
-    | docstring_sections.REST_RETURN_TYPE_FIELDS
-    | docstring_sections.REST_YIELD_VALUE_FIELDS
-    | docstring_sections.REST_YIELD_TYPE_FIELDS
-    | docstring_sections.REST_EXCEPTION_FIELDS
-    | docstring_sections.REST_ATTRIBUTE_VALUE_FIELDS
-    | docstring_sections.REST_ATTRIBUTE_TYPE_FIELDS
-)
-_REST_REQUIRED_ARGUMENT_FIELDS = (
-    docstring_sections.REST_PARAMETER_VALUE_FIELDS
-    | docstring_sections.REST_PARAMETER_TYPE_FIELDS
-    | docstring_sections.REST_EXCEPTION_FIELDS
-    | docstring_sections.REST_ATTRIBUTE_VALUE_FIELDS
-    | docstring_sections.REST_ATTRIBUTE_TYPE_FIELDS
-)
-_REST_UNEXPECTED_ARGUMENT_FIELDS = docstring_sections.REST_RETURN_VALUE_FIELDS | docstring_sections.REST_RETURN_TYPE_FIELDS
 
 
 @dataclasses.dataclass(frozen=True)
@@ -1972,7 +1953,7 @@ class _DocstringParser:
         if field_match is None or ":" in text[field_match.end() :]:
             return None
         field = field_match.group("field").lower()
-        if field not in _REST_STANDARD_FIELDS:
+        if docstring_sections.rest_field_metadata(field) is None:
             return None
         tail = text[field_match.end() :].strip()
         if not _rest_missing_delimiter_is_credible(field, tail):
@@ -2336,16 +2317,9 @@ def _entry_kind(section_name: str) -> DocstringEntryKind:
 
 def _rest_entry_kind(field: str) -> DocstringEntryKind:
     """Return the semantic entry kind for a reST field name."""
-    if field in docstring_sections.REST_PARAMETER_VALUE_FIELDS or field in docstring_sections.REST_PARAMETER_TYPE_FIELDS:
-        return DocstringEntryKind.PARAMETER
-    if field in docstring_sections.REST_RETURN_VALUE_FIELDS or field in docstring_sections.REST_RETURN_TYPE_FIELDS:
-        return DocstringEntryKind.RETURN
-    if field in docstring_sections.REST_YIELD_VALUE_FIELDS or field in docstring_sections.REST_YIELD_TYPE_FIELDS:
-        return DocstringEntryKind.YIELD
-    if field in docstring_sections.REST_EXCEPTION_FIELDS:
-        return DocstringEntryKind.EXCEPTION
-    if field in docstring_sections.REST_ATTRIBUTE_VALUE_FIELDS or field in docstring_sections.REST_ATTRIBUTE_TYPE_FIELDS:
-        return DocstringEntryKind.ATTRIBUTE
+    metadata = docstring_sections.rest_field_metadata(field)
+    if metadata is not None:
+        return DocstringEntryKind(metadata[0].kind)
     return DocstringEntryKind.FIELD
 
 
@@ -2356,7 +2330,7 @@ def _rest_entry_metadata(field: str, argument: str) -> tuple[DocstringEntryKind,
         return kind, (), None
     if kind is DocstringEntryKind.EXCEPTION:
         return kind, _exception_names(argument) or (), None
-    if field == "type":
+    if docstring_sections.is_rest_type_field(field):
         return kind, (argument,), None
     if kind is not DocstringEntryKind.PARAMETER:
         return kind, (argument,), None
@@ -2447,21 +2421,29 @@ def _is_exception_like_name(name: str) -> bool:
 
 def _rest_field_arity_issue(field: str, argument: str) -> ConventionEntryIssueKind | None:
     """Return a malformed reStructuredText field arity issue."""
-    if field in _REST_REQUIRED_ARGUMENT_FIELDS and not argument:
+    metadata = docstring_sections.rest_field_metadata(field)
+    if metadata is None:
+        return None
+    argument_policy = metadata[0].argument_policy
+    if argument_policy is docstring_sections.RestFieldArgumentPolicy.REQUIRED and not argument:
         return ConventionEntryIssueKind.REST_MISSING_ARGUMENT
-    if field in _REST_UNEXPECTED_ARGUMENT_FIELDS and argument:
+    if argument_policy is docstring_sections.RestFieldArgumentPolicy.FORBIDDEN and argument:
         return ConventionEntryIssueKind.REST_UNEXPECTED_ARGUMENT
     return None
 
 
 def _rest_missing_delimiter_is_credible(field: str, tail: str) -> bool:
     """Return whether a delimiter-free standard field has credible arity."""
-    if field not in _REST_REQUIRED_ARGUMENT_FIELDS:
+    metadata = docstring_sections.rest_field_metadata(field)
+    if metadata is None:
+        return False
+    family = metadata[0]
+    if family.argument_policy is not docstring_sections.RestFieldArgumentPolicy.REQUIRED:
         return not tail
     if not tail:
         return False
     argument = tail.split(None, 1)[0]
-    if field in docstring_sections.REST_EXCEPTION_FIELDS:
+    if family.kind == DocstringEntryKind.EXCEPTION.value:
         names = _exception_names(argument)
         return names is not None and all(_is_exception_like_name(name) for name in names)
     return _ENTRY_NAME_RE.fullmatch(argument) is not None

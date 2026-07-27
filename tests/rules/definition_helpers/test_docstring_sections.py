@@ -3,6 +3,41 @@ from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.definition_helpers import docstring_sections
 
 
+def test_rest_field_registry_has_unique_complete_semantic_families() -> None:
+    assert tuple(family.kind for family in docstring_sections.REST_FIELD_FAMILIES) == ("parameter", "return", "yield", "exception", "attribute")
+    field_names = tuple(field_name for family in docstring_sections.REST_FIELD_FAMILIES for field_name in family.value_fields | family.type_fields)
+
+    assert len(field_names) == len(set(field_names))
+    assert docstring_sections.rest_field_family_for_kind("field") is None
+
+
+def test_rest_field_registry_exposes_roles_arity_and_pairing_policies() -> None:
+    parameter_family, parameter_role = docstring_sections.rest_field_metadata("param") or (None, None)
+    parameter_type_family, parameter_type_role = docstring_sections.rest_field_metadata("type") or (None, None)
+    return_family, return_role = docstring_sections.rest_field_metadata("rtype") or (None, None)
+    yield_family, yield_role = docstring_sections.rest_field_metadata("ytype") or (None, None)
+    exception_family, exception_role = docstring_sections.rest_field_metadata("raises") or (None, None)
+
+    assert parameter_family is parameter_type_family
+    assert parameter_family is not None
+    assert parameter_family.argument_policy is docstring_sections.RestFieldArgumentPolicy.REQUIRED
+    assert parameter_family.pairing_key("**kwargs") == "kwargs"
+    assert parameter_role is docstring_sections.RestFieldRole.VALUE
+    assert parameter_type_role is docstring_sections.RestFieldRole.TYPE
+    assert return_family is not None
+    assert return_family.argument_policy is docstring_sections.RestFieldArgumentPolicy.FORBIDDEN
+    assert return_role is docstring_sections.RestFieldRole.TYPE
+    assert yield_family is not None
+    assert yield_family.argument_policy is docstring_sections.RestFieldArgumentPolicy.OPTIONAL
+    assert yield_role is docstring_sections.RestFieldRole.TYPE
+    assert exception_family is not None
+    assert not exception_family.type_fields
+    assert exception_role is docstring_sections.RestFieldRole.VALUE
+    assert docstring_sections.is_rest_type_field("rtype")
+    assert not docstring_sections.is_rest_type_field("returns")
+    assert docstring_sections.rest_field_metadata("custom") is None
+
+
 def test_convention_parses_sections_only_for_named_section_conventions() -> None:
     assert docstring_sections.convention_parses_sections(DocstringConvention.GOOGLE)
     assert docstring_sections.convention_parses_sections(DocstringConvention.NUMPY)

@@ -1,7 +1,9 @@
 # First-party imports
+import tests.rules.PDF.helpers as pdf_helpers
 from pydocformatter import formatter, rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention, DocstringMissingDocumentation
 from pydocformatter.rules.definitions.PDF.PDF502_missing_return_documentation import PDF502MissingReturnDocumentation
+from tests import rule_helpers
 
 
 def format_source(source: str, *, settings: CheckSettings | None = None) -> formatter.FormatterResult:
@@ -34,6 +36,13 @@ def test_default_policy_ignores_docstring_without_return_documentation() -> None
     source = 'def function(value):\n    """Return a value."""\n    return value\n'
 
     assert_pdf502_lines(source, (), settings=CheckSettings(select=("PDF502",), docstring_convention=DocstringConvention.GOOGLE))
+
+
+def test_non_summary_policy_checks_body_docstrings_but_not_summary_only_docstrings() -> None:
+    source = 'def summary_only():\n    """Return a value."""\n    return 1\n\n\ndef detailed():\n    """Return a value.\n\n    More detail.\n    """\n    return 1\n'
+    settings = CheckSettings(select=("PDF502",), docstring_convention=DocstringConvention.GOOGLE, docstring_missing_documentation=DocstringMissingDocumentation.NON_SUMMARY_DOCSTRINGS)
+
+    assert_pdf502_lines(source, ((11,),), settings=settings)
 
 
 def test_reports_async_function_return_missing_from_docstring() -> None:
@@ -84,10 +93,41 @@ def test_google_bare_none_return_entry_satisfies_meaningful_return() -> None:
     assert_pdf502_lines(none_period, ())
 
 
-def test_rtype_satisfies_meaningful_return_documentation() -> None:
+def test_rtype_activates_check_without_documenting_meaningful_return() -> None:
     source = 'def function():\n    """Return a value.\n\n    :rtype: int\n    """\n    return 1\n'
 
-    assert_pdf502_lines(source, (), settings=CheckSettings(select=("PDF502",), docstring_convention=DocstringConvention.REST))
+    assert_pdf502_lines(source, ((6,),), settings=CheckSettings(select=("PDF502",), docstring_convention=DocstringConvention.REST))
+
+
+def test_paired_empty_return_value_field_remains_missing_but_content_satisfies_rule() -> None:
+    source = 'def missing():\n    """Return a value.\n\n    :rtype: int\n    :return:\n    """\n    return 1\n\n\ndef documented():\n    """Return a value.\n\n    :rtype: int\n    :returns: Result value.\n    """\n    return 1\n'
+
+    assert_pdf502_lines(source, ((7,),), settings=CheckSettings(select=("PDF502",), docstring_convention=DocstringConvention.REST))
+
+
+def test_surplus_nonempty_return_type_field_does_not_rescue_an_empty_value_field() -> None:
+    source = 'def function():\n    """Return a value.\n\n    :rtype: int\n    :return:\n    :rtype: str\n    """\n    return 1\n'
+
+    assert_pdf502_lines(source, ((8,),), settings=CheckSettings(select=("PDF502",), docstring_convention=DocstringConvention.REST))
+
+
+def test_private_type_only_return_field_activates_public_only_policy_but_broad_policy_remains_private_aware() -> None:
+    source = 'def _explicit():\n    """Return a value.\n\n    :rtype: int\n    """\n    return 1\n\n\ndef _broad():\n    """Return a value."""\n    return 1\n'
+    public_only = CheckSettings(
+        select=("PDF502",),
+        docstring_convention=DocstringConvention.REST,
+        docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS,
+        docstring_missing_documentation_public_only=True,
+    )
+    include_private = CheckSettings(
+        select=("PDF502",),
+        docstring_convention=DocstringConvention.REST,
+        docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS,
+        docstring_missing_documentation_public_only=False,
+    )
+
+    assert_pdf502_lines(source, ((6,),), settings=public_only)
+    assert_pdf502_lines(source, ((6,), (11,)), settings=include_private)
 
 
 def test_none_and_pep257_conventions_keep_missing_return_documentation_inert_for_google_sections() -> None:
@@ -108,6 +148,16 @@ def test_none_and_pep257_conventions_keep_missing_return_documentation_inert_for
 
     for convention in (DocstringConvention.NONE, DocstringConvention.PEP257):
         assert_pdf502_lines(source, (), settings=CheckSettings(select=("PDF502",), docstring_convention=convention, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS))
+
+
+def test_direct_rule_hook_remains_inert_for_unparsed_conventions() -> None:
+    source = 'def function():\n    """Return a value.\n\n    :rtype: int\n    """\n    return 1\n'
+    contexts = pdf_helpers.contexts_for("PDF502")
+
+    for convention in (DocstringConvention.NONE, DocstringConvention.PEP257):
+        _, context = contexts(source, settings=CheckSettings(select=("PDF502",), docstring_convention=convention, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS))
+
+        assert not rule_helpers.rule_findings(PDF502MissingReturnDocumentation, context)
 
 
 def test_ignores_bare_return_return_none_generators_missing_docstrings_abstracts_and_stubs() -> None:

@@ -11,12 +11,13 @@ Attributes:
 from __future__ import annotations
 
 # Standard library imports
+import collections
 import dataclasses
 from typing import TYPE_CHECKING
 
 # First-party imports
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
-from pydocformatter.rules.definition_helpers import docstring_sections, parameter_documentation, section_edits
+from pydocformatter.rules.definition_helpers import docstring_sections, section_edits
 
 
 if TYPE_CHECKING:
@@ -41,6 +42,140 @@ class NamedRepetitionKey:
     comparison: tuple[str, str]
     label: str
     message_kind: str
+
+
+@dataclasses.dataclass(frozen=True)
+class RestFieldPart:
+    """One reStructuredText value or type field occurrence used for pairing.
+
+    Attributes:
+        key (str | None): Normalized identity used to pair value and type fields.
+        name (str | None): Parsed field argument spelling associated with this occurrence.
+        entry (PDF_definition.DocstringEntry): Parsed reStructuredText field represented by this occurrence.
+        order (int): Monotonic source-order index among considered entries.
+    """
+
+    key: str | None
+    name: str | None
+    entry: PDF_definition.DocstringEntry
+    order: int
+
+
+@dataclasses.dataclass(frozen=True)
+class RestFieldPair:
+    """One FIFO-associated reStructuredText value and type field occurrence.
+
+    Attributes:
+        value (RestFieldPart): Value or description field occurrence.
+        type (RestFieldPart): Corresponding type field occurrence.
+    """
+
+    value: RestFieldPart
+    type: RestFieldPart
+
+
+@dataclasses.dataclass(frozen=True)
+class RestFieldPairing:
+    """Complete one-to-one pairing result for one reStructuredText entry kind.
+
+    Attributes:
+        value_parts (tuple[RestFieldPart, ...]): Value field occurrences in source order.
+        pairs (tuple[RestFieldPair, ...]): FIFO pairs ordered by their value occurrences.
+        orphan_types (tuple[RestFieldPart, ...]): Type occurrences without corresponding value fields.
+    """
+
+    value_parts: tuple[RestFieldPart, ...]
+    pairs: tuple[RestFieldPair, ...]
+    orphan_types: tuple[RestFieldPart, ...]
+
+
+def pair_value_and_type_fields(entries: tuple[PDF_definition.DocstringEntry, ...], kind: PDF_definition.DocstringEntryKind) -> RestFieldPairing:
+    """Pair reStructuredText value and type fields of one semantic kind.
+
+    Args:
+        entries (tuple[PDF_definition.DocstringEntry, ...]): Parsed entries from one docstring.
+        kind (PDF_definition.DocstringEntryKind): Parameter, return, yield, or attribute kind to pair.
+
+    Returns:
+        RestFieldPairing: Ordered FIFO pairs and unmatched occurrences for the requested kind.
+
+    Raises:
+        ValueError: If the requested entry kind has no reStructuredText value/type pairing semantics.
+    """
+    return _pair_value_and_type_fields(entries, (kind,))[kind]
+
+
+def pair_all_value_and_type_fields(entries: tuple[PDF_definition.DocstringEntry, ...]) -> dict[PDF_definition.DocstringEntryKind, RestFieldPairing]:
+    """Pair every supported reStructuredText value/type field family in one entry scan.
+
+    Args:
+        entries (tuple[PDF_definition.DocstringEntry, ...]): Parsed entries from one docstring.
+
+    Returns:
+        dict[PDF_definition.DocstringEntryKind, RestFieldPairing]: Pairing results keyed by every pairable semantic
+            kind.
+    """
+    kinds = tuple(PDF_definition.DocstringEntryKind(family.kind) for family in docstring_sections.REST_FIELD_FAMILIES if family.type_fields)
+    return _pair_value_and_type_fields(entries, kinds)
+
+
+def value_field_label(entry: PDF_definition.DocstringEntry) -> str:
+    """Return the user-facing value-field family label for a standard reStructuredText entry.
+
+    Args:
+        entry (PDF_definition.DocstringEntry): Parsed standard reStructuredText entry.
+
+    Returns:
+        str: Value-field family label used in diagnostics.
+
+    Raises:
+        ValueError: If the entry is not a standard reStructuredText field.
+    """
+    metadata = docstring_sections.rest_field_metadata(entry.field_name)
+    if metadata is None or metadata[0].kind != entry.kind.value:
+        raise ValueError("A value-field label requires a standard reStructuredText entry")
+    return metadata[0].label
+
+
+def _pair_value_and_type_fields(entries: tuple[PDF_definition.DocstringEntry, ...], kinds: tuple[PDF_definition.DocstringEntryKind, ...]) -> dict[PDF_definition.DocstringEntryKind, RestFieldPairing]:
+    """Pair selected reStructuredText value/type field families in one entry scan."""
+    families: dict[PDF_definition.DocstringEntryKind, docstring_sections.RestFieldFamily] = {}
+    value_parts_by_kind: dict[PDF_definition.DocstringEntryKind, list[RestFieldPart]] = {}
+    type_parts_by_kind: dict[PDF_definition.DocstringEntryKind, list[RestFieldPart]] = {}
+    for kind in kinds:
+        family = docstring_sections.rest_field_family_for_kind(kind.value)
+        if family is None or not family.type_fields:
+            raise ValueError(f"Unsupported reStructuredText value/type pairing kind: {kind.value}")
+        families[kind] = family
+        value_parts_by_kind[kind] = []
+        type_parts_by_kind[kind] = []
+    part_order = 0
+    for entry in entries:
+        names = entry.names or (None,)
+        metadata = docstring_sections.rest_field_metadata(entry.field_name)
+        family = families.get(entry.kind)
+        if metadata is not None and family is not None and metadata[0] is family:
+            target = type_parts_by_kind[entry.kind] if metadata[1] is docstring_sections.RestFieldRole.TYPE else value_parts_by_kind[entry.kind]
+            target.extend(RestFieldPart(key=family.pairing_key(name), name=name, entry=entry, order=part_order + offset) for offset, name in enumerate(names))
+        part_order += len(names)
+    return {kind: _pair_field_parts(value_parts_by_kind[kind], type_parts_by_kind[kind]) for kind in kinds}
+
+
+def _pair_field_parts(value_parts: list[RestFieldPart], type_parts: list[RestFieldPart]) -> RestFieldPairing:
+    """Return FIFO pairs and orphan types for one semantic field family."""
+    type_parts_by_key: dict[str | None, collections.deque[RestFieldPart]] = {}
+    for type_part in type_parts:
+        type_parts_by_key.setdefault(type_part.key, collections.deque()).append(type_part)
+    pairs: list[RestFieldPair] = []
+    used_type_orders: set[int] = set()
+    for value_part in value_parts:
+        queued_type_parts = type_parts_by_key.get(value_part.key)
+        if not queued_type_parts:
+            continue
+        type_part = queued_type_parts.popleft()
+        used_type_orders.add(type_part.order)
+        pairs.append(RestFieldPair(value=value_part, type=type_part))
+    return RestFieldPairing(value_parts=tuple(value_parts), pairs=tuple(pairs), orphan_types=tuple(type_part for type_part in type_parts if type_part.order not in used_type_orders))
 
 
 def label(entry: PDF_definition.DocstringEntry) -> str:
@@ -101,20 +236,14 @@ def repetition_key(entry: PDF_definition.DocstringEntry) -> tuple[str, str, str]
     """
     field_name = entry.field_name or ""
     argument = entry.field_argument or ""
-    if entry.kind is PDF_definition.DocstringEntryKind.PARAMETER and field_name in docstring_sections.REST_PARAMETER_VALUE_FIELDS | docstring_sections.REST_PARAMETER_TYPE_FIELDS:
-        return None
-    if entry.kind is PDF_definition.DocstringEntryKind.RETURN and field_name in docstring_sections.REST_RETURN_VALUE_FIELDS:
-        return ("return", "", "")
-    if entry.kind is PDF_definition.DocstringEntryKind.RETURN and field_name in docstring_sections.REST_RETURN_TYPE_FIELDS:
-        return ("return-type", "", "")
-    if entry.kind is PDF_definition.DocstringEntryKind.YIELD and field_name in docstring_sections.REST_YIELD_VALUE_FIELDS:
-        return ("yield", "", "")
-    if entry.kind is PDF_definition.DocstringEntryKind.YIELD and field_name in docstring_sections.REST_YIELD_TYPE_FIELDS:
-        return ("yield-type", "", "")
-    if entry.kind is PDF_definition.DocstringEntryKind.EXCEPTION and field_name in docstring_sections.REST_EXCEPTION_FIELDS:
-        return None
-    if entry.kind is PDF_definition.DocstringEntryKind.ATTRIBUTE and field_name in docstring_sections.REST_ATTRIBUTE_VALUE_FIELDS | docstring_sections.REST_ATTRIBUTE_TYPE_FIELDS:
-        return None
+    metadata = docstring_sections.rest_field_metadata(field_name)
+    if metadata is not None and metadata[0].kind == entry.kind.value:
+        family, role = metadata
+        if entry.kind in {PDF_definition.DocstringEntryKind.PARAMETER, PDF_definition.DocstringEntryKind.EXCEPTION, PDF_definition.DocstringEntryKind.ATTRIBUTE}:
+            return None
+        if entry.kind in {PDF_definition.DocstringEntryKind.RETURN, PDF_definition.DocstringEntryKind.YIELD}:
+            suffix = "-type" if role is docstring_sections.RestFieldRole.TYPE else ""
+            return (f"{family.kind}{suffix}", "", "")
     return ("field", field_name, argument)
 
 
@@ -130,27 +259,26 @@ def named_repetition_keys(entry: PDF_definition.DocstringEntry) -> tuple[NamedRe
     """
     field_name = entry.field_name or ""
     argument = entry.field_argument or ""
-    if entry.kind is PDF_definition.DocstringEntryKind.PARAMETER and field_name in docstring_sections.REST_PARAMETER_VALUE_FIELDS:
-        return tuple(
-            NamedRepetitionKey(("rest-parameter", parameter_documentation.parameter_comparison_name(name)), parameter_documentation.parameter_comparison_name(name), "reST parameter")
-            for name in entry.names
-            if name
-        )
-    if entry.kind is PDF_definition.DocstringEntryKind.PARAMETER and field_name in docstring_sections.REST_PARAMETER_TYPE_FIELDS:
-        return (
-            (
-                NamedRepetitionKey(
-                    ("rest-parameter-type", parameter_documentation.parameter_comparison_name(argument)), parameter_documentation.parameter_comparison_name(argument), "reST parameter type"
-                ),
+    metadata = docstring_sections.rest_field_metadata(field_name)
+    if metadata is None or metadata[0].kind != entry.kind.value:
+        return ()
+    family, role = metadata
+    if entry.kind is PDF_definition.DocstringEntryKind.PARAMETER:
+        if role is docstring_sections.RestFieldRole.VALUE:
+            return tuple(
+                NamedRepetitionKey(("rest-parameter", comparison_name), comparison_name, "reST parameter")
+                for name in entry.names
+                if name
+                for comparison_name in (family.pairing_key(name),)
+                if comparison_name is not None
             )
-            if argument
-            else ()
-        )
-    if entry.kind is PDF_definition.DocstringEntryKind.ATTRIBUTE and field_name in docstring_sections.REST_ATTRIBUTE_VALUE_FIELDS:
-        return tuple(NamedRepetitionKey(("rest-attribute", name), name, "reST attribute") for name in entry.names if name)
-    if entry.kind is PDF_definition.DocstringEntryKind.ATTRIBUTE and field_name in docstring_sections.REST_ATTRIBUTE_TYPE_FIELDS:
+        comparison_name = family.pairing_key(argument)
+        return (NamedRepetitionKey(("rest-parameter-type", comparison_name), comparison_name, "reST parameter type"),) if comparison_name else ()
+    if entry.kind is PDF_definition.DocstringEntryKind.ATTRIBUTE:
+        if role is docstring_sections.RestFieldRole.VALUE:
+            return tuple(NamedRepetitionKey(("rest-attribute", name), name, "reST attribute") for name in entry.names if name)
         return (NamedRepetitionKey(("rest-attribute-type", argument), argument, "reST attribute type"),) if argument else ()
-    if entry.kind is PDF_definition.DocstringEntryKind.EXCEPTION and field_name in docstring_sections.REST_EXCEPTION_FIELDS:
+    if entry.kind is PDF_definition.DocstringEntryKind.EXCEPTION:
         return tuple(NamedRepetitionKey(("rest-exception", name), name, "reST exception") for name in entry.names if name)
     return ()
 

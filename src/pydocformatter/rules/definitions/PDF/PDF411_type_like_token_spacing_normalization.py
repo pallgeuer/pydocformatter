@@ -164,7 +164,7 @@ def _rest_replacement(line: PDF_definition.DocstringValueLine, entry: PDF_defini
     if match is None or entry.field_name is None:
         return None
     field = entry.field_name
-    if field in docstring_sections.REST_TYPE_DESCRIPTION_FIELDS:
+    if docstring_sections.is_rest_type_field(field):
         return _normalized_replacement(line, match.start("description"), match.end("description"), match.group("description").strip(), normalized_type_cache=normalized_type_cache)
     if entry.type_text is None or entry.field_argument is None:
         return None

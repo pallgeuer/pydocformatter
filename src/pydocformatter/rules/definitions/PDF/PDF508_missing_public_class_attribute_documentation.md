@@ -7,7 +7,7 @@ Rule is disabled if `docstring-convention` is `none` or `pep257`.
 ## What it does
 Checks that public class attributes are documented either in the class docstring attribute documentation or by an adjacent attribute docstring.
 
-The rule compares supported class attribute assignments against names documented in Google `Attributes` sections, NumPy `Attributes` sections, reStructuredText `:ivar:`, `:cvar:`, `:var:`, and `:vartype:` fields, and adjacent attribute docstrings. Class-scope assignments, annotated assignments, multi-target assignments, and tuple-unpacked assignment leaves are inventoried. Private attributes are never required.
+The rule compares supported class attribute assignments against names documented in Google `Attributes` sections, NumPy `Attributes` sections, reStructuredText `:ivar:`, `:cvar:`, and `:var:` value fields, and adjacent attribute docstrings. A type-only `:vartype:` field activates the consistency check but does not document the attribute value. Class-scope assignments, annotated assignments, multi-target assignments, and tuple-unpacked assignment leaves are inventoried. Private attributes are never required.
 
 By default, class-scope attributes are required and `self.*` assignments from `__init__` are accepted as existing attributes but are not required. Enable `docstring-require-init-attribute-documentation` to require supported `self.*` assignments too. Assignments inside methods other than `__init__`, list destructuring targets, unsupported tuple leaves, subscript targets, `cls.*`, and arbitrary object attributes are not class attribute inventory entries for this rule.
 
@@ -108,7 +108,7 @@ class Client:
 PDF508: Line 11: Public class attribute 'retries' is missing docstring documentation
 ```
 
-reStructuredText attribute fields are parsed under the `rest` convention:
+Under the reST convention, a type-only field activates the consistency check but does not document any inventory attribute. An empty value field does document its named attribute for PDF508; description quality is handled by PDF712:
 
 ```pydocfmt-example
 [settings]
@@ -118,7 +118,8 @@ docstring-convention = "rest"
 class Client:
     """HTTP client.
 
-    :ivar timeout: Request timeout.
+    :vartype removed: int
+    :var retries:
     """
 
     timeout: float
@@ -126,7 +127,32 @@ class Client:
 
 [output=unchanged]
 [findings]
-PDF508: Line 8: Public class attribute 'retries' is missing docstring documentation
+PDF508: Line 8: Public class attribute 'timeout' is missing docstring documentation
+```
+
+The `all-docstrings` policy can require attributes even when a public class has only a summary. With the public-only setting enabled, a private class without explicit attribute documentation is skipped:
+
+```pydocfmt-example
+[settings]
+docstring-convention = "google"
+docstring-missing-documentation = "all-docstrings"
+docstring-missing-documentation-public-only = true
+
+[input]
+class PublicClient:
+    """Public client."""
+
+    timeout: float
+
+
+class _PrivateClient:
+    """Private client."""
+
+    retries: int
+
+[output=unchanged]
+[findings]
+PDF508: Line 4: Public class attribute 'timeout' is missing docstring documentation
 ```
 
 `self.*` assignments in `__init__` are required only when `docstring-require-init-attribute-documentation` is enabled:

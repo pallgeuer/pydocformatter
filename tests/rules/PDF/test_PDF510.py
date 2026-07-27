@@ -82,10 +82,28 @@ def test_accepts_numpy_and_rest_module_attribute_documentation() -> None:
     assert_pdf510_lines(rest, ((7,),), settings=CheckSettings(select=("PDF510",), docstring_convention=DocstringConvention.REST))
 
 
-def test_rest_cvar_and_vartype_document_module_attributes() -> None:
+def test_rest_vartype_activates_check_without_documenting_module_attribute() -> None:
     source = '"""Client defaults.\n\n:cvar timeout: Request timeout.\n:vartype retries: int\n"""\n\ntimeout: float\nretries: int\nstale: str\n'
 
-    assert_pdf510_lines(source, ((9,),), settings=CheckSettings(select=("PDF510",), docstring_convention=DocstringConvention.REST))
+    assert_pdf510_lines(source, ((8,), (9,)), settings=CheckSettings(select=("PDF510",), docstring_convention=DocstringConvention.REST))
+
+
+def test_unrelated_orphan_vartype_activates_module_attribute_check_without_documenting_inventory() -> None:
+    source = '"""Client defaults.\n\n:vartype removed: int\n"""\n\ntimeout: float\nretries: int\n'
+
+    assert_pdf510_lines(source, ((6,), (7,)), settings=CheckSettings(select=("PDF510",), docstring_convention=DocstringConvention.REST))
+
+
+def test_empty_rest_attribute_value_field_documents_module_attribute_but_vartype_does_not() -> None:
+    source = '"""Client defaults.\n\n:vartype timeout: float\n:var retries:\n"""\n\ntimeout: float\nretries: int\n'
+
+    assert_pdf510_lines(source, ((7,),), settings=CheckSettings(select=("PDF510",), docstring_convention=DocstringConvention.REST))
+
+
+def test_attached_docstring_satisfies_module_attribute_even_when_owner_has_orphan_vartype() -> None:
+    source = '"""Client defaults.\n\n:vartype timeout: float\n"""\n\ntimeout: float\n"""Request timeout."""\n'
+
+    assert_pdf510_lines(source, (), settings=CheckSettings(select=("PDF510",), docstring_convention=DocstringConvention.REST))
 
 
 def test_numpy_comma_separated_attribute_entry_documents_multiple_module_attributes() -> None:

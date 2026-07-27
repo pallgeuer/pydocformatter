@@ -90,7 +90,7 @@ def _entry_targets(docstring: PDF_definition.DocstringInfo) -> tuple[documentati
 
 def _is_rest_type_entry(entry: PDF_definition.DocstringEntry) -> bool:
     """Return whether a parsed entry came from a reST attribute type field."""
-    return entry.field_name in docstring_sections.REST_ATTRIBUTE_TYPE_FIELDS
+    return docstring_sections.is_rest_type_field(entry.field_name)
 
 
 def _attached_docstring_target(docstring: PDF_definition.DocstringInfo) -> documentation_style.DocumentedValueTarget | None:

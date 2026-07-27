@@ -165,9 +165,26 @@ def documented_parameters(docstring: PDF_definition.DocstringInfo) -> tuple[Docu
     Returns:
         tuple[DocumentedParameter, ...]: Documented parameter names with comparison keys and diagnostic line targets.
     """
+    return _documented_parameters(docstring, include_type_fields=True)
+
+
+def value_documented_parameters(docstring: PDF_definition.DocstringInfo) -> tuple[DocumentedParameter, ...]:
+    """Return parameter names backed by value or description-bearing entries.
+
+    Args:
+        docstring (PDF_definition.DocstringInfo): Parsed docstring to inspect for parameter value entries.
+
+    Returns:
+        tuple[DocumentedParameter, ...]: Parameter names documented by value entries rather than type-only fields.
+    """
+    return _documented_parameters(docstring, include_type_fields=False)
+
+
+def _documented_parameters(docstring: PDF_definition.DocstringInfo, *, include_type_fields: bool) -> tuple[DocumentedParameter, ...]:
+    """Return comparable parameter names with optional reST type-only fields."""
     parameters: list[DocumentedParameter] = []
     for entry in docstring.structure.entries:
-        if entry.kind is not PDF_definition.DocstringEntryKind.PARAMETER:
+        if entry.kind is not PDF_definition.DocstringEntryKind.PARAMETER or (not include_type_fields and docstring_sections.is_rest_type_field(entry.field_name)):
             continue
         line = docstring.structure.lines[entry.start_line]
         line_numbers = PDF_definition.docstring_line_numbers(docstring, line)

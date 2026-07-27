@@ -59,7 +59,7 @@ class PDF502MissingReturnDocumentation(RuleBase):
             if not facts.meaningful_returns or facts.any_yields:
                 continue
             return_targets = value_documentation.value_documentation_targets(docstring, PDF_definition.DocstringEntryKind.RETURN)
-            if any(target.has_content for target in return_targets) or not missing_documentation.should_check_missing_documentation(
+            if any(target.has_value_entry and target.has_content for target in return_targets) or not missing_documentation.should_check_missing_documentation(
                 definition, docstring, context=context, has_relevant_documentation=bool(return_targets)
             ):
                 continue

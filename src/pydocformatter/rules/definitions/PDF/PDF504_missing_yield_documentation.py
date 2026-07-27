@@ -59,7 +59,7 @@ class PDF504MissingYieldDocumentation(RuleBase):
             yield_targets = value_documentation.value_documentation_targets(docstring, PDF_definition.DocstringEntryKind.YIELD)
             if (
                 not facts.meaningful_yields
-                or any(target.has_content for target in yield_targets)
+                or any(target.has_value_entry and target.has_content for target in yield_targets)
                 or not missing_documentation.should_check_missing_documentation(definition, docstring, context=context, has_relevant_documentation=bool(yield_targets))
             ):
                 continue

@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 import pydocformatter.rules.violations as rule_violations
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 from pydocformatter.cli import settings_check
-from pydocformatter.rules.definition_helpers import docstring_conventions, missing_documentation
+from pydocformatter.rules.definition_helpers import docstring_conventions, docstring_sections, missing_documentation
 
 
 if TYPE_CHECKING:
@@ -83,9 +83,26 @@ def documented_attributes(docstring: PDF_definition.DocstringInfo) -> tuple[Docu
     Returns:
         tuple[DocumentedAttribute, ...]: Documented attribute names with diagnostic line targets.
     """
+    return _documented_attributes(docstring, include_type_fields=True)
+
+
+def value_documented_attributes(docstring: PDF_definition.DocstringInfo) -> tuple[DocumentedAttribute, ...]:
+    """Return attribute names backed by value or description-bearing entries.
+
+    Args:
+        docstring (PDF_definition.DocstringInfo): Parsed owner docstring to inspect for attribute value entries.
+
+    Returns:
+        tuple[DocumentedAttribute, ...]: Attribute names documented by value entries rather than type-only fields.
+    """
+    return _documented_attributes(docstring, include_type_fields=False)
+
+
+def _documented_attributes(docstring: PDF_definition.DocstringInfo, *, include_type_fields: bool) -> tuple[DocumentedAttribute, ...]:
+    """Return documented attribute names with optional reST type-only fields."""
     attributes: list[DocumentedAttribute] = []
     for entry in docstring.structure.entries:
-        if entry.kind is not PDF_definition.DocstringEntryKind.ATTRIBUTE:
+        if entry.kind is not PDF_definition.DocstringEntryKind.ATTRIBUTE or (not include_type_fields and docstring_sections.is_rest_type_field(entry.field_name)):
             continue
         line = docstring.structure.lines[entry.start_line]
         line_numbers = PDF_definition.docstring_line_numbers(docstring, line)
@@ -107,7 +124,7 @@ def documented_attribute_names(data: PDF_definition.PDFCategoryData, owner: PDF_
     names: set[str] = set(data.attached_attribute_docstrings_by_name(owner))
     owner_docstring = data.docstring_for(owner)
     if owner_docstring is not None:
-        names.update(attribute.name for attribute in documented_attributes(owner_docstring))
+        names.update(attribute.name for attribute in value_documented_attributes(owner_docstring))
     return frozenset(names)
 
 

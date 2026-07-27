@@ -13,8 +13,6 @@ from __future__ import annotations
 # Standard library imports
 import typing
 import operator
-import collections
-import dataclasses
 
 # Third-party imports
 import libcst as cst
@@ -23,7 +21,16 @@ import libcst as cst
 import pydocformatter.rules.violations as rule_violations
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 import pydocformatter.rules.definition_helpers.typed_documentation_models as typed_models
-from pydocformatter.rules.definition_helpers import attribute_documentation, docstring_sections, entry_completeness, parameter_documentation, static_names, type_expressions, value_documentation
+from pydocformatter.rules.definition_helpers import (
+    attribute_documentation,
+    docstring_sections,
+    entry_completeness,
+    parameter_documentation,
+    rest_fields,
+    static_names,
+    type_expressions,
+    value_documentation,
+)
 
 
 if typing.TYPE_CHECKING:
@@ -53,23 +60,6 @@ TypedDocstringEntry = typed_models.TypedDocstringEntry
 TypedDocstringTypeSource = typed_models.TypedDocstringTypeSource
 
 
-@dataclasses.dataclass(frozen=True)
-class _RestEntryPart:
-    """One named reST field occurrence used for logical value/type pairing.
-
-    Attributes:
-        key (str | None): Normalized name used to pair value and type fields.
-        name (str | None): Source spelling shown in diagnostics when this field supplies the logical entry name.
-        entry (PDF_definition.DocstringEntry): Parsed reST field represented by this part.
-        order (int): Monotonic source-order index used to keep logical entries stable after pairing.
-    """
-
-    key: str | None
-    name: str | None
-    entry: PDF_definition.DocstringEntry
-    order: int
-
-
 def missing_description_violations(targets: tuple[TypedDocumentationTarget, ...], *, meta: RuleMetadata, label: str) -> tuple[rule_violations.RuleViolation, ...]:
     """Return diagnostics for documented targets without prose descriptions.
 
@@ -84,7 +74,7 @@ def missing_description_violations(targets: tuple[TypedDocumentationTarget, ...]
     return sort_violations(
         rule_violations.diagnostic(meta, target.entry.line_numbers, instance_message=f"{label} '{target.name}' docstring entry is missing a description")
         for target in targets
-        if not entry_completeness.has_prose_description(target.entry)
+        if target.entry.has_value_entry and not entry_completeness.has_prose_description(target.entry)
     )
 
 
@@ -335,36 +325,13 @@ def _logical_entries(docstring: PDF_definition.DocstringInfo, kind: PDF_definiti
     """Return logical entries, merging paired reST value and type fields."""
     if docstring.structure.convention.value != "rest":
         return tuple(logical_entry for entry in docstring.structure.entries if entry.kind is kind for logical_entry in _entries_from_raw(docstring, entry))
-    value_parts: list[_RestEntryPart] = []
-    type_parts: list[_RestEntryPart] = []
-    type_parts_by_key: dict[str | None, collections.deque[_RestEntryPart]] = {}
-    part_order = 0
-    for entry in docstring.structure.entries:
-        if entry.kind is not kind:
-            continue
-        parts = type_parts if entry.field_name in docstring_sections.REST_TYPE_DESCRIPTION_FIELDS else value_parts
-        if entry.field_name in docstring_sections.REST_TYPE_DESCRIPTION_FIELDS:
-            for name in entry.names or (None,):
-                part = _RestEntryPart(key=_rest_entry_key(kind, name), name=name, entry=entry, order=part_order)
-                part_order += 1
-                parts.append(part)
-                type_parts_by_key.setdefault(part.key, collections.deque()).append(part)
-        else:
-            for name in entry.names or (None,):
-                part = _RestEntryPart(key=_rest_entry_key(kind, name), name=name, entry=entry, order=part_order)
-                part_order += 1
-                parts.append(part)
-    used_type_parts: set[int] = set()
+    pairing = rest_fields.pair_value_and_type_fields(docstring.structure.entries, kind)
+    type_parts_by_value_order = {pair.value.order: pair.type for pair in pairing.pairs}
     logical: list[tuple[int, TypedDocstringEntry]] = []
-    for value_part in value_parts:
-        queued_type_parts = type_parts_by_key.get(value_part.key, collections.deque())
-        type_part = queued_type_parts.popleft() if queued_type_parts else None
-        if type_part is not None:
-            used_type_parts.add(id(type_part))
+    for value_part in pairing.value_parts:
+        type_part = type_parts_by_value_order.get(value_part.order)
         logical.append((value_part.order, _merged_rest_entry(docstring, name=value_part.name, value_entry=value_part.entry, type_entry=type_part.entry if type_part is not None else None)))
-    logical.extend(
-        (type_part.order, _merged_rest_entry(docstring, name=type_part.name, value_entry=None, type_entry=type_part.entry)) for type_part in type_parts if id(type_part) not in used_type_parts
-    )
+    logical.extend((type_part.order, _merged_rest_entry(docstring, name=type_part.name, value_entry=None, type_entry=type_part.entry)) for type_part in pairing.orphan_types)
     return tuple(entry for _, entry in sorted(logical, key=operator.itemgetter(0)))
 
 
@@ -373,7 +340,7 @@ def _entries_from_raw(docstring: PDF_definition.DocstringInfo, entry: PDF_defini
     names = entry.names or (None,)
     line_numbers = _entry_line_numbers(docstring, entry)
     type_sources = _type_sources(docstring, entry, fallback_line_numbers=line_numbers)
-    return tuple(TypedDocstringEntry(name=name, type_sources=type_sources, description=entry.description, line_numbers=line_numbers) for name in names)
+    return tuple(TypedDocstringEntry(name=name, type_sources=type_sources, description=entry.description, has_value_entry=True, line_numbers=line_numbers) for name in names)
 
 
 def _merged_rest_entry(
@@ -388,27 +355,18 @@ def _merged_rest_entry(
         *(() if value_entry is None else _type_sources(docstring, value_entry, fallback_line_numbers=source_line_numbers)),
         *(() if type_entry is None else _type_sources(docstring, type_entry, fallback_line_numbers=_entry_line_numbers(docstring, type_entry))),
     )
-    return TypedDocstringEntry(name=name, type_sources=type_sources, description=value_entry.description if value_entry is not None else "", line_numbers=source_line_numbers)
+    return TypedDocstringEntry(
+        name=name, type_sources=type_sources, description=value_entry.description if value_entry is not None else "", has_value_entry=value_entry is not None, line_numbers=source_line_numbers
+    )
 
 
 def _type_sources(docstring: PDF_definition.DocstringInfo, entry: PDF_definition.DocstringEntry, *, fallback_line_numbers: tuple[int, ...]) -> tuple[TypedDocstringTypeSource, ...]:
     """Return concrete type spellings supplied by one parsed entry."""
     text: str | None
-    text = entry.description.strip() if entry.field_name in docstring_sections.REST_TYPE_DESCRIPTION_FIELDS else entry.type_text
+    text = entry.description.strip() if docstring_sections.is_rest_type_field(entry.field_name) else entry.type_text
     if text is None or not text.strip():
         return ()
-    return (
-        TypedDocstringTypeSource(
-            text=text.strip(), line_numbers=_entry_line_numbers(docstring, entry) if entry.field_name in docstring_sections.REST_TYPE_DESCRIPTION_FIELDS else fallback_line_numbers
-        ),
-    )
-
-
-def _rest_entry_key(kind: PDF_definition.DocstringEntryKind, name: str | None) -> str | None:
-    """Return the logical key used to pair reST value and type fields."""
-    if name is not None and kind is PDF_definition.DocstringEntryKind.PARAMETER:
-        return parameter_documentation.parameter_comparison_name(name)
-    return name
+    return (TypedDocstringTypeSource(text=text.strip(), line_numbers=_entry_line_numbers(docstring, entry) if docstring_sections.is_rest_type_field(entry.field_name) else fallback_line_numbers),)
 
 
 def _entry_line_numbers(docstring: PDF_definition.DocstringInfo, entry: PDF_definition.DocstringEntry) -> tuple[int, ...]:

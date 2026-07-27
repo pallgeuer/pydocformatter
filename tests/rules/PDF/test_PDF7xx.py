@@ -66,13 +66,54 @@ def test_ignored_under_none_and_pep257_even_when_selected_broadly() -> None:
     assert codes(pep257_result) == ()
 
 
-def test_rest_type_only_fields_provide_types_without_descriptions() -> None:
+def test_rest_type_only_fields_provide_types_without_value_entry_descriptions() -> None:
     source = 'def function(value: int) -> str:\n    """Return a value.\n\n    :type value: int\n    :rtype: str\n    """\n    return "value"\n'
     missing_description = check(source, select=("PDF700", "PDF704"), convention=DocstringConvention.REST)
     required_type = check(source, select=("PDF701", "PDF705"), convention=DocstringConvention.REST)
 
-    assert codes(missing_description) == ("PDF700", "PDF704")
+    assert codes(missing_description) == ()
     assert codes(required_type) == ()
+
+
+def test_rest_type_only_fields_skip_every_missing_description_family() -> None:
+    source = '"""Module.\n\n:vartype module_value: int\n"""\nmodule_value: int = 1\n\n\nclass Client:\n    """Client.\n\n    :vartype timeout: int\n    """\n\n    timeout: int = 1\n\n\ndef generate(value: int) -> typing.Iterator[str]:\n    """Generate values.\n\n    :type value: int\n    :ytype: str\n    """\n    yield "value"\n'
+    description_result = check(source, select=("PDF700", "PDF708", "PDF712", "PDF716"), convention=DocstringConvention.REST)
+    type_result = check(source, select=("PDF701", "PDF709", "PDF713", "PDF717"), convention=DocstringConvention.REST)
+
+    assert codes(description_result) == ()
+    assert codes(type_result) == ()
+
+
+def test_rest_type_fields_before_empty_value_fields_target_each_value_entry() -> None:
+    source = '"""Module.\n\n:vartype module_value: int\n:var module_value:\n"""\nmodule_value: int = 1\n\n\nclass Client:\n    """Client.\n\n    :vartype timeout: int\n    :var timeout:\n    """\n\n    timeout: int = 1\n\n\ndef transform(value: int) -> str:\n    """Transform a value.\n\n    :type value: int\n    :param value:\n    :rtype: str\n    :return:\n    """\n    return str(value)\n\n\ndef generate() -> typing.Iterator[str]:\n    """Generate values.\n\n    :ytype: str\n    :yield:\n    """\n    yield "value"\n'
+    result = check(source, select=("PDF700", "PDF704", "PDF708", "PDF712", "PDF716"), convention=DocstringConvention.REST)
+
+    assert codes(result) == ("PDF700", "PDF704", "PDF708", "PDF712", "PDF716")
+    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((23,), (25,), (34,), (13,), (4,))
+
+
+def test_rest_surplus_value_entries_remain_independent_for_description_and_type_rules() -> None:
+    source = 'def function(value: int):\n    """Process a value.\n\n    :param value: First value.\n    :param value:\n    :type value: int\n    """\n'
+    result = check(source, select=("PDF700", "PDF701", "PDF722"), convention=DocstringConvention.REST)
+
+    assert codes(result) == ("PDF700", "PDF701")
+    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((5,), (5,))
+
+
+def test_rest_surplus_type_entry_is_description_silent_but_keeps_type_and_orphan_diagnostics() -> None:
+    source = 'def function(value: int):\n    """Process a value.\n\n    :type value: int\n    :param value:\n    :type value: str\n    """\n'
+    result = check(source, select=("PDF700", "PDF703", "PDF722"), convention=DocstringConvention.REST)
+
+    assert codes(result) == ("PDF700", "PDF703", "PDF722")
+    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((5,), (6,), (6,))
+
+
+def test_empty_orphan_type_entry_is_missing_a_type_but_not_a_description() -> None:
+    source = 'def function(value: int):\n    """Process a value.\n\n    :type value:\n    """\n'
+    result = check(source, select=("PDF700", "PDF701", "PDF722"), convention=DocstringConvention.REST)
+
+    assert codes(result) == ("PDF701", "PDF722")
+    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((4,), (4,))
 
 
 def test_rest_value_and_type_fields_merge_without_double_counting() -> None:

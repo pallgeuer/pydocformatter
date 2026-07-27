@@ -117,7 +117,7 @@ class PDF306ParameterDocumentationTooGeneric(RuleBase):
 
 def _is_rest_type_entry(entry: PDF_definition.DocstringEntry) -> bool:
     """Return whether a parsed entry came from a reST parameter type field."""
-    return entry.field_name in docstring_sections.REST_PARAMETER_TYPE_FIELDS
+    return docstring_sections.is_rest_type_field(entry.field_name)
 
 
 def _extra_generic_sequences(signature_parameter: parameter_documentation.SignatureParameter | None) -> frozenset[tuple[str, ...]]:
