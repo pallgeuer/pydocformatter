@@ -11,14 +11,13 @@ import pydocformatter.rules.registration as rule_registration
 from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase
-from pydocformatter.rules.definition_helpers import docstring_conventions, section_edits
+from pydocformatter.rules.definition_helpers import ascii_whitespace, docstring_conventions, section_edits
 from pydocformatter.rules.definitions.PDF.PDF import PDF
 from pydocformatter.rules.models import FixAvailability, RuleCacheBehavior, RuleCheckKind, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
 
 
 if TYPE_CHECKING:
     # First-party imports
-    import pydocformatter.rules.edits as rule_edits
     import pydocformatter.rules.violations as rule_violations
     from pydocformatter.rules.definition import RuleContext
 
@@ -67,37 +66,22 @@ def _results(context: RuleContext, *, rule: RuleMetadata) -> tuple[rule_violatio
     for docstring in data.docstrings:
         if docstring.structure.convention is not DocstringConvention.GOOGLE:
             continue
-        replacements: list[rule_edits.PlannedTextReplacement] = []
-        value_lines = [line.raw_text for line in docstring.structure.lines]
-        replacement_line_numbers: list[int] = []
-        unfixable_line_numbers: list[int] = []
-        replacement_messages: list[str] = []
-        unfixable_messages: list[str] = []
+        accumulator = section_edits.ReplacementAccumulator(docstring, context=context, rule=rule)
         for section in docstring.structure.sections:
             line = docstring.structure.lines[section.header_line]
-            if line.text.strip().endswith(":"):
+            suffix_start = section_edits.section_name_start_column(line) + len(section.name)
+            suffix = line.text[suffix_start:]
+            if ":" in suffix:
                 continue
             message = f"Docstring section '{section.name}' should end with a colon"
-            replacement = section_edits.replacement_for_section_suffix(line, section.name, ":")
-            if replacement is None:
-                unfixable_line_numbers.extend(section_edits.line_numbers(docstring, line))
-                unfixable_messages.append(message)
+            trimmed_suffix = suffix.strip(ascii_whitespace.SPACE_AND_TAB)
+            if not trimmed_suffix:
+                accumulator.add(line, suffix_start, len(line.text), ":", instance_message=message)
                 continue
-            replacements.append(replacement)
-            replacement_line_numbers.extend(section_edits.line_numbers(docstring, line))
-            replacement_messages.append(message)
-            section_edits.replace_value_line_span(value_lines, line, replacement, ":")
-        if not replacements and not unfixable_line_numbers:
-            continue
-        change = section_edits.planned_replacement_change(docstring, replacements=tuple(replacements), value_lines=value_lines)
-        results.extend(
-            section_edits.replacement_results(
-                rule,
-                replacement_line_numbers=replacement_line_numbers,
-                unfixable_line_numbers=unfixable_line_numbers,
-                change=change,
-                replacement_messages=replacement_messages,
-                unfixable_messages=unfixable_messages,
-            )
-        )
+            leading_end = suffix_start + len(suffix) - len(suffix.lstrip(ascii_whitespace.SPACE_AND_TAB))
+            accumulator.add(line, suffix_start, leading_end, ":", instance_message=message)
+            trailing_start = suffix_start + len(suffix.rstrip(ascii_whitespace.SPACE_AND_TAB))
+            if trailing_start < len(line.text):
+                accumulator.add(line, trailing_start, len(line.text), "", instance_message=message)
+        results.extend(accumulator.results())
     return tuple(results)

@@ -38,6 +38,15 @@ def test_preserves_noncanonical_section_name_case_when_adding_colon() -> None:
     assert not format_source(result.new_source).modified
 
 
+def test_preserves_nonstandard_whitespace_after_missing_section_colon() -> None:
+    """Insert the colon before whitespace owned by PDF004."""
+    source = 'def function(value):\n    """Summary.\n\n    Args\\u2003\n        value: Description.\n    """\n'
+    result = format_source(source)
+
+    assert result.new_source == source.replace("Args\\u2003", "Args:\\u2003")
+    assert result.fixed_findings[PDF404SectionNameTrailingColon.meta] == 1
+
+
 def test_leaves_section_name_with_colon_and_trailing_whitespace_to_whitespace_rules() -> None:
     source = 'def function(value):\n    """Summary.\n\n    Args:   \n        value: Description.\n    """\n'
     result = format_source(source)

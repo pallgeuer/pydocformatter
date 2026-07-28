@@ -9,7 +9,7 @@ import dataclasses
 
 # First-party imports
 from pydocformatter.cli import settings_check
-from pydocformatter.rules.definition_helpers import inline_markup
+from pydocformatter.rules.definition_helpers import ascii_whitespace, inline_markup
 
 
 _BALANCED_WRAP_MAX_CANDIDATES = 250_000
@@ -86,7 +86,7 @@ def leading_width(text: str) -> int:
     Returns:
         int: Display columns occupied by the leading whitespace prefix, using Python's default tab expansion.
     """
-    return display_width(text[: len(text) - len(text.lstrip(" \t"))], tab_width=8)
+    return display_width(text[: len(text) - len(text.lstrip(ascii_whitespace.SPACE_AND_TAB))], tab_width=8)
 
 
 def indent_unit(settings: settings_check.CheckSettings) -> str:
@@ -110,7 +110,7 @@ def has_space_tab_content(text: str) -> bool:
     Returns:
         bool: Whether any character remains after stripping spaces and tabs.
     """
-    return bool(text.strip(" \t"))
+    return bool(text.strip(ascii_whitespace.SPACE_AND_TAB))
 
 
 def strip_indent(text: str, width: int) -> str:
@@ -140,7 +140,7 @@ def strip_indent_with_mapping(text: str, width: int) -> tuple[str, int, int]:
     """
     index = 0
     column = 0
-    while index < len(text) and text[index] in " \t" and column < width:
+    while index < len(text) and text[index] in ascii_whitespace.SPACE_AND_TAB and column < width:
         column = ((column // 8) + 1) * 8 if text[index] == "\t" else column + 1
         index += 1
     virtual_prefix = max(column - width, 0)

@@ -9,13 +9,12 @@ import dataclasses
 from typing import TYPE_CHECKING
 
 # First-party imports
-import pydocformatter.rules.edits as rule_edits
 import pydocformatter.rules.registration as rule_registration
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase
-from pydocformatter.rules.definition_helpers import docstring_conventions, docstring_sections, section_edits
+from pydocformatter.rules.definition_helpers import ascii_whitespace, docstring_conventions, docstring_sections, section_edits
 from pydocformatter.rules.definitions.PDF.PDF import PDF
 from pydocformatter.rules.models import FixAvailability, RuleCacheBehavior, RuleCheckKind, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
 
@@ -35,23 +34,6 @@ class _Target:
 
     line: PDF_definition.DocstringValueLine
     name: str
-
-
-@dataclasses.dataclass(frozen=True)
-class _FixableTarget:
-    """Mapped source replacement for one target."""
-
-    replacement: rule_edits.PlannedTextReplacement
-    line_numbers: tuple[int, ...]
-    message: str
-
-
-@dataclasses.dataclass(frozen=True)
-class _UnfixableTarget:
-    """Diagnostic-only section-name colon target."""
-
-    line_numbers: tuple[int, ...]
-    message: str
 
 
 @rule_registration.register_rule_to(PDF)
@@ -98,31 +80,10 @@ def _results(context: RuleContext, *, rule: RuleMetadata) -> tuple[rule_violatio
     for docstring in data.docstrings:
         if docstring.structure.convention is not DocstringConvention.NUMPY:
             continue
-        fixable_targets: list[_FixableTarget] = []
-        value_lines = [line.raw_text for line in docstring.structure.lines]
-        unfixable_targets: list[_UnfixableTarget] = []
+        accumulator = section_edits.ReplacementAccumulator(docstring, context=context, rule=rule)
         for target in _targets(docstring):
-            fixable_target, unfixable_target = _planned_target(docstring, target, value_lines=value_lines)
-            if fixable_target is not None:
-                fixable_targets.append(fixable_target)
-            if unfixable_target is not None:
-                unfixable_targets.append(unfixable_target)
-        if not fixable_targets and not unfixable_targets:
-            continue
-        fixable_targets.sort(key=lambda target: target.replacement.start_offset)
-        unfixable_targets.sort(key=lambda target: target.line_numbers)
-        replacements = tuple(target.replacement for target in fixable_targets)
-        change = section_edits.planned_replacement_change(docstring, replacements=replacements, value_lines=value_lines)
-        results.extend(
-            section_edits.replacement_results(
-                rule,
-                replacement_line_numbers=[line_number for target in fixable_targets for line_number in target.line_numbers],
-                unfixable_line_numbers=[line_number for target in unfixable_targets for line_number in target.line_numbers],
-                change=change,
-                replacement_messages=[target.message for target in fixable_targets],
-                unfixable_messages=[target.message for target in unfixable_targets],
-            )
-        )
+            _add_target(accumulator, target)
+        results.extend(accumulator.results())
     return tuple(results)
 
 
@@ -157,17 +118,13 @@ def _is_unparsed_section_boundary(docstring: PDF_definition.DocstringInfo, line:
     return not docstring.structure.lines[line.index - 1].text.strip()
 
 
-def _planned_target(docstring: PDF_definition.DocstringInfo, target: _Target, *, value_lines: list[str]) -> tuple[_FixableTarget | None, _UnfixableTarget | None]:
-    """Return a planned replacement or diagnostic for one NumPy section-name colon."""
+def _add_target(accumulator: section_edits.ReplacementAccumulator, target: _Target) -> None:
+    """Add one NumPy section-name colon replacement when required."""
     if not _is_superfluous_colon_suffix(_section_suffix(target.line.text, target.name)):
-        return None, None
+        return
     message = f"Docstring section '{target.name}' should not end with a colon"
-    line_numbers = section_edits.line_numbers(docstring, target.line)
     replacement = section_edits.replacement_for_section_suffix(target.line, target.name, "")
-    if replacement is None:
-        return None, _UnfixableTarget(line_numbers=line_numbers, message=message)
-    section_edits.replace_value_line_span(value_lines, target.line, replacement, "")
-    return _FixableTarget(replacement=replacement, line_numbers=line_numbers, message=message), None
+    accumulator.add_replacement(target.line, replacement, "", instance_message=message)
 
 
 def _unparsed_numpy_colon_section_name(text: str) -> str | None:
@@ -183,10 +140,10 @@ def _unparsed_numpy_colon_section_name(text: str) -> str | None:
 
 def _section_suffix(text: str, name: str) -> str:
     """Return the text after a section name on its header line."""
-    start_column = len(text) - len(text.lstrip(" \t"))
+    start_column = len(text) - len(text.lstrip(ascii_whitespace.SPACE_AND_TAB))
     return text[start_column + len(name) :]
 
 
 def _is_superfluous_colon_suffix(suffix: str) -> bool:
     """Return whether a section-name suffix is exactly a colon with optional trailing whitespace."""
-    return suffix.startswith(":") and not suffix[1:].strip(" \t")
+    return suffix.startswith(":") and not suffix[1:].strip(ascii_whitespace.SPACE_AND_TAB)

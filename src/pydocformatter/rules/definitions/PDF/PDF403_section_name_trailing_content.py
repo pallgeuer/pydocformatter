@@ -13,7 +13,7 @@ import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase
-from pydocformatter.rules.definition_helpers import docstring_conventions, docstring_sections, section_edits, text_layout
+from pydocformatter.rules.definition_helpers import ascii_whitespace, docstring_conventions, docstring_sections, section_edits, text_layout, unicode_safety
 from pydocformatter.rules.definitions.PDF.PDF import PDF
 from pydocformatter.rules.models import FixAvailability, RuleCacheBehavior, RuleCheckKind, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
 
@@ -95,16 +95,19 @@ def _results(context: RuleContext, *, rule: RuleMetadata) -> tuple[rule_violatio
 
 def _google_trailing_content_target(line: PDF_definition.DocstringValueLine, *, context: RuleContext) -> tuple[str, str, str] | None:
     """Return split header/content lines for a Google section with trailing text."""
+    if unicode_safety.has_nonstandard_whitespace_or_control(line.text):
+        return None
     match = _GOOGLE_TRAILING_CONTENT_RE.match(line.text)
     if match is None:
         return None
-    name = match.group("name").rstrip()
+    name = match.group("name").rstrip(ascii_whitespace.SPACE_AND_TAB)
     canonical = docstring_sections.canonical_section_name(DocstringConvention.GOOGLE, name)
     if canonical is None:
         return None
     raw_indent = line.raw_text[: line.text_raw_start_column + len(match.group("indent")) - line.text_virtual_prefix_length]
     header = f"{raw_indent}{name}:"
-    content = f"{raw_indent}{text_layout.indent_unit(context.settings)}{match.group('content').strip()}"
+    trailing_content = match.group("content").strip(ascii_whitespace.SPACE_AND_TAB)
+    content = f"{raw_indent}{text_layout.indent_unit(context.settings)}{trailing_content}"
     return header, content, name
 
 

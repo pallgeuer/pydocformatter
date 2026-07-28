@@ -169,7 +169,7 @@ def _section_has_content(docstring: PDF_definition.DocstringInfo, section: PDF_d
 
 def _entry_has_content(entry: PDF_definition.DocstringEntry) -> bool:
     """Return whether a parsed entry carries any documented payload."""
-    return bool(entry.names or entry.type_text or entry.description)
+    return bool(entry.names or entry.type_info or entry.description)
 
 
 def _is_abstract(definition: PDF_definition.DefinitionInfo) -> bool:

@@ -58,6 +58,13 @@ def test_reports_google_missing_separator_and_unbalanced_type() -> None:
     )
 
 
+@pytest.mark.parametrize("type_slot", ["()", "( )", "(\t)"])
+def test_reports_google_missing_type_inside_parentheses(type_slot: str) -> None:
+    """Report an explicitly empty Google type slot without parsing the entry."""
+    source = f'def convert(value):\n    """Convert values.\n\n    Args:\n        value {type_slot}: The value.\n    """\n'
+    assert_pdf414(source, ((5,),), ("Google docstring entry 'value' is missing its type inside parentheses",), convention=DocstringConvention.GOOGLE)
+
+
 def test_google_name_confidence_includes_receivers_and_variadics() -> None:
     """Use all signature parameter categories while ignoring stars for comparison."""
     source = 'class Example:\n    def convert(self, /, value, *args, option, **kwargs):\n        """Convert values.\n\n        Args:\n            self Receiver.\n            value Value.\n            *args Positional values.\n            option Option.\n            **kwargs Keyword values.\n        """\n'
@@ -185,6 +192,19 @@ def test_unbalanced_google_type_remains_outside_semantic_parameter_entries() -> 
     assert tuple(finding.rule for finding in result.unfixed_findings) == (PDF414MalformedConventionEntry.meta, PDF500MissingParameterDocumentation.meta)
     assert tuple(finding.message for finding in result.unfixed_findings) == (
         "Google docstring entry 'value' has an unbalanced parenthesized type",
+        "Function parameter 'value' is missing docstring documentation",
+    )
+
+
+def test_empty_google_type_remains_outside_semantic_parameter_entries() -> None:
+    """Report malformed empty type syntax without satisfying parameter documentation."""
+    source = 'def convert(value):\n    """Convert values.\n\n    Args:\n        value (  ): Description.\n    """\n'
+    settings = CheckSettings(select=("PDF414", "PDF500"), docstring_convention=DocstringConvention.GOOGLE, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS)
+    result = format_source(source, settings=settings)
+
+    assert tuple(finding.rule for finding in result.unfixed_findings) == (PDF414MalformedConventionEntry.meta, PDF500MissingParameterDocumentation.meta)
+    assert tuple(finding.message for finding in result.unfixed_findings) == (
+        "Google docstring entry 'value' is missing its type inside parentheses",
         "Function parameter 'value' is missing docstring documentation",
     )
 

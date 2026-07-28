@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING
 
 # First-party imports
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
-from pydocformatter.rules.definition_helpers import docstring_sections, section_edits
+from pydocformatter.rules.definition_helpers import ascii_whitespace, docstring_sections, section_edits
 
 
 if TYPE_CHECKING:
@@ -360,4 +360,4 @@ def field_name_start_column(line: PDF_definition.DocstringValueLine) -> int:
         int: Text column immediately after the opening field colon.
     """
     # Parsed reStructuredText field lines start with a colon after indentation.
-    return len(line.text) - len(line.text.lstrip(" \t")) + 1
+    return len(line.text) - len(line.text.lstrip(ascii_whitespace.SPACE_AND_TAB)) + 1

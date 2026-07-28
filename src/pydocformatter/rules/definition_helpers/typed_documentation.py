@@ -362,11 +362,13 @@ def _merged_rest_entry(
 
 def _type_sources(docstring: PDF_definition.DocstringInfo, entry: PDF_definition.DocstringEntry, *, fallback_line_numbers: tuple[int, ...]) -> tuple[TypedDocstringTypeSource, ...]:
     """Return concrete type spellings supplied by one parsed entry."""
-    text: str | None
-    text = entry.description.strip() if docstring_sections.is_rest_type_field(entry.field_name) else entry.type_text
-    if text is None or not text.strip():
+    if entry.type_info is None or not entry.type_info.text.strip():
         return ()
-    return (TypedDocstringTypeSource(text=text.strip(), line_numbers=_entry_line_numbers(docstring, entry) if docstring_sections.is_rest_type_field(entry.field_name) else fallback_line_numbers),)
+    return (
+        TypedDocstringTypeSource(
+            text=entry.type_info.text.strip(), line_numbers=_entry_line_numbers(docstring, entry) if docstring_sections.is_rest_type_field(entry.field_name) else fallback_line_numbers
+        ),
+    )
 
 
 def _entry_line_numbers(docstring: PDF_definition.DocstringInfo, entry: PDF_definition.DocstringEntry) -> tuple[int, ...]:

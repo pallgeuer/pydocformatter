@@ -5,7 +5,7 @@ Fix is sometimes available.
 Rule is disabled if `docstring-convention` is `none`, `pep257`, `numpy`, or `rest`.
 
 ## What it does
-PDF404 reports recognized Google section names that are missing the required trailing colon. The fix adds one colon immediately after the stripped section name and removes spaces or tabs that appeared after the section name on that line.
+PDF404 reports recognized Google section names that are missing the required trailing colon. The fix adds one colon immediately after the section name and removes only ASCII spaces or tabs at the outer boundary of the remaining suffix. Other whitespace and controls are preserved with their existing source spelling for PDF004 or other authoritative rules.
 
 The fix is available for safely mapped simple docstrings. Concatenated docstrings and source mappings that cannot be safely rewritten are reported without a fix.
 

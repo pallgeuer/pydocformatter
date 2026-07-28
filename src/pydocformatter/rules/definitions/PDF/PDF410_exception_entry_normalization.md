@@ -11,7 +11,7 @@ The canonical spelling uses simple or dotted exception names without backtick co
 
 Google `Raise`/`Raises` and `Warn`/`Warns` entries, NumPy exception and `Warn`/`Warns` entries, and reST `raise`/`raises`/`except`/`exception` fields are supported under their matching conventions. Google and NumPy `Warning` and `Warnings` caution sections are not exception-entry sections for this rule. Nameless reST exception fields such as `:raises:` are left unchanged because their body is prose, not a parsed exception-name list.
 
-The rule only rewrites entries that parse as simple or dotted exception names. It does not normalize arbitrary prose, malformed exception lists, double-backtick code spans, return/yield type expressions, or description text. Concatenated docstrings and source mappings that cannot be safely rewritten are reported without a fix.
+The rule only rewrites entries that parse as simple or dotted exception names. Entries containing non-default whitespace or suspicious controls are left unchanged for PDF004 rather than reconstructed. Description boundaries trim only ASCII spaces and tabs. The rule does not normalize arbitrary prose, malformed exception lists, double-backtick code spans, return/yield type expressions, or description text. Concatenated docstrings and source mappings that cannot be safely rewritten are reported without a fix.
 
 ## Why is this useful?
 Consistent exception-entry spelling keeps convention-aware docstrings readable without wrapping exception names in backticks.

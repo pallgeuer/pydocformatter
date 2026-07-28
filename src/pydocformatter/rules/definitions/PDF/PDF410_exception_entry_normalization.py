@@ -12,13 +12,12 @@ import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase
-from pydocformatter.rules.definition_helpers import docstring_conventions, section_edits
+from pydocformatter.rules.definition_helpers import ascii_whitespace, docstring_conventions, section_edits, unicode_safety
 from pydocformatter.rules.models import FixAvailability, RuleCacheBehavior, RuleCheckKind, RuleMetadata
 
 
 if TYPE_CHECKING:
     # First-party imports
-    import pydocformatter.rules.edits as rule_edits
     import pydocformatter.rules.violations as rule_violations
     from pydocformatter.rules.definition import RuleContext
 
@@ -61,12 +60,7 @@ def _results(context: RuleContext, *, rule: RuleMetadata) -> tuple[rule_violatio
     data = PDF_definition.PDF.require_data(context)
     results: list[rule_violations.RuleViolation] = []
     for docstring in data.docstrings:
-        replacements: list[rule_edits.PlannedTextReplacement] = []
-        value_lines = [line.raw_text for line in docstring.structure.lines]
-        replacement_line_numbers: list[int] = []
-        unfixable_line_numbers: list[int] = []
-        replacement_messages: list[str] = []
-        unfixable_messages: list[str] = []
+        accumulator = section_edits.ReplacementAccumulator(docstring, context=context, rule=rule)
         for entry in docstring.structure.entries:
             if not PDF_definition.is_exception_name_entry_kind(entry.kind):
                 continue
@@ -75,34 +69,14 @@ def _results(context: RuleContext, *, rule: RuleMetadata) -> tuple[rule_violatio
             if canonical is None or canonical == line.text:
                 continue
             message = "Docstring warning entry should use canonical spelling" if entry.kind is PDF_definition.DocstringEntryKind.WARNING else rule.message
-            replacement = section_edits.text_replacement(line, 0, len(line.text), canonical)
-            if replacement is None:
-                unfixable_line_numbers.extend(section_edits.line_numbers(docstring, line))
-                unfixable_messages.append(message)
-                continue
-            replacements.append(replacement)
-            replacement_line_numbers.extend(section_edits.line_numbers(docstring, line))
-            replacement_messages.append(message)
-            section_edits.replace_value_line_span(value_lines, line, replacement, canonical)
-        if not replacements and not unfixable_line_numbers:
-            continue
-        change = section_edits.planned_replacement_change(docstring, replacements=tuple(replacements), value_lines=value_lines)
-        results.extend(
-            section_edits.replacement_results(
-                rule,
-                replacement_line_numbers=replacement_line_numbers,
-                unfixable_line_numbers=unfixable_line_numbers,
-                change=change,
-                replacement_messages=replacement_messages,
-                unfixable_messages=unfixable_messages,
-            )
-        )
+            accumulator.add(line, 0, len(line.text), canonical, instance_message=message)
+        results.extend(accumulator.results())
     return tuple(results)
 
 
 def _canonical_exception_or_warning_entry_line(convention: DocstringConvention, text: str, entry: PDF_definition.DocstringEntry) -> str | None:
     """Return the canonical exception or warning entry line for a docstring convention."""
-    if not entry.names:
+    if not entry.names or unicode_safety.has_nonstandard_whitespace_or_control(text):
         return None
     if convention is DocstringConvention.GOOGLE:
         return _canonical_google_exception_or_warning_entry_line(text, entry)
@@ -118,10 +92,10 @@ def _canonical_google_exception_or_warning_entry_line(text: str, entry: PDF_defi
     if PDF_definition._match_google_entry(text) is not None:
         return None
     match = PDF_definition._match_generic_entry(text)
-    if match is None:
+    if match is None or unicode_safety.has_nonstandard_whitespace_or_control(match.name):
         return None
-    description = match.description.strip()
-    if description == ":" and text.rstrip().endswith("::"):
+    description = match.description.strip(ascii_whitespace.SPACE_AND_TAB)
+    if description == ":" and text.rstrip(ascii_whitespace.SPACE_AND_TAB).endswith("::"):
         return None
     return f"{match.indent}{', '.join(entry.names)}:{f' {description}' if description else ''}"
 
@@ -130,16 +104,20 @@ def _canonical_numpy_exception_or_warning_entry_line(text: str, entry: PDF_defin
     """Return the canonical NumPy exception or warning entry spelling."""
     entry_match = PDF_definition._NUMPY_EXCEPTION_ENTRY_RE.match(text)
     if entry_match is not None:
-        description = entry_match.group("description").strip()
+        if unicode_safety.has_nonstandard_whitespace_or_control(entry_match.group("name")):
+            return None
+        description = entry_match.group("description").strip(ascii_whitespace.SPACE_AND_TAB)
         return f"{entry_match.group('indent')}{', '.join(entry.names)}:{f' {description}' if description else ''}"
-    indent = text[: len(text) - len(text.lstrip(" \t"))]
+    if unicode_safety.has_nonstandard_whitespace_or_control(text.strip(ascii_whitespace.SPACE_AND_TAB)):
+        return None
+    indent = text[: len(text) - len(text.lstrip(ascii_whitespace.SPACE_AND_TAB))]
     return f"{indent}{', '.join(entry.names)}"
 
 
 def _canonical_rest_exception_entry_line(text: str, entry: PDF_definition.DocstringEntry) -> str | None:
     """Return the canonical reStructuredText exception field spelling."""
     match = PDF_definition._REST_FIELD_RE.match(text)
-    if match is None or entry.field_name is None:
+    if match is None or entry.field_name is None or unicode_safety.has_nonstandard_whitespace_or_control(match.group("argument")):
         return None
-    description = match.group("description").strip()
+    description = match.group("description").strip(ascii_whitespace.SPACE_AND_TAB)
     return f"{match.group('indent')}:{match.group('field')} {', '.join(entry.names)}:{f' {description}' if description else ''}"

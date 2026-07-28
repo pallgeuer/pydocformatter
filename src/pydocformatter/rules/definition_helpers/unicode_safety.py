@@ -14,6 +14,9 @@ from __future__ import annotations
 import dataclasses
 from collections.abc import Iterator
 
+# First-party imports
+from pydocformatter.rules.definition_helpers import ascii_whitespace
+
 
 _C0_CONTROL_LABELS = (
     "NULL",
@@ -169,6 +172,27 @@ def suspicious_unicode_occurrences(text: str) -> tuple[SuspiciousUnicodeOccurren
         tuple[SuspiciousUnicodeOccurrence, ...]: Classified occurrences in input order.
     """
     return tuple(_suspicious_unicode_occurrences(text))
+
+
+def has_nonstandard_whitespace_or_control(text: str) -> bool:
+    """Return whether shared normalization should defer to suspicious-Unicode handling.
+
+    Args:
+        text (str): Evaluated text to inspect.
+
+    Returns:
+        bool: Whether text contains nonstandard whitespace or a reportable control.
+    """
+    in_indentation = True
+    for char in text:
+        code_point = ord(char)
+        if code_point in EVERYWHERE_CODE_POINTS or (in_indentation and code_point in INDENTATION_ONLY_CODE_POINTS) or (char.isspace() and char not in ascii_whitespace.SPACE_AND_TAB):
+            return True
+        if char in "\r\n":
+            in_indentation = True
+        elif in_indentation and not char.isspace():
+            in_indentation = False
+    return False
 
 
 def _suspicious_unicode_occurrences(text: str) -> Iterator[SuspiciousUnicodeOccurrence]:

@@ -17,6 +17,8 @@ All notable changes to this project are documented here. The format follows [Kee
 ### Added
 
 - **Docstring diagnostics:**
+  - Added PDF312 to report exact content-free return, yield, exception, warning, and method descriptions.
+  - Added PDF416 to safely normalize trailing periods, redundant outer parentheses, and lowercase `none` in parsed docstring type slots.
   - Added PDF213 to report complete evaluated docstrings that match configurable placeholder markers.
   - Added PDF723 to report method entries without prose descriptions in class-owned Google and NumPy docstrings.
   - Added PDF212 to report nonempty primary and supported attached attribute docstrings without a parsed top-level summary.
@@ -62,6 +64,9 @@ All notable changes to this project are documented here. The format follows [Kee
 - **Rule and path contracts:**
   - Validated terminal-punctuation policies at construction so contradictory classifications and unusable canonical endings fail immediately.
   - Centralized the shared trailing-period and terminal-punctuation policies and kept comma-introduced structure classification in the punctuation helper rather than the PDF parser core.
+  - Centralized the deliberately closed ASCII space-and-tab policy used by layout and convention normalization without broadening Unicode whitespace ownership.
+  - Unified parsed type semantics and optional source spans in one parser-owned value object, replaced rule-specific fragment safety state with complete evaluated-value offsets, and completed shared replacement accumulation across convention normalization rules.
+  - Encapsulated accumulated replacement requests in one private record collection and made normalization safety checks short-circuit without allocating detailed Unicode occurrences.
   - Centralized package, module, symlink-target, and public/private path semantics in a precomputed rule context shared with cache invalidation.
   - Made rule cache dependencies explicit and fail closed, with every built-in rule audited as file-local and new external dependency kinds requiring canonical invalidation before cache use.
 - **Configuration:**
@@ -74,9 +79,17 @@ All notable changes to this project are documented here. The format follows [Kee
   - Made ASCII case-insensitive duplicate `docstring-placeholder-markers` diagnostics deterministic when multiple configured spellings have the same normalized value.
   - Reported invalid `docstring-placeholder-markers` entries before checking ASCII case-insensitive duplicates, so Unicode case-folding collisions receive the relevant syntax error.
 - **Docstring diagnostics:**
+  - Made PDF409 leave empty Google type slots unchanged and PDF414 report the malformed syntax instead of canonicalizing empty parentheses.
+  - Made PDF312 recognize exact generic descriptions that preserve leading or trailing underscores in documented names.
+  - Prevented PDF312 from matching descriptions whose original parsed fragments contain non-ASCII boundary characters, non-space/tab whitespace, or suspicious controls.
+  - Prevented PDF416 trailing-period and redundant-parenthesis fixes from leaving newly exposed ASCII whitespace, sourced type-slot spans directly from convention parsing, restored fallback Google method type slots, cached repeated spellings, and left non-default whitespace and suspicious controls to PDF004.
+  - Limited PDF403, PDF404, PDF409, PDF410, PDF411, and PDF416 convention normalization to ASCII spaces and tabs while preserving or deferring other whitespace and controls.
+  - Made accumulated section replacements order-independent and prevented stale offsets or overlapping requests from corrupting same-line whole-docstring fallback fixes.
+  - Consolidated PDF312 owner, pattern, and message behavior into one immutable policy per entry kind.
   - Preserved exact string-prefix spelling when PDF300 and PDF301 insert or replace summary punctuation.
   - Reported PDF410 warning normalization findings as warning entries while retaining exception-specific messages for raised exceptions.
 - **Convention parsing:**
+  - Preserved complete multiline reStructuredText type-field semantics while exposing editable source slots only for line-local types.
   - Parsed balanced Google and NumPy method signatures as opaque method entry heads for PDF723 and related structural rules while preserving legacy Google colon-only and NumPy type-bearing entries.
   - Reported direct-method unbalanced Google and NumPy signatures with method-specific PDF414 diagnostics instead of treating signature contents as docstring type syntax, while leaving unknown prose-like candidates alone.
   - Kept NumPy `Warning` and `Warnings` caution sections as narrative content instead of treating their text as emitted-warning entries.

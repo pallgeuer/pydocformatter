@@ -23,6 +23,26 @@ def test_normalizes_google_exception_and_warning_entries() -> None:
     assert not format_source(result.new_source).modified
 
 
+def test_leaves_nonstandard_exception_list_whitespace_to_pdf004() -> None:
+    """Avoid reconstructing exception-name lists containing nonstandard whitespace."""
+    source = 'def function():\n    """Summary.\n\n    Raises:\n        `ValueError`\\f| TypeError: Bad value.\n    """\n'
+    result = format_source(source)
+
+    assert result.new_source == source
+    assert not result.fixed_findings
+    assert not result.unfixed_findings
+
+
+def test_leaves_nonstandard_description_whitespace_unchanged() -> None:
+    """Avoid reconstructing escaped non-default whitespace in descriptions."""
+    source = 'def function():\n    """Summary.\n\n    Raises:\n        `ValueError`: \\u00a0Bad value.\n    """\n'
+    result = format_source(source)
+
+    assert result.new_source == source
+    assert not result.fixed_findings
+    assert not result.unfixed_findings
+
+
 def test_uses_entry_kind_specific_messages_without_fixing() -> None:
     source = 'def function():\n    """Summary.\n\n    Raises:\n        ValueError | TypeError: Bad value.\n\n    Warns:\n        RuntimeWarning | UserWarning: Bad warning.\n    """\n'
     result = format_source(source, fix=False)

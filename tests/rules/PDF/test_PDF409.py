@@ -95,6 +95,26 @@ def test_normalizes_google_entry_prefix_without_rewriting_continuation_lines() -
     assert not format_source(result.new_source).modified
 
 
+def test_preserves_nonstandard_whitespace_while_normalizing_google_entry_spacing() -> None:
+    """Leave entries with nonstandard whitespace unchanged for PDF004."""
+    source = 'def function(value):\n    """Summary.\n\n    Args:\n        value   ( int ) : \\u00a0Description.\n    """\n'
+    result = format_source(source)
+
+    assert result.new_source == source
+    assert not result.fixed_findings
+    assert not result.unfixed_findings
+
+
+def test_leaves_empty_google_type_slot_unchanged_for_pdf414() -> None:
+    """Leave malformed empty type syntax to the diagnostic-only syntax rule."""
+    source = 'def function(value):\n    """Summary.\n\n    Args:\n        value   (  ) : Description.\n    """\n'
+    result = format_source(source)
+
+    assert result.new_source == source
+    assert not result.fixed_findings
+    assert not result.unfixed_findings
+
+
 def test_normalizes_numpy_entry_spacing() -> None:
     source = 'def function(first, second):\n    """Summary.\n\n    Parameters\n    ----------\n    first,second:int\n        Values.\n    """\n'
     settings = CheckSettings(select=("PDF409",), docstring_convention=DocstringConvention.NUMPY)

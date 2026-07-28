@@ -179,6 +179,23 @@ def test_rest_required_type_rules_accept_inline_or_paired_type_sources() -> None
     assert codes(check(paired_source, select=("PDF701",), convention=DocstringConvention.REST)) == ()
 
 
+def test_rest_required_type_rules_accept_continued_type_fields() -> None:
+    """Treat continuation-only reStructuredText field descriptions as types."""
+    source = 'def function(value: int) -> str:\n    """Process a value.\n\n    :param value: Input value.\n    :type value:\n        int\n    :returns: Result value.\n    :rtype:\n        str\n    """\n    return str(value)\n'
+    result = check(source, select=("PDF701", "PDF703", "PDF705", "PDF707"), convention=DocstringConvention.REST)
+
+    assert codes(result) == ()
+
+
+def test_rest_mismatch_rules_use_complete_multiline_type_fields() -> None:
+    """Compare complete mixed inline and continued reStructuredText types."""
+    source = 'def function(value: list[int]):\n    """Process a value.\n\n    :param value: Input value.\n    :type value: list[\n        str]\n    """\n'
+    result = check(source, select=("PDF701", "PDF703"), convention=DocstringConvention.REST)
+
+    assert codes(result) == ("PDF703",)
+    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((5,),)
+
+
 def test_rest_variadic_parameter_value_and_type_fields_pair_by_comparison_name() -> None:
     source = 'def function(*items: int):\n    """Process values.\n\n    :param *items: Items.\n    :type items: int\n    """\n'
     result = check(source, select=("PDF700", "PDF701", "PDF703"), convention=DocstringConvention.REST)

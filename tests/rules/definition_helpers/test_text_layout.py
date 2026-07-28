@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 # First-party imports
 from pydocformatter.cli.settings_check import CheckSettings, IndentStyle
-from pydocformatter.rules.definition_helpers import inline_markup, text_layout
+from pydocformatter.rules.definition_helpers import ascii_whitespace, inline_markup, text_layout
 
 
 if TYPE_CHECKING:
@@ -17,6 +17,11 @@ if TYPE_CHECKING:
 
 def test_display_width_expands_tabs_to_configured_width() -> None:
     assert text_layout.display_width("\t# text", tab_width=4) == 10
+
+
+def test_ascii_space_and_tab_policy_is_deliberately_closed() -> None:
+    """Keep horizontal layout ownership limited to ASCII space and tab."""
+    assert ascii_whitespace.SPACE_AND_TAB == " \t"
 
 
 def test_leading_width_expands_tabs_to_python_default_width() -> None:

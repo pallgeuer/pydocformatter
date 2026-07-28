@@ -23,7 +23,6 @@ from pydocformatter.rules.definition_helpers import rest_fields, section_edits
 
 if TYPE_CHECKING:
     # First-party imports
-    import pydocformatter.rules.edits as rule_edits
     import pydocformatter.rules.violations as rule_violations
     from pydocformatter.rules.definition import RuleContext
     from pydocformatter.rules.models import RuleMetadata
@@ -59,12 +58,7 @@ def results_for_mapped_names(
     data = PDF_definition.PDF.require_data(context)
     results: list[rule_violations.RuleViolation] = []
     for docstring in data.docstrings:
-        replacements: list[rule_edits.PlannedTextReplacement] = []
-        value_lines = [line.raw_text for line in docstring.structure.lines]
-        replacement_line_numbers: list[int] = []
-        unfixable_line_numbers: list[int] = []
-        replacement_messages: list[str] = []
-        unfixable_messages: list[str] = []
+        accumulator = section_edits.ReplacementAccumulator(docstring, context=context, rule=rule)
         for section in docstring.structure.sections:
             mapped_name = section_name_mapper(docstring.structure.convention, section.name)
             if mapped_name is None or mapped_name == section.name:
@@ -72,14 +66,7 @@ def results_for_mapped_names(
             message = section_message_builder(section.name, mapped_name)
             line = docstring.structure.lines[section.header_line]
             replacement = section_edits.replacement_for_section_name(line, section.name, mapped_name)
-            if replacement is None:
-                unfixable_line_numbers.extend(section_edits.line_numbers(docstring, line))
-                unfixable_messages.append(message)
-                continue
-            replacements.append(replacement)
-            replacement_line_numbers.extend(section_edits.line_numbers(docstring, line))
-            replacement_messages.append(message)
-            section_edits.replace_value_line_span(value_lines, line, replacement, mapped_name)
+            accumulator.add_replacement(line, replacement, mapped_name, instance_message=message)
         if field_name_mapper is not None and field_message_builder is not None:
             for entry in docstring.structure.entries:
                 if entry.field_name is None:
@@ -93,25 +80,6 @@ def results_for_mapped_names(
                     continue
                 message = field_message_builder(field_name, mapped_name)
                 replacement = rest_fields.replacement_for_field_name(line, mapped_name)
-                if replacement is None:
-                    unfixable_line_numbers.extend(section_edits.line_numbers(docstring, line))
-                    unfixable_messages.append(message)
-                    continue
-                replacements.append(replacement)
-                replacement_line_numbers.extend(section_edits.line_numbers(docstring, line))
-                replacement_messages.append(message)
-                section_edits.replace_value_line_span(value_lines, line, replacement, mapped_name)
-        if not replacements and not unfixable_line_numbers:
-            continue
-        change = section_edits.planned_replacement_changes(docstring, context=context, replacements=tuple(replacements), value_lines=value_lines)
-        results.extend(
-            section_edits.replacement_results(
-                rule,
-                replacement_line_numbers=replacement_line_numbers,
-                unfixable_line_numbers=unfixable_line_numbers,
-                change=change,
-                replacement_messages=replacement_messages,
-                unfixable_messages=unfixable_messages,
-            )
-        )
+                accumulator.add_replacement(line, replacement, mapped_name, instance_message=message)
+        results.extend(accumulator.results())
     return tuple(results)

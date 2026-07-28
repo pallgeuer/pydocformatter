@@ -35,7 +35,7 @@ from typing import TYPE_CHECKING
 # First-party imports
 import pydocformatter.rules.definitions.PCF.PCF as PCF_definition
 from pydocformatter.cli.settings_check import CommentTaskMarkerMode
-from pydocformatter.rules.definition_helpers import inline_markup, text_layout
+from pydocformatter.rules.definition_helpers import ascii_whitespace, inline_markup, text_layout
 
 
 if TYPE_CHECKING:
@@ -129,7 +129,7 @@ def preserved_indices(run: PCF_definition.StandaloneCommentRun, *, settings: Che
             index += 1
             while index < len(bodies):
                 body = bodies[index]
-                content_indent = len(body.expandtabs(settings.indent_width)) - len(body.lstrip(" \t").expandtabs(settings.indent_width))
+                content_indent = len(body.expandtabs(settings.indent_width)) - len(body.lstrip(ascii_whitespace.SPACE_AND_TAB).expandtabs(settings.indent_width))
                 if not body.strip() or content_indent <= base_indent:
                     break
                 preserved.add(index)

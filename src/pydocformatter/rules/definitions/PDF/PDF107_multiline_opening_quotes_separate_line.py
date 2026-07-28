@@ -18,7 +18,7 @@ import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase
-from pydocformatter.rules.definition_helpers import string_literals
+from pydocformatter.rules.definition_helpers import ascii_whitespace, string_literals
 from pydocformatter.rules.definitions.PDF.PDF import PDF
 from pydocformatter.rules.models import FixAvailability, RuleCacheBehavior, RuleCheckKind, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
 
@@ -86,7 +86,7 @@ def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo, *, co
         return None
     canonical_margin = PDF_definition.docstring_canonical_margin(docstring, context=context, source_lines=source_lines)
     first_line = docstring.structure.lines[0]
-    moved_text = first_line.raw_text.lstrip(" \t")
+    moved_text = first_line.raw_text.lstrip(ascii_whitespace.SPACE_AND_TAB)
     output_lines = (
         PDF_definition.DocstringOutputLine(source="", value=""),
         PDF_definition.DocstringOutputLine(source=f"{canonical_margin}{moved_text}", value=f"{canonical_margin}{moved_text}"),
@@ -110,7 +110,7 @@ def _planned_fast_body_change(
     first_line_source, rest_source = _split_first_body_line(body_source)
     if first_line_source is None:
         return None
-    moved_text = first_line_source.lstrip(" \t")
+    moved_text = first_line_source.lstrip(ascii_whitespace.SPACE_AND_TAB)
     moved_source = f"{PDF_definition.docstring_canonical_margin(docstring, context=context, source_lines=context.source_lines)}{moved_text}"
     replacement_body = f"{context.line_ending}{moved_source}{context.line_ending}{rest_source}"
     expected_value = PDF_definition.docstring_output_expected_value(output_lines, preserve_trailing_newline=PDF_definition.docstring_value_ends_with_newline(docstring))

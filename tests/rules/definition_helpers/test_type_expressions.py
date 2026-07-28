@@ -107,3 +107,25 @@ def test_ast_helpers_process_deep_parsed_types_iteratively() -> None:
 def test_normalized_type_like_text_preserves_structure() -> None:
     """Normalize token spacing while retaining qualified union operands."""
     assert type_expressions.normalized_type_like_text("dict[ str, list[int|pkg.Type ] ]") == "dict[str, list[int | pkg.Type]]"
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [("int.", "int"), ("list[int] .", "list[int]"), ('"pkg.Model".', '"pkg.Model"'), ("(int)", "int"), ("(((list[int])))", "list[int]"), ("none", "None"), ("(none).", "None"), ("(((str))).", "str")],
+)
+def test_normalized_type_spelling_text_applies_supported_defects(text: str, expected: str) -> None:
+    """Compose period, grouping, and exact lowercase-none normalization."""
+    assert type_expressions.normalized_type_spelling_text(text) == expected
+
+
+@pytest.mark.parametrize("text", ["None", "NONE", "Factory().", "int, str", "[int]", '("Value")', "((none.))", "()"])
+def test_normalized_type_spelling_text_rejects_unsupported_or_unchanged_forms(text: str) -> None:
+    """Leave broader policy, malformed forms, and quoted grouping untouched."""
+    assert type_expressions.normalized_type_spelling_text(text) is None
+
+
+@pytest.mark.parametrize("text", ["Mapping[\\fstr, object ]", "(( int\\v ))", "int\\f."])
+def test_type_normalizers_reject_nonstandard_whitespace_and_controls(text: str) -> None:
+    """Leave nonstandard whitespace and suspicious controls to PDF004."""
+    assert type_expressions.normalized_type_like_text(text) is None
+    assert type_expressions.normalized_type_spelling_text(text) is None

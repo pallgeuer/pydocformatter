@@ -50,6 +50,16 @@ def test_preserves_noncanonical_section_name_case_when_moving_trailing_content()
     assert not format_source(result.new_source).modified
 
 
+def test_preserves_nonstandard_whitespace_in_moved_section_content() -> None:
+    """Leave suspicious same-line content unchanged for PDF004."""
+    source = 'def function(value):\n    """Summary.\n\n    Args: \\u200bvalue: Description.\n    """\n'
+    result = format_source(source)
+
+    assert result.new_source == source
+    assert not result.fixed_findings
+    assert not result.unfixed_findings
+
+
 def test_does_not_treat_summary_with_section_like_prefix_as_trailing_section_content() -> None:
     source = 'def function(value):\n    """Returns: True when the value is enabled."""\n'
     result = format_source(source)

@@ -12,7 +12,7 @@ import pydocformatter.rules.registration as rule_registration
 from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase
-from pydocformatter.rules.definition_helpers import docstring_conventions, rest_fields, section_edits
+from pydocformatter.rules.definition_helpers import ascii_whitespace, docstring_conventions, rest_fields, section_edits
 from pydocformatter.rules.definitions.PDF.PDF import PDF
 from pydocformatter.rules.models import FixAvailability, RuleCacheBehavior, RuleCheckKind, RuleMetadata
 
@@ -76,4 +76,4 @@ def _violations(context: RuleContext, *, rule: RuleMetadata) -> tuple[rule_viola
 
 def _section_has_content(docstring: PDF_definition.DocstringInfo, section: PDF_definition.DocstringSection) -> bool:
     """Return whether a section body contains non-whitespace text."""
-    return any(line.text.strip(" \t") for line in docstring.structure.lines[section.content_start_line : section.end_line])
+    return any(line.text.strip(ascii_whitespace.SPACE_AND_TAB) for line in docstring.structure.lines[section.content_start_line : section.end_line])

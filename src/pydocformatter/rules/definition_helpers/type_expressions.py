@@ -16,7 +16,7 @@ import dataclasses
 from typing import TYPE_CHECKING
 
 # First-party imports
-from pydocformatter.rules.definition_helpers import module_bindings
+from pydocformatter.rules.definition_helpers import ascii_whitespace, module_bindings, unicode_safety
 
 
 if TYPE_CHECKING:
@@ -136,7 +136,9 @@ def normalized_type_like_text(text: str) -> str | None:
         str | None: Normalized type text when spacing can be changed safely, or None when the text should be left
             unchanged.
     """
-    stripped = text.strip()
+    if unicode_safety.has_nonstandard_whitespace_or_control(text):
+        return None
+    stripped = text.strip(ascii_whitespace.SPACE_AND_TAB)
     validated = _validated_type_tokens(stripped)
     if validated is None or validated.has_grouping:
         return None
@@ -152,6 +154,34 @@ def normalized_type_like_text(text: str) -> str | None:
     if reparsed is None or ast_dump(parsed) != ast_dump(reparsed):
         return None
     return normalized
+
+
+def normalized_type_spelling_text(text: str) -> str | None:
+    """Return conservatively normalized docstring type spelling.
+
+    Args:
+        text (str): Semantic parsed type-slot text.
+
+    Returns:
+        str | None: Normalized spelling when a supported defect is present, or None otherwise.
+    """
+    if unicode_safety.has_nonstandard_whitespace_or_control(text):
+        return None
+    normalized = text
+    if normalized.endswith("."):
+        candidate = normalized[:-1].rstrip(ascii_whitespace.SPACE_AND_TAB)
+        if is_type_like_text(candidate) or is_quoted_type_like_text(candidate):
+            normalized = candidate
+    while normalized.startswith("(") and normalized.endswith(")"):
+        candidate = normalized[1:-1].strip(ascii_whitespace.SPACE_AND_TAB)
+        parsed = parse_type_like_expr(normalized)
+        candidate_parsed = parse_type_like_expr(candidate)
+        if parsed is None or candidate_parsed is None or ast_dump(parsed) != ast_dump(candidate_parsed):
+            break
+        normalized = candidate
+    if normalized == "none":
+        normalized = "None"
+    return normalized if normalized != text else None
 
 
 def comparable_type_dump(text: str, *, aliases: TypeAliasMap | None = None) -> str | None:

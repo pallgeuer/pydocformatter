@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 # First-party imports
 import pydocformatter.rules.edits as rule_edits
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
-from pydocformatter.rules.definition_helpers import terminal_punctuation
+from pydocformatter.rules.definition_helpers import ascii_whitespace, terminal_punctuation
 
 
 if TYPE_CHECKING:
@@ -68,7 +68,7 @@ def _planned_change(target: PDF_definition.SummaryLineTarget, context: RuleConte
     line = target.line
     if not PDF_definition.is_safely_mapped_simple_docstring(docstring):
         return None
-    terminal_offset = line.start_offset + len(line.raw_text.rstrip(" \t"))
+    terminal_offset = line.start_offset + len(line.raw_text.rstrip(ascii_whitespace.SPACE_AND_TAB))
     start_offset = terminal_offset if expected_terminal is None else terminal_offset - 1
     value_lines = [line.raw_text for line in docstring.structure.lines]
     line_start = start_offset - line.start_offset

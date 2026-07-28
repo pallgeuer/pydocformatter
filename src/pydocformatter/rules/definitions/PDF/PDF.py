@@ -29,6 +29,7 @@ from pydocformatter import docs_urls
 from pydocformatter.cli import settings_check
 from pydocformatter.rules.definition import RuleCategoryBase
 from pydocformatter.rules.definition_helpers import (
+    ascii_whitespace,
     colon_boundaries,
     docstring_sections,
     exception_names,
@@ -167,6 +168,7 @@ class ConventionEntryIssueKind(enum.Enum):
     Attributes:
         GOOGLE_UNBALANCED_TYPE: Google entry with an unbalanced parenthesized type.
         GOOGLE_UNBALANCED_METHOD_SIGNATURE: Google method entry with an unbalanced signature.
+        GOOGLE_MISSING_TYPE: Google entry with empty type parentheses.
         GOOGLE_MISSING_SEPARATOR: Google entry without the colon before its description.
         GOOGLE_ENTRY_INDENTATION: Complete Google entry not indented beyond its section header.
         GOOGLE_CONTINUATION_INDENTATION: Google description line not indented beyond its entry.
@@ -181,6 +183,7 @@ class ConventionEntryIssueKind(enum.Enum):
 
     GOOGLE_UNBALANCED_TYPE = "google-unbalanced-type"
     GOOGLE_UNBALANCED_METHOD_SIGNATURE = "google-unbalanced-method-signature"
+    GOOGLE_MISSING_TYPE = "google-missing-type"
     GOOGLE_MISSING_SEPARATOR = "google-missing-separator"
     GOOGLE_ENTRY_INDENTATION = "google-entry-indentation"
     GOOGLE_CONTINUATION_INDENTATION = "google-continuation-indentation"
@@ -213,6 +216,7 @@ class ConventionEntryIssue:
 _CONVENTION_ENTRY_ISSUE_PRECEDENCE: Mapping[ConventionEntryIssueKind, int] = MappingProxyType({
     ConventionEntryIssueKind.GOOGLE_UNBALANCED_TYPE: 1,
     ConventionEntryIssueKind.GOOGLE_UNBALANCED_METHOD_SIGNATURE: 1,
+    ConventionEntryIssueKind.GOOGLE_MISSING_TYPE: 1,
     ConventionEntryIssueKind.GOOGLE_MISSING_SEPARATOR: 2,
     ConventionEntryIssueKind.GOOGLE_ENTRY_INDENTATION: 3,
     ConventionEntryIssueKind.GOOGLE_CONTINUATION_INDENTATION: 4,
@@ -257,6 +261,38 @@ class DocstringValueLine:
 
 
 @dataclasses.dataclass(frozen=True)
+class DocstringTypeSlot:
+    """Source spans for one parsed convention type slot.
+
+    Attributes:
+        line_index (int): Logical docstring value line that owns the type slot.
+        full_start_column (int): Start column of the complete convention type slot.
+        full_end_column (int): Exclusive end column of the complete convention type slot.
+        semantic_start_column (int): Start column of the semantic type spelling.
+        semantic_end_column (int): Exclusive end column of the semantic type spelling.
+    """
+
+    line_index: int
+    full_start_column: int
+    full_end_column: int
+    semantic_start_column: int
+    semantic_end_column: int
+
+
+@dataclasses.dataclass(frozen=True)
+class DocstringTypeInfo:
+    """Semantic text and optional source span for one parsed convention type.
+
+    Attributes:
+        text (str): Semantic type text without outer convention spaces or tabs.
+        slot (DocstringTypeSlot | None): Source-mapped convention slot, if one is available.
+    """
+
+    text: str
+    slot: DocstringTypeSlot | None
+
+
+@dataclasses.dataclass(frozen=True)
 class DocstringEntry:
     """One parsed convention section entry or reST field.
 
@@ -264,7 +300,7 @@ class DocstringEntry:
         kind (DocstringEntryKind): Semantic documentation role inferred from the section or field name.
         names (tuple[str, ...]): Parameter, exception, warning, attribute, or field argument names documented by this
             entry.
-        type_text (str | None): Parsed type annotation text supplied by the docstring convention, if present.
+        type_info (DocstringTypeInfo | None): Semantic parsed type and its optional source slot.
         description (str): Entry description text after the entry head.
         description_lines (tuple[DocstringTextFragment, ...]): Source-mapped fragments that make up the parsed entry
             description.
@@ -278,7 +314,7 @@ class DocstringEntry:
 
     kind: DocstringEntryKind
     names: tuple[str, ...]
-    type_text: str | None
+    type_info: DocstringTypeInfo | None
     description: str
     description_lines: tuple[DocstringTextFragment, ...]
     start_line: int
@@ -295,12 +331,16 @@ class DocstringTextFragment:
     Attributes:
         text (str): Fragment text after semantic indentation trimming.
         line_index (int): Logical docstring value line that owns the fragment.
+        full_start_offset (int): Start offset of the pre-trim fragment span in the evaluated docstring value.
+        full_end_offset (int): End offset of the pre-trim fragment span in the evaluated docstring value.
         start_offset (int): Start offset of the fragment in the evaluated docstring value.
         end_offset (int): End offset of the fragment in the evaluated docstring value.
     """
 
     text: str
     line_index: int
+    full_start_offset: int
+    full_end_offset: int
     start_offset: int
     end_offset: int
 
@@ -1374,6 +1414,8 @@ def _match_google_entry(text: str, *, require_indent: bool = True) -> _Conventio
         type_text = regex_match.group("type")
         if type_text is None:
             return _entry_match_from_regex(regex_match)
+        if not type_text.strip(ascii_whitespace.SPACE_AND_TAB):
+            return None
         opening = regex_match.start("type") - 1
         if opening >= 0 and text[opening] == "(" and _balanced_delimiter_end(text, opening) == regex_match.end("type"):
             return _entry_match_from_regex(regex_match)
@@ -1382,20 +1424,20 @@ def _match_google_entry(text: str, *, require_indent: bool = True) -> _Conventio
         return None
     tail_start = candidate.start("tail")
     opening = tail_start
-    while opening < len(text) and text[opening] in " \t":
+    while opening < len(text) and text[opening] in ascii_whitespace.SPACE_AND_TAB:
         opening += 1
     if opening >= len(text) or text[opening] != "(":
         return None
     closing = _balanced_delimiter_end(text, opening)
-    if closing is None or not text[opening + 1 : closing].strip():
+    if closing is None or not text[opening + 1 : closing].strip(ascii_whitespace.SPACE_AND_TAB):
         return None
     colon = closing + 1
-    while colon < len(text) and text[colon] in " \t":
+    while colon < len(text) and text[colon] in ascii_whitespace.SPACE_AND_TAB:
         colon += 1
     if colon >= len(text) or text[colon] != ":":
         return None
     description_start = colon + 1
-    while description_start < len(text) and text[description_start] in " \t":
+    while description_start < len(text) and text[description_start] in ascii_whitespace.SPACE_AND_TAB:
         description_start += 1
     return _ConventionEntryMatch(
         indent=candidate.group("indent"),
@@ -1425,12 +1467,12 @@ def _match_google_method_entry(text: str, *, require_indent: bool = True) -> _Co
         return None
     candidate, opening, closing = signature
     colon = closing + 1
-    while colon < len(text) and text[colon] in " \t":
+    while colon < len(text) and text[colon] in ascii_whitespace.SPACE_AND_TAB:
         colon += 1
     if colon >= len(text) or text[colon] != ":":
         return None
     description_start = colon + 1
-    while description_start < len(text) and text[description_start] in " \t":
+    while description_start < len(text) and text[description_start] in ascii_whitespace.SPACE_AND_TAB:
         description_start += 1
     return _ConventionEntryMatch(
         indent=candidate.group("indent"),
@@ -1474,7 +1516,7 @@ def _match_method_signature_head(text: str, *, require_indent: bool) -> tuple[re
     if candidate is None or (require_indent and not candidate.group("indent")):
         return None
     opening = candidate.start("tail")
-    while opening < len(text) and text[opening] in " \t":
+    while opening < len(text) and text[opening] in ascii_whitespace.SPACE_AND_TAB:
         opening += 1
     if opening >= len(text) or text[opening] != "(":
         return None
@@ -1506,6 +1548,23 @@ def _entry_match_from_regex(regex_match: re.Match[str]) -> _ConventionEntryMatch
         signature_text=None,
         description=regex_match.group("description"),
         description_start=regex_match.start("description"),
+    )
+
+
+def _type_info(line_index: int, text: str, full_start_column: int, full_end_column: int) -> DocstringTypeInfo | None:
+    """Return parsed type text and convention-space-trimmed source bounds."""
+    full_text = text[full_start_column:full_end_column]
+    leading = len(full_text) - len(full_text.lstrip(ascii_whitespace.SPACE_AND_TAB))
+    trailing = len(full_text) - len(full_text.rstrip(ascii_whitespace.SPACE_AND_TAB))
+    semantic_start_column = full_start_column + leading
+    semantic_end_column = full_end_column - trailing
+    if semantic_start_column >= semantic_end_column:
+        return None
+    return DocstringTypeInfo(
+        text=text[semantic_start_column:semantic_end_column],
+        slot=DocstringTypeSlot(
+            line_index=line_index, full_start_column=full_start_column, full_end_column=full_end_column, semantic_start_column=semantic_start_column, semantic_end_column=semantic_end_column
+        ),
     )
 
 
@@ -1826,6 +1885,8 @@ class _DocstringParser:
             entry_end = self._entry_end(index, end, text_layout.leading_width(match.indent))
             name = match.name.strip()
             type_text = match.type_text
+            type_start = match.type_start
+            type_end = match.type_end
             first_description = match.description.strip()
             description_fragments = []
             first_description_line = self._reflow_line_from_text_span(index, match.description_start, len(self.lines[index].text))
@@ -1840,10 +1901,20 @@ class _DocstringParser:
             if kind in {DocstringEntryKind.RETURN, DocstringEntryKind.YIELD} and type_text is None:
                 names = ()
                 type_text = name
+                type_start = match.name_start
+                type_end = match.name_end
+            type_info = (
+                _type_info(index, text, type_start, type_end)
+                if type_text is not None
+                and type_start is not None
+                and type_end is not None
+                and kind in {DocstringEntryKind.PARAMETER, DocstringEntryKind.RETURN, DocstringEntryKind.YIELD, DocstringEntryKind.ATTRIBUTE, DocstringEntryKind.METHOD}
+                else None
+            )
             entry = DocstringEntry(
                 kind=kind,
                 names=names,
-                type_text=type_text.strip() if type_text else None,
+                type_info=type_info if type_info is not None else DocstringTypeInfo(text=type_text.strip(), slot=None) if type_text else None,
                 description=" ".join(description_lines).strip(),
                 description_lines=tuple(description_fragments),
                 start_line=index,
@@ -1884,7 +1955,7 @@ class _DocstringParser:
                     description_fragments.extend(self._stripped_reflow_lines(index + 1, entry_end, skip_empty=True))
                     description_lines = [line.text for line in description_fragments]
                     entry = DocstringEntry(
-                        kind=kind, names=names, type_text=None, description=" ".join(description_lines), description_lines=tuple(description_fragments), start_line=index, end_line=entry_end
+                        kind=kind, names=names, type_info=None, description=" ".join(description_lines), description_lines=tuple(description_fragments), start_line=index, end_line=entry_end
                     )
                     entries.append(entry)
                     if not description_lines and entry_end == index + 1:
@@ -1902,7 +1973,7 @@ class _DocstringParser:
                 continue
             method_match = _match_numpy_method_entry(text) if kind is DocstringEntryKind.METHOD else None
             if method_match is not None:
-                entry = self._numpy_continuation_entry(index, end, kind=kind, names=(method_match.name.strip(),), type_text=None, entry_indent=text_layout.leading_width(method_match.indent))
+                entry = self._numpy_continuation_entry(index, end, kind=kind, names=(method_match.name.strip(),), type_info=None, entry_indent=text_layout.leading_width(method_match.indent))
                 entries.append(entry)
                 index = entry.end_line
                 continue
@@ -1912,7 +1983,19 @@ class _DocstringParser:
                 if names is None:
                     index = self._entry_end(index, end, text_layout.leading_width(match.group("indent")))
                     continue
-                entry = self._numpy_continuation_entry(index, end, kind=kind, names=names, type_text=match.group("type").strip(), entry_indent=text_layout.leading_width(match.group("indent")))
+                type_info = (
+                    _type_info(index, text, match.start("type"), match.end("type"))
+                    if kind in {DocstringEntryKind.PARAMETER, DocstringEntryKind.RETURN, DocstringEntryKind.YIELD, DocstringEntryKind.ATTRIBUTE, DocstringEntryKind.METHOD}
+                    else None
+                )
+                entry = self._numpy_continuation_entry(
+                    index,
+                    end,
+                    kind=kind,
+                    names=names,
+                    type_info=type_info if type_info is not None else DocstringTypeInfo(text=match.group("type").strip(), slot=None),
+                    entry_indent=text_layout.leading_width(match.group("indent")),
+                )
                 entries.append(entry)
                 index = entry.end_line
                 continue
@@ -1929,10 +2012,15 @@ class _DocstringParser:
                         continue
                 else:
                     names = ()
+                type_info = (
+                    _type_info(index, text, len(text) - len(text.lstrip(ascii_whitespace.SPACE_AND_TAB)), len(text.rstrip(ascii_whitespace.SPACE_AND_TAB)))
+                    if kind in {DocstringEntryKind.RETURN, DocstringEntryKind.YIELD}
+                    else None
+                )
                 entry = DocstringEntry(
                     kind=kind,
                     names=names,
-                    type_text=None if is_exception_name_entry_kind(kind) else text.strip(),
+                    type_info=None if is_exception_name_entry_kind(kind) else type_info if type_info is not None else DocstringTypeInfo(text=text.strip(), slot=None),
                     description=" ".join(description_lines),
                     description_lines=tuple(description_fragments),
                     start_line=index,
@@ -1955,12 +2043,12 @@ class _DocstringParser:
             index += 1
         return tuple(entries)
 
-    def _numpy_continuation_entry(self, index: int, end: int, *, kind: DocstringEntryKind, names: tuple[str, ...], type_text: str | None, entry_indent: int) -> DocstringEntry:
+    def _numpy_continuation_entry(self, index: int, end: int, *, kind: DocstringEntryKind, names: tuple[str, ...], type_info: DocstringTypeInfo | None, entry_indent: int) -> DocstringEntry:
         """Parse a NumPy entry whose description begins on a continuation line."""
         entry_end = self._entry_end(index, end, entry_indent)
         description_fragments = tuple(self._stripped_reflow_lines(index + 1, entry_end, skip_empty=True))
         description_lines = tuple(line.text for line in description_fragments)
-        entry = DocstringEntry(kind=kind, names=names, type_text=type_text, description=" ".join(description_lines), description_lines=description_fragments, start_line=index, end_line=entry_end)
+        entry = DocstringEntry(kind=kind, names=names, type_info=type_info, description=" ".join(description_lines), description_lines=description_fragments, start_line=index, end_line=entry_end)
         if not description_lines and entry_end == index + 1:
             self._record_numpy_continuation_issue(index + 1, end, entry=entry, entry_indent=text_layout.leading_width(self.lines[index].raw_indent))
         if description_lines:
@@ -1979,7 +2067,7 @@ class _DocstringParser:
         match = (_METHOD_ENTRY_CANDIDATE_RE if kind is DocstringEntryKind.METHOD else _GOOGLE_CANDIDATE_RE).match(self.lines[index].text)
         if (
             is_exception_name_entry_kind(kind)
-            and (match is None or not match.group("tail").lstrip(" \t").startswith("("))
+            and (match is None or not match.group("tail").lstrip(ascii_whitespace.SPACE_AND_TAB).startswith("("))
             and (exception_names := _google_exception_missing_separator_names(self.lines[index].text)) is not None
         ):
             self._record_convention_entry_issue(ConventionEntryIssue(kind=ConventionEntryIssueKind.GOOGLE_MISSING_SEPARATOR, start_line=index, names=exception_names))
@@ -1987,7 +2075,7 @@ class _DocstringParser:
         if match is None:
             return
         name = match.group("name")
-        tail = match.group("tail").lstrip(" \t")
+        tail = match.group("tail").lstrip(ascii_whitespace.SPACE_AND_TAB)
         names = (name,)
         if not tail.startswith("("):
             if is_exception_name_entry_kind(kind) or tail.startswith(":") or not self._google_name_is_credible(kind, name, closed_parenthesized=False):
@@ -1999,8 +2087,12 @@ class _DocstringParser:
                 if not self._google_name_is_credible(kind, name, closed_parenthesized=False):
                     return
                 issue_kind = ConventionEntryIssueKind.GOOGLE_UNBALANCED_METHOD_SIGNATURE if kind is DocstringEntryKind.METHOD else ConventionEntryIssueKind.GOOGLE_UNBALANCED_TYPE
+            elif not tail[1:closing].strip(ascii_whitespace.SPACE_AND_TAB):
+                if not self._google_name_is_credible(kind, name, closed_parenthesized=True):
+                    return
+                issue_kind = ConventionEntryIssueKind.GOOGLE_MISSING_TYPE
             else:
-                after_type = tail[closing + 1 :].lstrip(" \t")
+                after_type = tail[closing + 1 :].lstrip(ascii_whitespace.SPACE_AND_TAB)
                 if after_type.startswith(":") or not self._google_name_is_credible(kind, name, closed_parenthesized=True):
                     return
                 issue_kind = ConventionEntryIssueKind.GOOGLE_MISSING_SEPARATOR
@@ -2036,7 +2128,7 @@ class _DocstringParser:
         text = self.lines[index].text
         stripped = text.strip()
         if kind is DocstringEntryKind.METHOD and (method_candidate := _METHOD_ENTRY_CANDIDATE_RE.fullmatch(text)) is not None:
-            tail = method_candidate.group("tail").lstrip(" \t")
+            tail = method_candidate.group("tail").lstrip(ascii_whitespace.SPACE_AND_TAB)
             if tail.startswith("(") and _balanced_delimiter_end(tail, 0) is None and self._numpy_names_are_credible(kind, (method_candidate.group("name"),)):
                 self._record_convention_entry_issue(ConventionEntryIssue(kind=ConventionEntryIssueKind.NUMPY_UNBALANCED_METHOD_SIGNATURE, start_line=index, names=(method_candidate.group("name"),)))
                 return
@@ -2108,7 +2200,7 @@ class _DocstringParser:
 
     def _missing_rest_delimiter_issue(self, index: int) -> ConventionEntryIssue | None:
         """Return a recognized reStructuredText field missing its closing delimiter."""
-        text = self.lines[index].text.lstrip(" \t")
+        text = self.lines[index].text.lstrip(ascii_whitespace.SPACE_AND_TAB)
         if not text.startswith(":") or text.startswith("::"):
             return None
         field_match = re.match(r":(?P<field>[\w-]+)(?=$|[ \t])", text)
@@ -2155,15 +2247,29 @@ class _DocstringParser:
         else:
             reflow_runs.extend(continuation_runs)
         description_lines = [line.text for line in description_fragments]
+        description = " ".join(description_lines).strip()
         issue_kind = _rest_field_arity_issue(field, argument)
         entry: DocstringEntry | None = None
         if issue_kind is None:
             kind, names, type_text = _rest_entry_metadata(field, argument)
+            type_info = None
+            if docstring_sections.is_rest_type_field(field) and description:
+                inline_type_info = _type_info(start, self.lines[start].text, match.start("description"), match.end("description"))
+                type_info = (
+                    inline_type_info
+                    if len(description_fragments) == 1 and description_fragments[0].line_index == start and inline_type_info is not None
+                    else DocstringTypeInfo(text=description, slot=None)
+                )
+            elif kind is DocstringEntryKind.PARAMETER and type_text is not None and names and (raw_argument := match.group("argument")) is not None:
+                name_start = raw_argument.rfind(names[0])
+                if name_start > 0:
+                    full_type = raw_argument[:name_start].rstrip(ascii_whitespace.SPACE_AND_TAB)
+                    type_info = _type_info(start, self.lines[start].text, match.start("argument"), match.start("argument") + len(full_type))
             entry = DocstringEntry(
                 kind=kind,
                 names=names,
-                type_text=type_text,
-                description=" ".join(description_lines).strip(),
+                type_info=type_info if type_info is not None else DocstringTypeInfo(text=type_text, slot=None) if type_text is not None else None,
+                description=description,
                 description_lines=tuple(description_fragments),
                 start_line=start,
                 end_line=block_end,
@@ -2261,6 +2367,8 @@ class _DocstringParser:
     def _reflow_line_from_text_span(self, line_index: int, start_column: int, end_column: int) -> DocstringTextFragment | None:
         """Return a reflow line from a trimmed column span in evaluated text."""
         line = self.lines[line_index]
+        full_start_offset = value_offset_for_text_column(line, start_column)
+        full_end_offset = value_offset_for_text_column(line, end_column)
         while start_column < end_column and unicode_safety.is_layout_separator(line.text[start_column]):
             start_column += 1
         while end_column > start_column and unicode_safety.is_layout_separator(line.text[end_column - 1]):
@@ -2269,7 +2377,9 @@ class _DocstringParser:
             return None
         start_offset = value_offset_for_text_column(line, start_column)
         end_offset = value_offset_for_text_column(line, end_column)
-        return DocstringTextFragment(text=line.text[start_column:end_column], line_index=line_index, start_offset=start_offset, end_offset=end_offset)
+        return DocstringTextFragment(
+            text=line.text[start_column:end_column], line_index=line_index, full_start_offset=full_start_offset, full_end_offset=full_end_offset, start_offset=start_offset, end_offset=end_offset
+        )
 
     def _fence_end(self, start: int, end: int, opening: str) -> int:
         """Return the end index for a fenced code block."""
@@ -2446,7 +2556,7 @@ def _value_lines(value: str, *, source_line_number: int | None, source_indent: i
     lines: list[DocstringValueLine] = []
     for index, (line_start, line_end, raw_text) in enumerate(raw_lines):
         if index == 0:
-            text_raw_start_column = len(raw_text) - len(raw_text.lstrip(" \t"))
+            text_raw_start_column = len(raw_text) - len(raw_text.lstrip(ascii_whitespace.SPACE_AND_TAB))
             text_virtual_prefix_length = 0
             text = raw_text[text_raw_start_column:]
         else:
@@ -2458,8 +2568,8 @@ def _value_lines(value: str, *, source_line_number: int | None, source_indent: i
                 end_offset=line_end,
                 raw_text=raw_text,
                 text=text,
-                raw_indent=raw_text[: len(raw_text) - len(raw_text.lstrip(" \t"))],
-                text_indent=text[: len(text) - len(text.lstrip(" \t"))],
+                raw_indent=raw_text[: len(raw_text) - len(raw_text.lstrip(ascii_whitespace.SPACE_AND_TAB))],
+                text_indent=text[: len(text) - len(text.lstrip(ascii_whitespace.SPACE_AND_TAB))],
                 text_raw_start_column=text_raw_start_column,
                 text_virtual_prefix_length=text_virtual_prefix_length,
                 source_line_number=None if source_line_number is None else source_line_number + index,
@@ -2633,7 +2743,7 @@ def _google_none_value_entry(kind: DocstringEntryKind, text: str, *, start: int)
     """Return a Google return/yield entry for bare None spellings."""
     if kind not in {DocstringEntryKind.RETURN, DocstringEntryKind.YIELD} or not text[:1].isspace() or text.strip() not in {"None", "None."}:
         return None
-    return DocstringEntry(kind=kind, names=(), type_text="None", description="", description_lines=(), start_line=start, end_line=start + 1)
+    return DocstringEntry(kind=kind, names=(), type_info=DocstringTypeInfo(text="None", slot=None), description="", description_lines=(), start_line=start, end_line=start + 1)
 
 
 def _is_adornment(text: str) -> bool:
@@ -2707,7 +2817,7 @@ def docstring_canonical_margin(docstring: DocstringInfo, *, context: RuleContext
     """
     lines = source_lines if source_lines is not None else context.source_lines
     source_line = lines[docstring.range.start.line - 1]
-    line_indent = source_line[: len(source_line) - len(source_line.lstrip(" \t"))]
+    line_indent = source_line[: len(source_line) - len(source_line.lstrip(ascii_whitespace.SPACE_AND_TAB))]
     if isinstance(docstring.statement, cst.SimpleStatementSuite):
         return f"{line_indent}{text_layout.indent_unit(context.settings)}"
     prefix = source_line[: docstring.range.start.column]
@@ -2913,7 +3023,7 @@ def docstring_content_indexes(docstring: DocstringInfo) -> tuple[int, ...]:
     Returns:
         Zero-based logical line indexes that contain content other than spaces or tabs.
     """
-    return tuple(line.index for line in docstring.structure.lines if line.text.strip(" \t"))
+    return tuple(line.index for line in docstring.structure.lines if line.text.strip(ascii_whitespace.SPACE_AND_TAB))
 
 
 def docstring_value_line_numbers(lines: tuple[DocstringValueLine, ...]) -> tuple[int, ...]:
@@ -3061,7 +3171,7 @@ def first_non_adornment_line(docstring: DocstringInfo, start: int, end: int) -> 
     """
     for index in range(start, end):
         line = docstring.structure.lines[index]
-        if line.text.strip(" \t") and not is_adornment(line.text):
+        if line.text.strip(ascii_whitespace.SPACE_AND_TAB) and not is_adornment(line.text):
             return line
     return None
 
@@ -3079,7 +3189,7 @@ def final_non_adornment_line(docstring: DocstringInfo, start: int, end: int) -> 
     """
     for index in range(end - 1, start - 1, -1):
         line = docstring.structure.lines[index]
-        if line.text.strip(" \t") and not is_adornment(line.text):
+        if line.text.strip(ascii_whitespace.SPACE_AND_TAB) and not is_adornment(line.text):
             return line
     return None
 

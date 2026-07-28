@@ -9,22 +9,129 @@ Attributes:
 from __future__ import annotations
 
 # Standard library imports
+import dataclasses
 from typing import TYPE_CHECKING, cast
 
 # First-party imports
 import pydocformatter.rules.edits as rule_edits
 import pydocformatter.rules.violations as rule_violations
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
+from pydocformatter.rules.definition import RuleContext
+from pydocformatter.rules.definition_helpers import ascii_whitespace
+from pydocformatter.rules.models import RuleMetadata
 
 
 if TYPE_CHECKING:
     # First-party imports
-    from pydocformatter.rules.definition import RuleContext
     from pydocformatter.rules.definition_helpers import source_text, string_literals
-    from pydocformatter.rules.models import RuleMetadata
 
 
 SectionReplacementChange = rule_edits.PlannedSourceChange | tuple[rule_edits.PlannedSourceChange, ...]
+
+
+@dataclasses.dataclass(frozen=True)
+class _AccumulatedReplacement:
+    """One mapped replacement request against the immutable parsed docstring value."""
+
+    line: PDF_definition.DocstringValueLine
+    replacement: rule_edits.PlannedTextReplacement
+    text: str
+
+
+@dataclasses.dataclass(frozen=True)
+class _ReplacementRequest:
+    """One replacement request and its mapping outcome."""
+
+    replacement: _AccumulatedReplacement | None
+    line_numbers: tuple[int, ...]
+    message: str
+
+
+@dataclasses.dataclass
+class ReplacementAccumulator:
+    """Replacement state for one parsed docstring and rule.
+
+    Attributes:
+        docstring (PDF_definition.DocstringInfo): Parsed docstring whose text replacements are accumulated.
+        context (RuleContext): Current file context used to construct direct source edits.
+        rule (RuleMetadata): Rule metadata attached to the accumulated results.
+    """
+
+    docstring: PDF_definition.DocstringInfo
+    context: RuleContext
+    rule: RuleMetadata
+    _requests: list[_ReplacementRequest] = dataclasses.field(default_factory=list, init=False, repr=False)
+
+    def add(self, line: PDF_definition.DocstringValueLine, start_column: int, end_column: int, text: str, *, instance_message: str | None = None) -> None:
+        """Record one requested line-span replacement and its mapping result.
+
+        Args:
+            line (PDF_definition.DocstringValueLine): Parsed value line containing the replacement span.
+            start_column (int): Text-column start of the replacement span.
+            end_column (int): Text-column end of the replacement span.
+            text (str): Replacement text to write into the mapped span.
+            instance_message (str | None): Optional concrete diagnostic message for the replacement.
+        """
+        replacement = text_replacement(line, start_column, end_column, text)
+        self.add_replacement(line, replacement, text, instance_message=instance_message)
+
+    def add_replacement(self, line: PDF_definition.DocstringValueLine, replacement: rule_edits.PlannedTextReplacement | None, text: str, *, instance_message: str | None = None) -> None:
+        """Record one precomputed replacement and its mapping result.
+
+        Args:
+            line (PDF_definition.DocstringValueLine): Parsed value line containing the replacement span.
+            replacement (rule_edits.PlannedTextReplacement | None): Safely mapped replacement, or None if mapping
+                failed.
+            text (str): Replacement text to write into the mapped span.
+            instance_message (str | None): Optional concrete diagnostic message for the replacement.
+        """
+        message = self.rule.message if instance_message is None else instance_message
+        mapped_replacement = None if replacement is None else _AccumulatedReplacement(line=line, replacement=replacement, text=text)
+        self._requests.append(_ReplacementRequest(replacement=mapped_replacement, line_numbers=line_numbers(self.docstring, line), message=message))
+
+    def results(self) -> tuple[rule_violations.RuleViolation, ...]:
+        """Return violations for the accumulated fixable and unfixable replacements.
+
+        Returns:
+            tuple[rule_violations.RuleViolation, ...]: Fixable and diagnostic-only violations for the accumulated
+                replacements.
+        """
+        if not self._requests:
+            return ()
+        replacements = tuple(request.replacement for request in self._requests if request.replacement is not None)
+        replacement_line_numbers = [line_number for request in self._requests if request.replacement is not None for line_number in request.line_numbers]
+        unfixable_line_numbers = [line_number for request in self._requests if request.replacement is None for line_number in request.line_numbers]
+        replacement_messages = [request.message for request in self._requests if request.replacement is not None]
+        unfixable_messages = [request.message for request in self._requests if request.replacement is None]
+        ordered_replacements = tuple(sorted(replacements, key=lambda item: item.replacement.start_offset))
+        value_lines = _replacement_value_lines(self.docstring, replacements=ordered_replacements)
+        change = (
+            None
+            if value_lines is None
+            else _planned_replacement_changes(self.docstring, context=self.context, replacements=tuple(item.replacement for item in ordered_replacements), value_lines=value_lines)
+        )
+        return _replacement_results(
+            self.rule,
+            replacement_line_numbers=replacement_line_numbers,
+            unfixable_line_numbers=unfixable_line_numbers,
+            change=change,
+            replacement_messages=replacement_messages,
+            unfixable_messages=unfixable_messages,
+        )
+
+
+def _replacement_value_lines(docstring: PDF_definition.DocstringInfo, *, replacements: tuple[_AccumulatedReplacement, ...]) -> list[str] | None:
+    """Return original raw value lines with non-overlapping replacements applied right to left."""
+    previous_end = -1
+    for item in replacements:
+        replacement = item.replacement
+        if replacement.start_offset < previous_end:
+            return None
+        previous_end = replacement.end_offset
+    value_lines = [line.raw_text for line in docstring.structure.lines]
+    for item in reversed(replacements):
+        _replace_value_line_span(value_lines, item.line, item.replacement, item.text)
+    return value_lines
 
 
 def result(rule: RuleMetadata, line_numbers: tuple[int, ...] | list[int], *, change: rule_edits.PlannedSourceChange | None, instance_message: str | None = None) -> rule_violations.RuleViolation:
@@ -42,7 +149,7 @@ def result(rule: RuleMetadata, line_numbers: tuple[int, ...] | list[int], *, cha
     return rule_violations.violation_for_optional_planned_source_change(rule, change, line_numbers=tuple(dict.fromkeys(line_numbers)), instance_message=instance_message)
 
 
-def replacement_results(
+def _replacement_results(
     rule: RuleMetadata,
     *,
     replacement_line_numbers: list[int],
@@ -172,10 +279,10 @@ def section_name_start_column(line: PDF_definition.DocstringValueLine) -> int:
     Returns:
         int: First non-whitespace text column in the value line.
     """
-    return len(line.text) - len(line.text.lstrip(" \t"))
+    return len(line.text) - len(line.text.lstrip(ascii_whitespace.SPACE_AND_TAB))
 
 
-def replace_value_line_span(value_lines: list[str], line: PDF_definition.DocstringValueLine, replacement: rule_edits.PlannedTextReplacement, text: str) -> None:
+def _replace_value_line_span(value_lines: list[str], line: PDF_definition.DocstringValueLine, replacement: rule_edits.PlannedTextReplacement, text: str) -> None:
     """Apply a replacement to copied raw value lines.
 
     Args:
@@ -189,7 +296,7 @@ def replace_value_line_span(value_lines: list[str], line: PDF_definition.Docstri
     value_lines[line.index] = f"{value_lines[line.index][:raw_start_column]}{text}{value_lines[line.index][raw_end_column:]}"
 
 
-def planned_replacement_change(
+def _planned_replacement_change(
     docstring: PDF_definition.DocstringInfo, *, replacements: tuple[rule_edits.PlannedTextReplacement, ...], value_lines: list[str]
 ) -> rule_edits.PlannedSourceChange | None:
     """Return a safe whole-docstring replacement for section text replacements.
@@ -208,7 +315,7 @@ def planned_replacement_change(
     return PDF_definition.planned_simple_docstring_source_change(docstring, replacements=replacements, value_lines=value_lines)
 
 
-def planned_replacement_changes(
+def _planned_replacement_changes(
     docstring: PDF_definition.DocstringInfo, *, context: RuleContext, replacements: tuple[rule_edits.PlannedTextReplacement, ...], value_lines: list[str]
 ) -> SectionReplacementChange | None:
     """Return direct section source replacements with a whole-docstring fallback.
@@ -226,7 +333,7 @@ def planned_replacement_changes(
     direct_changes = _direct_replacement_changes(docstring, context=context, replacements=replacements)
     if direct_changes is not None:
         return direct_changes
-    return planned_replacement_change(docstring, replacements=replacements, value_lines=value_lines)
+    return _planned_replacement_change(docstring, replacements=replacements, value_lines=value_lines)
 
 
 def _direct_replacement_changes(

@@ -18,7 +18,7 @@ import pydocformatter.rules.registration as rule_registration
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase
-from pydocformatter.rules.definition_helpers import inline_markup, string_literals, text_layout
+from pydocformatter.rules.definition_helpers import ascii_whitespace, inline_markup, string_literals, text_layout
 from pydocformatter.rules.models import FixAvailability, RuleCacheBehavior, RuleCheckKind, RuleMetadata
 
 
@@ -331,7 +331,7 @@ def _fallback_line_prefix(source_lines: Sequence[str], *, docstring: PDF_definit
     """Return the generated body-line prefix when no prior body line exists."""
     source_line = source_lines[docstring.range.start.line - 1]
     if isinstance(docstring.statement, cst.SimpleStatementSuite):
-        source_indent = source_line[: len(source_line) - len(source_line.lstrip(" \t"))]
+        source_indent = source_line[: len(source_line) - len(source_line.lstrip(ascii_whitespace.SPACE_AND_TAB))]
         return f"{source_indent}{text_layout.indent_unit(context.settings)}"
     prefix = source_line[: docstring.range.start.column]
     return prefix if prefix.strip() == "" else " " * docstring.range.start.column

@@ -5,6 +5,23 @@ import pytest
 from pydocformatter.rules.definition_helpers import unicode_safety
 
 
+@pytest.mark.parametrize(("text", "expected"), [("plain text\t", False), ("line\nbreak", True), ("word\u00a0word", True), ("hazard\u202e", True), ("accepted\u200dformat", False)])
+def test_normalization_safety_guard_matches_shared_unicode_policy(text: str, expected: bool) -> None:
+    """Classify normalization barriers without producing diagnostic details."""
+    assert unicode_safety.has_nonstandard_whitespace_or_control(text) is expected
+
+
+def test_normalization_safety_guard_does_not_materialize_occurrences(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Avoid the detailed occurrence classifier for a Boolean safety check."""
+
+    def unexpected_classifier(text: str) -> tuple[unicode_safety.SuspiciousUnicodeOccurrence, ...]:
+        raise AssertionError(text)
+
+    monkeypatch.setattr(unicode_safety, "suspicious_unicode_occurrences", unexpected_classifier)
+
+    assert unicode_safety.has_nonstandard_whitespace_or_control("\x00")
+
+
 def test_every_reportable_code_point_has_exactly_one_stable_label() -> None:
     reportable = unicode_safety.INDENTATION_ONLY_CODE_POINTS | unicode_safety.EVERYWHERE_CODE_POINTS
 

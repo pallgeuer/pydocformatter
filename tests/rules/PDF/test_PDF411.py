@@ -5,9 +5,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 # First-party imports
-import pydocformatter.rules.definitions.PDF.PDF411_type_like_token_spacing_normalization as PDF411_definition
 from pydocformatter import formatter, rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention
+from pydocformatter.rules.definition_helpers import type_expressions
 from pydocformatter.rules.definitions.PDF.PDF409_docstring_entry_spacing import PDF409DocstringEntrySpacing
 from pydocformatter.rules.definitions.PDF.PDF410_exception_entry_normalization import PDF410ExceptionEntryNormalization
 from pydocformatter.rules.definitions.PDF.PDF411_type_like_token_spacing_normalization import PDF411TypeLikeTokenSpacingNormalization
@@ -52,6 +52,27 @@ def test_leaves_google_and_numpy_method_signature_arguments_unchanged() -> None:
     assert not numpy_result.unfixed_findings
 
 
+def test_normalizes_google_fallback_method_type_spacing() -> None:
+    """Normalize type slots on starred method entries that are not opaque signatures."""
+    source = 'class Client:\n    """Summary.\n\n    Methods:\n        *args ( Mapping[ str, object ]): Describe the fallback entry.\n    """\n'
+    result = format_source(source)
+
+    assert result.new_source == source.replace(" Mapping[ str, object ]", "Mapping[str, object]")
+    assert result.fixed_findings[PDF411TypeLikeTokenSpacingNormalization.meta] == 1
+    assert not format_source(result.new_source).modified
+
+
+def test_leaves_multiline_rest_type_spacing_unchanged_without_a_source_slot() -> None:
+    """Analyze continued type semantics without partially rewriting one line."""
+    source = 'def function(value):\n    """Summary.\n\n    :param value: Description.\n    :type value:\n        Mapping[ str, object ]\n    """\n'
+    settings = CheckSettings(select=("PDF411",), docstring_convention=DocstringConvention.REST)
+    result = format_source(source, settings=settings)
+
+    assert result.new_source == source
+    assert not result.fixed_findings
+    assert not result.unfixed_findings
+
+
 def test_normalizes_attribute_entry_type_spacing_in_attribute_docstring() -> None:
     source = 'value = 1\n"""Summary.\n\nAttributes:\n    child ( Mapping[ str, object ] ): Child.\n"""\n'
     result = format_source(source)
@@ -64,13 +85,13 @@ def test_normalizes_attribute_entry_type_spacing_in_attribute_docstring() -> Non
 
 def test_reuses_cached_type_like_normalization_for_repeated_text(monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[str] = []
-    original_normalizer = PDF411_definition._normalized_type_like_text
+    original_normalizer = type_expressions.normalized_type_like_text
 
     def counting_normalizer(text: str) -> str | None:
         calls.append(text)
         return original_normalizer(text)
 
-    monkeypatch.setattr(PDF411_definition, "_normalized_type_like_text", counting_normalizer)
+    monkeypatch.setattr(type_expressions, "normalized_type_like_text", counting_normalizer)
     source = 'def first(value):\n    """Summary.\n\n    Args:\n        value (Mapping[ str, Sequence[int  ]]): Description.\n\n    Returns:\n        dict[ str, Sequence[int | None  ]]: Result.\n    """\n\n\ndef second(value):\n    """Summary.\n\n    Args:\n        value (Mapping[ str, Sequence[int  ]]): Description.\n\n    Returns:\n        dict[ str, Sequence[int | None  ]]: Result.\n    """\n'
     settings = CheckSettings(select=("PDF411",), docstring_convention=DocstringConvention.GOOGLE)
     result = formatter.format_source(source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=False)
@@ -183,6 +204,16 @@ def test_leaves_unsupported_or_ambiguous_type_like_text_unchanged() -> None:
     assert not result.unfixed_findings
 
 
+def test_leaves_nonstandard_type_whitespace_unchanged() -> None:
+    """Leave control-bounded type slots to PDF004."""
+    source = 'def function(value):\n    """Summary.\n\n    Args:\n        value (\\fMapping[ str, object ]\\f): Description.\n    """\n'
+    result = format_source(source)
+
+    assert result.new_source == source
+    assert not result.fixed_findings
+    assert not result.unfixed_findings
+
+
 def test_leaves_top_level_tuple_and_list_expressions_unchanged() -> None:
     numpy_source = 'def function(value):\n    """Summary.\n\n    Returns\n    -------\n    int, str\n        Result.\n    """\n'
     google_source = 'def function(value):\n    """Summary.\n\n    Returns:\n        [ int ]: Result.\n    """\n'
@@ -240,6 +271,26 @@ def test_reports_unsafe_type_like_spacing_without_fixing() -> None:
     assert tuple(finding.rule for finding in result.unfixed_findings) == (PDF411TypeLikeTokenSpacingNormalization.meta,)
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((2, 3, 4),)
     assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring type-like token spacing should be normalized",)
+
+
+def test_local_suppression_before_docstring_suppresses_type_spacing_fix() -> None:
+    """Honor complete-expression PDF suppression."""
+    source = 'def function(value):\n    # pydocfmt: ignore[PDF411]\n    """Summary.\n\n    Args:\n        value (Mapping[ str, object ]): Description.\n    """\n'
+    result = format_source(source)
+
+    assert result.new_source == source
+    assert not result.fixed_findings
+    assert not result.unfixed_findings
+
+
+def test_concatenated_docstring_component_suppresses_unsafe_type_spacing_finding() -> None:
+    """Honor complete-expression suppression for an otherwise unfixable mapping."""
+    source = 'def function(value):\n    ("Summary.\\n\\n"  # pydocfmt: ignore[PDF411]\n     "Args:\\n"\n     "    value (Mapping[ str, object ]): Description.")\n'
+    result = format_source(source)
+
+    assert result.new_source == source
+    assert not result.fixed_findings
+    assert not result.unfixed_findings
 
 
 def test_fixes_escaped_type_like_source_span() -> None:

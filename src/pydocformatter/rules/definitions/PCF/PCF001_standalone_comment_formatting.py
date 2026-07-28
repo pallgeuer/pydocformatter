@@ -19,7 +19,7 @@ import pydocformatter.rules.definition_helpers.comments as comment_helpers
 from pydocformatter.cli.settings_check import CommentTaskMarkerMode
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase
-from pydocformatter.rules.definition_helpers import colon_boundaries, inline_markup, text_layout
+from pydocformatter.rules.definition_helpers import ascii_whitespace, colon_boundaries, inline_markup, text_layout
 from pydocformatter.rules.models import FixAvailability, RuleCacheBehavior, RuleCheckKind, RuleMetadata
 
 
@@ -175,7 +175,7 @@ def _format_task_marker(
     """Return the extent and hanging-indented output of one task marker."""
     first_body = run.comments[index].body
     first_prefix = f"{match.marker}:"
-    texts = [_SemanticLine(text=first_body[len(first_prefix) :].lstrip(" \t"), has_following_newline=_has_following_newline(data, run.comments[index]))]
+    texts = [_SemanticLine(text=first_body[len(first_prefix) :].lstrip(ascii_whitespace.SPACE_AND_TAB), has_following_newline=_has_following_newline(data, run.comments[index]))]
     end = index + 1
     while end < len(run.comments) and end not in preserved:
         continuation = comment_helpers.task_marker_continuation_text(run.comments[end].body.rstrip(), marker=match.marker)

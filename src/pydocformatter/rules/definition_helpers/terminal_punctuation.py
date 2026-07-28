@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING
 # First-party imports
 import pydocformatter.rules.violations as rule_violations
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
+from pydocformatter.rules.definition_helpers import ascii_whitespace
 
 
 if TYPE_CHECKING:
@@ -106,7 +107,7 @@ def violation(
     Returns:
         Terminal-punctuation violation, or None when the target text already complies.
     """
-    trimmed = text.rstrip(" \t")
+    trimmed = text.rstrip(ascii_whitespace.SPACE_AND_TAB)
     if not trimmed or trimmed.endswith(("\\", *policy.valid_endings)):
         return None
     if trimmed.endswith(tuple(policy.nonfixable_endings)):

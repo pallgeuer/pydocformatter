@@ -47,6 +47,11 @@ def reflow_texts(lines: tuple[DocstringTextFragment, ...]) -> tuple[str, ...]:
     return tuple(line.text for line in lines)
 
 
+def entry_type_text(entry: PDF_definition.DocstringEntry) -> str | None:
+    """Return semantic type text from one parsed entry."""
+    return None if entry.type_info is None else entry.type_info.text
+
+
 def category_context(source: str, *, settings: CheckSettings | None = None) -> RuleCategoryContext:
     module = cst.parse_module(source)
     metadata_wrapper = cst_metadata.MetadataWrapper(module, unsafe_skip_copy=True)
@@ -605,6 +610,17 @@ def test_reflow_region_lines_carry_description_offsets_when_text_matches_prefix(
     assert region.lines[0].start_offset != value.index("x:")
 
 
+def test_description_fragments_preserve_full_pretrim_value_offsets() -> None:
+    """Retain exact evaluated boundaries without storing rule-specific safety state."""
+    value = "Returns:\n    int: \u2003The return value.\u2003"
+    structure = structure_for(value, settings=CheckSettings(docstring_convention=DocstringConvention.GOOGLE))
+    fragment = structure.entries[0].description_lines[0]
+
+    assert fragment.text == "The return value."
+    assert value[fragment.full_start_offset : fragment.full_end_offset] == "\u2003The return value.\u2003"
+    assert value[fragment.start_offset : fragment.end_offset] == fragment.text
+
+
 def test_trailing_evaluated_newline_does_not_create_a_phantom_logical_line() -> None:
     docstring = PDF.prepare(category_context(r'"""Summary.\n"""' + "\n")).docstrings[0]
     assert docstring.value_lines == ("Summary.",)
@@ -828,7 +844,7 @@ def test_all_google_section_names_are_recognized(name: str) -> None:
 def test_google_parameter_entries_support_stars_dotted_names_types_and_empty_descriptions() -> None:
     value = "Args:\n    *args (tuple[str, ...]): Positional values.\n    **kwargs (dict[str, object]):\n        Keyword values.\n    model.value: Untyped dotted name."
     structure = structure_for(value, settings=CheckSettings(docstring_convention=DocstringConvention.GOOGLE))
-    assert tuple((entry.names, entry.type_text, entry.description, entry.start_line, entry.end_line) for entry in structure.entries) == (
+    assert tuple((entry.names, entry_type_text(entry), entry.description, entry.start_line, entry.end_line) for entry in structure.entries) == (
         (("*args",), "tuple[str, ...]", "Positional values.", 1, 2),
         (("**kwargs",), "dict[str, object]", "Keyword values.", 2, 4),
         (("model.value",), None, "Untyped dotted name.", 4, 5),
@@ -838,13 +854,46 @@ def test_google_parameter_entries_support_stars_dotted_names_types_and_empty_des
 def test_google_parameter_entries_support_mild_spacing_around_type_and_colon() -> None:
     value = "Args:\n    value   ( int ) : Description."
     structure = structure_for(value, settings=CheckSettings(docstring_convention=DocstringConvention.GOOGLE))
-    assert tuple((entry.names, entry.type_text, entry.description, entry.start_line, entry.end_line) for entry in structure.entries) == ((("value",), "int", "Description.", 1, 2),)
+    assert tuple((entry.names, entry_type_text(entry), entry.description, entry.start_line, entry.end_line) for entry in structure.entries) == ((("value",), "int", "Description.", 1, 2),)
+
+
+def test_google_entries_expose_parser_owned_type_slot_spans() -> None:
+    """Expose complete and semantic Google type spans without reparsing entry lines."""
+    value = "Args:\n    value (  list[int]  ): Description."
+    structure = structure_for(value, settings=CheckSettings(docstring_convention=DocstringConvention.GOOGLE))
+    entry = structure.entries[0]
+    type_info = entry.type_info
+
+    assert type_info is not None
+    slot = type_info.slot
+    assert slot is not None
+    line = structure.lines[slot.line_index]
+    assert line.text[slot.full_start_column : slot.full_end_column] == "  list[int]  "
+    assert line.text[slot.semantic_start_column : slot.semantic_end_column] == "list[int]"
+    assert type_info.text == "list[int]"
+
+
+def test_google_fallback_method_entries_expose_parser_owned_type_slot_spans() -> None:
+    """Expose type slots for starred method entries that cannot be opaque signatures."""
+    value = "Methods:\n    *args (  list[int]  ): Description."
+    structure = structure_for(value, settings=CheckSettings(docstring_convention=DocstringConvention.GOOGLE))
+    entry = structure.entries[0]
+    type_info = entry.type_info
+
+    assert entry.kind is DocstringEntryKind.METHOD
+    assert type_info is not None
+    slot = type_info.slot
+    assert slot is not None
+    line = structure.lines[slot.line_index]
+    assert line.text[slot.full_start_column : slot.full_end_column] == "  list[int]  "
+    assert line.text[slot.semantic_start_column : slot.semantic_end_column] == "list[int]"
+    assert type_info.text == "list[int]"
 
 
 def test_google_parameter_entries_support_balanced_nested_type_delimiters() -> None:
     value = 'Args:\n    callback (Callable[[tuple[int, str]], Literal[")"]]): Description.'
     structure = structure_for(value, settings=CheckSettings(docstring_convention=DocstringConvention.GOOGLE))
-    assert tuple((entry.names, entry.type_text, entry.description, entry.start_line, entry.end_line) for entry in structure.entries) == (
+    assert tuple((entry.names, entry_type_text(entry), entry.description, entry.start_line, entry.end_line) for entry in structure.entries) == (
         (("callback",), 'Callable[[tuple[int, str]], Literal[")"]]', "Description.", 1, 2),
     )
 
@@ -903,7 +952,7 @@ def test_malformed_entry_detection_skips_protected_google_content() -> None:
 def test_google_section_names_determine_entry_semantics(section: str, entry_text: str, expected_kind: DocstringEntryKind, expected_names: tuple[str, ...], expected_type: str | None) -> None:
     structure = structure_for(f"{section}:\n    {entry_text}", settings=CheckSettings(docstring_convention=DocstringConvention.GOOGLE))
     entry = structure.entries[0]
-    assert (entry.kind, entry.names, entry.type_text) == (expected_kind, expected_names, expected_type)
+    assert (entry.kind, entry.names, entry_type_text(entry)) == (expected_kind, expected_names, expected_type)
 
 
 def test_google_method_signatures_are_names_with_opaque_balanced_arguments() -> None:
@@ -915,10 +964,11 @@ def test_google_method_signatures_are_names_with_opaque_balanced_arguments() -> 
         settings=CheckSettings(docstring_convention=DocstringConvention.GOOGLE),
     )
 
-    assert tuple((entry.kind, entry.names, entry.type_text, entry.description) for entry in structure.entries) == (
+    assert tuple((entry.kind, entry.names, entry_type_text(entry), entry.description) for entry in structure.entries) == (
         (DocstringEntryKind.METHOD, ("run",), None, "Execute it."),
         (DocstringEntryKind.METHOD, ("convert",), None, "Convert it."),
     )
+    assert all(entry.type_info is None for entry in structure.entries)
 
 
 @pytest.mark.parametrize(
@@ -927,7 +977,9 @@ def test_google_method_signatures_are_names_with_opaque_balanced_arguments() -> 
 )
 def test_google_return_and_yield_sections_parse_bare_none_as_empty_typed_entry(section: str, entry_text: str, expected_kind: DocstringEntryKind) -> None:
     structure = structure_for(f"{section}:\n    {entry_text}", settings=CheckSettings(docstring_convention=DocstringConvention.GOOGLE))
-    assert tuple((entry.kind, entry.names, entry.type_text, entry.description, entry.start_line, entry.end_line) for entry in structure.entries) == ((expected_kind, (), "None", "", 1, 2),)
+    assert tuple((entry.kind, entry.names, entry_type_text(entry), entry.description, entry.start_line, entry.end_line) for entry in structure.entries) == ((expected_kind, (), "None", "", 1, 2),)
+    assert structure.entries[0].type_info is not None
+    assert structure.entries[0].type_info.slot is None
     assert structure.reflow_regions == ()
 
 
@@ -946,7 +998,7 @@ def test_google_return_yield_and_raise_entries_preserve_generic_looking_type_tex
     structure = structure_for(f"{section}:\n    {entry_text}", settings=CheckSettings(docstring_convention=DocstringConvention.GOOGLE))
     entry = structure.entries[0]
 
-    assert (entry.kind, entry.names, entry.type_text, entry.description) == (expected_kind, expected_names, expected_type, entry_text.rpartition(":")[2].strip())
+    assert (entry.kind, entry.names, entry_type_text(entry), entry.description) == (expected_kind, expected_names, expected_type, entry_text.rpartition(":")[2].strip())
 
 
 def test_google_malformed_exception_entry_skips_continuation_before_later_entry() -> None:
@@ -980,7 +1032,7 @@ def test_google_section_headers_and_entries_inside_code_fences_are_opaque() -> N
     value = "Args:\n    value: Description.\n\n```text\nReturns:\n    fake: Not an entry.\n```\n\nReturns:\n    str: Real result."
     structure = structure_for(value, settings=CheckSettings(docstring_convention=DocstringConvention.GOOGLE))
     assert tuple((section.name, section.start_line, section.end_line) for section in structure.sections) == (("Args", 0, 8), ("Returns", 8, 10))
-    assert tuple((entry.kind, entry.names, entry.type_text, entry.description) for entry in structure.entries) == (
+    assert tuple((entry.kind, entry.names, entry_type_text(entry), entry.description) for entry in structure.entries) == (
         (DocstringEntryKind.PARAMETER, ("value",), None, "Description."),
         (DocstringEntryKind.RETURN, (), "str", "Real result."),
     )
@@ -1008,7 +1060,7 @@ def test_indented_google_section_headers_are_recognized_as_malformed_sections() 
     structure = structure_for(value, settings=CheckSettings(docstring_convention=DocstringConvention.GOOGLE))
 
     assert tuple(section.name for section in structure.sections) == ("Args", "Returns")
-    assert tuple((entry.kind, entry.names, entry.type_text, entry.description) for entry in structure.entries) == (
+    assert tuple((entry.kind, entry.names, entry_type_text(entry), entry.description) for entry in structure.entries) == (
         (DocstringEntryKind.PARAMETER, ("value",), None, "Description."),
         (DocstringEntryKind.RETURN, (), "str", "Result."),
     )
@@ -1056,7 +1108,7 @@ def test_google_sections_parse_entries_and_reflow_descriptions() -> None:
     source = 'def function(value):\n    """Summary.\n\n    Args:\n        value (int): A value described on\n            two physical lines.\n\n    Returns:\n        str: The result.\n    """\n'
     structure = PDF.prepare(category_context(source, settings=CheckSettings(docstring_convention=DocstringConvention.GOOGLE))).docstrings[0].structure
     assert tuple(section.name for section in structure.sections) == ("Args", "Returns")
-    assert tuple((entry.kind, entry.names, entry.type_text, entry.description) for entry in structure.entries) == (
+    assert tuple((entry.kind, entry.names, entry_type_text(entry), entry.description) for entry in structure.entries) == (
         (DocstringEntryKind.PARAMETER, ("value",), "int", "A value described on two physical lines."),
         (DocstringEntryKind.RETURN, (), "str", "The result."),
     )
@@ -1068,7 +1120,7 @@ def test_numpy_sections_are_only_parsed_for_numpy_convention() -> None:
     numpy = PDF.prepare(category_context(source, settings=CheckSettings(docstring_convention=DocstringConvention.NUMPY))).docstrings[0].structure
     google = PDF.prepare(category_context(source, settings=CheckSettings(docstring_convention=DocstringConvention.GOOGLE))).docstrings[0].structure
     assert tuple(section.name for section in numpy.sections) == ("Parameters",)
-    assert tuple((entry.kind, entry.names, entry.type_text, entry.description) for entry in numpy.entries) == ((DocstringEntryKind.PARAMETER, ("value",), "int", "A value."),)
+    assert tuple((entry.kind, entry.names, entry_type_text(entry), entry.description) for entry in numpy.entries) == ((DocstringEntryKind.PARAMETER, ("value",), "int", "A value."),)
     assert google.sections == ()
 
 
@@ -1077,7 +1129,7 @@ def test_indented_numpy_section_headers_are_recognized_as_malformed_sections() -
     structure = structure_for(value, settings=CheckSettings(docstring_convention=DocstringConvention.NUMPY))
 
     assert tuple(section.name for section in structure.sections) == ("Parameters", "Returns")
-    assert tuple((entry.kind, entry.names, entry.type_text, entry.description) for entry in structure.entries) == (
+    assert tuple((entry.kind, entry.names, entry_type_text(entry), entry.description) for entry in structure.entries) == (
         (DocstringEntryKind.PARAMETER, ("value",), "int", "Description."),
         (DocstringEntryKind.RETURN, (), "str", "Result."),
     )
@@ -1091,7 +1143,7 @@ def test_numpy_section_header_variants_are_recognized(header: str) -> None:
     section = structure.sections[0]
     assert section.name == header.splitlines()[0]
     assert section.header_line == 0
-    assert section.entries[0].type_text == "int"
+    assert entry_type_text(section.entries[0]) == "int"
 
 
 @pytest.mark.parametrize(
@@ -1138,7 +1190,7 @@ def test_all_numpy_section_names_are_recognized(name: str) -> None:
 def test_numpy_parameter_entries_support_multiple_names_stars_and_multiline_descriptions() -> None:
     value = "Parameters\n----------\nx, y : int | None\n    First description line.\n    Second description line.\n*args : tuple[str, ...]\n    Positional values.\n**kwargs : dict[str, object]"
     structure = structure_for(value, settings=CheckSettings(docstring_convention=DocstringConvention.NUMPY))
-    assert tuple((entry.names, entry.type_text, entry.description, entry.start_line, entry.end_line) for entry in structure.entries) == (
+    assert tuple((entry.names, entry_type_text(entry), entry.description, entry.start_line, entry.end_line) for entry in structure.entries) == (
         (("x", "y"), "int | None", "First description line. Second description line.", 2, 5),
         (("*args",), "tuple[str, ...]", "Positional values.", 5, 7),
         (("**kwargs",), "dict[str, object]", "", 7, 8),
@@ -1149,11 +1201,31 @@ def test_numpy_parameter_entries_support_multiple_names_stars_and_multiline_desc
     )
 
 
+def test_numpy_entries_expose_named_bare_and_legacy_method_type_slots() -> None:
+    """Expose NumPy type slots while keeping signature-shaped methods opaque."""
+    value = (
+        "Parameters\n----------\nvalue :  list[int]  \n    Value.\n\n"
+        "Returns\n-------\n  dict[str, int]  \n    Mapping.\n\n"
+        "Methods\n-------\nconnect(value: int)\n    Connect.\nclose : Callable[[], None]\n    Close."
+    )
+    structure = structure_for(value, settings=CheckSettings(docstring_convention=DocstringConvention.NUMPY))
+    type_infos = tuple(entry.type_info for entry in structure.entries)
+    slots = tuple(type_info.slot if type_info is not None else None for type_info in type_infos)
+
+    assert tuple(type_info.text if type_info is not None else None for type_info in type_infos) == ("list[int]", "dict[str, int]", None, "Callable[[], None]")
+    assert tuple(structure.lines[slot.line_index].text[slot.full_start_column : slot.full_end_column] if slot is not None else None for slot in slots) == (
+        "list[int]  ",
+        "dict[str, int]",
+        None,
+        "Callable[[], None]",
+    )
+
+
 def test_numpy_section_headers_and_entries_inside_code_fences_are_opaque() -> None:
     value = "Parameters\n----------\nx : int\n    Description.\n\n```text\nReturns\n-------\nfake : entry\n```\n\nReturns\n-------\nstr\n    Real result."
     structure = structure_for(value, settings=CheckSettings(docstring_convention=DocstringConvention.NUMPY))
     assert tuple((section.name, section.start_line, section.end_line) for section in structure.sections) == (("Parameters", 0, 11), ("Returns", 11, 15))
-    assert tuple((entry.kind, entry.names, entry.type_text, entry.description) for entry in structure.entries) == (
+    assert tuple((entry.kind, entry.names, entry_type_text(entry), entry.description) for entry in structure.entries) == (
         (DocstringEntryKind.PARAMETER, ("x",), "int", "Description."),
         (DocstringEntryKind.RETURN, (), "str", "Real result."),
     )
@@ -1184,7 +1256,7 @@ def test_numpy_section_headers_and_entries_inside_code_fences_are_opaque() -> No
 def test_numpy_section_names_determine_entry_semantics(section: str, entry_text: str, expected_kind: DocstringEntryKind, expected_names: tuple[str, ...], expected_type: str | None) -> None:
     structure = structure_for(f"{section}\n{'-' * len(section)}\n{entry_text}\n    Description.", settings=CheckSettings(docstring_convention=DocstringConvention.NUMPY))
     entry = structure.entries[0]
-    assert (entry.kind, entry.names, entry.type_text, entry.description) == (expected_kind, expected_names, expected_type, "Description.")
+    assert (entry.kind, entry.names, entry_type_text(entry), entry.description) == (expected_kind, expected_names, expected_type, "Description.")
 
 
 def test_numpy_method_signatures_are_names_with_opaque_balanced_arguments() -> None:
@@ -1199,7 +1271,7 @@ convert(value: tuple[int, str], mode=Literal[")", "safe"])
         settings=CheckSettings(docstring_convention=DocstringConvention.NUMPY),
     )
 
-    assert tuple((entry.kind, entry.names, entry.type_text, entry.description) for entry in structure.entries) == (
+    assert tuple((entry.kind, entry.names, entry_type_text(entry), entry.description) for entry in structure.entries) == (
         (DocstringEntryKind.METHOD, ("colorspace",), None, "Represent the photo."),
         (DocstringEntryKind.METHOD, ("convert",), None, "Convert it."),
     )
@@ -1222,7 +1294,7 @@ def test_numpy_exception_colon_entry_parses_as_exception_description_not_type() 
     structure = structure_for("Raises\n------\n`ValueError` | errors.CustomError : Bad value.", settings=CheckSettings(docstring_convention=DocstringConvention.NUMPY))
     entry = structure.entries[0]
 
-    assert (entry.kind, entry.names, entry.type_text, entry.description) == (DocstringEntryKind.EXCEPTION, ("ValueError", "errors.CustomError"), None, "Bad value.")
+    assert (entry.kind, entry.names, entry_type_text(entry), entry.description) == (DocstringEntryKind.EXCEPTION, ("ValueError", "errors.CustomError"), None, "Bad value.")
 
 
 def test_numpy_malformed_exception_entry_skips_continuation_before_later_entry() -> None:
@@ -1240,7 +1312,7 @@ def test_numpy_malformed_exception_entry_skips_continuation_before_later_entry()
 
 def test_numpy_bare_return_without_description_does_not_create_reflow_region() -> None:
     structure = structure_for("Returns\n-------\nstr", settings=CheckSettings(docstring_convention=DocstringConvention.NUMPY))
-    assert tuple((entry.names, entry.type_text, entry.description) for entry in structure.entries) == (((), "str", ""),)
+    assert tuple((entry.names, entry_type_text(entry), entry.description) for entry in structure.entries) == (((), "str", ""),)
     assert structure.reflow_regions == ()
 
 
@@ -1258,7 +1330,7 @@ def test_numpy_return_yield_and_raise_entries_preserve_generic_looking_type_text
     structure = structure_for(f"{section}\n{'-' * len(section)}\n{entry_text}\n    Description.", settings=CheckSettings(docstring_convention=DocstringConvention.NUMPY))
     entry = structure.entries[0]
 
-    assert (entry.kind, entry.names, entry.type_text, entry.description) == (expected_kind, expected_names, expected_type, "Description.")
+    assert (entry.kind, entry.names, entry_type_text(entry), entry.description) == (expected_kind, expected_names, expected_type, "Description.")
 
 
 def test_section_block_contains_header_entries_blanks_and_generic_children() -> None:
@@ -1319,22 +1391,62 @@ def test_rest_field_aliases_map_to_semantic_entry_kinds(field: str, expected_kin
 def test_typed_rest_parameter_fields_split_type_from_name(field: str, expected_names: tuple[str, ...], expected_type: str) -> None:
     structure = structure_for(field, settings=CheckSettings(docstring_convention=DocstringConvention.REST))
     entry = structure.entries[0]
-    assert (entry.kind, entry.names, entry.type_text, entry.description) == (DocstringEntryKind.PARAMETER, expected_names, expected_type, "Description.")
+    assert (entry.kind, entry.names, entry_type_text(entry), entry.description) == (DocstringEntryKind.PARAMETER, expected_names, expected_type, "Description.")
+
+
+def test_rest_entries_expose_inline_and_type_field_slots() -> None:
+    """Expose reStructuredText inline and orphan type-field spans."""
+    structure = structure_for(":param  list[int]  value: Description.\n:rtype:  dict[str, int]  ", settings=CheckSettings(docstring_convention=DocstringConvention.REST))
+    type_infos = tuple(entry.type_info for entry in structure.entries)
+    slots = tuple(type_info.slot if type_info is not None else None for type_info in type_infos)
+
+    assert tuple(type_info.text if type_info is not None else None for type_info in type_infos) == ("list[int]", "dict[str, int]")
+    assert tuple(structure.lines[slot.line_index].text[slot.full_start_column : slot.full_end_column] if slot is not None else None for slot in slots) == ("list[int]", "dict[str, int]  ")
+
+
+def test_rest_multiline_type_fields_preserve_complete_semantics_without_slots() -> None:
+    """Keep complete continued type text while withholding partial source spans."""
+    structure = structure_for(":type value:\n    list[str]\n:rtype: tuple[\n    str, int]", settings=CheckSettings(docstring_convention=DocstringConvention.REST))
+    type_infos = tuple(entry.type_info for entry in structure.entries)
+
+    assert tuple(type_info.text if type_info is not None else None for type_info in type_infos) == ("list[str]", "tuple[ str, int]")
+    assert all(type_info is not None and type_info.slot is None for type_info in type_infos)
 
 
 @pytest.mark.parametrize(
-    ("field", "expected_kind", "expected_names", "expected_description"),
+    ("convention", "value"),
     [
-        (":rtype: Mapping[str, Sequence[int]]", DocstringEntryKind.RETURN, (), "Mapping[str, Sequence[int]]"),
-        (":ytype: Iterator[tuple[str, int | None]]", DocstringEntryKind.YIELD, (), "Iterator[tuple[str, int | None]]"),
-        (":raises mypkg.errors.CustomError: Bad value.", DocstringEntryKind.EXCEPTION, ("mypkg.errors.CustomError",), "Bad value."),
+        (DocstringConvention.GOOGLE, "Args:\n    value (\f((none)).\f): Description."),
+        (DocstringConvention.NUMPY, "Returns\n-------\n\v((none)).\v\n    Description."),
+        (DocstringConvention.REST, ":rtype: \f((none)).\f"),
     ],
 )
-def test_rest_return_yield_and_raise_fields_preserve_generic_looking_type_text(field: str, expected_kind: DocstringEntryKind, expected_names: tuple[str, ...], expected_description: str) -> None:
+def test_type_slots_preserve_suspicious_control_characters(convention: DocstringConvention, value: str) -> None:
+    """Keep form feeds and vertical tabs inside semantic type text for PDF004."""
+    structure = structure_for(value, settings=CheckSettings(docstring_convention=convention))
+    type_info = structure.entries[0].type_info
+
+    assert type_info is not None
+    slot = type_info.slot
+    assert slot is not None
+    assert type_info.text in {"\f((none)).\f", "\v((none)).\v"}
+
+
+@pytest.mark.parametrize(
+    ("field", "expected_kind", "expected_names", "expected_type", "expected_description"),
+    [
+        (":rtype: Mapping[str, Sequence[int]]", DocstringEntryKind.RETURN, (), "Mapping[str, Sequence[int]]", "Mapping[str, Sequence[int]]"),
+        (":ytype: Iterator[tuple[str, int | None]]", DocstringEntryKind.YIELD, (), "Iterator[tuple[str, int | None]]", "Iterator[tuple[str, int | None]]"),
+        (":raises mypkg.errors.CustomError: Bad value.", DocstringEntryKind.EXCEPTION, ("mypkg.errors.CustomError",), None, "Bad value."),
+    ],
+)
+def test_rest_return_yield_and_raise_fields_preserve_generic_looking_type_text(
+    field: str, expected_kind: DocstringEntryKind, expected_names: tuple[str, ...], expected_type: str | None, expected_description: str
+) -> None:
     structure = structure_for(field, settings=CheckSettings(docstring_convention=DocstringConvention.REST))
     entry = structure.entries[0]
 
-    assert (entry.kind, entry.names, entry.type_text, entry.description) == (expected_kind, expected_names, None, expected_description)
+    assert (entry.kind, entry.names, entry_type_text(entry), entry.description) == (expected_kind, expected_names, expected_type, expected_description)
 
 
 @pytest.mark.parametrize(
@@ -1603,9 +1715,9 @@ def test_rest_field_metadata_preserves_field_names_and_arguments_for_rule_helper
     value = ":PARAM int value: Description.\n:type value: int\n:meta private: yes\n:raises errors.ValueError: Bad value."
     structure = structure_for(value, settings=CheckSettings(docstring_convention=DocstringConvention.REST))
 
-    assert tuple((entry.field_name, entry.field_argument, entry.names, entry.type_text, entry.description) for entry in structure.entries) == (
+    assert tuple((entry.field_name, entry.field_argument, entry.names, entry_type_text(entry), entry.description) for entry in structure.entries) == (
         ("param", "int value", ("value",), "int", "Description."),
-        ("type", "value", ("value",), None, "int"),
+        ("type", "value", ("value",), "int", "int"),
         ("meta", "private", ("private",), None, "yes"),
         ("raises", "errors.ValueError", ("errors.ValueError",), None, "Bad value."),
     )
@@ -1686,4 +1798,4 @@ def test_complex_mixed_structure_partitions_lines_and_orders_semantic_regions() 
     assert all(structure.lines[region.start_line].start_offset == region.start_offset for region in structure.reflow_regions)
     assert all(structure.lines[region.end_line - 1].end_offset == region.end_offset for region in structure.reflow_regions)
     assert tuple(section.name for section in structure.sections) == ("Args", "Returns")
-    assert tuple((entry.names, entry.type_text) for entry in structure.entries) == ((("value",), None), (("other",), None), ((), "tuple[str, int]"))
+    assert tuple((entry.names, entry_type_text(entry)) for entry in structure.entries) == ((("value",), None), (("other",), None), ((), "tuple[str, int]"))

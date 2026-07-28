@@ -13,7 +13,7 @@ import pydocformatter.rules.registration as rule_registration
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase
-from pydocformatter.rules.definition_helpers import text_layout
+from pydocformatter.rules.definition_helpers import ascii_whitespace, text_layout
 from pydocformatter.rules.models import FixAvailability, RuleCacheBehavior, RuleCheckKind, RuleMetadata
 
 
@@ -68,7 +68,7 @@ def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo) -> ru
     line = docstring.structure.lines[0]
     if not text_layout.has_space_tab_content(line.raw_text):
         return None
-    whitespace_end = len(line.raw_text) - len(line.raw_text.lstrip(" \t"))
+    whitespace_end = len(line.raw_text) - len(line.raw_text.lstrip(ascii_whitespace.SPACE_AND_TAB))
     if whitespace_end == 0:
         return None
     return _validated_change(docstring, line, whitespace_end=whitespace_end, replacement_text="") or _validated_change(docstring, line, whitespace_end=whitespace_end, replacement_text=" ")

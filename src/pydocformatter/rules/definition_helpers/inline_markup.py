@@ -15,7 +15,7 @@ from collections.abc import Sequence
 from typing import Protocol
 
 # First-party imports
-from pydocformatter.rules.definition_helpers import unicode_safety
+from pydocformatter.rules.definition_helpers import ascii_whitespace, unicode_safety
 
 
 _BARE_URL_RE = re.compile(r"(?i)^(?:[a-z][a-z0-9+.-]*://|www\.)\S+$")
@@ -514,7 +514,7 @@ def _parse_markdown_link(text: str, start: int, *, delimiter_index: _DelimiterIn
 def _markdown_inline_end(text: str, opening: int, *, delimiter_index: _DelimiterIndex) -> tuple[int | None, InlineRewriteBarrierKind | None]:
     """Return the end of a bounded Markdown inline-link destination and title."""
     index = opening + 1
-    while index < len(text) and text[index] in " \t":
+    while index < len(text) and text[index] in ascii_whitespace.SPACE_AND_TAB:
         index += 1
     if index >= len(text):
         return None, InlineRewriteBarrierKind.INCOMPLETE_MARKDOWN_INLINE_DESTINATION
@@ -555,7 +555,7 @@ def _markdown_inline_end(text: str, opening: int, *, delimiter_index: _Delimiter
         return None, InlineRewriteBarrierKind.INCOMPLETE_MARKDOWN_INLINE_DESTINATION
     if not text[index].isspace():
         return None, InlineRewriteBarrierKind.MALFORMED_MARKDOWN_INLINE_DESTINATION
-    while index < len(text) and text[index] in " \t":
+    while index < len(text) and text[index] in ascii_whitespace.SPACE_AND_TAB:
         index += 1
     if index >= len(text):
         return None, InlineRewriteBarrierKind.INCOMPLETE_MARKDOWN_INLINE_DESTINATION
@@ -573,7 +573,7 @@ def _markdown_inline_end(text: str, opening: int, *, delimiter_index: _Delimiter
     if index >= len(text):
         return None, InlineRewriteBarrierKind.INCOMPLETE_MARKDOWN_LINK_TITLE
     index += 1
-    while index < len(text) and text[index] in " \t":
+    while index < len(text) and text[index] in ascii_whitespace.SPACE_AND_TAB:
         index += 1
     if index >= len(text) or text[index] != ")":
         return None, InlineRewriteBarrierKind.INCOMPLETE_MARKDOWN_INLINE_LINK

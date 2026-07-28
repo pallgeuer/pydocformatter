@@ -13,7 +13,7 @@ import pydocformatter.rules.registration as rule_registration
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase
-from pydocformatter.rules.definition_helpers import inline_markup, text_layout
+from pydocformatter.rules.definition_helpers import ascii_whitespace, inline_markup, text_layout
 from pydocformatter.rules.models import FixAvailability, RuleCacheBehavior, RuleCheckKind, RuleMetadata
 
 
@@ -74,7 +74,7 @@ def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo) -> ru
     for line in docstring.structure.lines:
         if not text_layout.has_space_tab_content(line.raw_text) or not _has_following_evaluated_newline(docstring, line):
             continue
-        trailing_start = len(line.raw_text.rstrip(" \t"))
+        trailing_start = len(line.raw_text.rstrip(ascii_whitespace.SPACE_AND_TAB))
         if trailing_start == len(line.raw_text):
             continue
         line_fragments = fragments[line.start_offset : line.end_offset]

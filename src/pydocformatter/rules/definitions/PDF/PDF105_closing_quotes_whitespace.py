@@ -16,7 +16,7 @@ import pydocformatter.rules.registration as rule_registration
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase
-from pydocformatter.rules.definition_helpers import text_layout
+from pydocformatter.rules.definition_helpers import ascii_whitespace, text_layout
 from pydocformatter.rules.models import FixAvailability, RuleCacheBehavior, RuleCheckKind, RuleMetadata
 
 
@@ -71,7 +71,7 @@ def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo) -> ru
     line = docstring.structure.lines[-1]
     if not PDF_definition.is_same_line_closing_delimiter_prefix(docstring, line) or not text_layout.has_space_tab_content(line.raw_text):
         return None
-    content_end = len(line.raw_text.rstrip(" \t"))
+    content_end = len(line.raw_text.rstrip(ascii_whitespace.SPACE_AND_TAB))
     if content_end == len(line.raw_text):
         return None
     return (

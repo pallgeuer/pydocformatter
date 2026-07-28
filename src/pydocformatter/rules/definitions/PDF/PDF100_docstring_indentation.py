@@ -16,7 +16,7 @@ import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 from pydocformatter.cli import settings_check
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase
-from pydocformatter.rules.definition_helpers import string_literals, text_layout
+from pydocformatter.rules.definition_helpers import ascii_whitespace, string_literals, text_layout
 from pydocformatter.rules.models import FixAvailability, RuleCacheBehavior, RuleCheckKind, RuleMetadata
 
 
@@ -138,7 +138,7 @@ def _target_blank_line(raw_text: str, *, canonical_margin: str) -> str:
 
 def _has_indentation_content(raw_text: str) -> bool:
     """Return whether a line has content safe to include in indentation normalization."""
-    content = raw_text.lstrip(" \t")
+    content = raw_text.lstrip(ascii_whitespace.SPACE_AND_TAB)
     return bool(content) and not content[:1].isspace()
 
 
@@ -206,7 +206,7 @@ def _source_for_target_line(line: PDF_definition.DocstringValueLine, target: _Li
     _, raw_index, virtual_prefix = text_layout.strip_indent_with_mapping(line.raw_text, max(target.strip_width, 0))
     suffix = f"{' ' * virtual_prefix}{''.join(fragment.source for fragment in fragments[line.start_offset + raw_index : line.end_offset])}"
     if context.settings.indent_style == settings_check.IndentStyle.SPACE:
-        suffix_content = suffix.lstrip(" \t")
+        suffix_content = suffix.lstrip(ascii_whitespace.SPACE_AND_TAB)
         suffix = f"{_style_normalized_indent(suffix, context=context)}{suffix_content}"
     return f"{target.prefix}{suffix}"
 
@@ -222,7 +222,7 @@ def _space_normalized_target_text(target: _LineTarget, *, context: RuleContext) 
     """Return target text with residual leading tabs expanded after the generated prefix."""
     if target.prefix and target.raw_text.startswith(target.prefix):
         suffix = target.raw_text[len(target.prefix) :]
-        suffix_content = suffix.lstrip(" \t")
+        suffix_content = suffix.lstrip(ascii_whitespace.SPACE_AND_TAB)
         return f"{target.prefix}{_style_normalized_indent(suffix, context=context)}{suffix_content}"
-    content = target.raw_text.lstrip(" \t")
+    content = target.raw_text.lstrip(ascii_whitespace.SPACE_AND_TAB)
     return f"{_style_normalized_indent(target.raw_text, context=context)}{content}"
