@@ -103,6 +103,17 @@ class Client:
     def close(self): """close client"""; return None
 ```
 
+An unsupported escape in a concatenated docstring prevents a value-preserving rewrite, so the finding remains diagnostic:
+
+```pydocfmt-example
+[input]
+"bad \z" " words"
+
+[output=unchanged]
+[findings]
+PDF000: Line 1: Docstring literal should be normalized
+```
+
 Only a string-valued first expression in a module, class, or function body is a docstring. Concatenated strings used elsewhere, f-string expressions, raw strings containing literal backslash text, and already-normal simple docstrings are unchanged:
 
 ```pydocfmt-example

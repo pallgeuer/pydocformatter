@@ -13,11 +13,13 @@ import libcst as cst
 # First-party imports
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 import pydocformatter.rules.definition_helpers.decorators as decorator_helpers
-from pydocformatter.rules.definition_helpers import docstring_sections, missing_documentation
+from pydocformatter.cli.settings_check import DocstringConvention
+from pydocformatter.rules.definition_helpers import docstring_sections, missing_documentation, section_edits
 
 
 if TYPE_CHECKING:
     # First-party imports
+    import pydocformatter.rules.edits as rule_edits
     from pydocformatter.rules.definition import RuleContext
 
 
@@ -65,11 +67,14 @@ class DocumentedParameter:
         name (str): Parameter name as written in the docstring.
         comparison_name (str): Normalized name used to match a signature parameter.
         line_numbers (tuple[int, ...]): One-based source lines occupied by the docstring entry.
+        name_slot (PDF_definition.DocstringNameSlot | None): Parser-owned source span for the parameter name, if
+            available.
     """
 
     name: str
     comparison_name: str
     line_numbers: tuple[int, ...]
+    name_slot: PDF_definition.DocstringNameSlot | None
 
 
 @dataclasses.dataclass(frozen=True)
@@ -85,6 +90,19 @@ class ParameterOrderIssue:
     documented_parameter: DocumentedParameter
     signature_parameter: SignatureParameter
     preceding_signature_parameter: SignatureParameter
+
+
+@dataclasses.dataclass(frozen=True)
+class ParameterVariadicMarkerStyleIssue:
+    """One documented parameter whose variadic markers differ from the canonical style.
+
+    Attributes:
+        documented_parameter (DocumentedParameter): Documentation occurrence with noncanonical markers.
+        expected_name (str): Parameter spelling required by the active convention.
+    """
+
+    documented_parameter: DocumentedParameter
+    expected_name: str
 
 
 def signature_parameters(definition: PDF_definition.DefinitionInfo, *, context: RuleContext) -> tuple[SignatureParameter, ...]:
@@ -188,7 +206,11 @@ def _documented_parameters(docstring: PDF_definition.DocstringInfo, *, include_t
             continue
         line = docstring.structure.lines[entry.start_line]
         line_numbers = PDF_definition.docstring_line_numbers(docstring, line)
-        parameters.extend(DocumentedParameter(name=name, comparison_name=parameter_comparison_name(name), line_numbers=line_numbers) for name in entry.names if name)
+        parameters.extend(
+            DocumentedParameter(name=name, comparison_name=parameter_comparison_name(name, convention=docstring.structure.convention), line_numbers=line_numbers, name_slot=name_slot)
+            for name, name_slot in zip(entry.names, entry.name_slots, strict=True)
+            if name
+        )
     return tuple(parameters)
 
 
@@ -221,16 +243,64 @@ def parameter_order_issues(definition: PDF_definition.DefinitionInfo, docstring:
     return tuple(issues)
 
 
-def parameter_comparison_name(name: str) -> str:
+def parameter_variadic_marker_style_issues(
+    definition: PDF_definition.DefinitionInfo, docstring: PDF_definition.DocstringInfo, *, context: RuleContext
+) -> tuple[ParameterVariadicMarkerStyleIssue, ...]:
+    """Return parameter documentation whose variadic markers use the wrong style.
+
+    Args:
+        definition (PDF_definition.DefinitionInfo): Function definition whose signature provides canonical spelling.
+        docstring (PDF_definition.DocstringInfo): Parsed function docstring whose parameter names should be compared.
+        context (RuleContext): Current file context used to normalize signature parameters.
+
+    Returns:
+        tuple[ParameterVariadicMarkerStyleIssue, ...]: Matched parameter occurrences with noncanonical marker spelling.
+    """
+    parameters_by_name = {parameter.comparison_name: parameter for parameter in signature_parameters(definition, context=context)}
+    bare_rest_names = context.settings.docstring_convention is DocstringConvention.REST
+    return tuple(
+        ParameterVariadicMarkerStyleIssue(documented_parameter=documented_parameter, expected_name=expected_name)
+        for documented_parameter in documented_parameters(docstring)
+        for signature_parameter in (parameters_by_name.get(documented_parameter.comparison_name),)
+        if signature_parameter is not None
+        for expected_name in (signature_parameter.name if bare_rest_names else signature_parameter.display_name,)
+        if documented_parameter.name != expected_name
+    )
+
+
+def planned_parameter_name_change(docstring: PDF_definition.DocstringInfo, issue: ParameterVariadicMarkerStyleIssue, *, context: RuleContext) -> rule_edits.PlannedSourceChange | None:
+    """Return a safe source-local replacement for one noncanonical documented parameter name.
+
+    Args:
+        docstring (PDF_definition.DocstringInfo): Parsed docstring containing the mismatched occurrence.
+        issue (ParameterVariadicMarkerStyleIssue): Matched occurrence and its canonical replacement spelling.
+        context (RuleContext): Current file context used to map evaluated offsets into source ranges.
+
+    Returns:
+        rule_edits.PlannedSourceChange | None: Exact source replacement, or None when the occurrence cannot be rewritten
+            safely.
+    """
+    documented_parameter = issue.documented_parameter
+    name_slot = documented_parameter.name_slot
+    if name_slot is None:
+        return None
+    line = docstring.structure.lines[name_slot.line_index]
+    return section_edits.planned_line_text_change(docstring, line, name_slot.start_column, name_slot.end_column, issue.expected_name, context=context, line_numbers=documented_parameter.line_numbers)
+
+
+def parameter_comparison_name(name: str, *, convention: DocstringConvention | None = None) -> str:
     """Return a docstring-comparison name without vararg marker stars.
 
     Args:
         name (str): Parameter name parsed from a signature or docstring entry.
+        convention (DocstringConvention | None): Convention that determines whether one reStructuredText variadic escape
+            is semantic.
 
     Returns:
         str: Name used to compare regular and variadic parameter spellings.
     """
-    return name.lstrip("*")
+    spelling = docstring_sections.rest_parameter_spelling(name) if convention is DocstringConvention.REST else name
+    return spelling.lstrip("*")
 
 
 def should_check_missing_parameters(definition: PDF_definition.DefinitionInfo, docstring: PDF_definition.DocstringInfo, *, context: RuleContext) -> bool:

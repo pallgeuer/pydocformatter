@@ -35,6 +35,84 @@ def test_reports_directly_raised_exception_missing_from_docstring() -> None:
     assert tuple(finding.message for finding in result.unfixed_findings) == ("Raised exception 'ValueError' is missing docstring documentation",)
 
 
+def test_assertions_are_ignored_by_default() -> None:
+    source = 'def function(value):\n    """Validate a value."""\n    assert value\n'
+
+    assert_pdf506_lines(source, ())
+
+
+def test_enabled_assertion_inventory_reports_assertion_specific_message() -> None:
+    source = 'def function(value):\n    """Validate a value."""\n    assert value\n'
+    settings = CheckSettings(
+        select=("PDF506",), docstring_convention=DocstringConvention.GOOGLE, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS, docstring_include_assertion_errors=True
+    )
+    result = format_source(source, settings=settings)
+
+    assert_pdf506_lines(source, ((3,),), settings=settings)
+    assert tuple(finding.message for finding in result.unfixed_findings) == ("AssertionError from assert statement is missing docstring documentation",)
+
+
+def test_default_missing_documentation_policy_requires_relevant_section_for_assertions() -> None:
+    no_section = 'def function(value):\n    """Validate a value."""\n    assert value\n'
+    existing_section = 'def function(value):\n    """Validate a value.\n\n    Raises:\n        ValueError: Bad value.\n    """\n    assert value\n'
+    settings = CheckSettings(select=("PDF506",), docstring_convention=DocstringConvention.GOOGLE, docstring_include_assertion_errors=True)
+
+    assert_pdf506_lines(no_section, (), settings=settings)
+    assert_pdf506_lines(existing_section, ((7,),), settings=settings)
+
+
+def test_documented_assertion_error_is_accepted_in_google_numpy_and_rest() -> None:
+    google = 'def function(value):\n    """Validate.\n\n    Raises:\n        AssertionError: Invalid value.\n    """\n    assert value\n'
+    numpy = 'def function(value):\n    """Validate.\n\n    Raises\n    ------\n    AssertionError\n        Invalid value.\n    """\n    assert value\n'
+    rest = 'def function(value):\n    """Validate.\n\n    :raises AssertionError: Invalid value.\n    """\n    assert value\n'
+
+    assert_pdf506_lines(google, (), settings=CheckSettings(select=("PDF506",), docstring_convention=DocstringConvention.GOOGLE, docstring_include_assertion_errors=True))
+    assert_pdf506_lines(numpy, (), settings=CheckSettings(select=("PDF506",), docstring_convention=DocstringConvention.NUMPY, docstring_include_assertion_errors=True))
+    assert_pdf506_lines(rest, (), settings=CheckSettings(select=("PDF506",), docstring_convention=DocstringConvention.REST, docstring_include_assertion_errors=True))
+
+
+@pytest.mark.parametrize(
+    ("body", "expected_message"),
+    [
+        ('    raise AssertionError("bad")\n    assert value\n', "Raised exception 'AssertionError' is missing docstring documentation"),
+        ('    assert value\n    raise AssertionError("bad")\n', "AssertionError from assert statement is missing docstring documentation"),
+        ('    assert value; raise AssertionError("bad")\n', "AssertionError from assert statement is missing docstring documentation"),
+    ],
+)
+def test_first_assertion_error_occurrence_owns_deduplicated_finding(body: str, expected_message: str) -> None:
+    source = f'def function(value):\n    """Validate a value."""\n{body}'
+    settings = CheckSettings(
+        select=("PDF506",), docstring_convention=DocstringConvention.GOOGLE, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS, docstring_include_assertion_errors=True
+    )
+    result = format_source(source, settings=settings)
+
+    assert len(result.unfixed_findings) == 1
+    assert result.unfixed_findings[0].message == expected_message
+
+
+def test_enabled_assertions_join_distinct_direct_raises_in_source_order() -> None:
+    source = 'def function(value):\n    """Validate a value."""\n    assert value\n    raise ValueError("bad")\n'
+    settings = CheckSettings(
+        select=("PDF506",), docstring_convention=DocstringConvention.GOOGLE, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS, docstring_include_assertion_errors=True
+    )
+    result = format_source(source, settings=settings)
+
+    assert_pdf506_lines(source, ((3,), (4,)), settings=settings)
+    assert tuple(finding.message for finding in result.unfixed_findings) == (
+        "AssertionError from assert statement is missing docstring documentation",
+        "Raised exception 'ValueError' is missing docstring documentation",
+    )
+
+
+def test_every_syntactic_assertion_shape_is_collected_with_nested_ownership_boundaries() -> None:
+    source = 'async def outer(value):\n    """Validate outer."""\n    if value:\n        assert True\n    try:\n        assert value\n    except ValueError:\n        assert False\n\n    class Nested:\n        assert False\n\n    def inner():\n        """Validate inner."""\n        assert value\n\n    return inner\n'
+    settings = CheckSettings(
+        select=("PDF506",), docstring_convention=DocstringConvention.GOOGLE, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS, docstring_include_assertion_errors=True
+    )
+
+    assert_pdf506_lines(source, ((4,), (15,)), settings=settings)
+
+
 def test_default_policy_ignores_docstring_without_exception_documentation() -> None:
     source = 'def function(value):\n    """Validate a value."""\n    if value < 0:\n        raise ValueError("negative")\n'
 

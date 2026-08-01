@@ -34,7 +34,7 @@ class PDF416TypeSpellingNormalization(RuleBase):
         code=RuleCode("PDF416"),
         name="type-spelling-normalization",
         message="Docstring type spelling should be normalized",
-        fix_availability=FixAvailability.SOMETIMES,
+        fix_availability=FixAvailability.USUALLY,
         stable_since="1.1.0",
         setting_effects=docstring_conventions.convention_setting_effects(disabled=docstring_conventions.UNPARSED_CONVENTIONS),
         incompatible_with=(),

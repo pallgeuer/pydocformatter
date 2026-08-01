@@ -11,6 +11,7 @@ import pydocformatter.rules.registration as rule_registration
 from pydocformatter.rules.definition import RuleBase
 from pydocformatter.rules.definition_helpers import typed_entry_rules
 from pydocformatter.rules.definitions.PDF.PDF import PDF
+from pydocformatter.rules.models import FixAvailability
 
 
 if TYPE_CHECKING:
@@ -27,7 +28,9 @@ class PDF705ReturnTypeRequired(RuleBase):
         meta (RuleMetadata): Static metadata used for registration, diagnostics, and rule selection.
     """
 
-    meta = typed_entry_rules.metadata("PDF705", "return-type-required", "Function return docstring entry is missing a type", exact_opt_in=True, incompatible_with=("PDF706",))
+    meta = typed_entry_rules.metadata(
+        "PDF705", "return-type-required", "Function return docstring entry is missing a type", exact_opt_in=True, incompatible_with=("PDF706",), fix_availability=FixAvailability.SOMETIMES
+    )
 
     @classmethod
     def violations(cls, context: RuleContext) -> tuple[rule_violations.RuleViolation, ...]:

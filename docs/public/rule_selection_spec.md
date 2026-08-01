@@ -39,7 +39,7 @@ Rule classes register with their category through `@register_rule_to(PDF)`. Rule
 - `code`: A `RuleCode`, such as `PDF101`.
 - `name`: A stable machine-readable name, such as `docstring-reflow`.
 - `message`: The default diagnostic message shown in rule listings and findings.
-- `fix_availability`: A `FixAvailability` value describing whether automatic fixes are `Always`, `Usually`, `Sometimes`, or `Never` available at the rule level.
+- `fix_availability`: A `FixAvailability` value describing whether automatic fixes are `Always`, `Usually`, `Sometimes`, or `Never` available at the rule level. `Always` means every finding has a fix. `Usually` means every semantic violation kind has a correction, although instance-specific safety can prevent a fix. `Sometimes` means at least one semantic violation kind is intentionally diagnostic-only while another has a fix. `Never` means the rule is diagnostic-only.
 - `stable_since`: The pydocformatter version in which the rule became stable.
 - `setting_effects`: Immutable metadata mapping resolved setting fields and triggering values to `Ignored` or `Disabled` selection effects.
 - `incompatible_with`: An immutable tuple of `RuleCode` values for rules that cannot be selected together with this rule.

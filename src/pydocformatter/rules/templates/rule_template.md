@@ -2,6 +2,8 @@
 
 Fix is always available. (Use `Fix is usually available.`, `Fix is sometimes available.`, or `Fix is not available.` when that matches the rule metadata.)
 
+(Choose `Usually` when every semantic violation kind has a defined correction but instance-specific safety can prevent a fix. Choose `Sometimes` when at least one semantic violation kind is intentionally diagnostic-only while another has a fix.)
+
 (Only if rule has `setting_effects` like ignored or disabled:) Use one leading sentence that matches the metadata:
 
 - Ignored only: "Rule is ignored if `docstring-convention` is `google` or `numpy`."

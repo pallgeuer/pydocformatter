@@ -36,7 +36,7 @@ def public_docs_url(*parts: str) -> str:
     """Return a canonical public documentation URL.
 
     Args:
-        parts (str): URL path parts to append below the documentation root.
+        *parts (str): URL path parts to append below the documentation root.
 
     Returns:
         str: Absolute public documentation URL with a trailing slash.

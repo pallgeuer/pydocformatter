@@ -33,7 +33,7 @@ class PDF401SectionNamePluralization(RuleBase):
         code=RuleCode("PDF401"),
         name="section-name-pluralization",
         message="Docstring section name should use the preferred plural or canonical form",
-        fix_availability=FixAvailability.SOMETIMES,
+        fix_availability=FixAvailability.USUALLY,
         stable_since="1.0.0",
         setting_effects=docstring_conventions.convention_setting_effects(disabled=docstring_conventions.UNPARSED_CONVENTIONS),
         incompatible_with=(),

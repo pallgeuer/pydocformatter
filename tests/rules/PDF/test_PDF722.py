@@ -247,7 +247,7 @@ def test_orphans_remain_available_to_extraneous_mismatch_and_forbidden_type_rule
     forbidden_settings = CheckSettings(select=("PDF702", "PDF722"), docstring_convention=DocstringConvention.REST)
 
     assert codes(format_source(stale_source, settings=stale_settings)) == ("PDF501", "PDF722")
-    assert codes(format_source(mismatch_source, settings=mismatch_settings)) == ("PDF703", "PDF722")
+    assert codes(format_source(mismatch_source, settings=mismatch_settings, fix=False)) == ("PDF703", "PDF722")
     assert codes(format_source(mismatch_source, settings=forbidden_settings)) == ("PDF702", "PDF722")
 
 

@@ -270,6 +270,80 @@ def text_replacement(line: PDF_definition.DocstringValueLine, start_column: int,
     return rule_edits.PlannedTextReplacement(start_offset=start_offset, end_offset=end_offset, text=text, line_numbers=PDF_definition.docstring_value_line_numbers((line,)))
 
 
+def planned_line_text_change(
+    docstring: PDF_definition.DocstringInfo,
+    line: PDF_definition.DocstringValueLine,
+    start_column: int,
+    end_column: int,
+    text: str,
+    *,
+    context: RuleContext,
+    line_numbers: tuple[int, ...] | None = None,
+) -> rule_edits.PlannedSourceChange | None:
+    """Return a safe direct source change for one evaluated docstring line span.
+
+    Args:
+        docstring (PDF_definition.DocstringInfo): Parsed docstring that owns the changed line.
+        line (PDF_definition.DocstringValueLine): Evaluated line containing the changed span.
+        start_column (int): Start column in the parsed line text.
+        end_column (int): Exclusive end column in the parsed line text.
+        text (str): Replacement evaluated text.
+        context (RuleContext): Current source context used for exact source mapping.
+        line_numbers (tuple[int, ...] | None): Optional finding lines overriding the changed line's mapped lines.
+
+    Returns:
+        rule_edits.PlannedSourceChange | None: Direct source change, or None when mapping or rendering is unsafe.
+    """
+    replacement = text_replacement(line, start_column, end_column, text)
+    if replacement is None:
+        return None
+    resolved_line_numbers = line_numbers if line_numbers is not None else replacement.line_numbers or PDF_definition.docstring_line_numbers(docstring, line)
+    replacement = dataclasses.replace(replacement, line_numbers=resolved_line_numbers)
+    value_lines = [value_line.raw_text for value_line in docstring.structure.lines]
+    _replace_value_line_span(value_lines, line, replacement, text)
+    return PDF_definition.planned_simple_docstring_text_change(docstring, context=context, replacement=replacement, expected_value=PDF_definition.join_docstring_value_lines(docstring, value_lines))
+
+
+def planned_convention_entry_change(docstring: PDF_definition.DocstringInfo, issue: PDF_definition.ConventionEntryIssue, *, context: RuleContext) -> rule_edits.PlannedSourceChange | None:
+    """Return an exact source repair for one convention entry issue.
+
+    Args:
+        docstring (PDF_definition.DocstringInfo): Parsed docstring containing the issue.
+        issue (PDF_definition.ConventionEntryIssue): Convention issue with an optional replacement.
+        context (RuleContext): Current source context used for exact source mapping.
+
+    Returns:
+        rule_edits.PlannedSourceChange | None: Direct source repair, or None when no safe replacement is available.
+    """
+    replacement = issue.replacement
+    if replacement is None:
+        return None
+    line = docstring.structure.lines[issue.start_line]
+    return planned_line_text_change(docstring, line, replacement.start_column, replacement.end_column, replacement.text, context=context)
+
+
+def planned_value_text_change(
+    docstring: PDF_definition.DocstringInfo, start_offset: int, end_offset: int, text: str, *, context: RuleContext, line_numbers: tuple[int, ...], source_text: str | None = None
+) -> rule_edits.PlannedSourceChange | None:
+    """Return a safe direct source change for one evaluated docstring value span.
+
+    Args:
+        docstring (PDF_definition.DocstringInfo): Parsed docstring containing the changed value span.
+        start_offset (int): Start offset in the evaluated docstring value.
+        end_offset (int): Exclusive end offset in the evaluated docstring value.
+        text (str): Replacement evaluated text.
+        context (RuleContext): Current source context used for exact source mapping.
+        line_numbers (tuple[int, ...]): Finding lines associated with the replacement.
+        source_text (str | None): Optional replacement source spelling when it differs from the evaluated text.
+
+    Returns:
+        rule_edits.PlannedSourceChange | None: Direct source change, or None when mapping or rendering is unsafe.
+    """
+    replacement = rule_edits.PlannedTextReplacement(start_offset=start_offset, end_offset=end_offset, text=text, line_numbers=line_numbers)
+    expected_value = f"{docstring.value[:start_offset]}{text}{docstring.value[end_offset:]}"
+    return PDF_definition.planned_simple_docstring_text_change(docstring, context=context, replacement=replacement, expected_value=expected_value, replacement_source=source_text)
+
+
 def section_name_start_column(line: PDF_definition.DocstringValueLine) -> int:
     """Return the text column where a section name starts.
 

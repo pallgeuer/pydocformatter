@@ -29,6 +29,7 @@ Attributes:
 from __future__ import annotations
 
 # Standard library imports
+import re
 import enum
 import dataclasses
 
@@ -92,8 +93,21 @@ class RestFieldFamily:
             str | None: Name used for value/type pairing.
         """
         if name is not None and self.strip_name_prefix_stars:
-            return name.lstrip("*")
+            return rest_parameter_spelling(name).lstrip("*")
         return name
+
+
+def rest_parameter_spelling(name: str) -> str:
+    """Return a parameter spelling with one reStructuredText variadic escape removed.
+
+    Args:
+        name (str): Raw parameter spelling parsed from a reStructuredText field argument.
+
+    Returns:
+        str: Parameter spelling with an exact escaped one- or two-star prefix decoded.
+    """
+    match = re.fullmatch(r"\\(?P<stars>\*{1,2})(?P<name>[A-Za-z_]\w*)", name)
+    return f"{match.group('stars')}{match.group('name')}" if match is not None else name
 
 
 GOOGLE_SECTIONS = {

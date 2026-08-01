@@ -227,6 +227,8 @@ class CheckSettings:
             public API definitions.
         docstring_require_init_attribute_documentation (bool): Whether class missing-attribute checks require `self.*`
             attributes assigned in `__init__`.
+        docstring_include_assertion_errors (bool): Whether `assert` statements contribute possible `AssertionError`
+            occurrences to exception-documentation checks.
         docstring_class_attribute_no_type_base_classes (StringList): Direct class base names whose class attribute
             docstring entries should not include types for PDF713.
         docstring_forbidden_function_decorators (StringList): Exact function decorator names whose definitions should
@@ -297,6 +299,7 @@ class CheckSettings:
     docstring_missing_documentation: DocstringMissingDocumentation = DocstringMissingDocumentation.HAS_SECTION
     docstring_missing_documentation_public_only: bool = True
     docstring_require_init_attribute_documentation: bool = False
+    docstring_include_assertion_errors: bool = False
     docstring_class_attribute_no_type_base_classes: StringList = DEFAULT_DOCSTRING_CLASS_ATTRIBUTE_NO_TYPE_BASE_CLASSES
     docstring_forbidden_function_decorators: StringList = DEFAULT_DOCSTRING_FORBIDDEN_FUNCTION_DECORATORS
     docstring_optional_function_decorators: StringList = DEFAULT_DOCSTRING_OPTIONAL_FUNCTION_DECORATORS
@@ -384,6 +387,8 @@ class CheckSettingsOverrides(TypedDict, total=False):
             public API definitions.
         docstring_require_init_attribute_documentation (bool): Whether class missing-attribute checks require `self.*`
             attributes assigned in `__init__`.
+        docstring_include_assertion_errors (bool): Whether `assert` statements contribute possible `AssertionError`
+            occurrences to exception-documentation checks.
         docstring_class_attribute_no_type_base_classes (StringList): Direct class base names whose class attribute
             docstring entries should not include types for PDF713.
         docstring_forbidden_function_decorators (StringList): Exact function decorator names whose definitions should
@@ -454,6 +459,7 @@ class CheckSettingsOverrides(TypedDict, total=False):
     docstring_missing_documentation: DocstringMissingDocumentation
     docstring_missing_documentation_public_only: bool
     docstring_require_init_attribute_documentation: bool
+    docstring_include_assertion_errors: bool
     docstring_class_attribute_no_type_base_classes: StringList
     docstring_forbidden_function_decorators: StringList
     docstring_optional_function_decorators: StringList
@@ -939,6 +945,14 @@ SETTINGS_SCHEMA = SettingsSchema(
             group=SettingsGroup.DOCSTRING_FORMATTING,
             help="Require documented `__init__` instance attributes.",
             documentation="Whether class missing-attribute documentation rules require supported `self.*` attributes assigned in `__init__`; extraneous class-attribute documentation checks always treat those attributes as present.",
+        ),
+        CheckSettingDefinition(
+            cache_identity_role=CacheIdentityRole.DIRECT_ANALYSIS_VALUE,
+            field="docstring_include_assertion_errors",
+            value_type=bool,
+            group=SettingsGroup.DOCSTRING_FORMATTING,
+            help="Treat `assert` statements as possible `AssertionError` occurrences.",
+            documentation="Whether PDF506 and PDF507 treat every syntactic `assert` statement as a possible `AssertionError`. Assertions can be removed by optimized Python execution, so this option is disabled by default.",
         ),
         CheckSettingDefinition(
             cache_identity_role=CacheIdentityRole.DIRECT_ANALYSIS_VALUE,

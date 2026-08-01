@@ -1,6 +1,6 @@
 # section-name-trailing-content (PDF403)
 
-Fix is sometimes available.
+Fix is usually available.
 
 Rule is disabled if `docstring-convention` is `none`, `pep257`, `numpy`, or `rest`.
 
@@ -122,6 +122,22 @@ def example():
 
 [output=unchanged]
 ````
+
+A recognized header in a concatenated docstring is reported without an unsafe rewrite:
+
+```pydocfmt-example
+[settings]
+docstring-convention = "google"
+
+[input]
+def function(value):
+    ("Summary.\n\n"
+     "Args: value: Description.")
+
+[output=unchanged]
+[findings]
+PDF403: Lines 2-3: Docstring section 'Args' should be followed by a line break
+```
 
 ## Options
 - `indent-style`: Indentation style used for content moved below the section name.

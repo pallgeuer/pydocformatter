@@ -35,7 +35,7 @@ class PDF304SummaryFirstWordCapitalization(RuleBase):
         code=RuleCode("PDF304"),
         name="summary-first-word-capitalization",
         message="Docstring summary first word should be capitalized",
-        fix_availability=FixAvailability.SOMETIMES,
+        fix_availability=FixAvailability.USUALLY,
         stable_since="1.0.0",
         setting_effects=(),
         incompatible_with=(),

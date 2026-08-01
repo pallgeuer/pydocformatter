@@ -21,7 +21,12 @@ if TYPE_CHECKING:
 
 
 def check(
-    source: str, *, select: tuple[str, ...], convention: DocstringConvention = DocstringConvention.GOOGLE, docstring_class_attribute_no_type_base_classes: tuple[str, ...] | None = None
+    source: str,
+    *,
+    select: tuple[str, ...],
+    convention: DocstringConvention = DocstringConvention.GOOGLE,
+    docstring_class_attribute_no_type_base_classes: tuple[str, ...] | None = None,
+    fix: bool = False,
 ) -> formatter.FormatterResult:
     """Run pydocformatter on source with PDF7xx-oriented settings."""
     settings = CheckSettings(
@@ -31,7 +36,7 @@ def check(
             CheckSettings().docstring_class_attribute_no_type_base_classes if docstring_class_attribute_no_type_base_classes is None else docstring_class_attribute_no_type_base_classes
         ),
     )
-    return formatter.format_source(source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=False)
+    return formatter.format_source(source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=fix)
 
 
 def codes(result: formatter.FormatterResult) -> tuple[str, ...]:
@@ -39,6 +44,122 @@ def codes(result: formatter.FormatterResult) -> tuple[str, ...]:
     assert not result.errors
     assert not result.fixed_findings
     return tuple(finding.rule.code.tag for finding in result.unfixed_findings)
+
+
+def fixed_codes(result: formatter.FormatterResult) -> tuple[str, ...]:
+    """Return fixed finding rule-code tags."""
+    assert not result.errors
+    return tuple(rule.code.tag for rule, count in result.fixed_findings.items() for _ in range(count))
+
+
+def test_typed_rule_fix_availability_matches_semantic_coverage() -> None:
+    """Classify annotation mismatches as diagnostic-only and missing types as sometimes fixable."""
+    settings = CheckSettings(select=("PDF701", "PDF703", "PDF705", "PDF707", "PDF709", "PDF711", "PDF713", "PDF715", "PDF717", "PDF719"), docstring_convention=DocstringConvention.GOOGLE)
+    selected = {rule.rule.code.tag: rule.rule.fix_availability.value for rule in rules_selection.select_rules(settings).rules}
+
+    assert selected == {
+        "PDF701": "Sometimes",
+        "PDF703": "Never",
+        "PDF705": "Sometimes",
+        "PDF707": "Never",
+        "PDF709": "Sometimes",
+        "PDF711": "Never",
+        "PDF713": "Sometimes",
+        "PDF715": "Never",
+        "PDF717": "Sometimes",
+        "PDF719": "Never",
+    }
+
+
+def test_mismatch_rules_remain_diagnostic_when_fixing() -> None:
+    """Preserve conflicting docstring types so a person can resolve each mismatch."""
+    source = '"""Module.\n\nAttributes:\n    module_value (str): Value.\n"""\nmodule_value: bytes = b""\n\n\nclass Client:\n    """Client.\n\n    Attributes:\n        timeout (str): Timeout.\n    """\n\n    timeout: float\n\n\ndef transform(value: "list[int]") -> tuple[str, ...]:\n    """Transform a value.\n\n    Args:\n        value (set[int]): Value.\n\n    Returns:\n        list[str]: Result.\n    """\n    return (str(value),)\n\n\ndef generate() -> typing.Iterator[dict[str, int]]:\n    """Generate values.\n\n    Yields:\n        set[str]: Value.\n    """\n    yield {"value": 1}\n'
+    result = check(source, select=("PDF703", "PDF707", "PDF711", "PDF715", "PDF719"), fix=True)
+
+    assert result.new_source == source
+    assert not result.fixed_findings
+    assert codes(result) == ("PDF703", "PDF707", "PDF711", "PDF715", "PDF719")
+
+
+def test_required_rules_insert_paired_rest_type_fields_from_annotations() -> None:
+    """Insert canonical paired reStructuredText type fields after documented values."""
+    source = '"""Module.\n\n:var module_value: Value.\n"""\nmodule_value: bytes = b""\n\n\nclass Client:\n    """Client.\n\n    :var timeout: Timeout.\n    """\n\n    timeout: float\n\n\ndef transform(*values: int) -> tuple[str, ...]:\n    """Transform values.\n\n    :param *values: Values.\n    :return: Result.\n    """\n    return tuple(map(str, values))\n\n\ndef generate() -> typing.Iterator[dict[str, int]]:\n    """Generate values.\n\n    :yield item: Value.\n    """\n    yield {"value": 1}\n'
+    expected = (
+        source
+        .replace(":var module_value: Value.\n", ":var module_value: Value.\n:vartype module_value: bytes\n")
+        .replace("    :var timeout: Timeout.\n", "    :var timeout: Timeout.\n    :vartype timeout: float\n")
+        .replace("    :param *values: Values.\n", "    :param *values: Values.\n    :type values: int\n")
+        .replace("    :return: Result.\n", "    :return: Result.\n    :rtype: tuple[str, ...]\n")
+        .replace("    :yield item: Value.\n", "    :yield item: Value.\n    :ytype item: dict[str, int]\n")
+    )
+    result = check(source, select=("PDF701", "PDF705", "PDF709", "PDF713", "PDF717"), convention=DocstringConvention.REST, fix=True)
+
+    assert result.new_source == expected
+    assert fixed_codes(result) == ("PDF701", "PDF705", "PDF709", "PDF713", "PDF717")
+    assert not result.unfixed_findings
+
+
+def test_required_rules_fill_existing_empty_rest_type_fields_first() -> None:
+    """Fill an empty paired field instead of inserting a duplicate type field."""
+    source = 'def transform(value: int) -> str:\n    """Transform a value.\n\n    :param value: Value.\n    :type value:\n    :return: Result.\n    :rtype:\n    """\n    return str(value)\n'
+    expected = source.replace(":type value:\n", ":type value: int\n").replace(":rtype:\n", ":rtype: str\n")
+    result = check(source, select=("PDF701", "PDF705"), convention=DocstringConvention.REST, fix=True)
+
+    assert result.new_source == expected
+    assert fixed_codes(result) == ("PDF701", "PDF705")
+    assert not result.unfixed_findings
+
+
+def test_pdf713_removes_enum_types_for_google_and_rest_but_not_numpy() -> None:
+    """Apply enum inversion only where removing a type preserves convention grammar."""
+    google = 'from enum import Enum\n\n\nclass Color(Enum):\n    """Color.\n\n    Attributes:\n        RED (int): Red.\n    """\n\n    RED = 1\n'
+    google_result = check(google, select=("PDF713",), fix=True)
+
+    assert google_result.new_source == google.replace("RED (int):", "RED:")
+    assert fixed_codes(google_result) == ("PDF713",)
+
+    rest = 'from enum import Enum\n\n\nclass Color(Enum):\n    """Color.\n\n    :var RED: Red.\n    :vartype RED: int\n    """\n\n    RED = 1\n'
+    rest_result = check(rest, select=("PDF713",), convention=DocstringConvention.REST, fix=True)
+
+    assert rest_result.new_source == rest.replace("    :vartype RED: int\n", "")
+    assert fixed_codes(rest_result) == ("PDF713",)
+
+    numpy = 'from enum import Enum\n\n\nclass Color(Enum):\n    """Color.\n\n    Attributes\n    ----------\n    RED : int\n        Red.\n    """\n\n    RED = 1\n'
+    numpy_result = check(numpy, select=("PDF713",), convention=DocstringConvention.NUMPY, fix=True)
+
+    assert numpy_result.new_source == numpy
+    assert not numpy_result.fixed_findings
+    assert not numpy_result.unfixed_findings
+
+
+def test_numpy_shared_type_slots_remain_diagnostic() -> None:
+    """Report a mismatching name without changing its shared NumPy type slot."""
+    source = 'def function(x: int, y: str):\n    """Process values.\n\n    Parameters\n    ----------\n    x, y : int\n        Values.\n    """\n'
+    result = check(source, select=("PDF703",), convention=DocstringConvention.NUMPY, fix=True)
+
+    assert result.new_source == source
+    assert not result.fixed_findings
+    assert codes(result) == ("PDF703",)
+
+
+def test_required_type_without_annotation_remains_diagnostic_when_fixing() -> None:
+    """Avoid inventing a type when the corresponding code target has no annotation."""
+    source = 'def function(value):\n    """Process a value.\n\n    Args:\n        value: Value.\n    """\n'
+    result = check(source, select=("PDF701",), fix=True)
+
+    assert result.new_source == source
+    assert not result.fixed_findings
+    assert codes(result) == ("PDF701",)
+
+
+def test_required_rest_type_field_insertion_preserves_crlf() -> None:
+    """Use source line endings for an inserted field while validating normalized string value text."""
+    source = 'def function(value: int):\r\n    """Process a value.\r\n\r\n    :param value: Value.\r\n    """\r\n'
+    result = check(source, select=("PDF701",), convention=DocstringConvention.REST, fix=True)
+
+    assert result.new_source == source.replace("    :param value: Value.\r\n", "    :param value: Value.\r\n    :type value: int\r\n")
+    assert fixed_codes(result) == ("PDF701",)
+    assert "\n" not in result.new_source.replace("\r\n", "")
 
 
 def test_broad_selection_includes_missing_description_and_mismatch_but_not_type_policy() -> None:
@@ -55,6 +176,16 @@ def test_exact_selection_enables_required_and_forbidden_type_policy_rules() -> N
 
     assert codes(required) == ("PDF701",)
     assert codes(forbidden) == ("PDF706",)
+
+
+def test_forbidden_type_rule_metadata_does_not_enable_type_removal() -> None:
+    """Keep ordinary forbidden-type rules diagnostic-only under fix mode."""
+    source = 'def function(value: int):\n    """Process a value.\n\n    Args:\n        value (int): Input value.\n    """\n'
+    result = check(source, select=("PDF702",), fix=True)
+
+    assert result.new_source == source
+    assert not result.fixed_findings
+    assert codes(result) == ("PDF702",)
 
 
 def test_ignored_under_none_and_pep257_even_when_selected_broadly() -> None:
@@ -198,6 +329,14 @@ def test_rest_mismatch_rules_use_complete_multiline_type_fields() -> None:
 
 def test_rest_variadic_parameter_value_and_type_fields_pair_by_comparison_name() -> None:
     source = 'def function(*items: int):\n    """Process values.\n\n    :param *items: Items.\n    :type items: int\n    """\n'
+    result = check(source, select=("PDF700", "PDF701", "PDF703"), convention=DocstringConvention.REST)
+
+    assert codes(result) == ()
+
+
+def test_rest_escaped_variadic_parameter_fields_pair_by_comparison_name() -> None:
+    """Pair escaped variadic value and type fields with the signature parameter."""
+    source = 'def function(*items: int):\n    r"""Process values.\n\n    :param \\*items: Items.\n    :type \\*items: int\n    """\n'
     result = check(source, select=("PDF700", "PDF701", "PDF703"), convention=DocstringConvention.REST)
 
     assert codes(result) == ()
@@ -353,7 +492,7 @@ def test_class_attribute_enum_inversion_affects_only_pdf713() -> None:
 
 
 def test_class_attribute_enum_inversion_matches_import_aliases() -> None:
-    source = 'import enum as e\nfrom enum import Flag as F\n\n\nclass Color(e.Enum):\n    """Color.\n\n    Attributes:\n        RED (int): Red value.\n    """\n\n    RED = 1\n\n\nclass Permission(F):\n    """Permission.\n\n    Attributes:\n        READ (int): Read value.\n    """\n\n    READ = 1\n'
+    source = 'import enum\nfrom enum import Flag as F\n\n\nclass Color(enum.Enum):\n    """Color.\n\n    Attributes:\n        RED (int): Red value.\n    """\n\n    RED = 1\n\n\nclass Permission(F):\n    """Permission.\n\n    Attributes:\n        READ (int): Read value.\n    """\n\n    READ = 1\n'
     result = check(source, select=("PDF713",))
 
     assert codes(result) == ("PDF713", "PDF713")
@@ -387,16 +526,16 @@ def test_shadowed_enum_import_alias_is_not_treated_as_imported_enum_base() -> No
     assert tuple(finding.message for finding in result.unfixed_findings) == ("Class attribute 'RED' docstring entry is missing a type",)
 
 
-def test_later_enum_import_alias_rebinding_does_not_affect_prior_base() -> None:
-    source = 'import enum as e\n\n\nclass Color(e.Enum):\n    """Color.\n\n    Attributes:\n        RED (int): Red value.\n    """\n\n    RED = 1\n\n\ne = object\n'
+def test_later_enum_import_rebinding_does_not_affect_prior_base() -> None:
+    source = 'import enum\n\n\nclass Color(enum.Enum):\n    """Color.\n\n    Attributes:\n        RED (int): Red value.\n    """\n\n    RED = 1\n\n\nenum = object\n'
     result = check(source, select=("PDF713",))
 
     assert codes(result) == ("PDF713",)
     assert tuple(finding.message for finding in result.unfixed_findings) == ("Class attribute 'RED' docstring entry should not include a type",)
 
 
-def test_guarded_enum_import_alias_matches_enum_like_base() -> None:
-    source = 'if enabled:\n    import enum as e\n\n\nclass Color(e.Enum):\n    """Color.\n\n    Attributes:\n        RED (int): Red value.\n    """\n\n    RED = 1\n'
+def test_guarded_enum_import_matches_enum_like_base() -> None:
+    source = 'if enabled:\n    import enum\n\n\nclass Color(enum.Enum):\n    """Color.\n\n    Attributes:\n        RED (int): Red value.\n    """\n\n    RED = 1\n'
     result = check(source, select=("PDF713",))
 
     assert codes(result) == ("PDF713",)

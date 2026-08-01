@@ -84,7 +84,7 @@ def create_parser(**kwargs: Unpack[ArgumentParserKwargs]) -> argparse.ArgumentPa
     """Create a configured top-level argparse parser.
 
     Args:
-        kwargs (Unpack[ArgumentParserKwargs]): Keyword arguments forwarded to `argparse.ArgumentParser`.
+        **kwargs (Unpack[ArgumentParserKwargs]): Keyword arguments forwarded to `argparse.ArgumentParser`.
 
     Returns:
         argparse.ArgumentParser: Parser with project help formatting and explicit help option handling.
@@ -99,7 +99,7 @@ def create_subparser(subparsers: argparse._SubParsersAction[argparse.ArgumentPar
     Args:
         subparsers (argparse._SubParsersAction[argparse.ArgumentParser]): Parent subparser action to add to.
         name (str): Command name for the subparser.
-        kwargs (Unpack[SubparserKwargs]): Keyword arguments forwarded to `add_parser`.
+        **kwargs (Unpack[SubparserKwargs]): Keyword arguments forwarded to `add_parser`.
 
     Returns:
         argparse.ArgumentParser: Subparser with project help formatting and explicit help option handling.

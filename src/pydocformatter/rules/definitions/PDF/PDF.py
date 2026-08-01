@@ -197,6 +197,21 @@ class ConventionEntryIssueKind(enum.Enum):
 
 
 @dataclasses.dataclass(frozen=True)
+class ConventionEntryReplacement:
+    """One exact evaluated-line replacement for a convention entry issue.
+
+    Attributes:
+        start_column (int): Zero-based replacement start column in the parsed line text.
+        end_column (int): Zero-based exclusive replacement end column in the parsed line text.
+        text (str): Replacement evaluated text.
+    """
+
+    start_column: int
+    end_column: int
+    text: str
+
+
+@dataclasses.dataclass(frozen=True)
 class ConventionEntryIssue:
     """One high-confidence convention entry syntax or indentation issue.
 
@@ -205,12 +220,14 @@ class ConventionEntryIssue:
         start_line (int): Logical docstring line containing the issue.
         names (tuple[str, ...]): Confidently recovered entry names in source order.
         field_name (str | None): Normalized reStructuredText field name, without colons.
+        replacement (ConventionEntryReplacement | None): Exact repair when the parser can prove one.
     """
 
     kind: ConventionEntryIssueKind
     start_line: int
     names: tuple[str, ...] = ()
     field_name: str | None = None
+    replacement: ConventionEntryReplacement | None = None
 
 
 _CONVENTION_ENTRY_ISSUE_PRECEDENCE: Mapping[ConventionEntryIssueKind, int] = MappingProxyType({
@@ -293,6 +310,38 @@ class DocstringTypeInfo:
 
 
 @dataclasses.dataclass(frozen=True)
+class DocstringTypeEditSlot:
+    """Parser-owned source bounds for editing one convention type clause.
+
+    Attributes:
+        line_index (int): Logical docstring value line that owns the editable type clause.
+        insertion_column (int): Column where a missing type clause can be inserted.
+        removal_start_column (int | None): Start column of the complete removable type clause, if present.
+        removal_end_column (int | None): Exclusive end column of the complete removable type clause, if present.
+    """
+
+    line_index: int
+    insertion_column: int
+    removal_start_column: int | None
+    removal_end_column: int | None
+
+
+@dataclasses.dataclass(frozen=True)
+class DocstringNameSlot:
+    """Source span for one parsed convention entry name.
+
+    Attributes:
+        line_index (int): Logical docstring value line that owns the name.
+        start_column (int): Start column of the parsed name.
+        end_column (int): Exclusive end column of the parsed name.
+    """
+
+    line_index: int
+    start_column: int
+    end_column: int
+
+
+@dataclasses.dataclass(frozen=True)
 class DocstringEntry:
     """One parsed convention section entry or reST field.
 
@@ -300,12 +349,15 @@ class DocstringEntry:
         kind (DocstringEntryKind): Semantic documentation role inferred from the section or field name.
         names (tuple[str, ...]): Parameter, exception, warning, attribute, or field argument names documented by this
             entry.
+        name_slots (tuple[DocstringNameSlot | None, ...]): Source spans aligned one-for-one with names.
         type_info (DocstringTypeInfo | None): Semantic parsed type and its optional source slot.
         description (str): Entry description text after the entry head.
         description_lines (tuple[DocstringTextFragment, ...]): Source-mapped fragments that make up the parsed entry
             description.
         start_line (int): First logical docstring line occupied by the entry.
         end_line (int): Last logical docstring line occupied by the entry.
+        type_edit_slot (DocstringTypeEditSlot | None): Parser-owned insertion and removal bounds for a convention type
+            clause, if available.
         following_description_block_kind (DocstringBlockKind | None): Protected structural block immediately after the
             final parsed description fragment but still owned by the entry.
         field_name (str | None): Original reStructuredText field name, without the surrounding colons.
@@ -314,14 +366,21 @@ class DocstringEntry:
 
     kind: DocstringEntryKind
     names: tuple[str, ...]
+    name_slots: tuple[DocstringNameSlot | None, ...]
     type_info: DocstringTypeInfo | None
     description: str
     description_lines: tuple[DocstringTextFragment, ...]
     start_line: int
     end_line: int
+    type_edit_slot: DocstringTypeEditSlot | None = None
     following_description_block_kind: DocstringBlockKind | None = None
     field_name: str | None = None
     field_argument: str | None = None
+
+    def __post_init__(self) -> None:
+        """Validate that semantic names and source slots stay aligned."""
+        if len(self.name_slots) != len(self.names):
+            raise ValueError("Docstring entry name slots must align with names")
 
 
 @dataclasses.dataclass(frozen=True)
@@ -716,22 +775,36 @@ class StatementTarget:
     line_numbers: tuple[int, ...]
 
 
+class ExceptionOccurrenceOrigin(enum.Enum):
+    """Origins of possible exception occurrences.
+
+    Attributes:
+        RAISE: Exception occurrence from an explicit `raise` statement.
+        ASSERT: Possible `AssertionError` occurrence from an `assert` statement.
+    """
+
+    RAISE = "raise"
+    ASSERT = "assert"
+
+
 @dataclasses.dataclass(frozen=True)
-class RaisedException:
-    """One directly raised exception relevant to documentation rules.
+class ExceptionOccurrence:
+    """One possible exception occurrence relevant to documentation rules.
 
     Attributes:
         name (str): Best-effort exception class name used for documentation comparison.
-        line_numbers (tuple[int, ...]): One-based source lines associated with the `raise` statement.
+        line_numbers (tuple[int, ...]): One-based source lines associated with the originating statement.
+        origin (ExceptionOccurrenceOrigin): Syntax that produced the possible exception occurrence.
     """
 
     name: str
     line_numbers: tuple[int, ...]
+    origin: ExceptionOccurrenceOrigin
 
 
 @dataclasses.dataclass(frozen=True)
 class FunctionFacts:
-    """Return, yield, and raise facts collected for one function.
+    """Return, yield, and exception facts collected for one function.
 
     Attributes:
         meaningful_returns (tuple[StatementTarget, ...]): Return statements that produce a non-None value.
@@ -739,7 +812,8 @@ class FunctionFacts:
         any_yields (tuple[StatementTarget, ...]): Yield or yield-from statements regardless of yielded value.
         meaningful_yields (tuple[StatementTarget, ...]): Yield statements that may produce a non-None value.
         explicit_none_yields (tuple[StatementTarget, ...]): Yield statements whose expression is explicitly `None`.
-        raised_exceptions (tuple[RaisedException, ...]): Directly raised exceptions detected in the function body.
+        exception_occurrences (tuple[ExceptionOccurrence, ...]): Directly raised exceptions and syntactic assertions
+            detected in the function body.
     """
 
     meaningful_returns: tuple[StatementTarget, ...]
@@ -747,7 +821,7 @@ class FunctionFacts:
     any_yields: tuple[StatementTarget, ...]
     meaningful_yields: tuple[StatementTarget, ...]
     explicit_none_yields: tuple[StatementTarget, ...]
-    raised_exceptions: tuple[RaisedException, ...]
+    exception_occurrences: tuple[ExceptionOccurrence, ...]
 
 
 DocumentedFunctionFact = tuple[DefinitionInfo, DocstringInfo, FunctionFacts]
@@ -765,8 +839,8 @@ class PDFCategoryData:
             apply owner-specific policy.
         summary_terminal_line_targets (tuple[SummaryLineTarget, ...]): Summary lines eligible for terminal-punctuation
             checks.
-        function_facts_by_definition_id (Mapping[int, FunctionFacts]): Return, yield, and raise facts indexed by owning
-            function definition identity.
+        function_facts_by_definition_id (Mapping[int, FunctionFacts]): Return, yield, and exception facts indexed by
+            owning function definition identity.
     """
 
     definitions: tuple[DefinitionInfo, ...]
@@ -919,7 +993,7 @@ class _MutableFunctionFacts:
     any_yields: list[StatementTarget] = dataclasses.field(default_factory=list)
     meaningful_yields: list[StatementTarget] = dataclasses.field(default_factory=list)
     explicit_none_yields: list[StatementTarget] = dataclasses.field(default_factory=list)
-    raised_exceptions: list[RaisedException] = dataclasses.field(default_factory=list)
+    exception_occurrences: list[ExceptionOccurrence] = dataclasses.field(default_factory=list)
 
     def frozen(self) -> FunctionFacts:
         """Return immutable function facts for rule consumption."""
@@ -929,7 +1003,7 @@ class _MutableFunctionFacts:
             any_yields=tuple(self.any_yields),
             meaningful_yields=tuple(self.meaningful_yields),
             explicit_none_yields=tuple(self.explicit_none_yields),
-            raised_exceptions=tuple(self.raised_exceptions),
+            exception_occurrences=tuple(self.exception_occurrences),
         )
 
 
@@ -1054,7 +1128,13 @@ class _DefinitionCollector(cst.CSTVisitor):
             return
         name = exception_names.exception_name(node.exc)
         if name is not None:
-            facts.raised_exceptions.append(RaisedException(name=name, line_numbers=_node_line_numbers(node, context=self.context)))
+            facts.exception_occurrences.append(ExceptionOccurrence(name=name, line_numbers=_node_line_numbers(node, context=self.context), origin=ExceptionOccurrenceOrigin.RAISE))
+
+    def visit_Assert(self, node: cst.Assert) -> None:
+        """Record a top-level syntactic assertion for the current function."""
+        facts = self._current_function_facts()
+        if facts is not None:
+            facts.exception_occurrences.append(ExceptionOccurrence(name="AssertionError", line_numbers=_node_line_numbers(node, context=self.context), origin=ExceptionOccurrenceOrigin.ASSERT))
 
     def _current_function_facts(self) -> _MutableFunctionFacts | None:
         """Return the current function fact builder, if statement facts should be collected."""
@@ -1197,7 +1277,7 @@ class PDF(RuleCategoryBase[PDFCategoryData]):
         attribute_collection = attribute_collector.collect()
         definitions = tuple(collector.definitions)
         targets = (*collector.docstring_targets, *attribute_collection.docstring_targets)
-        if context.settings.docstring_convention in {settings_check.DocstringConvention.GOOGLE, settings_check.DocstringConvention.NUMPY}:
+        if context.settings.docstring_convention in {settings_check.DocstringConvention.GOOGLE, settings_check.DocstringConvention.NUMPY, settings_check.DocstringConvention.REST}:
             attribute_names_by_parent_id, method_names_by_parent_id = _malformed_entry_inventories(definitions=definitions, attributes=attribute_collection.attributes)
         else:
             attribute_names_by_parent_id, method_names_by_parent_id = {}, {}
@@ -1365,7 +1445,7 @@ _GOOGLE_FLAT_ENTRY_RE = re.compile(r"^(?P<indent>[ \t]*)(?P<name>\*{0,2}[A-Za-z_
 _GOOGLE_CANDIDATE_RE = re.compile(r"^(?P<indent>[ \t]*)(?P<name>\*{0,2}[A-Za-z_][\w.]*)(?P<tail>.*)$")
 _METHOD_ENTRY_CANDIDATE_RE = re.compile(r"^(?P<indent>[ \t]*)(?P<name>[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*)(?P<tail>.*)$")
 _GENERIC_ENTRY_PATTERN = re.compile(r"^(?P<indent>[ \t]*)(?P<name>[^:]+):[ \t]*(?P<description>.*)$")
-_NUMPY_ENTRY_RE = re.compile(r"^(?P<indent>[ \t]*)(?P<name>\*{0,2}[A-Za-z_][\w., ]*?)[ \t]*:[ \t]*(?P<type>.+)$")
+_NUMPY_ENTRY_RE = re.compile(r"^(?P<indent>[ \t]*)(?P<name>\*{0,2}[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*(?:[ \t]*,[ \t]*\*{0,2}[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*)*)[ \t]*:[ \t]*(?P<type>.+)$")
 _NUMPY_EXCEPTION_ENTRY_RE = re.compile(r"^(?P<indent>[ \t]*)(?P<name>[^:]+?)[ \t]*:[ \t]*(?P<description>.*)$")
 _ENTRY_NAME_RE = re.compile(r"\*{0,2}[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*")
 _NUMPY_NAME_LIST_RE = re.compile(r"\*{0,2}[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*(?:[ \t]*,[ \t]*\*{0,2}[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*)*")
@@ -1566,6 +1646,13 @@ def _type_info(line_index: int, text: str, full_start_column: int, full_end_colu
             line_index=line_index, full_start_column=full_start_column, full_end_column=full_end_column, semantic_start_column=semantic_start_column, semantic_end_column=semantic_end_column
         ),
     )
+
+
+def _google_type_edit_slot(line_index: int, match: _ConventionEntryMatch) -> DocstringTypeEditSlot:
+    """Return parser-owned bounds for inserting or removing a Google type clause."""
+    removal_start = match.name_end if match.type_start is not None and match.type_end is not None else None
+    removal_end = match.type_end + 1 if match.type_end is not None else None
+    return DocstringTypeEditSlot(line_index=line_index, insertion_column=match.name_end, removal_start_column=removal_start, removal_end_column=removal_end)
 
 
 def _balanced_delimiter_end(text: str, opening: int) -> int | None:
@@ -1806,7 +1893,7 @@ class _DocstringParser:
             content_start += 1
         section_end = self._section_end(content_start, end, text_layout.leading_width(self.lines[start].text))
         section_indent = text_layout.leading_width(self.lines[start].raw_indent)
-        entries = self._section_entries(name, content_start, section_end, section_indent=section_indent)
+        entries = self._section_entries(name, content_start, section_end, section_indent=section_indent, section_text_indent=self.lines[start].text_indent)
         children: list[DocstringBlock] = [DocstringBlock(DocstringBlockKind.SECTION_HEADER, start, content_start)]
         if entries:
             entry_by_start = {entry.start_line: entry for entry in entries}
@@ -1833,15 +1920,15 @@ class _DocstringParser:
         self.entries.extend(entries)
         return DocstringBlock(DocstringBlockKind.SECTION, start, section_end, children=tuple(children)), section_end
 
-    def _section_entries(self, name: str, start: int, end: int, *, section_indent: int) -> tuple[DocstringEntry, ...]:
+    def _section_entries(self, name: str, start: int, end: int, *, section_indent: int, section_text_indent: str) -> tuple[DocstringEntry, ...]:
         """Return entries parsed from a convention section body."""
         if self.settings.docstring_convention == settings_check.DocstringConvention.GOOGLE:
-            return self._google_entries(name, start, end, section_indent=section_indent)
+            return self._google_entries(name, start, end, section_indent=section_indent, section_text_indent=section_text_indent)
         if self.settings.docstring_convention == settings_check.DocstringConvention.NUMPY:
             return self._numpy_entries(name, start, end)
         return ()
 
-    def _google_entries(self, section_name: str, start: int, end: int, *, section_indent: int) -> tuple[DocstringEntry, ...]:
+    def _google_entries(self, section_name: str, start: int, end: int, *, section_indent: int, section_text_indent: str) -> tuple[DocstringEntry, ...]:
         """Return Google-style entries parsed from a section body."""
         entries: list[DocstringEntry] = []
         index = start
@@ -1870,7 +1957,14 @@ class _DocstringParser:
                     or (len(names) == 1 and self._google_name_is_credible(kind, names[0], closed_parenthesized=complete_match.type_text is not None or complete_match.signature_text is not None))
                 )
                 if credible:
-                    self._record_convention_entry_issue(ConventionEntryIssue(kind=ConventionEntryIssueKind.GOOGLE_ENTRY_INDENTATION, start_line=index, names=names))
+                    self._record_convention_entry_issue(
+                        ConventionEntryIssue(
+                            kind=ConventionEntryIssueKind.GOOGLE_ENTRY_INDENTATION,
+                            start_line=index,
+                            names=names,
+                            replacement=ConventionEntryReplacement(0, len(self.lines[index].text_indent), f"{section_text_indent}{text_layout.indent_unit(self.settings)}"),
+                        )
+                    )
                 match = None
             if match is None:
                 if detects_malformed:
@@ -1914,11 +2008,13 @@ class _DocstringParser:
             entry = DocstringEntry(
                 kind=kind,
                 names=names,
+                name_slots=_name_slots_from_text(index, match.name, names, start_column=match.name_start),
                 type_info=type_info if type_info is not None else DocstringTypeInfo(text=type_text.strip(), slot=None) if type_text else None,
                 description=" ".join(description_lines).strip(),
                 description_lines=tuple(description_fragments),
                 start_line=index,
                 end_line=entry_end,
+                type_edit_slot=_google_type_edit_slot(index, match),
             )
             entries.append(entry)
             if not first_description and entry_end == index + 1:
@@ -1955,7 +2051,14 @@ class _DocstringParser:
                     description_fragments.extend(self._stripped_reflow_lines(index + 1, entry_end, skip_empty=True))
                     description_lines = [line.text for line in description_fragments]
                     entry = DocstringEntry(
-                        kind=kind, names=names, type_info=None, description=" ".join(description_lines), description_lines=tuple(description_fragments), start_line=index, end_line=entry_end
+                        kind=kind,
+                        names=names,
+                        name_slots=_name_slots_from_text(index, exception_match.group("name"), names, start_column=exception_match.start("name")),
+                        type_info=None,
+                        description=" ".join(description_lines),
+                        description_lines=tuple(description_fragments),
+                        start_line=index,
+                        end_line=entry_end,
                     )
                     entries.append(entry)
                     if not description_lines and entry_end == index + 1:
@@ -1973,7 +2076,16 @@ class _DocstringParser:
                 continue
             method_match = _match_numpy_method_entry(text) if kind is DocstringEntryKind.METHOD else None
             if method_match is not None:
-                entry = self._numpy_continuation_entry(index, end, kind=kind, names=(method_match.name.strip(),), type_info=None, entry_indent=text_layout.leading_width(method_match.indent))
+                names = (method_match.name.strip(),)
+                entry = self._numpy_continuation_entry(
+                    index,
+                    end,
+                    kind=kind,
+                    names=names,
+                    name_slots=_name_slots_from_text(index, method_match.name, names, start_column=method_match.name_start),
+                    type_info=None,
+                    entry_indent=text_layout.leading_width(method_match.indent),
+                )
                 entries.append(entry)
                 index = entry.end_line
                 continue
@@ -1993,6 +2105,7 @@ class _DocstringParser:
                     end,
                     kind=kind,
                     names=names,
+                    name_slots=_name_slots_from_text(index, match.group("name"), names, start_column=match.start("name")),
                     type_info=type_info if type_info is not None else DocstringTypeInfo(text=match.group("type").strip(), slot=None),
                     entry_indent=text_layout.leading_width(match.group("indent")),
                 )
@@ -2020,6 +2133,7 @@ class _DocstringParser:
                 entry = DocstringEntry(
                     kind=kind,
                     names=names,
+                    name_slots=_name_slots_from_text(index, text, names),
                     type_info=None if is_exception_name_entry_kind(kind) else type_info if type_info is not None else DocstringTypeInfo(text=text.strip(), slot=None),
                     description=" ".join(description_lines),
                     description_lines=tuple(description_fragments),
@@ -2043,12 +2157,16 @@ class _DocstringParser:
             index += 1
         return tuple(entries)
 
-    def _numpy_continuation_entry(self, index: int, end: int, *, kind: DocstringEntryKind, names: tuple[str, ...], type_info: DocstringTypeInfo | None, entry_indent: int) -> DocstringEntry:
+    def _numpy_continuation_entry(
+        self, index: int, end: int, *, kind: DocstringEntryKind, names: tuple[str, ...], name_slots: tuple[DocstringNameSlot | None, ...], type_info: DocstringTypeInfo | None, entry_indent: int
+    ) -> DocstringEntry:
         """Parse a NumPy entry whose description begins on a continuation line."""
         entry_end = self._entry_end(index, end, entry_indent)
         description_fragments = tuple(self._stripped_reflow_lines(index + 1, entry_end, skip_empty=True))
         description_lines = tuple(line.text for line in description_fragments)
-        entry = DocstringEntry(kind=kind, names=names, type_info=type_info, description=" ".join(description_lines), description_lines=description_fragments, start_line=index, end_line=entry_end)
+        entry = DocstringEntry(
+            kind=kind, names=names, name_slots=name_slots, type_info=type_info, description=" ".join(description_lines), description_lines=description_fragments, start_line=index, end_line=entry_end
+        )
         if not description_lines and entry_end == index + 1:
             self._record_numpy_continuation_issue(index + 1, end, entry=entry, entry_indent=text_layout.leading_width(self.lines[index].raw_indent))
         if description_lines:
@@ -2064,23 +2182,31 @@ class _DocstringParser:
 
     def _record_google_head_issue(self, index: int, *, kind: DocstringEntryKind) -> None:
         """Record a high-confidence malformed Google entry head."""
-        match = (_METHOD_ENTRY_CANDIDATE_RE if kind is DocstringEntryKind.METHOD else _GOOGLE_CANDIDATE_RE).match(self.lines[index].text)
+        text = self.lines[index].text
+        match = (_METHOD_ENTRY_CANDIDATE_RE if kind is DocstringEntryKind.METHOD else _GOOGLE_CANDIDATE_RE).match(text)
         if (
             is_exception_name_entry_kind(kind)
             and (match is None or not match.group("tail").lstrip(ascii_whitespace.SPACE_AND_TAB).startswith("("))
-            and (exception_names := _google_exception_missing_separator_names(self.lines[index].text)) is not None
+            and (exception_head := _google_exception_missing_separator(text)) is not None
         ):
-            self._record_convention_entry_issue(ConventionEntryIssue(kind=ConventionEntryIssueKind.GOOGLE_MISSING_SEPARATOR, start_line=index, names=exception_names))
+            exception_names, head_end = exception_head
+            self._record_convention_entry_issue(
+                ConventionEntryIssue(kind=ConventionEntryIssueKind.GOOGLE_MISSING_SEPARATOR, start_line=index, names=exception_names, replacement=ConventionEntryReplacement(head_end, head_end, ":"))
+            )
             return
         if match is None:
             return
         name = match.group("name")
-        tail = match.group("tail").lstrip(ascii_whitespace.SPACE_AND_TAB)
+        raw_tail = match.group("tail")
+        tail = raw_tail.lstrip(ascii_whitespace.SPACE_AND_TAB)
+        tail_start = match.start("tail") + len(raw_tail) - len(tail)
         names = (name,)
+        replacement = None
         if not tail.startswith("("):
             if is_exception_name_entry_kind(kind) or tail.startswith(":") or not self._google_name_is_credible(kind, name, closed_parenthesized=False):
                 return
             issue_kind = ConventionEntryIssueKind.GOOGLE_MISSING_SEPARATOR
+            replacement = ConventionEntryReplacement(match.end("name"), match.end("name"), ":")
         else:
             closing = _balanced_delimiter_end(tail, 0)
             if closing is None:
@@ -2096,7 +2222,9 @@ class _DocstringParser:
                 if after_type.startswith(":") or not self._google_name_is_credible(kind, name, closed_parenthesized=True):
                     return
                 issue_kind = ConventionEntryIssueKind.GOOGLE_MISSING_SEPARATOR
-        self._record_convention_entry_issue(ConventionEntryIssue(kind=issue_kind, start_line=index, names=names))
+                separator_column = tail_start + closing + 1
+                replacement = ConventionEntryReplacement(separator_column, separator_column, ":")
+        self._record_convention_entry_issue(ConventionEntryIssue(kind=issue_kind, start_line=index, names=names, replacement=replacement))
 
     def _google_name_is_credible(self, kind: DocstringEntryKind, name: str, *, closed_parenthesized: bool) -> bool:
         """Return whether a recovered Google name is sufficiently entry-like."""
@@ -2121,7 +2249,13 @@ class _DocstringParser:
                 return
         if not self._is_incorrect_continuation(index, end, entry_indent=entry_indent):
             return
-        self._record_convention_entry_issue(ConventionEntryIssue(kind=ConventionEntryIssueKind.GOOGLE_CONTINUATION_INDENTATION, start_line=index, names=entry.names))
+        line = self.lines[index]
+        desired_indent = f"{self.lines[entry.start_line].text_indent}{text_layout.indent_unit(self.settings)}"
+        self._record_convention_entry_issue(
+            ConventionEntryIssue(
+                kind=ConventionEntryIssueKind.GOOGLE_CONTINUATION_INDENTATION, start_line=index, names=entry.names, replacement=ConventionEntryReplacement(0, len(line.text_indent), desired_indent)
+            )
+        )
 
     def _record_numpy_head_issue(self, index: int, *, kind: DocstringEntryKind) -> None:
         """Record a high-confidence malformed NumPy entry head."""
@@ -2144,7 +2278,11 @@ class _DocstringParser:
             or not self._is_missing_separator_type(candidate.group("type"))
         ):
             return
-        self._record_convention_entry_issue(ConventionEntryIssue(kind=ConventionEntryIssueKind.NUMPY_MISSING_SEPARATOR, start_line=index, names=names))
+        leading = len(text) - len(text.lstrip(ascii_whitespace.SPACE_AND_TAB))
+        separator_column = leading + candidate.end("names")
+        self._record_convention_entry_issue(
+            ConventionEntryIssue(kind=ConventionEntryIssueKind.NUMPY_MISSING_SEPARATOR, start_line=index, names=names, replacement=ConventionEntryReplacement(separator_column, separator_column, ":"))
+        )
 
     def _numpy_names_are_credible(self, kind: DocstringEntryKind, names: tuple[str, ...]) -> bool:
         """Return whether recovered NumPy names match their owner inventory."""
@@ -2170,7 +2308,13 @@ class _DocstringParser:
                 return
         if not self._is_incorrect_continuation(index, end, entry_indent=entry_indent):
             return
-        self._record_convention_entry_issue(ConventionEntryIssue(kind=ConventionEntryIssueKind.NUMPY_CONTINUATION_INDENTATION, start_line=index, names=entry.names))
+        line = self.lines[index]
+        desired_indent = f"{self.lines[entry.start_line].text_indent}{text_layout.indent_unit(self.settings)}"
+        self._record_convention_entry_issue(
+            ConventionEntryIssue(
+                kind=ConventionEntryIssueKind.NUMPY_CONTINUATION_INDENTATION, start_line=index, names=entry.names, replacement=ConventionEntryReplacement(0, len(line.text_indent), desired_indent)
+            )
+        )
 
     def _is_missing_separator_type(self, text: str) -> bool:
         """Return a docstring-local cached conservative type classification."""
@@ -2200,19 +2344,68 @@ class _DocstringParser:
 
     def _missing_rest_delimiter_issue(self, index: int) -> ConventionEntryIssue | None:
         """Return a recognized reStructuredText field missing its closing delimiter."""
-        text = self.lines[index].text.lstrip(ascii_whitespace.SPACE_AND_TAB)
+        line_text = self.lines[index].text
+        leading = len(line_text) - len(line_text.lstrip(ascii_whitespace.SPACE_AND_TAB))
+        text = line_text[leading:]
         if not text.startswith(":") or text.startswith("::"):
             return None
         field_match = re.match(r":(?P<field>[\w-]+)(?=$|[ \t])", text)
         if field_match is None or ":" in text[field_match.end() :]:
             return None
         field = field_match.group("field").lower()
-        if docstring_sections.rest_field_metadata(field) is None:
+        metadata = docstring_sections.rest_field_metadata(field)
+        if metadata is None:
             return None
-        tail = text[field_match.end() :].strip()
-        if not _rest_missing_delimiter_is_credible(field, tail):
+        credible, replacement = self._missing_rest_delimiter_analysis(text, leading=leading, field_match=field_match, family=metadata[0])
+        if not credible:
             return None
-        return ConventionEntryIssue(kind=ConventionEntryIssueKind.REST_MISSING_CLOSING_DELIMITER, start_line=index, field_name=field)
+        return ConventionEntryIssue(kind=ConventionEntryIssueKind.REST_MISSING_CLOSING_DELIMITER, start_line=index, field_name=field, replacement=replacement)
+
+    def _missing_rest_delimiter_analysis(self, text: str, *, leading: int, field_match: re.Match[str], family: docstring_sections.RestFieldFamily) -> tuple[bool, ConventionEntryReplacement | None]:
+        """Return whether a malformed field is credible and its safe delimiter repair."""
+        if family.argument_policy is not docstring_sections.RestFieldArgumentPolicy.REQUIRED:
+            if text[field_match.end() :].strip(ascii_whitespace.SPACE_AND_TAB):
+                return False, None
+            delimiter_column = leading + len(text.rstrip(ascii_whitespace.SPACE_AND_TAB))
+            return True, ConventionEntryReplacement(delimiter_column, delimiter_column, ":")
+        tail_start = field_match.end()
+        raw_tail = text[tail_start:]
+        if family.kind == DocstringEntryKind.EXCEPTION.value:
+            exception_head = _google_exception_missing_separator(raw_tail)
+            if exception_head is not None:
+                _, head_end = exception_head
+            else:
+                stripped_tail = raw_tail.strip(ascii_whitespace.SPACE_AND_TAB)
+                names = _exception_names(stripped_tail)
+                if names is None or not all(_is_exception_like_name(name) for name in names):
+                    return False, None
+                head_end = len(raw_tail.rstrip(ascii_whitespace.SPACE_AND_TAB))
+            delimiter_column = leading + tail_start + head_end
+            return True, ConventionEntryReplacement(delimiter_column, delimiter_column, ":")
+        if family.kind == DocstringEntryKind.PARAMETER.value:
+            owner_names = self.malformed_entry_confidence.parameter_names
+            owner_matches = tuple(match for match in _ENTRY_NAME_RE.finditer(raw_tail) if match.group().lstrip("*") in owner_names and _entry_name_match_is_token(raw_tail, match))
+            eligible_matches = tuple(match for match in owner_matches if not (prefix := raw_tail[: match.start()].strip(ascii_whitespace.SPACE_AND_TAB)) or self._is_missing_separator_type(prefix))
+            first_argument = raw_tail.strip(ascii_whitespace.SPACE_AND_TAB).split(None, 1)[0] if raw_tail.strip(ascii_whitespace.SPACE_AND_TAB) else ""
+            credible = _ENTRY_NAME_RE.fullmatch(first_argument) is not None or bool(eligible_matches)
+            if not credible or len(owner_matches) != 1 or len(eligible_matches) != 1:
+                return credible, None
+            match = eligible_matches[0]
+        elif family.kind == DocstringEntryKind.ATTRIBUTE.value:
+            owner_names = self.malformed_entry_confidence.attribute_names
+            stripped_tail = raw_tail.strip(ascii_whitespace.SPACE_AND_TAB)
+            first_argument = stripped_tail.split(None, 1)[0] if stripped_tail else ""
+            if _ENTRY_NAME_RE.fullmatch(first_argument) is None:
+                return False, None
+            if first_argument not in owner_names:
+                return True, None
+            match = _ENTRY_NAME_RE.search(raw_tail)
+            if match is None:
+                return True, None
+        else:
+            return False, None
+        delimiter_column = leading + tail_start + match.end()
+        return True, ConventionEntryReplacement(delimiter_column, delimiter_column, ":")
 
     def _record_convention_entry_issue(self, issue: ConventionEntryIssue) -> None:
         """Record the highest-priority malformed entry issue for one line."""
@@ -2268,6 +2461,7 @@ class _DocstringParser:
             entry = DocstringEntry(
                 kind=kind,
                 names=names,
+                name_slots=_rest_name_slots(start, match, names),
                 type_info=type_info if type_info is not None else DocstringTypeInfo(text=type_text, slot=None) if type_text is not None else None,
                 description=description,
                 description_lines=tuple(description_fragments),
@@ -2624,6 +2818,36 @@ def _rest_entry_metadata(field: str, argument: str) -> tuple[DocstringEntryKind,
     return kind, (name,), type_text
 
 
+def _rest_name_slots(line_index: int, match: re.Match[str], names: tuple[str, ...]) -> tuple[DocstringNameSlot | None, ...]:
+    """Return name slots aligned with a parsed reStructuredText field."""
+    argument = match.group("argument")
+    if argument is None:
+        return (None,) * len(names)
+    if len(names) == 1:
+        name = names[0]
+        name_start = argument.rfind(name)
+        if name_start < 0:
+            return (None,)
+        start_column = match.start("argument") + name_start
+        return (DocstringNameSlot(line_index=line_index, start_column=start_column, end_column=start_column + len(name)),)
+    return _name_slots_from_text(line_index, argument, names, start_column=match.start("argument"))
+
+
+def _name_slots_from_text(line_index: int, text: str, names: tuple[str, ...], *, start_column: int = 0) -> tuple[DocstringNameSlot | None, ...]:
+    """Return sequential source spans for parsed names within parser-owned text."""
+    slots: list[DocstringNameSlot | None] = []
+    search_start = 0
+    for name in names:
+        name_start = text.find(name, search_start)
+        if name_start < 0:
+            slots.append(None)
+            continue
+        name_end = name_start + len(name)
+        slots.append(DocstringNameSlot(line_index=line_index, start_column=start_column + name_start, end_column=start_column + name_end))
+        search_start = name_end
+    return tuple(slots)
+
+
 def _entry_names(kind: DocstringEntryKind, text: str) -> tuple[str, ...] | None:
     """Return parsed entry names for a convention entry."""
     if is_exception_name_entry_kind(kind):
@@ -2651,9 +2875,10 @@ def _is_numpy_exception_entry(text: str) -> bool:
     return _exception_names(match.group("name") if match is not None else text.strip()) is not None
 
 
-def _google_exception_missing_separator_names(text: str) -> tuple[str, ...] | None:
-    """Return a complete exception-like name list followed by description text."""
-    stripped = text.strip()
+def _google_exception_missing_separator(text: str) -> tuple[tuple[str, ...], int] | None:
+    """Return exception-like names and their head end before description text."""
+    stripped = text.strip(ascii_whitespace.SPACE_AND_TAB)
+    leading = len(text) - len(text.lstrip(ascii_whitespace.SPACE_AND_TAB))
     names: list[str] = []
     position = 0
     while True:
@@ -2682,7 +2907,7 @@ def _google_exception_missing_separator_names(text: str) -> tuple[str, ...] | No
             continue
         if after_whitespace == position or after_whitespace == len(stripped):
             return None
-        return tuple(names) if all(_is_exception_like_name(name) for name in names) else None
+        return (tuple(names), leading + position) if all(_is_exception_like_name(name) for name in names) else None
 
 
 def _exception_names(text: str) -> tuple[str, ...] | None:
@@ -2715,21 +2940,9 @@ def _rest_field_arity_issue(field: str, argument: str) -> ConventionEntryIssueKi
     return None
 
 
-def _rest_missing_delimiter_is_credible(field: str, tail: str) -> bool:
-    """Return whether a delimiter-free standard field has credible arity."""
-    metadata = docstring_sections.rest_field_metadata(field)
-    if metadata is None:
-        return False
-    family = metadata[0]
-    if family.argument_policy is not docstring_sections.RestFieldArgumentPolicy.REQUIRED:
-        return not tail
-    if not tail:
-        return False
-    argument = tail.split(None, 1)[0]
-    if family.kind == DocstringEntryKind.EXCEPTION.value:
-        names = _exception_names(argument)
-        return names is not None and all(_is_exception_like_name(name) for name in names)
-    return _ENTRY_NAME_RE.fullmatch(argument) is not None
+def _entry_name_match_is_token(text: str, match: re.Match[str]) -> bool:
+    """Return whether an entry-name match occupies one space-delimited token."""
+    return (match.start() == 0 or text[match.start() - 1] in ascii_whitespace.SPACE_AND_TAB) and (match.end() == len(text) or text[match.end()] in ascii_whitespace.SPACE_AND_TAB)
 
 
 def _strip_exception_code_span(text: str) -> str:
@@ -2743,7 +2956,7 @@ def _google_none_value_entry(kind: DocstringEntryKind, text: str, *, start: int)
     """Return a Google return/yield entry for bare None spellings."""
     if kind not in {DocstringEntryKind.RETURN, DocstringEntryKind.YIELD} or not text[:1].isspace() or text.strip() not in {"None", "None."}:
         return None
-    return DocstringEntry(kind=kind, names=(), type_info=DocstringTypeInfo(text="None", slot=None), description="", description_lines=(), start_line=start, end_line=start + 1)
+    return DocstringEntry(kind=kind, names=(), name_slots=(), type_info=DocstringTypeInfo(text="None", slot=None), description="", description_lines=(), start_line=start, end_line=start + 1)
 
 
 def _is_adornment(text: str) -> bool:
@@ -2886,7 +3099,7 @@ def planned_simple_docstring_source_change(
 
 
 def planned_simple_docstring_text_change(
-    docstring: DocstringInfo, *, context: RuleContext, replacement: rule_edits.PlannedTextReplacement, expected_value: str, expected_source: str | None = None
+    docstring: DocstringInfo, *, context: RuleContext, replacement: rule_edits.PlannedTextReplacement, expected_value: str, expected_source: str | None = None, replacement_source: str | None = None
 ) -> rule_edits.PlannedSourceChange | None:
     """Return one source-slice replacement from an evaluated-value replacement.
 
@@ -2896,6 +3109,7 @@ def planned_simple_docstring_text_change(
         replacement (rule_edits.PlannedTextReplacement): Evaluated-offset replacement to map into current source text.
         expected_value (str): Complete evaluated docstring value expected after applying the replacement.
         expected_source (str | None): Optional exact source spelling required for the replaced value slice.
+        replacement_source (str | None): Optional source spelling that differs from the evaluated replacement text.
 
     Returns:
         Planned replacement for the mapped source slice, or None when the source mapping is unsafe.
@@ -2906,7 +3120,8 @@ def planned_simple_docstring_text_change(
         return None
     if expected_source is not None and source_map.producing_source_for_value_slice(replacement.start_offset, replacement.end_offset) != expected_source:
         return None
-    replacement_body = source_map.body_source_with_replacements(((replacement.start_offset, replacement.end_offset, replacement.text),))
+    source_text = replacement.text if replacement_source is None else replacement_source
+    replacement_body = source_map.body_source_with_replacements(((replacement.start_offset, replacement.end_offset, source_text),))
     if (
         not isinstance(docstring.node, cst.SimpleString)
         or string_literals.render_simple_string_from_body_source(docstring.node.prefix, docstring.node.quote, replacement_body, expected_value=expected_value) is None
@@ -2915,7 +3130,7 @@ def planned_simple_docstring_text_change(
     return rule_edits.PlannedSourceChange(
         edit=rule_edits.SourceEdit(
             range=simple_docstring_source_range(docstring, source_map=source_map, start_offset=replacement.start_offset, end_offset=replacement.end_offset, line_bounds=line_bounds),
-            replacement=replacement.text,
+            replacement=source_text,
         ),
         line_numbers=replacement.line_numbers,
         suppression_line_numbers=(),

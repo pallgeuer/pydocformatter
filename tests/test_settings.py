@@ -268,6 +268,7 @@ def test_cache_identity_roles_have_exact_current_field_membership() -> None:
             "docstring_missing_documentation",
             "docstring_missing_documentation_public_only",
             "docstring_require_init_attribute_documentation",
+            "docstring_include_assertion_errors",
             "docstring_class_attribute_no_type_base_classes",
             "docstring_forbidden_function_decorators",
             "docstring_optional_function_decorators",
@@ -346,6 +347,7 @@ def test_setting_definitions_are_iterable_by_group() -> None:
         "docstring_missing_documentation",
         "docstring_missing_documentation_public_only",
         "docstring_require_init_attribute_documentation",
+        "docstring_include_assertion_errors",
         "docstring_class_attribute_no_type_base_classes",
         "docstring_forbidden_function_decorators",
         "docstring_optional_function_decorators",
@@ -890,6 +892,7 @@ def test_load_settings_defaults_in_isolated_mode(monkeypatch: pytest.MonkeyPatch
     assert config.indent_width == 4
     assert config.parallelism == 0.0  # noqa: RUF069
     assert config.docstring_convention is pydocformatter_settings.DocstringConvention.PEP257
+    assert not config.docstring_include_assertion_errors
     assert config.docstring_placeholder_markers == pydocformatter_settings.DEFAULT_DOCSTRING_PLACEHOLDER_MARKERS
     assert not config.comment_join_standalone_lines
     assert config.comment_format_list_items
@@ -1149,7 +1152,7 @@ def test_nested_docstring_table_settings_are_loaded_from_pyproject(monkeypatch: 
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
         (root / "pyproject.toml").write_text(
-            '[tool.pydocfmt.docstring]\nconvention = "google"\nblank-line-style = "aligned"\nblank-line-after-last-section = true\nplaceholder-markers = ["WIP", "..."]\nproperty-decorators = ["project.Property"]\nparse-tables = false\n',
+            '[tool.pydocfmt.docstring]\nconvention = "google"\nblank-line-style = "aligned"\nblank-line-after-last-section = true\ninclude-assertion-errors = true\nplaceholder-markers = ["WIP", "..."]\nproperty-decorators = ["project.Property"]\nparse-tables = false\n',
             encoding="utf-8",
         )
         monkeypatch.chdir(root)
@@ -1158,6 +1161,7 @@ def test_nested_docstring_table_settings_are_loaded_from_pyproject(monkeypatch: 
     assert config.docstring_convention == pydocformatter_settings.DocstringConvention.GOOGLE
     assert config.docstring_blank_line_style == pydocformatter_settings.DocstringBlankLineStyle.ALIGNED
     assert config.docstring_blank_line_after_last_section
+    assert config.docstring_include_assertion_errors
     assert config.docstring_placeholder_markers == ("WIP", "...")
     assert config.docstring_property_decorators == ("project.Property",)
     assert not config.docstring_parse_tables
@@ -1222,14 +1226,17 @@ def test_per_file_settings_are_loaded(monkeypatch: pytest.MonkeyPatch) -> None:
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
         (root / "pyproject.toml").write_text(
-            '[tool.pydocfmt.per-file-settings]\n"tests/*.py" = { docstring = { missing-documentation = "has-section" }, comment = { detect-code = true } }\n"generated/*.py" = { line-length = 100 }\n',
+            '[tool.pydocfmt.per-file-settings]\n"tests/*.py" = { docstring = { missing-documentation = "has-section", include-assertion-errors = true }, comment = { detect-code = true } }\n"generated/*.py" = { line-length = 100 }\n',
             encoding="utf-8",
         )
         monkeypatch.chdir(root)
         config = pydocformatter_settings.SETTINGS_SCHEMA.load()
 
     assert config.per_file_settings == (
-        ("tests/*.py", (("docstring-missing-documentation", pydocformatter_settings.DocstringMissingDocumentation.HAS_SECTION), ("comment-detect-code", True))),
+        (
+            "tests/*.py",
+            (("docstring-missing-documentation", pydocformatter_settings.DocstringMissingDocumentation.HAS_SECTION), ("docstring-include-assertion-errors", True), ("comment-detect-code", True)),
+        ),
         ("generated/*.py", (("line-length", 100),)),
     )
 
@@ -1447,7 +1454,7 @@ def test_docstring_parsing_settings_are_loaded_and_validated() -> None:
         global_values=pydocformatter_global_args.GlobalArgs(
             isolated=True,
             config_options=(
-                'docstring-convention = "google"\ndocstring-blank-line-style = "aligned"\ndocstring-blank-line-after-last-section = true\ndocstring-missing-documentation = "all-docstrings"\ndocstring-missing-documentation-public-only = false\ndocstring-require-init-attribute-documentation = true\ndocstring-class-attribute-no-type-base-classes = ["enum.Enum"]\ndocstring-forbidden-function-decorators = ["project.overload"]\ndocstring-optional-function-decorators = ["project.override"]\ndocstring-placeholder-markers = ["TODO", "NotImplemented", "..."]\ndocstring-property-decorators = ["project.Property"]\ndocstring-parse-tables = false',
+                'docstring-convention = "google"\ndocstring-blank-line-style = "aligned"\ndocstring-blank-line-after-last-section = true\ndocstring-missing-documentation = "all-docstrings"\ndocstring-missing-documentation-public-only = false\ndocstring-require-init-attribute-documentation = true\ndocstring-include-assertion-errors = true\ndocstring-class-attribute-no-type-base-classes = ["enum.Enum"]\ndocstring-forbidden-function-decorators = ["project.overload"]\ndocstring-optional-function-decorators = ["project.override"]\ndocstring-placeholder-markers = ["TODO", "NotImplemented", "..."]\ndocstring-property-decorators = ["project.Property"]\ndocstring-parse-tables = false',
             ),
         )
     )
@@ -1460,6 +1467,7 @@ def test_docstring_parsing_settings_are_loaded_and_validated() -> None:
             docstring_missing_documentation="non-summary-docstrings",
             docstring_missing_documentation_public_only=True,
             docstring_require_init_attribute_documentation=False,
+            docstring_include_assertion_errors=False,
             docstring_class_attribute_no_type_base_classes=("Flag,enum.Flag",),
             docstring_forbidden_function_decorators=("typing.overload,overload",),
             docstring_optional_function_decorators=("typing.override,override",),
@@ -1474,6 +1482,7 @@ def test_docstring_parsing_settings_are_loaded_and_validated() -> None:
     assert configured.docstring_missing_documentation == pydocformatter_settings.DocstringMissingDocumentation.ALL_DOCSTRINGS
     assert not configured.docstring_missing_documentation_public_only
     assert configured.docstring_require_init_attribute_documentation
+    assert configured.docstring_include_assertion_errors
     assert configured.docstring_class_attribute_no_type_base_classes == ("enum.Enum",)
     assert configured.docstring_forbidden_function_decorators == ("project.overload",)
     assert configured.docstring_optional_function_decorators == ("project.override",)
@@ -1486,6 +1495,7 @@ def test_docstring_parsing_settings_are_loaded_and_validated() -> None:
     assert overridden.docstring_missing_documentation == pydocformatter_settings.DocstringMissingDocumentation.NON_SUMMARY_DOCSTRINGS
     assert overridden.docstring_missing_documentation_public_only
     assert not overridden.docstring_require_init_attribute_documentation
+    assert not overridden.docstring_include_assertion_errors
     assert overridden.docstring_class_attribute_no_type_base_classes == ("Flag", "enum.Flag")
     assert overridden.docstring_forbidden_function_decorators == ("typing.overload", "overload")
     assert overridden.docstring_optional_function_decorators == ("typing.override", "override")

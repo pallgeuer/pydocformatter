@@ -96,7 +96,7 @@ class _FormattedUnit:
 def _violations(context: RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
     """Return safe fixes and ambiguity-protected standalone findings."""
     data = PCF_definition.PCF.require_data(context)
-    violations: list[rule_violations.RuleViolation] = []
+    violations = list(_empty_comment_violations(data))
     for run in data.standalone_runs:
         preserved = comment_helpers.preserved_indices(run, settings=context.settings)
         unicode_barriers = {index for index, comment in enumerate(run.comments) if comment.unicode_occurrences}
@@ -143,6 +143,24 @@ def _violations(context: RuleContext) -> tuple[rule_violations.RuleViolation, ..
                 else:
                     violations.append(rule_violations.violation_for_planned_source_change(PCF001StandaloneCommentFormatting.meta, canonical_change))
             index = formatted.end
+    violations.sort(key=lambda violation: violation.finding.line_numbers)
+    return tuple(violations)
+
+
+def _empty_comment_violations(data: PCF_definition.PCFCategoryData) -> tuple[rule_violations.RuleViolation, ...]:
+    """Return fixes for standalone comments with ASCII-horizontal-whitespace payloads."""
+    violations: list[rule_violations.RuleViolation] = []
+    for comment in data.comments:
+        if (
+            comment.placement is not PCF_definition.CommentPlacement.STANDALONE
+            or comment.kind is not PCF_definition.CommentKind.REGULAR
+            or not comment.raw_content
+            or any(character not in " \t\f" for character in comment.raw_content)
+        ):
+            continue
+        change = PCF_definition.planned_full_line_change(data, comment, f"{comment.indent}#")
+        if change is not None:
+            violations.append(rule_violations.violation_for_planned_source_change(PCF001StandaloneCommentFormatting.meta, change))
     return tuple(violations)
 
 

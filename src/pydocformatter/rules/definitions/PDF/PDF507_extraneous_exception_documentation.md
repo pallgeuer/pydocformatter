@@ -5,9 +5,11 @@ Fix is not available.
 Rule is disabled if `docstring-convention` is `none` or `pep257`, and ignored by broad selectors under `google`, `numpy`, and `rest`.
 
 ## What it does
-Checks function and method docstrings for documented exception classes that are not directly raised by the function body.
+Checks function and method docstrings for documented exception classes that are not directly raised by the function body. When `docstring-include-assertion-errors` is enabled, every syntactic `assert` also makes documented `AssertionError` non-extraneous.
 
 The rule recognizes direct raises such as `raise ValueError`, `raise ValueError(...)`, `raise errors.ValueError`, and `raise errors.ValueError(...)`. Bare re-raises and dynamic raises such as `raise error` are ignored. Exception names are compared case-sensitively. Qualified names match exactly when both sides are qualified; otherwise the final class-name component is compared, so `errors.CustomError()` matches documented `CustomError` but not documented `other.CustomError`. Duplicate stale documented exception entries produce duplicate findings.
+
+Assertion collection is syntactic and does not attempt reachability analysis. Constant-true assertions and assertions inside branches, loops, and exception handlers all count when the option is enabled. Assertions inside nested functions, nested classes, and lambdas do not belong to the enclosing function. The option is disabled by default because optimized Python execution can remove assertions and because assertions often express internal invariants rather than public API contracts.
 
 Exception documentation is read from recognized `Raises` sections and parsed reST exception fields. Prose-only `Raises` content and warning sections such as `Warns` and `Warnings` are not exception documentation for this rule. Functions without docstrings, abstract methods, and stub functions are ignored. Nested functions, classes, and lambdas are ignored by the enclosing function and checked independently when they have their own docstrings.
 
@@ -185,6 +187,47 @@ def parse(value):
 PDF507: Line 4: Docstring documents exception 'ValueError' that is not explicitly raised
 ```
 
+By default, an `assert` does not make documented `AssertionError` non-extraneous:
+
+```pydocfmt-example
+[settings]
+docstring-convention = "google"
+
+[input]
+def validate(value):
+    """Validate a value.
+
+    Raises:
+        AssertionError: The value is false.
+    """
+    assert value
+
+[output=unchanged]
+[findings]
+PDF507: Line 5: Docstring documents exception 'AssertionError' that is not explicitly raised
+```
+
+An enabled assertion inventory accepts documented `AssertionError`:
+
+```pydocfmt-example
+[settings]
+docstring-convention = "google"
+docstring-include-assertion-errors = true
+
+[input]
+def validate(value):
+    """Validate a value.
+
+    Raises:
+        AssertionError: The value is false.
+    """
+    assert value
+
+[output=unchanged]
+```
+
+Disabled conventions leave the rule inactive:
+
 ```pydocfmt-example
 [settings]
 docstring-convention = "none"
@@ -201,4 +244,4 @@ def parse(value):
 ```
 
 ## Options
-None.
+- `docstring-include-assertion-errors`: Treats every syntactic `assert` as a possible `AssertionError` when enabled.

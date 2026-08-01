@@ -338,6 +338,19 @@ def example():
     """
 ```
 
+Text that already fits the configured line length is unchanged:
+
+```pydocfmt-example
+[settings]
+line-length = 72
+
+[input]
+def area(radius):
+    """Return the area of a circle."""
+
+[output=unchanged]
+```
+
 ## Options
 - `line-length`: Maximum display width used when wrapping generated docstring lines.
 - `url-aware-wrapping`: Uses balanced rather than greedy line selection around destination-bearing tokens; recognized markup remains indivisible either way.

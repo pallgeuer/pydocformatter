@@ -7,9 +7,11 @@ Rule is disabled if `docstring-convention` is `none` or `pep257`.
 Rule is incompatible with `PDF710`.
 
 ## What it does
-Checks that parsed yield docstring types conservatively match recognized generator or iterator return annotations.
+Checks that parsed yield docstring types conservatively match the yielded type extracted from recognized generator or iterator return annotations. It checks existing yield entries only in functions that contain yield expressions.
 
-The comparison uses a small, syntax-only type-expression subset and extracts the first type argument from recognized generator and iterator return annotations resolved from `typing`, `collections.abc`, or direct qualified names such as `typing.Iterator`. Unparseable, ambiguous, or unrecognized annotations are skipped instead of guessed.
+The yielded type is the first type argument of `Generator`, `Iterator`, `Iterable`, `AsyncGenerator`, `AsyncIterator`, or `AsyncIterable` from `typing` or `collections.abc`. Direct qualified names, stringized annotations, and unshadowed import aliases are recognized; local or shadowed names are not assumed to be typing containers.
+
+The comparison uses a syntax-only type-expression subset that covers common names, qualified names, subscriptions, tuples, and unions. Unparseable, unsupported, ambiguous, or unrecognized annotations are skipped instead of guessed. Google, NumPy, and inline or paired reStructuredText types are supported. Findings are diagnostic-only because choosing between conflicting documentation and code requires human judgment.
 
 ## Why is this useful?
 Stale yield type text can mislead readers when generator annotations have changed.
@@ -57,6 +59,26 @@ def function() -> typing.Generator[dict[str, int], None, None]:
     yield {"value": 1}
 
 [output=unchanged]
+```
+
+For paired reStructuredText fields, a mismatch is reported on the `:ytype:` field:
+
+```pydocfmt-example
+[settings]
+docstring-convention = "rest"
+
+[input]
+def function() -> typing.Iterator[int]:
+    """Yield values.
+
+    :yields: Next value.
+    :ytype: str
+    """
+    yield 1
+
+[output=unchanged]
+[findings]
+PDF711: Line 5: Function yield 'yield' docstring type does not match the annotation
 ```
 
 Unrecognized generator annotations are skipped by mismatch checks:

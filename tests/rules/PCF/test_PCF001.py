@@ -211,7 +211,7 @@ def test_comment_edits_preserve_untouched_mixed_endings_and_use_configured_gener
         ("    #indented comment", 80, "    # indented comment"),
         ("# supercalifragilisticexpialidocious", 12, "# supercalifragilisticexpialidocious"),
         ("# alpha-beta-gamma-delta", 12, "# alpha-beta-gamma-delta"),
-        ("#\n#   \n##\n###   \n", 12, "#\n#   \n##\n###   \n"),
+        ("#\n#   \n##\n###   \n", 12, "#\n#\n##\n###   \n"),
     ],
 )
 def test_standalone_spacing_long_tokens_hash_boundaries_and_eof_are_stable(source: str, line_length: int, expected: str) -> None:
@@ -224,6 +224,58 @@ def test_standalone_wrapping_preserves_missing_final_newline() -> None:
     result = pcf_helpers.format_pcf(source, line_length=16, comment_detect_statements=False)
 
     assert result.new_source == "# alpha beta\n# gamma delta"
+
+
+@pytest.mark.parametrize("payload", [" ", "   ", "\t", "\f", " \t\f "])
+def test_ascii_horizontal_whitespace_only_standalone_comments_become_bare_hash(payload: str) -> None:
+    source = f"if ready:\n    #{payload}\n    commit()\n"
+    settings = CheckSettings(select=("PCF001",))
+
+    result = pcf_helpers.format_pcf_settings(source, settings=settings)
+
+    assert result.new_source == "if ready:\n    #\n    commit()\n"
+    assert result.fixed_findings[PCF001StandaloneCommentFormatting.meta] == 1
+
+
+@pytest.mark.parametrize("source", ["#", "#\n", "##   \n", "###\t\n", "# #\n", "#\u00a0\n", "value = 1  #   \n"])
+def test_empty_comment_normalization_leaves_excluded_comment_shapes_unchanged(source: str) -> None:
+    settings = CheckSettings(select=("PCF001",))
+
+    assert pcf_helpers.format_pcf_settings(source, settings=settings).new_source == source
+
+
+def test_empty_comment_normalization_preserves_crlf_and_missing_final_newline() -> None:
+    settings = CheckSettings(select=("PCF001",))
+
+    assert pcf_helpers.format_pcf_settings("if ready:\r\n    # \t\f\r\n    commit()\r\n", settings=settings).new_source == "if ready:\r\n    #\r\n    commit()\r\n"
+    assert pcf_helpers.format_pcf_settings("    #   ", settings=settings).new_source == "    #"
+
+
+def test_empty_comment_normalization_is_idempotent_and_does_not_overlap_pcf002() -> None:
+    source = "#   \nvalue = 1  #   \n"
+    first = pcf_helpers.format_pcf_settings(source, settings=CheckSettings(select=("PCF001", "PCF002")))
+    assert first.new_source is not None
+    second = pcf_helpers.format_pcf_settings(first.new_source, settings=CheckSettings(select=("PCF001", "PCF002")))
+
+    assert first.new_source == "#\nvalue = 1  #\n"
+    assert not second.fixed_findings
+    assert second.new_source == first.new_source
+
+
+def test_empty_comment_normalization_respects_local_suppression() -> None:
+    source = "# pydocfmt: ignore[PCF001]\n#   \n"
+    settings = CheckSettings(select=("PCF001",))
+
+    assert pcf_helpers.format_pcf_settings(source, settings=settings).new_source == source
+
+
+def test_empty_comment_and_regular_formatting_findings_remain_in_source_order() -> None:
+    source = "#bad spacing\n#   \n#also bad\n"
+    settings = CheckSettings(select=("PCF001",))
+
+    result = pcf_helpers.format_pcf_settings(source, settings=settings, fix=False)
+
+    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((1,), (2,), (3,))
 
 
 def test_indented_wrapping_accounts_for_comment_prefix_width() -> None:
@@ -336,7 +388,7 @@ def test_task_marker_unwrapped_normalization_preserves_supplied_blank_continuati
 def test_task_marker_blank_source_continuation_still_splits_units() -> None:
     source = "#TODO: value = compute()\n#       \n#       next = call()\n"
     result = pcf_helpers.format_pcf(source, line_length=24)
-    assert result.new_source == "# TODO: value = compute()\n#       \n#       next = call()\n"
+    assert result.new_source == "# TODO: value = compute()\n#\n#       next = call()\n"
 
 
 def test_task_marker_list_is_configurable_and_case_sensitive() -> None:

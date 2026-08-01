@@ -245,7 +245,7 @@ def test_repetition_and_indentation_diagnostics_remain_independent() -> None:
 
     indented = 'def convert():\n    """Convert.\n\n    Raises:\n        ValueError:\n        Failure at entry indentation.\n    """\n'
     indented_settings = CheckSettings(select=("PDF415", "PDF720"), docstring_convention=DocstringConvention.GOOGLE)
-    indented_result = format_source(indented, settings=indented_settings)
+    indented_result = format_source(indented, settings=indented_settings, fix=False)
 
     assert {finding.rule for finding in indented_result.unfixed_findings} == {PDF415ConventionEntryIndentation.meta, PDF720ExceptionMissingDescription.meta}
 
@@ -253,7 +253,7 @@ def test_repetition_and_indentation_diagnostics_remain_independent() -> None:
 def test_malformed_exception_and_warning_heads_are_owned_only_by_pdf414() -> None:
     source = 'def convert():\n    """Convert.\n\n    Raises:\n        ValueError Failure detail.\n\n    Warns:\n        RuntimeWarning Warning detail.\n    """\n'
     settings = CheckSettings(select=("PDF414", "PDF720", "PDF721"), docstring_convention=DocstringConvention.GOOGLE)
-    result = format_source(source, settings=settings)
+    result = format_source(source, settings=settings, fix=False)
 
     assert tuple(finding.rule for finding in result.unfixed_findings) == (PDF414MalformedConventionEntry.meta, PDF414MalformedConventionEntry.meta)
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((5,), (8,))

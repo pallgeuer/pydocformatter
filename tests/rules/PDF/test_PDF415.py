@@ -14,6 +14,7 @@ from pydocformatter.rules.definitions.PDF.PDF100_docstring_indentation import PD
 from pydocformatter.rules.definitions.PDF.PDF101_docstring_reflow import PDF101DocstringReflow
 from pydocformatter.rules.definitions.PDF.PDF414_malformed_convention_entry import PDF414MalformedConventionEntry
 from pydocformatter.rules.definitions.PDF.PDF415_convention_entry_indentation import PDF415ConventionEntryIndentation
+from pydocformatter.rules.models import FixAvailability
 from tests.rules.PDF import helpers as pdf_helpers
 
 
@@ -22,16 +23,45 @@ format_source = pdf_helpers.formatter_for("PDF415")
 
 def assert_pdf415(source: str, expected_lines: tuple[tuple[int, ...], ...], expected_messages: tuple[str, ...], *, convention: DocstringConvention) -> None:
     """Assert PDF415 findings for source under one convention."""
-    result = pdf_helpers.assert_unfixed_lines(
+    result = pdf_helpers.assert_check_lines(
         format_source, source, expected_lines, meta=PDF415ConventionEntryIndentation.meta, settings=CheckSettings(select=("PDF415",), docstring_convention=convention)
     )
     assert tuple(finding.message for finding in result.unfixed_findings) == expected_messages
 
 
 def test_metadata() -> None:
-    """Expose the intended stable diagnostic-only rule identity."""
+    """Expose the intended stable usually-fixable rule identity."""
     assert PDF415ConventionEntryIndentation.meta.name == "convention-entry-indentation"
+    assert PDF415ConventionEntryIndentation.meta.fix_availability is FixAvailability.USUALLY
     assert PDF415ConventionEntryIndentation.meta.stable_since == "1.1.0"
+
+
+@pytest.mark.parametrize(
+    ("convention", "body", "expected_body"),
+    [
+        (DocstringConvention.GOOGLE, "Args:\n    value:\n    Description.", "Args:\n        value:\n            Description."),
+        (DocstringConvention.NUMPY, "Parameters\n----------\nvalue : int\nDescription.", "Parameters\n----------\nvalue : int\n    Description."),
+    ],
+)
+def test_fixes_convention_entry_indentation(convention: DocstringConvention, body: str, expected_body: str) -> None:
+    """Indent entry heads and continuations to their canonical structural depth."""
+    source = f'def convert(value):\n    """Convert a value.\n\n    {body}\n    """\n'
+    result = format_source(source, settings=CheckSettings(select=("PDF415",), docstring_convention=convention))
+
+    assert result.new_source == source.replace(body, expected_body)
+    assert result.fixed_findings[PDF415ConventionEntryIndentation.meta] >= 1
+    assert not result.unfixed_findings
+
+
+def test_fixes_exact_escaped_logical_line_indentation() -> None:
+    """Repair an exactly mapped escaped entry line without an empty finding target."""
+    source = 'def convert(value):\n    """Summary.\\n\\nArgs:\\nvalue: Description."""\n'
+    expected = source.replace("\\nvalue:", "\\n    value:")
+    result = format_source(source)
+
+    assert result.new_source == expected
+    assert result.fixed_findings[PDF415ConventionEntryIndentation.meta] == 1
+    assert not result.unfixed_findings
 
 
 def test_instance_message_rejects_syntax_issue_kind() -> None:
@@ -216,8 +246,8 @@ def test_disabling_directive_protection_can_expose_a_same_indented_continuation_
     protected = CheckSettings(select=("PDF415",), docstring_convention=DocstringConvention.GOOGLE)
     unprotected = CheckSettings(select=("PDF415",), docstring_convention=DocstringConvention.GOOGLE, docstring_parse_directives=False)
 
-    assert not format_source(source, settings=protected).unfixed_findings
-    result = format_source(source, settings=unprotected)
+    assert not format_source(source, settings=protected, fix=False).unfixed_findings
+    result = format_source(source, settings=unprotected, fix=False)
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((6,),)
     assert tuple(finding.message for finding in result.unfixed_findings) == ("Google docstring entry 'value' description should be indented beyond the entry",)
 
@@ -243,7 +273,7 @@ def test_malformed_next_entry_outranks_a_possible_continuation_issue(convention:
     """Keep one syntax issue when the same line could first look like an under-indented continuation."""
     source = f'def combine(first, second):\n    """Combine values.\n\n    {body}\n    """\n'
     settings = CheckSettings(select=("PDF414", "PDF415"), docstring_convention=convention)
-    result = format_source(source, settings=settings)
+    result = format_source(source, settings=settings, fix=False)
 
     assert tuple(finding.rule for finding in result.unfixed_findings) == (expected_rule,)
     assert tuple(finding.message for finding in result.unfixed_findings) == (expected_message,)
@@ -260,21 +290,21 @@ def test_indented_continuations_are_allowed() -> None:
 def test_docstring_suppression_hides_findings() -> None:
     """Honor whole-docstring suppression from the closing delimiter line."""
     source = 'def convert(value):\n    """Convert a value.\n\n    Args:\n    value: The value.\n    """  # noqa: PDF415\n'
-    result = format_source(source)
+    result = format_source(source, fix=False)
     assert not result.unfixed_findings
 
 
 def test_signature_line_suppression_does_not_hide_docstring_indentation_findings() -> None:
     """Keep suppression attachment on the malformed docstring rather than its owner signature."""
     source = 'def convert(value):  # noqa: PDF415\n    """Convert a value.\n\n    Args:\n    value: The value.\n    """\n'
-    result = format_source(source)
+    result = format_source(source, fix=False)
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((5,),)
 
 
 def test_implicitly_concatenated_docstring_uses_whole_expression_line_fallback() -> None:
     """Report an unmapped malformed continuation against the complete expression."""
     source = 'def convert(value):\n    (\n        "Convert a value.\\n\\n"\n        "Args:\\n"\n        "    value:\\n"\n        "    Description at entry indentation."\n    )\n'
-    result = format_source(source)
+    result = format_source(source, fix=False)
 
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((3, 4, 5, 6),)
 
@@ -288,16 +318,17 @@ def test_pdf100_and_pdf415_report_independent_indentation_facts() -> None:
     assert {finding.rule for finding in result.unfixed_findings} == {PDF100DocstringIndentation.meta, PDF415ConventionEntryIndentation.meta}
 
 
-def test_pdf101_does_not_reflow_a_diagnosed_numpy_continuation() -> None:
-    """Keep uncertain continuation indentation unchanged while retaining PDF415."""
+def test_pdf101_reflows_after_pdf415_repairs_numpy_continuation_indentation() -> None:
+    """Repair continuation structure before reflowing its description."""
     source = 'def convert(value):\n    """Convert a value.\n\n    Parameters\n    ----------\n    value : int\n    Description at entry indentation that would otherwise be wrapped.\n    """\n'
     settings = CheckSettings(select=("PDF101", "PDF415"), docstring_convention=DocstringConvention.NUMPY, line_length=45)
     result = format_source(source, settings=settings)
 
-    assert result.new_source == source
-    assert PDF101DocstringReflow.meta not in result.fixed_findings
-    assert tuple(finding.rule for finding in result.unfixed_findings) == (PDF415ConventionEntryIndentation.meta,)
-    assert tuple(finding.message for finding in result.unfixed_findings) == ("NumPy docstring entry 'value' description should be indented beyond the entry",)
+    assert result.new_source == source.replace(
+        "    Description at entry indentation that would otherwise be wrapped.", "        Description at entry indentation that\n        would otherwise be wrapped."
+    )
+    assert result.fixed_findings == {PDF101DocstringReflow.meta: 1, PDF415ConventionEntryIndentation.meta: 1}
+    assert not result.unfixed_findings
 
 
 @pytest.mark.parametrize("selector", ["PDF415", "PDF4", "PDF", "ALL"])

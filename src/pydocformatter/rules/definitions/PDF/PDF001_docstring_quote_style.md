@@ -1,6 +1,6 @@
 # docstring-quote-style (PDF001)
 
-Fix is sometimes available.
+Fix is usually available.
 
 ## What it does
 Checks recognized simple docstrings that do not use triple double quotes. The rule applies to the first string-valued simple string expression in a module, class, function, async function, or method body. It reports docstrings written with `"..."`, `'...'`, or `'''...'''` delimiters, and it skips docstrings that already use `"""`.

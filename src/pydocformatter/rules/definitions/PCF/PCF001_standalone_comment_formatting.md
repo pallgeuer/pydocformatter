@@ -5,9 +5,11 @@ Fix is usually available.
 ## What it does
 Checks ordinary standalone comments for canonical marker spacing, trailing whitespace, and wrapping at `line-length`. A standalone comment is a physical comment line that is not trailing code on the same line.
 
-Canonical ordinary output uses one syntactic `#`, one following space for non-empty content, and normalized content without surrounding whitespace except for a recognized hard-break suffix. Additional hashes are content and are retained, so `##Heading` becomes `# #Heading` unless heading preservation protects that line. Empty comments and hash-only comments are boundaries and remain unchanged. Long words and hyphenated words are never split.
+Canonical ordinary output uses one syntactic `#`, one following space for non-empty content, and normalized content without surrounding whitespace except for a recognized hard-break suffix. Additional hashes are content and are retained, so `##Heading` becomes `# #Heading` unless heading preservation protects that line. Before run formatting, a regular standalone comment with a nonempty payload containing only ASCII space, tab, or form feed is normalized to a bare `#`. An already bare `#`, multi-hash separators, and comments containing other whitespace remain unchanged. Long words and hyphenated words are never split.
 
 PCF001 operates on physical runs of consecutive, same-indent, regular, non-empty standalone comments. Empty comments, hash-only separators, protected comments, blank lines, code lines, and indentation changes end a run. By default, each ordinary physical prose line is normalized and wrapped independently; consecutive ordinary lines are joined into paragraphs only when `comment-join-standalone-lines` is enabled. Joined paragraphs do not cross standalone colon-ended label lines, while lowercase colon-ended lines can complete unfinished preceding prose.
+
+Whitespace-only normalization happens before these runs are formatted, but empty and hash-only comments remain run boundaries. The narrow replacement preserves indentation, the original line ending, final-newline state, and all surrounding source. PCF001 alone owns this standalone normalization; PCF002 remains responsible for ordinary trailing-comment whitespace.
 
 Within a run, PCF001 first identifies enabled preserved structures, then applies enabled code detectors to the remaining semantic text, and finally formats the remaining list items, block quotes, paragraphs, or physical lines. Lines inside an explicitly preserved structure are excluded from code detection, so code in a fenced or directive region does not prevent adjacent prose from formatting. If any code detector matches another non-preserved line or multiline candidate, the entire physical standalone run remains unchanged.
 
@@ -43,6 +45,20 @@ line-length = 40
 # This standalone comment has enough
 # words to wrap neatly around the
 # configured limit.
+```
+
+A regular standalone comment containing only ASCII horizontal whitespace becomes a bare marker without disturbing indentation or surrounding code:
+
+```pydocfmt-example
+[input]
+if ready:
+    #   
+    commit()
+
+[output]
+if ready:
+    #
+    commit()
 ```
 
 Ordinary physical prose lines are wrapped independently by default rather than joined with the next line:

@@ -155,3 +155,17 @@ def test_replacement_accumulator_reports_overlapping_requests_without_fix() -> N
     (violation,) = accumulator.results()
 
     assert violation.fix is None
+
+
+def test_planned_line_text_change_uses_owner_line_for_exact_escaped_logical_line() -> None:
+    """Keep exact escaped-line edits operational when the logical line has no physical line number."""
+    source = 'def function(value):\n    """Summary.\\n\\nArgs:\\nvalue: Description."""\n'
+    category, context = contexts(source)
+    docstring = PDF.require_data(context).docstrings[0]
+    line = docstring.structure.lines[3]
+
+    change = section_edits.planned_line_text_change(docstring, line, 0, 0, "    ", context=context)
+
+    assert change is not None
+    module = rule_edits.apply_context_source_changes(category, (change,))
+    assert module.code == source.replace("\\nvalue:", "\\n    value:")

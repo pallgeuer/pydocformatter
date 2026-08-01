@@ -170,7 +170,7 @@ def test_empty_and_malformed_method_sections_are_owned_by_structural_rules() -> 
     empty = 'class Client:\n    """Client.\n\n    Methods:\n    """\n'
     malformed = 'class Client:\n    """Client.\n\n    Methods:\n        connect Execute it.\n    """\n\n    def connect(self):\n        pass\n'
     malformed_settings = CheckSettings(select=("PDF414", "PDF723"), docstring_convention=DocstringConvention.GOOGLE)
-    result = format_source(malformed, settings=malformed_settings)
+    result = format_source(malformed, settings=malformed_settings, fix=False)
 
     assert_pdf723(empty, ())
     assert tuple(finding.rule for finding in result.unfixed_findings) == (PDF414MalformedConventionEntry.meta,)

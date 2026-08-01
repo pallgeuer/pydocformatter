@@ -1,6 +1,6 @@
 # section-name-trailing-colon (PDF404)
 
-Fix is sometimes available.
+Fix is usually available.
 
 Rule is disabled if `docstring-convention` is `none`, `pep257`, `numpy`, or `rest`.
 

@@ -1,15 +1,19 @@
 # yield-type-required (PDF709)
 
-Fix is not available.
+Fix is sometimes available.
 
 Rule is disabled if `docstring-convention` is `none` or `pep257`, and ignored by broad selectors under `google`, `numpy`, and `rest`.
 
 Rule is incompatible with `PDF710`.
 
 ## What it does
-Checks that parsed yield entries in owning function docstrings include a documented type.
+Checks that parsed yield entries in owning function docstrings include a documented type. It checks existing yield entries rather than requiring a yield section or field to be added.
 
-Only functions that actually contain yield expressions are checked. The rule is exact opt-in because many projects rely on generator annotations instead of repeating yield types in docstrings.
+Only functions that actually contain yield expressions are checked. The yielded type is extracted from the first type argument of recognized `Generator`, `Iterator`, `Iterable`, `AsyncGenerator`, `AsyncIterator`, and `AsyncIterable` return annotations from `typing` or `collections.abc`, including unshadowed import aliases.
+
+When a recognized single-line yield annotation is available, PDF709 adds a paired canonical reStructuredText `:ytype:` field or fills an existing empty, single-line field. Named reStructuredText yield fields retain their bare name. Google and NumPy entries, missing or unrecognized annotations, and source shapes that cannot be mapped safely remain diagnostic.
+
+The rule is exact opt-in because many projects rely on generator annotations instead of repeating yield types in docstrings.
 
 ## Why is this useful?
 Projects that keep yield types in docstrings can enforce complete yield type documentation.
@@ -18,14 +22,44 @@ Projects that keep yield types in docstrings can enforce complete yield type doc
 None.
 
 ## Examples
-PDF709 reports yield entries without docstring types:
+PDF709 copies the yielded type from a recognized generator return annotation:
 
 ```pydocfmt-example
 [settings]
 docstring-convention = "rest"
 
 [input]
+from typing import Iterator
+
+
 def function() -> Iterator[int]:
+    """Yield values.
+
+    :yields: Next value.
+    """
+    yield 1
+
+[output]
+from typing import Iterator
+
+
+def function() -> Iterator[int]:
+    """Yield values.
+
+    :yields: Next value.
+    :ytype: int
+    """
+    yield 1
+```
+
+Without a usable generator return annotation, the finding remains diagnostic:
+
+```pydocfmt-example
+[settings]
+docstring-convention = "rest"
+
+[input]
+def function():
     """Yield values.
 
     :yields: Next value.
@@ -55,22 +89,28 @@ def function() -> Iterator[int]:
 [output=unchanged]
 ```
 
-reST `:ytype:` fields provide the type for paired yield documentation:
+Named reStructuredText yield fields retain their name when PDF709 inserts the paired type field:
 
 ```pydocfmt-example
 [settings]
 docstring-convention = "rest"
 
 [input]
-def function() -> Iterator[int]:
+def function() -> typing.Iterator[int]:
     """Yield values.
 
-    :yields: Next value.
-    :ytype: int
+    :yield item: Next value.
     """
     yield 1
 
-[output=unchanged]
+[output]
+def function() -> typing.Iterator[int]:
+    """Yield values.
+
+    :yield item: Next value.
+    :ytype item: int
+    """
+    yield 1
 ```
 
 ## Options

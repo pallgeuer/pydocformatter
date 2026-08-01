@@ -31,6 +31,38 @@ def test_reports_documented_exception_absent_from_direct_raises() -> None:
     assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring documents exception 'ValueError' that is not explicitly raised",)
 
 
+def test_assertion_error_documentation_is_extraneous_by_default_and_accepted_when_enabled() -> None:
+    source = 'def function(value):\n    """Validate a value.\n\n    Raises:\n        AssertionError: Invalid value.\n    """\n    assert value\n'
+    enabled = CheckSettings(select=("PDF507",), docstring_convention=DocstringConvention.GOOGLE, docstring_include_assertion_errors=True)
+
+    assert_pdf507_lines(source, ((5,),))
+    assert_pdf507_lines(source, (), settings=enabled)
+
+
+def test_enabled_assertion_inventory_accepts_google_numpy_and_rest_documentation() -> None:
+    google = 'def function(value):\n    """Validate.\n\n    Raises:\n        AssertionError: Invalid value.\n    """\n    assert value\n'
+    numpy = 'def function(value):\n    """Validate.\n\n    Raises\n    ------\n    AssertionError\n        Invalid value.\n    """\n    assert value\n'
+    rest = 'def function(value):\n    """Validate.\n\n    :raises AssertionError: Invalid value.\n    """\n    assert value\n'
+
+    assert_pdf507_lines(google, (), settings=CheckSettings(select=("PDF507",), docstring_convention=DocstringConvention.GOOGLE, docstring_include_assertion_errors=True))
+    assert_pdf507_lines(numpy, (), settings=CheckSettings(select=("PDF507",), docstring_convention=DocstringConvention.NUMPY, docstring_include_assertion_errors=True))
+    assert_pdf507_lines(rest, (), settings=CheckSettings(select=("PDF507",), docstring_convention=DocstringConvention.REST, docstring_include_assertion_errors=True))
+
+
+def test_enabled_assertions_only_satisfy_assertion_error_in_mixed_documentation() -> None:
+    source = 'def function(value):\n    """Validate.\n\n    Raises:\n        AssertionError: Invalid value.\n        ValueError: Bad value.\n    """\n    assert value\n'
+    settings = CheckSettings(select=("PDF507",), docstring_convention=DocstringConvention.GOOGLE, docstring_include_assertion_errors=True)
+
+    assert_pdf507_lines(source, ((6,),), settings=settings)
+
+
+def test_assertions_preserve_nested_function_and_class_ownership_boundaries() -> None:
+    source = 'def outer(value):\n    """Validate outer.\n\n    Raises:\n        AssertionError: Invalid outer value.\n    """\n\n    class Nested:\n        assert False\n\n    def inner():\n        """Validate inner.\n\n        Raises:\n            AssertionError: Invalid inner value.\n        """\n        assert value\n\n    assert value\n    return inner\n'
+    settings = CheckSettings(select=("PDF507",), docstring_convention=DocstringConvention.GOOGLE, docstring_include_assertion_errors=True)
+
+    assert_pdf507_lines(source, (), settings=settings)
+
+
 @pytest.mark.parametrize("convention", tuple(DocstringConvention))
 def test_every_convention_ignores_broad_selection_but_exact_selection_still_applies(convention: DocstringConvention) -> None:
     broad = rules_selection.select_rules(CheckSettings(select=("PDF5",), docstring_convention=convention))

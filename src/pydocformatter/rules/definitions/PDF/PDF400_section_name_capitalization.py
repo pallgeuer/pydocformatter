@@ -33,7 +33,7 @@ class PDF400SectionNameCapitalization(RuleBase):
         code=RuleCode("PDF400"),
         name="section-name-capitalization",
         message="Docstring section name should be properly capitalized",
-        fix_availability=FixAvailability.SOMETIMES,
+        fix_availability=FixAvailability.USUALLY,
         stable_since="1.0.0",
         setting_effects=docstring_conventions.convention_setting_effects(disabled=docstring_conventions.UNPARSED_CONVENTIONS),
         incompatible_with=(),

@@ -34,7 +34,7 @@ class PDF404SectionNameTrailingColon(RuleBase):
         code=RuleCode("PDF404"),
         name="section-name-trailing-colon",
         message="Docstring section name should end with a colon",
-        fix_availability=FixAvailability.SOMETIMES,
+        fix_availability=FixAvailability.USUALLY,
         stable_since="1.0.0",
         setting_effects=(
             RuleSettingEffects(

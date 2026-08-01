@@ -35,7 +35,7 @@ class PDF405SectionUnderlineFormat(RuleBase):
         code=RuleCode("PDF405"),
         name="section-underline-format",
         message="Docstring section underline should be normalized",
-        fix_availability=FixAvailability.SOMETIMES,
+        fix_availability=FixAvailability.USUALLY,
         stable_since="1.0.0",
         setting_effects=(
             RuleSettingEffects(

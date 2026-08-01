@@ -1,6 +1,6 @@
 # exception-entry-normalization (PDF410)
 
-Fix is sometimes available.
+Fix is usually available.
 
 Rule is disabled if `docstring-convention` is `none` or `pep257`.
 

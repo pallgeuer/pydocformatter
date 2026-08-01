@@ -13,6 +13,7 @@ import typing
 # First-party imports
 import pydocformatter.rules.violations as rule_violations
 import pydocformatter.rules.definition_helpers.typed_documentation_models as typed_models
+from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleContext
 from pydocformatter.rules.definition_helpers import docstring_conventions, typed_documentation
@@ -36,7 +37,7 @@ _TARGET_COLLECTORS: dict[TypedDocumentationSubject, _TargetCollector] = {
 _REQUIRED_TYPE_POLICIES: dict[TypedDocumentationSubject, _RequiredTypePolicy] = {}
 
 
-def metadata(code: str, name: str, message: str, *, exact_opt_in: bool, incompatible_with: tuple[str, ...] = ()) -> RuleMetadata:
+def metadata(code: str, name: str, message: str, *, exact_opt_in: bool, incompatible_with: tuple[str, ...] = (), fix_availability: FixAvailability = FixAvailability.NEVER) -> RuleMetadata:
     """Return standard metadata for one PDF7xx typed-entry rule.
 
     Args:
@@ -45,6 +46,7 @@ def metadata(code: str, name: str, message: str, *, exact_opt_in: bool, incompat
         message (str): Default diagnostic message for the rule.
         exact_opt_in (bool): Whether the rule should be ignored under every convention unless selected by exact code.
         incompatible_with (tuple[str, ...]): Rule code tags that cannot be selected with this rule.
+        fix_availability (FixAvailability): Availability classification for safe automatic fixes.
 
     Returns:
         RuleMetadata: Complete rule metadata shared by the thin PDF7xx rule modules.
@@ -53,7 +55,7 @@ def metadata(code: str, name: str, message: str, *, exact_opt_in: bool, incompat
         code=RuleCode(code),
         name=name,
         message=message,
-        fix_availability=FixAvailability.NEVER,
+        fix_availability=fix_availability,
         stable_since="1.0.0",
         setting_effects=_EXACT_OPT_IN_EFFECT if exact_opt_in else _SUPPORTED_CONVENTION_EFFECT,
         incompatible_with=tuple(RuleCode(code) for code in incompatible_with),
@@ -96,7 +98,7 @@ def required_type_violations(context: RuleContext, *, meta: RuleMetadata, subjec
 
 def _standard_required_type_violations(context: RuleContext, meta: RuleMetadata, subject: TypedDocumentationSubject, label: str) -> tuple[rule_violations.RuleViolation, ...]:
     """Return required-type violations for subjects without special policy."""
-    return typed_documentation.required_type_violations(_TARGET_COLLECTORS[subject](context), meta=meta, label=label)
+    return typed_documentation.required_type_violations(_TARGET_COLLECTORS[subject](context), context=context, meta=meta, label=label)
 
 
 def _class_attribute_required_type_violations(context: RuleContext, meta: RuleMetadata, subject: TypedDocumentationSubject, label: str) -> tuple[rule_violations.RuleViolation, ...]:
@@ -116,11 +118,11 @@ def _class_attribute_required_type_violations(context: RuleContext, meta: RuleMe
             enum_like_owner_by_id[owner_id] = enum_like
         return enum_like
 
-    enum_targets = tuple(target for target in normal_targets if target_owner_is_enum_like(target))
+    enum_targets = tuple(target for target in normal_targets if target.entry.docstring.structure.convention is not DocstringConvention.NUMPY and target_owner_is_enum_like(target))
     enum_entries = {id(target.entry) for target in enum_targets}
     violations: list[rule_violations.RuleViolation] = []
-    violations.extend(typed_documentation.required_type_violations(tuple(target for target in normal_targets if id(target.entry) not in enum_entries), meta=meta, label=label))
-    violations.extend(typed_documentation.forbidden_type_violations(enum_targets, meta=meta, label=label))
+    violations.extend(typed_documentation.required_type_violations(tuple(target for target in normal_targets if id(target.entry) not in enum_entries), context=context, meta=meta, label=label))
+    violations.extend(typed_documentation.forbidden_type_violations(enum_targets, context=context, meta=meta, label=label, correction=typed_models.TypeRemovalCorrection.REMOVE))
     return typed_documentation.sort_violations(violations)
 
 
@@ -139,7 +141,7 @@ def forbidden_type_violations(context: RuleContext, *, meta: RuleMetadata, subje
     Returns:
         tuple[rule_violations.RuleViolation, ...]: Diagnostics for entries with forbidden docstring type text.
     """
-    return typed_documentation.forbidden_type_violations(_TARGET_COLLECTORS[subject](context), meta=meta, label=label)
+    return typed_documentation.forbidden_type_violations(_TARGET_COLLECTORS[subject](context), context=context, meta=meta, label=label, correction=typed_models.TypeRemovalCorrection.DIAGNOSTIC_ONLY)
 
 
 def mismatch_violations(context: RuleContext, *, meta: RuleMetadata, subject: TypedDocumentationSubject, label: str) -> tuple[rule_violations.RuleViolation, ...]:

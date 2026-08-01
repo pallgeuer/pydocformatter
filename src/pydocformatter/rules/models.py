@@ -21,8 +21,8 @@ class FixAvailability(enum.StrEnum):
 
     Attributes:
         ALWAYS: Every reported finding has an automatic fix.
-        USUALLY: Most findings have fixes, but individual cases may opt out.
-        SOMETIMES: Only a subset of findings can be fixed automatically.
+        USUALLY: Every semantic violation kind has a correction, but instance-specific safety can prevent a fix.
+        SOMETIMES: At least one semantic violation kind is intentionally diagnostic-only while others have fixes.
         NEVER: The rule is diagnostic-only.
     """
 

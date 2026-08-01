@@ -3,23 +3,15 @@
 # Future imports
 from __future__ import annotations
 
-# Standard library imports
-from typing import TYPE_CHECKING
-
 # First-party imports
 import pydocformatter.rules.violations as rule_violations
 import pydocformatter.rules.registration as rule_registration
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.codes import RuleCode
-from pydocformatter.rules.definition import RuleBase
-from pydocformatter.rules.definition_helpers import docstring_conventions
+from pydocformatter.rules.definition import RuleBase, RuleContext
+from pydocformatter.rules.definition_helpers import docstring_conventions, section_edits
 from pydocformatter.rules.models import FixAvailability, RuleCacheBehavior, RuleCheckKind, RuleMetadata
-
-
-if TYPE_CHECKING:
-    # First-party imports
-    from pydocformatter.rules.definition import RuleContext
 
 
 _ISSUE_KINDS = {
@@ -41,7 +33,7 @@ class PDF415ConventionEntryIndentation(RuleBase):
         code=RuleCode("PDF415"),
         name="convention-entry-indentation",
         message="Docstring convention entry should use valid indentation",
-        fix_availability=FixAvailability.NEVER,
+        fix_availability=FixAvailability.USUALLY,
         stable_since="1.1.0",
         setting_effects=docstring_conventions.convention_setting_effects(disabled=docstring_conventions.conventions_except(DocstringConvention.GOOGLE, DocstringConvention.NUMPY)),
         incompatible_with=(),
@@ -61,7 +53,12 @@ class PDF415ConventionEntryIndentation(RuleBase):
         """
         data = PDF_definition.PDF.require_data(context)
         return tuple(
-            rule_violations.diagnostic(cls.meta, PDF_definition.docstring_line_numbers(docstring, docstring.structure.lines[issue.start_line]), instance_message=_instance_message(issue))
+            rule_violations.violation_for_optional_planned_source_change(
+                cls.meta,
+                section_edits.planned_convention_entry_change(docstring, issue, context=context),
+                line_numbers=PDF_definition.docstring_line_numbers(docstring, docstring.structure.lines[issue.start_line]),
+                instance_message=_instance_message(issue),
+            )
             for docstring in data.docstrings
             for issue in docstring.structure.convention_entry_issues
             if issue.kind in _ISSUE_KINDS

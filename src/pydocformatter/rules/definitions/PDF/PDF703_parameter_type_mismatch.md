@@ -7,9 +7,11 @@ Rule is disabled if `docstring-convention` is `none` or `pep257`.
 Rule is incompatible with `PDF702`.
 
 ## What it does
-Checks that parsed parameter docstring types conservatively match parameter annotations.
+Checks that parsed parameter docstring types conservatively match parameter annotations. It checks only entries that match real signature parameters and have both a documented type and a usable annotation.
 
-The comparison uses a small, syntax-only type-expression subset. Unparseable or ambiguous expressions are skipped instead of guessed. Only entries that match real signature parameters are checked, and NumPy entries that document multiple names are checked once per name.
+The comparison uses a syntax-only type-expression subset that covers common names, qualified names, subscriptions, tuples, unions, and stringized annotations. Unshadowed import aliases are normalized before comparison. Unparseable, unsupported, or ambiguous expressions are skipped instead of guessed.
+
+Google, NumPy, and inline or paired reStructuredText types are supported. NumPy entries that document multiple names are checked once per matching parameter, so one shared type can produce a finding for only the names whose annotations differ. Findings are diagnostic-only because choosing between conflicting documentation and code requires human judgment.
 
 ## Why is this useful?
 Stale parameter type text can mislead readers when annotations have changed.
@@ -55,6 +57,25 @@ def function(value: "list[str | None]"):
 [output=unchanged]
 ```
 
+For paired reStructuredText fields, a mismatch is reported on the type field rather than the value field:
+
+```pydocfmt-example
+[settings]
+docstring-convention = "rest"
+
+[input]
+def function(value: int):
+    """Handle a value.
+
+    :param value: Value to handle.
+    :type value: str
+    """
+
+[output=unchanged]
+[findings]
+PDF703: Line 5: Function parameter 'value' docstring type does not match the annotation
+```
+
 NumPy entries that document multiple names are checked for each matching signature parameter:
 
 ```pydocfmt-example
@@ -76,7 +97,7 @@ def function(x: int, y: str):
 PDF703: Line 6: Function parameter 'y' docstring type does not match the annotation
 ```
 
-Unparseable type expressions are ignored by mismatch checks:
+Unparseable type expressions are ignored rather than compared speculatively:
 
 ```pydocfmt-example
 [settings]

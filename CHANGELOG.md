@@ -17,6 +17,9 @@ All notable changes to this project are documented here. The format follows [Kee
 ### Added
 
 - **Docstring diagnostics:**
+  - Added PDF417 to validate NumPy single-value and multiple-value `Returns` entry structure.
+  - Added usually-fixable PDF527 to enforce signature variadic markers in Google and NumPy documentation and bare parameter names in reStructuredText value and type fields.
+  - Added `docstring-include-assertion-errors` so PDF506 and PDF507 can optionally treat syntactic assertions as possible `AssertionError` occurrences.
   - Added PDF312 to report exact content-free return, yield, exception, warning, and method descriptions.
   - Added PDF416 to safely normalize trailing periods, redundant outer parentheses, and lowercase `none` in parsed docstring type slots.
   - Added PDF213 to report complete evaluated docstrings that match configurable placeholder markers.
@@ -37,10 +40,15 @@ All notable changes to this project are documented here. The format follows [Kee
 
 - **Developer documentation:**
   - Corrected the rule settings audit to distinguish disabled rules from rules ignored only by broad selectors, with metadata-backed regression coverage.
+  - Synchronized the future-rule coverage audit with registered fix availability and added metadata-backed coverage, classification, and summary-count validation.
   - Reworked the future rule ideas inventory into a code-informed, future-only backlog with benefit-oriented scores and weighted prioritization across implementation risk, runtime cost, Ruff overlap, and reach.
 - **Rule suppressions:**
   - Made inline suppressions after any component token of an implicitly concatenated docstring cover the complete expression for PDF findings while preserving line-local PCF coverage and existing local and standalone attachment boundaries.
 - **Docstring diagnostics:**
+  - Made PDF414 sometimes fixable for deterministic Google and NumPy separators and reStructuredText closing delimiters while leaving missing or unexpected field arguments diagnostic-only, and made PDF415 usually fixable for mapped convention indentation.
+  - Made PDF701, PDF705, PDF709, PDF713, and PDF717 sometimes fixable from available code annotations, including canonical paired reStructuredText type fields.
+  - Kept PDF713's enum-like no-type inversion for Google and reStructuredText entries while letting NumPy grammar take precedence for typed enum entries.
+  - Extended PDF506 and PDF507 with one ordered exception-occurrence inventory that preserves direct-raise behavior while supporting optional assertion-derived `AssertionError`.
   - Made PDF300, PDF301, PDF308, and PDF309 safely replace terminal semicolons and standalone commas with periods when the source mapping is exact, while leaving commas before recognized structured content diagnostic-only.
   - Preserved commas before protected nested content owned by reStructuredText field entries, including lists, fences, doctests, directives, literal blocks, tables, headings, and block quotes.
   - Made PDF202 target the complete physical empty-docstring expression, including delimiter-only closing lines, consistently with other whole-docstring diagnostics.
@@ -62,6 +70,8 @@ All notable changes to this project are documented here. The format follows [Kee
   - Reduced worker requests to immutable path-specific rule execution plans, returned frozen batch results, made probe and persistence outcomes explicit, aggregated cache statistics once per phase, and touched each engine retention row once with its maximum observed day.
   - Deferred engine, path-builder, and store construction until at least one selected file is cacheable, so disabled and wholly uncacheable runs avoid cache-only fingerprint work.
 - **Rule and path contracts:**
+  - Added parser-owned Google type-edit bounds for typed documentation fixes and made enum-specific forbidden-type removal an explicit correction policy independent of descriptive fix metadata.
+  - Defined `Usually` fix availability for rules whose every semantic violation kind has a correction but whose individual findings can fail conservative safety checks, and reserved `Sometimes` for rules with intentionally diagnostic-only violation kinds.
   - Validated terminal-punctuation policies at construction so contradictory classifications and unusable canonical endings fail immediately.
   - Centralized the shared trailing-period and terminal-punctuation policies and kept comma-introduced structure classification in the punctuation helper rather than the PDF parser core.
   - Centralized the deliberately closed ASCII space-and-tab policy used by layout and convention normalization without broadening Unicode whitespace ownership.
@@ -72,6 +82,8 @@ All notable changes to this project are documented here. The format follows [Kee
 - **Configuration:**
   - Added `docstring-placeholder-markers` for configuring the exact marker inventory used by PDF213, including an empty-list opt-out that does not change rule selection.
   - Extended settings profiles with the auto-discovered project root so default cache locations are stable across nested paths and relocated workspaces.
+- **Comment formatting:**
+  - Made PCF001 normalize regular standalone comments containing only ASCII space, tab, or form-feed payloads to bare `#` while preserving deliberate hash separators and source line endings.
 
 ### Fixed
 
@@ -79,6 +91,7 @@ All notable changes to this project are documented here. The format follows [Kee
   - Made ASCII case-insensitive duplicate `docstring-placeholder-markers` diagnostics deterministic when multiple configured spellings have the same normalized value.
   - Reported invalid `docstring-placeholder-markers` entries before checking ASCII case-insensitive duplicates, so Unicode case-folding collisions receive the relevant syntax error.
 - **Docstring diagnostics:**
+  - Fixed PDF414 reStructuredText closing-colon repairs to use bounded syntactic heads instead of description prose, preserve inline parameter types and spaced exception lists, and leave ambiguous or unsupported heads diagnostic-only; made PDF527 recognize narrowly escaped reStructuredText variadic markers; fixed PDF414, PDF415, and PDF527 exact edits on escaped logical lines without physical line mappings.
   - Made PDF409 leave empty Google type slots unchanged and PDF414 report the malformed syntax instead of canonicalizing empty parentheses.
   - Made PDF312 recognize exact generic descriptions that preserve leading or trailing underscores in documented names.
   - Prevented PDF312 from matching descriptions whose original parsed fragments contain non-ASCII boundary characters, non-space/tab whitespace, or suspicious controls.

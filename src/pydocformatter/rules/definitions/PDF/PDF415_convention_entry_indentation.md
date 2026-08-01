@@ -1,6 +1,6 @@
 # convention-entry-indentation (PDF415)
 
-Fix is not available.
+Fix is usually available.
 
 Rule is disabled if `docstring-convention` is `none`, `pep257`, or `rest`.
 
@@ -17,11 +17,11 @@ PDF100 and PDF415 divide indentation responsibility by intent:
 - PDF100 normalizes the absolute physical indentation of safely rewritable docstring lines against the docstring's canonical margin. For parsed Google and NumPy structures, it generates indentation from `indent-style` and `indent-width` and can shift an otherwise correctly nested section as a unit.
 - PDF415 validates relative convention relationships using raw evaluated indentation, independently of the canonical margin, virtual margin stripping, or configured indentation width. It asks whether a Google entry is deeper than its section header and whether an immediate Google or NumPy description is deeper than its entry.
 
-A convention section can therefore need only PDF100 when all of its elements are correctly nested but collectively displaced. Conversely, a section can need only PDF415 when its absolute margins are normal but malformed indentation prevented an intended description from being parsed as an entry continuation. Both rules can report independent facts when a structure is collectively displaced and also internally misnested. PDF100 is always fixable when it reports a safely normalizable source change; PDF415 remains diagnostic-only because recognizing a likely relationship does not make the intended replacement indentation certain. PDF415 can also diagnose concatenated or otherwise non-rewritable docstrings that PDF100 deliberately skips.
+A convention section can therefore need only PDF100 when all of its elements are correctly nested but collectively displaced. Conversely, a section can need only PDF415 when its absolute margins are normal but malformed indentation prevented an intended description from being parsed as an entry continuation. Both rules can report independent facts when a structure is collectively displaced and also internally misnested. PDF100 is always fixable when it reports a safely normalizable source change. PDF415 uses one configured indent unit below the owning section or entry and remains diagnostic for concatenated or otherwise non-rewritable docstrings that cannot be mapped exactly.
 
 PDF415 handles indentation of otherwise parseable entries. Malformed delimiters, missing types, and unbalanced Google types belong to PDF414; when one line could resemble both a malformed next entry and an under-indented continuation, the syntax diagnosis takes precedence.
 
-The rule reports the malformed entry or continuation line and does not infer replacement indentation. The correct nesting level depends on the surrounding style and indentation settings, so no fix is applied. Diagnosed lines are excluded from PDF101 prose reflow so another formatting rule cannot silently rewrite the uncertain relationship.
+The rule repairs mapped entry and continuation lines with the configured indentation style and width. Diagnosed lines that cannot be repaired are excluded from PDF101 prose reflow so another formatting rule cannot silently rewrite the relationship.
 
 ## Why is this useful?
 Incorrect entry indentation can move intended documentation outside its section or make a description look like a new top-level block. Documentation tools and semantic checks may then miss parameters, return values, yields, or exceptions even though the text appears visually nearby.
@@ -44,9 +44,13 @@ def convert(value):
     value: The value.
     """
 
-[output=unchanged]
-[findings]
-PDF415: Line 5: Google docstring entry 'value' should be indented beyond its section header
+[output]
+def convert(value):
+    """Convert a value.
+
+    Args:
+        value: The value.
+    """
 ```
 
 PDF415 reports immediate Google descriptions aligned with their entry heads. Return and yield entries have no semantic name, so their messages describe the entry without an empty name:
@@ -68,10 +72,18 @@ def convert(value):
         Converted value.
     """
 
-[output=unchanged]
-[findings]
-PDF415: Line 6: Google docstring entry 'value' description should be indented beyond the entry
-PDF415: Line 10: Google docstring entry description should be indented beyond the entry
+[output]
+def convert(value):
+    """Convert a value.
+
+    Args:
+        value:
+            Value to convert.
+
+    Returns:
+        int:
+            Converted value.
+    """
 ```
 
 This correctly nested Google section is collectively displaced. PDF415 accepts its internal relationships and leaves it unchanged, while PDF100 would move the header to the canonical margin and the entry one configured indent unit below it:
@@ -112,10 +124,20 @@ def convert(value):
     Converted value.
     """
 
-[output=unchanged]
-[findings]
-PDF415: Line 7: NumPy docstring entry 'value' description should be indented beyond the entry
-PDF415: Line 12: NumPy docstring entry description should be indented beyond the entry
+[output]
+def convert(value):
+    """Convert a value.
+
+    Parameters
+    ----------
+    value : int
+        Value to convert.
+
+    Returns
+    -------
+    int
+        Converted value.
+    """
 ```
 
 Complete Google exception lists provide enough evidence to diagnose an entry head aligned with its section:
@@ -132,9 +154,13 @@ def convert():
     `ValueError` | pkg.CustomError: Conversion failed.
     """
 
-[output=unchanged]
-[findings]
-PDF415: Line 5: Google docstring entry 'ValueError', 'pkg.CustomError' should be indented beyond its section header
+[output]
+def convert():
+    """Convert a value.
+
+    Raises:
+        `ValueError` | pkg.CustomError: Conversion failed.
+    """
 ```
 
 Inline descriptions, nested continuation descriptions, and a valid next entry are accepted:
@@ -160,5 +186,26 @@ def combine(first, second):
 [output=unchanged]
 ```
 
+A malformed continuation in a concatenated docstring is reported against the complete expression because its source cannot be rewritten exactly:
+
+```pydocfmt-example
+[settings]
+docstring-convention = "google"
+
+[input]
+def convert(value):
+    (
+        "Convert a value.\n\n"
+        "Args:\n"
+        "    value:\n"
+        "    Description at entry indentation."
+    )
+
+[output=unchanged]
+[findings]
+PDF415: Lines 3-6: Google docstring entry 'value' description should be indented beyond the entry
+```
+
 ## Options
-None.
+- `indent-style`: Indentation style used for repaired convention entry indentation.
+- `indent-width`: Indentation width used for repaired convention entry indentation and indentation measurement.

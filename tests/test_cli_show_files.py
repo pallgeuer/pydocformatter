@@ -641,11 +641,22 @@ def test_pydocfmt_check_show_settings_prints_resolved_settings() -> None:
     assert "[tool.pydocfmt]" in output
     assert output.index("output-format") < output.index("line-length")
     assert output.index("line-length") < output.index("select")
-    assert output.index("extend-fixable") < output.index("include")
+    assert output.index("extend-fixable") < output.index("\ninclude =")
     assert "line-length = 72" in output
     assert 'line-ending = "lf"' in output
     assert 'convention = "pep257"' in output
     assert "respect-gitignore = false" in output
+
+
+@pytest.mark.parametrize(
+    ("flag", "expected"), [("--docstring-include-assertion-errors", "include-assertion-errors = true"), ("--no-docstring-include-assertion-errors", "include-assertion-errors = false")]
+)
+def test_pydocfmt_check_assertion_error_flags_round_trip_through_show_settings(flag: str, expected: str) -> None:
+    argv = ["pydocfmt", "check", "--show-settings", "--isolated", flag]
+    result = cli_helpers.run_cli(pydocfmt_cli.main, argv)
+
+    assert result.exit_code == 0
+    assert expected in result.stdout
 
 
 @pytest.mark.parametrize(("args", "settings"), SHOW_RULES_CASES)

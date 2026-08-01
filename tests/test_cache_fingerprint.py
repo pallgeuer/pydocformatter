@@ -49,6 +49,7 @@ _ALTERNATE_DIRECT_ANALYSIS_VALUES = {
     "docstring_missing_documentation": settings_check.DocstringMissingDocumentation.ALL_DOCSTRINGS,
     "docstring_missing_documentation_public_only": False,
     "docstring_require_init_attribute_documentation": True,
+    "docstring_include_assertion_errors": True,
     "docstring_class_attribute_no_type_base_classes": ("project.Enum",),
     "docstring_forbidden_function_decorators": ("project.forbidden",),
     "docstring_optional_function_decorators": ("project.optional",),

@@ -1,6 +1,6 @@
 # entry-description-first-word-capitalization (PDF310)
 
-Fix is sometimes available.
+Fix is usually available.
 
 Rule is disabled if `docstring-convention` is `none` or `pep257`.
 
@@ -251,6 +251,23 @@ def connect(timeout):
     """
 
 [output=unchanged]
+```
+
+A concatenated docstring without an exact source mapping is reported but not changed:
+
+```pydocfmt-example
+[settings]
+docstring-convention = "google"
+
+[input]
+def connect(timeout):
+    ("Connect.\n\n"
+     "Args:\n"
+     "    timeout: timeout in seconds.")
+
+[output=unchanged]
+[findings]
+PDF310: Lines 2-4: Docstring entry description first word 'timeout' should be capitalized
 ```
 
 Safely mapped escapes elsewhere in the docstring do not prevent a source-local fix:

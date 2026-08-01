@@ -44,7 +44,7 @@ class PDF507ExtraneousExceptionDocumentation(RuleBase):
 
     @classmethod
     def violations(cls, context: RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
-        """Return violations for exception docs absent from direct raises.
+        """Return violations for exception docs absent from enabled occurrences.
 
         Args:
             context (RuleContext): Current file context with parsed module, settings, and prepared category data.
@@ -55,9 +55,10 @@ class PDF507ExtraneousExceptionDocumentation(RuleBase):
         violations: list[rule_violations.RuleViolation] = []
         for definition, docstring, facts in value_documentation.documented_function_facts(context):
             del definition
+            exception_occurrences = value_documentation.effective_exception_occurrences(facts, settings=context.settings)
             violations.extend(
                 rule_violations.diagnostic(cls.meta, entry.line_numbers, instance_message=f"Docstring documents exception '{entry.name}' that is not explicitly raised")
                 for entry in value_documentation.documented_entries(docstring, PDF_definition.DocstringEntryKind.EXCEPTION, require_content=False)
-                if entry.name is not None and not any(value_documentation.exception_names_match(raised.name, entry.name) for raised in facts.raised_exceptions)
+                if entry.name is not None and not any(value_documentation.exception_names_match(occurrence.name, entry.name) for occurrence in exception_occurrences)
             )
         return tuple(violations)

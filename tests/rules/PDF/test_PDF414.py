@@ -19,6 +19,7 @@ from pydocformatter.rules.definitions.PDF.PDF414_malformed_convention_entry impo
 from pydocformatter.rules.definitions.PDF.PDF500_missing_parameter_documentation import PDF500MissingParameterDocumentation
 from pydocformatter.rules.definitions.PDF.PDF502_missing_return_documentation import PDF502MissingReturnDocumentation
 from pydocformatter.rules.definitions.PDF.PDF506_missing_exception_documentation import PDF506MissingExceptionDocumentation
+from pydocformatter.rules.models import FixAvailability
 from tests.rules.PDF import helpers as pdf_helpers
 
 
@@ -27,16 +28,110 @@ format_source = pdf_helpers.formatter_for("PDF414")
 
 def assert_pdf414(source: str, expected_lines: tuple[tuple[int, ...], ...], expected_messages: tuple[str, ...], *, convention: DocstringConvention) -> None:
     """Assert PDF414 findings for source under one convention."""
-    result = pdf_helpers.assert_unfixed_lines(
+    result = pdf_helpers.assert_check_lines(
         format_source, source, expected_lines, meta=PDF414MalformedConventionEntry.meta, settings=CheckSettings(select=("PDF414",), docstring_convention=convention)
     )
     assert tuple(finding.message for finding in result.unfixed_findings) == expected_messages
 
 
 def test_metadata() -> None:
-    """Expose the intended stable diagnostic-only rule identity."""
+    """Expose the intended stable sometimes-fixable rule identity."""
     assert PDF414MalformedConventionEntry.meta.name == "malformed-convention-entry"
+    assert PDF414MalformedConventionEntry.meta.fix_availability is FixAvailability.SOMETIMES
     assert PDF414MalformedConventionEntry.meta.stable_since == "1.1.0"
+
+
+def test_fixes_google_missing_separator_but_keeps_unbalanced_type_diagnostic() -> None:
+    """Repair only the safely determined punctuation defect in a mixed Google docstring."""
+    source = 'def convert(value, option):\n    """Convert values.\n\n    Args:\n        value (int) The value.\n        option (str: The option.\n    """\n'
+    result = format_source(source, settings=CheckSettings(select=("PDF414",), docstring_convention=DocstringConvention.GOOGLE))
+
+    assert result.new_source == source.replace("value (int) The value.", "value (int): The value.")
+    assert result.fixed_findings[PDF414MalformedConventionEntry.meta] == 1
+    assert tuple((finding.rule, finding.line_numbers) for finding in result.unfixed_findings) == ((PDF414MalformedConventionEntry.meta, (6,)),)
+
+
+def test_fixes_numpy_separator_and_rest_field_punctuation_only() -> None:
+    """Repair deterministic punctuation without removing reStructuredText field arguments."""
+    numpy = 'def convert(value, option):\n    """Convert values.\n\n    Parameters\n    ----------\n    value :\n    option list[str]\n    """\n'
+    numpy_result = format_source(numpy, settings=CheckSettings(select=("PDF414",), docstring_convention=DocstringConvention.NUMPY))
+
+    assert numpy_result.new_source == numpy.replace("option list[str]", "option: list[str]")
+    assert numpy_result.fixed_findings[PDF414MalformedConventionEntry.meta] == 1
+    assert tuple(finding.line_numbers for finding in numpy_result.unfixed_findings) == ((6,),)
+
+    rest = 'def convert(value):\n    """Convert values.\n\n    :param value Value.\n    :rtype result: int\n    :type: int\n    """\n'
+    rest_result = format_source(rest, settings=CheckSettings(select=("PDF414",), docstring_convention=DocstringConvention.REST))
+
+    assert rest_result.new_source == rest.replace(":param value Value.", ":param value: Value.")
+    assert rest_result.fixed_findings[PDF414MalformedConventionEntry.meta] == 1
+    assert tuple(finding.line_numbers for finding in rest_result.unfixed_findings) == ((5,), (6,))
+
+
+def test_rest_missing_delimiter_repairs_only_uniquely_proven_owner_heads() -> None:
+    """Place the delimiter after a unique signature parameter and retain ambiguous diagnostics."""
+    source = 'def convert(value, other):\n    """Convert values.\n\n    :param int value Description.\n    :param int stale Description.\n    :param value other Description.\n    :raises ValueError | TypeError Failure.\n    """\n'
+    expected = source.replace("int value Description", "int value: Description").replace("ValueError | TypeError Failure", "ValueError | TypeError: Failure")
+    result = format_source(source, settings=CheckSettings(select=("PDF414",), docstring_convention=DocstringConvention.REST))
+
+    assert result.new_source == expected
+    assert result.fixed_findings[PDF414MalformedConventionEntry.meta] == 2
+    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((5,), (6,))
+
+
+def test_rest_parameter_delimiter_does_not_use_description_prose_as_the_head() -> None:
+    """Report a credible malformed field without inserting its delimiter into prose."""
+    source = 'def convert(value):\n    """Convert values.\n\n    :param This describes value plainly.\n    """\n'
+    result = format_source(source, settings=CheckSettings(select=("PDF414",), docstring_convention=DocstringConvention.REST))
+
+    assert result.new_source == source
+    assert not result.fixed_findings
+    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((4,),)
+
+
+def test_rest_missing_delimiter_accepts_inline_types_and_spaced_exception_lists() -> None:
+    """Repair complete typed parameter and comma-separated exception heads."""
+    source = 'def convert(value):\n    """Convert values.\n\n    :param list[int] value Description.\n    :raises ValueError, TypeError Failure.\n    """\n'
+    expected = source.replace("list[int] value Description", "list[int] value: Description").replace("ValueError, TypeError Failure", "ValueError, TypeError: Failure")
+    result = format_source(source, settings=CheckSettings(select=("PDF414",), docstring_convention=DocstringConvention.REST))
+
+    assert result.new_source == expected
+    assert result.fixed_findings[PDF414MalformedConventionEntry.meta] == 2
+    assert not result.unfixed_findings
+    assert not format_source(expected, settings=CheckSettings(select=("PDF414",), docstring_convention=DocstringConvention.REST)).modified
+
+
+def test_rest_parameter_owner_name_inside_inline_type_is_not_a_head_candidate() -> None:
+    """Exclude identifier tokens nested inside a proven inline type from owner matching."""
+    source = 'def convert(list, value):\n    """Convert values.\n\n    :param list[int] value Description.\n    """\n'
+    expected = source.replace("value Description", "value: Description")
+    result = format_source(source, settings=CheckSettings(select=("PDF414",), docstring_convention=DocstringConvention.REST))
+
+    assert result.new_source == expected
+    assert result.fixed_findings[PDF414MalformedConventionEntry.meta] == 1
+    assert not result.unfixed_findings
+
+
+def test_rest_attribute_delimiter_requires_the_owner_name_as_the_first_head_token() -> None:
+    """Repair ordinary attribute heads without interpreting an unsupported inline attribute type."""
+    source = 'class Config:\n    """Configuration.\n\n    :ivar timeout Description.\n    :ivar int timeout Description.\n    """\n\n    timeout = 1\n'
+    expected = source.replace(":ivar timeout Description", ":ivar timeout: Description")
+    result = format_source(source, settings=CheckSettings(select=("PDF414",), docstring_convention=DocstringConvention.REST))
+
+    assert result.new_source == expected
+    assert result.fixed_findings[PDF414MalformedConventionEntry.meta] == 1
+    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((5,),)
+
+
+def test_rest_missing_delimiter_fixes_exact_escaped_logical_line() -> None:
+    """Repair an exactly mapped escaped field line without an empty finding target."""
+    source = 'def convert(value):\n    """Summary.\\n\\n:param value Description."""\n'
+    expected = source.replace("value Description", "value: Description")
+    result = format_source(source, settings=CheckSettings(select=("PDF414",), docstring_convention=DocstringConvention.REST))
+
+    assert result.new_source == expected
+    assert result.fixed_findings[PDF414MalformedConventionEntry.meta] == 1
+    assert not result.unfixed_findings
 
 
 def test_instance_message_rejects_indentation_issue_kind() -> None:
@@ -187,7 +282,7 @@ def test_unbalanced_google_type_remains_outside_semantic_parameter_entries() -> 
     """Report malformed syntax without allowing it to satisfy parameter documentation."""
     source = 'def convert(value):\n    """Convert values.\n\n    Args:\n        value (list[int): Description.\n    """\n'
     settings = CheckSettings(select=("PDF414", "PDF500"), docstring_convention=DocstringConvention.GOOGLE, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS)
-    result = format_source(source, settings=settings)
+    result = format_source(source, settings=settings, fix=False)
 
     assert tuple(finding.rule for finding in result.unfixed_findings) == (PDF414MalformedConventionEntry.meta, PDF500MissingParameterDocumentation.meta)
     assert tuple(finding.message for finding in result.unfixed_findings) == (
@@ -200,7 +295,7 @@ def test_empty_google_type_remains_outside_semantic_parameter_entries() -> None:
     """Report malformed empty type syntax without satisfying parameter documentation."""
     source = 'def convert(value):\n    """Convert values.\n\n    Args:\n        value (  ): Description.\n    """\n'
     settings = CheckSettings(select=("PDF414", "PDF500"), docstring_convention=DocstringConvention.GOOGLE, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS)
-    result = format_source(source, settings=settings)
+    result = format_source(source, settings=settings, fix=False)
 
     assert tuple(finding.rule for finding in result.unfixed_findings) == (PDF414MalformedConventionEntry.meta, PDF500MissingParameterDocumentation.meta)
     assert tuple(finding.message for finding in result.unfixed_findings) == (
@@ -400,10 +495,10 @@ def test_protected_structure_settings_control_whether_nested_candidates_are_insp
     partially_unprotected = dataclasses.replace(protected, **{settings_to_disable[0]: False})
     unprotected = dataclasses.replace(protected, **dict.fromkeys(settings_to_disable, False))
 
-    assert not format_source(source, settings=protected).unfixed_findings
+    assert not format_source(source, settings=protected, fix=False).unfixed_findings
     if len(settings_to_disable) > 1:
-        assert not format_source(source, settings=partially_unprotected).unfixed_findings
-    result = format_source(source, settings=unprotected)
+        assert not format_source(source, settings=partially_unprotected, fix=False).unfixed_findings
+    result = format_source(source, settings=unprotected, fix=False)
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((line_number,),)
     assert tuple(finding.message for finding in result.unfixed_findings) == ("Google docstring entry 'value' is missing the colon before its description",)
 
@@ -411,7 +506,7 @@ def test_protected_structure_settings_control_whether_nested_candidates_are_insp
 def test_implicitly_concatenated_docstring_uses_whole_expression_line_fallback() -> None:
     """Report unmapped evaluated lines against the complete concatenated expression."""
     source = 'def convert(value):\n    (\n        "Convert a value.\\n\\n"\n        "Args:\\n"\n        "    value Value."\n    )\n'
-    result = format_source(source)
+    result = format_source(source, fix=False)
 
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((3, 4, 5),)
 
@@ -420,7 +515,7 @@ def test_arity_invalid_rest_fields_do_not_satisfy_parameter_or_return_documentat
     """Keep malformed fields outside semantic completeness checks while reporting both facts."""
     source = 'def convert(value):\n    """Convert a value.\n\n    :param: Value.\n    :returns result: Result.\n    """\n    return value\n'
     settings = CheckSettings(select=("PDF414", "PDF500", "PDF502"), docstring_convention=DocstringConvention.REST, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS)
-    result = format_source(source, settings=settings)
+    result = format_source(source, settings=settings, fix=False)
 
     assert tuple(finding.rule for finding in result.unfixed_findings) == (
         PDF414MalformedConventionEntry.meta,
@@ -435,7 +530,7 @@ def test_malformed_google_exception_does_not_satisfy_raised_exception_documentat
     """Report malformed syntax and the independently missing semantic exception entry."""
     source = 'def convert():\n    """Convert a value.\n\n    Raises:\n        ValueError Failure detail.\n    """\n    raise ValueError\n'
     settings = CheckSettings(select=("PDF414", "PDF506"), docstring_convention=DocstringConvention.GOOGLE, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS)
-    result = format_source(source, settings=settings)
+    result = format_source(source, settings=settings, fix=False)
 
     assert tuple(finding.rule for finding in result.unfixed_findings) == (PDF414MalformedConventionEntry.meta, PDF506MissingExceptionDocumentation.meta)
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((5,), (7,))
@@ -445,25 +540,22 @@ def test_mixed_valid_and_malformed_numpy_entries_preserve_only_valid_semantics()
     """Keep valid peers available to completeness checks without promoting a malformed entry."""
     source = 'def combine(first, second):\n    """Combine values.\n\n    Parameters\n    ----------\n    first int\n    second : str\n        Second value.\n    """\n'
     settings = CheckSettings(select=("PDF414", "PDF500"), docstring_convention=DocstringConvention.NUMPY, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS)
-    result = format_source(source, settings=settings)
+    result = format_source(source, settings=settings, fix=False)
 
     assert tuple(finding.rule for finding in result.unfixed_findings) == (PDF414MalformedConventionEntry.meta, PDF500MissingParameterDocumentation.meta)
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((6,), (1,))
     assert result.unfixed_findings[1].message == "Function parameter 'first' is missing docstring documentation"
 
 
-def test_pdf101_does_not_merge_adjacent_malformed_numpy_entries() -> None:
-    """Keep diagnosed NumPy candidates unchanged and independently visible."""
+def test_pdf101_and_pdf414_fix_adjacent_numpy_entries_without_merging() -> None:
+    """Repair adjacent NumPy separators while keeping the entries independent."""
     source = 'def combine(first, second):\n    """Combine values.\n\n    Parameters\n    ----------\n    first tuple[int, int]\n    second list[str]\n    """\n'
     settings = CheckSettings(select=("PDF101", "PDF414"), docstring_convention=DocstringConvention.NUMPY)
     result = format_source(source, settings=settings)
 
-    assert result.new_source == source
-    assert not result.fixed_findings
-    assert tuple(finding.message for finding in result.unfixed_findings) == (
-        "NumPy docstring entry 'first' is missing the colon before its type",
-        "NumPy docstring entry 'second' is missing the colon before its type",
-    )
+    assert result.new_source == source.replace("first tuple[int, int]", "first: tuple[int, int]").replace("second list[str]", "second: list[str]")
+    assert result.fixed_findings == {PDF414MalformedConventionEntry.meta: 2}
+    assert not result.unfixed_findings
 
 
 def test_malformed_numpy_entry_splits_reflowable_surrounding_prose() -> None:
@@ -474,10 +566,10 @@ def test_malformed_numpy_entry_splits_reflowable_surrounding_prose() -> None:
 
     assert (
         result.new_source
-        == 'def convert(first):\n    """Convert values.\n\n    Parameters\n    ----------\n    Narrative section prose that is\n    intentionally long enough to wrap.\n    first int\n    """\n'
+        == 'def convert(first):\n    """Convert values.\n\n    Parameters\n    ----------\n    Narrative section prose that is\n    intentionally long enough to wrap.\n    first: int\n    """\n'
     )
-    assert result.fixed_findings == {PDF101DocstringReflow.meta: 1}
-    assert tuple(finding.message for finding in result.unfixed_findings) == ("NumPy docstring entry 'first' is missing the colon before its type",)
+    assert result.fixed_findings == {PDF101DocstringReflow.meta: 1, PDF414MalformedConventionEntry.meta: 1}
+    assert not result.unfixed_findings
 
 
 @pytest.mark.parametrize("separator", ["", "\n"])
@@ -485,7 +577,7 @@ def test_malformed_rest_fields_preserve_layout_and_remain_individually_diagnosed
     """Keep adjacent or blank-separated malformed fields outside layout fixes."""
     source = f'def convert(value):\n    """Convert values.\n:param value Missing delimiter.{separator}\n:type value Missing delimiter.\n    """\n'
     settings = CheckSettings(select=("PDF101", "PDF200", "PDF201", "PDF414"), docstring_convention=DocstringConvention.REST)
-    result = format_source(source, settings=settings)
+    result = format_source(source, settings=settings, fix=False)
 
     assert result.new_source == source
     assert not result.fixed_findings
@@ -513,14 +605,14 @@ def test_mismatched_convention_syntax_is_not_diagnosed(convention: DocstringConv
 def test_docstring_suppression_hides_findings() -> None:
     """Honor whole-docstring suppression from the closing delimiter line."""
     source = 'def convert(value):\n    """Convert a value.\n\n    Args:\n        value Value.\n    """  # noqa: PDF414\n'
-    result = format_source(source)
+    result = format_source(source, fix=False)
     assert not result.unfixed_findings
 
 
 def test_signature_line_suppression_does_not_hide_docstring_syntax_findings() -> None:
     """Keep suppression attachment on the malformed docstring rather than its owner signature."""
     source = 'def convert(value):  # noqa: PDF414\n    """Convert a value.\n\n    Args:\n        value Value.\n    """\n'
-    result = format_source(source)
+    result = format_source(source, fix=False)
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((5,),)
 
 

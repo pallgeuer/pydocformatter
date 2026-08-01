@@ -205,7 +205,7 @@ def test_prepare_uses_complete_function_parameter_inventory_case_sensitively() -
     assert tuple(issue.names for issue in structure.convention_entry_issues) == (("receiver",), ("value",), ("*args",), ("option",), ("**kwargs",))
 
 
-@pytest.mark.parametrize("convention", [DocstringConvention.NONE, DocstringConvention.PEP257, DocstringConvention.REST])
+@pytest.mark.parametrize("convention", [DocstringConvention.NONE, DocstringConvention.PEP257])
 def test_prepare_skips_malformed_entry_member_inventories_for_irrelevant_conventions(convention: DocstringConvention, monkeypatch: pytest.MonkeyPatch) -> None:
     source = 'class Client:\n    """Client values."""\n\n    value = 1\n\n    def run(self):\n        """Run the client."""\n'
     monkeypatch.setattr(PDF_definition, "_malformed_entry_inventories", pytest.fail)
@@ -290,6 +290,23 @@ def test_documented_function_facts_reuse_prepared_function_facts() -> None:
     assert facts[0][2] is data.function_facts_by_definition_id[id(facts[0][0])]
     assert value_documentation.documented_function_facts(context_with_data) is facts
     assert data._documented_function_facts is facts
+
+
+def test_function_facts_preserve_exception_occurrence_order_origins_and_nested_ownership() -> None:
+    source = 'def outer(values):\n    """Validate outer."""\n    assert values\n    for value in values:\n        assert value\n    try:\n        raise ValueError("bad")\n    except ValueError:\n        assert False\n\n    class Nested:\n        def method(self):\n            """Validate method."""\n            assert False\n\n    def inner():\n        """Validate inner."""\n        assert True\n\n    return inner\n'
+    data = PDF.prepare(category_context(source))
+    facts_by_name = {definition.qualified_name: data.function_facts_by_definition_id[id(definition)] for definition in data.definitions if definition.kind is DefinitionKind.FUNCTION}
+
+    assert tuple((occurrence.name, occurrence.line_numbers, occurrence.origin) for occurrence in facts_by_name["outer"].exception_occurrences) == (
+        ("AssertionError", (3,), PDF_definition.ExceptionOccurrenceOrigin.ASSERT),
+        ("AssertionError", (5,), PDF_definition.ExceptionOccurrenceOrigin.ASSERT),
+        ("ValueError", (7,), PDF_definition.ExceptionOccurrenceOrigin.RAISE),
+        ("AssertionError", (9,), PDF_definition.ExceptionOccurrenceOrigin.ASSERT),
+    )
+    assert tuple((occurrence.line_numbers, occurrence.origin) for occurrence in facts_by_name["outer.Nested.method"].exception_occurrences) == (
+        ((14,), PDF_definition.ExceptionOccurrenceOrigin.ASSERT),
+    )
+    assert tuple((occurrence.line_numbers, occurrence.origin) for occurrence in facts_by_name["outer.inner"].exception_occurrences) == (((18,), PDF_definition.ExceptionOccurrenceOrigin.ASSERT),)
 
 
 def test_value_documentation_has_no_body_walk_fallback() -> None:
@@ -1394,6 +1411,45 @@ def test_typed_rest_parameter_fields_split_type_from_name(field: str, expected_n
     assert (entry.kind, entry.names, entry_type_text(entry), entry.description) == (DocstringEntryKind.PARAMETER, expected_names, expected_type, "Description.")
 
 
+@pytest.mark.parametrize(
+    ("convention", "value", "expected_names"),
+    [
+        (DocstringConvention.GOOGLE, "Args:\n    *args: Values.", ("*args",)),
+        (DocstringConvention.NUMPY, "Parameters\n----------\nvalue, *args : object\n    Values.", ("value", "*args")),
+        (DocstringConvention.REST, ":param tuple[object, ...] *args: Values.", ("*args",)),
+    ],
+)
+def test_entries_expose_parser_owned_name_slots(convention: DocstringConvention, value: str, expected_names: tuple[str, ...]) -> None:
+    """Align every parsed name with the exact logical source span that produced it."""
+    structure = structure_for(value, settings=CheckSettings(docstring_convention=convention))
+    entry = structure.entries[0]
+
+    assert entry.names == expected_names
+    assert tuple(None if slot is None else structure.lines[slot.line_index].text[slot.start_column : slot.end_column] for slot in entry.name_slots) == expected_names
+
+
+def test_google_entries_expose_parser_owned_type_edit_slots() -> None:
+    """Retain complete insertion and removal bounds without reparsing entry text."""
+    structure = structure_for("Args:\n    value: Value.\n    other  ( list[int] ): Other.", settings=CheckSettings(docstring_convention=DocstringConvention.GOOGLE))
+    insertion_slot = structure.entries[0].type_edit_slot
+    removal_slot = structure.entries[1].type_edit_slot
+
+    assert insertion_slot is not None
+    assert structure.lines[insertion_slot.line_index].text[insertion_slot.insertion_column :] == ": Value."
+    assert insertion_slot.removal_start_column is None
+    assert insertion_slot.removal_end_column is None
+    assert removal_slot is not None
+    assert removal_slot.removal_start_column is not None
+    assert removal_slot.removal_end_column is not None
+    assert structure.lines[removal_slot.line_index].text[removal_slot.removal_start_column : removal_slot.removal_end_column] == "  ( list[int] )"
+
+
+def test_docstring_entry_rejects_misaligned_name_slots() -> None:
+    """Reject parser results whose semantic names and source slots cannot be paired."""
+    with pytest.raises(ValueError, match="name slots must align"):
+        PDF_definition.DocstringEntry(kind=DocstringEntryKind.PARAMETER, names=("value",), name_slots=(), type_info=None, description="", description_lines=(), start_line=0, end_line=1)
+
+
 def test_rest_entries_expose_inline_and_type_field_slots() -> None:
     """Expose reStructuredText inline and orphan type-field spans."""
     structure = structure_for(":param  list[int]  value: Description.\n:rtype:  dict[str, int]  ", settings=CheckSettings(docstring_convention=DocstringConvention.REST))
@@ -1411,6 +1467,16 @@ def test_rest_multiline_type_fields_preserve_complete_semantics_without_slots() 
 
     assert tuple(type_info.text if type_info is not None else None for type_info in type_infos) == ("list[str]", "tuple[ str, int]")
     assert all(type_info is not None and type_info.slot is None for type_info in type_infos)
+
+
+def test_typed_rest_name_slot_uses_the_final_argument_name() -> None:
+    """Distinguish the parameter name from the same spelling inside its inline type."""
+    structure = structure_for(":param value.Type value: Description.", settings=CheckSettings(docstring_convention=DocstringConvention.REST))
+    entry = structure.entries[0]
+    (slot,) = entry.name_slots
+
+    assert slot is not None
+    assert slot.start_column == structure.lines[0].text.rfind("value")
 
 
 @pytest.mark.parametrize(

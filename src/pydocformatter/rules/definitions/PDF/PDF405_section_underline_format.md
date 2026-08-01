@@ -1,6 +1,6 @@
 # section-underline-format (PDF405)
 
-Fix is sometimes available.
+Fix is usually available.
 
 Rule is disabled if `docstring-convention` is `none`, `pep257`, `google`, or `rest`.
 

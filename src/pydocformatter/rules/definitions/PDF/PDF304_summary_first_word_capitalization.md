@@ -1,6 +1,6 @@
 # summary-first-word-capitalization (PDF304)
 
-Fix is sometimes available.
+Fix is usually available.
 
 ## What it does
 Checks docstring summaries whose first word starts with a lowercase ASCII letter when that word can be safely interpreted as ordinary ASCII prose. This includes module, class, function, method, and attached attribute docstrings.

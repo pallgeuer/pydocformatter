@@ -39,7 +39,7 @@ class PDF403SectionNameTrailingContent(RuleBase):
         code=RuleCode("PDF403"),
         name="section-name-trailing-content",
         message="Docstring section name should be followed by a line break",
-        fix_availability=FixAvailability.SOMETIMES,
+        fix_availability=FixAvailability.USUALLY,
         stable_since="1.0.0",
         setting_effects=(
             RuleSettingEffects(

@@ -44,7 +44,7 @@ class PDF506MissingExceptionDocumentation(RuleBase):
 
     @classmethod
     def violations(cls, context: RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
-        """Return violations for directly raised exceptions missing from docs.
+        """Return violations for enabled exception occurrences missing from docs.
 
         Args:
             context (RuleContext): Current file context with parsed module, settings, and prepared category data.
@@ -64,17 +64,17 @@ class PDF506MissingExceptionDocumentation(RuleBase):
             ):
                 continue
             seen: list[str] = []
-            for raised in facts.raised_exceptions:
-                if any(value_documentation.exception_names_match(raised.name, seen_name) for seen_name in seen):
+            for occurrence in value_documentation.effective_exception_occurrences(facts, settings=context.settings):
+                if any(value_documentation.exception_names_match(occurrence.name, seen_name) for seen_name in seen):
                     continue
-                seen.append(raised.name)
-                if not any(value_documentation.exception_names_match(raised.name, documented_name) for documented_name in documented_names):
+                seen.append(occurrence.name)
+                if not any(value_documentation.exception_names_match(occurrence.name, documented_name) for documented_name in documented_names):
+                    message = (
+                        "AssertionError from assert statement is missing docstring documentation"
+                        if occurrence.origin is PDF_definition.ExceptionOccurrenceOrigin.ASSERT
+                        else f"Raised exception '{occurrence.name}' is missing docstring documentation"
+                    )
                     violations.append(
-                        rule_violations.diagnostic(
-                            cls.meta,
-                            raised.line_numbers,
-                            suppression_line_numbers=(PDF_definition.docstring_physical_line_numbers(docstring),),
-                            instance_message=f"Raised exception '{raised.name}' is missing docstring documentation",
-                        )
+                        rule_violations.diagnostic(cls.meta, occurrence.line_numbers, suppression_line_numbers=(PDF_definition.docstring_physical_line_numbers(docstring),), instance_message=message)
                     )
         return tuple(violations)

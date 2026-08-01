@@ -70,7 +70,7 @@ def formatter_for(rule_code: str, *, convention: DocstringConvention = Docstring
 
 
 def assert_unfixed_lines(format_source: RuleFormatter, source: str, expected: tuple[tuple[int, ...], ...], *, meta: RuleMetadata, settings: CheckSettings | None = None) -> formatter.FormatterResult:
-    """Assert unfixed findings for one diagnostic-only rule.
+    """Assert findings that remain unfixed during normal formatting.
 
     Args:
         format_source (RuleFormatter): Formatter helper configured for the rule under test.
@@ -83,6 +83,28 @@ def assert_unfixed_lines(format_source: RuleFormatter, source: str, expected: tu
         Formatter result produced by the configured rule.
     """
     result = format_source(source, settings=settings)
+
+    assert result.new_source == source
+    assert not result.fixed_findings
+    assert tuple(finding.rule for finding in result.unfixed_findings) == (meta,) * len(expected)
+    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == expected
+    return result
+
+
+def assert_check_lines(format_source: RuleFormatter, source: str, expected: tuple[tuple[int, ...], ...], *, meta: RuleMetadata, settings: CheckSettings | None = None) -> formatter.FormatterResult:
+    """Assert findings without applying available fixes.
+
+    Args:
+        format_source (RuleFormatter): Formatter helper configured for the rule under test.
+        source (str): Python source text to check.
+        expected (tuple[tuple[int, ...], ...]): Expected finding line-number targets.
+        meta (RuleMetadata): Rule metadata expected on every finding.
+        settings (CheckSettings | None): Explicit settings overriding the formatter helper default.
+
+    Returns:
+        Formatter result produced by the configured rule in check-only mode.
+    """
+    result = format_source(source, settings=settings, fix=False)
 
     assert result.new_source == source
     assert not result.fixed_findings

@@ -18,8 +18,9 @@ from pydocformatter.rules.definition_helpers import docstring_sections, exceptio
 
 if TYPE_CHECKING:
     # First-party imports
+    from pydocformatter.cli.settings_check import CheckSettings
     from pydocformatter.rules.definition import RuleContext
-    from pydocformatter.rules.definitions.PDF.PDF import DocumentedFunctionFact
+    from pydocformatter.rules.definitions.PDF.PDF import DocumentedFunctionFact, ExceptionOccurrence, FunctionFacts
 
 
 @dataclasses.dataclass(frozen=True)
@@ -49,8 +50,8 @@ def documented_function_facts(context: RuleContext) -> tuple[DocumentedFunctionF
         context (RuleContext): Current file context with prepared PDF data and LibCST metadata.
 
     Returns:
-        tuple[DocumentedFunctionFact, ...]: Function definitions with docstrings and collected return, yield, and raise
-            facts.
+        tuple[DocumentedFunctionFact, ...]: Function definitions with docstrings and collected return, yield, and
+            exception facts.
     """
     data = PDF_definition.PDF.require_data(context)
     cached_facts = data._documented_function_facts
@@ -60,6 +61,21 @@ def documented_function_facts(context: RuleContext) -> tuple[DocumentedFunctionF
     # Keep prepared data frozen externally while memoizing this expensive derived fact tuple.
     object.__setattr__(data, "_documented_function_facts", facts)
     return facts
+
+
+def effective_exception_occurrences(facts: FunctionFacts, *, settings: CheckSettings) -> tuple[ExceptionOccurrence, ...]:
+    """Return possible exception occurrences enabled for documentation checks.
+
+    Args:
+        facts (FunctionFacts): Function-body facts containing direct raises and syntactic assertions.
+        settings (CheckSettings): Resolved settings controlling whether assertions contribute `AssertionError`.
+
+    Returns:
+        tuple[ExceptionOccurrence, ...]: Enabled exception occurrences in source traversal order.
+    """
+    if settings.docstring_include_assertion_errors:
+        return facts.exception_occurrences
+    return tuple(occurrence for occurrence in facts.exception_occurrences if occurrence.origin is PDF_definition.ExceptionOccurrenceOrigin.RAISE)
 
 
 def _collect_documented_function_facts(data: PDF_definition.PDFCategoryData) -> tuple[DocumentedFunctionFact, ...]:

@@ -18,15 +18,18 @@ import operator
 import libcst as cst
 
 # First-party imports
+import pydocformatter.rules.edits as rule_edits
 import pydocformatter.rules.violations as rule_violations
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 import pydocformatter.rules.definition_helpers.typed_documentation_models as typed_models
+from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.definition_helpers import (
     attribute_documentation,
     docstring_sections,
     entry_completeness,
     parameter_documentation,
     rest_fields,
+    section_edits,
     static_names,
     type_expressions,
     value_documentation,
@@ -78,11 +81,12 @@ def missing_description_violations(targets: tuple[TypedDocumentationTarget, ...]
     )
 
 
-def required_type_violations(targets: tuple[TypedDocumentationTarget, ...], *, meta: RuleMetadata, label: str) -> tuple[rule_violations.RuleViolation, ...]:
+def required_type_violations(targets: tuple[TypedDocumentationTarget, ...], *, context: RuleContext, meta: RuleMetadata, label: str) -> tuple[rule_violations.RuleViolation, ...]:
     """Return diagnostics for documented targets without docstring types.
 
     Args:
         targets (tuple[TypedDocumentationTarget, ...]): Code/documentation pairs to inspect.
+        context (RuleContext): Current source context used to construct safe source edits.
         meta (RuleMetadata): Metadata for the PDF7xx rule reporting the findings.
         label (str): Human-readable target label used in per-instance diagnostic messages.
 
@@ -90,25 +94,37 @@ def required_type_violations(targets: tuple[TypedDocumentationTarget, ...], *, m
         tuple[rule_violations.RuleViolation, ...]: Diagnostics for entries missing docstring type text.
     """
     return sort_violations(
-        rule_violations.diagnostic(meta, target.entry.line_numbers, instance_message=f"{label} '{target.name}' docstring entry is missing a type")
+        rule_violations.violation_for_optional_planned_source_change(
+            meta, _planned_required_type_change(target, context=context), line_numbers=target.entry.line_numbers, instance_message=f"{label} '{target.name}' docstring entry is missing a type"
+        )
         for target in targets
         if not target.entry.type_sources
     )
 
 
-def forbidden_type_violations(targets: tuple[TypedDocumentationTarget, ...], *, meta: RuleMetadata, label: str) -> tuple[rule_violations.RuleViolation, ...]:
+def forbidden_type_violations(
+    targets: tuple[TypedDocumentationTarget, ...], *, context: RuleContext, meta: RuleMetadata, label: str, correction: typed_models.TypeRemovalCorrection
+) -> tuple[rule_violations.RuleViolation, ...]:
     """Return diagnostics for documented targets with docstring types.
 
     Args:
         targets (tuple[TypedDocumentationTarget, ...]): Code/documentation pairs to inspect.
+        context (RuleContext): Current source context used to construct safe source edits.
         meta (RuleMetadata): Metadata for the PDF7xx rule reporting the findings.
         label (str): Human-readable target label used in per-instance diagnostic messages.
+        correction (typed_models.TypeRemovalCorrection): Explicit policy controlling whether safe type removals are
+            planned.
 
     Returns:
         tuple[rule_violations.RuleViolation, ...]: Diagnostics for entries that include forbidden docstring type text.
     """
     return sort_violations(
-        rule_violations.diagnostic(meta, source.line_numbers, instance_message=f"{label} '{target.name}' docstring entry should not include a type")
+        rule_violations.violation_for_optional_planned_source_change(
+            meta,
+            _planned_forbidden_type_change(source, context=context) if correction is typed_models.TypeRemovalCorrection.REMOVE else None,
+            line_numbers=source.line_numbers,
+            instance_message=f"{label} '{target.name}' docstring entry should not include a type",
+        )
         for target in targets
         for source in target.entry.type_sources
     )
@@ -141,6 +157,102 @@ def mismatch_violations(targets: tuple[TypedDocumentationTarget, ...], *, contex
                 continue
             violations.append(rule_violations.diagnostic(meta, source.line_numbers, instance_message=f"{label} '{target.name}' docstring type does not match the annotation"))
     return sort_violations(violations)
+
+
+def _planned_required_type_change(target: TypedDocumentationTarget, *, context: RuleContext) -> rule_edits.PlannedSourceChange | None:
+    """Return a safe insertion of one missing docstring type from its code annotation."""
+    annotation_text = target.annotation_text
+    entry = target.entry
+    if annotation_text is None or "\n" in annotation_text or "\r" in annotation_text:
+        return None
+    if entry.type_entry is not None:
+        return _planned_empty_rest_type_change(entry, annotation_text, context=context)
+    if entry.docstring.structure.convention is DocstringConvention.GOOGLE:
+        return _planned_google_type_insertion(entry, annotation_text, context=context)
+    if entry.docstring.structure.convention is DocstringConvention.REST:
+        return _planned_rest_type_field_insertion(target, context=context)
+    return None
+
+
+def _planned_empty_rest_type_change(entry: TypedDocstringEntry, annotation_text: str, *, context: RuleContext) -> rule_edits.PlannedSourceChange | None:
+    """Return a safe fill of one existing empty reStructuredText type field."""
+    type_entry = entry.type_entry
+    if type_entry is None or type_entry.end_line != type_entry.start_line + 1:
+        return None
+    line = entry.docstring.structure.lines[type_entry.start_line]
+    stripped_end = len(line.text.rstrip(" \t"))
+    separator = "" if stripped_end < len(line.text) else " "
+    return section_edits.planned_line_text_change(entry.docstring, line, len(line.text), len(line.text), f"{separator}{annotation_text}", context=context, line_numbers=entry.line_numbers)
+
+
+def _planned_google_type_insertion(entry: TypedDocstringEntry, annotation_text: str, *, context: RuleContext) -> rule_edits.PlannedSourceChange | None:
+    """Return a safe parenthesized type insertion for one Google entry."""
+    value_entry = entry.value_entry
+    if value_entry is None or value_entry.type_edit_slot is None:
+        return None
+    slot = value_entry.type_edit_slot
+    if slot.removal_start_column is not None or slot.removal_end_column is not None:
+        return None
+    line = entry.docstring.structure.lines[slot.line_index]
+    return section_edits.planned_line_text_change(entry.docstring, line, slot.insertion_column, slot.insertion_column, f" ({annotation_text})", context=context, line_numbers=entry.line_numbers)
+
+
+def _planned_rest_type_field_insertion(target: TypedDocumentationTarget, *, context: RuleContext) -> rule_edits.PlannedSourceChange | None:
+    """Return a safe paired reStructuredText type-field insertion."""
+    entry = target.entry
+    value_entry = entry.value_entry
+    if value_entry is None:
+        return None
+    line = entry.docstring.structure.lines[value_entry.start_line]
+    if value_entry.end_line < len(entry.docstring.structure.lines):
+        insertion_offset = entry.docstring.structure.lines[value_entry.end_line].start_offset
+    elif entry.docstring.value.endswith("\n"):
+        insertion_offset = len(entry.docstring.value)
+    else:
+        return None
+    field = _rest_type_field(target, value_entry)
+    if field is None:
+        return None
+    raw_prefix = line.raw_text[: line.text_raw_start_column]
+    raw_text = f"{raw_prefix}{line.text_indent}{field}"
+    return section_edits.planned_value_text_change(
+        entry.docstring, insertion_offset, insertion_offset, f"{raw_text}\n", context=context, line_numbers=entry.line_numbers, source_text=f"{raw_text}{context.line_ending}"
+    )
+
+
+def _rest_type_field(target: TypedDocumentationTarget, value_entry: PDF_definition.DocstringEntry) -> str | None:
+    """Return the canonical paired reStructuredText type field for one target."""
+    annotation_text = target.annotation_text
+    if annotation_text is None:
+        return None
+    if value_entry.kind is PDF_definition.DocstringEntryKind.PARAMETER:
+        return f":type {parameter_documentation.parameter_comparison_name(target.name, convention=DocstringConvention.REST)}: {annotation_text}"
+    if value_entry.kind is PDF_definition.DocstringEntryKind.RETURN:
+        return f":rtype: {annotation_text}"
+    if value_entry.kind is PDF_definition.DocstringEntryKind.YIELD:
+        argument = f" {value_entry.field_argument.lstrip('*')}" if value_entry.field_argument else ""
+        return f":ytype{argument}: {annotation_text}"
+    if value_entry.kind is PDF_definition.DocstringEntryKind.ATTRIBUTE:
+        return f":vartype {target.name.lstrip('*')}: {annotation_text}"
+    return None
+
+
+def _planned_forbidden_type_change(source: TypedDocstringTypeSource, *, context: RuleContext) -> rule_edits.PlannedSourceChange | None:
+    """Return a safe removal of one forbidden Google or reStructuredText type."""
+    docstring = source.docstring
+    entry = source.entry
+    if docstring.structure.convention is DocstringConvention.REST and docstring_sections.is_rest_type_field(entry.field_name):
+        start_line = docstring.structure.lines[entry.start_line]
+        start_offset = start_line.start_offset
+        end_offset = docstring.structure.lines[entry.end_line].start_offset if entry.end_line < len(docstring.structure.lines) else len(docstring.value)
+        return section_edits.planned_value_text_change(docstring, start_offset, end_offset, "", context=context, line_numbers=source.line_numbers)
+    if docstring.structure.convention is not DocstringConvention.GOOGLE or entry.type_edit_slot is None:
+        return None
+    slot = entry.type_edit_slot
+    if slot.removal_start_column is None or slot.removal_end_column is None:
+        return None
+    line = docstring.structure.lines[slot.line_index]
+    return section_edits.planned_line_text_change(docstring, line, slot.removal_start_column, slot.removal_end_column, "", context=context, line_numbers=source.line_numbers)
 
 
 def parameter_targets(context: RuleContext) -> tuple[TypedDocumentationTarget, ...]:
@@ -289,7 +401,7 @@ def _collect_parameter_targets(context: RuleContext) -> tuple[TypedDocumentation
         for entry in entries:
             if entry.name is None:
                 continue
-            comparison_name = parameter_documentation.parameter_comparison_name(entry.name)
+            comparison_name = parameter_documentation.parameter_comparison_name(entry.name, convention=entry.docstring.structure.convention)
             if comparison_name in annotations:
                 targets.append(TypedDocumentationTarget(name=entry.name, entry=entry, annotation_text=annotations[comparison_name], owner=definition))
     return tuple(targets)
@@ -323,7 +435,7 @@ def _collect_yield_targets(context: RuleContext) -> tuple[TypedDocumentationTarg
 
 def _logical_entries(docstring: PDF_definition.DocstringInfo, kind: PDF_definition.DocstringEntryKind) -> tuple[TypedDocstringEntry, ...]:
     """Return logical entries, merging paired reST value and type fields."""
-    if docstring.structure.convention.value != "rest":
+    if docstring.structure.convention is not DocstringConvention.REST:
         return tuple(logical_entry for entry in docstring.structure.entries if entry.kind is kind for logical_entry in _entries_from_raw(docstring, entry))
     pairing = rest_fields.pair_value_and_type_fields(docstring.structure.entries, kind)
     type_parts_by_value_order = {pair.value.order: pair.type for pair in pairing.pairs}
@@ -340,7 +452,9 @@ def _entries_from_raw(docstring: PDF_definition.DocstringInfo, entry: PDF_defini
     names = entry.names or (None,)
     line_numbers = _entry_line_numbers(docstring, entry)
     type_sources = _type_sources(docstring, entry, fallback_line_numbers=line_numbers)
-    return tuple(TypedDocstringEntry(name=name, type_sources=type_sources, description=entry.description, has_value_entry=True, line_numbers=line_numbers) for name in names)
+    return tuple(
+        TypedDocstringEntry(name=name, type_sources=type_sources, description=entry.description, line_numbers=line_numbers, docstring=docstring, value_entry=entry, type_entry=None) for name in names
+    )
 
 
 def _merged_rest_entry(
@@ -356,7 +470,13 @@ def _merged_rest_entry(
         *(() if type_entry is None else _type_sources(docstring, type_entry, fallback_line_numbers=_entry_line_numbers(docstring, type_entry))),
     )
     return TypedDocstringEntry(
-        name=name, type_sources=type_sources, description=value_entry.description if value_entry is not None else "", has_value_entry=value_entry is not None, line_numbers=source_line_numbers
+        name=name,
+        type_sources=type_sources,
+        description=value_entry.description if value_entry is not None else "",
+        line_numbers=source_line_numbers,
+        docstring=docstring,
+        value_entry=value_entry,
+        type_entry=type_entry,
     )
 
 
@@ -366,7 +486,10 @@ def _type_sources(docstring: PDF_definition.DocstringInfo, entry: PDF_definition
         return ()
     return (
         TypedDocstringTypeSource(
-            text=entry.type_info.text.strip(), line_numbers=_entry_line_numbers(docstring, entry) if docstring_sections.is_rest_type_field(entry.field_name) else fallback_line_numbers
+            text=entry.type_info.text.strip(),
+            line_numbers=_entry_line_numbers(docstring, entry) if docstring_sections.is_rest_type_field(entry.field_name) else fallback_line_numbers,
+            docstring=docstring,
+            entry=entry,
         ),
     )
 

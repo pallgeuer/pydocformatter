@@ -103,7 +103,7 @@ class PDF306ParameterDocumentationTooGeneric(RuleBase):
                 if entry.kind is not PDF_definition.DocstringEntryKind.PARAMETER or len(entry.names) != 1 or not entry.description or _is_rest_type_entry(entry):
                     continue
                 line = docstring.structure.lines[entry.start_line]
-                signature_parameter = signature_parameters.get(parameter_documentation.parameter_comparison_name(entry.names[0]))
+                signature_parameter = signature_parameters.get(parameter_documentation.parameter_comparison_name(entry.names[0], convention=docstring.structure.convention))
                 targets.append(
                     documentation_style.DocumentedValueTarget(
                         name=entry.names[0],

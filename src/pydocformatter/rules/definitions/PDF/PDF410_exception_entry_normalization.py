@@ -34,7 +34,7 @@ class PDF410ExceptionEntryNormalization(RuleBase):
         code=RuleCode("PDF410"),
         name="exception-entry-normalization",
         message="Docstring exception entry should use canonical spelling",
-        fix_availability=FixAvailability.SOMETIMES,
+        fix_availability=FixAvailability.USUALLY,
         stable_since="1.0.0",
         setting_effects=docstring_conventions.convention_setting_effects(disabled=docstring_conventions.UNPARSED_CONVENTIONS),
         incompatible_with=(),

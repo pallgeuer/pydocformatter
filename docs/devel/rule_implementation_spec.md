@@ -72,6 +72,8 @@ Findings and planned changes must use non-empty positive one-based source line t
 
 Always-fixable rules must attach a source fix to every reported violation. Never-fixable rules must not attach source fixes. Usually-fixable and sometimes-fixable rules report per-instance fixability through the violation helpers.
 
+Classify inherent fix availability by the rule's designed corrections, not by observed finding frequency. Use `USUALLY` when every semantic violation kind reported by the rule has a defined automatic correction, but an individual finding can remain non-fixable because conservative source mapping, content ambiguity, syntax validation, or value-preservation checks reject that instance. Use `SOMETIMES` when at least one semantic violation kind is intentionally diagnostic-only even for ordinary, exactly mapped source while another kind has a fix. Candidates that the rule skips, configured fixability selectors, and how often unusual source forms occur do not affect this classification.
+
 Source fixes are planned source edits only. Rules do not return replacement LibCST modules, mutate the `RuleContext`, or apply edits themselves.
 
 Reusable parsing, rendering, and source-edit behavior belongs in existing helpers under `src/pydocformatter/rules/definition_helpers/` or `src/pydocformatter/rules/edits.py` when it has more than one rule-level use.
