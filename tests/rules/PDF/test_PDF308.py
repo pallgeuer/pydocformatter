@@ -65,6 +65,7 @@ def test_reports_comma_before_nested_structure_without_fixing() -> None:
         "        ```text\n        fast\n        ```",
         "        >>> choose()",
         "        .. note::\n            fast",
+        "        .. warning:\n            fast",
         "        Example::\n            fast",
         "        | Mode | Value |\n        | --- | --- |\n        | fast | 1 |",
         "        Modes\n        -----",

@@ -6,6 +6,9 @@ import re
 import pathlib
 from typing import TYPE_CHECKING
 
+# Third-party imports
+import pytest
+
 # First-party imports
 import pydocformatter.rules.collection as rule_collection
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention
@@ -25,6 +28,10 @@ EXPECTED_RUFF_HEADERS = ("Code", "Name", "Message", "Fixable", "Since", "Support
 PCF_HEADING = "### PCF: pydocformatter comment formatting"
 PDF_HEADING = "### PDF: pydocformatter docstring formatting"
 CONVENTION_NAMES = {DocstringConvention.NONE: "None", DocstringConvention.PEP257: "PEP257", DocstringConvention.GOOGLE: "Google", DocstringConvention.NUMPY: "NumPy", DocstringConvention.REST: "reST"}
+PYDOCFORMATTER_MAPPING_LABELS = ("Disable", "Related to")
+RUFF_MAPPING_LABELS = ("Replaced by", "Related to")
+PYDOCFORMATTER_CODE_PATTERN = r"P[CD]F\d{3}"
+RUFF_CODE_PATTERN = r"[A-Z]+\d{3,4}"
 
 
 def _table_rows_after_heading(text: str, heading: str) -> list[dict[str, str]]:
@@ -109,9 +116,30 @@ def _explicit_cell(rule: rule_models.RuleMetadata) -> str:
     return "Opt-in" if any(selector.selects_code(rule.code) for selector in selectors) else "-"
 
 
-def _codes_for_mapping_label(cell: str, label: str, code_pattern: str) -> list[str]:
-    """Return rule codes from semicolon-separated mapping cell clauses."""
-    return [code for clause in cell.split(";") if (stripped := clause.strip()).startswith(label) for code in re.findall(code_pattern, stripped)]
+def _mapping_codes(cell: str, *, labels: tuple[str, ...], code_pattern: str) -> dict[str, list[str]]:
+    """Return codes from canonical mapping clauses, rejecting unrecognized text."""
+    if cell == "-":
+        return {}
+    clause_pattern = re.compile(rf"(?P<label>{'|'.join(re.escape(label) for label in labels)}) (?P<codes>{code_pattern}(?:, {code_pattern})*)")
+    mappings: dict[str, list[str]] = {}
+    for clause in cell.split(";"):
+        stripped = clause.strip()
+        match = clause_pattern.fullmatch(stripped)
+        assert match is not None, f"Unexpected Ruff mapping clause: {stripped!r}"
+        label = match.group("label")
+        assert label not in mappings, f"Repeated Ruff mapping label: {label!r}"
+        codes = re.findall(code_pattern, match.group("codes"))
+        assert len(codes) == len(set(codes)), f"Repeated Ruff mapping code in clause: {stripped!r}"
+        mappings[label] = codes
+    return mappings
+
+
+@pytest.mark.parametrize(
+    "cell", ["Related RUF023", "related PDF527", "Related to RUF023 PLE0237", "Related to RUF023, PLE0237 trailing", "Related to RUF023; Related to PLE0237", "Related to RUF023, RUF023"]
+)
+def test_ruff_mapping_parser_rejects_noncanonical_clauses(cell: str) -> None:
+    with pytest.raises(AssertionError):
+        _mapping_codes(cell, labels=PYDOCFORMATTER_MAPPING_LABELS, code_pattern=RUFF_CODE_PATTERN)
 
 
 def test_rule_list_table_headers_are_sentence_case() -> None:
@@ -144,6 +172,21 @@ def test_pydocformatter_rule_tables_match_rule_metadata() -> None:
             assert row["Conflicts"] == _conflicts_cell(rule)
 
 
+def test_rule_list_ruff_mapping_clauses_are_canonical_and_reference_known_codes() -> None:
+    text = FORMAT_RULES_PATH.read_text(encoding="utf-8")
+    pydocformatter_rows = _table_rows_after_heading(text, PCF_HEADING) + _table_rows_after_heading(text, PDF_HEADING)
+    ruff_rows = _table_rows_after_heading(text, "## Ruff rules")
+    pydocformatter_codes = {row["Code"] for row in pydocformatter_rows}
+    ruff_codes = {row["Code"] for row in ruff_rows}
+
+    for row in pydocformatter_rows:
+        mappings = _mapping_codes(row.get("Ruff rules", "-"), labels=PYDOCFORMATTER_MAPPING_LABELS, code_pattern=RUFF_CODE_PATTERN)
+        assert {code for codes in mappings.values() for code in codes} <= ruff_codes
+    for row in ruff_rows:
+        mappings = _mapping_codes(row["Support by pydocformatter"], labels=RUFF_MAPPING_LABELS, code_pattern=PYDOCFORMATTER_CODE_PATTERN)
+        assert {code for codes in mappings.values() for code in codes} <= pydocformatter_codes
+
+
 def test_rule_list_ruff_replacement_mappings_are_bidirectional() -> None:
     text = FORMAT_RULES_PATH.read_text(encoding="utf-8")
     pydocformatter_rows = _table_rows_after_heading(text, PCF_HEADING) + _table_rows_after_heading(text, PDF_HEADING)
@@ -152,11 +195,12 @@ def test_rule_list_ruff_replacement_mappings_are_bidirectional() -> None:
     replaced_by_ruff_rule: dict[str, list[str]] = {}
 
     for row in pydocformatter_rows:
-        for ruff_code in _codes_for_mapping_label(row.get("Ruff rules", ""), "Disable ", r"(?:D|DOC|E|W)\d{3}|(?:PLE)\d{4}|(?:RUF)\d{3}"):
+        mappings = _mapping_codes(row.get("Ruff rules", "-"), labels=PYDOCFORMATTER_MAPPING_LABELS, code_pattern=RUFF_CODE_PATTERN)
+        for ruff_code in mappings.get("Disable", ()):
             disabled_by_ruff_rule.setdefault(ruff_code, []).append(row["Code"])
 
     for row in ruff_rows:
-        replacements = _codes_for_mapping_label(row["Support by pydocformatter"], "Replaced by ", r"P[CD]F\d{3}")
+        replacements = _mapping_codes(row["Support by pydocformatter"], labels=RUFF_MAPPING_LABELS, code_pattern=PYDOCFORMATTER_CODE_PATTERN).get("Replaced by", ())
         if replacements:
             replaced_by_ruff_rule[row["Code"]] = replacements
 
@@ -171,11 +215,12 @@ def test_rule_list_ruff_related_mappings_are_bidirectional() -> None:
     related_by_pydocformatter_rule: dict[str, list[str]] = {}
 
     for row in pydocformatter_rows:
-        for ruff_code in _codes_for_mapping_label(row.get("Ruff rules", ""), "Related to ", r"(?:D|DOC|E|W)\d{3}|(?:PLE)\d{4}|(?:RUF)\d{3}"):
+        mappings = _mapping_codes(row.get("Ruff rules", "-"), labels=PYDOCFORMATTER_MAPPING_LABELS, code_pattern=RUFF_CODE_PATTERN)
+        for ruff_code in mappings.get("Related to", ()):
             related_by_ruff_rule.setdefault(ruff_code, []).append(row["Code"])
 
     for row in ruff_rows:
-        related_rules = _codes_for_mapping_label(row["Support by pydocformatter"], "Related to ", r"P[CD]F\d{3}")
+        related_rules = _mapping_codes(row["Support by pydocformatter"], labels=RUFF_MAPPING_LABELS, code_pattern=PYDOCFORMATTER_CODE_PATTERN).get("Related to", ())
         if related_rules:
             related_by_pydocformatter_rule[row["Code"]] = related_rules
 

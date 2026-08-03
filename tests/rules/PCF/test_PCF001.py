@@ -504,6 +504,23 @@ def test_directive_preservation_includes_only_more_indented_body_and_resumes_for
     assert result.new_source == "# .. note::\n#    :class: important\n#    directive body remains untouched\n# ordinary prose after\n# directive needs\n# wrapping\n"
 
 
+def test_directive_preservation_accepts_unicode_names_and_optional_delimiter_space() -> None:
+    namespaced = "# .. py:function :: signature\n#    preserved directive body\n"
+    unicode_name = "# .. n\N{LATIN SMALL LETTER O WITH DIAERESIS}te::\n#    preserved directive body\n"
+    invalid = "# .. note::text that should wrap as prose\n"
+
+    assert pcf_helpers.format_pcf(namespaced, line_length=20).new_source == namespaced
+    assert pcf_helpers.format_pcf(unicode_name, line_length=20).new_source == unicode_name
+    assert pcf_helpers.format_pcf(invalid, line_length=20, comment_detect_statements=False).new_source == "# .. note::text that\n# should wrap as\n# prose\n"
+
+
+def test_malformed_directive_introducer_remains_ordinary_comment_prose() -> None:
+    source = "# .. note:\n#    ordinary malformed directive body words\n"
+    result = pcf_helpers.format_pcf(source, line_length=24, comment_detect_statements=False)
+
+    assert result.new_source == "# .. note:\n# ordinary malformed\n# directive body words\n"
+
+
 def test_directive_preservation_can_be_disabled() -> None:
     source = "# .. note::\n#    ordinary directive body words\n"
     result = pcf_helpers.format_pcf(source, line_length=20, comment_preserve_directives=False, comment_detect_statements=False)

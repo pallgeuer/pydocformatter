@@ -202,6 +202,8 @@ def test_generic_missing_summary_is_enabled_under_every_convention(convention: D
         ('def function():\n    """.. note::\n        Body."""\n', {"docstring_parse_directives": False}, True),
         ('def function():\n    """.. note::"""\n', {}, True),
         ('def function():\n    """.. note::"""\n', {"docstring_parse_directives": False}, False),
+        ('def function():\n    """.. versionadded: 1.0"""\n', {}, True),
+        ('def function():\n    """.. versionadded: 1.0"""\n', {"docstring_parse_directives": False}, False),
         ('def function():\n    """Example::\n\n        call()"""\n', {"docstring_parse_literal_blocks": False}, True),
     ],
 )

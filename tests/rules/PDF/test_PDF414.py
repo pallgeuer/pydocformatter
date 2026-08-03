@@ -336,6 +336,26 @@ def test_numpy_confidence_uses_class_and_instance_attributes_and_direct_methods_
     )
 
 
+def test_numpy_confidence_includes_literal_slot_members() -> None:
+    """Use literal slot names as class attribute evidence for malformed entry detection."""
+    source = 'class Point:\n    """Describe a point.\n\n    Attributes\n    ----------\n    x float\n    stale int\n    """\n\n    __slots__ = ("x",)\n'
+    assert_pdf414(source, ((6,),), ("NumPy docstring entry 'x' is missing the colon before its type",), convention=DocstringConvention.NUMPY)
+
+
+def test_numpy_confidence_excludes_members_invalidated_by_the_final_slot_binding() -> None:
+    """Do not use stale literal members after a dynamic slot rebinding."""
+    source = 'class Point:\n    """Describe a point.\n\n    Attributes\n    ----------\n    x float\n    """\n\n    __slots__ = ("x",)\n    __slots__ = slot_names\n'
+
+    assert_pdf414(source, (), (), convention=DocstringConvention.NUMPY)
+
+
+def test_malformed_directive_body_is_opaque_to_convention_issue_detection() -> None:
+    """Do not reinterpret protected directive body text as a malformed Google entry."""
+    source = 'def convert(value):\n    """Convert a value.\n\n    Args:\n        .. custom:\n            value Missing separator.\n    """\n'
+
+    assert_pdf414(source, (), (), convention=DocstringConvention.GOOGLE)
+
+
 def test_attached_multi_target_docstring_uses_only_its_own_attribute_targets_for_confidence() -> None:
     """Give attached docstrings confidence in every assignment target but no unrelated module attribute."""
     source = 'first = second = 1\n"""Describe stored values.\n\nAttributes:\n    first First value.\n    second Second value.\n    third Unrelated value.\n"""\n'

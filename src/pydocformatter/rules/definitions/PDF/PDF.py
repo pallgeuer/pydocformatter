@@ -11,9 +11,11 @@ Attributes:
 from __future__ import annotations
 
 # Standard library imports
+import io
 import re
 import enum
 import typing
+import tokenize
 import dataclasses
 from collections.abc import Iterator, Mapping, Sequence
 from types import MappingProxyType
@@ -35,6 +37,7 @@ from pydocformatter.rules.definition_helpers import (
     exception_names,
     inline_markup,
     module_bindings,
+    rest_directives,
     source_text,
     string_literals,
     text_layout,
@@ -70,6 +73,20 @@ class DefinitionKind(enum.Enum):
     ATTRIBUTE = "attribute"
 
 
+class AttributeOrigin(enum.Enum):
+    """Origins of attributes in the documentation inventory.
+
+    Attributes:
+        ASSIGNMENT: A module- or class-scope assignment.
+        INITIALIZER_ASSIGNMENT: A supported `self.*` assignment in `__init__`.
+        SLOT_DECLARATION: A synthetic instance attribute from a literal `__slots__` declaration.
+    """
+
+    ASSIGNMENT = "assignment"
+    INITIALIZER_ASSIGNMENT = "initializer-assignment"
+    SLOT_DECLARATION = "slot-declaration"
+
+
 class DocstringKind(enum.Enum):
     """LibCST string-expression shapes accepted as Python docstrings.
 
@@ -101,6 +118,7 @@ class DocstringBlockKind(enum.Enum):
         BLOCK_QUOTE: A Markdown block quote.
         TABLE: A Markdown or reStructuredText table protected from prose reflow.
         DIRECTIVE: A reStructuredText directive and its indented body.
+        DIRECTIVE_ISSUE: A malformed reStructuredText directive and its indented body.
         LITERAL_BLOCK: A reStructuredText literal block.
         REST_FIELD: A parsed reStructuredText field list entry.
         VERBATIM: Any protected block whose source should be preserved as-is.
@@ -121,6 +139,7 @@ class DocstringBlockKind(enum.Enum):
     BLOCK_QUOTE = "block-quote"
     TABLE = "table"
     DIRECTIVE = "directive"
+    DIRECTIVE_ISSUE = "directive-issue"
     LITERAL_BLOCK = "literal-block"
     REST_FIELD = "rest-field"
     VERBATIM = "verbatim"
@@ -228,6 +247,19 @@ class ConventionEntryIssue:
     names: tuple[str, ...] = ()
     field_name: str | None = None
     replacement: ConventionEntryReplacement | None = None
+
+
+@dataclasses.dataclass(frozen=True)
+class DirectiveIssue:
+    """One high-confidence malformed reStructuredText directive introducer.
+
+    Attributes:
+        name (str): Directive type written between the marker and malformed delimiter.
+        start_line (int): Logical docstring line containing the malformed introducer.
+    """
+
+    name: str
+    start_line: int
 
 
 _CONVENTION_ENTRY_ISSUE_PRECEDENCE: Mapping[ConventionEntryIssueKind, int] = MappingProxyType({
@@ -542,6 +574,7 @@ class DocstringStructure:
         entries (tuple[DocstringEntry, ...]): Parsed documentation entries from sections and fields.
         convention_entry_issues (tuple[ConventionEntryIssue, ...]): High-confidence malformed convention entries that
             remain outside semantic entry collections.
+        directive_issues (tuple[DirectiveIssue, ...]): High-confidence malformed reStructuredText directive introducers.
         reflow_regions (tuple[ReflowRegion, ...]): Text regions that rules may safely reflow.
     """
 
@@ -551,6 +584,7 @@ class DocstringStructure:
     sections: tuple[DocstringSection, ...]
     entries: tuple[DocstringEntry, ...]
     convention_entry_issues: tuple[ConventionEntryIssue, ...]
+    directive_issues: tuple[DirectiveIssue, ...]
     reflow_regions: tuple[ReflowRegion, ...]
 
 
@@ -596,7 +630,8 @@ class AttributeInfo:
         targets (tuple[str, ...]): All simple assignment target names documented by the same docstring.
         line_numbers (tuple[int, ...]): One-based source lines occupied by supported assignment targets.
         target_line_numbers (tuple[tuple[int, ...], ...]): One-based source lines for each target in `targets`.
-        instance (bool): Whether the attribute comes from a `self.*` assignment in an `__init__` body.
+        instance (bool): Whether the attribute comes from an initializer assignment or a literal slot declaration.
+        origin (AttributeOrigin): Syntax that introduced the inventory record.
     """
 
     node: cst.Assign | cst.AnnAssign
@@ -608,6 +643,7 @@ class AttributeInfo:
     line_numbers: tuple[int, ...]
     target_line_numbers: tuple[tuple[int, ...], ...]
     instance: bool
+    origin: AttributeOrigin
 
 
 DocstringOwner = DefinitionInfo | AttributeInfo
@@ -1155,10 +1191,11 @@ class _DefinitionCollector(cst.CSTVisitor):
 class _AttributeDocstringCollector:
     """Collect attribute docstrings recognized by common documentation tools."""
 
-    def __init__(self, context: RuleCategoryContext, definitions: Sequence[DefinitionInfo]) -> None:
+    def __init__(self, context: RuleCategoryContext, definitions: Sequence[DefinitionInfo], slot_attributes_by_assignment_id: Mapping[int, AttributeInfo]) -> None:
         """Index collected definitions before scanning for adjacent attribute docstrings."""
         self.context = context
         self.definitions_by_node_id = {id(definition.node): definition for definition in definitions}
+        self.slot_attributes_by_assignment_id = slot_attributes_by_assignment_id
         self._attributes: list[AttributeInfo] = []
         self._docstring_targets: list[_DocstringTarget] = []
 
@@ -1199,6 +1236,9 @@ class _AttributeDocstringCollector:
             pending_assignment = _attribute_info(small_statement, owner, context=self.context)
             if pending_assignment is not None:
                 self._attributes.append(pending_assignment)
+                slot_attribute = self.slot_attributes_by_assignment_id.get(id(small_statement))
+                if slot_attribute is not None:
+                    self._attributes.append(slot_attribute)
         return pending_assignment
 
     def _collect_after_assignment(self, expression: cst.Expr, statement: cst.SimpleStatementLine | cst.SimpleStatementSuite, assignment: AttributeInfo | None) -> None:
@@ -1273,7 +1313,8 @@ class PDF(RuleCategoryBase[PDFCategoryData]):
         del cls
         collector = _DefinitionCollector(context)
         context.module.visit(collector)
-        attribute_collector = _AttributeDocstringCollector(context, collector.definitions)
+        slot_attributes_by_assignment_id = _literal_slot_attributes(context, collector.definitions)
+        attribute_collector = _AttributeDocstringCollector(context, collector.definitions, slot_attributes_by_assignment_id)
         attribute_collection = attribute_collector.collect()
         definitions = tuple(collector.definitions)
         targets = (*collector.docstring_targets, *attribute_collection.docstring_targets)
@@ -1439,7 +1480,7 @@ def _first_non_closing_quote_prefix_line(docstring: DocstringInfo, *, start: int
 
 _LIST_RE = re.compile(r"^(?P<indent>[ \t]*)(?P<marker>(?:[-+*]|\d+[.)]))[ \t]+(?P<text>.*)$")
 _BLOCK_QUOTE_RE = re.compile(r"^(?P<indent>[ \t]*)(?P<quote>(?:>[ \t]*)+)(?P<text>.*)$")
-_DIRECTIVE_RE = re.compile(r"^(?P<indent>[ \t]*)\.\.[ \t]+(?P<name>[\w-]+)::(?P<argument>.*)$")
+_UNAMBIGUOUS_DIRECTIVE_NAMES = frozenset({"deprecated", "version-added", "version-changed", "version-deprecated", "version-removed", "versionadded", "versionchanged", "versionremoved"})
 _REST_FIELD_RE = re.compile(r"^(?P<indent>[ \t]*):(?P<field>[\w-]+)(?:[ \t]+(?P<argument>[^:]*?\S))?[ \t]*:[ \t]*(?P<description>.*)$")
 _GOOGLE_FLAT_ENTRY_RE = re.compile(r"^(?P<indent>[ \t]*)(?P<name>\*{0,2}[A-Za-z_][\w.]*)(?:[ \t]*\((?P<type>[^)]+)\))?[ \t]*:[ \t]*(?P<description>.*)$")
 _GOOGLE_CANDIDATE_RE = re.compile(r"^(?P<indent>[ \t]*)(?P<name>\*{0,2}[A-Za-z_][\w.]*)(?P<tail>.*)$")
@@ -1707,6 +1748,7 @@ class _DocstringParser:
         self.sections: list[DocstringSection] = []
         self.entries: list[DocstringEntry] = []
         self.convention_entry_issues: dict[int, ConventionEntryIssue] = {}
+        self.directive_issues: dict[int, DirectiveIssue] = {}
         self.reflow_regions: list[ReflowRegion] = []
         self.missing_separator_type_cache: dict[str, bool] = {}
         self.summary_pending = True
@@ -1721,6 +1763,7 @@ class _DocstringParser:
             sections=tuple(sorted(self.sections, key=lambda section: (section.start_line, section.end_line))),
             entries=tuple(sorted(self.entries, key=lambda entry: (entry.start_line, entry.end_line))),
             convention_entry_issues=tuple(sorted(self.convention_entry_issues.values(), key=lambda issue: issue.start_line)),
+            directive_issues=tuple(sorted(self.directive_issues.values(), key=lambda issue: issue.start_line)),
             reflow_regions=tuple(sorted(self.reflow_regions, key=lambda region: (region.start_line, region.end_line))),
         )
 
@@ -1757,9 +1800,15 @@ class _DocstringParser:
                 index = block_end
                 self.summary_pending = False
                 continue
-            if self.settings.docstring_parse_directives and (directive := _DIRECTIVE_RE.match(text)) is not None:
+            if self.settings.docstring_parse_directives and (directive := rest_directives.directive_match(text)) is not None:
                 block_end = self._indented_body_end(index, end, text_layout.leading_width(directive.group("indent")))
                 blocks.append(DocstringBlock(DocstringBlockKind.DIRECTIVE, index, block_end))
+                index = block_end
+                self.summary_pending = False
+                continue
+            if self.settings.docstring_parse_directives and self._directive_issue_at(index, end) is not None:
+                block_end = self._indented_body_end(index, end, text_layout.leading_width(text))
+                blocks.append(DocstringBlock(DocstringBlockKind.DIRECTIVE_ISSUE, index, block_end))
                 index = block_end
                 self.summary_pending = False
                 continue
@@ -1844,7 +1893,8 @@ class _DocstringParser:
             self._section_at(index, end) is not None
             or (self.settings.docstring_parse_code_fences and inline_markup.FENCE_RE.match(text) is not None)
             or (self.settings.docstring_parse_doctests and _is_doctest_prompt(text))
-            or (self.settings.docstring_parse_directives and _DIRECTIVE_RE.match(text) is not None)
+            or (self.settings.docstring_parse_directives and rest_directives.directive_match(text) is not None)
+            or (self.settings.docstring_parse_directives and self._directive_issue_at(index, end) is not None)
             or (self.settings.docstring_parse_literal_blocks and text.rstrip().endswith("::") and self._has_indented_body(index, end))
             or (self.settings.docstring_parse_tables and self._table_end(index, end) is not None)
             or (self.settings.docstring_parse_headings and self._is_heading(index, end))
@@ -1858,6 +1908,21 @@ class _DocstringParser:
     def _is_colon_header(self, index: int) -> bool:
         """Return whether a line should be treated as a colon-ended structure boundary."""
         return colon_boundaries.is_colon_header_text(self.lines[index].text, require_unindented=True)
+
+    def _directive_issue_at(self, index: int, end: int) -> DirectiveIssue | None:
+        """Return and record a high-confidence malformed directive at one line."""
+        existing = self.directive_issues.get(index)
+        if existing is not None:
+            return existing
+        match = rest_directives.malformed_directive_match(self.lines[index].text)
+        if match is None:
+            return None
+        name = match.group("name")
+        if name.casefold() not in _UNAMBIGUOUS_DIRECTIVE_NAMES and ":" not in name and not self._has_indented_body(index, end):
+            return None
+        issue = DirectiveIssue(name=name, start_line=index)
+        self.directive_issues[index] = issue
+        return issue
 
     def _allows_colon_continuation(self, previous_index: int, colon_index: int) -> bool:
         """Return whether a colon-ended line may continue the previous prose line."""
@@ -2610,8 +2675,10 @@ class _DocstringParser:
             while block_end < end and self.lines[block_end].text.strip():
                 block_end += 1
             return DocstringBlockKind.DOCTEST, block_end
-        if self.settings.docstring_parse_directives and (directive := _DIRECTIVE_RE.match(text)) is not None:
+        if self.settings.docstring_parse_directives and (directive := rest_directives.directive_match(text)) is not None:
             return DocstringBlockKind.DIRECTIVE, self._indented_body_end(index, end, text_layout.leading_width(directive.group("indent")))
+        if self.settings.docstring_parse_directives and self._directive_issue_at(index, end) is not None:
+            return DocstringBlockKind.DIRECTIVE_ISSUE, self._indented_body_end(index, end, text_layout.leading_width(text))
         if self.settings.docstring_parse_literal_blocks and text.rstrip().endswith("::") and self._has_indented_body(index, end):
             return DocstringBlockKind.LITERAL_BLOCK, self._indented_body_end(index, end, text_layout.leading_width(text))
         if self.settings.docstring_parse_tables and (table_end := self._table_end(index, end)) is not None:
@@ -3816,6 +3883,234 @@ def _malformed_entry_confidence(
     return _MalformedEntryConfidence(parameter_names=parameter_names, attribute_names=attribute_names, method_names=method_names)
 
 
+@dataclasses.dataclass(frozen=True)
+class _SlotMember:
+    """One usable literal slot name and its source line."""
+
+    name: str
+    line_numbers: tuple[int, ...]
+
+
+@dataclasses.dataclass(frozen=True)
+class _SlotCandidate:
+    """One direct static assignment that can establish the final slot inventory."""
+
+    assignment: cst.Assign | cst.AnnAssign
+    members: tuple[_SlotMember, ...]
+
+
+class _SlotBindingDisposition(enum.Enum):
+    """Disposition of one class-scope `__slots__` binding."""
+
+    PRESERVE = "preserve"
+    RESET = "reset"
+    CANDIDATE = "candidate"
+
+
+@dataclasses.dataclass(frozen=True)
+class _SlotBindingOutcome:
+    """Explicit state transition produced by one slot binding.
+
+    Attributes:
+        disposition (_SlotBindingDisposition): Whether to preserve, reset, or replace the effective candidate.
+        candidate (_SlotCandidate | None): Replacement candidate when `disposition` is `CANDIDATE`.
+    """
+
+    disposition: _SlotBindingDisposition
+    candidate: _SlotCandidate | None = None
+
+
+_PRESERVE_SLOT_BINDING = _SlotBindingOutcome(_SlotBindingDisposition.PRESERVE)
+_RESET_SLOT_BINDING = _SlotBindingOutcome(_SlotBindingDisposition.RESET)
+
+
+@dataclasses.dataclass(frozen=True)
+class _SlotBindingEvent:
+    """One ordered class-scope binding or deletion of `__slots__`."""
+
+    position: tuple[int, int]
+    outcome: _SlotBindingOutcome
+
+
+class _SlotNonAssignmentBindingCollector(cst.CSTVisitor):
+    """Collect class-scope `__slots__` bindings omitted from scope assignments."""
+
+    def __init__(self, scopes: Mapping[cst.CSTNode, object]) -> None:
+        """Store resolved scopes used to exclude nested and non-class targets."""
+        self.scopes = scopes
+        self.targets: list[tuple[cst_metadata.ClassScope, cst.Name]] = []
+
+    def _record(self, target: cst.Name | None) -> None:
+        """Record an exact class-scope slot target when present."""
+        if target is None or target.value != "__slots__":
+            return
+        scope = self.scopes.get(target)
+        if isinstance(scope, cst_metadata.ClassScope):
+            self.targets.append((scope, target))
+
+    def visit_Del(self, node: cst.Del) -> None:
+        """Record every exact slot name in a deletion target."""
+        for target in _exact_slot_target_names(node.target):
+            self._record(target)
+
+    def visit_MatchAs(self, node: cst.MatchAs) -> None:
+        """Record a bare or `as` pattern capture."""
+        self._record(node.name)
+
+    def visit_MatchStar(self, node: cst.MatchStar) -> None:
+        """Record a starred sequence pattern capture."""
+        self._record(node.name)
+
+    def visit_MatchMapping(self, node: cst.MatchMapping) -> None:
+        """Record a mapping rest pattern capture."""
+        self._record(node.rest)
+
+
+def _literal_slot_attributes(context: RuleCategoryContext, definitions: Sequence[DefinitionInfo]) -> Mapping[int, AttributeInfo]:
+    """Return synthetic literal slot attributes indexed by effective assignment identity."""
+    if not _contains_slot_name_token(context.source):
+        return MappingProxyType({})
+    scopes = context.metadata_wrapper.resolve(cst_metadata.ScopeProvider)
+    parents = context.metadata_wrapper.resolve(cst_metadata.ParentNodeProvider)
+    definitions_by_node_id = {id(definition.node): definition for definition in definitions}
+    non_assignment_binding_collector = _SlotNonAssignmentBindingCollector(scopes)
+    context.module.visit(non_assignment_binding_collector)
+    non_assignment_bindings_by_scope_id: dict[int, list[cst.Name]] = {}
+    for scope, target in non_assignment_binding_collector.targets:
+        non_assignment_bindings_by_scope_id.setdefault(id(scope), []).append(target)
+    class_scopes = {id(scope): scope for scope in scopes.values() if isinstance(scope, cst_metadata.ClassScope)}
+    slot_attributes: dict[int, AttributeInfo] = {}
+    for scope in class_scopes.values():
+        owner = definitions_by_node_id.get(id(scope.node))
+        if owner is None:
+            continue
+        events: list[_SlotBindingEvent] = []
+        for assignment in scope.assignments:
+            if assignment.name != "__slots__":
+                continue
+            outcome = _slot_binding_outcome(assignment.node, scope.node, parents=parents, context=context)
+            if outcome.disposition is _SlotBindingDisposition.PRESERVE:
+                continue
+            events.append(_SlotBindingEvent(position=_node_position(assignment.node, context=context), outcome=outcome))
+        events.extend(_SlotBindingEvent(position=_node_position(target, context=context), outcome=_RESET_SLOT_BINDING) for target in non_assignment_bindings_by_scope_id.get(id(scope), ()))
+        effective: _SlotCandidate | None = None
+        for event in sorted(events, key=lambda item: item.position):
+            effective = event.outcome.candidate if event.outcome.disposition is _SlotBindingDisposition.CANDIDATE else None
+        if effective is None or not effective.members:
+            continue
+        names = tuple(member.name for member in effective.members)
+        target_line_numbers = tuple(member.line_numbers for member in effective.members)
+        qualified_names = tuple(_qualified_name(owner, name) for name in names)
+        slot_attributes[id(effective.assignment)] = AttributeInfo(
+            node=effective.assignment,
+            kind=DefinitionKind.ATTRIBUTE,
+            name=", ".join(names),
+            qualified_name=", ".join(qualified_names),
+            parent=owner,
+            targets=names,
+            line_numbers=tuple(dict.fromkeys(line_number for member in effective.members for line_number in member.line_numbers)),
+            target_line_numbers=target_line_numbers,
+            instance=True,
+            origin=AttributeOrigin.SLOT_DECLARATION,
+        )
+    return MappingProxyType(slot_attributes)
+
+
+def _contains_slot_name_token(source: str) -> bool:
+    """Return whether source contains an exact `__slots__` name token."""
+    if "__slots__" not in source:
+        return False
+    return any(token.type == tokenize.NAME and token.string == "__slots__" for token in tokenize.generate_tokens(io.StringIO(source).readline))
+
+
+def _slot_binding_outcome(binding_node: cst.CSTNode, class_node: cst.ClassDef, *, parents: Mapping[cst.CSTNode, cst.CSTNode], context: RuleCategoryContext) -> _SlotBindingOutcome:
+    """Return the explicit state transition produced by one slot binding."""
+    assignment = _enclosing_slot_assignment(binding_node, class_node, parents=parents)
+    if isinstance(assignment, cst.AnnAssign) and assignment.target is binding_node and assignment.value is None:
+        return _PRESERVE_SLOT_BINDING
+    if assignment is None or not _is_direct_class_suite_statement(assignment, class_node, parents=parents):
+        return _RESET_SLOT_BINDING
+    if isinstance(assignment, cst.AnnAssign):
+        if assignment.target is not binding_node or not isinstance(assignment.target, cst.Name) or assignment.target.value != "__slots__" or assignment.value is None:
+            return _RESET_SLOT_BINDING
+        value = assignment.value
+    else:
+        if not any(target.target is binding_node for target in assignment.targets):
+            return _RESET_SLOT_BINDING
+        if any(not isinstance(target.target, cst.Name) for target in assignment.targets for name in _exact_slot_target_names(target.target) if name.value == "__slots__"):
+            return _RESET_SLOT_BINDING
+        value = assignment.value
+    members = _literal_slot_members(value, context=context)
+    if members is None:
+        return _RESET_SLOT_BINDING
+    return _SlotBindingOutcome(_SlotBindingDisposition.CANDIDATE, _SlotCandidate(assignment=assignment, members=members))
+
+
+def _enclosing_slot_assignment(binding_node: cst.CSTNode, class_node: cst.ClassDef, *, parents: Mapping[cst.CSTNode, cst.CSTNode]) -> cst.Assign | cst.AnnAssign | None:
+    """Return the nearest ordinary assignment containing a slot binding node."""
+    current = binding_node
+    while current is not class_node:
+        if isinstance(current, (cst.Assign, cst.AnnAssign)):
+            return current
+        parent = parents.get(current)
+        if parent is None:
+            return None
+        current = parent
+    return None
+
+
+def _is_direct_class_suite_statement(statement: cst.BaseSmallStatement, class_node: cst.ClassDef, *, parents: Mapping[cst.CSTNode, cst.CSTNode]) -> bool:
+    """Return whether a small statement occurs directly in one class suite."""
+    container = parents.get(statement)
+    if isinstance(container, cst.SimpleStatementSuite):
+        return container is class_node.body
+    if not isinstance(container, cst.SimpleStatementLine):
+        return False
+    return parents.get(container) is class_node.body
+
+
+def _exact_slot_target_names(target: cst.BaseExpression) -> tuple[cst.Name, ...]:
+    """Return exact `__slots__` names from a binding or deletion target."""
+    if isinstance(target, cst.Name):
+        return (target,) if target.value == "__slots__" else ()
+    if not isinstance(target, (cst.Tuple, cst.List)):
+        return ()
+    return tuple(name for element in target.elements for name in _exact_slot_target_names(element.value))
+
+
+def _literal_slot_members(value: cst.BaseExpression, *, context: RuleCategoryContext) -> tuple[_SlotMember, ...] | None:
+    """Return usable members when an expression is a completely static slot value."""
+    expressions: tuple[cst.BaseExpression, ...]
+    if isinstance(value, (cst.SimpleString, cst.ConcatenatedString)):
+        expressions = (value,)
+    elif isinstance(value, cst.Tuple):
+        if any(not isinstance(element, cst.Element) for element in value.elements):
+            return None
+        expressions = tuple(element.value for element in value.elements)
+    else:
+        return None
+    members: list[_SlotMember] = []
+    seen: set[str] = set()
+    for expression in expressions:
+        if not isinstance(expression, (cst.SimpleString, cst.ConcatenatedString)):
+            return None
+        parts = string_literals.simple_string_parts(expression)
+        if parts is None:
+            return None
+        name = "".join(part.value for part in parts)
+        if not name.isidentifier() or name in {"__dict__", "__weakref__"} or name in seen:
+            continue
+        seen.add(name)
+        members.append(_SlotMember(name=name, line_numbers=_node_line_numbers(expression, context=context)))
+    return tuple(members)
+
+
+def _node_position(node: cst.CSTNode, *, context: RuleCategoryContext) -> tuple[int, int]:
+    """Return a sortable source start position with a safe fallback."""
+    position = context.positions.get(node)
+    return (1, 0) if position is None else (position.start.line, position.start.column)
+
+
 def _parameter_names(parameters: cst.Parameters | None) -> tuple[str, ...]:
     """Return normalized names from every parameter category."""
     if parameters is None:
@@ -3852,6 +4147,7 @@ def _attribute_info(statement: cst.BaseSmallStatement, owner: DefinitionInfo, *,
         line_numbers=tuple(dict.fromkeys(line_number for line_numbers in target_line_numbers for line_number in line_numbers)),
         target_line_numbers=target_line_numbers,
         instance=owner.kind is DefinitionKind.FUNCTION,
+        origin=AttributeOrigin.INITIALIZER_ASSIGNMENT if owner.kind is DefinitionKind.FUNCTION else AttributeOrigin.ASSIGNMENT,
     )
 
 

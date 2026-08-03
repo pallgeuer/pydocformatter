@@ -18,10 +18,11 @@ import pydocformatter.rules.definitions.PDF.PDF415_convention_entry_indentation 
 from pydocformatter import formatter, rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention
 from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
-from pydocformatter.rules.definition_helpers import source_text, string_literals, unicode_safety, value_documentation
+from pydocformatter.rules.definition_helpers import attribute_documentation, source_text, string_literals, unicode_safety, value_documentation
 from pydocformatter.rules.definitions.PDF.PDF import (
     PDF,
     AttributeInfo,
+    AttributeOrigin,
     ConventionEntryIssueKind,
     DefinitionInfo,
     DefinitionKind,
@@ -170,6 +171,177 @@ def test_prepare_collects_attribute_docstrings_and_owner_metadata() -> None:
     with pytest.raises(TypeError):
         typing.cast("dict[str, tuple[object, ...]]", attached_docstrings)["other"] = ()
     assert data._attached_attribute_docstrings_by_owner_id is not None
+
+
+def test_prepare_inserts_literal_slot_members_after_the_effective_assignment() -> None:
+    source = 'class Point:\n    __slots__ = ("x", "y" "_axis", "__dict__", "__weakref__", "not valid", "class", "\\u03b1", "x")\n'
+    data = PDF.prepare(category_context(source))
+    owner = data.definitions[1]
+    attributes = data.attributes_for(owner)
+
+    assert tuple((attribute.origin, attribute.targets) for attribute in attributes) == (
+        (AttributeOrigin.ASSIGNMENT, ("__slots__",)),
+        (AttributeOrigin.SLOT_DECLARATION, ("x", "y_axis", "class", chr(0x3B1))),
+    )
+    assert attributes[1].target_line_numbers == ((2,), (2,), (2,), (2,))
+    assert tuple(attribute.name for attribute in attribute_documentation.inventory_attributes(data, owner, include_instance=False)) == ("__slots__",)
+
+
+def test_slot_inventory_preserves_first_position_but_enriches_real_assignment_facts() -> None:
+    source = 'class Point:\n    __slots__ = (\n        "x",\n        "y",\n        "slot_only",\n    )\n    x: int\n\n    def __init__(self):\n        self.y: str = ""\n'
+    data = PDF.prepare(category_context(source))
+    owner = data.definitions[1]
+    inventory = {attribute.name: attribute for attribute in attribute_documentation.inventory_attributes(data, owner, include_instance=True)}
+
+    assert inventory["x"].line_numbers == (3,)
+    assert inventory["x"].annotated_info is not None
+    assert inventory["x"].annotated_info.line_numbers == (7,)
+    assert inventory["x"].has_attachable_assignment
+    assert inventory["y"].line_numbers == (4,)
+    assert inventory["y"].annotated_info is not None
+    assert inventory["y"].annotated_info.origin is AttributeOrigin.INITIALIZER_ASSIGNMENT
+    assert not inventory["slot_only"].has_attachable_assignment
+    assert inventory["slot_only"].annotated_info is None
+
+
+def test_slot_inventory_deduplicates_after_applying_the_instance_policy() -> None:
+    source = 'class Point:\n    __slots__ = ("x", "slot_only")\n    x: int\n\n    def __init__(self):\n        self.slot_only: str\n'
+    data = PDF.prepare(category_context(source))
+    owner = data.definitions[1]
+    class_only = {attribute.name: attribute for attribute in attribute_documentation.inventory_attributes(data, owner, include_instance=False)}
+    complete = {attribute.name: attribute for attribute in attribute_documentation.inventory_attributes(data, owner, include_instance=True)}
+
+    assert class_only["x"].line_numbers == (3,)
+    assert class_only["x"].annotated_info is not None
+    assert class_only["x"].annotated_info.origin is AttributeOrigin.ASSIGNMENT
+    assert "slot_only" not in class_only
+    assert complete["x"].line_numbers == (2,)
+    assert complete["x"].annotated_info is class_only["x"].annotated_info
+    assert complete["slot_only"].line_numbers == (2,)
+    assert complete["slot_only"].annotated_info is not None
+    assert complete["slot_only"].annotated_info.origin is AttributeOrigin.INITIALIZER_ASSIGNMENT
+
+
+@pytest.mark.parametrize(
+    ("body", "expected"),
+    [
+        ('    __slots__ = "single" "_name"\n', ("single_name",)),
+        ('    __slots__: tuple[str, ...] = ("annotated",)\n', ("annotated",)),
+        ('    __slots__ = ("early",)\n    __slots__: tuple[str, ...]\n', ("early",)),
+        ('    __slots__ = dynamic\n    __slots__ = ("recovered",)\n', ("recovered",)),
+        ('    __slots__ = ("early",)\n    del __slots__\n    __slots__ = ("recovered",)\n', ("recovered",)),
+        ('    __slots__ = ("outer",)\n    def method(self):\n        __slots__ = dynamic\n', ("outer",)),
+        ('    __slots__ = ("outer",)\n    def method(self):\n        del __slots__\n', ("outer",)),
+        ('    __slots__ = ("outer",)\n    callback = lambda: (__slots__ := ("nested",))\n', ("outer",)),
+        ('    __slots__ = ("outer",)\n    values = [__slots__ for __slots__ in groups]\n', ("outer",)),
+        ('    __slots__ = ("outer",)\n    def method(self, value):\n        match value:\n            case __slots__:\n                pass\n', ("outer",)),
+        ('    __slots__ = ("outer",)\n    holder.__slots__ = ("attribute",)\n    slots_by_name["__slots__"] = ("subscript",)\n', ("outer",)),
+        ('    __slots__ = ("outer",)\n    del holder.__slots__\n    del __slots__[0]\n', ("outer",)),
+    ],
+)
+def test_final_direct_literal_slot_binding_is_inventoried(body: str, expected: tuple[str, ...]) -> None:
+    data = PDF.prepare(category_context(f"class Owner:\n{body}"))
+    slot_attributes = tuple(attribute for attribute in data.attributes_for(data.definitions[1]) if attribute.origin is AttributeOrigin.SLOT_DECLARATION)
+
+    assert tuple(name for attribute in slot_attributes for name in attribute.targets) == expected
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        '    __slots__ = ("early",)\n    __slots__ = dynamic\n',
+        '    __slots__ = ("early",)\n    if enabled:\n        __slots__ = ("conditional",)\n',
+        '    __slots__ = ("early",)\n    del __slots__\n',
+        '    __slots__ = ("early",)\n    del __slots__\n    __slots__: tuple[str, ...]\n',
+        '    __slots__ = ("early",)\n    del (__slots__, other)\n',
+        '    __slots__ = ("early",)\n    __slots__ = ()\n',
+        '    __slots__ += ("dynamic",)\n',
+        "    __slots__, other = values\n",
+        "    __slots__ = (__slots__, other) = values\n",
+        '    holder.__slots__ = ("attribute",)\n',
+        '    slots_by_name["__slots__"] = ("subscript",)\n',
+        '    __slots__ = ("early",)\n    import slot_values as __slots__\n',
+        '    __slots__ = ("early",)\n    for __slots__ in slot_values:\n        pass\n',
+        '    __slots__ = ("early",)\n    with slot_context() as __slots__:\n        pass\n',
+        '    __slots__ = ("early",)\n    def __slots__(self):\n        pass\n',
+        '    __slots__ = ("early",)\n    class __slots__:\n        pass\n',
+        '    __slots__ = ("early",)\n    try:\n        pass\n    except Exception as __slots__:\n        pass\n',
+        '    __slots__ = ("early",)\n    if (__slots__ := dynamic):\n        pass\n',
+        '    __slots__ = ("early",)\n    match value:\n        case __slots__:\n            pass\n',
+        '    __slots__ = ("early",)\n    match value:\n        case 1 as __slots__:\n            pass\n',
+        '    __slots__ = ("early",)\n    match value:\n        case [*__slots__]:\n            pass\n',
+        '    __slots__ = ("early",)\n    match value:\n        case {**__slots__}:\n            pass\n',
+        '    __slots__ = ("early",)\n    try:\n        pass\n    finally:\n        __slots__ = ("conditional",)\n',
+        '    __slots__ = ["mutable"]\n',
+        '    other = __slots__ = ["first", "second"]\n',
+        '    __slots__ = ("early",)\n    __slots__ = ["mutable"]\n',
+        '    __slots__ = ["x"]\n    __slots__.append("y")\n',
+        '    __slots__ = ["x"]\n    alias = __slots__\n    alias.append("y")\n',
+        '    __slots__ = b"bytes"\n',
+        '    __slots__ = f"{name}"\n',
+        '    __slots__ = ("partial", name)\n',
+        '    __slots__ = ["partial", *names]\n',
+        '    __slots__ = {"set"}\n',
+        '    __slots__ = {"name": "value"}\n',
+        "    __slots__ = [name for name in names]\n",
+        '    __slots__ = ("left" if enabled else "right")\n',
+    ],
+)
+def test_dynamic_or_invalid_final_slot_bindings_do_not_add_members(body: str) -> None:
+    data = PDF.prepare(category_context(f"class Owner:\n{body}"))
+
+    assert all(attribute.origin is not AttributeOrigin.SLOT_DECLARATION for attribute in data.attributes_for(data.definitions[1]))
+
+
+def test_literal_slot_assignment_recovers_after_a_match_capture() -> None:
+    source = 'class Owner:\n    __slots__ = ("early",)\n    match value:\n        case {"slot": __slots__}:\n            pass\n    __slots__ = ("recovered",)\n'
+    data = PDF.prepare(category_context(source))
+
+    assert tuple(attribute.targets for attribute in data.attributes_for(data.definitions[1]) if attribute.origin is AttributeOrigin.SLOT_DECLARATION) == (("recovered",),)
+
+
+def test_slot_inventory_skips_metadata_without_slot_name_token(mocker: MockerFixture) -> None:
+    context = category_context('def function():\n    """Mention `__slots__` as documentation text."""\n')
+    metadata_wrapper = mocker.Mock(spec=cst_metadata.MetadataWrapper)
+    context = dataclasses.replace(context, metadata_wrapper=typing.cast("cst_metadata.MetadataWrapper", metadata_wrapper))
+
+    assert PDF_definition._literal_slot_attributes(context, ()) == {}
+    metadata_wrapper.resolve.assert_not_called()
+
+
+def test_nested_classes_have_independent_slot_inventories() -> None:
+    source = 'class Outer:\n    __slots__ = ("outer",)\n\n    class Inner:\n        __slots__ = ("inner",)\n'
+    data = PDF.prepare(category_context(source))
+    owners = {definition.name: definition for definition in data.definitions if definition.kind is DefinitionKind.CLASS}
+
+    assert tuple(attribute.targets for attribute in data.attributes_for(owners["Outer"]) if attribute.origin is AttributeOrigin.SLOT_DECLARATION) == (("outer",),)
+    assert tuple(attribute.targets for attribute in data.attributes_for(owners["Inner"]) if attribute.origin is AttributeOrigin.SLOT_DECLARATION) == (("inner",),)
+
+
+def test_literal_slots_in_a_compact_class_suite_are_inventoried() -> None:
+    data = PDF.prepare(category_context('class Owner: __slots__ = ("compact",)\n'))
+
+    assert tuple(attribute.targets for attribute in data.attributes_for(data.definitions[1]) if attribute.origin is AttributeOrigin.SLOT_DECLARATION) == (("compact",),)
+
+
+def test_literal_slot_member_locations_use_each_string_expression_start() -> None:
+    source = 'class Owner:\n    __slots__ = (\n        "first",\n        "second"\n        "_part",\n    )\n'
+    data = PDF.prepare(category_context(source))
+    slot_attribute = next(attribute for attribute in data.attributes_for(data.definitions[1]) if attribute.origin is AttributeOrigin.SLOT_DECLARATION)
+
+    assert slot_attribute.targets == ("first", "second_part")
+    assert slot_attribute.target_line_numbers == ((3,), (4,))
+    assert slot_attribute.line_numbers == (3, 4)
+
+
+def test_synthetic_slot_members_do_not_own_the_slot_declaration_docstring() -> None:
+    source = 'class Owner:\n    __slots__ = ("x",)\n    """Document the slot declaration itself."""\n'
+    data = PDF.prepare(category_context(source))
+    owner = data.definitions[1]
+    slot_attribute = next(attribute for attribute in data.attributes_for(owner) if attribute.origin is AttributeOrigin.SLOT_DECLARATION)
+
+    assert all(docstring.owner is not slot_attribute for docstring in data.docstrings)
+    assert set(data.attached_attribute_docstrings_by_name(owner)) == {"__slots__"}
 
 
 def test_convention_entry_issue_metadata_covers_every_kind() -> None:
@@ -1671,6 +1843,20 @@ def test_directives_and_literal_blocks_include_blank_lines_and_indented_bodies()
     literal = structure_for("Example::\n\n    value = 1\n    print(value)\nAfter.")
     assert tuple((block.kind, block.start_line, block.end_line) for block in directive.blocks) == ((DocstringBlockKind.DIRECTIVE, 0, 4), (DocstringBlockKind.PARAGRAPH, 4, 5))
     assert tuple((block.kind, block.start_line, block.end_line) for block in literal.blocks) == ((DocstringBlockKind.LITERAL_BLOCK, 0, 4), (DocstringBlockKind.PARAGRAPH, 4, 5))
+
+
+def test_malformed_directive_issues_include_blank_lines_and_indented_bodies() -> None:
+    structure = structure_for(".. custom:\n\n    Body.\n        Nested.\nAfter.")
+
+    assert structure.directive_issues == (PDF_definition.DirectiveIssue(name="custom", start_line=0),)
+    assert tuple((block.kind, block.start_line, block.end_line) for block in structure.blocks) == ((DocstringBlockKind.DIRECTIVE_ISSUE, 0, 4), (DocstringBlockKind.PARAGRAPH, 4, 5))
+
+
+def test_disabling_directive_parsing_removes_malformed_directive_issues() -> None:
+    structure = structure_for(".. py:function: signature", settings=CheckSettings(docstring_parse_directives=False))
+
+    assert structure.directive_issues == ()
+    assert DocstringBlockKind.DIRECTIVE_ISSUE not in block_kinds(structure.blocks)
 
 
 def test_literal_block_detection_compares_visual_indentation_with_tabs() -> None:

@@ -7,6 +7,9 @@ from __future__ import annotations
 import dataclasses
 from typing import TYPE_CHECKING
 
+# Third-party imports
+import libcst as cst
+
 # First-party imports
 import pydocformatter.rules.violations as rule_violations
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
@@ -27,12 +30,15 @@ class InventoryAttribute:
     Attributes:
         name (str): Attribute target name used for docstring comparison.
         line_numbers (tuple[int, ...]): One-based source lines occupied by the attribute assignment.
-        info (PDF_definition.AttributeInfo): Assignment inventory record that supplied this target.
+        annotated_info (PDF_definition.AttributeInfo | None): First real annotated assignment for type comparison and
+            safe type insertion.
+        has_attachable_assignment (bool): Whether any real assignment for the name can own an attached docstring.
     """
 
     name: str
     line_numbers: tuple[int, ...]
-    info: PDF_definition.AttributeInfo
+    annotated_info: PDF_definition.AttributeInfo | None
+    has_attachable_assignment: bool
 
 
 @dataclasses.dataclass(frozen=True)
@@ -55,23 +61,28 @@ def inventory_attributes(data: PDF_definition.PDFCategoryData, owner: PDF_defini
         data (PDF_definition.PDFCategoryData): Prepared PDF definitions, attributes, and docstrings for the current
             file.
         owner (PDF_definition.DefinitionInfo): Module or class whose attribute inventory should be collected.
-        include_instance (bool): Whether supported `self.*` assignments from `__init__` should be included for class
-            owners.
+        include_instance (bool): Whether initializer assignments and literal slot declarations should be included for
+            class owners.
 
     Returns:
         tuple[InventoryAttribute, ...]: Unique attribute targets in first-seen order.
     """
-    attributes: list[InventoryAttribute] = []
-    seen: set[str] = set()
+    first_targets: dict[str, tuple[int, ...]] = {}
+    annotated_infos: dict[str, PDF_definition.AttributeInfo] = {}
+    attachable_names: set[str] = set()
     for attribute in data.attributes_for(owner):
         if attribute.instance and not include_instance:
             continue
         for name, line_numbers in zip(attribute.targets, attribute.target_line_numbers, strict=True):
-            if name in seen:
-                continue
-            seen.add(name)
-            attributes.append(InventoryAttribute(name=name, line_numbers=line_numbers, info=attribute))
-    return tuple(attributes)
+            first_targets.setdefault(name, line_numbers)
+            if attribute.origin is not PDF_definition.AttributeOrigin.SLOT_DECLARATION:
+                attachable_names.add(name)
+                if isinstance(attribute.node, cst.AnnAssign):
+                    annotated_infos.setdefault(name, attribute)
+    return tuple(
+        InventoryAttribute(name=name, line_numbers=line_numbers, annotated_info=annotated_infos.get(name), has_attachable_assignment=name in attachable_names)
+        for name, line_numbers in first_targets.items()
+    )
 
 
 def documented_attributes(docstring: PDF_definition.DocstringInfo) -> tuple[DocumentedAttribute, ...]:
@@ -239,7 +250,8 @@ def missing_attribute_violations(
         meta (rule_models.RuleMetadata): Rule metadata to attach to diagnostics.
         owner_kind (PDF_definition.DefinitionKind): Definition kind, module or class, whose owners should be checked.
         owner_label (str): Human-readable owner label used in diagnostic messages.
-        include_instance (bool): Whether supported `self.*` assignments from `__init__` should be required.
+        include_instance (bool): Whether initializer assignments and literal slot declarations should be required for
+            class owners.
 
     Returns:
         tuple[rule_violations.RuleViolation, ...]: Missing-attribute diagnostics for the requested owner kind.
@@ -275,7 +287,7 @@ def extraneous_attribute_violations(
         owner_kind (PDF_definition.DefinitionKind): Definition kind, module or class, whose docstrings should be
             checked.
         owner_label (str): Human-readable owner label used in diagnostic messages.
-        include_instance (bool): Whether supported `self.*` assignments from `__init__` count as class inventory.
+        include_instance (bool): Whether initializer assignments and literal slot declarations count as class inventory.
 
     Returns:
         tuple[rule_violations.RuleViolation, ...]: Extraneous attribute documentation diagnostics.
@@ -307,7 +319,8 @@ def duplicate_attribute_violations(
         owner_kind (PDF_definition.DefinitionKind): Definition kind, module or class, whose duplicated docs should be
             checked.
         owner_label (str): Human-readable owner label used in diagnostic messages.
-        include_instance (bool): Whether attached `self.*` docstrings from `__init__` participate in duplicate checks.
+        include_instance (bool): Whether attached docstrings owned by initializer assignments participate in duplicate
+            checks.
 
     Returns:
         tuple[rule_violations.RuleViolation, ...]: Duplicate attached-attribute documentation diagnostics.
@@ -392,7 +405,7 @@ def private_attached_attribute_violations(
         owner_kind (PDF_definition.DefinitionKind): Definition kind, module or class, whose attached docs should be
             checked.
         owner_label (str): Human-readable owner label used in diagnostic messages.
-        include_instance (bool): Whether attached `self.*` docstrings from `__init__` participate in checks.
+        include_instance (bool): Whether attached docstrings owned by initializer assignments participate in checks.
 
     Returns:
         tuple[rule_violations.RuleViolation, ...]: Private attached-attribute documentation diagnostics.
@@ -428,7 +441,7 @@ def attribute_docstring_must_be_owner_violations(
             checked.
         owner_label (str): Human-readable owner label used in diagnostic messages.
         public (bool): Whether public attributes are reported instead of private attributes.
-        include_instance (bool): Whether attached `self.*` docstrings from `__init__` participate in checks.
+        include_instance (bool): Whether attached docstrings owned by initializer assignments participate in checks.
 
     Returns:
         tuple[rule_violations.RuleViolation, ...]: Placement diagnostics for attached attribute docstrings.
@@ -467,7 +480,7 @@ def attribute_docstring_must_be_attached_violations(
             checked.
         owner_label (str): Human-readable owner label used in diagnostic messages.
         public (bool): Whether public attributes are reported instead of private attributes.
-        include_instance (bool): Whether supported `self.*` assignments from `__init__` count as class inventory.
+        include_instance (bool): Whether initializer assignments that can own docstrings count as class inventory.
 
     Returns:
         tuple[rule_violations.RuleViolation, ...]: Placement diagnostics for owner docstring attribute documentation.
@@ -480,7 +493,7 @@ def attribute_docstring_must_be_attached_violations(
         docstring = data.docstring_for(definition)
         if docstring is None:
             continue
-        inventory_names = {attribute.name for attribute in inventory_attributes(data, definition, include_instance=include_instance)}
+        inventory_names = {attribute.name for attribute in inventory_attributes(data, definition, include_instance=include_instance) if attribute.has_attachable_assignment}
         for attribute in documented_attributes(docstring):
             if attribute.name not in inventory_names or is_private_attribute_name(attribute.name) is public:
                 continue

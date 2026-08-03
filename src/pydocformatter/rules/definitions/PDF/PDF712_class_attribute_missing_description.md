@@ -7,7 +7,7 @@ Rule is disabled if `docstring-convention` is `none` or `pep257`.
 ## What it does
 Checks that parsed class attribute entries in owning class docstrings include a prose description.
 
-Only entries that match inventoried class or instance attributes are checked. Attached attribute docstrings are intentionally not checked by PDF7xx rules.
+Only entries that match inventoried class or instance attributes are checked. Proven literal slot members are instance attributes for this comparison. Attached attribute docstrings are intentionally not checked by PDF7xx rules.
 
 An orphan reST `:vartype name:` field has no attribute value entry whose description PDF712 could check, so PDF722 owns that structural problem.
 
@@ -15,7 +15,7 @@ An orphan reST `:vartype name:` field has no attribute value entry whose descrip
 Attribute entries without descriptions do not explain class state or constants.
 
 ## Ruff compatibility
-None.
+Ruff's `RUF023` and `PLE0237` inspect slot order and non-slot assignments. PDF712 instead checks descriptions for documented attributes, including proven slot members.
 
 ## Examples
 PDF712 reports class attribute entries without descriptions:
@@ -124,6 +124,28 @@ class Client:
     """
 
 [output=unchanged]
+```
+
+Proven literal slot members participate even without separate assignments, so an empty slot entry is checked like any other inventoried class attribute:
+
+```pydocfmt-example
+[settings]
+docstring-convention = "google"
+
+[input]
+class Point:
+    """Point.
+
+    Attributes:
+        x (float):
+        y (float): Vertical coordinate.
+    """
+
+    __slots__ = ("x", "y")
+
+[output=unchanged]
+[findings]
+PDF712: Line 5: Class attribute 'x' docstring entry is missing a description
 ```
 
 ## Options

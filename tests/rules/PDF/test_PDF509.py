@@ -34,6 +34,44 @@ def test_init_instance_attributes_count_as_present_for_extraneous_checks() -> No
     assert_pdf509_lines(source, ())
 
 
+def test_literal_slots_always_count_as_present_for_extraneous_checks() -> None:
+    source = 'class Point:\n    """Point.\n\n    Attributes:\n        x (float): Horizontal coordinate.\n        y (float): Vertical coordinate.\n    """\n\n    __slots__ = ("x", "y")\n'
+
+    assert_pdf509_lines(source, ())
+
+
+def test_mutable_slot_lists_do_not_supply_static_inventory() -> None:
+    source = 'class Point:\n    """Point.\n\n    Attributes:\n        y (float): Vertical coordinate.\n    """\n\n    __slots__ = ["x"]\n    __slots__.append("y")\n'
+
+    assert_pdf509_lines(source, ((5,),))
+
+
+def test_dynamic_slots_do_not_count_as_present_for_extraneous_checks() -> None:
+    source = 'class Point:\n    """Point.\n\n    Attributes:\n        x (float): Horizontal coordinate.\n    """\n\n    __slots__ = slot_names\n'
+
+    assert_pdf509_lines(source, ((5,),))
+
+
+def test_match_capture_invalidates_an_earlier_literal_slot_inventory() -> None:
+    source = 'class Point:\n    """Point.\n\n    Attributes:\n        x (float): Horizontal coordinate.\n    """\n\n    __slots__ = ("x",)\n    match value:\n        case {"slot": __slots__}:\n            pass\n'
+
+    assert_pdf509_lines(source, ((5,),))
+
+
+def test_inherited_slots_do_not_enter_the_subclass_inventory() -> None:
+    source = 'class Base:\n    __slots__ = ("x",)\n\n\nclass Derived(Base):\n    """Derived point.\n\n    Attributes:\n        x (float): Inherited coordinate.\n    """\n'
+
+    assert_pdf509_lines(source, ((9,),))
+
+
+def test_private_slot_names_are_not_mangled_for_documentation_comparison() -> None:
+    exact = 'class Vault:\n    """Vault.\n\n    Attributes:\n        __secret (str): Secret value.\n    """\n\n    __slots__ = ("__secret",)\n'
+    mangled = exact.replace("__secret (str)", "_Vault__secret (str)")
+
+    assert_pdf509_lines(exact, ())
+    assert_pdf509_lines(mangled, ((5,),))
+
+
 def test_private_attributes_may_be_voluntarily_documented_when_present() -> None:
     source = 'class Client:\n    """HTTP client.\n\n    Attributes:\n        _token (str): Internal token.\n    """\n\n    _token: str\n'
 

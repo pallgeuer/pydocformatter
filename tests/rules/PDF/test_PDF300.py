@@ -106,6 +106,16 @@ def test_reports_comma_before_structured_content_without_fixing() -> None:
     assert not result.unfixed_findings[0].fixable
 
 
+def test_reports_comma_before_malformed_directive_without_fixing() -> None:
+    source = 'def function():\n    """Choose one,\n\n    .. warning:\n        Important details.\n    """\n'
+    result = format_source(source)
+
+    assert result.new_source == source
+    assert not result.fixed_findings
+    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((2,),)
+    assert not result.unfixed_findings[0].fixable
+
+
 @pytest.mark.parametrize(
     ("source", "expected"),
     [

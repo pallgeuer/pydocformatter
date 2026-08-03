@@ -11,7 +11,7 @@ Rule is incompatible with `PDF518`.
 ## What it does
 Checks for public class attributes documented in class docstring attribute entries when public class attribute documentation must use attached docstrings.
 
-PDF519 checks parsed Google `Attributes` sections, NumPy `Attributes` sections, and reStructuredText attribute fields when the matching convention is active. The documented name must also match a supported class-scope attribute or supported `self.*` attribute assigned in `__init__`.
+PDF519 checks parsed Google `Attributes` sections, NumPy `Attributes` sections, and reStructuredText attribute fields when the matching convention is active. The documented name must also match a supported class-scope attribute or supported `self.*` attribute assigned in `__init__`. A slot-only member is excluded because its string literal cannot own an attached docstring. If the same name also has any real class or initializer assignment, including an annotation-only declaration, the ordinary attached-docstring policy applies.
 
 PDF519 is a location policy: it reports inventory-backed public class attributes documented in the class docstring because attached docstrings are required. It does not report stale class docstring entries; use PDF509 for those, PDF508 for missing documentation, and PDF512 for duplicates when both locations are allowed.
 
@@ -19,7 +19,7 @@ PDF519 is a location policy: it reports inventory-backed public class attributes
 Attached docstrings keep attribute documentation next to the assignment, which can be clearer for projects with many class attributes or conditional instance attributes.
 
 ## Ruff compatibility
-None.
+Ruff's `RUF023` and `PLE0237` inspect slot order and non-slot assignments. PDF519 instead applies documentation placement policy and excludes slot-only names that cannot own attached docstrings.
 
 ## Examples
 A public class attribute documented in the class docstring is reported:
@@ -111,6 +111,29 @@ class Client:
     timeout: float
 
 [output=unchanged]
+```
+
+A slot-only member is exempt because no assignment can own its attached docstring. A separate real declaration of another slot name restores the ordinary placement requirement for that name:
+
+```pydocfmt-example
+[settings]
+docstring-convention = "google"
+
+[input]
+class Point:
+    """Point.
+
+    Attributes:
+        x: Horizontal coordinate.
+        y: Vertical coordinate.
+    """
+
+    __slots__ = ("x", "y")
+    y: float
+
+[output=unchanged]
+[findings]
+PDF519: Line 6: Public class attribute 'y' must use attached docstring, not class docstring documentation
 ```
 
 ## Options

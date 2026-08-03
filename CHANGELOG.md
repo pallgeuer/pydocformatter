@@ -17,6 +17,7 @@ All notable changes to this project are documented here. The format follows [Kee
 ### Added
 
 - **Docstring diagnostics:**
+  - Added PDF418 to report high-confidence malformed reStructuredText directive introducers while preserving their bodies as structured content for other docstring rules.
   - Added PDF417 to validate NumPy single-value and multiple-value `Returns` entry structure.
   - Added usually-fixable PDF527 to enforce signature variadic markers in Google and NumPy documentation and bare parameter names in reStructuredText value and type fields.
   - Added `docstring-include-assertion-errors` so PDF506 and PDF507 can optionally treat syntactic assertions as possible `AssertionError` occurrences.
@@ -45,6 +46,7 @@ All notable changes to this project are documented here. The format follows [Kee
 - **Rule suppressions:**
   - Made inline suppressions after any component token of an implicitly concatenated docstring cover the complete expression for PDF findings while preserving line-local PCF coverage and existing local and standalone attachment boundaries.
 - **Docstring diagnostics:**
+  - Included proven members from final effective immutable literal `__slots__` declarations in class attribute documentation coverage, placement, description, and type checks while retaining later real assignments and annotations as documentation attachment and type sources.
   - Made PDF414 sometimes fixable for deterministic Google and NumPy separators and reStructuredText closing delimiters while leaving missing or unexpected field arguments diagnostic-only, and made PDF415 usually fixable for mapped convention indentation.
   - Made PDF701, PDF705, PDF709, PDF713, and PDF717 sometimes fixable from available code annotations, including canonical paired reStructuredText type fields.
   - Kept PDF713's enum-like no-type inversion for Google and reStructuredText entries while letting NumPy grammar take precedence for typed enum entries.
@@ -83,6 +85,7 @@ All notable changes to this project are documented here. The format follows [Kee
   - Added `docstring-placeholder-markers` for configuring the exact marker inventory used by PDF213, including an empty-list opt-out that does not change rule selection.
   - Extended settings profiles with the auto-discovered project root so default cache locations are stable across nested paths and relocated workspaces.
 - **Comment formatting:**
+  - Recognized the complete Unicode-aware reStructuredText directive-name grammar, including namespaced directives and the optional space before `::`, when preserving directive blocks in standalone and extracted trailing comments.
   - Made PCF001 normalize regular standalone comments containing only ASCII space, tab, or form-feed payloads to bare `#` while preserving deliberate hash separators and source line endings.
 
 ### Fixed
@@ -91,6 +94,8 @@ All notable changes to this project are documented here. The format follows [Kee
   - Made ASCII case-insensitive duplicate `docstring-placeholder-markers` diagnostics deterministic when multiple configured spellings have the same normalized value.
   - Reported invalid `docstring-placeholder-markers` entries before checking ASCII case-insensitive duplicates, so Unicode case-folding collisions receive the relevant syntax error.
 - **Docstring diagnostics:**
+  - Made literal `__slots__` inventory conservative for mutable list values and skipped expensive slot metadata analysis in files without an exact `__slots__` name token.
+  - Recognized current Sphinx version-directive names and the optional delimiter space in PDF418 malformed directive diagnostics.
   - Fixed PDF414 reStructuredText closing-colon repairs to use bounded syntactic heads instead of description prose, preserve inline parameter types and spaced exception lists, and leave ambiguous or unsupported heads diagnostic-only; made PDF527 recognize narrowly escaped reStructuredText variadic markers; fixed PDF414, PDF415, and PDF527 exact edits on escaped logical lines without physical line mappings.
   - Made PDF409 leave empty Google type slots unchanged and PDF414 report the malformed syntax instead of canonicalizing empty parentheses.
   - Made PDF312 recognize exact generic descriptions that preserve leading or trailing underscores in documented names.

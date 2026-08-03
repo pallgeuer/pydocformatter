@@ -133,6 +133,7 @@ def _is_recognized_structure(block: PDF_definition.DocstringBlock) -> bool:
         PDF_definition.DocstringBlockKind.BLOCK_QUOTE,
         PDF_definition.DocstringBlockKind.TABLE,
         PDF_definition.DocstringBlockKind.DIRECTIVE,
+        PDF_definition.DocstringBlockKind.DIRECTIVE_ISSUE,
         PDF_definition.DocstringBlockKind.LITERAL_BLOCK,
         PDF_definition.DocstringBlockKind.REST_FIELD,
         PDF_definition.DocstringBlockKind.VERBATIM,

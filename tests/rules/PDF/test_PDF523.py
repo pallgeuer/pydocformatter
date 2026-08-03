@@ -36,6 +36,18 @@ def test_reports_private_init_attribute_owner_documentation() -> None:
     assert_pdf523_lines(source, ((5,),))
 
 
+def test_slot_only_private_attribute_does_not_require_an_impossible_attached_docstring() -> None:
+    source = 'class Client:\n    """Client.\n\n    Attributes:\n        _token: Internal token.\n    """\n\n    __slots__ = ("_token",)\n'
+
+    assert_pdf523_lines(source, ())
+
+
+def test_private_slot_with_real_assignment_uses_normal_attached_docstring_policy() -> None:
+    source = 'class Client:\n    """Client.\n\n    Attributes:\n        _token: Internal token.\n    """\n\n    __slots__ = ("_token",)\n    _token: str\n'
+
+    assert_pdf523_lines(source, ((5,),))
+
+
 def test_reports_repeated_private_class_owner_entries_and_ignores_stale_entries() -> None:
     source = 'class Client:\n    """HTTP client.\n\n    Attributes:\n        _token: Internal token.\n        _missing: Stale docs.\n        _token: Repeated token docs.\n    """\n\n    _token: str\n'
 

@@ -11,7 +11,7 @@ PCF001 operates on physical runs of consecutive, same-indent, regular, non-empty
 
 Whitespace-only normalization happens before these runs are formatted, but empty and hash-only comments remain run boundaries. The narrow replacement preserves indentation, the original line ending, final-newline state, and all surrounding source. PCF001 alone owns this standalone normalization; PCF002 remains responsible for ordinary trailing-comment whitespace.
 
-Within a run, PCF001 first identifies enabled preserved structures, then applies enabled code detectors to the remaining semantic text, and finally formats the remaining list items, block quotes, paragraphs, or physical lines. Lines inside an explicitly preserved structure are excluded from code detection, so code in a fenced or directive region does not prevent adjacent prose from formatting. If any code detector matches another non-preserved line or multiline candidate, the entire physical standalone run remains unchanged.
+Within a run, PCF001 first identifies enabled preserved structures, then applies enabled code detectors to the remaining semantic text, and finally formats the remaining list items, block quotes, paragraphs, or physical lines. Lines inside an explicitly preserved structure are excluded from code detection, so code in a fenced or directive region does not prevent adjacent prose from formatting. Valid reStructuredText directive types use Unicode word-character components separated by isolated `-`, `_`, `+`, `.`, or `:` characters, so namespaced types such as `py:function` are preserved. One optional ASCII space may precede the two-colon delimiter, which must be followed by whitespace or the end of the line; text glued directly to it remains ordinary prose. If any code detector matches another non-preserved line or multiline candidate, the entire physical standalone run remains unchanged.
 
 When `comment-task-marker-mode` is `no-wrap`, recognized task markers such as `TODO:`, `FIXME:`, and `HACK:` are formatted as independent units but are not wrapped. When it is `hanging`, recognized task-marker units use hanging continuation indentation. Existing continuation lines belong to the same unit only when they have the same base indentation and exactly enough spaces after the comment marker to align with the task-marker payload. Code-like task-marker payloads in `hanging` mode are normalized but not wrapped according to the enabled code-detection settings. Set `comment-task-marker-mode` to `none` for no task-marker-specific handling.
 
@@ -285,6 +285,27 @@ if value:
 [output=unchanged]
 ```
 
+Namespaced reStructuredText directives and their indented bodies are preserved. A one-colon introducer is not a valid directive: its colon-ended opener remains a structural boundary, but its following text is ordinary prose that can be reflowed:
+
+```pydocfmt-example
+[settings]
+line-length = 24
+comment-detect-statements = false
+
+[input]
+# .. py:function :: signature
+#    preserved directive body that may exceed the line length
+# .. note:
+#    ordinary malformed directive body words
+
+[output]
+# .. py:function :: signature
+#    preserved directive body that may exceed the line length
+# .. note:
+# ordinary malformed
+# directive body words
+```
+
 ## Options
 - `line-length`: Maximum display width used when wrapping generated standalone comment lines.
 - `indent-width`: Tab display width used for wrapping and structure-prefix calculations.
@@ -298,7 +319,7 @@ if value:
 - `comment-preserve-doctests`: Preserves standalone doctest comment regions unchanged.
 - `comment-preserve-code-fences`: Preserves fenced code regions in standalone comments unchanged.
 - `comment-preserve-tables`: Preserves detected Markdown and reStructuredText tables unchanged.
-- `comment-preserve-directives`: Preserves reStructuredText directives and their indented bodies unchanged.
+- `comment-preserve-directives`: Preserves valid reStructuredText directives, including namespaced types, and their indented bodies unchanged.
 - `comment-detect-code`: Protects whole standalone runs when the indentation or leading-keyword heuristic detects disabled code.
 - `comment-detect-statements`: Protects whole standalone runs when comment text parses as Python containing a non-expression statement.
 - `comment-detect-expressions`: Protects whole standalone runs when comment text parses as a nontrivial Python expression.

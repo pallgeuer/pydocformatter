@@ -152,6 +152,49 @@ def test_required_type_without_annotation_remains_diagnostic_when_fixing() -> No
     assert codes(result) == ("PDF701",)
 
 
+def test_slot_only_class_attribute_participates_in_typed_rules_without_an_unsafe_type_fix() -> None:
+    """Check literal slots while leaving a missing type diagnostic-only without a real annotation."""
+    source = 'class Point:\n    """Point.\n\n    Attributes:\n        x: Horizontal coordinate.\n    """\n\n    __slots__ = ("x",)\n'
+    required = check(source, select=("PDF713",), fix=True)
+    forbidden = check(source.replace("x: Horizontal", "x (float): Horizontal"), select=("PDF714",))
+    mismatch = check(source.replace("x: Horizontal", "x (float): Horizontal"), select=("PDF715",))
+
+    assert required.new_source == source
+    assert not required.fixed_findings
+    assert codes(required) == ("PDF713",)
+    assert codes(forbidden) == ("PDF714",)
+    assert codes(mismatch) == ()
+
+
+def test_slot_only_class_attribute_participates_in_description_checks() -> None:
+    """Report an empty documented slot entry through PDF712."""
+    source = 'class Point:\n    """Point.\n\n    Attributes:\n        x (float):\n    """\n\n    __slots__ = ("x",)\n'
+
+    assert codes(check(source, select=("PDF712",))) == ("PDF712",)
+
+
+def test_later_real_slot_annotation_supplies_safe_type_fix_and_mismatch_comparison() -> None:
+    """Keep slot order while enriching typed checks from a later real declaration."""
+    source = 'class Point:\n    """Point.\n\n    Attributes:\n        x: Horizontal coordinate.\n    """\n\n    __slots__ = ("x",)\n    x: float\n'
+    required = check(source, select=("PDF713",), fix=True)
+    mismatching = source.replace("x: Horizontal", "x (int): Horizontal")
+
+    assert required.new_source == source.replace("x: Horizontal", "x (float): Horizontal")
+    assert fixed_codes(required) == ("PDF713",)
+    assert codes(check(mismatching, select=("PDF715",))) == ("PDF715",)
+
+
+def test_first_real_slot_annotation_remains_the_canonical_type_source() -> None:
+    """Ignore later redeclaration types when enriching an earlier slot inventory entry."""
+    source = 'class Point:\n    """Point.\n\n    Attributes:\n        x: Horizontal coordinate.\n    """\n\n    __slots__ = ("x",)\n    x: int\n    x: str\n'
+    required = check(source, select=("PDF713",), fix=True)
+    documented_as_later_type = source.replace("x: Horizontal", "x (str): Horizontal")
+
+    assert required.new_source == source.replace("x: Horizontal", "x (int): Horizontal")
+    assert fixed_codes(required) == ("PDF713",)
+    assert codes(check(documented_as_later_type, select=("PDF715",))) == ("PDF715",)
+
+
 def test_required_rest_type_field_insertion_preserves_crlf() -> None:
     """Use source line endings for an inserted field while validating normalized string value text."""
     source = 'def function(value: int):\r\n    """Process a value.\r\n\r\n    :param value: Value.\r\n    """\r\n'

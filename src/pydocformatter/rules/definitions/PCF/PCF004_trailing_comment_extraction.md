@@ -7,7 +7,7 @@ Checks overlong ordinary trailing comments after canonical spacing. When the com
 
 When `comment-trailing-extraction-syntax-aware` is enabled, overlong comments in decorators, compound statement headers, arguments, and parenthesized or continuation contexts remain inline to preserve their physical association. Syntax-aware extraction applies to function, class, loop, conditional, `with`, `try`/`except`/`else`/`finally`, `match`, and `case` headers, plus decorators, arguments, and parenthesized or continuation contexts. It does not protect ordinary trailing comments merely because they appear inside a compound statement body.
 
-When `comment-trailing-extraction-content-aware` is enabled, overlong comments remain inline if their content would be unsafe to reinterpret as standalone comment text. The unsafe-content check respects the existing standalone comment settings: list-like text is unsafe when `comment-format-list-items` is enabled, table-like text is unsafe when `comment-preserve-tables` is enabled, and the same pattern applies to enabled headings, doctests, code fences, block quotes, directives, and code-detection settings. Disabling one detector only removes that detector from the safety check; if the same text also matches another enabled detector, it still remains inline. Within this content-aware check, leading symbolic operator-like tokens such as `-`, `*`, `>`, `|`, `+`, comparison operators, and arrows are always unsafe, even when a matching structure setting is disabled. Ordinary prose that starts with words such as `and`, `or`, or `not` can still extract.
+When `comment-trailing-extraction-content-aware` is enabled, overlong comments remain inline if their content would be unsafe to reinterpret as standalone comment text. The unsafe-content check respects the existing standalone comment settings: list-like text is unsafe when `comment-format-list-items` is enabled, table-like text is unsafe when `comment-preserve-tables` is enabled, and the same pattern applies to enabled headings, doctests, code fences, block quotes, directives, and code-detection settings. Valid directive recognition includes Unicode and namespaced reStructuredText types, allows one optional ASCII space before the two-colon delimiter, and requires whitespace or the end of the line after it. Disabling one detector only removes that detector from the safety check; if the same text also matches another enabled detector, it still remains inline. Within this content-aware check, leading symbolic operator-like tokens such as `-`, `*`, `>`, `|`, `+`, comparison operators, and arrows are always unsafe, even when a matching structure setting is disabled. Ordinary prose that starts with words such as `and`, `or`, or `not` can still extract.
 
 When `comment-task-marker-mode` is `no-wrap` or `hanging`, extracted task-marker comments use the same task-marker treatment as standalone task markers. Content-aware code detection checks the task-marker payload rather than the full `TODO:`-style prefix, so annotation-like marker text such as `TODO: fix_parser` is not mistaken for Python code.
 
@@ -239,6 +239,22 @@ value = compute()  # Read [the label](missing destination words that need moving
 PCF004: Line 1: Trailing comment should be extracted
 ```
 
+Content-aware extraction recognizes namespaced reStructuredText directives only with a valid two-colon delimiter. The valid directive remains inline, while a one-colon lookalike is ordinary extractable prose:
+
+```pydocfmt-example
+[settings]
+line-length = 60
+
+[input]
+very_long_variable_name = compute_expensive_value()  # .. py:function :: signature
+very_long_variable_name = compute_expensive_value()  # .. note: text that can move
+
+[output]
+very_long_variable_name = compute_expensive_value()  # .. py:function :: signature
+# .. note: text that can move
+very_long_variable_name = compute_expensive_value()
+```
+
 ## Options
 - `line-length`: Maximum display width used to decide whether a canonical trailing comment is overlong and to wrap extracted standalone comments.
 - `indent-width`: Tab display width used when measuring inline comments and standalone comment width.
@@ -253,7 +269,7 @@ PCF004: Line 1: Trailing comment should be extracted
 - `comment-preserve-doctests`: Makes content-aware extraction treat doctest prompts as unsafe to extract.
 - `comment-preserve-code-fences`: Makes content-aware extraction treat fenced-code openers as unsafe to extract.
 - `comment-preserve-tables`: Makes content-aware extraction treat table borders as unsafe to extract.
-- `comment-preserve-directives`: Makes content-aware extraction treat reStructuredText directives as unsafe to extract.
+- `comment-preserve-directives`: Makes content-aware extraction treat valid reStructuredText directives, including namespaced types, as unsafe to extract.
 - `comment-detect-code`: Makes content-aware extraction keep disabled-code-looking comments inline.
 - `comment-detect-statements`: Makes content-aware extraction keep Python-statement-looking comments inline.
 - `comment-detect-expressions`: Makes content-aware extraction keep nontrivial Python-expression-looking comments inline.

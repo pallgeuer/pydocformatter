@@ -7,8 +7,8 @@ Rule is disabled if `docstring-convention` is `none` or `pep257`.
 ## What it does
 PDF414 reports high-confidence malformed entry syntax for the configured Google, NumPy, or reStructuredText convention:
 
-- For Google sections, it detects an empty or unbalanced parenthesized type, an unbalanced method signature, and a missing colon between an entry head and its description. Unbalanced method signatures require the name to match a direct method of the documented class. Parameter, attribute, and other method candidates can be confirmed from the complete owning function or class inventory, while a closed, balanced parenthesized head is also strong entry evidence and may contain nested parentheses, brackets, braces, or quoted delimiters. Exception entries can be recognized from one or more comma- or pipe-separated qualified names whose final components end in `Error`, `Exception`, or `Warning`.
-- For NumPy sections, it detects an unbalanced method signature, a colon with no following type, and a missing colon between one or more entry names and a conservative type expression. Every check requires all recovered names to match the relevant parameter, attribute, or direct method inventory. Type candidates are validated with an iterative token grammar before any general Python expression parsing, including for deeply nested candidates. Top-level line breaks are rejected, while line breaks inside brackets or parentheses and explicit backslash continuations remain valid.
+- For Google sections, it detects an empty or unbalanced parenthesized type, an unbalanced method signature, and a missing colon between an entry head and its description. Unbalanced method signatures require the name to match a direct method of the documented class. Parameter, attribute, and other method candidates can be confirmed from the complete owning function or class inventory, including proven literal slot members, while a closed, balanced parenthesized head is also strong entry evidence and may contain nested parentheses, brackets, braces, or quoted delimiters. Exception entries can be recognized from one or more comma- or pipe-separated qualified names whose final components end in `Error`, `Exception`, or `Warning`.
+- For NumPy sections, it detects an unbalanced method signature, a colon with no following type, and a missing colon between one or more entry names and a conservative type expression. Every check requires all recovered names to match the relevant parameter, attribute, or direct method inventory; proven literal slot members participate in the class attribute inventory. Type candidates are validated with an iterative token grammar before any general Python expression parsing, including for deeply nested candidates. Top-level line breaks are rejected, while line breaks inside brackets or parentheses and explicit backslash continuations remain valid.
 - For reStructuredText fields, it detects a missing closing colon on a standard field name when the remaining text matches the field's expected arity. Named parameter, exception, and attribute fields require a credible first argument; exception arguments must use a conventional exception suffix. Owner-wide fields are reported only when no trailing text follows the field name. The rule also requires arguments on complete parameter, exception, and attribute fields and rejects arguments on complete owner-wide return fields. Yield fields intentionally allow both named and owner-wide forms. A parameter delimiter is repaired only after exactly one name in the malformed syntactic head matches the owning signature; any preceding inline type must be a complete conservative type expression, and owner names found only after non-type prose never select a repair location. Attribute delimiters require exactly one owner attribute match in the first head token because standard reStructuredText attribute fields do not support the same inline type form. Complete comma- or pipe-separated exception-name lists are repaired after the final name. Zero or multiple owner matches remain diagnostic-only.
 
 The rule follows only the configured convention. It does not reinterpret syntax belonging to another convention. Candidates inside parser-recognized protected structures, such as code fences, doctests, directives, literal blocks, and list items, remain part of those structures rather than convention entries.
@@ -220,6 +220,37 @@ def convert(value):
     """
 
 [output=unchanged]
+```
+
+Proven literal slot members supply the same class-attribute confidence as real assignments. Unknown prose-like names remain unreported:
+
+```pydocfmt-example
+[settings]
+docstring-convention = "numpy"
+
+[input]
+class Point:
+    """Point.
+
+    Attributes
+    ----------
+    x float
+    stale int
+    """
+
+    __slots__ = ("x",)
+
+[output]
+class Point:
+    """Point.
+
+    Attributes
+    ----------
+    x: float
+    stale int
+    """
+
+    __slots__ = ("x",)
 ```
 
 ## Options

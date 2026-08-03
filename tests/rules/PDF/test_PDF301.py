@@ -113,6 +113,7 @@ def test_replaces_comma_and_semicolon_with_period(punctuation: str) -> None:
         "    ```text\n    red\n    ```",
         "    >>> choose()",
         "    .. note::\n        red",
+        "    .. warning:\n        red",
         "    Example::\n\n        red",
         "    | Color | Value |\n    | --- | --- |\n    | red | 1 |",
         "    Colors\n    ------",

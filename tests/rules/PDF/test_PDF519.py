@@ -42,6 +42,18 @@ def test_reports_public_init_attribute_owner_documentation() -> None:
     assert_pdf519_lines(source, ((5,),))
 
 
+def test_slot_only_public_attribute_does_not_require_an_impossible_attached_docstring() -> None:
+    source = 'class Point:\n    """Point.\n\n    Attributes:\n        x: Horizontal coordinate.\n    """\n\n    __slots__ = ("x",)\n'
+
+    assert_pdf519_lines(source, ())
+
+
+def test_slot_with_real_assignment_uses_normal_attached_docstring_policy() -> None:
+    source = 'class Point:\n    """Point.\n\n    Attributes:\n        x: Horizontal coordinate.\n    """\n\n    __slots__ = ("x",)\n\n    def __init__(self):\n        self.x: float\n'
+
+    assert_pdf519_lines(source, ((5,),))
+
+
 def test_reports_repeated_public_class_owner_entries_and_ignores_stale_entries() -> None:
     source = 'class Client:\n    """HTTP client.\n\n    Attributes:\n        timeout: Request timeout.\n        missing: Stale docs.\n        timeout: Repeated timeout docs.\n    """\n\n    timeout: float\n'
 

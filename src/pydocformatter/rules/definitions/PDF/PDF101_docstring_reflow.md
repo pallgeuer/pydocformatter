@@ -7,7 +7,7 @@ Checks for docstring text regions whose normalized wrapping does not match the c
 
 This rule rewrites safely mapped simple string docstrings by replacing the complete string literal with an equivalent literal that preserves the original string prefix, quote delimiter, and reusable source spellings for moved text. It can reflow summaries, paragraphs, convention section descriptions, reST field descriptions, list items, and block quotes.
 
-PDF101 treats each reflowable semantic region independently. It joins consecutive physical lines in the same region before wrapping, so a finding can be emitted even when no individual input line is over the configured line length. Blank lines, standalone colon-ended lines, protected structures, and lines carrying high-confidence PDF414 or PDF415 diagnostics remain region boundaries.
+PDF101 treats each reflowable semantic region independently. It joins consecutive physical lines in the same region before wrapping, so a finding can be emitted even when no individual input line is over the configured line length. Blank lines, standalone colon-ended lines, protected structures, lines carrying high-confidence PDF414 or PDF415 diagnostics, and PDF418 malformed directive blocks remain region boundaries. PDF418 protection is parser-owned and applies whenever directive parsing is enabled, even when PDF418 itself is not selected.
 
 Within each logical line, PDF101 preserves a conservative set of recognized inline markup as indivisible source-aware tokens: non-empty same-line backtick spans whose opening and closing delimiter runs have equal length; inline and full or collapsed reference-style Markdown links and images; CommonMark-style URI and email autolinks; and boundary-valid reStructuredText interpreted text, prefix and suffix roles, phrase and anonymous references, embedded targets, inline literals, and substitution references. Escaped and nested Markdown labels, empty inline labels or destinations, link titles delimited by `"..."`, `'...'`, or `(...)`, and destination parentheses nested up to three levels are supported. reStructuredText role names use alphanumeric components separated by isolated `-`, `_`, `+`, `:`, or `.` characters. The complete whitespace-delimited punctuation envelope around a recognized construct stays together, and exact source spelling inside the token is retained.
 
@@ -347,6 +347,23 @@ line-length = 72
 [input]
 def area(radius):
     """Return the area of a circle."""
+
+[output=unchanged]
+```
+
+High-confidence malformed directive blocks are protected even when PDF418 is not selected, so PDF101 does not reflow either the opener or its indented body:
+
+```pydocfmt-example
+[settings]
+line-length = 50
+
+[input]
+def connect():
+    """Open a connection.
+
+    .. caution:
+        This deliberately long malformed directive body remains exactly as authored.
+    """
 
 [output=unchanged]
 ```

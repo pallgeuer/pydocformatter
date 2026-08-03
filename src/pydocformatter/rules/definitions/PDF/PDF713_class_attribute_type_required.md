@@ -7,11 +7,11 @@ Rule is disabled if `docstring-convention` is `none` or `pep257`, and ignored by
 Rule is incompatible with `PDF714`.
 
 ## What it does
-Checks that parsed class attribute entries in owning class docstrings include documented types. It checks only entries that match inventoried class or instance attributes; it does not require undocumented attributes to be added to the class docstring. Attached attribute docstrings are outside the scope of PDF7xx rules.
+Checks that parsed class attribute entries in owning class docstrings include documented types. It checks only entries that match inventoried class or instance attributes, including proven literal slot members; it does not require undocumented attributes to be added to the class docstring. Attached attribute docstrings are outside the scope of PDF7xx rules.
 
 For classes that directly inherit from a configured enum-like base, the policy is inverted: present Google and reStructuredText types are reported as redundant. Dotted configured base names are resolved through unshadowed imports and aliases, while unqualified configured names match syntactically. NumPy grammar takes precedence and is not inverted.
 
-For ordinary classes with available single-line annotations, PDF713 inserts a mapped Google type or adds a paired canonical reStructuredText `:vartype:` field, filling an existing empty, single-line field first. For configured enum-like classes, it removes mapped Google types and paired reStructuredText `:vartype:` fields. NumPy entries, missing annotations, and source shapes that cannot be mapped safely remain diagnostic.
+For ordinary classes with available single-line annotations, PDF713 inserts a mapped Google type or adds a paired canonical reStructuredText `:vartype:` field, filling an existing empty, single-line field first. A slot-only member has no annotation source, so its missing type remains diagnostic; the first real annotated assignment of the same name supplies the normal safe fix without changing the slot's inventory position. Later redeclarations do not replace that canonical annotation source. For configured enum-like classes, PDF713 removes mapped Google types and paired reStructuredText `:vartype:` fields. NumPy entries, missing annotations, and source shapes that cannot be mapped safely remain diagnostic.
 
 The rule is exact opt-in because many projects rely on class annotations instead of repeating attribute types in docstrings.
 
@@ -19,7 +19,7 @@ The rule is exact opt-in because many projects rely on class annotations instead
 Projects can require class attribute type documentation while avoiding redundant enum member type text.
 
 ## Ruff compatibility
-None.
+Ruff's `RUF023` and `PLE0237` inspect slot order and non-slot assignments. PDF713 instead applies docstring type policy to proven slot members and can use a separate real annotation for safe insertion.
 
 ## Examples
 PDF713 canonically copies an ordinary class attribute annotation into a Google entry that has no type:
@@ -186,6 +186,40 @@ class Color(e.Enum):
     """
 
     RED = 1
+```
+
+Slot-only members are checked but have no annotation from which to build a fix. A separate real annotation of the same slot name supplies a safe insertion source:
+
+```pydocfmt-example
+[settings]
+docstring-convention = "google"
+
+[input]
+class Point:
+    """Point.
+
+    Attributes:
+        x: Horizontal coordinate.
+        y: Vertical coordinate.
+    """
+
+    __slots__ = ("x", "y")
+    x: float
+
+[output]
+class Point:
+    """Point.
+
+    Attributes:
+        x (float): Horizontal coordinate.
+        y: Vertical coordinate.
+    """
+
+    __slots__ = ("x", "y")
+    x: float
+
+[findings]
+PDF713: Line 6: Class attribute 'y' docstring entry is missing a type
 ```
 
 ## Options

@@ -7,7 +7,7 @@ Rule is disabled if `docstring-convention` is `none` or `pep257`.
 Rule is incompatible with `PDF714`.
 
 ## What it does
-Checks that parsed class attribute docstring types conservatively match annotated class or instance attributes. It checks only entries in the owning class docstring that match inventoried attributes and have both a documented type and a usable annotation. Attached attribute docstrings are outside the scope of PDF7xx rules.
+Checks that parsed class attribute docstring types conservatively match annotated class or instance attributes. It checks only entries in the owning class docstring that match inventoried attributes and have both a documented type and a usable annotation. Proven literal slot members participate in the inventory, but a slot-only member has no annotation to compare; the first real annotated assignment of the same name supplies the comparison annotation without changing first-source order, and later redeclarations do not replace it. Attached attribute docstrings are outside the scope of PDF7xx rules.
 
 The comparison uses a syntax-only type-expression subset that covers common names, qualified names, subscriptions, tuples, unions, and stringized annotations. Unshadowed import aliases are normalized before comparison. Unparseable, unsupported, or ambiguous expressions are skipped instead of guessed.
 
@@ -17,7 +17,7 @@ Google, NumPy, and inline or paired reStructuredText types are supported. NumPy 
 Stale class attribute type text can mislead readers when annotations have changed.
 
 ## Ruff compatibility
-None.
+Ruff's `RUF023` and `PLE0237` inspect slot order and non-slot assignments. PDF715 instead compares documented slot types with annotations from real declarations of the same name.
 
 ## Examples
 PDF715 reports class attribute docstring types that do not match annotations:
@@ -103,6 +103,29 @@ class Client:
 [output=unchanged]
 [findings]
 PDF715: Line 6: Class attribute 'fallback' docstring type does not match the annotation
+```
+
+A later real annotation supplies comparison data for a slot name. Slot-only members without annotations remain outside mismatch comparison rather than being guessed:
+
+```pydocfmt-example
+[settings]
+docstring-convention = "google"
+
+[input]
+class Point:
+    """Point.
+
+    Attributes:
+        x (str): Horizontal coordinate.
+        y (bytes): Vertical coordinate.
+    """
+
+    __slots__ = ("x", "y")
+    x: float
+
+[output=unchanged]
+[findings]
+PDF715: Line 5: Class attribute 'x' docstring type does not match the annotation
 ```
 
 ## Options

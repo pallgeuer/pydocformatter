@@ -10,8 +10,6 @@ Attributes:
     ATX_HEADING_RE (re.Pattern[str]): Markdown ATX heading detector used to keep standalone heading comments unchanged.
     HEADING_ADORNMENT_RE (re.Pattern[str]): Setext and reStructuredText adornment detector for preserving underlined or
         overlined headings.
-    DIRECTIVE_RE (re.Pattern[str]): ReStructuredText directive opener detector used to preserve directive bodies by
-        indentation.
     MARKDOWN_TABLE_DELIMITER_RE (re.Pattern[str]): Markdown pipe-table separator detector used as structural evidence
         for table preservation.
     REST_GRID_BORDER_RE (re.Pattern[str]): ReStructuredText grid-table border detector used to keep table rows aligned.
@@ -35,7 +33,7 @@ from typing import TYPE_CHECKING
 # First-party imports
 import pydocformatter.rules.definitions.PCF.PCF as PCF_definition
 from pydocformatter.cli.settings_check import CommentTaskMarkerMode
-from pydocformatter.rules.definition_helpers import ascii_whitespace, inline_markup, text_layout
+from pydocformatter.rules.definition_helpers import ascii_whitespace, inline_markup, rest_directives, text_layout
 
 
 if TYPE_CHECKING:
@@ -48,7 +46,6 @@ LIST_RE = re.compile(r"^(?P<indent>[ \t]*)(?P<marker>(?:[-+*]|\d+[.)]))[ \t]+(?P
 BLOCK_QUOTE_RE = re.compile(r"^(?P<prefix>(?:>[ \t]*)+)(?P<text>.*)$")
 ATX_HEADING_RE = re.compile(r"^#{1,6}(?:[ \t]+|$)")
 HEADING_ADORNMENT_RE = re.compile(r"^(?P<char>[=\-~`^\"'*+#:._])(?P=char){2,}[ \t]*$")
-DIRECTIVE_RE = re.compile(r"^(?P<indent>[ \t]*)\.\.\s+[A-Za-z][\w-]*::(?:\s|$)")
 MARKDOWN_TABLE_DELIMITER_RE = re.compile(r"^[ \t]*\|?(?:[ \t]*:?-{3,}:?[ \t]*\|)+[ \t]*:?-{3,}:?[ \t]*\|?[ \t]*$")
 REST_GRID_BORDER_RE = re.compile(r"^[ \t]*\+(?:[-=]+\+)+[ \t]*$")
 REST_SIMPLE_BORDER_RE = re.compile(r"^[ \t]*(?:={3,}|-{3,})(?:[ \t]+(?:={3,}|-{3,}))*[ \t]*$")
@@ -120,7 +117,7 @@ def preserved_indices(run: PCF_definition.StandaloneCommentRun, *, settings: Che
     if settings.comment_preserve_directives:
         index = 0
         while index < len(bodies):
-            match = DIRECTIVE_RE.match(bodies[index])
+            match = rest_directives.directive_match(bodies[index])
             if match is None:
                 index += 1
                 continue
@@ -500,7 +497,7 @@ def trailing_content_is_unsafe(content: str, *, settings: CheckSettings) -> bool
         return True
     if settings.comment_preserve_code_fences and inline_markup.FENCE_RE.match(body) is not None:
         return True
-    if settings.comment_preserve_directives and DIRECTIVE_RE.match(body) is not None:
+    if settings.comment_preserve_directives and rest_directives.directive_match(body) is not None:
         return True
     if settings.comment_preserve_tables and is_table_border(body):
         return True

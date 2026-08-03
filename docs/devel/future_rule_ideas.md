@@ -2,11 +2,10 @@
 
 The main remaining opportunities are:
 
-- Convention exactness: malformed reST directive introducers.
-- Inventory and ordering: attribute declaration order and literal `__slots__` members.
+- Inventory and ordering: attribute declaration order.
 - Conservative autofixes: duplicate directive selectors.
 
-There are currently 137 rules: 7 PCF and 130 PDF. Fix availability is 22 always, 21 usually, 13 sometimes, and 81 never.
+There are currently 138 rules: 7 PCF and 131 PDF. Fix availability is 22 always, 21 usually, 13 sometimes, and 82 never.
 
 ## Current coverage audit
 
@@ -88,6 +87,7 @@ The comment parser deliberately excludes empty/hash-only lines from ordinary run
 | PDF415 | High-confidence Google and NumPy entry indentation                                                |   U |
 | PDF416 | Conservative trailing-period, outer-parenthesis, and lowercase `none` type spelling normalization |   U |
 | PDF417 | NumPy single-value versus multiple-value `Returns` entry shape                                    |   N |
+| PDF418 | High-confidence reStructuredText directive introducers with one trailing colon                    |   N |
 
 Recognized section names and ordering are explicit tables in `docstring_sections.py`. PDF414 and PDF415 intentionally diagnose only high-confidence malformed entry syntax and indentation so arbitrary prose remains untouched.
 
@@ -95,54 +95,50 @@ Recognized section names and ordering are explicit tables in `docstring_sections
 
 Most PDF5xx–7xx rules are diagnostic-only. PDF527 is usually fixable, while PDF701, PDF705, PDF709, PDF713, and PDF717 are sometimes fixable from source annotations or convention-specific policy.
 
-| Rules          | Current check                                                                                      | Fix |
-|----------------|----------------------------------------------------------------------------------------------------|----:|
-| PDF500/501/526 | Missing or extraneous parameters and documentation order against the signature                     |   N |
-| PDF527         | Exact parameter variadic spelling against the signature                                            |   U |
-| PDF502/503     | Missing or extraneous ordinary return documentation based on function-body returns                 |   N |
-| PDF504/505     | Missing or extraneous yield documentation based on function-body yields                            |   N |
-| PDF506/507     | Missing or extraneous directly raised exceptions, with optional assertion-derived `AssertionError` |   N |
-| PDF508/509     | Missing public or extraneous class/instance attribute documentation                                |   N |
-| PDF510/511     | Missing public or extraneous module attribute documentation                                        |   N |
-| PDF512/513     | Attribute documentation duplicated between owner and attached docstrings                           |   N |
-| PDF514/515     | Private class/module attributes forbidden in owner docstrings                                      |   N |
-| PDF516/517     | Private class/module attributes forbidden from attached docstrings                                 |   N |
-| PDF518/519     | Public class attributes must use owner versus attached documentation                               |   N |
-| PDF520/521     | Public module attributes must use owner versus attached documentation                              |   N |
-| PDF522/523     | Private class attributes must use owner versus attached documentation                              |   N |
-| PDF524/525     | Private module attributes must use owner versus attached documentation                             |   N |
-| PDF600/601     | Missing public/private package docstrings                                                          |   N |
-| PDF602/603     | Missing public/private module docstrings                                                           |   N |
-| PDF604/605     | Missing public/private top-level class docstrings                                                  |   N |
-| PDF606/607     | Missing public/private nested-class docstrings                                                     |   N |
-| PDF608/609     | Missing public/private top-level function docstrings                                               |   N |
-| PDF610/611     | Missing public/private non-dunder method docstrings                                                |   N |
-| PDF612/613     | Missing public/private dunder-method docstrings                                                    |   N |
-| PDF614/615     | Missing public/private `__init__` docstrings                                                       |   N |
-| PDF616         | Docstrings forbidden by configured decorators, defaulting to overload decorators                   |   N |
-| PDF700/702/703 | Parameter description presence, forbidden types, and annotation mismatch                           |   N |
-| PDF701         | Required parameter types                                                                           |   S |
-| PDF704/706/707 | Return description presence, forbidden types, and annotation mismatch                              |   N |
-| PDF705         | Required return types                                                                              |   S |
-| PDF708/710/711 | Yield description presence, forbidden types, and generator-annotation mismatch                     |   N |
-| PDF709         | Required yield types                                                                               |   S |
-| PDF712/714/715 | Class-attribute description presence, forbidden types, and annotation mismatch                     |   N |
-| PDF713         | Required class-attribute types and enum-like no-type inversion                                     |   S |
-| PDF716/718/719 | Module-attribute description presence, forbidden types, and annotation mismatch                    |   N |
-| PDF717         | Required module-attribute types                                                                    |   S |
-| PDF720/721     | Raised-exception and emitted-warning description presence                                          |   N |
-| PDF722         | Orphan reStructuredText type fields without corresponding value fields                             |   N |
-| PDF723         | Method-entry description presence in class docstrings                                              |   N |
+| Rules          | Current check                                                                                           | Fix |
+|----------------|---------------------------------------------------------------------------------------------------------|----:|
+| PDF500/501/526 | Missing or extraneous parameters and documentation order against the signature                          |   N |
+| PDF527         | Exact parameter variadic spelling against the signature                                                 |   U |
+| PDF502/503     | Missing or extraneous ordinary return documentation based on function-body returns                      |   N |
+| PDF504/505     | Missing or extraneous yield documentation based on function-body yields                                 |   N |
+| PDF506/507     | Missing or extraneous directly raised exceptions, with optional assertion-derived `AssertionError`      |   N |
+| PDF508/509     | Missing public or extraneous class/instance attribute documentation, including proven literal slots     |   N |
+| PDF510/511     | Missing public or extraneous module attribute documentation                                             |   N |
+| PDF512/513     | Attribute documentation duplicated between owner and attached docstrings                                |   N |
+| PDF514/515     | Private class/module attributes forbidden in owner docstrings                                           |   N |
+| PDF516/517     | Private class/module attributes forbidden from attached docstrings                                      |   N |
+| PDF518/519     | Public class attributes must use owner versus attached documentation; slot-only names cannot attach     |   N |
+| PDF520/521     | Public module attributes must use owner versus attached documentation                                   |   N |
+| PDF522/523     | Private class attributes must use owner versus attached documentation; slot-only names cannot attach    |   N |
+| PDF524/525     | Private module attributes must use owner versus attached documentation                                  |   N |
+| PDF600/601     | Missing public/private package docstrings                                                               |   N |
+| PDF602/603     | Missing public/private module docstrings                                                                |   N |
+| PDF604/605     | Missing public/private top-level class docstrings                                                       |   N |
+| PDF606/607     | Missing public/private nested-class docstrings                                                          |   N |
+| PDF608/609     | Missing public/private top-level function docstrings                                                    |   N |
+| PDF610/611     | Missing public/private non-dunder method docstrings                                                     |   N |
+| PDF612/613     | Missing public/private dunder-method docstrings                                                         |   N |
+| PDF614/615     | Missing public/private `__init__` docstrings                                                            |   N |
+| PDF616         | Docstrings forbidden by configured decorators, defaulting to overload decorators                        |   N |
+| PDF700/702/703 | Parameter description presence, forbidden types, and annotation mismatch                                |   N |
+| PDF701         | Required parameter types                                                                                |   S |
+| PDF704/706/707 | Return description presence, forbidden types, and annotation mismatch                                   |   N |
+| PDF705         | Required return types                                                                                   |   S |
+| PDF708/710/711 | Yield description presence, forbidden types, and generator-annotation mismatch                          |   N |
+| PDF709         | Required yield types                                                                                    |   S |
+| PDF712/714/715 | Class-attribute description presence, forbidden types, and annotation mismatch, including literal slots |   N |
+| PDF713         | Required class-attribute types and enum-like no-type inversion; later real slot annotations can fix     |   S |
+| PDF716/718/719 | Module-attribute description presence, forbidden types, and annotation mismatch                         |   N |
+| PDF717         | Required module-attribute types                                                                         |   S |
+| PDF720/721     | Raised-exception and emitted-warning description presence                                               |   N |
+| PDF722         | Orphan reStructuredText type fields without corresponding value fields                                  |   N |
+| PDF723         | Method-entry description presence in class docstrings                                                   |   N |
 
-The category’s exact inventory boundaries are documented in `PDF.md`.
+The category’s exact inventory boundaries, including final effective literal `__slots__` declarations, are documented in `PDF.md`.
 
 ## Proposed additions and extensions
 
-Ideas #1–#9 were implemented and removed from this list; the remaining idea numbers are retained for stable cross-references.
-
-10. **Validate reST directive introducers.** Report directive-looking lines using one colon instead of `.. name::`, corresponding to numpydoc's broadly useful GL10 check.
-
-11. **Inventory literal `__slots__` members.** When `__slots__` is a statically known string, tuple, or list, include those instance attributes in class documentation checks.
+Ideas #1–#11 were implemented and removed from this list; the remaining idea numbers are retained for stable cross-references.
 
 12. **Deduplicate directive selectors and codes.** PCF003 can safely remove exact duplicate entries from `noqa`, `pydocfmt`, `ruff`, `pylint`, `type: ignore`, and similar comma or bracket lists. Sorting should be optional; deduplication is semantics-preserving.
 
@@ -150,8 +146,8 @@ Ideas #1–#9 were implemented and removed from this list; the remaining idea nu
 
 ## Recommended implementation sequence
 
-- **Highest priority:** #10 reST directive introducers remain well-bounded and materially extend current coverage.
-- **Focused refinements:** #11 literal `__slots__` inventory, #12 directive deduplication, and #13 attribute ordering have narrower reach or more preference-sensitive policy but remain worthwhile.
+- **Highest priority:** #12 directive deduplication is a small, conservative extension of existing normalization.
+- **Focused refinement:** #13 attribute ordering has narrower reach and preference-sensitive policy but remains worthwhile as an opt-in rule.
 
 ## Scored assessment
 
@@ -169,11 +165,9 @@ Every individual score uses a benefit-oriented scale where 1 is worst and 5 is b
 
 The **weighted average** is the arithmetic mean of the eight individual dimension scores after applying these weights: robustness 20%; scope clarity, reach, and added value beyond Ruff 15% each; implementation locality, check-time efficiency, and implementation straightforwardness 10% each; and broad agreement 5%. This prioritizes reliable behavior and clear user value while giving less weight to consensus because an opt-in rule can still be worthwhile when preferences differ. The overall recommendation is an independent synthesis and is not included in the weighted average. Rows are sorted by descending weighted average, then by descending overall recommendation and ascending idea number to break ties.
 
-The Ruff comparison was checked against the official [rule catalog](https://docs.astral.sh/ruff/rules/), [pydoclint rules](https://docs.astral.sh/ruff/rules/#pydoclint-doc), [pydocstyle rules](https://docs.astral.sh/ruff/rules/#pydocstyle-d), [task-comment rules](https://docs.astral.sh/ruff/rules/invalid-todo-capitalization/), [suppression rules](https://docs.astral.sh/ruff/rules/unused-noqa/), and [docstring code formatting](https://docs.astral.sh/ruff/formatter/#docstring-formatting) on 2026-07-28.
+The Ruff comparison was checked against the official [rule catalog](https://docs.astral.sh/ruff/rules/), [pydoclint rules](https://docs.astral.sh/ruff/rules/#pydoclint-doc), [pydocstyle rules](https://docs.astral.sh/ruff/rules/#pydocstyle-d), [task-comment rules](https://docs.astral.sh/ruff/rules/invalid-todo-capitalization/), [suppression rules](https://docs.astral.sh/ruff/rules/unused-noqa/), [slot ordering](https://docs.astral.sh/ruff/rules/unsorted-dunder-slots/), [non-slot assignment](https://docs.astral.sh/ruff/rules/non-slot-assignment/), and [docstring code formatting](https://docs.astral.sh/ruff/formatter/#docstring-formatting) on 2026-08-01.
 
-| Idea | Proposed change                                       | Implementation locality | Robustness | Broad agreement | Scope clarity | Check-time efficiency | Reach | Implementation straightforwardness | Added value beyond Ruff | Weighted average | Overall recommendation | Existing-code and design assessment                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-|------|-------------------------------------------------------|------------------------:|-----------:|----------------:|--------------:|----------------------:|------:|-----------------------------------:|------------------------:|-----------------:|-----------------------:|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| #10  | Validate reST directive introducers                   |                       4 |          4 |               5 |             4 |                     5 |     2 |                                  4 |                       5 |             4.00 |                      4 | `_DIRECTIVE_RE` recognizes only valid `.. name::` openers, and invalid directive-looking lines otherwise become prose or colon headers. A focused diagnostic can inspect clear line boundaries for one-colon or missing-dot variants while excluding field lists, literal blocks, ellipses, examples, and ordinary prose; no semantic body rewrite is required. The syntax is standardized and numpydoc's GL10 demonstrates usefulness, though reach is mostly reST and NumPy documentation. Ruff has no corresponding directive-introducer rule.                                                              |
-| #11  | Inventory literal `__slots__` members                 |                       3 |          4 |               4 |             5 |                     5 |     2 |                                  3 |                       5 |             3.90 |                      4 | `_AttributeDocstringCollector` inventories ordinary class assignments and `self.name` writes in `__init__`, but a literal `__slots__` assignment is currently just the attribute named `__slots__`. A bounded evaluator for a string, tuple, or list can add member names to the owning class inventory with declaration order, while rejecting dynamic expressions; name mangling, invalid slot values, duplicates, `__dict__`, `__weakref__`, and overlap with actual assignments need explicit handling. Ruff can sort `__slots__` through RUF023 but does not connect slots to documentation completeness. |
-| #12  | Deduplicate directive selectors and codes             |                       4 |          4 |               5 |             4 |                     5 |     3 |                                  4 |                       3 |             3.85 |                      4 | PCF003 already parses and canonicalizes the relevant comma and bracket list families through `_normalized_comma_list()`, preserving rationale tails and rejecting unsafe token shapes. Stable first-occurrence deduplication is a small extension, but semantics should be audited separately for action pairs, `type: ignore` namespaces, case normalization, empty selectors, and tools where repeated tokens might carry unusual meaning. Ruff has strong suppression validation for its own directives, while pydocfmt's multi-tool directive coverage remains broader.                                    |
-| #13  | Check attribute entry order against declaration order |                       4 |          4 |               2 |             4 |                     5 |     2 |                                  4 |                       5 |             3.85 |                      3 | `PDFCategoryData.attributes_for()` preserves collected assignment order, and parsed attribute entries preserve docstring order, so first-occurrence rank comparison can closely follow `parameter_order_issues()`. Multiple-target assignments, repeated declarations, instance attributes discovered through branches, and attached-versus-owner documentation need deterministic collapsing, but the technical boundary is manageable. Conceptual grouping is often intentional, making this appropriately opt-in and less broadly recommendable despite no Ruff equivalent.                                 |
+| Idea | Proposed change                                       | Implementation locality | Robustness | Broad agreement | Scope clarity | Check-time efficiency | Reach | Implementation straightforwardness | Added value beyond Ruff | Weighted average | Overall recommendation | Existing-code and design assessment                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+|------|-------------------------------------------------------|------------------------:|-----------:|----------------:|--------------:|----------------------:|------:|-----------------------------------:|------------------------:|-----------------:|-----------------------:|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| #12  | Deduplicate directive selectors and codes             |                       4 |          4 |               5 |             4 |                     5 |     3 |                                  4 |                       3 |             3.85 |                      4 | PCF003 already parses and canonicalizes the relevant comma and bracket list families through `_normalized_comma_list()`, preserving rationale tails and rejecting unsafe token shapes. Stable first-occurrence deduplication is a small extension, but semantics should be audited separately for action pairs, `type: ignore` namespaces, case normalization, empty selectors, and tools where repeated tokens might carry unusual meaning. Ruff has strong suppression validation for its own directives, while pydocfmt's multi-tool directive coverage remains broader.    |
+| #13  | Check attribute entry order against declaration order |                       4 |          4 |               2 |             4 |                     5 |     2 |                                  4 |                       5 |             3.85 |                      3 | `PDFCategoryData.attributes_for()` preserves collected assignment order, and parsed attribute entries preserve docstring order, so first-occurrence rank comparison can closely follow `parameter_order_issues()`. Multiple-target assignments, repeated declarations, instance attributes discovered through branches, and attached-versus-owner documentation need deterministic collapsing, but the technical boundary is manageable. Conceptual grouping is often intentional, making this appropriately opt-in and less broadly recommendable despite no Ruff equivalent. |

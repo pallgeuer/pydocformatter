@@ -119,6 +119,20 @@ def test_init_instance_attributes_are_required_only_when_setting_enabled() -> No
     assert_pdf508_lines(source, ((11,),), settings=CheckSettings(select=("PDF508",), docstring_convention=DocstringConvention.GOOGLE, docstring_require_init_attribute_documentation=True))
 
 
+def test_literal_slots_are_required_only_when_init_attribute_requirement_is_enabled() -> None:
+    source = 'class Point:\n    """Point.\n\n    Attributes:\n        x (float): Horizontal coordinate.\n    """\n\n    __slots__ = ("x", "y")\n'
+
+    assert_pdf508_lines(source, ())
+    assert_pdf508_lines(source, ((8,),), settings=CheckSettings(select=("PDF508",), docstring_convention=DocstringConvention.GOOGLE, docstring_require_init_attribute_documentation=True))
+
+
+def test_real_class_declaration_controls_slot_overlap_eligibility_and_line_ownership() -> None:
+    source = 'class Point:\n    """Point.\n\n    Attributes:\n        documented (float): Existing coordinate.\n    """\n\n    __slots__ = ("x",)\n    x: float\n'
+
+    assert_pdf508_lines(source, ((9,),))
+    assert_pdf508_lines(source, ((8,),), settings=CheckSettings(select=("PDF508",), docstring_convention=DocstringConvention.GOOGLE, docstring_require_init_attribute_documentation=True))
+
+
 def test_all_docstrings_policy_reports_summary_only_public_class_docstring() -> None:
     source = 'class Client:\n    """HTTP client."""\n\n    timeout: float\n'
 

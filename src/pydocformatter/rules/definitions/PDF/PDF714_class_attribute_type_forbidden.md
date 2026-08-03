@@ -9,13 +9,13 @@ Rule is incompatible with `PDF713` and `PDF715`.
 ## What it does
 Checks that parsed class attribute entries in owning class docstrings do not include documented types.
 
-Only entries that match inventoried class or instance attributes are checked. The rule is exact opt-in and cannot be combined with the required-type or type-mismatch class attribute policies.
+Only entries that match inventoried class or instance attributes are checked, including proven literal slot members. The rule is exact opt-in and cannot be combined with the required-type or type-mismatch class attribute policies.
 
 ## Why is this useful?
 Projects that rely on code annotations can prevent duplicated class attribute type documentation.
 
 ## Ruff compatibility
-None.
+Ruff's `RUF023` and `PLE0237` inspect slot order and non-slot assignments. PDF714 instead applies docstring no-type policy to proven slot members.
 
 ## Examples
 PDF714 reports class attribute entries that include docstring type text:
@@ -83,6 +83,27 @@ class Client:
 [findings]
 PDF714: Line 6: Class attribute 'primary' docstring entry should not include a type
 PDF714: Line 6: Class attribute 'fallback' docstring entry should not include a type
+```
+
+Literal slot members are inventoried even without real assignments, so their documented types are also forbidden:
+
+```pydocfmt-example
+[settings]
+docstring-convention = "google"
+
+[input]
+class Point:
+    """Point.
+
+    Attributes:
+        x (float): Horizontal coordinate.
+    """
+
+    __slots__ = ("x",)
+
+[output=unchanged]
+[findings]
+PDF714: Line 5: Class attribute 'x' docstring entry should not include a type
 ```
 
 ## Options

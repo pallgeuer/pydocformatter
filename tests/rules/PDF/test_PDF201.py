@@ -88,6 +88,7 @@ def test_inserts_blank_line_between_summary_and_recognized_structure() -> None:
         "    > quote\n    > continuation",
         "    | A | B |\n    | --- | --- |\n    | 1 | 2 |",
         "    .. note:: Title\n\n        detail",
+        "    .. custom:\n        detail",
         "    Example::\n\n        code",
         "    Accepted values:",
         "        verbatim line",
@@ -124,6 +125,18 @@ def test_disabled_structure_parsing_prevents_summary_separator_insertion() -> No
     assert result.new_source == source
     assert not result.fixed_findings
     assert not result.unfixed_findings
+
+
+def test_directive_setting_controls_malformed_namespaced_structure_separator() -> None:
+    source = 'def function():\n    """Summary.\n    .. py:function: signature\n    """\n'
+    enabled = format_source(source)
+    disabled = format_source(source, settings=CheckSettings(select=("PDF201",), docstring_parse_directives=False))
+
+    assert enabled.new_source == source.replace("Summary.\n", "Summary.\n\n")
+    assert enabled.fixed_findings[PDF201MissingBlankLine.meta] == 1
+    assert disabled.new_source == source
+    assert not disabled.fixed_findings
+    assert not disabled.unfixed_findings
 
 
 def test_does_not_split_ambiguous_multiline_summary_or_plain_prose() -> None:

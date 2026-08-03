@@ -347,7 +347,7 @@ def _attribute_targets(context: RuleContext, *, owner_kind: PDF_definition.Defin
         if docstring is None:
             continue
         annotations = {
-            attribute.name: _attribute_annotation_text(attribute.info, context=context)
+            attribute.name: _attribute_annotation_text(attribute.annotated_info, context=context)
             for attribute in attribute_documentation.inventory_attributes(data, definition, include_instance=include_instance)
         }
         targets.extend(
@@ -524,9 +524,9 @@ def _annotation_text(annotation: cst.Annotation | None, *, context: RuleContext)
     return context.module.code_for_node(expression)
 
 
-def _attribute_annotation_text(attribute: PDF_definition.AttributeInfo, *, context: RuleContext) -> str | None:
+def _attribute_annotation_text(attribute: PDF_definition.AttributeInfo | None, *, context: RuleContext) -> str | None:
     """Return annotation source text for an annotated attribute assignment."""
-    if isinstance(attribute.node, cst.AnnAssign):
+    if attribute is not None and isinstance(attribute.node, cst.AnnAssign):
         return _annotation_text(attribute.node.annotation, context=context)
     return None
 

@@ -119,6 +119,24 @@ def test_protected_directives_are_not_extracted_by_pcf004(directive: str) -> Non
     assert not result.fixed_findings
 
 
+def test_unicode_and_namespaced_directives_are_unsafe_to_extract_but_glued_argument_is_not_a_directive() -> None:
+    namespaced = "very_long_variable_name = compute_expensive_value()  # .. py:function :: signature\n"
+    unicode_name = "very_long_variable_name = compute_expensive_value()  # .. n\N{LATIN SMALL LETTER O WITH DIAERESIS}te::\n"
+    glued = "very_long_variable_name = compute_expensive_value()  # .. note::text that can move\n"
+    malformed = "very_long_variable_name = compute_expensive_value()  # .. note: text that can move\n"
+
+    settings = CheckSettings(select=("PCF004",), line_length=60)
+    namespaced_result = formatter.format_source(namespaced, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
+    unicode_result = formatter.format_source(unicode_name, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
+    glued_result = formatter.format_source(glued, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
+    malformed_result = formatter.format_source(malformed, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
+
+    assert namespaced_result.new_source == namespaced
+    assert unicode_result.new_source == unicode_name
+    assert glued_result.new_source != glued
+    assert malformed_result.new_source != malformed
+
+
 def test_canonical_overlong_trailing_comment_in_sensitive_position_is_not_reported_when_syntax_aware() -> None:
     source = "if enabled:  # explanation long enough to move above the header\n    pass\n"
     settings = CheckSettings(select=("PCF004",), line_length=32)

@@ -7,9 +7,9 @@ Rule is disabled if `docstring-convention` is `none` or `pep257`.
 ## What it does
 Checks that class docstring attribute entries name attributes that are present on the class.
 
-The rule compares names documented in the class docstring against supported class attribute inventory entries. Class-scope assignments, annotated assignments, multi-target assignments, tuple-unpacked assignment leaves, and supported `self.*` assignments from `__init__` count as present. Adjacent attribute docstrings are not checked by this rule because they are attached to an assignment that exists.
+The rule compares names documented in the class docstring against supported class attribute inventory entries. Class-scope assignments, annotated assignments, multi-target assignments, tuple-unpacked assignment leaves, supported `self.*` assignments from `__init__`, and proven members of the final effective literal `__slots__` declaration count as present. Literal slots always count for this extraneous check, independently of the setting that controls whether instance attributes are required by PDF508. Adjacent attribute docstrings are not checked by this rule because they are attached to an assignment that exists.
 
-List destructuring targets, unsupported tuple leaves, subscript targets, `cls.*`, arbitrary object attributes, and attributes belonging to nested classes do not satisfy documentation on the containing class.
+Only the final effective direct class-body `__slots__` binding contributes members. A dynamic, partially static, conditional, compound, deleted, or otherwise unsupported final binding contributes none; a later supported direct assignment recovers the static inventory, while an annotation-only declaration leaves the previous value effective. Evaluated identifier names retain literal order and exact decoded spelling without private-name mangling; duplicates, `__dict__`, `__weakref__`, and non-identifiers are ignored. Slots are not inherited by subclasses. List destructuring targets, unsupported tuple leaves, subscript targets, `cls.*`, arbitrary object attributes, and attributes belonging to nested classes do not satisfy documentation on the containing class.
 
 PDF509 is an owner-docstring inventory check: it reports class docstring attribute entries for attributes that are not present. It does not report missing attributes, duplicate documentation, or a project's preferred documentation location; use PDF508, PDF512, or PDF518/PDF519 for those policies.
 
@@ -17,7 +17,7 @@ PDF509 is an owner-docstring inventory check: it reports class docstring attribu
 Stale attribute entries can mislead readers about the documented class surface.
 
 ## Ruff compatibility
-None.
+Ruff's `RUF023` sorts literal `__slots__` declarations, while `PLE0237` reports assignments to attributes absent from slots. PDF509 instead uses proven slot members to reject stale class documentation.
 
 ## Examples
 Stale class attribute entries are reported when the documented name is absent from the class inventory:
@@ -151,6 +151,33 @@ class Outer:
 [output=unchanged]
 [findings]
 PDF509: Line 5: Class docstring documents attribute 'inner_timeout' that is not present
+```
+
+Literal slot names count only on the class that declares them and retain their exact spelling without private-name mangling. An inherited slot is therefore stale in the subclass inventory:
+
+```pydocfmt-example
+[settings]
+docstring-convention = "google"
+
+[input]
+class Base:
+    __slots__ = ("x",)
+
+
+class Derived(Base):
+    """Derived point.
+
+    Attributes:
+        local (float): Local coordinate.
+        __secret (str): Private value.
+        x (float): Inherited coordinate.
+    """
+
+    __slots__ = ("local", "__secret")
+
+[output=unchanged]
+[findings]
+PDF509: Line 11: Class docstring documents attribute 'x' that is not present
 ```
 
 ## Options
