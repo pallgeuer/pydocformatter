@@ -52,6 +52,7 @@ def test_directive_normalization_preserves_payload_after_marker_space() -> None:
         ("# ruff: isort: skip_file\n", "# ruff: isort: skip_file\n"),
         ("# ruff : isort : ON\n", "# ruff: isort: on\n"),
         ("#NoInspection PyTypeChecker\n", "# noinspection PyTypeChecker\n"),
+        ("#NoInspection\n", "# noinspection\n"),
         ("#noinspection PyTypeChecker,PyUnresolvedReferences\n", "# noinspection PyTypeChecker, PyUnresolvedReferences\n"),
         ("# LANGUAGE = SQL prefix=SELECT suffix=FROM table\n", "# language=SQL prefix=SELECT suffix=FROM table\n"),
         ("# @formatter : OFF\n", "# @formatter:off\n"),
@@ -107,6 +108,53 @@ def test_directive_normalization_does_not_add_trailing_space_for_empty_payloads(
 def test_directive_normalization_normalizes_safe_machine_readable_payloads(source: str, expected: str) -> None:
     result = pcf_helpers.format_pcf(source)
     assert result.new_source == expected
+
+
+@pytest.mark.parametrize(
+    ("source", "expected"),
+    [
+        ("# type: ignore[assignment, ty:assignment, assignment]\n", "# type: ignore[assignment, ty:assignment]\n"),
+        ("# ty: ignore[invalid-argument-type, invalid-argument-type]\n", "# ty: ignore[invalid-argument-type]\n"),
+        ("# noqa: f401, e501, F401, E501  # generated\n", "# noqa: F401, E501  # generated\n"),
+        ("# ruff: noqa: f401, F401, e501, E501\n", "# ruff: noqa: F401, E501\n"),
+        ("# flake8: noqa: f401, F401\n", "# flake8: noqa: F401\n"),
+        ("# pydocfmt: noqa: pdf101, PDF101, pcf001\n", "# pydocfmt: noqa: PDF101, PCF001\n"),
+        ("# pydocfmt: ignore[pdf101, PDF101, pcf001,]\n", "# pydocfmt: ignore[PDF101, PCF001]\n"),
+        ("# pydocfmt: file-ignore[pdf101, PDF101,]\n", "# pydocfmt: file-ignore[PDF101]\n"),
+        ("# ruff: ignore[F401, F401, f401]\n", "# ruff: ignore[F401, f401]\n"),
+        ("# ruff: file-ignore[unused-import, unused-import, F401]\n", "# ruff: file-ignore[unused-import, F401]\n"),
+        ("# pylint: disable=missing-docstring, missing-docstring, Missing-Docstring\n", "# pylint: disable=missing-docstring, Missing-Docstring\n"),
+        ("# noinspection PyTypeChecker, PyTypeChecker, pytypechecker\n", "# noinspection PyTypeChecker, pytypechecker\n"),
+    ],
+)
+def test_directive_normalization_stably_deduplicates_safe_list_families(source: str, expected: str) -> None:
+    result = pcf_helpers.format_pcf(source)
+    assert result.new_source == expected
+    assert not pcf_helpers.format_pcf(expected).modified
+
+
+def test_directive_normalization_preserves_ruff_range_item_order_and_multiplicity() -> None:
+    source = "# RUFF : disable [ E501, E501, F401, ]\nvalue = 1\n# RUFF : enable [ E501, F401, E501, ]\n"
+    result = pcf_helpers.format_pcf(source)
+
+    assert result.new_source == "# ruff: disable[E501, E501, F401]\nvalue = 1\n# ruff: enable[E501, F401, E501]\n"
+
+
+def test_directive_normalization_deduplicates_a_trailing_payload_without_owning_delimiter_spacing() -> None:
+    source = "value = compute()#NOQA: f401, F401, e501\n"
+    settings = CheckSettings(select=("PCF003",))
+    result = formatter.format_source(source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
+
+    assert result.new_source == "value = compute()# noqa: F401, E501\n"
+    assert result.fixed_findings[PCF003CommentDirectiveNormalization.meta] == 1
+
+
+@pytest.mark.parametrize(
+    "source", ["# type: ignore[assignment, prose words, assignment]\n", "# ruff: ignore[F401, unsafe code, F401]\n", "# pylint: disable=missing-docstring, unsafe message, missing-docstring\n"]
+)
+def test_directive_normalization_does_not_partly_deduplicate_malformed_lists(source: str) -> None:
+    result = pcf_helpers.format_pcf(source)
+    assert result.new_source == source
 
 
 def test_directive_normalization_preserves_eof_without_final_newline() -> None:

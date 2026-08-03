@@ -17,6 +17,7 @@ All notable changes to this project are documented here. The format follows [Kee
 ### Added
 
 - **Docstring diagnostics:**
+  - Added effectively opt-in PDF528 to report module and class attribute documentation that does not follow the complete first-seen source inventory order.
   - Added PDF418 to report high-confidence malformed reStructuredText directive introducers while preserving their bodies as structured content for other docstring rules.
   - Added PDF417 to validate NumPy single-value and multiple-value `Returns` entry structure.
   - Added usually-fixable PDF527 to enforce signature variadic markers in Google and NumPy documentation and bare parameter names in reStructuredText value and type fields.
@@ -41,9 +42,8 @@ All notable changes to this project are documented here. The format follows [Kee
 
 - **Developer documentation:**
   - Corrected the rule settings audit to distinguish disabled rules from rules ignored only by broad selectors, with metadata-backed regression coverage.
-  - Synchronized the future-rule coverage audit with registered fix availability and added metadata-backed coverage, classification, and summary-count validation.
-  - Reworked the future rule ideas inventory into a code-informed, future-only backlog with benefit-oriented scores and weighted prioritization across implementation risk, runtime cost, Ruff overlap, and reach.
 - **Rule suppressions:**
+  - Collapsed repeated normalized pydocfmt selectors before suppression and PCF006 auditing so check-only and fixing runs preserve coverage without duplicate unused-selector findings.
   - Made inline suppressions after any component token of an implicitly concatenated docstring cover the complete expression for PDF findings while preserving line-local PCF coverage and existing local and standalone attachment boundaries.
 - **Docstring diagnostics:**
   - Included proven members from final effective immutable literal `__slots__` declarations in class attribute documentation coverage, placement, description, and type checks while retaining later real assignments and annotations as documentation attachment and type sources.
@@ -85,6 +85,7 @@ All notable changes to this project are documented here. The format follows [Kee
   - Added `docstring-placeholder-markers` for configuring the exact marker inventory used by PDF213, including an empty-list opt-out that does not change rule selection.
   - Extended settings profiles with the auto-discovered project root so default cache locations are stable across nested paths and relocated workspaces.
 - **Comment formatting:**
+  - Made PCF003 stably remove repeated normalized items from validated set-like directive lists while preserving first occurrence, author order, namespaces, rationale tails, malformed payloads, and Ruff range-boundary multiplicity.
   - Recognized the complete Unicode-aware reStructuredText directive-name grammar, including namespaced directives and the optional space before `::`, when preserving directive blocks in standalone and extracted trailing comments.
   - Made PCF001 normalize regular standalone comments containing only ASCII space, tab, or form-feed payloads to bare `#` while preserving deliberate hash separators and source line endings.
 
@@ -161,6 +162,8 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Removed
 
+- **Developer documentation:**
+  - Removed the exhausted future-rule ideas and coverage audit together with its audit-only consistency tests after implementing the remaining proposals.
 - **Internal cleanup:**
   - Removed the full selector and per-file matcher payload from workers, duplicate path-fingerprint helper APIs, contradictory optional cache-evidence states, the parallel cache-role map, duplicate store-side clean-proof validators, the unused source-context display field, the test-only settings-discovery wrapper, cached glob-pattern tuples, optional rule-context path fallbacks, duplicate formatter and rule-runner compatibility entry points, pass-through CLI worker wrappers, dead or misleading string-source helper APIs, an unused inline-token source renderer, and a thin URL-classification facade.
 

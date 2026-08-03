@@ -2362,6 +2362,76 @@ def test_unused_suppression_reports_partially_unused_selector_lists() -> None:
     assert tuple((finding.rule.code.tag, finding.message) for finding in result.unfixed_findings) == (("PCF006", "Suppression selector 'PCF002' did not suppress any findings"),)
 
 
+@pytest.mark.parametrize(
+    "source",
+    [
+        "# pydocfmt: ignore[PCF001, pcf001]\n# Short comment.\n",
+        "# pydocfmt: file-ignore[PCF001, pcf001]\n# Short comment.\n",
+        "# pydocfmt: noqa: PCF001, pcf001\n# Short comment.\n",
+        "# noqa: PCF001, pcf001\n# Short comment.\n",
+    ],
+)
+def test_unused_suppression_audits_repeated_normalized_selectors_once_in_check_mode(source: str) -> None:
+    settings = CheckSettings(select=("PCF001", "PCF006"))
+    result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=False)
+
+    assert tuple(finding.message for finding in result.unfixed_findings) == ("Suppression selector 'PCF001' did not suppress any findings",)
+
+
+@pytest.mark.parametrize(
+    ("selectors", "message"), [("PDF999, pdf999", "Unknown pydocfmt suppression selector 'PDF999'"), ("not-a-rule, NOT-A-RULE", "Invalid pydocfmt suppression selector 'NOT-A-RULE'")]
+)
+def test_unused_suppression_validates_repeated_normalized_invalid_or_unknown_selectors_once(selectors: str, message: str) -> None:
+    source = f"# pydocfmt: ignore[{selectors}]\n# Short comment.\n"
+    settings = CheckSettings(select=("PCF006",))
+    result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=False)
+
+    assert tuple(finding.message for finding in result.unfixed_findings) == (message,)
+
+
+def test_repeated_suppression_selectors_preserve_used_and_overlapping_selector_semantics() -> None:
+    repeated_source = "# pydocfmt: ignore[PCF001, pcf001]\n# This is a long comment that needs wrapping into more than one physical line.\n"
+    overlapping_source = "# pydocfmt: ignore[PCF, PCF001]\n# Short comment.\n"
+    interleaved_source = "# pydocfmt: ignore[PCF002, PCF001, pcf002]\n# Short comment.\n"
+    settings = CheckSettings(select=("PCF001", "PCF002", "PCF006"), line_length=42)
+    selection = rules_selection.select_rules(settings)
+
+    repeated = formatter.format_source(repeated_source, "a.py", settings=settings, rule_selection=selection, fix=False)
+    overlapping = formatter.format_source(overlapping_source, "a.py", settings=settings, rule_selection=selection, fix=False)
+    interleaved = formatter.format_source(interleaved_source, "a.py", settings=settings, rule_selection=selection, fix=False)
+
+    assert repeated.unfixed_findings == ()
+    assert tuple(finding.message for finding in overlapping.unfixed_findings) == (
+        "Suppression selector 'PCF' did not suppress any findings",
+        "Suppression selector 'PCF001' did not suppress any findings",
+    )
+    assert tuple(finding.message for finding in interleaved.unfixed_findings) == (
+        "Suppression selector 'PCF002' did not suppress any findings",
+        "Suppression selector 'PCF001' did not suppress any findings",
+    )
+
+
+def test_repeated_suppression_selector_deduplication_is_scoped_to_each_directive() -> None:
+    source = "# pydocfmt: file-ignore[PCF001, pcf001]\n# noqa: PCF001, pcf001\n# Short comment.\n"
+    settings = CheckSettings(select=("PCF001", "PCF006"))
+    result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=False)
+
+    assert tuple(finding.message for finding in result.unfixed_findings) == (
+        "Suppression selector 'PCF001' did not suppress any findings",
+        "Suppression selector 'PCF001' did not suppress any findings",
+    )
+
+
+def test_directive_fix_and_unused_suppression_audit_converge_on_one_selector() -> None:
+    source = "# PYDOCFMT : ignore [ pcf001, PCF001, ]\n# Short comment.\n"
+    settings = CheckSettings(select=("PCF001", "PCF003", "PCF006"))
+    result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
+
+    assert result.new_source == "# pydocfmt: ignore[PCF001]\n# Short comment.\n"
+    assert tuple((rule.code.tag, count) for rule, count in result.fixed_findings.items()) == (("PCF003", 1),)
+    assert tuple(finding.message for finding in result.unfixed_findings) == ("Suppression selector 'PCF001' did not suppress any findings",)
+
+
 def test_unused_suppression_does_not_report_selectors_for_disabled_rules() -> None:
     source = '# pydocfmt: ignore[PDF101]\n"""This is a long module summary that needs wrapping into more than one physical line."""\n'
     settings = CheckSettings(select=("PCF006",), line_length=48)

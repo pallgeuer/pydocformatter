@@ -5,7 +5,9 @@ Fix is always available.
 ## What it does
 Normalizes safe marker spacing and machine-readable syntax in recognized directive comments. For trailing directives, the code before the directive is preserved exactly so PCF002 remains the owner of code-to-`#` delimiter spacing. For standalone directives, indentation is preserved. In both cases, directive content starts after one marker space.
 
-PCF003 handles comments already classified as type comments or known tool directives by the PCF category. It normalizes recognized directive heads to lowercase, removes space before directive introducer colons, adds one space after directive colons where a value follows, and normalizes safe comma-separated lists for `type: ignore[...]`, `ty: ignore[...]`, `noqa`, `pydocfmt: noqa`, `pydocfmt: ignore[...]`, `pydocfmt: file-ignore[...]`, `ruff: noqa`, `flake8: noqa`, `pylint` enable/disable directives, PyCharm `noinspection` directives, and Ruff bracket directives such as `ruff: ignore[...]`, `ruff: disable[...]`, `ruff: enable[...]`, and `ruff: file-ignore[...]`. Ruff-prefixed isort action comments such as `ruff: isort: skip_file` are normalized as nested directives. PyCharm `language=` injection comments normalize only the directive head and preserve the language ID and optional `prefix=`/`suffix=` payload. PyCharm `@formatter:on` and `@formatter:off` marker comments are normalized as individual directive lines only; they do not disable pydocformatter for a range of code.
+PCF003 handles comments already classified as type comments or known tool directives by the PCF category. It normalizes recognized directive heads to lowercase, removes space before directive introducer colons, adds one space after directive colons where a value follows, and normalizes safe comma-separated lists for `type: ignore[...]`, `ty: ignore[...]`, `noqa`, `pydocfmt: noqa`, `pydocfmt: ignore[...]`, `pydocfmt: file-ignore[...]`, `ruff: noqa`, `flake8: noqa`, `pylint` enable/disable directives, PyCharm `noinspection` directives, and Ruff bracket directives such as `ruff: ignore[...]`, `ruff: disable[...]`, `ruff: enable[...]`, and `ruff: file-ignore[...]`. Safe list families remove repeated normalized items while preserving the first occurrence and existing order. Families with canonical uppercase selectors deduplicate after uppercasing; other families use exact trimmed spelling, so qualified and unqualified type-checker selectors remain distinct.
+
+Ruff `disable[...]` and `enable[...]` range payloads are not deduplicated because Ruff pairs range boundaries by identical codes in identical order. PCF003 still normalizes their directive heads, bracket spacing, comma spacing, and accepted trailing commas without changing item order or multiplicity. Ruff-prefixed isort action comments such as `ruff: isort: skip_file` are normalized as nested directives. PyCharm `language=` injection comments normalize only the directive head and preserve the language ID and optional `prefix=`/`suffix=` payload. PyCharm `@formatter:on` and `@formatter:off` marker comments are normalized as individual directive lines only; they do not disable pydocformatter for a range of code.
 
 For pydocfmt directives, this rule normalizes only the supported suppression forms: `pydocfmt: noqa`, `pydocfmt: ignore[...]`, and `pydocfmt: file-ignore[...]`. It does not add support for range-style `pydocfmt: disable[...]` or `pydocfmt: enable[...]` comments.
 
@@ -15,7 +17,7 @@ Unknown or ambiguous payload text is preserved after safe prefix cleanup. Ordina
 Tool directives are sensitive, so ordinary comment reflow should not rewrite them. A separate comment-directive-normalization rule lets projects canonicalize recognized directive syntax without enabling broader trailing-comment extraction or prose formatting.
 
 ## Ruff compatibility
-Ruff may normalize some comment spacing through its formatter, but pydocformatter keeps this as an independently selectable PCF rule so directive syntax normalization can be controlled separately from ordinary comment formatting.
+Ruff may normalize some comment spacing through its formatter, and `RUF100` can report or remove duplicate and unused `noqa` codes. PCF003 remains independently selectable and covers normalized duplicates across multiple tools while deliberately preserving Ruff range-boundary payloads.
 
 ## Examples
 Compact known directives get canonical marker spacing and directive-head spelling:
@@ -58,6 +60,36 @@ Standalone directives are normalized without changing indentation:
 # language=SQL prefix=SELECT suffix=FROM table
 # @formatter:off
 # pylint: disable-next=missing-docstring, unused-argument
+```
+
+Safe list families remove duplicates after applying their family-specific normalization. Canonically uppercased selectors therefore collapse case-only duplicates, while type-checker selectors with different qualified spellings remain distinct:
+
+```pydocfmt-example
+[input]
+#noqa: f401,F401,e501,E501
+#PYDOCFMT : ignore [ pdf101, PDF101, pcf001, ]
+# type: ignore[assignment, ty:assignment, assignment]
+# noinspection PyTypeChecker, PyTypeChecker, pytypechecker
+
+[output]
+# noqa: F401, E501
+# pydocfmt: ignore[PDF101, PCF001]
+# type: ignore[assignment, ty:assignment]
+# noinspection PyTypeChecker, pytypechecker
+```
+
+Ruff range boundaries retain repeated selectors and their order so matching `disable` and `enable` payloads keep their pairing semantics:
+
+```pydocfmt-example
+[input]
+#RUFF : disable [ E501, E501, F401, ]
+value = 1
+#RUFF : enable [ E501, F401, E501, ]
+
+[output]
+# ruff: disable[E501, E501, F401]
+value = 1
+# ruff: enable[E501, F401, E501]
 ```
 
 Pydocfmt suppression directives use pydocfmt selector casing and safe list normalization:

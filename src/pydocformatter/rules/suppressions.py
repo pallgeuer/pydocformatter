@@ -473,7 +473,7 @@ def _selectors(
 
 def _selector_texts(selectors_text: str, *, include_empty: bool) -> tuple[str, ...]:
     """Return normalized selector text entries from a comma-separated list."""
-    texts = tuple(text.strip().upper() for text in selectors_text.split(",") if text.strip())
+    texts = tuple(dict.fromkeys(text.strip().upper() for text in selectors_text.split(",") if text.strip()))
     if texts:
         return texts
     return ("",) if include_empty else ()

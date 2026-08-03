@@ -14,7 +14,7 @@ import libcst as cst
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 import pydocformatter.rules.definition_helpers.decorators as decorator_helpers
 from pydocformatter.cli.settings_check import DocstringConvention
-from pydocformatter.rules.definition_helpers import docstring_sections, missing_documentation, section_edits
+from pydocformatter.rules.definition_helpers import docstring_sections, documentation_order, missing_documentation, section_edits
 
 
 if TYPE_CHECKING:
@@ -226,21 +226,13 @@ def parameter_order_issues(definition: PDF_definition.DefinitionInfo, docstring:
         tuple[ParameterOrderIssue, ...]: Late first occurrences paired with their matched and highest-ranked preceding
             signature parameters.
     """
-    parameters_by_name = {parameter.comparison_name: (rank, parameter) for rank, parameter in enumerate(signature_parameters(definition, context=context))}
-    seen_names: set[str] = set()
-    greatest_rank_and_parameter: tuple[int, SignatureParameter] | None = None
-    issues: list[ParameterOrderIssue] = []
-    for documented_parameter in documented_parameters(docstring):
-        ranked_parameter = parameters_by_name.get(documented_parameter.comparison_name)
-        if ranked_parameter is None or documented_parameter.comparison_name in seen_names:
-            continue
-        seen_names.add(documented_parameter.comparison_name)
-        rank, signature_parameter = ranked_parameter
-        if greatest_rank_and_parameter is not None and rank < greatest_rank_and_parameter[0]:
-            issues.append(ParameterOrderIssue(documented_parameter=documented_parameter, signature_parameter=signature_parameter, preceding_signature_parameter=greatest_rank_and_parameter[1]))
-            continue
-        greatest_rank_and_parameter = (rank, signature_parameter)
-    return tuple(issues)
+    return documentation_order.order_issues(
+        signature_parameters(definition, context=context),
+        documented_parameters(docstring),
+        ordered_key=lambda parameter: parameter.comparison_name,
+        documented_key=lambda parameter: parameter.comparison_name,
+        issue_factory=ParameterOrderIssue,
+    )
 
 
 def parameter_variadic_marker_style_issues(

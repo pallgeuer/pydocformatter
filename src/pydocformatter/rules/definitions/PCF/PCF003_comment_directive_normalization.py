@@ -96,23 +96,23 @@ def _planned_changes(context: RuleContext) -> tuple[rule_edits.PlannedSourceChan
 def _normalized_directive_content(content: str) -> str:
     """Return safely normalized directive content without the leading hash."""
     if (match := _TYPE_IGNORE_RE.match(content)) is not None:
-        return f"type: ignore{_normalized_bracketed_list(match.group('codes'), item_re=_TYPE_IGNORE_ITEM_RE)}{match.group('rest')}"
+        return f"type: ignore{_normalized_bracketed_list(match.group('codes'), item_re=_TYPE_IGNORE_ITEM_RE, deduplicate=True)}{match.group('rest')}"
     if (match := _TY_IGNORE_RE.match(content)) is not None:
-        return f"ty: ignore{_normalized_bracketed_list(match.group('codes'), item_re=_LIST_ITEM_RE)}{match.group('rest')}"
+        return f"ty: ignore{_normalized_bracketed_list(match.group('codes'), item_re=_LIST_ITEM_RE, deduplicate=True)}{match.group('rest')}"
     if (match := directive_helpers.NOQA_RE.match(content)) is not None:
         return _normalized_noqa("noqa", match.group("selectors"), match.group("rest"))
     if (match := directive_helpers.PYDOCFMT_NOQA_RE.match(content)) is not None:
         return _normalized_pydocfmt_noqa(match.group("selectors"), match.group("rest"))
     if (match := directive_helpers.PYDOCFMT_BRACKET_RE.match(content)) is not None and match.group("action").lower() in {"ignore", "file-ignore"}:
         action = match.group("action").lower()
-        codes = _normalized_bracketed_list(match.group("codes"), item_re=_PYDOCFMT_SELECTOR_RE, allow_trailing_comma=True, uppercase=True)
+        codes = _normalized_bracketed_list(match.group("codes"), item_re=_PYDOCFMT_SELECTOR_RE, deduplicate=True, allow_trailing_comma=True, uppercase=True)
         return f"pydocfmt: {action}{codes}{match.group('rest')}"
     if (match := _PREFIXED_NOQA_RE.match(content)) is not None:
         head = match.group("head").lower()
         return _normalized_noqa(f"{head}: noqa", match.group("codes"), match.group("rest"))
     if (match := _RUFF_BRACKET_RE.match(content)) is not None:
         action = match.group("action").lower()
-        codes = _normalized_bracketed_list(match.group("codes"), item_re=_LIST_ITEM_RE, allow_trailing_comma=True)
+        codes = _normalized_bracketed_list(match.group("codes"), item_re=_LIST_ITEM_RE, deduplicate=action not in {"disable", "enable"}, allow_trailing_comma=True)
         return f"ruff: {action}{codes}{match.group('rest')}"
     if (match := _RUFF_ISORT_RE.match(content)) is not None:
         return _normalized_colon_payload("ruff", _normalized_colon_value("isort", match.group("value")))
@@ -120,14 +120,14 @@ def _normalized_directive_content(content: str) -> str:
         inspections = match.group("inspections")
         if inspections is None:
             return "noinspection"
-        return f"noinspection {_normalized_comma_list(inspections, item_re=_LIST_ITEM_RE)}"
+        return f"noinspection {_normalized_comma_list(inspections, item_re=_LIST_ITEM_RE, deduplicate=True)}"
     if (match := _LANGUAGE_INJECTION_RE.match(content)) is not None:
         return f"language={match.group('language')}{match.group('rest')}"
     if (match := _FORMATTER_MARKER_RE.match(content)) is not None:
         return f"@formatter:{match.group('state').lower()}{match.group('rest')}"
     if (match := _PYLINT_RE.match(content)) is not None:
         action = match.group("action").lower()
-        messages = _normalized_comma_list(match.group("messages"), item_re=_LIST_ITEM_RE)
+        messages = _normalized_comma_list(match.group("messages"), item_re=_LIST_ITEM_RE, deduplicate=True)
         return f"pylint: {action}={messages}{match.group('rest')}"
     if (match := _COLON_VALUE_RE.match(content)) is not None:
         return _normalized_colon_value(match.group("head"), match.group("value"))
@@ -141,7 +141,7 @@ def _normalized_noqa(head: str, codes: str | None, rest: str) -> str:
     """Return a normalized noqa-style directive."""
     if codes is None:
         return f"{head}{rest}"
-    normalized_codes = _normalized_comma_list(codes, item_re=_NOQA_CODE_RE, uppercase=True)
+    normalized_codes = _normalized_comma_list(codes, item_re=_NOQA_CODE_RE, deduplicate=True, uppercase=True)
     return _normalized_colon_payload(head, f"{normalized_codes}{rest}")
 
 
@@ -149,21 +149,43 @@ def _normalized_pydocfmt_noqa(codes: str | None, rest: str) -> str:
     """Return a normalized pydocfmt noqa directive."""
     if codes is None:
         return f"pydocfmt: noqa{rest}"
-    normalized_codes = _normalized_comma_list(codes, item_re=_PYDOCFMT_SELECTOR_RE, uppercase=True)
+    normalized_codes = _normalized_comma_list(codes, item_re=_PYDOCFMT_SELECTOR_RE, deduplicate=True, uppercase=True)
     return _normalized_colon_payload("pydocfmt: noqa", f"{normalized_codes}{rest}")
 
 
-def _normalized_bracketed_list(text: str | None, *, item_re: re.Pattern[str], allow_trailing_comma: bool = False, uppercase: bool = False) -> str:
-    """Return a normalized bracketed directive list when it is clearly comma-separated."""
+def _normalized_bracketed_list(text: str | None, *, item_re: re.Pattern[str], deduplicate: bool, allow_trailing_comma: bool = False, uppercase: bool = False) -> str:
+    """Return a normalized bracketed directive list when it is clearly comma-separated.
+
+    Args:
+        text (str | None): Optional bracketed list text to normalize.
+        item_re (re.Pattern[str]): Complete safe token shape required for every list item.
+        deduplicate (bool): Whether to retain only the first occurrence of each normalized item.
+        allow_trailing_comma (bool): Whether a final empty item from a trailing comma is valid.
+        uppercase (bool): Whether to canonicalize items to uppercase before deduplication.
+
+    Returns:
+        str: Normalized bracketed list, or an empty string when no list is present.
+    """
     if text is None:
         return ""
     inner = text[1:-1]
-    normalized = _normalized_comma_list(inner, item_re=item_re, allow_trailing_comma=allow_trailing_comma, uppercase=uppercase)
+    normalized = _normalized_comma_list(inner, item_re=item_re, allow_trailing_comma=allow_trailing_comma, uppercase=uppercase, deduplicate=deduplicate)
     return f"[{normalized}]"
 
 
-def _normalized_comma_list(text: str, *, item_re: re.Pattern[str], uppercase: bool = False, allow_trailing_comma: bool = False) -> str:
-    """Normalize a comma-separated directive list when every item has a safe token shape."""
+def _normalized_comma_list(text: str, *, item_re: re.Pattern[str], deduplicate: bool, uppercase: bool = False, allow_trailing_comma: bool = False) -> str:
+    """Normalize a comma-separated directive list when every item has a safe token shape.
+
+    Args:
+        text (str): Comma-separated list text to normalize.
+        item_re (re.Pattern[str]): Complete safe token shape required for every list item.
+        deduplicate (bool): Whether to retain only the first occurrence of each normalized item.
+        uppercase (bool): Whether to canonicalize items to uppercase before deduplication.
+        allow_trailing_comma (bool): Whether a final empty item from a trailing comma is valid.
+
+    Returns:
+        str: Normalized list text, or stripped original text when validation fails.
+    """
     items = tuple(item.strip() for item in text.split(","))
     if allow_trailing_comma and items and not items[-1]:
         items = items[:-1]
@@ -171,6 +193,8 @@ def _normalized_comma_list(text: str, *, item_re: re.Pattern[str], uppercase: bo
         return text.strip()
     if uppercase:
         items = tuple(item.upper() for item in items)
+    if deduplicate:
+        items = tuple(dict.fromkeys(items))
     return ", ".join(items)
 
 

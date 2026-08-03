@@ -14,7 +14,7 @@ import libcst as cst
 import pydocformatter.rules.violations as rule_violations
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 from pydocformatter.cli import settings_check
-from pydocformatter.rules.definition_helpers import docstring_conventions, docstring_sections, missing_documentation
+from pydocformatter.rules.definition_helpers import docstring_conventions, docstring_sections, documentation_order, missing_documentation
 
 
 if TYPE_CHECKING:
@@ -52,6 +52,21 @@ class DocumentedAttribute:
 
     name: str
     line_numbers: tuple[int, ...]
+
+
+@dataclasses.dataclass(frozen=True)
+class AttributeOrderIssue:
+    """One documented attribute that appears after a later source attribute.
+
+    Attributes:
+        documented_attribute (DocumentedAttribute): Late documentation occurrence that should move earlier.
+        inventory_attribute (InventoryAttribute): Inventory attribute matched by the late documentation occurrence.
+        preceding_inventory_attribute (InventoryAttribute): Highest-ranked inventory attribute documented earlier.
+    """
+
+    documented_attribute: DocumentedAttribute
+    inventory_attribute: InventoryAttribute
+    preceding_inventory_attribute: InventoryAttribute
 
 
 def inventory_attributes(data: PDF_definition.PDFCategoryData, owner: PDF_definition.DefinitionInfo, *, include_instance: bool) -> tuple[InventoryAttribute, ...]:
@@ -107,6 +122,27 @@ def value_documented_attributes(docstring: PDF_definition.DocstringInfo) -> tupl
         tuple[DocumentedAttribute, ...]: Attribute names documented by value entries rather than type-only fields.
     """
     return _documented_attributes(docstring, include_type_fields=False)
+
+
+def attribute_order_issues(data: PDF_definition.PDFCategoryData, owner: PDF_definition.DefinitionInfo, docstring: PDF_definition.DocstringInfo) -> tuple[AttributeOrderIssue, ...]:
+    """Return documented attributes that do not follow first-seen source order.
+
+    Args:
+        data (PDF_definition.PDFCategoryData): Prepared definitions, attributes, and docstrings for the current file.
+        owner (PDF_definition.DefinitionInfo): Module or class whose inventory supplies the canonical order.
+        docstring (PDF_definition.DocstringInfo): Owner docstring whose value-bearing attribute entries are checked.
+
+    Returns:
+        tuple[AttributeOrderIssue, ...]: Late first occurrences paired with their matched and highest-ranked preceding
+            inventory attributes.
+    """
+    return documentation_order.order_issues(
+        inventory_attributes(data, owner, include_instance=True),
+        value_documented_attributes(docstring),
+        ordered_key=lambda attribute: attribute.name,
+        documented_key=lambda attribute: attribute.name,
+        issue_factory=AttributeOrderIssue,
+    )
 
 
 def _documented_attributes(docstring: PDF_definition.DocstringInfo, *, include_type_fields: bool) -> tuple[DocumentedAttribute, ...]:

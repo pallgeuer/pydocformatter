@@ -278,7 +278,7 @@ select = ["PCF001", "PCF006"]
 PCF006: Line 1: Suppression selector 'PCF001' did not suppress any findings
 ```
 
-Each selector in a list is evaluated independently:
+Each distinct normalized selector in a list is evaluated independently. Exact repeats are collapsed by first occurrence even when PCF003 is not selected, while overlapping selectors such as `PDF` and `PDF528` remain independent:
 
 ```pydocfmt-example
 [settings]
