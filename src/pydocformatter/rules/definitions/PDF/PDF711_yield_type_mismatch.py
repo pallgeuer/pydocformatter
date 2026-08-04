@@ -27,7 +27,7 @@ class PDF711YieldTypeMismatch(RuleBase):
         meta (RuleMetadata): Static metadata used for registration, diagnostics, and rule selection.
     """
 
-    meta = typed_entry_rules.metadata("PDF711", "yield-type-mismatch", "Function yield docstring type does not match the annotation", exact_opt_in=False, incompatible_with=("PDF710",))
+    meta = typed_entry_rules.metadata("PDF711", "yield-type-mismatch", "Function yield docstring type does not match the annotation", convention_opt_in=False, incompatible_with=("PDF710",))
 
     @classmethod
     def violations(cls, context: RuleContext) -> tuple[rule_violations.RuleViolation, ...]:

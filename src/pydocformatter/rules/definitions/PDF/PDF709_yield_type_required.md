@@ -13,7 +13,7 @@ Only functions that actually contain yield expressions are checked. The yielded 
 
 When a recognized single-line yield annotation is available, PDF709 adds a paired canonical reStructuredText `:ytype:` field or fills an existing empty, single-line field. Named reStructuredText yield fields retain their bare name. Google and NumPy entries, missing or unrecognized annotations, and source shapes that cannot be mapped safely remain diagnostic.
 
-The rule is exact opt-in because many projects rely on generator annotations instead of repeating yield types in docstrings.
+The rule is convention opt-in because many projects rely on generator annotations instead of repeating yield types in docstrings.
 
 ## Why is this useful?
 Projects that keep yield types in docstrings can enforce complete yield type documentation.

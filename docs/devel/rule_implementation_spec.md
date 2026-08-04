@@ -35,9 +35,9 @@ Every rule class defines `meta = RuleMetadata(...)` with:
 
 Rule incompatibilities must be declared on both rules. Rule collection rejects one-sided, self-referential, unknown, or duplicate incompatibilities.
 
-Setting effects describe selection behavior only. Use `Ignored` when an exact selector may restore the rule and `Disabled` when the setting must always remove it from the active selection. A setting effect must name a resolved `CheckSettings` field.
+Setting effects describe selection behavior only. Use `Disabled` when a resolved setting value leaves the rule without a meaningful target and exact selection must not restore it. Use `Ignored` when a settings profile declines the rule's policy but exact selection may restore it. For `docstring-convention`, this includes choosing among mutually incompatible alternatives: a convention may broadly select either alternative or neither, and every current convention may legitimately decline the same alternative. Every broad built-in convention profile must remain conflict-free. A rule disabled under every convention is unreachable and invalid. A setting effect must name a resolved `CheckSettings` field.
 
-Rules that should not be enabled by broad selectors belong in the default `require-explicit` setting, not in rule implementation code.
+Use the default `require-explicit` setting when a broadly applicable rule should require explicit selection independently of convention because it is unusually strict, noisy, or project-specific. Separate `Disabled` effects may still remove the rule under convention values where it has no meaningful target. Every default entry must be the effective broad-selection blocker in at least one otherwise applicable built-in settings profile. Do not add a rule removed by every convention merely to label its effective opt-in behavior; generated rule documentation identifies that state as `Convention opt-in`.
 
 ## Rule execution contract
 

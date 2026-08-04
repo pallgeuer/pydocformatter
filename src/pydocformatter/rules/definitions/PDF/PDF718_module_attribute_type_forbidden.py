@@ -28,7 +28,7 @@ class PDF718ModuleAttributeTypeForbidden(RuleBase):
     """
 
     meta = typed_entry_rules.metadata(
-        "PDF718", "module-attribute-type-forbidden", "Module attribute docstring entry should not include a type", exact_opt_in=True, incompatible_with=("PDF717", "PDF719")
+        "PDF718", "module-attribute-type-forbidden", "Module attribute docstring entry should not include a type", convention_opt_in=True, incompatible_with=("PDF717", "PDF719")
     )
 
     @classmethod

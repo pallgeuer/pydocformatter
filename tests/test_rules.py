@@ -342,26 +342,12 @@ def _define_synthetic_standard_rule(name: str, violations_hook: object) -> None:
 
 def _ignored_docstring_conventions(rule: RuleMetadata) -> frozenset[DocstringConvention]:
     """Return docstring conventions that ignore a rule unless it is selected exactly."""
-    ignored_conventions: set[DocstringConvention] = set()
-    for setting_effects in rule.setting_effects:
-        if setting_effects.setting != "docstring_convention":
-            continue
-        for effect_values in setting_effects.effects:
-            if effect_values.effect == RuleSettingEffect.IGNORED:
-                ignored_conventions.update(typing.cast("DocstringConvention", value) for value in effect_values.values)
-    return frozenset(ignored_conventions)
+    return frozenset(convention for convention in DocstringConvention if rule.setting_effect("docstring_convention", convention) is RuleSettingEffect.IGNORED)
 
 
 def _disabled_docstring_conventions(rule: RuleMetadata) -> frozenset[DocstringConvention]:
     """Return docstring conventions that disable a rule even when it is selected exactly."""
-    disabled_conventions: set[DocstringConvention] = set()
-    for setting_effects in rule.setting_effects:
-        if setting_effects.setting != "docstring_convention":
-            continue
-        for effect_values in setting_effects.effects:
-            if effect_values.effect == RuleSettingEffect.DISABLED:
-                disabled_conventions.update(typing.cast("DocstringConvention", value) for value in effect_values.values)
-    return frozenset(disabled_conventions)
+    return frozenset(convention for convention in DocstringConvention if rule.setting_effect("docstring_convention", convention) is RuleSettingEffect.DISABLED)
 
 
 def _setting_effect_values(effects: tuple[RuleSettingEffects, ...]) -> dict[RuleSettingEffect, tuple[DocstringConvention, ...]]:
@@ -389,22 +375,24 @@ def _builtin_rule_incompatibility_pairs() -> tuple[tuple[RuleCode, RuleCode], ..
 
 BUILTIN_RULE_INCOMPATIBILITY_PAIRS = _builtin_rule_incompatibility_pairs()
 BUILTIN_RULE_INCOMPATIBILITY_CASES = tuple(pytest.param(first_code, second_code, id=f"{first_code}-{second_code}") for first_code, second_code in BUILTIN_RULE_INCOMPATIBILITY_PAIRS)
-EXACT_OPT_IN_RULE_CODES = tuple(rule_class.meta.code.tag for rule_class in rule_collection.RULE_COLLECTION.rules if _ignored_docstring_conventions(rule_class.meta) == frozenset(DocstringConvention))
-EXACT_OPT_IN_RULE_CASES = tuple(pytest.param(code, convention, id=f"{code}-{convention.value}") for code in EXACT_OPT_IN_RULE_CODES for convention in DocstringConvention)
 UNPARSED_CONVENTIONS = frozenset(docstring_conventions.UNPARSED_CONVENTIONS)
 PARSED_CONVENTIONS = frozenset(docstring_conventions.PARSED_CONVENTIONS)
-ORDERED_PARSED_CONVENTIONS = docstring_conventions.PARSED_CONVENTIONS
+DOCSTRING_CONVENTION_CASES = tuple(pytest.param(convention, id=convention.value) for convention in DocstringConvention)
+IGNORED_DOCSTRING_CONVENTION_CASES = tuple(
+    pytest.param(rule_class.meta.code.tag, convention, id=f"{rule_class.meta.code.tag}-{convention.value}")
+    for rule_class in rule_collection.RULE_COLLECTION.rules
+    for convention in sorted(_ignored_docstring_conventions(rule_class.meta), key=lambda item: item.value)
+)
 DISABLED_DOCSTRING_CONVENTION_CASES = tuple(
     pytest.param(rule_class.meta.code.tag, convention, id=f"{rule_class.meta.code.tag}-{convention.value}")
     for rule_class in rule_collection.RULE_COLLECTION.rules
     for convention in sorted(_disabled_docstring_conventions(rule_class.meta), key=lambda item: item.value)
 )
-PARSED_EXACT_OPT_IN_RULE_CODES = tuple(
+CONVENTION_OPT_IN_RULE_CODES = tuple(
     rule_class.meta.code.tag
     for rule_class in rule_collection.RULE_COLLECTION.rules
-    if _disabled_docstring_conventions(rule_class.meta) == UNPARSED_CONVENTIONS and _ignored_docstring_conventions(rule_class.meta) == PARSED_CONVENTIONS
+    if _disabled_docstring_conventions(rule_class.meta) | _ignored_docstring_conventions(rule_class.meta) == frozenset(DocstringConvention)
 )
-PARSED_EXACT_OPT_IN_RULE_CASES = tuple(pytest.param(code, convention, id=f"{code}-{convention.value}") for code in PARSED_EXACT_OPT_IN_RULE_CODES for convention in ORDERED_PARSED_CONVENTIONS)
 
 
 def _write(path: Path, text: str = "x = 1\n") -> None:
@@ -968,6 +956,22 @@ def test_rule_metadata_derives_prefix_and_number_from_code() -> None:
     assert not hasattr(rule, "matches_selector_parts")
 
 
+def test_rule_metadata_resolves_setting_effects_with_disabled_precedence() -> None:
+    rule = dataclasses.replace(
+        PDF101SampleRule.meta,
+        setting_effects=(
+            RuleSettingEffects(setting="sample_setting", effects=(RuleSettingEffectValues(effect=RuleSettingEffect.IGNORED, values=("ignored", "both")),)),
+            RuleSettingEffects(setting="sample_setting", effects=(RuleSettingEffectValues(effect=RuleSettingEffect.DISABLED, values=("disabled", "both")),)),
+        ),
+    )
+
+    assert rule.setting_effect("other_setting", "both") is None
+    assert rule.setting_effect("sample_setting", "other") is None
+    assert rule.setting_effect("sample_setting", "ignored") is RuleSettingEffect.IGNORED
+    assert rule.setting_effect("sample_setting", "disabled") is RuleSettingEffect.DISABLED
+    assert rule.setting_effect("sample_setting", "both") is RuleSettingEffect.DISABLED
+
+
 def test_rule_selector_selects_code() -> None:
     code = RuleCode("PDF101")
 
@@ -1424,17 +1428,27 @@ def test_docstring_convention_setting_effect_helper_builds_expected_effects() ->
 
 
 def test_typed_entry_rule_metadata_uses_disabled_unparsed_conventions() -> None:
-    supported = typed_entry_rules.metadata("PDF900", "sample-supported", "Sample", exact_opt_in=False)
-    exact = typed_entry_rules.metadata("PDF901", "sample-exact", "Sample", exact_opt_in=True)
+    supported = typed_entry_rules.metadata("PDF900", "sample-supported", "Sample", convention_opt_in=False)
+    convention_opt_in = typed_entry_rules.metadata("PDF901", "sample-convention-opt-in", "Sample", convention_opt_in=True)
 
     assert _disabled_docstring_conventions(supported) == UNPARSED_CONVENTIONS
     assert _ignored_docstring_conventions(supported) == frozenset()
-    assert _disabled_docstring_conventions(exact) == UNPARSED_CONVENTIONS
-    assert _ignored_docstring_conventions(exact) == PARSED_CONVENTIONS
+    assert _disabled_docstring_conventions(convention_opt_in) == UNPARSED_CONVENTIONS
+    assert _ignored_docstring_conventions(convention_opt_in) == PARSED_CONVENTIONS
 
 
 def test_builtin_rule_incompatibilities_are_declared() -> None:
     assert BUILTIN_RULE_INCOMPATIBILITY_PAIRS
+
+
+@pytest.mark.parametrize("convention", DOCSTRING_CONVENTION_CASES)
+def test_builtin_docstring_convention_broad_profiles_are_conflict_free(convention: DocstringConvention) -> None:
+    selection = rules_selection.select_rules(CheckSettings(select=("ALL",), docstring_convention=convention))
+    selected_codes = frozenset(rule.rule.code for rule in selection.rules)
+
+    assert selection.errors == ()
+    for first_code, second_code in BUILTIN_RULE_INCOMPATIBILITY_PAIRS:
+        assert not {first_code, second_code} <= selected_codes
 
 
 @pytest.mark.parametrize(("first_code", "second_code"), BUILTIN_RULE_INCOMPATIBILITY_CASES)
@@ -1445,25 +1459,18 @@ def test_builtin_rule_incompatibilities_resolve_pairwise(first_code: RuleCode, s
     assert selection.errors == (f"Selected rule {second_code} is incompatible with earlier selected rule {first_code}; {second_code} has been disabled",)
 
 
-def test_builtin_docstring_convention_exact_opt_in_rules_are_declared() -> None:
-    assert EXACT_OPT_IN_RULE_CODES
+def test_builtin_docstring_convention_opt_in_rules_are_declared_and_separate_from_require_explicit() -> None:
+    require_explicit_codes = frozenset(CheckSettings().require_explicit)
+
+    assert CONVENTION_OPT_IN_RULE_CODES
+    assert not require_explicit_codes.intersection(CONVENTION_OPT_IN_RULE_CODES)
+    for rule_class in rule_collection.RULE_COLLECTION.rules:
+        if rule_class.meta.code.tag in CONVENTION_OPT_IN_RULE_CODES:
+            assert _ignored_docstring_conventions(rule_class.meta)
 
 
-@pytest.mark.parametrize(("code", "convention"), EXACT_OPT_IN_RULE_CASES)
-def test_builtin_docstring_convention_exact_opt_in_rules_are_exactly_selectable(code: str, convention: DocstringConvention) -> None:
-    broad_selection = rules_selection.select_rules(CheckSettings(select=("ALL",), docstring_convention=convention))
-    exact_selection = rules_selection.select_rules(CheckSettings(select=(code,), docstring_convention=convention))
-
-    assert code not in tuple(rule.rule.code.tag for rule in broad_selection.rules)
-    assert code in tuple(rule.rule.code.tag for rule in exact_selection.rules)
-
-
-def test_builtin_parsed_docstring_convention_exact_opt_in_rules_are_declared() -> None:
-    assert PARSED_EXACT_OPT_IN_RULE_CODES
-
-
-@pytest.mark.parametrize(("code", "convention"), PARSED_EXACT_OPT_IN_RULE_CASES)
-def test_builtin_parsed_docstring_convention_exact_opt_in_rules_are_exactly_selectable(code: str, convention: DocstringConvention) -> None:
+@pytest.mark.parametrize(("code", "convention"), IGNORED_DOCSTRING_CONVENTION_CASES)
+def test_builtin_ignored_docstring_convention_rules_require_exact_selection(code: str, convention: DocstringConvention) -> None:
     broad_selection = rules_selection.select_rules(CheckSettings(select=("ALL",), docstring_convention=convention))
     exact_selection = rules_selection.select_rules(CheckSettings(select=(code,), docstring_convention=convention))
 
@@ -1555,6 +1562,17 @@ def test_default_require_explicit_selectors_are_exact_known_rule_codes() -> None
 
     assert tuple(selector for selector in default_selectors if not RuleCode.is_valid_tag(selector)) == ()
     assert tuple(selector for selector in default_selectors if selector not in known_rule_codes) == ()
+
+
+def test_default_require_explicit_rules_have_a_broad_selection_counterfactual() -> None:
+    settings = CheckSettings(select=("ALL",))
+
+    for code in settings.require_explicit:
+        reduced_require_explicit = tuple(selector for selector in settings.require_explicit if selector != code)
+        selections = tuple(
+            rules_selection.select_rules(dataclasses.replace(settings, require_explicit=reduced_require_explicit, docstring_convention=convention)) for convention in DocstringConvention
+        )
+        assert any(not selection.errors and code in {rule.rule.code.tag for rule in selection.rules} for selection in selections), code
 
 
 def test_select_rules_reports_require_explicit_selector_errors() -> None:

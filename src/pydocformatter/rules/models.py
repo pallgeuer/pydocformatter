@@ -169,6 +169,25 @@ class RuleMetadata:
         if len(set(self.incompatible_with)) != len(self.incompatible_with):
             raise ValueError(f"{self.code}: Incompatible rule codes must not contain duplicates")
 
+    def setting_effect(self, setting: str, value: object) -> RuleSettingEffect | None:
+        """Return the effective selection effect for one resolved setting value.
+
+        Args:
+            setting (str): Resolved settings field to query.
+            value (object): Resolved field value to match against declared effects.
+
+        Returns:
+            RuleSettingEffect | None: Matching effect with disabled precedence, or none when no effect applies.
+        """
+        triggered_effects = {
+            effect_values.effect for setting_effects in self.setting_effects if setting_effects.setting == setting for effect_values in setting_effects.effects if value in effect_values.values
+        }
+        if RuleSettingEffect.DISABLED in triggered_effects:
+            return RuleSettingEffect.DISABLED
+        if RuleSettingEffect.IGNORED in triggered_effects:
+            return RuleSettingEffect.IGNORED
+        return None
+
 
 @dataclasses.dataclass(frozen=True, order=True)
 class RuleCategoryMetadata:

@@ -9,7 +9,7 @@ Rule is incompatible with `PDF709` and `PDF711`.
 ## What it does
 Checks that parsed yield entries in owning function docstrings do not include documented types.
 
-Only functions that actually contain yield expressions are checked. The rule is exact opt-in and cannot be combined with the required-type or type-mismatch yield policies.
+Only functions that actually contain yield expressions are checked. The rule is convention opt-in and cannot be combined with the required-type or type-mismatch yield policies.
 
 ## Why is this useful?
 Projects that rely on code annotations can prevent duplicated yield type documentation.

@@ -9,7 +9,7 @@ Rule is incompatible with `PDF705` and `PDF707`.
 ## What it does
 Checks that parsed return entries in owning function docstrings do not include documented types.
 
-Generator functions are skipped by return-entry rules because their value documentation belongs in yield entries. The rule is exact opt-in and cannot be combined with the required-type or type-mismatch return policies.
+Generator functions are skipped by return-entry rules because their value documentation belongs in yield entries. The rule is convention opt-in and cannot be combined with the required-type or type-mismatch return policies.
 
 ## Why is this useful?
 Projects that rely on code annotations can prevent duplicated return type documentation.

@@ -9,7 +9,7 @@ Rule is incompatible with `PDF713` and `PDF715`.
 ## What it does
 Checks that parsed class attribute entries in owning class docstrings do not include documented types.
 
-Only entries that match inventoried class or instance attributes are checked, including proven literal slot members. The rule is exact opt-in and cannot be combined with the required-type or type-mismatch class attribute policies.
+Only entries that match inventoried class or instance attributes are checked, including proven literal slot members. The rule is convention opt-in and cannot be combined with the required-type or type-mismatch class attribute policies.
 
 ## Why is this useful?
 Projects that rely on code annotations can prevent duplicated class attribute type documentation.

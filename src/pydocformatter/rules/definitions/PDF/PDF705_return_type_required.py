@@ -29,7 +29,7 @@ class PDF705ReturnTypeRequired(RuleBase):
     """
 
     meta = typed_entry_rules.metadata(
-        "PDF705", "return-type-required", "Function return docstring entry is missing a type", exact_opt_in=True, incompatible_with=("PDF706",), fix_availability=FixAvailability.SOMETIMES
+        "PDF705", "return-type-required", "Function return docstring entry is missing a type", convention_opt_in=True, incompatible_with=("PDF706",), fix_availability=FixAvailability.SOMETIMES
     )
 
     @classmethod

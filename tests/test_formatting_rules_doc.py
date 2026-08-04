@@ -22,8 +22,8 @@ if TYPE_CHECKING:
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 FORMAT_RULES_PATH = ROOT / "docs" / "public" / "ruff_rule_links.md"
-EXPECTED_PCF_HEADERS = ("Code", "Name", "Message", "Fixable", "Explicit", "Since", "Ruff rules")
-EXPECTED_PDF_HEADERS = ("Code", "Name", "Message", "Fixable", "Explicit", "Convention effects", "Since", "Conflicts", "Ruff rules")
+EXPECTED_PCF_HEADERS = ("Code", "Name", "Message", "Fixable", "Require explicit", "Since", "Ruff rules")
+EXPECTED_PDF_HEADERS = ("Code", "Name", "Message", "Fixable", "Require explicit", "Convention effects", "Since", "Conflicts", "Ruff rules")
 EXPECTED_RUFF_HEADERS = ("Code", "Name", "Message", "Fixable", "Since", "Support by pydocformatter")
 PCF_HEADING = "### PCF: pydocformatter comment formatting"
 PDF_HEADING = "### PDF: pydocformatter docstring formatting"
@@ -80,16 +80,7 @@ def _plain_code_cell(cell: str) -> str:
 
 def _convention_effects(rule: rule_models.RuleMetadata) -> dict[DocstringConvention, rule_models.RuleSettingEffect]:
     """Return docstring convention effects for a rule."""
-    effects: dict[DocstringConvention, rule_models.RuleSettingEffect] = {}
-    for setting_effects in rule.setting_effects:
-        if setting_effects.setting != "docstring_convention":
-            continue
-        for effect_values in setting_effects.effects:
-            for value in effect_values.values:
-                if not isinstance(value, DocstringConvention):
-                    raise TypeError(f"{rule.code}: Unexpected docstring convention effect value {value!r}")
-                effects[value] = effect_values.effect
-    return effects
+    return {convention: effect for convention in DocstringConvention if (effect := rule.setting_effect("docstring_convention", convention)) is not None}
 
 
 def _convention_effects_cell(rule: rule_models.RuleMetadata) -> str:
@@ -164,7 +155,7 @@ def test_pydocformatter_rule_tables_match_rule_metadata() -> None:
         assert row["Name"] == rule.name
         assert row["Message"] == rule.message
         assert row["Fixable"] == rule.fix_availability.value
-        assert row["Explicit"] == _explicit_cell(rule)
+        assert row["Require explicit"] == _explicit_cell(rule)
         assert row["Since"] == rule.stable_since
 
         if rule.code.prefix == "PDF":

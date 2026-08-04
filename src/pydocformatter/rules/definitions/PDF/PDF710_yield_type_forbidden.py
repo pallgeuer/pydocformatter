@@ -27,7 +27,7 @@ class PDF710YieldTypeForbidden(RuleBase):
         meta (RuleMetadata): Static metadata used for registration, diagnostics, and rule selection.
     """
 
-    meta = typed_entry_rules.metadata("PDF710", "yield-type-forbidden", "Function yield docstring entry should not include a type", exact_opt_in=True, incompatible_with=("PDF709", "PDF711"))
+    meta = typed_entry_rules.metadata("PDF710", "yield-type-forbidden", "Function yield docstring entry should not include a type", convention_opt_in=True, incompatible_with=("PDF709", "PDF711"))
 
     @classmethod
     def violations(cls, context: RuleContext) -> tuple[rule_violations.RuleViolation, ...]:

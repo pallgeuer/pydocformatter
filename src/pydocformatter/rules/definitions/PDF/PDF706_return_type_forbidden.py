@@ -27,7 +27,7 @@ class PDF706ReturnTypeForbidden(RuleBase):
         meta (RuleMetadata): Static metadata used for registration, diagnostics, and rule selection.
     """
 
-    meta = typed_entry_rules.metadata("PDF706", "return-type-forbidden", "Function return docstring entry should not include a type", exact_opt_in=True, incompatible_with=("PDF705", "PDF707"))
+    meta = typed_entry_rules.metadata("PDF706", "return-type-forbidden", "Function return docstring entry should not include a type", convention_opt_in=True, incompatible_with=("PDF705", "PDF707"))
 
     @classmethod
     def violations(cls, context: RuleContext) -> tuple[rule_violations.RuleViolation, ...]:

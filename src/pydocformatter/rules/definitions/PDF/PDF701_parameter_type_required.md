@@ -13,7 +13,7 @@ The rule recognizes types in Google and NumPy parameter entries and in inline or
 
 When a single-line parameter annotation is available, PDF701 inserts its annotation text into a mapped Google entry or adds a paired canonical reStructuredText `:type:` field with the parameter's bare name. An existing empty, single-line reStructuredText type field is filled first. NumPy entries, parameters without usable annotations, and source shapes that cannot be mapped safely remain diagnostic.
 
-The rule is exact opt-in because many projects rely on code annotations instead of repeating parameter types in docstrings.
+The rule is convention opt-in because many projects rely on code annotations instead of repeating parameter types in docstrings.
 
 ## Why is this useful?
 Projects that keep types in docstrings can enforce complete parameter type documentation.

@@ -255,14 +255,13 @@ def _apply_setting_effects(settings: CheckSettings, *, enabled_strengths: dict[R
         if rule.code not in effective_strengths:
             continue
         triggered_effects: set[RuleSettingEffect] = set()
-        for setting_effects in rule.setting_effects:
+        for setting in dict.fromkeys(setting_effects.setting for setting_effects in rule.setting_effects):
             try:
-                setting_value = getattr(settings, setting_effects.setting)
+                setting_value = getattr(settings, setting)
             except AttributeError:
-                raise ValueError(f"{rule.code}: Unknown rule setting effect field: {setting_effects.setting}") from None
-            for effect_values in setting_effects.effects:
-                if setting_value in effect_values.values:
-                    triggered_effects.add(effect_values.effect)
+                raise ValueError(f"{rule.code}: Unknown rule setting effect field: {setting}") from None
+            if (setting_effect := rule.setting_effect(setting, setting_value)) is not None:
+                triggered_effects.add(setting_effect)
         enabled_strength = effective_strengths[rule.code]
         if RuleSettingEffect.DISABLED in triggered_effects or (RuleSettingEffect.IGNORED in triggered_effects and not enabled_strength.exact_match):
             del effective_strengths[rule.code]

@@ -400,7 +400,7 @@ def _write_rules_index(rule_pages: tuple[RulePage, ...]) -> None:
         "- `By default`: Selected by default.",
         "- `Requires explicit`: Not selected by broad selectors unless the exact rule code is also selected, because it is included in the default `require-explicit` setting.",
         "- `Convention`: Default selection depends on the active `docstring-convention` setting, with at least one convention selecting the rule by default.",
-        "- `Convention-explicit`: Removed by every `docstring-convention` value. Ignored conventions can be restored by exact rule-code selection, while disabled conventions cannot.",
+        "- `Convention opt-in`: Removed by every `docstring-convention` value. Ignored conventions can be restored by exact rule-code selection, while disabled conventions cannot.",
         "- `Setting-gated`: Default selection depends on a setting other than `docstring-convention`.",
         "",
     ))
@@ -824,28 +824,16 @@ def _enabled_text(rule_class: type[RuleBase]) -> str:
     """Return compact rule activation text."""
     rule = rule_class.meta
     explicit_selectors = tuple(RuleSelector(selector) for selector in settings_check.DEFAULT_REQUIRE_EXPLICIT)
-    if _is_convention_explicit(rule_class):
-        return "Convention-explicit"
+    convention_effects = tuple(rule.setting_effect("docstring_convention", convention) for convention in settings_check.DocstringConvention)
+    if all(effect in {RuleSettingEffect.IGNORED, RuleSettingEffect.DISABLED} for effect in convention_effects):
+        return "Convention opt-in"
     if any(selector.selects_code(rule.code) for selector in explicit_selectors):
         return "Requires explicit"
-    if any(setting_effects.setting == "docstring_convention" for setting_effects in rule.setting_effects):
+    if any(effect is not None for effect in convention_effects):
         return "Convention"
     if rule.setting_effects:
         return "Setting-gated"
     return "By default"
-
-
-def _is_convention_explicit(rule_class: type[RuleBase]) -> bool:
-    """Return whether every docstring convention removes the rule from broad selection."""
-    convention_effects: dict[settings_check.DocstringConvention, RuleSettingEffect] = {}
-    for setting_effects in rule_class.meta.setting_effects:
-        if setting_effects.setting != "docstring_convention":
-            continue
-        for effect_values in setting_effects.effects:
-            for value in effect_values.values:
-                if isinstance(value, settings_check.DocstringConvention):
-                    convention_effects[value] = effect_values.effect
-    return bool(convention_effects) and all(convention_effects.get(convention) in {RuleSettingEffect.IGNORED, RuleSettingEffect.DISABLED} for convention in settings_check.DocstringConvention)
 
 
 def _transform_pydocfmt_examples(markdown: str, *, context: str) -> str:

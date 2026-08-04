@@ -13,7 +13,7 @@ For classes that directly inherit from a configured enum-like base, the policy i
 
 For ordinary classes with available single-line annotations, PDF713 inserts a mapped Google type or adds a paired canonical reStructuredText `:vartype:` field, filling an existing empty, single-line field first. A slot-only member has no annotation source, so its missing type remains diagnostic; the first real annotated assignment of the same name supplies the normal safe fix without changing the slot's inventory position. Later redeclarations do not replace that canonical annotation source. For configured enum-like classes, PDF713 removes mapped Google types and paired reStructuredText `:vartype:` fields. NumPy entries, missing annotations, and source shapes that cannot be mapped safely remain diagnostic.
 
-The rule is exact opt-in because many projects rely on class annotations instead of repeating attribute types in docstrings.
+The rule is convention opt-in because many projects rely on class annotations instead of repeating attribute types in docstrings.
 
 ## Why is this useful?
 Projects can require class attribute type documentation while avoiding redundant enum member type text.

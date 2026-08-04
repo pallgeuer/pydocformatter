@@ -177,15 +177,10 @@ def _expected_docstring_convention_notice(rule: rule_models.RuleMetadata) -> str
 
 def _docstring_convention_effects(rule: rule_models.RuleMetadata) -> dict[RuleSettingEffect, frozenset[settings_check.DocstringConvention]]:
     """Return disabled and ignored docstring conventions for a rule."""
-    effects: dict[RuleSettingEffect, set[settings_check.DocstringConvention]] = {RuleSettingEffect.DISABLED: set(), RuleSettingEffect.IGNORED: set()}
-    for setting_effects in rule.setting_effects:
-        if setting_effects.setting != "docstring_convention":
-            continue
-        for effect_values in setting_effects.effects:
-            for value in effect_values.values:
-                if isinstance(value, settings_check.DocstringConvention):
-                    effects[effect_values.effect].add(value)
-    return {effect: frozenset(values) for effect, values in effects.items()}
+    return {
+        effect: frozenset(convention for convention in settings_check.DocstringConvention if rule.setting_effect("docstring_convention", convention) is effect)
+        for effect in (RuleSettingEffect.DISABLED, RuleSettingEffect.IGNORED)
+    }
 
 
 def _leading_rule_markdown_paragraphs(markdown: str) -> tuple[str, ...]:

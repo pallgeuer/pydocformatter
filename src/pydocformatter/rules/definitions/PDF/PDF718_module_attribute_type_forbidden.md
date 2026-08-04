@@ -9,7 +9,7 @@ Rule is incompatible with `PDF717` and `PDF719`.
 ## What it does
 Checks that parsed module attribute entries in owning module docstrings do not include documented types.
 
-Only entries that match inventoried module attributes are checked. The rule is exact opt-in and cannot be combined with the required-type or type-mismatch module attribute policies.
+Only entries that match inventoried module attributes are checked. The rule is convention opt-in and cannot be combined with the required-type or type-mismatch module attribute policies.
 
 ## Why is this useful?
 Projects that rely on code annotations can prevent duplicated module attribute type documentation.

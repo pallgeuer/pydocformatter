@@ -29,7 +29,7 @@ class PDF709YieldTypeRequired(RuleBase):
     """
 
     meta = typed_entry_rules.metadata(
-        "PDF709", "yield-type-required", "Function yield docstring entry is missing a type", exact_opt_in=True, incompatible_with=("PDF710",), fix_availability=FixAvailability.SOMETIMES
+        "PDF709", "yield-type-required", "Function yield docstring entry is missing a type", convention_opt_in=True, incompatible_with=("PDF710",), fix_availability=FixAvailability.SOMETIMES
     )
 
     @classmethod

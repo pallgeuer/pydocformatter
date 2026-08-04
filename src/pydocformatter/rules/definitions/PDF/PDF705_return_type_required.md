@@ -13,7 +13,7 @@ The rule recognizes types in Google and NumPy return entries and in inline or pa
 
 When a single-line return annotation is available, PDF705 adds a paired canonical reStructuredText `:rtype:` field or fills an existing empty, single-line field. Google and NumPy entries, functions without usable return annotations, and source shapes that cannot be mapped safely remain diagnostic.
 
-The rule is exact opt-in because many projects rely on function annotations instead of repeating return types in docstrings.
+The rule is convention opt-in because many projects rely on function annotations instead of repeating return types in docstrings.
 
 ## Why is this useful?
 Projects that keep return types in docstrings can enforce complete return type documentation.

@@ -29,7 +29,12 @@ class PDF717ModuleAttributeTypeRequired(RuleBase):
     """
 
     meta = typed_entry_rules.metadata(
-        "PDF717", "module-attribute-type-required", "Module attribute docstring entry is missing a type", exact_opt_in=True, incompatible_with=("PDF718",), fix_availability=FixAvailability.SOMETIMES
+        "PDF717",
+        "module-attribute-type-required",
+        "Module attribute docstring entry is missing a type",
+        convention_opt_in=True,
+        incompatible_with=("PDF718",),
+        fix_availability=FixAvailability.SOMETIMES,
     )
 
     @classmethod

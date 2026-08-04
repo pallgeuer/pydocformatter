@@ -15,7 +15,7 @@ Only the adjacent blank-line run after the docstring statement is changed. Comme
 Some projects prefer keeping function docstrings directly attached to executable body statements.
 
 ## Ruff compatibility
-This rule replaces Ruff's `D202`. It is exact opt-in by default because broad pydocformatter selection follows Black-compatible spacing after function docstrings.
+This rule replaces Ruff's `D202`. It is convention opt-in by default because broad pydocformatter selection follows Black-compatible spacing after function docstrings.
 
 ## Examples
 The canonical fix removes blank lines after a function docstring:

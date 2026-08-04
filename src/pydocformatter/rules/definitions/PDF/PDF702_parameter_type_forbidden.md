@@ -9,7 +9,7 @@ Rule is incompatible with `PDF701` and `PDF703`.
 ## What it does
 Checks that parsed parameter entries in owning function docstrings do not include documented types.
 
-Only entries that match real signature parameters are checked. The rule is exact opt-in and cannot be combined with the required-type or type-mismatch parameter policies.
+Only entries that match real signature parameters are checked. The rule is convention opt-in and cannot be combined with the required-type or type-mismatch parameter policies.
 
 ## Why is this useful?
 Projects that rely on code annotations can prevent duplicated parameter type documentation.

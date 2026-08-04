@@ -136,6 +136,7 @@ After normal `select` and `ignore` precedence is resolved, each selected rule's 
 - `Disabled` takes precedence over `Ignored`.
 - `Ignored` removes a rule selected through `ALL`, a category prefix, or a partial selector, but any participating exact rule-code selector restores it, including one retained alongside a higher-priority broad `extend-select`.
 - `Disabled` always removes a rule, including one selected by exact rule code.
+- Convention `Ignored` effects can encode a profile's choice among antagonistic rules, including a choice to broadly select neither alternative.
 - Configured `ignore` selectors and matching per-file ignores still suppress an exactly restored ignored rule.
 - Setting effects do not change effective fixability.
 - A metadata field name that is not present on `CheckSettings` is a programming error identifying the rule and unknown field.
@@ -161,7 +162,7 @@ Global enabled rules are resolved per rule:
 
 The output `rules` tuple preserves deterministic rule-code order after filtering.
 
-`require-explicit` is intended for rules that should remain available through exact selection without being enabled by broad selectors such as `ALL`, `PDF`, or `PCF`. For a rule matched by `require-explicit`, `select = ["ALL"]` does not enable it, while including the rule's exact code in `extend-select` enables it. Setting `require-explicit = []` lets broad selectors enable all selected rules.
+`require-explicit` is intended for otherwise applicable rules that should remain available through exact selection without being enabled by broad selectors such as `ALL`, `PDF`, or `PCF`. For a rule matched by `require-explicit`, `select = ["ALL"]` does not enable it, while including the rule's exact code in `extend-select` enables it. Setting `require-explicit = []` removes this gate, but it does not override configured ignores, `Ignored` or `Disabled` setting effects, per-file ignores, or incompatibility resolution. Each built-in default entry changes broad selection in at least one settings profile where those independent gates permit the rule.
 
 ## Rule incompatibilities
 
@@ -174,7 +175,7 @@ After normal selection precedence, setting effects, and explicit-selection requi
 - Each discarded rule produces one operational error listing all earlier retained rules that conflict with it.
 - Per-file ignores run later and do not restore rules discarded by incompatibility resolution.
 
-The built-in opposing pairs (e.g. `PDF106`/`PDF107` and `PDF108`/`PDF109`) are mutually incompatible. Convention-specific setting effects keep each built-in convention profile conflict-free, but exact selection can restore ignored rules. Selecting both rules in either pair retains the lower ordered rule and reports the higher ordered rule as disabled.
+The built-in opposing pairs (e.g. `PDF106`/`PDF107` and `PDF108`/`PDF109`) are mutually incompatible. Convention-specific setting effects keep every broad built-in convention profile conflict-free by selecting at most one rule from each incompatible pair; a profile may select neither alternative. Exact selection can restore ignored rules. Selecting both rules in either pair retains the lower ordered rule and reports the higher ordered rule as disabled.
 
 `docstring-convention = "pep257"` is the default named convention profile. It does not parse Google sections, NumPy sections, or reStructuredText fields, and it applies PEP 257/pydocstyle-compatible broad-rule carve-outs. `docstring-convention = "none"` also avoids convention-specific parsing, but keeps the stricter generic no-convention rule profile for rules that can act without convention parsing.
 

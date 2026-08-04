@@ -27,7 +27,9 @@ class PDF702ParameterTypeForbidden(RuleBase):
         meta (RuleMetadata): Static metadata used for registration, diagnostics, and rule selection.
     """
 
-    meta = typed_entry_rules.metadata("PDF702", "parameter-type-forbidden", "Function parameter docstring entry should not include a type", exact_opt_in=True, incompatible_with=("PDF701", "PDF703"))
+    meta = typed_entry_rules.metadata(
+        "PDF702", "parameter-type-forbidden", "Function parameter docstring entry should not include a type", convention_opt_in=True, incompatible_with=("PDF701", "PDF703")
+    )
 
     @classmethod
     def violations(cls, context: RuleContext) -> tuple[rule_violations.RuleViolation, ...]:

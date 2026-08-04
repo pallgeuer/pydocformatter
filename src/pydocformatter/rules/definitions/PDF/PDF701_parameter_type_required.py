@@ -29,7 +29,7 @@ class PDF701ParameterTypeRequired(RuleBase):
     """
 
     meta = typed_entry_rules.metadata(
-        "PDF701", "parameter-type-required", "Function parameter docstring entry is missing a type", exact_opt_in=True, incompatible_with=("PDF702",), fix_availability=FixAvailability.SOMETIMES
+        "PDF701", "parameter-type-required", "Function parameter docstring entry is missing a type", convention_opt_in=True, incompatible_with=("PDF702",), fix_availability=FixAvailability.SOMETIMES
     )
 
     @classmethod

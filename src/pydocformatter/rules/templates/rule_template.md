@@ -7,8 +7,11 @@ Fix is always available. (Use `Fix is usually available.`, `Fix is sometimes ava
 (Only if rule has `setting_effects` like ignored or disabled:) Use one leading sentence that matches the metadata:
 
 - Ignored only: "Rule is ignored if `docstring-convention` is `google` or `numpy`."
+- Ignored under every convention: "Rule is ignored by broad selectors for all `docstring-convention` values."
 - Disabled only: "Rule is disabled if `docstring-convention` is `none` or `pep257`."
 - Both disabled and ignored: "Rule is disabled if `docstring-convention` is `none` or `pep257`, and ignored by broad selectors under `google`, `numpy`, and `rest`."
+
+(Use convention `Ignored` effects for profile choices among antagonistic rules, including profiles that select neither alternative. Use `Disabled` only where the rule has no meaningful target. Do not list a convention opt-in rule in `require-explicit` merely to duplicate its effective selection state.)
 
 (Only if rule is listed in the default `require-explicit` setting:) Rule must by default be explicitly selected, unless it is removed from `require-explicit`.
 

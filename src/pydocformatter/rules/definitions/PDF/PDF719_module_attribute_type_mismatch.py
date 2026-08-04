@@ -27,7 +27,9 @@ class PDF719ModuleAttributeTypeMismatch(RuleBase):
         meta (RuleMetadata): Static metadata used for registration, diagnostics, and rule selection.
     """
 
-    meta = typed_entry_rules.metadata("PDF719", "module-attribute-type-mismatch", "Module attribute docstring type does not match the annotation", exact_opt_in=False, incompatible_with=("PDF718",))
+    meta = typed_entry_rules.metadata(
+        "PDF719", "module-attribute-type-mismatch", "Module attribute docstring type does not match the annotation", convention_opt_in=False, incompatible_with=("PDF718",)
+    )
 
     @classmethod
     def violations(cls, context: RuleContext) -> tuple[rule_violations.RuleViolation, ...]:

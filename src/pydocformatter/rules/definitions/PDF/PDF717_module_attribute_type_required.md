@@ -13,7 +13,7 @@ The rule recognizes types in Google and NumPy attribute entries and in inline or
 
 When a single-line module attribute annotation is available, PDF717 inserts its annotation text into a mapped Google entry or adds a paired canonical reStructuredText `:vartype:` field, filling an existing empty, single-line field first. NumPy entries, attributes without usable annotations, and source shapes that cannot be mapped safely remain diagnostic.
 
-The rule is exact opt-in because many projects rely on module annotations instead of repeating attribute types in docstrings.
+The rule is convention opt-in because many projects rely on module annotations instead of repeating attribute types in docstrings.
 
 ## Why is this useful?
 Projects that keep types in docstrings can enforce complete module attribute type documentation.

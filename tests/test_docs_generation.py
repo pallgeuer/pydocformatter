@@ -9,6 +9,7 @@ import types
 import typing
 import pathlib
 import tomllib
+import dataclasses
 
 # Third-party imports
 import pytest
@@ -20,6 +21,7 @@ import pydocformatter.rules.collection as rule_collection
 import pydocformatter.rules.documentation as rule_documentation
 from pydocformatter import docs_urls
 from pydocformatter.cli import settings_check
+from pydocformatter.rules.codes import RuleSelector
 from pydocformatter.rules.models import RuleSettingEffect, RuleSettingEffects
 
 
@@ -38,6 +40,16 @@ def _normalized_dependency_name(dependency: str) -> str:
     for separator in ("<", ">", "=", "!", "~", ";"):
         name = name.split(separator, maxsplit=1)[0]
     return name.strip().lower().replace("_", "-")
+
+
+def _docstring_convention_effects(rule_class: type[typing.Any]) -> dict[settings_check.DocstringConvention, RuleSettingEffect]:
+    """Return convention effects declared by one rule class."""
+    return {convention: effect for convention in settings_check.DocstringConvention if (effect := rule_class.meta.setting_effect("docstring_convention", convention)) is not None}
+
+
+def _requires_explicit(rule_class: type[typing.Any]) -> bool:
+    """Return whether the default require-explicit selectors match a rule class."""
+    return any(RuleSelector(selector).selects_code(rule_class.meta.code) for selector in settings_check.DEFAULT_REQUIRE_EXPLICIT)
 
 
 def test_runtime_rule_url_slug_matches_generated_rule_page_slug() -> None:
@@ -126,45 +138,53 @@ def test_rule_index_labels_convention_rules(generated_site: tuple[pathlib.Path, 
     """The generated rule index must identify convention-dependent rules."""
     generated_docs_dir, _ = generated_site
     markdown = (generated_docs_dir / "rules.md").read_text(encoding="utf-8")
+    convention_rule_codes: list[str] = []
 
     for rule_class in rule_collection.RULE_COLLECTION.rules:
-        convention_effects = {
-            value: effect_values.effect
-            for setting_effects in rule_class.meta.setting_effects
-            if setting_effects.setting == "docstring_convention"
-            for effect_values in setting_effects.effects
-            for value in effect_values.values
-            if isinstance(value, settings_check.DocstringConvention)
-        }
-        if convention_effects and any(convention_effects.get(convention) not in {RuleSettingEffect.IGNORED, RuleSettingEffect.DISABLED} for convention in settings_check.DocstringConvention):
-            assert "| Convention |" in markdown
-            assert "| Convention-gated |" not in markdown
+        convention_effects = _docstring_convention_effects(rule_class)
+        if (
+            convention_effects
+            and not _requires_explicit(rule_class)
+            and any(convention_effects.get(convention) not in {RuleSettingEffect.IGNORED, RuleSettingEffect.DISABLED} for convention in settings_check.DocstringConvention)
+        ):
+            convention_rule_codes.append(rule_class.meta.code.tag)
             assert generate_zensical._enabled_text(rule_class) == "Convention"
-            break
-    else:
-        raise AssertionError("Expected at least one convention-dependent rule")
+
+    assert convention_rule_codes
+    assert markdown.count("| Convention |") == len(convention_rule_codes)
+    assert "| Convention-gated |" not in markdown
 
 
-def test_rule_index_labels_convention_explicit_rules(generated_site: tuple[pathlib.Path, pathlib.Path]) -> None:
+def test_rule_index_labels_convention_opt_in_rules(generated_site: tuple[pathlib.Path, pathlib.Path]) -> None:
     """The generated rule index must identify rules removed by every convention."""
     generated_docs_dir, _ = generated_site
     markdown = (generated_docs_dir / "rules.md").read_text(encoding="utf-8")
+    convention_opt_in_rule_codes: list[str] = []
 
     for rule_class in rule_collection.RULE_COLLECTION.rules:
-        convention_effects = {
-            value: effect_values.effect
-            for setting_effects in rule_class.meta.setting_effects
-            if setting_effects.setting == "docstring_convention"
-            for effect_values in setting_effects.effects
-            for value in effect_values.values
-            if isinstance(value, settings_check.DocstringConvention)
-        }
+        convention_effects = _docstring_convention_effects(rule_class)
         if convention_effects and all(convention_effects.get(convention) in {RuleSettingEffect.IGNORED, RuleSettingEffect.DISABLED} for convention in settings_check.DocstringConvention):
-            assert "| Convention-explicit |" in markdown
-            assert generate_zensical._enabled_text(rule_class) == "Convention-explicit"
-            break
-    else:
-        raise AssertionError("Expected at least one convention-explicit rule")
+            convention_opt_in_rule_codes.append(rule_class.meta.code.tag)
+            assert generate_zensical._enabled_text(rule_class) == "Convention opt-in"
+
+    assert convention_opt_in_rule_codes
+    assert markdown.count("| Convention opt-in |") == len(convention_opt_in_rule_codes)
+    assert "Convention-explicit" not in markdown
+
+
+def test_rule_index_labels_require_explicit_rules(generated_site: tuple[pathlib.Path, pathlib.Path]) -> None:
+    """The generated rule index must identify every default require-explicit rule."""
+    generated_docs_dir, _ = generated_site
+    markdown = (generated_docs_dir / "rules.md").read_text(encoding="utf-8")
+    require_explicit_rule_codes: list[str] = []
+
+    for rule_class in rule_collection.RULE_COLLECTION.rules:
+        if _requires_explicit(rule_class):
+            require_explicit_rule_codes.append(rule_class.meta.code.tag)
+            assert generate_zensical._enabled_text(rule_class) == "Requires explicit"
+
+    assert require_explicit_rule_codes
+    assert markdown.count("| Requires explicit |") == len(require_explicit_rule_codes)
 
 
 def test_rule_index_explains_table_columns(generated_site: tuple[pathlib.Path, pathlib.Path]) -> None:
@@ -176,7 +196,7 @@ def test_rule_index_explains_table_columns(generated_site: tuple[pathlib.Path, p
     assert '<a id="rule-table-columns"></a>' in explanation
     assert "The `Fix available` column" in explanation
     assert "The `Enabled` column" in explanation
-    for value in ("Always", "Usually", "Sometimes", "Never", "By default", "Requires explicit", "Convention", "Convention-explicit", "Setting-gated"):
+    for value in ("Always", "Usually", "Sometimes", "Never", "By default", "Requires explicit", "Convention", "Convention opt-in", "Setting-gated"):
         assert f"- `{value}`:" in explanation
 
 
@@ -186,7 +206,7 @@ def test_enabled_text_values_are_documented(generated_site: tuple[pathlib.Path, 
     markdown = (generated_docs_dir / "rules.md").read_text(encoding="utf-8")
     explanation = markdown.split("### PCF:", maxsplit=1)[0]
     by_default_rule = next(rule_class for rule_class in rule_collection.RULE_COLLECTION.rules if generate_zensical._enabled_text(rule_class) == "By default")
-    fake_setting_gated_rule = types.SimpleNamespace(meta=types.SimpleNamespace(code=by_default_rule.meta.code, setting_effects=(RuleSettingEffects(setting="future_setting", effects=()),)))
+    fake_setting_gated_rule = types.SimpleNamespace(meta=dataclasses.replace(by_default_rule.meta, setting_effects=(RuleSettingEffects(setting="future_setting", effects=()),)))
     labels = {generate_zensical._enabled_text(rule_class) for rule_class in rule_collection.RULE_COLLECTION.rules}
     labels.add(generate_zensical._enabled_text(typing.cast("type[typing.Any]", fake_setting_gated_rule)))
 

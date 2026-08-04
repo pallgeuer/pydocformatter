@@ -27,7 +27,7 @@ class PDF700ParameterMissingDescription(RuleBase):
         meta (RuleMetadata): Static metadata used for registration, diagnostics, and rule selection.
     """
 
-    meta = typed_entry_rules.metadata("PDF700", "parameter-missing-description", "Function parameter docstring entry is missing a description", exact_opt_in=False)
+    meta = typed_entry_rules.metadata("PDF700", "parameter-missing-description", "Function parameter docstring entry is missing a description", convention_opt_in=False)
 
     @classmethod
     def violations(cls, context: RuleContext) -> tuple[rule_violations.RuleViolation, ...]:

@@ -25,7 +25,7 @@ _TargetCollector = typing.Callable[[RuleContext], tuple[typed_models.TypedDocume
 _RequiredTypePolicy = typing.Callable[[RuleContext, RuleMetadata, TypedDocumentationSubject, str], tuple[rule_violations.RuleViolation, ...]]
 
 _SUPPORTED_CONVENTION_EFFECT = docstring_conventions.convention_setting_effects(disabled=docstring_conventions.UNPARSED_CONVENTIONS)
-_EXACT_OPT_IN_EFFECT = docstring_conventions.convention_setting_effects(disabled=docstring_conventions.UNPARSED_CONVENTIONS, ignored=docstring_conventions.PARSED_CONVENTIONS)
+_CONVENTION_OPT_IN_EFFECT = docstring_conventions.convention_setting_effects(disabled=docstring_conventions.UNPARSED_CONVENTIONS, ignored=docstring_conventions.PARSED_CONVENTIONS)
 
 _TARGET_COLLECTORS: dict[TypedDocumentationSubject, _TargetCollector] = {
     TypedDocumentationSubject.PARAMETER: typed_documentation.parameter_targets,
@@ -37,14 +37,15 @@ _TARGET_COLLECTORS: dict[TypedDocumentationSubject, _TargetCollector] = {
 _REQUIRED_TYPE_POLICIES: dict[TypedDocumentationSubject, _RequiredTypePolicy] = {}
 
 
-def metadata(code: str, name: str, message: str, *, exact_opt_in: bool, incompatible_with: tuple[str, ...] = (), fix_availability: FixAvailability = FixAvailability.NEVER) -> RuleMetadata:
+def metadata(code: str, name: str, message: str, *, convention_opt_in: bool, incompatible_with: tuple[str, ...] = (), fix_availability: FixAvailability = FixAvailability.NEVER) -> RuleMetadata:
     """Return standard metadata for one PDF7xx typed-entry rule.
 
     Args:
         code (str): Rule code tag assigned to the concrete rule module.
         name (str): Stable kebab-case rule name exposed in docs and CLI output.
         message (str): Default diagnostic message for the rule.
-        exact_opt_in (bool): Whether the rule should be ignored under every convention unless selected by exact code.
+        convention_opt_in (bool): Whether the rule should be ignored under every convention unless selected by exact
+            code.
         incompatible_with (tuple[str, ...]): Rule code tags that cannot be selected with this rule.
         fix_availability (FixAvailability): Availability classification for safe automatic fixes.
 
@@ -57,7 +58,7 @@ def metadata(code: str, name: str, message: str, *, exact_opt_in: bool, incompat
         message=message,
         fix_availability=fix_availability,
         stable_since="1.0.0",
-        setting_effects=_EXACT_OPT_IN_EFFECT if exact_opt_in else _SUPPORTED_CONVENTION_EFFECT,
+        setting_effects=_CONVENTION_OPT_IN_EFFECT if convention_opt_in else _SUPPORTED_CONVENTION_EFFECT,
         incompatible_with=tuple(RuleCode(code) for code in incompatible_with),
         check_kind=RuleCheckKind.STANDARD,
         cache_behavior=RuleCacheBehavior.FILE_LOCAL,

@@ -27,7 +27,7 @@ class PDF707ReturnTypeMismatch(RuleBase):
         meta (RuleMetadata): Static metadata used for registration, diagnostics, and rule selection.
     """
 
-    meta = typed_entry_rules.metadata("PDF707", "return-type-mismatch", "Function return docstring type does not match the annotation", exact_opt_in=False, incompatible_with=("PDF706",))
+    meta = typed_entry_rules.metadata("PDF707", "return-type-mismatch", "Function return docstring type does not match the annotation", convention_opt_in=False, incompatible_with=("PDF706",))
 
     @classmethod
     def violations(cls, context: RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
