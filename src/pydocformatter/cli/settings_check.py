@@ -775,7 +775,7 @@ def _per_file_settings_allowed_fields() -> frozenset[str]:
 def _rule_setting_effect_fields() -> frozenset[str]:
     """Return settings fields referenced by rule selection effects."""
     # First-party imports
-    import pydocformatter.rules.collection as rule_collection  # noqa: PLC0415
+    import pydocformatter.rules.collection as rule_collection  # ruff: ignore[import-outside-top-level]
 
     return frozenset(setting_effects.setting for rule_class in rule_collection.RULE_COLLECTION.rules for setting_effects in rule_class.meta.setting_effects)
 

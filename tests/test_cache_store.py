@@ -246,7 +246,7 @@ def test_quarantine_moves_wal_and_shm_with_committed_wal_only_data(tmp_path: Pat
     layout = cache_directory.cache_layout(tmp_path / "cache")
     cache_directory.ensure_cache_layout(layout)
     script = "import os, sqlite3, sys; c = sqlite3.connect(sys.argv[1]); c.execute('PRAGMA journal_mode = WAL'); c.execute('PRAGMA wal_autocheckpoint = 0'); c.execute('CREATE TABLE clean_proofs (value TEXT)'); c.execute('CREATE TABLE cache_state (key TEXT)'); c.execute('PRAGMA user_version = 99'); c.execute(\"INSERT INTO clean_proofs VALUES ('from-wal')\"); c.commit(); os._exit(0)"
-    subprocess.run([sys.executable, "-c", script, str(layout.database)], check=True, shell=False)  # noqa: S603
+    subprocess.run([sys.executable, "-c", script, str(layout.database)], check=True, shell=False)  # ruff: ignore[subprocess-without-shell-equals-true]
 
     assert Path(f"{layout.database}-wal").is_file()
     quarantine = cache_directory.quarantine_database(layout, kind="incompatible")
@@ -493,7 +493,7 @@ def test_killed_writer_leaves_the_previous_transaction_readable(tmp_path: Path) 
     store.commit(touches=(), proofs=(proof,))
     ready = tmp_path / "transaction-ready"
     script = "import pathlib, sqlite3, sys, time; connection = sqlite3.connect(sys.argv[1]); connection.execute('BEGIN IMMEDIATE'); connection.execute('DELETE FROM clean_proofs'); pathlib.Path(sys.argv[2]).write_text('ready', encoding='utf-8'); time.sleep(30)"
-    process = subprocess.Popen([sys.executable, "-c", script, str(store.layout.database), str(ready)], shell=False)  # noqa: S603
+    process = subprocess.Popen([sys.executable, "-c", script, str(store.layout.database), str(ready)], shell=False)  # ruff: ignore[subprocess-without-shell-equals-true]
     try:
         deadline = time.monotonic() + 10
         while not ready.exists() and process.poll() is None and time.monotonic() < deadline:

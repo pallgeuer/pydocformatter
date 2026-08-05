@@ -183,7 +183,7 @@ def _prepared_module_bindings(context: RuleCategoryContext) -> module_bindings.M
     if not isinstance(context, RuleContext):
         return None
     # First-party imports
-    import pydocformatter.rules.definitions.PDF.PDF as PDF_definition  # noqa: PLC0415
+    import pydocformatter.rules.definitions.PDF.PDF as PDF_definition  # ruff: ignore[import-outside-top-level]
 
     try:
         data = PDF_definition.PDF.require_data(context)

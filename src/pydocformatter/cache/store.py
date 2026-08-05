@@ -127,7 +127,7 @@ class CacheStore:
                 conditions = " OR ".join("(engine_key = ? AND analysis_key = ? AND path_key = ?)" for _ in chunk)
                 parameters = tuple(value for key in chunk for value in key)
                 rows = connection.execute(
-                    f"SELECT engine_key, analysis_key, path_key, path_context_key, source_digest, source_size, mtime_ns, last_seen_day FROM clean_proofs WHERE {conditions}",  # noqa: S608
+                    f"SELECT engine_key, analysis_key, path_key, path_context_key, source_digest, source_size, mtime_ns, last_seen_day FROM clean_proofs WHERE {conditions}",  # ruff: ignore[hardcoded-sql-expression]
                     parameters,
                 )
                 for row in rows:

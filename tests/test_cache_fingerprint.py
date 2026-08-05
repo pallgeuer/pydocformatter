@@ -124,7 +124,7 @@ def test_canonical_encoding_is_independent_of_python_hash_seed() -> None:
     script = "import pydocformatter.cache.fingerprint as f; print(f.canonical_bytes({key: frozenset({key, 'shared'}) for key in {'alpha', 'beta', 'gamma'}}).hex())"
     outputs = []
     for seed in ("1", "8675309"):
-        result = subprocess.run(  # noqa: S603
+        result = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true]
             ["uv", "run", "python", "-c", script], cwd=Path(__file__).parents[1], env={**os.environ, "PYTHONHASHSEED": seed}, shell=False, check=True, capture_output=True, text=True
         )
         outputs.append(result.stdout)

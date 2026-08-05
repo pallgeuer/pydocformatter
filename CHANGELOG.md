@@ -46,6 +46,7 @@ All notable changes to this project are documented here. The format follows [Kee
   - Corrected the rule settings audit to distinguish disabled rules from rules ignored only by broad selectors, with metadata-backed regression coverage.
   - Distinguished convention opt-in policies from `require-explicit`, with exhaustive conflict-free convention profiles and meaningful explicit-selection defaults enforced by regression tests.
 - **Developer tooling:**
+  - Updated the fixed documentation, test, and development dependency pins and migrated Ruff selectors and suppressions to the human-readable names supported by Ruff 0.16.
   - Replaced the repository-local Markdown table formatter, release checksum generator, and pytest working-directory isolation fixtures with the shared `la-dev-codex-plugins` implementations.
   - Strengthened semantic Markdown table tests with full-document parsing and normalized all generated documentation tables to the shared canonical style.
 - **Internal cleanup:**

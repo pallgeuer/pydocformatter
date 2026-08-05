@@ -470,7 +470,7 @@ class SettingDefinition(Generic[SettingValueT]):
         field: str,
         value_type: type[SettingValueT] | GenericAlias,
         group: enum.StrEnum,
-        help: str,  # noqa: A002
+        help: str,  # ruff: ignore[builtin-argument-shadowing]
         key: str = "",
         available_in_cli: bool = True,
         available_in_toml: bool = True,

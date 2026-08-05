@@ -565,7 +565,7 @@ def _query_git_ignored_paths(git_root: str, relative_paths: list[str]) -> tuple[
 
     stdin_bytes = ("\0".join(unique_relative_paths) + "\0").encode("utf-8", errors="surrogateescape")
     try:
-        process = subprocess.run(["git", "-C", git_root, "check-ignore", "--stdin", "--no-index", "-z"], input=stdin_bytes, capture_output=True, check=False)  # noqa: S603
+        process = subprocess.run(["git", "-C", git_root, "check-ignore", "--stdin", "--no-index", "-z"], input=stdin_bytes, capture_output=True, check=False)  # ruff: ignore[subprocess-without-shell-equals-true]
     except OSError as error:
         return set(), str(error)
 

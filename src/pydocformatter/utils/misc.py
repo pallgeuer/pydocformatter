@@ -14,7 +14,7 @@ from typing import Any, Generic, TypeVar, cast, overload
 _R_co = TypeVar("_R_co", covariant=True)
 
 
-class classproperty(Generic[_R_co]):  # noqa: N801
+class classproperty(Generic[_R_co]):  # ruff: ignore[invalid-class-name]
     """A descriptor that computes a read-only value from the owning class.
 
     Instance assignment/deletion is blocked. Class-level assignment/deletion can still replace/remove the descriptor

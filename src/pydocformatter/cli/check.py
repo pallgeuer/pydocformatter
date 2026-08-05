@@ -343,7 +343,7 @@ def output_stream(output_file: str | None) -> Iterator[TextIO | None]:
         if parent:
             with contextlib.suppress(FileExistsError):
                 os.mkdir(parent)
-        output = open(output_file, "w", encoding="utf-8", newline="")  # noqa: SIM115
+        output = open(output_file, "w", encoding="utf-8", newline="")  # ruff: ignore[open-file-with-context-handler]
     except OSError as error:
         raise OutputError(str(error)) from error
     with output:

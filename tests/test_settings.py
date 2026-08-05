@@ -890,7 +890,7 @@ def test_load_settings_defaults_in_isolated_mode(monkeypatch: pytest.MonkeyPatch
     assert config.line_ending is LineEnding.AUTO
     assert config.indent_style is IndentStyle.SPACE
     assert config.indent_width == 4
-    assert config.parallelism == 0.0  # noqa: RUF069
+    assert config.parallelism == 0.0  # ruff: ignore[float-equality-comparison]
     assert config.docstring_convention is pydocformatter_settings.DocstringConvention.PEP257
     assert not config.docstring_include_assertion_errors
     assert config.docstring_placeholder_markers == pydocformatter_settings.DEFAULT_DOCSTRING_PLACEHOLDER_MARKERS
@@ -964,7 +964,7 @@ def test_ty_default_exclude_matches_shared_default_directories() -> None:
             ignored_dir.mkdir(parents=True)
             (ignored_dir / "ignored.py").write_text("x = 1\n", encoding="utf-8")
 
-        result = subprocess.run(  # noqa: S603
+        result = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true]
             ["uv", "run", "ty", "check", "--project", str(root), "-vv", "--no-progress", "--output-format", "concise"], cwd=_repo_root(), shell=False, check=True, capture_output=True, text=True
         )
 

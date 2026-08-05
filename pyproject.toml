@@ -52,7 +52,7 @@ pydocfmt = "pydocformatter.cli.main:main"
 [dependency-groups]
 docs = [
     "la-dev-codex-plugins==0.4.3",
-    "zensical==0.0.50",
+    "zensical==0.0.53",
 ]
 test = [
     {include-group = "docs"},
@@ -64,10 +64,10 @@ test = [
 ]
 dev = [
     {include-group = "test"},
-    "pre-commit==4.6.0",
-    "ruff==0.15.21",
-    "twine==6.2.0",
-    "ty==0.0.60",
+    "pre-commit==4.6.1",
+    "ruff==0.16.1",
+    "twine==7.0.0",
+    "ty==0.0.66",
 ]
 
 #
@@ -179,19 +179,32 @@ select = [
     "YTT",
 ]
 extend-select = [
-    "FBT003",
+    "boolean-positional-value-in-call",
 ]
 ignore = [
-    "ANN401",
-    "COM812", "COM819",
-    "D", "DOC",
-    "E111", "E114", "E117", "E261", "E262", "E265", "E266", "E501",
-    "FURB101", "FURB103",
-    "N999",
-    "PLC1901", "PLC2801",
-    "S404", "S607",
-    "TRY003",
-    "W191", "W505",
+    "D",
+    "DOC",
+    "any-type",
+    "compare-to-empty-string",
+    "doc-line-too-long",
+    "indentation-with-invalid-multiple",
+    "indentation-with-invalid-multiple-comment",
+    "invalid-module-name",
+    "line-too-long",
+    "missing-trailing-comma",
+    "multiple-leading-hashes-for-block-comment",
+    "no-space-after-block-comment",
+    "no-space-after-inline-comment",
+    "over-indented",
+    "prohibited-trailing-comma",
+    "raise-vanilla-args",
+    "read-whole-file",
+    "start-process-with-partial-path",
+    "suspicious-subprocess-import",
+    "tab-indentation",
+    "too-few-spaces-before-inline-comment",
+    "unnecessary-dunder-call",
+    "write-whole-file",
 ]
 extend-unsafe-fixes = []
 unfixable = []
@@ -201,8 +214,12 @@ preview = true
 task-tags = ["TODO", "FIXME", "XXX", "HACK", "BUG", "DEBUG", "NOTE", "OPTIMIZE", "REVIEW"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**/*.py" = ["S101"]
-"tests/**/test_*.py" = ["SLF001"]
+"tests/**/*.py" = [
+    "assert",
+]
+"tests/**/test_*.py" = [
+    "private-member-access",
+]
 
 [tool.ruff.lint.flake8-implicit-str-concat]
 allow-multiline = true

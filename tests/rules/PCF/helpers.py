@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from pydocformatter.settings import StringList
 
 
-def format_pcf(  # noqa: PLR0913
+def format_pcf(  # ruff: ignore[too-many-arguments]
     source: str,
     *,
     fix: bool = True,

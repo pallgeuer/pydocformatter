@@ -18,7 +18,7 @@ def test_release_checksum_command_writes_and_prints_ordered_manifest(tmp_path: p
     wheel.write_bytes(b"wheel")
     expected = f"{hashlib.sha256(b'source distribution').hexdigest()}  package.tar.gz\n{hashlib.sha256(b'wheel').hexdigest()}  package.whl\n"
 
-    result = subprocess.run([command, "--output", str(output), str(sdist), str(wheel)], check=False, capture_output=True, text=True)  # noqa: S603
+    result = subprocess.run([command, "--output", str(output), str(sdist), str(wheel)], check=False, capture_output=True, text=True)  # ruff: ignore[subprocess-without-shell-equals-true]
 
     assert result.returncode == 0
     assert result.stderr == ""
