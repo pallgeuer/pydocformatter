@@ -374,6 +374,21 @@ class DocstringNameSlot:
 
 
 @dataclasses.dataclass(frozen=True)
+class DocstringNameListEditSlot:
+    """Parser-owned source bounds for editing one aggregate convention name list.
+
+    Attributes:
+        line_index (int): Logical docstring value line that owns the editable name list.
+        start_column (int): Start column of the complete semantic name-list spelling.
+        end_column (int): Exclusive end column of the complete semantic name-list spelling.
+    """
+
+    line_index: int
+    start_column: int
+    end_column: int
+
+
+@dataclasses.dataclass(frozen=True)
 class DocstringEntry:
     """One parsed convention section entry or reST field.
 
@@ -390,6 +405,8 @@ class DocstringEntry:
         end_line (int): Last logical docstring line occupied by the entry.
         type_edit_slot (DocstringTypeEditSlot | None): Parser-owned insertion and removal bounds for a convention type
             clause, if available.
+        name_list_edit_slot (DocstringNameListEditSlot | None): Parser-owned replacement bounds for an aggregate
+            convention name list, if available.
         following_description_block_kind (DocstringBlockKind | None): Protected structural block immediately after the
             final parsed description fragment but still owned by the entry.
         field_name (str | None): Original reStructuredText field name, without the surrounding colons.
@@ -405,6 +422,7 @@ class DocstringEntry:
     start_line: int
     end_line: int
     type_edit_slot: DocstringTypeEditSlot | None = None
+    name_list_edit_slot: DocstringNameListEditSlot | None = None
     following_description_block_kind: DocstringBlockKind | None = None
     field_name: str | None = None
     field_argument: str | None = None
@@ -1689,6 +1707,16 @@ def _type_info(line_index: int, text: str, full_start_column: int, full_end_colu
     )
 
 
+def _name_list_edit_slot(line_index: int, text: str, start_column: int, end_column: int) -> DocstringNameListEditSlot | None:
+    """Return parser-owned name-list bounds after trimming convention spaces and tabs."""
+    candidate = text[start_column:end_column]
+    semantic_start_column = start_column + len(candidate) - len(candidate.lstrip(ascii_whitespace.SPACE_AND_TAB))
+    semantic_end_column = end_column - (len(candidate) - len(candidate.rstrip(ascii_whitespace.SPACE_AND_TAB)))
+    if semantic_start_column >= semantic_end_column:
+        return None
+    return DocstringNameListEditSlot(line_index=line_index, start_column=semantic_start_column, end_column=semantic_end_column)
+
+
 def _google_type_edit_slot(line_index: int, match: _ConventionEntryMatch) -> DocstringTypeEditSlot:
     """Return parser-owned bounds for inserting or removing a Google type clause."""
     removal_start = match.name_end if match.type_start is not None and match.type_end is not None else None
@@ -2080,6 +2108,7 @@ class _DocstringParser:
                 start_line=index,
                 end_line=entry_end,
                 type_edit_slot=_google_type_edit_slot(index, match),
+                name_list_edit_slot=_name_list_edit_slot(index, text, match.name_start, match.name_end) if is_exception_name_entry_kind(kind) else None,
             )
             entries.append(entry)
             if not first_description and entry_end == index + 1:
@@ -2124,6 +2153,7 @@ class _DocstringParser:
                         description_lines=tuple(description_fragments),
                         start_line=index,
                         end_line=entry_end,
+                        name_list_edit_slot=_name_list_edit_slot(index, text, exception_match.start("name"), exception_match.end("name")),
                     )
                     entries.append(entry)
                     if not description_lines and entry_end == index + 1:
@@ -2204,6 +2234,7 @@ class _DocstringParser:
                     description_lines=tuple(description_fragments),
                     start_line=index,
                     end_line=entry_end,
+                    name_list_edit_slot=_name_list_edit_slot(index, text, 0, len(text)) if is_exception_name_entry_kind(kind) else None,
                 )
                 entries.append(entry)
                 if not description_lines and entry_end == index + 1:
@@ -2532,6 +2563,9 @@ class _DocstringParser:
                 description_lines=tuple(description_fragments),
                 start_line=start,
                 end_line=block_end,
+                name_list_edit_slot=_name_list_edit_slot(start, self.lines[start].text, match.start("argument"), match.end("argument"))
+                if is_exception_name_entry_kind(kind) and match.group("argument") is not None
+                else None,
                 following_description_block_kind=following_description_block_kind,
                 field_name=field,
                 field_argument=argument or None,

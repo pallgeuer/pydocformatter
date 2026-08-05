@@ -28,6 +28,17 @@ def test_shared_rule_policies_are_distinct_and_immutable() -> None:
     assert policy(valid_endings=".?!\u2026") == terminal_punctuation.TERMINAL_PUNCTUATION_POLICY
 
 
+def test_trailing_period_policy_is_stricter_than_terminal_punctuation_policy() -> None:
+    """Require every expressive-policy finding to also violate the strict policy."""
+    strict = terminal_punctuation.TRAILING_PERIOD_POLICY
+    expressive = terminal_punctuation.TERMINAL_PUNCTUATION_POLICY
+
+    assert set(strict.valid_endings) < set(expressive.valid_endings)
+    assert strict.replaceable_endings == expressive.replaceable_endings
+    assert set(strict.nonfixable_endings) == set(expressive.nonfixable_endings) | (set(expressive.valid_endings) - set(strict.valid_endings))
+    assert strict.canonical_ending == expressive.canonical_ending
+
+
 @pytest.mark.parametrize(
     "kind",
     [

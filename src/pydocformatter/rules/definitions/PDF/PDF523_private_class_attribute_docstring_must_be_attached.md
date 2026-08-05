@@ -2,18 +2,16 @@
 
 Fix is not available.
 
-Rule is disabled if `docstring-convention` is `none` or `pep257`.
+Rule is disabled if `docstring-convention` is `none` or `pep257`, and ignored by broad selectors under `google`, `numpy`, and `rest`.
 
-Rule must by default be explicitly selected, unless it is removed from `require-explicit`.
-
-Rule is incompatible with `PDF516` and `PDF522`.
+Rule is incompatible with `PDF514`, `PDF516`, and `PDF522`.
 
 ## What it does
 Checks for private class attributes documented in class docstring attribute entries when private class attribute documentation must use attached docstrings.
 
 PDF523 checks parsed Google `Attributes` sections, NumPy `Attributes` sections, and reStructuredText attribute fields when the matching convention is active. The documented name must also match a supported class-scope attribute or supported `self.*` attribute assigned in `__init__`. A slot-only member is excluded because its string literal cannot own an attached docstring. If the same name also has any real class or initializer assignment, including an annotation-only declaration, the ordinary attached-docstring policy applies.
 
-PDF523 is a location policy: it reports inventory-backed private class attributes documented in the class docstring because attached docstrings are required. It differs from PDF514, which forbids private class owner-docstring entries even when the attribute is stale or otherwise not in inventory, and it conflicts with PDF516, which forbids attached private class docstrings.
+PDF523 is a location policy: it reports inventory-backed private class attributes documented in the class docstring because attached docstrings are required. It conflicts with PDF514, whose broader owner-docstring prohibition overlaps its findings; PDF516, which forbids the required attached docstrings; and PDF522, the opposite owner-docstring policy.
 
 ## Why is this useful?
 Attached docstrings let private implementation attributes be documented near their assignment without adding private details to the owner docstring's public attribute list.

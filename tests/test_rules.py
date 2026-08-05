@@ -1473,9 +1473,12 @@ def test_builtin_docstring_convention_opt_in_rules_are_declared_and_separate_fro
 def test_builtin_ignored_docstring_convention_rules_require_exact_selection(code: str, convention: DocstringConvention) -> None:
     broad_selection = rules_selection.select_rules(CheckSettings(select=("ALL",), docstring_convention=convention))
     exact_selection = rules_selection.select_rules(CheckSettings(select=(code,), docstring_convention=convention))
+    exact_extension = rules_selection.select_rules(CheckSettings(select=("ALL",), extend_select=(code,), docstring_convention=convention))
 
     assert code not in tuple(rule.rule.code.tag for rule in broad_selection.rules)
     assert code in tuple(rule.rule.code.tag for rule in exact_selection.rules)
+    assert code in tuple(rule.rule.code.tag for rule in exact_extension.rules)
+    assert exact_extension.errors == ()
 
 
 @pytest.mark.parametrize(("code", "convention"), DISABLED_DOCSTRING_CONVENTION_CASES)
@@ -1677,15 +1680,40 @@ def test_select_rules_applies_setting_effects_before_incompatibilities() -> None
     assert selection.errors == ("Selected rule TST003 is incompatible with earlier selected rule TST002; TST003 has been disabled",)
 
 
-def test_select_rules_uses_collection_order_before_selector_strength_for_incompatibilities() -> None:
+def test_select_rules_uses_selector_strength_before_collection_order_for_incompatibilities() -> None:
     selection = rules_selection.select_rules(
         CheckSettings(select=("TST001",), extend_select=("TST004",)),
         collection=incompatibility_collection(),
         field_priorities={"select": settings_core.CONFIG_FILE_SOURCE_PRIORITY, "extend_select": settings_core.ARGUMENT_SOURCE_PRIORITY},
     )
 
-    assert tuple(rule.rule.code.tag for rule in selection.rules) == ("TST001",)
+    assert tuple(rule.rule.code.tag for rule in selection.rules) == ("TST004",)
+    assert selection.errors == ()
+
+
+def test_select_rules_uses_specificity_to_resolve_incompatibilities_without_errors() -> None:
+    selection = rules_selection.select_rules(CheckSettings(select=("TST",), extend_select=("TST004",)), collection=incompatibility_collection())
+
+    assert tuple(rule.rule.code.tag for rule in selection.rules) == ("TST002", "TST004")
+    assert selection.errors == ()
+
+
+def test_select_rules_reports_only_equal_strength_incompatibilities() -> None:
+    selection = rules_selection.select_rules(CheckSettings(select=("TST", "TST001", "TST004")), collection=incompatibility_collection())
+
+    assert tuple(rule.rule.code.tag for rule in selection.rules) == ("TST001", "TST003")
     assert selection.errors == ("Selected rule TST004 is incompatible with earlier selected rule TST001; TST004 has been disabled",)
+
+
+def test_select_rules_resolves_incompatibilities_globally_by_strength() -> None:
+    selection = rules_selection.select_rules(
+        CheckSettings(select=("TST", "TST002"), extend_select=("TST003",), ignore=("TST004",)),
+        collection=incompatibility_collection(),
+        field_priorities={"select": settings_core.CONFIG_FILE_SOURCE_PRIORITY, "extend_select": settings_core.ARGUMENT_SOURCE_PRIORITY, "ignore": settings_core.CONFIG_FILE_SOURCE_PRIORITY},
+    )
+
+    assert tuple(rule.rule.code.tag for rule in selection.rules) == ("TST001", "TST003")
+    assert selection.errors == ()
 
 
 def test_select_rules_does_not_restore_incompatible_rules_after_per_file_ignores() -> None:

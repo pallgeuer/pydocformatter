@@ -11,9 +11,9 @@ import pydocformatter.rules.registration as rule_registration
 from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase
-from pydocformatter.rules.definition_helpers import summary_terminal_punctuation, terminal_punctuation
+from pydocformatter.rules.definition_helpers import docstring_conventions, summary_terminal_punctuation, terminal_punctuation
 from pydocformatter.rules.definitions.PDF.PDF import PDF
-from pydocformatter.rules.models import FixAvailability, RuleCacheBehavior, RuleCheckKind, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
+from pydocformatter.rules.models import FixAvailability, RuleCacheBehavior, RuleCheckKind, RuleMetadata
 
 
 if TYPE_CHECKING:
@@ -36,10 +36,8 @@ class PDF301SummaryTerminalPunctuation(RuleBase):
         message="Docstring summary should end with terminal punctuation",
         fix_availability=FixAvailability.SOMETIMES,
         stable_since="1.0.0",
-        setting_effects=(
-            RuleSettingEffects(setting="docstring_convention", effects=(RuleSettingEffectValues(effect=RuleSettingEffect.IGNORED, values=(DocstringConvention.NUMPY, DocstringConvention.PEP257)),)),
-        ),
-        incompatible_with=(),
+        setting_effects=docstring_conventions.convention_setting_effects(ignored=docstring_conventions.ignored_conventions_except(DocstringConvention.GOOGLE)),
+        incompatible_with=(RuleCode("PDF300"),),
         check_kind=RuleCheckKind.STANDARD,
         cache_behavior=RuleCacheBehavior.FILE_LOCAL,
     )

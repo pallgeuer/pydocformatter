@@ -2,7 +2,9 @@
 
 Fix is sometimes available.
 
-Rule is disabled if `docstring-convention` is `none` or `pep257`, and ignored by broad selectors under `numpy`.
+Rule is disabled if `docstring-convention` is `none` or `pep257`, and ignored by broad selectors under `numpy` and `rest`.
+
+Rule is incompatible with `PDF308`.
 
 ## What it does
 Checks that parsed docstring entry descriptions end with terminal punctuation.

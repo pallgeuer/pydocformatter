@@ -4,6 +4,8 @@ Fix is sometimes available.
 
 Rule is ignored if `docstring-convention` is `google`.
 
+Rule is incompatible with `PDF301`.
+
 ## What it does
 Checks that the docstring summary punctuation target ends with a period.
 

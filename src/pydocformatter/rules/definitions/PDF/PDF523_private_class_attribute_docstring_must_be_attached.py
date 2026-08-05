@@ -36,8 +36,8 @@ class PDF523PrivateClassAttributeDocstringMustBeAttached(RuleBase):
         message="Private class attribute must use attached docstring, not class docstring documentation",
         fix_availability=FixAvailability.NEVER,
         stable_since="1.0.0",
-        setting_effects=docstring_conventions.convention_setting_effects(disabled=docstring_conventions.UNPARSED_CONVENTIONS),
-        incompatible_with=(RuleCode("PDF516"), RuleCode("PDF522")),
+        setting_effects=docstring_conventions.convention_setting_effects(disabled=docstring_conventions.UNPARSED_CONVENTIONS, ignored=docstring_conventions.PARSED_CONVENTIONS),
+        incompatible_with=(RuleCode("PDF514"), RuleCode("PDF516"), RuleCode("PDF522")),
         check_kind=RuleCheckKind.STANDARD,
         cache_behavior=RuleCacheBehavior.FILE_LOCAL,
     )

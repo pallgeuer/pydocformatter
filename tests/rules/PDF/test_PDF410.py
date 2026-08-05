@@ -17,10 +17,35 @@ def test_normalizes_google_exception_and_warning_entries() -> None:
 
     assert (
         result.new_source
-        == 'def function(value):\n    """Summary.\n\n    Raises:\n        ValueError, mypkg.CustomError, TypeError: Bad value.\n\n    Warns:\n        RuntimeWarning, UserWarning: Bad warning.\n    """\n'
+        == 'def function(value):\n    """Summary.\n\n    Raises:\n        ValueError, mypkg.CustomError, TypeError   : Bad value.\n\n    Warns:\n        RuntimeWarning, UserWarning : Bad warning.\n    """\n'
     )
     assert result.fixed_findings[PDF410ExceptionEntryNormalization.meta] == 1
     assert not format_source(result.new_source).modified
+
+
+def test_composes_exception_spelling_with_pdf409_spacing_normalization() -> None:
+    source = 'def function(value):\n    """Summary.\n\n    Raises:\n        `ValueError` | TypeError   :  Bad value.\n    """\n'
+    settings = CheckSettings(select=("PDF409", "PDF410"), docstring_convention=DocstringConvention.GOOGLE)
+    result = format_source(source, settings=settings)
+
+    assert result.new_source == 'def function(value):\n    """Summary.\n\n    Raises:\n        ValueError, TypeError: Bad value.\n    """\n'
+    assert result.fixed_findings[PDF409DocstringEntrySpacing.meta] == 1
+    assert result.fixed_findings[PDF410ExceptionEntryNormalization.meta] == 1
+    assert not result.unfixed_findings
+    assert not format_source(result.new_source, settings=settings).modified
+
+
+def test_leaves_spacing_only_findings_exclusively_to_pdf409() -> None:
+    source = 'def function(value):\n    """Summary.\n\n    Raises:\n        ValueError   :  Bad value.\n    """\n'
+    pdf410 = format_source(source, settings=CheckSettings(select=("PDF410",), docstring_convention=DocstringConvention.GOOGLE))
+    pdf409 = format_source(source, settings=CheckSettings(select=("PDF409",), docstring_convention=DocstringConvention.GOOGLE))
+
+    assert pdf410.new_source == source
+    assert not pdf410.fixed_findings
+    assert not pdf410.unfixed_findings
+    assert pdf409.new_source == 'def function(value):\n    """Summary.\n\n    Raises:\n        ValueError: Bad value.\n    """\n'
+    assert pdf409.fixed_findings[PDF409DocstringEntrySpacing.meta] == 1
+    assert not pdf409.unfixed_findings
 
 
 def test_leaves_nonstandard_exception_list_whitespace_to_pdf004() -> None:
@@ -59,7 +84,7 @@ def test_warning_normalization_ignores_other_parsed_entry_families_in_mixed_docs
 
     assert (
         result.new_source
-        == 'def function(value):\n    """Summary.\n\n    Args:\n        value (tuple[int, int]): Keep parameter spelling.\n\n    Returns:\n        tuple[int, int]: Keep return spelling.\n\n    Warns:\n        RuntimeWarning, UserWarning: Normalize warning spelling.\n    """\n'
+        == 'def function(value):\n    """Summary.\n\n    Args:\n        value (tuple[int, int]): Keep parameter spelling.\n\n    Returns:\n        tuple[int, int]: Keep return spelling.\n\n    Warns:\n        RuntimeWarning, UserWarning : Normalize warning spelling.\n    """\n'
     )
     assert result.fixed_findings[PDF410ExceptionEntryNormalization.meta] == 1
     assert not result.unfixed_findings
@@ -112,7 +137,7 @@ def test_normalizes_numpy_colon_style_exception_name_list() -> None:
     settings = CheckSettings(select=("PDF410",), docstring_convention=DocstringConvention.NUMPY)
     result = format_source(source, settings=settings)
 
-    assert result.new_source == 'def function(value):\n    """Summary.\n\n    Raises\n    ------\n    ValueError, TypeError: Bad value.\n    """\n'
+    assert result.new_source == 'def function(value):\n    """Summary.\n\n    Raises\n    ------\n    ValueError, TypeError : Bad value.\n    """\n'
     assert result.fixed_findings[PDF410ExceptionEntryNormalization.meta] == 1
     assert not format_source(result.new_source, settings=settings).modified
 
@@ -122,7 +147,7 @@ def test_normalizes_rest_exception_field_entries() -> None:
     settings = CheckSettings(select=("PDF410",), docstring_convention=DocstringConvention.REST)
     result = format_source(source, settings=settings)
 
-    assert result.new_source == 'def function(value):\n    """Summary.\n\n    :raises ValueError, errors.CustomError: Bad value.\n    :exception RuntimeError, TypeError:\n    """\n'
+    assert result.new_source == 'def function(value):\n    """Summary.\n\n    :raises   ValueError, errors.CustomError : Bad value.\n    :exception RuntimeError, TypeError:\n    """\n'
     assert result.fixed_findings[PDF410ExceptionEntryNormalization.meta] == 1
     assert not format_source(result.new_source, settings=settings).modified
 
@@ -132,7 +157,7 @@ def test_normalizes_rest_exception_field_aliases_and_whole_list_code_span() -> N
     settings = CheckSettings(select=("PDF410",), docstring_convention=DocstringConvention.REST)
     result = format_source(source, settings=settings)
 
-    assert result.new_source == 'def function(value):\n    """Summary.\n\n    :raise ValueError, errors.CustomError: Bad value.\n    :except RuntimeError, TypeError:\n    """\n'
+    assert result.new_source == 'def function(value):\n    """Summary.\n\n    :raise ValueError, errors.CustomError : Bad value.\n    :except RuntimeError, TypeError:\n    """\n'
     assert result.fixed_findings[PDF410ExceptionEntryNormalization.meta] == 1
     assert not format_source(result.new_source, settings=settings).modified
 
@@ -165,7 +190,7 @@ def test_skips_malformed_google_exception_block_before_later_valid_entry() -> No
 
     assert (
         result.new_source
-        == 'def function(value):\n    """Summary.\n\n    Raises:\n        If the value is bad: explain the condition.\n            `ValueError` | TypeError : prose continuation.\n        RuntimeError, LookupError: Bad runtime.\n    """\n'
+        == 'def function(value):\n    """Summary.\n\n    Raises:\n        If the value is bad: explain the condition.\n            `ValueError` | TypeError : prose continuation.\n        RuntimeError, LookupError : Bad runtime.\n    """\n'
     )
     assert result.fixed_findings[PDF410ExceptionEntryNormalization.meta] == 1
     assert not result.unfixed_findings
@@ -192,7 +217,7 @@ def test_skips_malformed_exception_entries_without_blocking_later_valid_entries(
 
     assert (
         result.new_source
-        == 'def function(value):\n    """Summary.\n\n    Raises:\n        ValueError || TypeError: Ambiguous separator.\n        RuntimeError: Bad runtime.\n        ValueError,: Trailing separator.\n        LookupError, KeyError: Bad lookup.\n    """\n'
+        == 'def function(value):\n    """Summary.\n\n    Raises:\n        ValueError || TypeError: Ambiguous separator.\n        RuntimeError: Bad runtime.\n        ValueError,: Trailing separator.\n        LookupError, KeyError : Bad lookup.\n    """\n'
     )
     assert result.fixed_findings[PDF410ExceptionEntryNormalization.meta] == 1
     assert not result.unfixed_findings
@@ -218,7 +243,7 @@ def test_literal_block_parsing_setting_controls_exception_entry_normalization() 
     assert protected.new_source == source
     assert not protected.fixed_findings
     assert not protected.unfixed_findings
-    assert unprotected.new_source == 'def function(value):\n    """Summary.\n\n    Raises:\n        Example::\n\n            ValueError, TypeError: Entry-like text.\n    """\n'
+    assert unprotected.new_source == 'def function(value):\n    """Summary.\n\n    Raises:\n        Example::\n\n            ValueError, TypeError : Entry-like text.\n    """\n'
     assert unprotected.fixed_findings[PDF410ExceptionEntryNormalization.meta] == 1
     assert not format_source(unprotected.new_source, settings=unprotected_settings).modified
 

@@ -36,8 +36,8 @@ class PDF525PrivateModuleAttributeDocstringMustBeAttached(RuleBase):
         message="Private module attribute must use attached docstring, not module docstring documentation",
         fix_availability=FixAvailability.NEVER,
         stable_since="1.0.0",
-        setting_effects=docstring_conventions.convention_setting_effects(disabled=docstring_conventions.UNPARSED_CONVENTIONS),
-        incompatible_with=(RuleCode("PDF517"), RuleCode("PDF524")),
+        setting_effects=docstring_conventions.convention_setting_effects(disabled=docstring_conventions.UNPARSED_CONVENTIONS, ignored=docstring_conventions.PARSED_CONVENTIONS),
+        incompatible_with=(RuleCode("PDF515"), RuleCode("PDF517"), RuleCode("PDF524")),
         check_kind=RuleCheckKind.STANDARD,
         cache_behavior=RuleCacheBehavior.FILE_LOCAL,
     )

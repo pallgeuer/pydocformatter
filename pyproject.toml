@@ -117,7 +117,7 @@ indent-width = 4
 line-ending = "lf"
 respect-gitignore = true
 extend-select = ["PDF300", "PDF302", "PDF305", "PDF510", "PDF701", "PDF705", "PDF709", "PDF713", "PDF717"]
-ignore = ["PDF519", "PDF521", "PDF522", "PDF523", "PDF524", "PDF525"]
+ignore = ["PDF519", "PDF521", "PDF522", "PDF524"]
 require-explicit = []
 
 [tool.pydocfmt.docstring]

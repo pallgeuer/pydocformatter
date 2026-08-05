@@ -4,14 +4,14 @@ Fix is not available.
 
 Rule must by default be explicitly selected, unless it is removed from `require-explicit`.
 
-Rule is incompatible with `PDF515` and `PDF525`.
+Rule is incompatible with `PDF515`, `PDF517`, and `PDF525`.
 
 ## What it does
 Checks for attached docstrings on private module attributes when private module attribute documentation must live in the module docstring.
 
 PDF524 checks supported module-scope assignments, annotations, multi-target assignments, and tuple-unpacked assignment leaves. Attribute names beginning with `_` are private.
 
-PDF524 is a location policy: it reports attached private module attribute docstrings because the module docstring is required. It conflicts with PDF515, which forbids private module owner-docstring entries entirely, and with PDF525, the opposite attached-docstring policy.
+PDF524 is a location policy: it reports attached private module attribute docstrings because the module docstring is required. It conflicts with PDF515, which forbids private module owner-docstring entries entirely; PDF517, which forbids attached docstrings without selecting owner documentation and would duplicate the attached-docstring prohibition; and PDF525, the opposite attached-docstring policy.
 
 ## Why is this useful?
 Some projects choose to document private module state in module docstrings for internal API reference builds while avoiding scattered attached docstrings.

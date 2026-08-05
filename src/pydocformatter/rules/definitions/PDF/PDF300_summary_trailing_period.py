@@ -37,7 +37,7 @@ class PDF300SummaryTrailingPeriod(RuleBase):
         fix_availability=FixAvailability.SOMETIMES,
         stable_since="1.0.0",
         setting_effects=(RuleSettingEffects(setting="docstring_convention", effects=(RuleSettingEffectValues(effect=RuleSettingEffect.IGNORED, values=(DocstringConvention.GOOGLE,)),)),),
-        incompatible_with=(),
+        incompatible_with=(RuleCode("PDF301"),),
         check_kind=RuleCheckKind.STANDARD,
         cache_behavior=RuleCacheBehavior.FILE_LOCAL,
     )

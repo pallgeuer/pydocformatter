@@ -280,20 +280,31 @@ def _apply_require_explicit(enabled_strengths: dict[RuleCode, _SelectorStrength]
 
 
 def _resolve_rule_incompatibilities(enabled_strengths: dict[RuleCode, _SelectorStrength], *, collection: RuleCollection, errors: list[str]) -> dict[RuleCode, _SelectorStrength]:
-    """Keep the first selected rule from each incompatible set and report discarded rules."""
-    effective_strengths: dict[RuleCode, _SelectorStrength] = {}
+    """Retain the strongest compatible rules and report unresolved equal-strength conflicts."""
+    collection_order = {rule_class.meta.code: index for index, rule_class in enumerate(collection.rules)}
+    ranked_rules = sorted(
+        (rule_class.meta for rule_class in collection.rules if rule_class.meta.code in enabled_strengths),
+        key=lambda rule: (-enabled_strengths[rule.code].priority, -enabled_strengths[rule.code].specificity, collection_order[rule.code]),
+    )
+    retained_codes: set[RuleCode] = set()
+    for rule in ranked_rules:
+        if not retained_codes.intersection(rule.incompatible_with):
+            retained_codes.add(rule.code)
+
     for rule_class in collection.rules:
         rule = rule_class.meta
-        if rule.code not in enabled_strengths:
+        if rule.code not in enabled_strengths or rule.code in retained_codes:
             continue
-        incompatible_codes = set(rule.incompatible_with)
-        earlier_conflicts = tuple(code for code in effective_strengths if code in incompatible_codes)
-        if earlier_conflicts:
-            conflicts = ", ".join(map(str, earlier_conflicts))
-            errors.append(f"Selected rule {rule.code} is incompatible with earlier selected {misc.auto_plural(len(earlier_conflicts), 'rule')} {conflicts}; {rule.code} has been disabled")
-        else:
-            effective_strengths[rule.code] = enabled_strengths[rule.code]
-    return effective_strengths
+        retained_conflicts = tuple(sorted(retained_codes.intersection(rule.incompatible_with), key=collection_order.__getitem__))
+        if any(enabled_strengths[conflict] > enabled_strengths[rule.code] for conflict in retained_conflicts):
+            continue
+        earlier_conflicts = tuple(
+            conflict for conflict in retained_conflicts if enabled_strengths[conflict] == enabled_strengths[rule.code] and collection_order[conflict] < collection_order[rule.code]
+        )
+        conflicts = ", ".join(map(str, earlier_conflicts))
+        errors.append(f"Selected rule {rule.code} is incompatible with earlier selected {misc.auto_plural(len(earlier_conflicts), 'rule')} {conflicts}; {rule.code} has been disabled")
+
+    return {rule_class.meta.code: enabled_strengths[rule_class.meta.code] for rule_class in collection.rules if rule_class.meta.code in retained_codes}
 
 
 def _selector_groups(settings: CheckSettings, *, primary_field: str, extension_field: str, field_priorities: Mapping[str, int] | None, include_primary: bool = True) -> tuple[_SelectorGroup, ...]:

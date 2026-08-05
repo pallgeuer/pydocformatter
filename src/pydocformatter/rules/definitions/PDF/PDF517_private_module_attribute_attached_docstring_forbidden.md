@@ -4,7 +4,7 @@ Fix is not available.
 
 Rule must by default be explicitly selected, unless it is removed from `require-explicit`.
 
-Rule is incompatible with `PDF525`.
+Rule is incompatible with `PDF524` and `PDF525`.
 
 ## What it does
 Checks for attached docstrings on private module attributes.
@@ -15,7 +15,7 @@ The rule reports on the attached docstring source lines. When one attached docst
 
 Class attributes, function-local assignments, list destructuring targets, unsupported tuple leaves, subscript targets, arbitrary object attributes, bytes literals, and f-strings are not module attribute docstrings for this rule.
 
-PDF517 forbids attached docstrings on private module attributes. If the project instead wants private module attributes documented in module docstrings, use PDF524; if it wants private module attributes documented by attached docstrings, use PDF525 and do not enable PDF517.
+PDF517 forbids attached docstrings on private module attributes. Projects that require private module attributes in owner docstrings should select PDF524 instead of PDF517; projects that require attached docstrings should select PDF525 instead of PDF517.
 
 ## Why is this useful?
 Private module attributes are implementation details and should usually be documented with nearby comments or internal design documentation rather than API docstrings.

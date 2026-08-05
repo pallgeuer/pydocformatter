@@ -7,11 +7,11 @@ Rule is disabled if `docstring-convention` is `none` or `pep257`.
 ## What it does
 PDF410 reports parsed exception and warning entries whose exception-name lists are not in canonical form.
 
-The canonical spelling uses simple or dotted exception names without backtick code spans, with multiple exception names separated by commas. The fix removes single-backtick code spans around individual exception names or around a whole parsed exception-name list, converts pipe separators to commas, and normalizes unambiguous spacing around the parsed exception entry prefix.
+The canonical spelling uses simple or dotted exception names without backtick code spans, with multiple exception names separated by commas. The fix removes single-backtick code spans around individual exception names or around a whole parsed exception-name list and converts pipe separators to commas. PDF410 edits only the semantic exception-name list; PDF409 independently owns spacing around the entry prefix, colon, and description.
 
 Google `Raise`/`Raises` and `Warn`/`Warns` entries, NumPy exception and `Warn`/`Warns` entries, and reST `raise`/`raises`/`except`/`exception` fields are supported under their matching conventions. Google and NumPy `Warning` and `Warnings` caution sections are not exception-entry sections for this rule. Nameless reST exception fields such as `:raises:` are left unchanged because their body is prose, not a parsed exception-name list.
 
-The rule only rewrites entries that parse as simple or dotted exception names. Entries containing non-default whitespace or suspicious controls are left unchanged for PDF004 rather than reconstructed. Description boundaries trim only ASCII spaces and tabs. The rule does not normalize arbitrary prose, malformed exception lists, double-backtick code spans, return/yield type expressions, or description text. Concatenated docstrings and source mappings that cannot be safely rewritten are reported without a fix.
+The rule only rewrites entries that parse as simple or dotted exception names. Entries containing non-default whitespace or suspicious controls are left unchanged for PDF004 rather than reconstructed. Exception-name list boundaries trim only ASCII spaces and tabs. The rule does not normalize arbitrary prose, malformed exception lists, double-backtick code spans, return/yield type expressions, or description text. Concatenated docstrings and source mappings that cannot be safely rewritten are reported without a fix.
 
 ## Why is this useful?
 Consistent exception-entry spelling keeps convention-aware docstrings readable without wrapping exception names in backticks.
@@ -44,12 +44,12 @@ def value(arg):
     """Return the value.
 
     Raises:
-        ValueError: Bad value.
-        errors.CustomError: Custom bad value.
+        ValueError : Bad value.
+        errors.CustomError : Custom bad value.
 
     Warns:
         RuntimeWarning: Bad warning.
-        UserWarning: User-visible warning.
+        UserWarning : User-visible warning.
     """
 ```
 
@@ -78,7 +78,7 @@ def value(arg):
     """Return the value.
 
     Raise:
-        LookupError, KeyError: Missing value.
+        LookupError, KeyError : Missing value.
 
     Warn:
         RuntimeWarning, UserWarning: Bad warning.
@@ -130,7 +130,7 @@ def value(arg):
 
     Raise
     -----
-    LookupError, KeyError: Missing value.
+    LookupError, KeyError : Missing value.
 
     Warns
     -----
@@ -160,7 +160,7 @@ def value(arg):
     """Return the value.
 
     Raises:
-        ValueError, errors.CustomError: Bad value.
+        ValueError, errors.CustomError : Bad value.
     """
 ```
 
@@ -183,11 +183,13 @@ def value(arg):
 def value(arg):
     """Return the value.
 
-    :raises LookupError: Missing value.
-    :raise ValueError, errors.CustomError: Bad value.
+    :raises   LookupError : Missing value.
+    :raise ValueError, errors.CustomError : Bad value.
     :except RuntimeError, TypeError:
     """
 ```
+
+Selecting PDF409 and PDF410 together composes the independent spelling and spacing fixes, producing canonical name lists and canonical entry spacing in one formatting pass.
 
 PDF410 leaves malformed exception-like prose, ambiguous separators, and nameless reST exception fields unchanged:
 

@@ -4,7 +4,7 @@ Fix is not available.
 
 Rule is disabled if `docstring-convention` is `none` or `pep257`.
 
-Rule is incompatible with `PDF522`.
+Rule is incompatible with `PDF522` and `PDF523`.
 
 ## What it does
 Checks for private attributes documented in class docstring attribute documentation.
@@ -13,7 +13,7 @@ PDF514 checks Google `Attributes` sections, NumPy `Attributes` sections, and reS
 
 The rule checks parsed primary class docstrings only. It does not require the private attribute to exist in the class inventory, and it reports repeated private entries independently. Nested class docstrings are checked as their own class docstrings. Module docstrings, function docstrings, and additional string literals after a primary class docstring are not class owner docstrings for this rule.
 
-PDF514 forbids private class attributes in class docstring attribute entries regardless of whether the attribute exists. If the project instead wants private class attributes documented as attached docstrings, use PDF523; if it wants private class attributes documented in owner docstrings, use PDF522 and do not enable PDF514.
+PDF514 forbids private class attributes in class docstring attribute entries regardless of whether the attribute exists. Projects that require private class attributes in owner docstrings should select PDF522 instead of PDF514; projects that require attached docstrings should select PDF523 instead of PDF514.
 
 ## Why is this useful?
 Private attributes are implementation details and should usually stay out of owner docstrings that describe the public class API.

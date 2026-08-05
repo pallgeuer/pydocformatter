@@ -4,7 +4,7 @@ Fix is not available.
 
 Rule is disabled if `docstring-convention` is `none` or `pep257`.
 
-Rule is incompatible with `PDF524`.
+Rule is incompatible with `PDF524` and `PDF525`.
 
 ## What it does
 Checks for private attributes documented in module docstring attribute documentation.
@@ -13,7 +13,7 @@ PDF515 checks Google `Attributes` sections, NumPy `Attributes` sections, and reS
 
 The rule checks parsed primary module docstrings only. It does not require the private attribute to exist in the module inventory, and it reports repeated private entries independently. Class docstrings, function docstrings, and additional string literals after the primary module docstring are not module owner docstrings for this rule.
 
-PDF515 forbids private module attributes in module docstring attribute entries regardless of whether the attribute exists. If the project instead wants private module attributes documented as attached docstrings, use PDF525; if it wants private module attributes documented in owner docstrings, use PDF524 and do not enable PDF515.
+PDF515 forbids private module attributes in module docstring attribute entries regardless of whether the attribute exists. Projects that require private module attributes in owner docstrings should select PDF524 instead of PDF515; projects that require attached docstrings should select PDF525 instead of PDF515.
 
 ## Why is this useful?
 Private module attributes are implementation details and should usually stay out of module docstrings that describe the public module API.

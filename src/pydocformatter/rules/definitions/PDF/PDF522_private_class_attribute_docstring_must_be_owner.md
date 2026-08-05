@@ -4,14 +4,14 @@ Fix is not available.
 
 Rule must by default be explicitly selected, unless it is removed from `require-explicit`.
 
-Rule is incompatible with `PDF514` and `PDF523`.
+Rule is incompatible with `PDF514`, `PDF516`, and `PDF523`.
 
 ## What it does
 Checks for attached docstrings on private class attributes when private class attribute documentation must live in the class docstring.
 
 PDF522 checks class-scope attributes and supported `self.*` instance attributes assigned in `__init__`. Attribute names beginning with `_` are private.
 
-PDF522 is a location policy: it reports attached private class attribute docstrings because the class docstring is required. It conflicts with PDF514, which forbids private class owner-docstring entries entirely, and with PDF523, the opposite attached-docstring policy.
+PDF522 is a location policy: it reports attached private class attribute docstrings because the class docstring is required. It conflicts with PDF514, which forbids private class owner-docstring entries entirely; PDF516, which forbids attached docstrings without selecting owner documentation and would duplicate the attached-docstring prohibition; and PDF523, the opposite attached-docstring policy.
 
 ## Why is this useful?
 Some projects choose to document private class state in owner docstrings for internal API reference builds while avoiding scattered attached docstrings.

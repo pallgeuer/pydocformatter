@@ -37,7 +37,7 @@ class PDF308EntryDescriptionTrailingPeriod(RuleBase):
         fix_availability=FixAvailability.SOMETIMES,
         stable_since="1.0.0",
         setting_effects=docstring_conventions.convention_setting_effects(disabled=docstring_conventions.UNPARSED_CONVENTIONS, ignored=(DocstringConvention.GOOGLE,)),
-        incompatible_with=(),
+        incompatible_with=(RuleCode("PDF309"),),
         check_kind=RuleCheckKind.STANDARD,
         cache_behavior=RuleCacheBehavior.FILE_LOCAL,
     )

@@ -2,7 +2,9 @@
 
 Fix is sometimes available.
 
-Rule is ignored if `docstring-convention` is `pep257` or `numpy`.
+Rule is ignored if `docstring-convention` is `none`, `pep257`, `numpy`, or `rest`.
+
+Rule is incompatible with `PDF300`.
 
 ## What it does
 Checks that the docstring summary punctuation target ends with terminal punctuation: a period, question mark, exclamation point, or Unicode ellipsis (`\u2026`).

@@ -47,10 +47,15 @@ All notable changes to this project are documented here. The format follows [Kee
   - Distinguished convention opt-in policies from `require-explicit`, with exhaustive conflict-free convention profiles and meaningful explicit-selection defaults enforced by regression tests.
 - **Internal cleanup:**
   - Centralized setting-effect resolution with disabled precedence across runtime rule selection, documentation generation, and metadata-backed tests.
+- **Rule selection:**
+  - Made stronger selectors silently override incompatible weaker selections by source priority and specificity, while preserving deterministic collection-order errors that name only the equal-strength blockers.
 - **Rule suppressions:**
   - Collapsed repeated normalized pydocfmt selectors before suppression and PCF006 auditing so check-only and fixing runs preserve coverage without duplicate unused-selector findings.
   - Made inline suppressions after any component token of an implicitly concatenated docstring cover the complete expression for PDF findings while preserving line-local PCF coverage and existing local and standalone attachment boundaries.
 - **Docstring diagnostics:**
+  - Made strict trailing-period rules PDF300 and PDF308 mutually exclusive with their terminal-punctuation alternatives PDF301 and PDF309, with broad convention profiles choosing one alternative consistently.
+  - Made PDF409 solely responsible for parsed entry spacing while PDF410 now edits only parser-mapped semantic exception and warning name lists, so both independent fixes compose without overlapping replacements or rule-local syntax reparsing.
+  - Made each private attribute documentation placement policy incompatible with every overlapping or opposing policy, and changed PDF523 and PDF525 to convention opt-in rules so broad profiles remain conflict-free.
   - Included proven members from final effective immutable literal `__slots__` declarations in class attribute documentation coverage, placement, description, and type checks while retaining later real assignments and annotations as documentation attachment and type sources.
   - Made PDF414 sometimes fixable for deterministic Google and NumPy separators and reStructuredText closing delimiters while leaving missing or unexpected field arguments diagnostic-only, and made PDF415 usually fixable for mapped convention indentation.
   - Made PDF701, PDF705, PDF709, PDF713, and PDF717 sometimes fixable from available code annotations, including canonical paired reStructuredText type fields.

@@ -37,7 +37,7 @@ class PDF517PrivateModuleAttributeAttachedDocstringForbidden(RuleBase):
         fix_availability=FixAvailability.NEVER,
         stable_since="1.0.0",
         setting_effects=(),
-        incompatible_with=(RuleCode("PDF525"),),
+        incompatible_with=(RuleCode("PDF524"), RuleCode("PDF525")),
         check_kind=RuleCheckKind.STANDARD,
         cache_behavior=RuleCacheBehavior.FILE_LOCAL,
     )

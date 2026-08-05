@@ -37,7 +37,7 @@ class PDF524PrivateModuleAttributeDocstringMustBeOwner(RuleBase):
         fix_availability=FixAvailability.NEVER,
         stable_since="1.0.0",
         setting_effects=(),
-        incompatible_with=(RuleCode("PDF515"), RuleCode("PDF525")),
+        incompatible_with=(RuleCode("PDF515"), RuleCode("PDF517"), RuleCode("PDF525")),
         check_kind=RuleCheckKind.STANDARD,
         cache_behavior=RuleCacheBehavior.FILE_LOCAL,
     )

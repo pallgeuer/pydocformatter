@@ -5,7 +5,6 @@ import pytest
 import tests.rules.PDF.helpers as pdf_helpers
 from pydocformatter import rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention, LineEnding
-from pydocformatter.rules.definitions.PDF.PDF308_entry_description_trailing_period import PDF308EntryDescriptionTrailingPeriod
 from pydocformatter.rules.definitions.PDF.PDF309_entry_description_terminal_punctuation import PDF309EntryDescriptionTerminalPunctuation
 from tests import rule_helpers
 
@@ -197,23 +196,25 @@ def test_crlf_source_with_lf_setting_uses_correct_entry_offsets() -> None:
     assert not format_source(result.new_source, settings=settings).modified
 
 
-def test_combined_period_and_terminal_rules_converge_without_duplicate_terminal_fix() -> None:
-    source = 'def connect(timeout):\n    """Connect.\n\n    Args:\n        timeout: timeout in seconds;\n    """\n'
-    result = format_source(source, settings=CheckSettings(select=("PDF308", "PDF309"), docstring_convention=DocstringConvention.GOOGLE))
+def test_entry_description_punctuation_rules_are_incompatible() -> None:
+    settings = CheckSettings(select=("PDF308", "PDF309"), docstring_convention=DocstringConvention.GOOGLE)
+    selection = rules_selection.select_rules(settings)
 
-    assert result.new_source == 'def connect(timeout):\n    """Connect.\n\n    Args:\n        timeout: timeout in seconds.\n    """\n'
-    assert result.fixed_findings[PDF308EntryDescriptionTrailingPeriod.meta] == 1
-    assert not result.fixed_findings[PDF309EntryDescriptionTerminalPunctuation.meta]
+    assert tuple(rule.rule.code.tag for rule in selection.rules) == ("PDF308",)
+    assert selection.errors == ("Selected rule PDF309 is incompatible with earlier selected rule PDF308; PDF309 has been disabled",)
 
 
 def test_broad_selection_follows_pdf301_defaults() -> None:
     google = rules_selection.select_rules(CheckSettings(select=("PDF3",), docstring_convention=DocstringConvention.GOOGLE))
     numpy = rules_selection.select_rules(CheckSettings(select=("PDF3",), docstring_convention=DocstringConvention.NUMPY))
     pep257 = rules_selection.select_rules(CheckSettings(select=("PDF3",), docstring_convention=DocstringConvention.PEP257))
+    rest = rules_selection.select_rules(CheckSettings(select=("PDF3",), docstring_convention=DocstringConvention.REST))
 
     assert "PDF309" in {rule.rule.code.tag for rule in google.rules}
     assert "PDF309" not in {rule.rule.code.tag for rule in numpy.rules}
     assert "PDF309" not in {rule.rule.code.tag for rule in pep257.rules}
+    assert "PDF308" in {rule.rule.code.tag for rule in rest.rules}
+    assert "PDF309" not in {rule.rule.code.tag for rule in rest.rules}
 
 
 def test_direct_rule_and_check_only_findings_agree() -> None:

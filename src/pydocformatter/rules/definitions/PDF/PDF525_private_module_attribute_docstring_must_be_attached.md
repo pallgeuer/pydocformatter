@@ -2,18 +2,16 @@
 
 Fix is not available.
 
-Rule is disabled if `docstring-convention` is `none` or `pep257`.
+Rule is disabled if `docstring-convention` is `none` or `pep257`, and ignored by broad selectors under `google`, `numpy`, and `rest`.
 
-Rule must by default be explicitly selected, unless it is removed from `require-explicit`.
-
-Rule is incompatible with `PDF517` and `PDF524`.
+Rule is incompatible with `PDF515`, `PDF517`, and `PDF524`.
 
 ## What it does
 Checks for private module attributes documented in module docstring attribute entries when private module attribute documentation must use attached docstrings.
 
 PDF525 checks parsed Google `Attributes` sections, NumPy `Attributes` sections, and reStructuredText attribute fields when the matching convention is active. The documented name must also match a supported module attribute inventory entry.
 
-PDF525 is a location policy: it reports inventory-backed private module attributes documented in the module docstring because attached docstrings are required. It differs from PDF515, which forbids private module owner-docstring entries even when the attribute is stale or otherwise not in inventory, and it conflicts with PDF517, which forbids attached private module docstrings.
+PDF525 is a location policy: it reports inventory-backed private module attributes documented in the module docstring because attached docstrings are required. It conflicts with PDF515, whose broader owner-docstring prohibition overlaps its findings; PDF517, which forbids the required attached docstrings; and PDF524, the opposite owner-docstring policy.
 
 ## Why is this useful?
 Attached docstrings let private module attributes be documented near their assignment without adding private details to the owner docstring's public attribute list.

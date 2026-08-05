@@ -1600,6 +1600,30 @@ def test_entries_expose_parser_owned_name_slots(convention: DocstringConvention,
     assert tuple(None if slot is None else structure.lines[slot.line_index].text[slot.start_column : slot.end_column] for slot in entry.name_slots) == expected_names
 
 
+@pytest.mark.parametrize(
+    ("convention", "value", "expected"),
+    [
+        (DocstringConvention.GOOGLE, "Raises:\n    `ValueError` | TypeError   : Bad value.", "`ValueError` | TypeError"),
+        (DocstringConvention.NUMPY, "Raises\n------\nValueError,TypeError   : Bad value.", "ValueError,TypeError"),
+        (DocstringConvention.NUMPY, "Raises\n------\n  `ValueError` | TypeError  \n    Bad value.", "`ValueError` | TypeError"),
+        (DocstringConvention.REST, ":raises   `ValueError | TypeError`  : Bad value.", "`ValueError | TypeError`"),
+    ],
+)
+def test_exception_entries_expose_parser_owned_name_list_edit_slots(convention: DocstringConvention, value: str, expected: str) -> None:
+    structure = structure_for(value, settings=CheckSettings(docstring_convention=convention))
+    entry = structure.entries[0]
+    slot = entry.name_list_edit_slot
+
+    assert slot is not None
+    assert structure.lines[slot.line_index].text[slot.start_column : slot.end_column] == expected
+
+
+def test_non_exception_entries_do_not_expose_name_list_edit_slots() -> None:
+    structure = structure_for("Args:\n    value: Description.", settings=CheckSettings(docstring_convention=DocstringConvention.GOOGLE))
+
+    assert structure.entries[0].name_list_edit_slot is None
+
+
 def test_google_entries_expose_parser_owned_type_edit_slots() -> None:
     """Retain complete insertion and removal bounds without reparsing entry text."""
     structure = structure_for("Args:\n    value: Value.\n    other  ( list[int] ): Other.", settings=CheckSettings(docstring_convention=DocstringConvention.GOOGLE))

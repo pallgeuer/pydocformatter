@@ -91,6 +91,11 @@ SHOW_RULES_CASES = (
             CheckSettings(docstring_convention=settings_check.DocstringConvention.GOOGLE, extend_select=("PDF107", "PDF108"), ignore=("PDF107",)),
             id="google-extend-ignore",
         ),
+        pytest.param(
+            ("--docstring-convention", "rest", "--extend-select", "PDF301"),
+            CheckSettings(docstring_convention=settings_check.DocstringConvention.REST, extend_select=("PDF301",)),
+            id="rest-exact-incompatibility-override",
+        ),
     ]
 )
 

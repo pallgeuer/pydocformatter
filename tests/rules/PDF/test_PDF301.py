@@ -10,7 +10,6 @@ from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
 from pydocformatter.rules.definition_helpers import source_text
 from pydocformatter.rules.definitions.PDF.PDF import PDF
 from pydocformatter.rules.definitions.PDF.PDF101_docstring_reflow import PDF101DocstringReflow
-from pydocformatter.rules.definitions.PDF.PDF300_summary_trailing_period import PDF300SummaryTrailingPeriod
 from pydocformatter.rules.definitions.PDF.PDF301_summary_terminal_punctuation import PDF301SummaryTerminalPunctuation
 from pydocformatter.source_path import SourcePathContext
 from tests import rule_helpers
@@ -185,17 +184,12 @@ def test_reports_escaped_semicolon_as_nonfixable() -> None:
     assert not result.unfixed_findings[0].fixable
 
 
-def test_combined_summary_punctuation_rules_replace_once_and_converge() -> None:
-    """Let the earlier strict rule own a shared safe replacement."""
-    source = 'def function():\n    """Return value;"""\n'
+def test_summary_punctuation_rules_are_incompatible() -> None:
     settings = CheckSettings(select=("PDF300", "PDF301"))
-    result = format_source(source, settings=settings)
+    selection = rules_selection.select_rules(settings)
 
-    assert result.new_source == 'def function():\n    """Return value."""\n'
-    assert result.fixed_findings[PDF300SummaryTrailingPeriod.meta] == 1
-    assert not result.fixed_findings[PDF301SummaryTerminalPunctuation.meta]
-    assert not result.unfixed_findings
-    assert not format_source(result.new_source, settings=settings).modified
+    assert tuple(rule.rule.code.tag for rule in selection.rules) == ("PDF300",)
+    assert selection.errors == ("Selected rule PDF301 is incompatible with earlier selected rule PDF300; PDF301 has been disabled",)
 
 
 def test_skips_empty_sections_fields_and_backslash_ending_targets() -> None:
@@ -399,15 +393,14 @@ def test_pdf301_runs_before_pdf110_so_single_summary_can_be_collapsed_after_peri
     assert result.fixed_findings[PDF301SummaryTerminalPunctuation.meta] == 1
 
 
-def test_pdf300_fix_satisfies_pdf301() -> None:
-    source = 'def function():\n    """Return value"""\n'
-    settings = CheckSettings(select=("PDF300", "PDF301"))
-    result = formatter.format_source(source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
+@pytest.mark.parametrize("convention", [DocstringConvention.NONE, DocstringConvention.REST])
+def test_none_and_rest_broad_selection_prefers_pdf300(convention: DocstringConvention) -> None:
+    selection = rules_selection.select_rules(CheckSettings(select=("PDF3",), docstring_convention=convention))
+    active_codes = {rule.rule.code.tag for rule in selection.rules}
 
-    assert result.new_source == 'def function():\n    """Return value."""\n'
-    assert result.fixed_findings[PDF300SummaryTrailingPeriod.meta] == 1
-    assert not result.fixed_findings[PDF301SummaryTerminalPunctuation.meta]
-    assert not result.unfixed_findings
+    assert selection.errors == ()
+    assert "PDF300" in active_codes
+    assert "PDF301" not in active_codes
 
 
 def test_check_and_fix_false_findings_agree() -> None:

@@ -168,14 +168,15 @@ The output `rules` tuple preserves deterministic rule-code order after filtering
 
 After normal selection precedence, setting effects, and explicit-selection requirements are resolved, selected rule incompatibilities are resolved once for the complete settings profile:
 
-- Rules are considered in deterministic `RuleCollection.rules` order.
-- A rule is retained unless it is incompatible with an earlier retained rule.
-- A discarded rule does not prevent a later compatible rule from being retained.
-- Selector source priority and specificity do not override collection ordering during this final pass.
-- Each discarded rule produces one operational error listing all earlier retained rules that conflict with it.
+- Rules are ranked by effective enabling-selector source priority and then selector specificity, with deterministic `RuleCollection.rules` order breaking equal-strength ties.
+- The complete incompatibility graph is resolved strongest-first so a rule discarded by a weaker blocker can still be retained when that blocker loses to a later stronger rule.
+- A retained stronger rule silently overrides incompatible weaker rules.
+- Equal-strength incompatible rules retain the earlier rule in collection order, and each discarded equal-strength rule produces one operational error listing its earlier retained equal-strength conflicts.
+- Final selected rules return to deterministic collection order for execution.
+- A discarded rule does not prevent a weaker compatible rule from being retained.
 - Per-file ignores run later and do not restore rules discarded by incompatibility resolution.
 
-The built-in opposing pairs (e.g. `PDF106`/`PDF107` and `PDF108`/`PDF109`) are mutually incompatible. Convention-specific setting effects keep every broad built-in convention profile conflict-free by selecting at most one rule from each incompatible pair; a profile may select neither alternative. Exact selection can restore ignored rules. Selecting both rules in either pair retains the lower ordered rule and reports the higher ordered rule as disabled.
+The built-in opposing pairs (e.g. `PDF106`/`PDF107` and `PDF108`/`PDF109`) are mutually incompatible. Convention-specific setting effects keep every broad built-in convention profile conflict-free by selecting at most one rule from each incompatible pair; a profile may select neither alternative. Exact selection can restore an ignored rule and silently override an incompatible rule selected through a weaker broad selector. Selecting both rules exactly at the same source priority retains the lower ordered rule and reports the higher ordered rule as disabled.
 
 `docstring-convention = "pep257"` is the default named convention profile. It does not parse Google sections, NumPy sections, or reStructuredText fields, and it applies PEP 257/pydocstyle-compatible broad-rule carve-outs. `docstring-convention = "none"` also avoids convention-specific parsing, but keeps the stricter generic no-convention rule profile for rules that can act without convention parsing.
 
@@ -284,7 +285,7 @@ Current error wording:
 - Invalid selector: `"{context} contains invalid selector: {selector}"`
 - Unknown selector: `"{context} contains unknown selector: {selector}"`
 - Fixability selector that only matches rules with no available fixes: `"{context} selector {selector!r} only matches rules with no available fixes"`
-- Incompatible selected rule: `"Selected rule {rule} is incompatible with earlier selected rule[s] {conflicts}; {rule} has been disabled"`
+- Equal-strength incompatible selected rule: `"Selected rule {rule} is incompatible with earlier selected rule[s] {conflicts}; {rule} has been disabled"`
 
 Contexts include:
 
