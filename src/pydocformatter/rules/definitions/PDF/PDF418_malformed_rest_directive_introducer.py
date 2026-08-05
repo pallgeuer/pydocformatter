@@ -32,7 +32,7 @@ class PDF418MalformedRestDirectiveIntroducer(RuleBase):
     meta = RuleMetadata(
         code=RuleCode("PDF418"),
         name="malformed-rest-directive-introducer",
-        message="reStructuredText directive must be followed by two colons",
+        message="reST directive must be followed by two colons",
         fix_availability=FixAvailability.NEVER,
         stable_since="1.1.0",
         setting_effects=(RuleSettingEffects(setting="docstring_parse_directives", effects=(RuleSettingEffectValues(effect=RuleSettingEffect.DISABLED, values=(False,)),)),),
@@ -56,7 +56,7 @@ class PDF418MalformedRestDirectiveIntroducer(RuleBase):
             rule_violations.diagnostic(
                 cls.meta,
                 PDF_definition.docstring_line_numbers(docstring, docstring.structure.lines[issue.start_line]),
-                instance_message=f"reStructuredText directive '{issue.name}' must be followed by two colons",
+                instance_message=f"reST directive '{issue.name}' must be followed by two colons",
             )
             for docstring in data.docstrings
             for issue in docstring.structure.directive_issues

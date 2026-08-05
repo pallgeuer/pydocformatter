@@ -256,7 +256,7 @@ def test_reports_repeated_rest_fields() -> None:
     assert not result.fixed_findings
     assert tuple(finding.rule for finding in result.unfixed_findings) == (PDF408RepeatedSection.meta,)
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((8,),)
-    assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring field ':return:' repeats earlier field ':returns:'",)
+    assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring reST field ':return:' repeats earlier reST field ':returns:'",)
 
 
 def test_rest_type_fields_repeat_independently_from_value_fields() -> None:
@@ -266,7 +266,10 @@ def test_rest_type_fields_repeat_independently_from_value_fields() -> None:
     assert result.new_source == source
     assert not result.fixed_findings
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((9,), (12,))
-    assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring field ':rtype:' repeats earlier field ':rtype:'", "Docstring field ':ytype:' repeats earlier field ':ytype:'")
+    assert tuple(finding.message for finding in result.unfixed_findings) == (
+        "Docstring reST field ':rtype:' repeats earlier reST field ':rtype:'",
+        "Docstring reST field ':ytype:' repeats earlier reST field ':ytype:'",
+    )
 
 
 def test_rest_named_attribute_repeats_are_not_reported_by_pdf408() -> None:
@@ -286,8 +289,8 @@ def test_unknown_rest_fields_repeat_only_with_same_field_name_and_argument() -> 
     assert not result.fixed_findings
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((6,), (8,))
     assert tuple(finding.message for finding in result.unfixed_findings) == (
-        "Docstring field ':meta private:' repeats earlier field ':meta private:'",
-        "Docstring field ':custom:' repeats earlier field ':custom:'",
+        "Docstring reST field ':meta private:' repeats earlier reST field ':meta private:'",
+        "Docstring reST field ':custom:' repeats earlier reST field ':custom:'",
     )
 
 

@@ -97,22 +97,29 @@ class PDF312EntryDescriptionTooGeneric(RuleBase):
                 continue
             for entry in docstring.structure.entries:
                 policy = _POLICIES.get(entry.kind)
-                if (
-                    policy is None
-                    or docstring.owner.kind is not policy.owner_kind
-                    or not entry.description
-                    or docstring_sections.is_rest_type_field(entry.field_name)
-                    or not all(documentation_style.exact_description_fragment_is_safe(docstring.value[fragment.full_start_offset : fragment.full_end_offset]) for fragment in entry.description_lines)
-                    or not _is_too_generic(entry, policy=policy)
-                ):
+                if policy is None or docstring.owner.kind is not policy.owner_kind or not entry.description or docstring_sections.is_rest_type_field(entry.field_name):
+                    continue
+                if not all(documentation_style.exact_description_fragment_is_safe(docstring.value[fragment.full_start_offset : fragment.full_end_offset]) for fragment in entry.description_lines):
+                    continue
+                matching_names = _generic_description_names(entry, policy=policy)
+                if matching_names is None:
                     continue
                 line = docstring.structure.lines[entry.start_line]
-                results.append(rule_violations.diagnostic(cls.meta, PDF_definition.docstring_line_numbers(docstring, line), instance_message=f"{policy.message_subject} documentation is too generic"))
+                results.append(rule_violations.diagnostic(cls.meta, PDF_definition.docstring_line_numbers(docstring, line), instance_message=_instance_message(matching_names, policy=policy)))
         return tuple(results)
 
 
-def _is_too_generic(entry: PDF_definition.DocstringEntry, *, policy: _DescriptionPolicy) -> bool:
-    """Return whether one parsed entry description matches an exact generic pattern."""
+def _generic_description_names(entry: PDF_definition.DocstringEntry, *, policy: _DescriptionPolicy) -> tuple[str, ...] | None:
+    """Return names implicated by an exact generic description, or None."""
     if documentation_style.matches_exact_description(entry.description, policy.unnamed_patterns):
-        return True
-    return any(documentation_style.matches_exact_named_description(entry.description, name, policy.named_templates) for name in entry.names)
+        return tuple(dict.fromkeys(entry.names))
+    matching_names = tuple(dict.fromkeys(name for name in entry.names if documentation_style.matches_exact_named_description(entry.description, name, policy.named_templates)))
+    return matching_names or None
+
+
+def _instance_message(names: tuple[str, ...], *, policy: _DescriptionPolicy) -> str:
+    """Return the concrete generic-description diagnostic for an entry."""
+    if not names:
+        return f"{policy.message_subject} documentation is too generic"
+    displayed_names = ", ".join(f"'{name}'" for name in names)
+    return f"{policy.message_subject} documentation for {displayed_names} is too generic"

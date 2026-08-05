@@ -29,9 +29,9 @@ def test_metadata() -> None:
         ("Returns", "int: The return value.", "Return documentation is too generic"),
         ("Returns", "int: The returned value!", "Return documentation is too generic"),
         ("Yields", "str: The yielded value?", "Yield documentation is too generic"),
-        ("Raises", "ValueError: The exception.", "Exception documentation is too generic"),
-        ("Raises", "ValueError: The error.", "Exception documentation is too generic"),
-        ("Warns", "RuntimeWarning: The warning.", "Warning documentation is too generic"),
+        ("Raises", "ValueError: The exception.", "Exception documentation for 'ValueError' is too generic"),
+        ("Raises", "ValueError: The error.", "Exception documentation for 'ValueError' is too generic"),
+        ("Warns", "RuntimeWarning: The warning.", "Warning documentation for 'RuntimeWarning' is too generic"),
     ],
 )
 def test_reports_unnamed_google_patterns(section: str, head: str, message: str) -> None:
@@ -55,21 +55,45 @@ def test_reports_named_numpy_return_yield_exception_warning_and_method_patterns(
 
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((6,), (15,), (20,), (25,), (30,))
     assert tuple(finding.message for finding in result.unfixed_findings) == (
-        "Method documentation is too generic",
-        "Return documentation is too generic",
-        "Yield documentation is too generic",
-        "Exception documentation is too generic",
-        "Warning documentation is too generic",
+        "Method documentation for 'run' is too generic",
+        "Return documentation for 'count' is too generic",
+        "Yield documentation for 'item' is too generic",
+        "Exception documentation for 'errors.CustomError' is too generic",
+        "Warning documentation for 'UserWarning' is too generic",
     )
+
+
+def test_reports_every_name_for_unnamed_generic_multi_name_description() -> None:
+    """An unnamed generic phrase applies to every name sharing the entry."""
+    source = 'def value():\n    """Produce a value.\n\n    Raises\n    ------\n    ValueError, TypeError\n        The exception.\n    """\n'
+    settings = CheckSettings(select=("PDF312",), docstring_convention=DocstringConvention.NUMPY)
+    result = format_source(source, settings=settings)
+
+    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((6,),)
+    assert tuple(finding.message for finding in result.unfixed_findings) == ("Exception documentation for 'ValueError', 'TypeError' is too generic",)
+
+
+@pytest.mark.parametrize(
+    ("description", "message"),
+    [("The exception.", "Exception documentation for 'ValueError', 'TypeError' is too generic"), ("The ValueError exception.", "Exception documentation for 'ValueError' is too generic")],
+)
+def test_deduplicates_displayed_names_in_first_occurrence_order(description: str, message: str) -> None:
+    """Display each implicated entry name once without reordering it."""
+    source = f'def value():\n    """Produce a value.\n\n    Raises\n    ------\n    ValueError, TypeError, ValueError\n        {description}\n    """\n'
+    settings = CheckSettings(select=("PDF312",), docstring_convention=DocstringConvention.NUMPY)
+    result = format_source(source, settings=settings)
+
+    assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((6,),)
+    assert tuple(finding.message for finding in result.unfixed_findings) == (message,)
 
 
 @pytest.mark.parametrize(
     ("section", "head", "description", "message"),
     [
-        ("Returns", "count : int", "The count value.", "Return documentation is too generic"),
-        ("Returns", "count : int", "The count return value.", "Return documentation is too generic"),
-        ("Yields", "item : str", "The item value.", "Yield documentation is too generic"),
-        ("Raises", "ValueError", "The ValueError exception.", "Exception documentation is too generic"),
+        ("Returns", "count : int", "The count value.", "Return documentation for 'count' is too generic"),
+        ("Returns", "count : int", "The count return value.", "Return documentation for 'count' is too generic"),
+        ("Yields", "item : str", "The item value.", "Yield documentation for 'item' is too generic"),
+        ("Raises", "ValueError", "The ValueError exception.", "Exception documentation for 'ValueError' is too generic"),
     ],
 )
 def test_reports_remaining_named_numpy_templates(section: str, head: str, description: str, message: str) -> None:
@@ -88,7 +112,7 @@ def test_reports_unnamed_method_pattern() -> None:
     result = format_source(source)
 
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((5,),)
-    assert tuple(finding.message for finding in result.unfixed_findings) == ("Method documentation is too generic",)
+    assert tuple(finding.message for finding in result.unfixed_findings) == ("Method documentation for 'run' is too generic",)
 
 
 def test_reports_google_method_patterns_with_boundary_underscores() -> None:
@@ -104,7 +128,11 @@ def test_reports_google_method_patterns_with_boundary_underscores() -> None:
     result = format_source(source)
 
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((5,), (6,), (7,))
-    assert tuple(finding.message for finding in result.unfixed_findings) == ("Method documentation is too generic",) * 3
+    assert tuple(finding.message for finding in result.unfixed_findings) == (
+        "Method documentation for '_run' is too generic",
+        "Method documentation for '__init__' is too generic",
+        "Method documentation for 'close_' is too generic",
+    )
 
 
 def test_reports_numpy_method_pattern_with_boundary_underscores() -> None:
@@ -114,7 +142,7 @@ def test_reports_numpy_method_pattern_with_boundary_underscores() -> None:
     result = format_source(source, settings=settings)
 
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((6,),)
-    assert tuple(finding.message for finding in result.unfixed_findings) == ("Method documentation is too generic",)
+    assert tuple(finding.message for finding in result.unfixed_findings) == ("Method documentation for '__init__' is too generic",)
 
 
 def test_reports_rest_return_yield_and_exception_patterns_but_skips_type_fields() -> None:
@@ -124,7 +152,11 @@ def test_reports_rest_return_yield_and_exception_patterns_but_skips_type_fields(
     result = format_source(source, settings=settings)
 
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((4,), (5,), (6,))
-    assert tuple(finding.message for finding in result.unfixed_findings) == ("Return documentation is too generic", "Yield documentation is too generic", "Exception documentation is too generic")
+    assert tuple(finding.message for finding in result.unfixed_findings) == (
+        "Return documentation is too generic",
+        "Yield documentation for 'item' is too generic",
+        "Exception documentation for 'ValueError' is too generic",
+    )
 
 
 @pytest.mark.parametrize("description", ["The return value in bytes.", "The result.", "A return value.", "The return-value.", "`The return value`.", "The return value:"])
@@ -147,7 +179,7 @@ def test_targets_entry_heads_and_applies_owner_restrictions() -> None:
     result = format_source(source)
 
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((11,), (20,))
-    assert tuple(finding.message for finding in result.unfixed_findings) == ("Method documentation is too generic", "Return documentation is too generic")
+    assert tuple(finding.message for finding in result.unfixed_findings) == ("Method documentation for 'run' is too generic", "Return documentation is too generic")
 
 
 def test_skips_parsed_entries_in_attached_attribute_docstrings() -> None:

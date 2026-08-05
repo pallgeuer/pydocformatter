@@ -150,7 +150,7 @@ test -f "$WHEEL"
 uv run twine check "$SDIST" "$WHEEL"
 ```
 
-Inspect both file lists. The wheel should contain the importable package, rule documentation required by the CLI, metadata, and licenses, but not source-only rule templates. The source distribution should contain the files needed to build and document the project, but not excluded CI or agent configuration.
+Inspect both file lists. The wheel should contain the importable package, rule documentation required by the CLI, metadata, and licenses, but not source-only rule templates. The source distribution should contain the files needed to build, document, and test the project, including the root pytest configuration and test suite, but not excluded CI or agent configuration.
 
 ```bash
 uv run python -m zipfile -l "$WHEEL"
@@ -240,7 +240,7 @@ test "$(uvx --isolated --from "./${WHEEL}" pydocfmt --version)" = "pydocfmt ${VE
 printf '%s\n' '"""Package metadata."""' | uvx --isolated --from "./${WHEEL}" pydocfmt --isolated check -
 test "$(uvx --isolated --from "./${SDIST}" pydocfmt --version)" = "pydocfmt ${VERSION}"
 printf '%s\n' '"""Package metadata."""' | uvx --isolated --from "./${SDIST}" pydocfmt --isolated check -
-uv run python tools/generate_release_checksums.py --output "$CHECKSUMS" "$SDIST" "$WHEEL"
+uv run la-dev-release-checksums --output "$CHECKSUMS" "$SDIST" "$WHEEL"
 ```
 
 Inspect the final file lists against the same wheel and source-distribution inclusion criteria used for the candidate artifacts. Every version command must report `VERSION`, and both functional checks must report `All checks passed!`. The checksum generator removes any previous manifest before hashing and atomically writes and prints a new manifest only after reading both artifacts successfully. It exits unsuccessfully if either artifact or the manifest cannot be processed. The two manifest entries contain artifact basenames without a `dist/` prefix so that the manifest can be verified beside downloaded GitHub release assets.

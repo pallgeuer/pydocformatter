@@ -33,7 +33,7 @@ class PDF206NoBlankLineAfterFunctionDocstring(RuleBase):
     meta = RuleMetadata(
         code=RuleCode("PDF206"),
         name="no-blank-line-after-function-docstring",
-        message="No blank lines allowed after function docstring",
+        message="Function docstring should have no blank lines after it",
         fix_availability=FixAvailability.ALWAYS,
         stable_since="1.0.0",
         setting_effects=(RuleSettingEffects(setting="docstring_convention", effects=(RuleSettingEffectValues(effect=RuleSettingEffect.IGNORED, values=tuple(settings_check.DocstringConvention)),)),),

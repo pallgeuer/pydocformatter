@@ -29,7 +29,7 @@ class Client:
 
 [output=unchanged]
 [findings]
-PDF311: Line 4: Property docstring should not start with a verb ("Returns")
+PDF311: Line 4: Property docstring first word 'Returns' should not be a verb
 ```
 
 Property docstrings with attribute-style summaries are accepted:
@@ -63,8 +63,8 @@ class Client:
 
 [output=unchanged]
 [findings]
-PDF311: Line 4: Property docstring should not start with a verb ("'Returns'")
-PDF311: Line 8: Property docstring should not start with a verb ("Fetch")
+PDF311: Line 4: Property docstring first word 'Returns' should not be a verb
+PDF311: Line 8: Property docstring first word 'Fetch' should not be a verb
 ```
 
 Configured property decorators unwrap direct calls and can match import aliases for dotted configured names. Accessor decorators are always property-like:
@@ -89,8 +89,8 @@ class Client:
 
 [output=unchanged]
 [findings]
-PDF311: Line 8: Property docstring should not start with a verb ("Gets")
-PDF311: Line 12: Property docstring should not start with a verb ("Returns")
+PDF311: Line 8: Property docstring first word 'Gets' should not be a verb
+PDF311: Line 12: Property docstring first word 'Returns' should not be a verb
 ```
 
 Static decorator names that look similar to property decorators are not treated as properties unless they are configured exactly:
@@ -140,7 +140,7 @@ class Client:
 
 [output=unchanged]
 [findings]
-PDF311: Line 4: Property docstring should not start with a verb ("Returns")
+PDF311: Line 4: Property docstring first word 'Returns' should not be a verb
 ```
 
 The active convention controls which convention-specific structures are protected. reStructuredText fields are not summaries under the reST convention:

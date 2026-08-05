@@ -35,7 +35,7 @@ def connect():
 
 [output=unchanged]
 [findings]
-PDF418: Line 4: reStructuredText directive 'version-added' must be followed by two colons
+PDF418: Line 4: reST directive 'version-added' must be followed by two colons
 ```
 
 An arbitrary directive name is reported when an indented body establishes its structural intent:
@@ -54,7 +54,7 @@ def connect():
 
 [output=unchanged]
 [findings]
-PDF418: Line 4: reStructuredText directive 'caution' must be followed by two colons
+PDF418: Line 4: reST directive 'caution' must be followed by two colons
 ```
 
 A valid namespaced directive remains unchanged:

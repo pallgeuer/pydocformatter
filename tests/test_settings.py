@@ -1116,10 +1116,12 @@ def test_auto_discovered_pyproject_path_skips_files_without_pydocfmt_table(monke
 
 
 def test_suite_temporary_directories_stay_below_configuration_boundary() -> None:
-    boundary = Path(tempfile.gettempdir())
+    temporary_directory = Path(tempfile.gettempdir())
+    boundary = next(parent for parent in temporary_directory.parents if (parent / "pyproject.toml").is_file())
     boundary_config = boundary / "pyproject.toml"
 
-    assert boundary_config.read_text(encoding="utf-8") == "[tool.pydocfmt]\n"
+    assert boundary_config.read_text(encoding="utf-8") == '[tool.pydocfmt]\ncache-dir = "tmp/.pydocfmt_cache"\n'
+    assert temporary_directory.is_relative_to(boundary / "tmp")
     with tempfile.TemporaryDirectory() as td:
         nested = Path(td) / "nested"
         nested.mkdir()
@@ -1130,7 +1132,7 @@ def test_suite_temporary_directories_stay_below_configuration_boundary() -> None
 
     assert nested.is_relative_to(boundary)
     assert discovered == str(boundary_config)
-    assert settings == CheckSettings()
+    assert settings == dataclasses.replace(CheckSettings(), cache_dir="tmp/.pydocfmt_cache")
 
 
 def test_rule_settings_accept_all_rule_prefixes(monkeypatch: pytest.MonkeyPatch) -> None:

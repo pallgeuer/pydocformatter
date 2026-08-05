@@ -30,7 +30,7 @@ def test_reports_unambiguous_malformed_directives_without_bodies(name: str) -> N
     source = f'def function():\n    """Summary.\n\n    .. {name}: argument\n    """\n'
     result = assert_pdf418_lines(source, ((4,),))
 
-    assert tuple(finding.message for finding in result.unfixed_findings) == (f"reStructuredText directive '{name}' must be followed by two colons",)
+    assert tuple(finding.message for finding in result.unfixed_findings) == (f"reST directive '{name}' must be followed by two colons",)
 
 
 def test_reports_multiple_directives_in_source_order() -> None:
@@ -38,8 +38,8 @@ def test_reports_multiple_directives_in_source_order() -> None:
     result = assert_pdf418_lines(source, ((4,), (5,)))
 
     assert tuple(finding.message for finding in result.unfixed_findings) == (
-        "reStructuredText directive 'versionadded' must be followed by two colons",
-        "reStructuredText directive 'py:function' must be followed by two colons",
+        "reST directive 'versionadded' must be followed by two colons",
+        "reST directive 'py:function' must be followed by two colons",
     )
 
 

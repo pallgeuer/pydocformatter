@@ -112,8 +112,8 @@ def test_reports_rest_fields_after_later_ranked_fields() -> None:
     assert tuple(finding.rule for finding in result.unfixed_findings) == (PDF407SectionOrder.meta, PDF407SectionOrder.meta)
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((5,), (7,))
     assert tuple(finding.message for finding in result.unfixed_findings) == (
-        "Docstring field ':param value:' should appear before ':returns:'",
-        "Docstring field ':rtype:' should appear before ':raises ValueError:'",
+        "Docstring reST field ':param value:' should appear before ':returns:'",
+        "Docstring reST field ':rtype:' should appear before ':raises ValueError:'",
     )
 
 
@@ -125,7 +125,7 @@ def test_reports_type_rest_field_after_return_field() -> None:
     assert not result.fixed_findings
     assert tuple(finding.rule for finding in result.unfixed_findings) == (PDF407SectionOrder.meta,)
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((5,),)
-    assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring field ':type value:' should appear before ':returns:'",)
+    assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring reST field ':type value:' should appear before ':returns:'",)
 
 
 def test_unordered_rest_fields_do_not_affect_order() -> None:
@@ -144,7 +144,7 @@ def test_rest_unknown_fields_do_not_reset_highest_rank_and_return_yield_share_ra
     assert result.new_source == source
     assert not result.fixed_findings
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((7,),)
-    assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring field ':param value:' should appear before ':yields:'",)
+    assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring reST field ':param value:' should appear before ':yields:'",)
 
 
 def test_ignored_without_google_or_numpy_convention() -> None:

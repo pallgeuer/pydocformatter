@@ -162,12 +162,12 @@ To preview the generated site, run `uv run zensical serve -f zensical.generated.
 Repository Markdown tables have a tested alignment style. If its test fails, normalize tracked Markdown tables with:
 
 ```bash
-uv run python tools/fix_markdown_tables.py
+uv run la-dev-markdown-tables
 ```
 
 ## Dependencies
 
-Declare dependencies in `pyproject.toml` and commit the corresponding `uv.lock` update. Direct entries in the `test` and `dev` dependency groups must use exact `name==version` pins; included groups are allowed. After a dependency change, run:
+Declare dependencies in `pyproject.toml` and commit the corresponding `uv.lock` update. Direct entries in the `docs`, `test`, and `dev` dependency groups must use exact `name==version` pins; included groups are allowed. After a dependency change, run:
 
 ```bash
 uv lock

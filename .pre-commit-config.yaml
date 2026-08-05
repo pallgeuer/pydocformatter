@@ -16,6 +16,11 @@ repos:
         entry: uv run ruff format
         language: system
         types_or: [python, pyi, markdown]
+      - id: markdown-tables
+        name: Markdown tables (fix)
+        entry: uv run la-dev-markdown-tables
+        language: system
+        types: [markdown]
       - id: ty
         name: ty (type checker)
         entry: uv run ty check

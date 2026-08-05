@@ -33,7 +33,7 @@ class PDF303SignatureLikeSummary(RuleBase):
     meta = RuleMetadata(
         code=RuleCode("PDF303"),
         name="signature-like-summary",
-        message="Docstring summary should not be a signature",
+        message="Docstring summary should not include a function signature",
         fix_availability=FixAvailability.NEVER,
         stable_since="1.0.0",
         setting_effects=(RuleSettingEffects(setting="docstring_convention", effects=(RuleSettingEffectValues(effect=RuleSettingEffect.IGNORED, values=(DocstringConvention.NUMPY,)),)),),
@@ -58,7 +58,7 @@ class PDF303SignatureLikeSummary(RuleBase):
             if not summary_style.is_function_docstring(target.docstring):
                 continue
             if _contains_signature(target.line.text, target.docstring.owner.name):
-                violations.append(rule_violations.diagnostic(cls.meta, summary_style.line_numbers(target), instance_message="Docstring summary should not include a function signature"))
+                violations.append(rule_violations.diagnostic(cls.meta, summary_style.line_numbers(target)))
         return tuple(violations)
 
 

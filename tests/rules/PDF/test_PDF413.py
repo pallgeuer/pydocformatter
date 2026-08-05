@@ -133,7 +133,7 @@ def test_check_only_reports_parsed_and_unparsed_section_name_colon_lines() -> No
 
     assert result.new_source == source
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((4, 9),)
-    assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring section 'Parameters' should not end with a colon; Docstring section 'Returns' should not end with a colon",)
+    assert tuple(finding.message for finding in result.unfixed_findings) == (PDF413SectionNameSuperfluousColon.meta.message,)
 
 
 def test_removes_unparsed_section_before_parsed_section_in_source_order() -> None:

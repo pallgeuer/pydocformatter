@@ -70,6 +70,7 @@ def _results(context: RuleContext, *, rule: RuleMetadata) -> tuple[rule_violatio
             if normalized is None:
                 continue
             line = docstring.structure.lines[slot.line_index]
-            accumulator.add(line, slot.full_start_column, slot.full_end_column, normalized)
+            message = f"Docstring type-like token spacing should be normalized from '{entry.type_info.text}' to '{normalized}'"
+            accumulator.add(line, slot.full_start_column, slot.full_end_column, normalized, instance_message=message)
         results.extend(accumulator.results())
     return tuple(results)

@@ -51,10 +51,12 @@ pydocfmt = "pydocformatter.cli.main:main"
 
 [dependency-groups]
 docs = [
+    "la-dev-codex-plugins==0.4.3",
     "zensical==0.0.50",
 ]
 test = [
     {include-group = "docs"},
+    "la-dev-codex-plugins[pytest]==0.4.3",
     "pytest==9.1.1",
     "pytest-cov==7.1.0",
     "pytest-mock==3.15.1",
@@ -102,9 +104,7 @@ path = "src/pydocformatter/_version.py"
 addopts = ["-n", "auto"]
 filterwarnings = ["error"]
 testpaths = ["tests"]
-markers = [
-    "isolated_cwd: Run the test in a fresh writable temporary working directory below the test session boundary",
-]
+la_dev_cwd_isolation_unmarked = "shared_guarded"
 
 #
 # pydocfmt
@@ -222,6 +222,7 @@ runtime-evaluated-decorators = ["dataclasses.dataclass"]
 [tool.ruff.lint.isort]
 combine-as-imports = false
 force-sort-within-sections = false
+known-first-party = ["tests"]
 length-sort = false
 length-sort-straight = true
 lines-after-imports = 2

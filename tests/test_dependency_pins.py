@@ -12,7 +12,8 @@ import pytest
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 PYPROJECT_PATH = ROOT / "pyproject.toml"
-GROUPS_TO_CHECK = ("test", "dev")
+GROUPS_TO_CHECK = ("docs", "test", "dev")
+SHARED_TOOLING_PACKAGE = "la-dev-codex-plugins"
 NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*(?:\[[A-Za-z0-9_,.-]+\])?$")
 VERSION_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9.!+_-]*$")
 
@@ -96,29 +97,43 @@ def test_parse_exact_pin_rejects_flexible_or_non_dependency_pins(requirement: st
 
 
 def test_dependency_groups_use_exact_pins() -> None:
-    """Check that test and dev dependency groups use exact concrete pins."""
+    """Check that all development dependency groups use exact concrete pins."""
     with PYPROJECT_PATH.open("rb") as f:
         pyproject = tomllib.load(f)
 
     assert dependency_pin_errors(pyproject) == []
 
 
-def test_dependency_pin_errors_accepts_pinned_test_and_dev_groups() -> None:
-    """Check that pinned test and dev dependencies pass."""
-    pyproject: dict[str, Any] = {"dependency-groups": {"test": ["pytest==9.1.1"], "dev": [{"include-group": "test"}, "ruff==0.15.21"]}}
+def test_shared_tooling_dependency_uses_consumer_specific_extras() -> None:
+    """Keep docs independent from upstream development-only dependencies."""
+    with PYPROJECT_PATH.open("rb") as f:
+        dependency_groups = tomllib.load(f)["dependency-groups"]
+
+    docs_requirements = [entry for entry in dependency_groups["docs"] if isinstance(entry, str) and (pin := parse_exact_pin(entry)) is not None and pin[0] == SHARED_TOOLING_PACKAGE]
+    assert len(docs_requirements) == 1
+    shared_tooling_version = parse_exact_pin(docs_requirements[0])
+    assert shared_tooling_version is not None
+    assert docs_requirements[0] == f"{SHARED_TOOLING_PACKAGE}=={shared_tooling_version[1]}"
+    assert f"{SHARED_TOOLING_PACKAGE}[pytest]=={shared_tooling_version[1]}" in dependency_groups["test"]
+    assert all(f"{SHARED_TOOLING_PACKAGE}[dev]" not in entry for group in dependency_groups.values() for entry in group if isinstance(entry, str))
+
+
+def test_dependency_pin_errors_accepts_pinned_development_groups() -> None:
+    """Check that pinned documentation, test, and development dependencies pass."""
+    pyproject: dict[str, Any] = {"dependency-groups": {"docs": ["zensical==0.0.50"], "test": ["pytest==9.1.1"], "dev": [{"include-group": "test"}, "ruff==0.15.21"]}}
 
     assert dependency_pin_errors(pyproject) == []
 
 
 def test_dependency_pin_errors_rejects_flexible_dependency_pins() -> None:
     """Check that flexible dependency specifiers fail."""
-    pyproject: dict[str, Any] = {"dependency-groups": {"test": ["pytest>=9.1.1"], "dev": [{"include-group": "test"}, "ruff==0.15.21"]}}
+    pyproject: dict[str, Any] = {"dependency-groups": {"docs": ["zensical==0.0.50"], "test": ["pytest>=9.1.1"], "dev": [{"include-group": "test"}, "ruff==0.15.21"]}}
 
     assert dependency_pin_errors(pyproject) == ["dependency-groups.test must use exact pins (name==version): 'pytest>=9.1.1'"]
 
 
 def test_dependency_pin_errors_rejects_unsupported_table_entries() -> None:
     """Check that only include-group table entries are skipped."""
-    pyproject: dict[str, Any] = {"dependency-groups": {"test": ["pytest==9.1.1"], "dev": [{"include-group": "test", "extra": "bad"}, "ruff==0.15.21"]}}
+    pyproject: dict[str, Any] = {"dependency-groups": {"docs": ["zensical==0.0.50"], "test": ["pytest==9.1.1"], "dev": [{"include-group": "test", "extra": "bad"}, "ruff==0.15.21"]}}
 
     assert dependency_pin_errors(pyproject) == ["dependency-groups.dev contains unsupported table entry: {'include-group': 'test', 'extra': 'bad'}"]

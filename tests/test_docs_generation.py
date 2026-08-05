@@ -14,6 +14,7 @@ import dataclasses
 # Third-party imports
 import pytest
 import markdown as markdown_core
+from la_dev_codex_plugins import markdown_tables
 from tools.docs import generate_zensical
 
 # First-party imports
@@ -23,10 +24,14 @@ from pydocformatter import docs_urls
 from pydocformatter.cli import settings_check
 from pydocformatter.rules.codes import RuleSelector
 from pydocformatter.rules.models import RuleSettingEffect, RuleSettingEffects
+from tests import markdown_table_helpers
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 FORBIDDEN_DOCS_DEPENDENCIES = {"mdformat", "mkdocs", "mkdocs-material", "mkdocs-redirects", "mkdocstrings", "mkdocstrings-python", "properdocs"}
+RULE_TABLE_HEADERS = ("Code", "Name", "Summary", "Fix available", "Enabled")
+RULE_TABLE_WRAPPER = '<div class="pydocformatter-rule-table-wrapper" markdown="1">'
+SETTINGS_TABLE_WRAPPER = '<div class="pydocformatter-settings-table-wrapper" markdown="1">'
 
 
 def _render_markdown(text: str) -> str:
@@ -76,6 +81,17 @@ def generated_site(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> t
     return generated_docs_dir, generated_config_path
 
 
+def test_generated_markdown_tables_use_canonical_style(generated_site: tuple[pathlib.Path, pathlib.Path]) -> None:
+    """Every generated Markdown table must already use the shared canonical style."""
+    generated_docs_dir, _ = generated_site
+    failures = []
+    for path in generated_docs_dir.rglob("*.md"):
+        result = markdown_tables.format_markdown_tables_file(path, check=True)
+        failures.extend((*result.changes, *result.issues))
+
+    assert not failures
+
+
 def test_rule_pages_have_unique_slugs() -> None:
     """Generated rule slugs must be unique."""
     pages = generate_zensical.rule_pages()
@@ -123,9 +139,10 @@ def test_rule_index_groups_all_rules_by_category(generated_site: tuple[pathlib.P
         heading = f"### {category.prefix}: {category.name}"
         _, section_after_heading = markdown.split(heading, maxsplit=1)
         section = section_after_heading.split("\n### ", maxsplit=1)[0]
+        table = markdown_table_helpers.table_after_heading(markdown, heading, label="generated rules Markdown", expected_leading_lines=(RULE_TABLE_WRAPPER,))
 
         assert section.count('<div class="pydocformatter-rule-table-wrapper" markdown="1">') == 1
-        assert section.count("| Code | Name | Summary | Fix available | Enabled |") == 1
+        assert markdown_table_helpers.table_headers(table, label="generated rules Markdown") == RULE_TABLE_HEADERS
         for rule_class in rule_collection.RULE_COLLECTION.rules:
             rule = rule_class.meta
             if rule.code.prefix == category.prefix:
@@ -151,8 +168,13 @@ def test_rule_index_labels_convention_rules(generated_site: tuple[pathlib.Path, 
             assert generate_zensical._enabled_text(rule_class) == "Convention"
 
     assert convention_rule_codes
-    assert markdown.count("| Convention |") == len(convention_rule_codes)
-    assert "| Convention-gated |" not in markdown
+    rows = tuple(
+        row
+        for table in markdown_table_helpers.tables_with_headers(markdown, RULE_TABLE_HEADERS, label="generated rules Markdown")
+        for row in markdown_table_helpers.table_rows(table, label="generated rules Markdown")
+    )
+    assert sum(row["Enabled"] == "Convention" for row in rows) == len(convention_rule_codes)
+    assert all(row["Enabled"] != "Convention-gated" for row in rows)
 
 
 def test_rule_index_labels_convention_opt_in_rules(generated_site: tuple[pathlib.Path, pathlib.Path]) -> None:
@@ -168,7 +190,12 @@ def test_rule_index_labels_convention_opt_in_rules(generated_site: tuple[pathlib
             assert generate_zensical._enabled_text(rule_class) == "Convention opt-in"
 
     assert convention_opt_in_rule_codes
-    assert markdown.count("| Convention opt-in |") == len(convention_opt_in_rule_codes)
+    rows = tuple(
+        row
+        for table in markdown_table_helpers.tables_with_headers(markdown, RULE_TABLE_HEADERS, label="generated rules Markdown")
+        for row in markdown_table_helpers.table_rows(table, label="generated rules Markdown")
+    )
+    assert sum(row["Enabled"] == "Convention opt-in" for row in rows) == len(convention_opt_in_rule_codes)
     assert "Convention-explicit" not in markdown
 
 
@@ -184,7 +211,12 @@ def test_rule_index_labels_require_explicit_rules(generated_site: tuple[pathlib.
             assert generate_zensical._enabled_text(rule_class) == "Requires explicit"
 
     assert require_explicit_rule_codes
-    assert markdown.count("| Requires explicit |") == len(require_explicit_rule_codes)
+    rows = tuple(
+        row
+        for table in markdown_table_helpers.tables_with_headers(markdown, RULE_TABLE_HEADERS, label="generated rules Markdown")
+        for row in markdown_table_helpers.table_rows(table, label="generated rules Markdown")
+    )
+    assert sum(row["Enabled"] == "Requires explicit" for row in rows) == len(require_explicit_rule_codes)
 
 
 def test_rule_index_explains_table_columns(generated_site: tuple[pathlib.Path, pathlib.Path]) -> None:
@@ -462,6 +494,21 @@ def test_category_options_link_to_settings(generated_site: tuple[pathlib.Path, p
     assert "| `line-length`" not in markdown
 
 
+def test_category_options_link_only_the_structural_first_cell() -> None:
+    """Link the parsed first cell without replacing matching text in later cells."""
+    markdown = "## Options\n\n| Setting | Effect |\n|---------|--------|\n| `line-length` | Compare `line-length` values. |"
+
+    linked = generate_zensical._link_options_settings(markdown, settings_path="../settings.md", context="example")
+
+    assert "| [`line-length`](../settings.md#line-length) | Compare `line-length` values. |" in linked
+
+
+def test_option_table_link_rejects_inconsistent_first_cell_structure() -> None:
+    """Reject a parsed first cell that is not positioned as the source row's first cell."""
+    with pytest.raises(ValueError, match="does not match its source row structure"):
+        generate_zensical._link_option_table_setting_cell("prefix `line-length` | Effect |", "`line-length`", settings_path="../settings.md", context="example")
+
+
 def test_rule_page_footer_tags_order_category_before_code(generated_site: tuple[pathlib.Path, pathlib.Path]) -> None:
     """Generated rule page tag chips must list category, rule code, then rule name."""
     generated_docs_dir, _ = generated_site
@@ -493,31 +540,33 @@ def test_settings_markdown_explains_table_columns() -> None:
 def test_settings_markdown_tables_are_compact_without_scope() -> None:
     """Generated settings Markdown must use compact tables without scope text."""
     markdown = generate_zensical._settings_markdown(generate_zensical.rule_pages())
+    tables = markdown_table_helpers.validate_tables(markdown, label="generated settings Markdown")
 
     assert '<div class="pydocformatter-settings-table-wrapper" markdown="1">' in markdown
-    assert "| Setting | CLI | Type | Default | Related rules |" in markdown
-    assert "| Setting | Type | Default | CLI | Scope | Related rules |" not in markdown
+    assert any(markdown_table_helpers.table_headers(table, label="generated settings Markdown") == ("Setting", "CLI", "Type", "Default", "Related rules") for table in tables)
+    assert all("Scope" not in markdown_table_helpers.table_headers(table, label="generated settings Markdown") for table in tables)
     assert "- Scope:" not in markdown
     assert "[Settings specification](reference/settings-spec.md)" in markdown
     assert "[Settings spec](reference/settings-spec.md)" not in markdown
 
 
 def test_settings_markdown_tables_have_consistent_cell_counts() -> None:
-    """Generated settings tables must not contain unescaped cell delimiters."""
+    """Generated settings tables must satisfy the full parser contract."""
     markdown = generate_zensical._settings_markdown(generate_zensical.rule_pages())
+    tables = markdown_table_helpers.validate_tables(markdown, label="generated settings Markdown")
 
-    for table in markdown.split('<div class="pydocformatter-settings-table-wrapper" markdown="1">')[1:]:
-        table_lines = [line for line in table.split("</div>", maxsplit=1)[0].splitlines() if line.startswith("|")]
-        header_cell_count = len(table_lines[0].split("|"))
-
-        assert all(len(line.split("|")) == header_cell_count for line in table_lines)
+    assert len(tables) == len(settings_check.SettingsGroup)
+    assert all(markdown_table_helpers.table_headers(table, label="generated settings Markdown")[:4] == ("Setting", "CLI", "Type", "Default") for table in tables)
 
 
 def test_settings_markdown_enum_type_table_cells_render_readable_pipes() -> None:
     """Generated enum type cells must render pipe separators without visible escapes."""
     markdown = generate_zensical._settings_markdown(generate_zensical.rule_pages())
-    row = next(line for line in markdown.splitlines() if line.startswith("| `line-ending` "))
-    rendered = html.unescape(markdown_core.markdown("| Type |\n| --- |\n|" + row.split("|")[3] + "|\n", extensions=["tables"]))
+    rows = (
+        row for table in markdown_tables.parse_markdown_tables(markdown) for row in markdown_table_helpers.table_rows(table, label="generated settings Markdown") if row["Setting"] == "`line-ending`"
+    )
+    row = next(rows)
+    rendered = html.unescape(markdown_core.markdown(f"| Type |\n| --- |\n| {row['Type']} |\n", extensions=["tables"]))
 
     assert "<code>auto | lf | cr-lf | native</code>" in rendered
     assert "\\|" not in rendered
@@ -532,13 +581,13 @@ def test_settings_markdown_omits_empty_related_rules_table_columns() -> None:
         definitions = [definition for definition in settings_check.SETTINGS_SCHEMA.definitions if definition.group == group]
         if not definitions:
             continue
-        section = markdown.split(f"\n## {group.value}\n", maxsplit=1)[1].split("\n## ", maxsplit=1)[0]
+        table = markdown_table_helpers.table_after_heading(markdown, f"## {group.value}", label="generated settings Markdown", expected_leading_lines=(SETTINGS_TABLE_WRAPPER,))
+        headers = markdown_table_helpers.table_headers(table, label="generated settings Markdown")
         has_related_rules = any(definition.field in related_rules_by_field for definition in definitions)
         if has_related_rules:
-            assert "| Setting | CLI | Type | Default | Related rules |" in section
+            assert headers == ("Setting", "CLI", "Type", "Default", "Related rules")
         else:
-            assert "| Setting | CLI | Type | Default |\n| --- | --- | --- | --- |" in section
-            assert "| Related rules |" not in section
+            assert headers == ("Setting", "CLI", "Type", "Default")
 
 
 def test_settings_markdown_links_related_rules() -> None:

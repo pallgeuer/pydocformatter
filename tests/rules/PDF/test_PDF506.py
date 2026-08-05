@@ -49,7 +49,7 @@ def test_enabled_assertion_inventory_reports_assertion_specific_message() -> Non
     result = format_source(source, settings=settings)
 
     assert_pdf506_lines(source, ((3,),), settings=settings)
-    assert tuple(finding.message for finding in result.unfixed_findings) == ("AssertionError from assert statement is missing docstring documentation",)
+    assert tuple(finding.message for finding in result.unfixed_findings) == ("AssertionError raised by an assert statement is missing docstring documentation",)
 
 
 def test_default_missing_documentation_policy_requires_relevant_section_for_assertions() -> None:
@@ -75,8 +75,8 @@ def test_documented_assertion_error_is_accepted_in_google_numpy_and_rest() -> No
     ("body", "expected_message"),
     [
         ('    raise AssertionError("bad")\n    assert value\n', "Raised exception 'AssertionError' is missing docstring documentation"),
-        ('    assert value\n    raise AssertionError("bad")\n', "AssertionError from assert statement is missing docstring documentation"),
-        ('    assert value; raise AssertionError("bad")\n', "AssertionError from assert statement is missing docstring documentation"),
+        ('    assert value\n    raise AssertionError("bad")\n', "AssertionError raised by an assert statement is missing docstring documentation"),
+        ('    assert value; raise AssertionError("bad")\n', "AssertionError raised by an assert statement is missing docstring documentation"),
     ],
 )
 def test_first_assertion_error_occurrence_owns_deduplicated_finding(body: str, expected_message: str) -> None:
@@ -99,7 +99,7 @@ def test_enabled_assertions_join_distinct_direct_raises_in_source_order() -> Non
 
     assert_pdf506_lines(source, ((3,), (4,)), settings=settings)
     assert tuple(finding.message for finding in result.unfixed_findings) == (
-        "AssertionError from assert statement is missing docstring documentation",
+        "AssertionError raised by an assert statement is missing docstring documentation",
         "Raised exception 'ValueError' is missing docstring documentation",
     )
 

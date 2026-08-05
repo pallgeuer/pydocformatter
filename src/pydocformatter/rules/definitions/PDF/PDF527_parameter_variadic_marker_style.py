@@ -76,5 +76,5 @@ class PDF527ParameterVariadicMarkerStyle(RuleBase):
 def _instance_message(issue: parameter_documentation.ParameterVariadicMarkerStyleIssue, *, context: RuleContext) -> str:
     """Return the convention-specific diagnostic for a variadic marker style issue."""
     if context.settings.docstring_convention is DocstringConvention.REST:
-        return f"Docstring parameter '{issue.documented_parameter.name}' should be written as '{issue.expected_name}' without variadic markers under the reStructuredText convention"
+        return f"Docstring parameter '{issue.documented_parameter.name}' should be written as '{issue.expected_name}' without variadic markers under the reST convention"
     return f"Docstring parameter '{issue.documented_parameter.name}' should be written as '{issue.expected_name}' to match the function signature"

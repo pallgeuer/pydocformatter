@@ -33,7 +33,7 @@ class PDF305SummaryStartsWithThis(RuleBase):
     meta = RuleMetadata(
         code=RuleCode("PDF305"),
         name="summary-starts-with-this",
-        message='Docstring summary should not start with "This"',
+        message="Docstring summary should not start with 'This'",
         fix_availability=FixAvailability.NEVER,
         stable_since="1.0.0",
         setting_effects=(

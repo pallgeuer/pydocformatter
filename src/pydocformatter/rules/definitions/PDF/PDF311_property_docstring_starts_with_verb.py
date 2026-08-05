@@ -65,8 +65,19 @@ class PDF311PropertyDocstringStartsWithVerb(RuleBase):
             normalized = summary_style.normalize_word(word.word)
             if normalized not in _DISALLOWED_VERBS or not decorator_helpers.has_property_decorator(owner.decorators, context=context, settings=context.settings):
                 continue
-            violations.append(rule_violations.diagnostic(cls.meta, summary_style.line_numbers(word), instance_message=f'Property docstring should not start with a verb ("{word.word}")'))
+            violations.append(
+                rule_violations.diagnostic(cls.meta, summary_style.line_numbers(word), instance_message=f"Property docstring first word {_display_word(word.word)!r} should not be a verb")
+            )
         return tuple(violations)
+
+
+def _display_word(word: str) -> str:
+    """Return the source word without surrounding punctuation."""
+    start = next((index for index, character in enumerate(word) if character.isalnum()), None)
+    if start is None:
+        return word
+    end = next(index for index in range(len(word) - 1, -1, -1) if word[index].isalnum())
+    return word[start : end + 1]
 
 
 _DISALLOWED_VERBS = frozenset(("return", "returns", "get", "gets", "yield", "yields", "fetch", "fetches", "retrieve", "retrieves"))

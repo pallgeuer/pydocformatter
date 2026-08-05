@@ -21,7 +21,7 @@ from pydocformatter.rules import line_endings
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.models import RuleSettingEffect
 from pydocformatter.source_path import SourcePathContext
-from tests import markdown_example_helpers
+from tests import markdown_example_helpers, markdown_table_helpers
 
 
 if TYPE_CHECKING:
@@ -35,8 +35,8 @@ _REQUIRE_EXPLICIT_NOTICE = "Rule must by default be explicitly selected, unless 
 _FENCED_CODE_BLOCK_RE = re.compile(r"^(`{3,}|~{3,}).*?^\1\s*$", re.DOTALL | re.MULTILINE)
 _RUFF_RULE_REFERENCE_RE = re.compile(r"\b(?:(?:D|DOC|E|W|RUF)\d{3}|PLE\d{4})\b")
 _PYDOCFORMATTER_RULE_REFERENCE_RE = re.compile(r"\bP[CD]F\d{3}\b")
-_MARKDOWN_TABLE_SEPARATOR_RE = re.compile(r":?-{3,}:?")
 _TEMPLATE_PLACEHOLDERS = ("Describe the rule's check", "This line says", "CODE101", "related-setting", "Topic name", "Briefly describe")
+RUFF_RULE_TABLE_HEADERS = ("Code", "Name", "Message", "Fixable", "Since", "Support by pydocformatter")
 
 
 def _rule_cases() -> tuple[tuple[str, type[RuleBase]], ...]:
@@ -235,16 +235,19 @@ def test_rule_markdown_rule_references_exist() -> None:
 
 
 def test_rule_markdown_tables_are_well_formed() -> None:
-    """Markdown pipe tables in rule docs must have consistent row shapes."""
+    """Markdown tables in rule docs must satisfy the full parser contract."""
     for label, markdown in _rule_and_category_markdown_documents():
-        for table_index, table_lines in enumerate(_markdown_pipe_tables(_FENCED_CODE_BLOCK_RE.sub("", markdown)), start=1):
-            _assert_well_formed_markdown_table(label, table_index, table_lines)
+        markdown_table_helpers.validate_tables(markdown, label=label)
 
 
 def _rule_list_ruff_codes() -> frozenset[str]:
     """Return Ruff codes documented in the public Ruff rules table."""
     text = (pathlib.Path(__file__).resolve().parents[1] / "docs" / "public" / "ruff_rule_links.md").read_text(encoding="utf-8")
-    return frozenset(_plain_code_cell(row["Code"]) for row in _markdown_table_rows_after_heading(text, "## Ruff rules"))
+    table = markdown_table_helpers.table_after_heading(
+        text, "## Ruff rules", label="docs/public/ruff_rule_links.md", expected_leading_lines=('<div class="pydocformatter-rule-table-wrapper" markdown="1">',)
+    )
+    assert markdown_table_helpers.table_headers(table, label="docs/public/ruff_rule_links.md") == RUFF_RULE_TABLE_HEADERS
+    return frozenset(_plain_code_cell(row["Code"]) for row in markdown_table_helpers.table_rows(table, label="docs/public/ruff_rule_links.md"))
 
 
 def _plain_code_cell(cell: str) -> str:
@@ -260,64 +263,6 @@ def _rule_and_category_markdown_documents() -> tuple[tuple[str, str], ...]:
     documents = [(rule_code, rule_documentation.load_rule_explanation(rule_class)) for rule_code, rule_class in _rule_cases()]
     documents.extend((category_class.meta.prefix, rule_documentation.load_rule_explanation(category_class)) for category_class in rule_collection.RULE_COLLECTION.categories)
     return tuple(documents)
-
-
-def _markdown_pipe_tables(markdown: str) -> tuple[tuple[str, ...], ...]:
-    """Return contiguous pipe-table line groups from Markdown text."""
-    tables: list[tuple[str, ...]] = []
-    table_lines: list[str] = []
-    for line in markdown.splitlines():
-        if line.startswith("|"):
-            table_lines.append(line)
-            continue
-        if table_lines:
-            tables.append(tuple(table_lines))
-            table_lines = []
-    if table_lines:
-        tables.append(tuple(table_lines))
-    return tuple(tables)
-
-
-def _assert_well_formed_markdown_table(label: str, table_index: int, table_lines: tuple[str, ...]) -> None:
-    """Assert one Markdown pipe table has a consistent, parseable shape."""
-    assert len(table_lines) >= 3, f"{label}: table {table_index} must include header, separator, and body row"
-    header_cells = _split_markdown_row(table_lines[0])
-    separator_cells = _split_markdown_row(table_lines[1])
-    expected_cell_count = len(header_cells)
-
-    assert expected_cell_count > 0, f"{label}: table {table_index} must have at least one column"
-    assert all(header_cells), f"{label}: table {table_index} has an empty header cell"
-    assert len(separator_cells) == expected_cell_count, f"{label}: table {table_index} separator cell count does not match header"
-    assert all(_MARKDOWN_TABLE_SEPARATOR_RE.fullmatch(cell) is not None for cell in separator_cells), f"{label}: table {table_index} has an invalid separator row"
-
-    for row_number, row in enumerate(table_lines[2:], start=3):
-        cells = _split_markdown_row(row)
-        assert len(cells) == expected_cell_count, f"{label}: table {table_index} row {row_number} cell count does not match header"
-
-
-def _markdown_table_rows_after_heading(text: str, heading: str) -> tuple[dict[str, str], ...]:
-    """Return simple Markdown table rows immediately after a heading."""
-    lines = text.splitlines()
-    heading_index = lines.index(heading)
-    table_lines: list[str] = []
-    for line in lines[heading_index + 1 :]:
-        if not line.strip():
-            if table_lines:
-                break
-            continue
-        if table_lines and not line.startswith("|"):
-            break
-        if line.startswith("|"):
-            table_lines.append(line)
-    if len(table_lines) < 2:
-        raise AssertionError(f"No Markdown table found after {heading}")
-    headers = _split_markdown_row(table_lines[0])
-    return tuple(dict(zip(headers, cells, strict=True)) for cells in (_split_markdown_row(line) for line in table_lines[2:]))
-
-
-def _split_markdown_row(line: str) -> list[str]:
-    """Split one simple Markdown table row into stripped cells."""
-    return [cell.strip() for cell in line.strip().strip("|").split("|")]
 
 
 def _markdown_section(markdown: str, heading: str) -> str:

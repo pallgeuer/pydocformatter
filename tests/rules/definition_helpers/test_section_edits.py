@@ -25,8 +25,8 @@ def test_replacement_accumulator_keeps_request_state_private_and_structural() ->
     assert field_names == ("docstring", "context", "rule", "_requests")
 
 
-def test_replacement_accumulator_groups_ordered_span_edits_and_messages() -> None:
-    """Build one fix from ordered replacements with stable deduplicated messages."""
+def test_replacement_accumulator_groups_ordered_span_edits_and_uses_default_for_distinct_messages() -> None:
+    """Build one fix and use rule metadata for multiple distinct messages."""
     source = 'def function(value, other):\n    """Summary.\n\n    Args:\n        value (int): Description.\n        other (bool): Other description.\n\n    Returns:\n        str: Result.\n    """\n'
     _, context = contexts(source)
     docstring = PDF.require_data(context).docstrings[0]
@@ -43,10 +43,25 @@ def test_replacement_accumulator_groups_ordered_span_edits_and_messages() -> Non
     accumulator.add(third_line, third_start, third_start + len("str"), "complex", instance_message="Normalize result")
     (violation,) = accumulator.results()
 
-    assert violation.finding.message == "Normalize type; Normalize result"
+    assert violation.finding.message == PDF409DocstringEntrySpacing.meta.message
     assert violation.fix is not None
     module = rule_edits.apply_context_source_changes(context, violation.fix.planned_changes())
     assert module.code == source.replace("value (int)", "value (float)").replace("other (bool)", "other (bytes)").replace("str: Result.", "complex: Result.")
+
+
+def test_replacement_accumulator_deduplicates_identical_messages() -> None:
+    """Keep one concrete message when every grouped request agrees."""
+    source = 'def function(value, other):\n    """Summary.\n\n    Args:\n        value (int): Description.\n        other (bool): Other description.\n    """\n'
+    _, context = contexts(source)
+    docstring = PDF.require_data(context).docstrings[0]
+    accumulator = section_edits.ReplacementAccumulator(docstring, context=context, rule=PDF409DocstringEntrySpacing.meta)
+    for line, old, new in ((docstring.structure.lines[3], "int", "float"), (docstring.structure.lines[4], "bool", "bytes")):
+        start = line.text.index(old)
+        accumulator.add(line, start, start + len(old), new, instance_message="Normalize type")
+
+    (violation,) = accumulator.results()
+
+    assert violation.finding.message == "Normalize type"
 
 
 def test_replacement_accumulator_returns_nothing_without_candidates() -> None:

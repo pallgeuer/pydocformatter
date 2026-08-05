@@ -945,7 +945,7 @@ def test_pydocfmt_check_reports_warning_specific_pdf410_message() -> None:
         assert result.exit_code == 1
         assert target.read_text(encoding="utf-8") == source
         assert f"{target}:" in result.stdout
-        assert "PDF410* Docstring warning entry should use canonical spelling. Line 5" in result.stdout
+        assert "PDF410* Docstring warning entry spelling should be normalized from 'RuntimeWarning | UserWarning' to 'RuntimeWarning, UserWarning'. Line 5" in result.stdout
 
 
 def test_pydocfmt_diff_prints_unified_diff_without_writing_file(mocker: MockerFixture) -> None:

@@ -417,11 +417,7 @@ def test_reports_rest_delimiter_and_argument_arity() -> None:
     assert_pdf414(
         source,
         ((4,), (5,), (6,)),
-        (
-            "reStructuredText field ':param:' is missing its closing colon",
-            "reStructuredText field ':param:' is missing its required argument",
-            "reStructuredText field ':returns:' has an unexpected argument",
-        ),
+        ("reST field ':param:' is missing its closing colon", "reST field ':param:' is missing its required argument", "reST field ':returns:' has an unexpected argument"),
         convention=DocstringConvention.REST,
     )
 
@@ -433,13 +429,13 @@ def test_all_named_rest_field_families_require_arguments() -> None:
         source,
         ((4,), (5,), (6,), (7,), (8,), (9,), (10,)),
         (
-            "reStructuredText field ':param:' is missing its required argument",
-            "reStructuredText field ':type:' is missing its required argument",
-            "reStructuredText field ':raises:' is missing its required argument",
-            "reStructuredText field ':ivar:' is missing its required argument",
-            "reStructuredText field ':cvar:' is missing its required argument",
-            "reStructuredText field ':var:' is missing its required argument",
-            "reStructuredText field ':vartype:' is missing its required argument",
+            "reST field ':param:' is missing its required argument",
+            "reST field ':type:' is missing its required argument",
+            "reST field ':raises:' is missing its required argument",
+            "reST field ':ivar:' is missing its required argument",
+            "reST field ':cvar:' is missing its required argument",
+            "reST field ':var:' is missing its required argument",
+            "reST field ':vartype:' is missing its required argument",
         ),
         convention=DocstringConvention.REST,
     )
@@ -451,11 +447,7 @@ def test_all_owner_wide_rest_field_families_reject_arguments() -> None:
     assert_pdf414(
         source,
         ((4,), (5,), (6,)),
-        (
-            "reStructuredText field ':return:' has an unexpected argument",
-            "reStructuredText field ':returns:' has an unexpected argument",
-            "reStructuredText field ':rtype:' has an unexpected argument",
-        ),
+        ("reST field ':return:' has an unexpected argument", "reST field ':returns:' has an unexpected argument", "reST field ':rtype:' has an unexpected argument"),
         convention=DocstringConvention.REST,
     )
 
@@ -469,7 +461,7 @@ def test_rest_yield_fields_retain_named_and_owner_wide_forms() -> None:
 def test_rest_missing_delimiter_is_case_normalized_and_limited_to_standard_fields() -> None:
     """Recognize standard fields case-insensitively without consuming roles, custom fields, or double-colon text."""
     source = 'def convert(value):\n    """Convert a value.\n\n    :VARTYPE value\n\n    :unknown value\n\n    ::param value\n\n    :class:`Example`\n    """\n'
-    assert_pdf414(source, ((4,),), ("reStructuredText field ':vartype:' is missing its closing colon",), convention=DocstringConvention.REST)
+    assert_pdf414(source, ((4,),), ("reST field ':vartype:' is missing its closing colon",), convention=DocstringConvention.REST)
 
 
 def test_rest_missing_delimiter_uses_field_arity_as_confidence() -> None:
@@ -478,11 +470,7 @@ def test_rest_missing_delimiter_uses_field_arity_as_confidence() -> None:
     assert_pdf414(
         source,
         ((4,), (6,), (14,)),
-        (
-            "reStructuredText field ':param:' is missing its closing colon",
-            "reStructuredText field ':raises:' is missing its closing colon",
-            "reStructuredText field ':return:' is missing its closing colon",
-        ),
+        ("reST field ':param:' is missing its closing colon", "reST field ':raises:' is missing its closing colon", "reST field ':return:' is missing its closing colon"),
         convention=DocstringConvention.REST,
     )
 
@@ -601,10 +589,7 @@ def test_malformed_rest_fields_preserve_layout_and_remain_individually_diagnosed
 
     assert result.new_source == source
     assert not result.fixed_findings
-    assert tuple(finding.message for finding in result.unfixed_findings) == (
-        "reStructuredText field ':param:' is missing its closing colon",
-        "reStructuredText field ':type:' is missing its closing colon",
-    )
+    assert tuple(finding.message for finding in result.unfixed_findings) == ("reST field ':param:' is missing its closing colon", "reST field ':type:' is missing its closing colon")
 
 
 @pytest.mark.parametrize(

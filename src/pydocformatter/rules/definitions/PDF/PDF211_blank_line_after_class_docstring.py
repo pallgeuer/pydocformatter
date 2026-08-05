@@ -32,7 +32,7 @@ class PDF211BlankLineAfterClassDocstring(RuleBase):
     meta = RuleMetadata(
         code=RuleCode("PDF211"),
         name="blank-line-after-class-docstring",
-        message="One blank line required after class docstring",
+        message="Class docstring should have one blank line after it",
         fix_availability=FixAvailability.ALWAYS,
         stable_since="1.0.0",
         setting_effects=(),

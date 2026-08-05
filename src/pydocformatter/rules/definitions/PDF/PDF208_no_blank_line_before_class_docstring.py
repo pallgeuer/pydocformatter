@@ -32,7 +32,7 @@ class PDF208NoBlankLineBeforeClassDocstring(RuleBase):
     meta = RuleMetadata(
         code=RuleCode("PDF208"),
         name="no-blank-line-before-class-docstring",
-        message="No blank lines allowed before class docstring",
+        message="Class docstring should have no blank lines before it",
         fix_availability=FixAvailability.ALWAYS,
         stable_since="1.0.0",
         setting_effects=(),

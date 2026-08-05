@@ -288,7 +288,7 @@ def value(arg):
 
 [output=unchanged]
 [findings]
-PDF408: Line 5: Docstring field ':return:' repeats earlier field ':returns:'
+PDF408: Line 5: Docstring reST field ':return:' repeats earlier reST field ':returns:'
 ```
 
 Non-named type fields and unknown fields repeat within their own field family:
@@ -310,8 +310,8 @@ def value(arg):
 
 [output=unchanged]
 [findings]
-PDF408: Line 5: Docstring field ':rtype:' repeats earlier field ':rtype:'
-PDF408: Line 8: Docstring field ':meta private:' repeats earlier field ':meta private:'
+PDF408: Line 5: Docstring reST field ':rtype:' repeats earlier reST field ':rtype:'
+PDF408: Line 8: Docstring reST field ':meta private:' repeats earlier reST field ':meta private:'
 ```
 
 Repeated named reST entries are handled by PDF412 instead:

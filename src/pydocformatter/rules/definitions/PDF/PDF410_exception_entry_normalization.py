@@ -32,7 +32,7 @@ class PDF410ExceptionEntryNormalization(RuleBase):
     meta = RuleMetadata(
         code=RuleCode("PDF410"),
         name="exception-entry-normalization",
-        message="Docstring exception entry should use canonical spelling",
+        message="Docstring exception or warning entry should use canonical spelling",
         fix_availability=FixAvailability.USUALLY,
         stable_since="1.0.0",
         setting_effects=docstring_conventions.convention_setting_effects(disabled=docstring_conventions.UNPARSED_CONVENTIONS),
@@ -68,7 +68,9 @@ def _results(context: RuleContext, *, rule: RuleMetadata) -> tuple[rule_violatio
             if replacement is None:
                 continue
             start_column, end_column, canonical = replacement
-            message = "Docstring warning entry should use canonical spelling" if entry.kind is PDF_definition.DocstringEntryKind.WARNING else rule.message
+            subject = "warning" if entry.kind is PDF_definition.DocstringEntryKind.WARNING else "exception"
+            original = line.text[start_column:end_column]
+            message = f"Docstring {subject} entry spelling should be normalized from '{original}' to '{canonical}'"
             accumulator.add(line, start_column, end_column, canonical, instance_message=message)
         results.extend(accumulator.results())
     return tuple(results)

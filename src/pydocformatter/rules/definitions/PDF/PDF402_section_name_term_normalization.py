@@ -32,7 +32,7 @@ class PDF402SectionNameTermNormalization(RuleBase):
     meta = RuleMetadata(
         code=RuleCode("PDF402"),
         name="section-name-term-normalization",
-        message="Docstring section name should use the preferred equivalent term",
+        message="Docstring section or reST field name should use the preferred equivalent term",
         fix_availability=FixAvailability.USUALLY,
         stable_since="1.0.0",
         setting_effects=docstring_conventions.convention_setting_effects(disabled=docstring_conventions.UNPARSED_CONVENTIONS),

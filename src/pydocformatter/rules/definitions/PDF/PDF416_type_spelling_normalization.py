@@ -65,6 +65,7 @@ class PDF416TypeSpellingNormalization(RuleBase):
                 if normalized is None:
                     continue
                 line = docstring.structure.lines[slot.line_index]
-                accumulator.add(line, slot.semantic_start_column, slot.semantic_end_column, normalized)
+                message = f"Docstring type spelling should be normalized from '{entry.type_info.text}' to '{normalized}'"
+                accumulator.add(line, slot.semantic_start_column, slot.semantic_end_column, normalized, instance_message=message)
             results.extend(accumulator.results())
         return tuple(results)

@@ -74,7 +74,7 @@ def test_reports_empty_rest_fields() -> None:
     assert not result.fixed_findings
     assert tuple(finding.rule for finding in result.unfixed_findings) == (PDF406EmptySection.meta, PDF406EmptySection.meta)
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((4,), (5,))
-    assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring field ':param value:' should not be empty", "Docstring field ':rtype:' should not be empty")
+    assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring reST field ':param value:' should not be empty", "Docstring reST field ':rtype:' should not be empty")
 
 
 def test_accepts_rest_fields_with_only_continuation_body_content() -> None:

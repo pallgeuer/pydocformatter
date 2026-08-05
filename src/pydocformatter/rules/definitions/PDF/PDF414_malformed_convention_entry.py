@@ -90,9 +90,9 @@ def _instance_message(issue: PDF_definition.ConventionEntryIssue) -> str:
         return f"NumPy docstring entry {names} is missing the colon before its type"
     field = f":{issue.field_name or ''}:"
     if issue.kind is PDF_definition.ConventionEntryIssueKind.REST_MISSING_CLOSING_DELIMITER:
-        return f"reStructuredText field '{field}' is missing its closing colon"
+        return f"reST field '{field}' is missing its closing colon"
     if issue.kind is PDF_definition.ConventionEntryIssueKind.REST_MISSING_ARGUMENT:
-        return f"reStructuredText field '{field}' is missing its required argument"
+        return f"reST field '{field}' is missing its required argument"
     if issue.kind is PDF_definition.ConventionEntryIssueKind.REST_UNEXPECTED_ARGUMENT:
-        return f"reStructuredText field '{field}' has an unexpected argument"
+        return f"reST field '{field}' has an unexpected argument"
     raise AssertionError(f"Unsupported PDF414 convention entry issue kind: {issue.kind.value}")

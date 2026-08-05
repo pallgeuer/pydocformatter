@@ -34,7 +34,7 @@ class PDF406EmptySection(RuleBase):
     meta = RuleMetadata(
         code=RuleCode("PDF406"),
         name="empty-section",
-        message="Docstring section should not be empty",
+        message="Docstring section or reST field should not be empty",
         fix_availability=FixAvailability.NEVER,
         stable_since="1.0.0",
         setting_effects=docstring_conventions.convention_setting_effects(disabled=docstring_conventions.UNPARSED_CONVENTIONS),
@@ -70,7 +70,9 @@ def _violations(context: RuleContext, *, rule: RuleMetadata) -> tuple[rule_viola
                 if entry.field_name is None or rest_fields.has_content(entry):
                     continue
                 line = docstring.structure.lines[entry.start_line]
-                violations.append(rule_violations.diagnostic(rule, section_edits.line_numbers(docstring, line), instance_message=f"Docstring field '{rest_fields.label(entry)}' should not be empty"))
+                violations.append(
+                    rule_violations.diagnostic(rule, section_edits.line_numbers(docstring, line), instance_message=f"Docstring reST field '{rest_fields.label(entry)}' should not be empty")
+                )
     return tuple(violations)
 
 

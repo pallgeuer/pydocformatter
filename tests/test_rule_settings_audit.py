@@ -15,11 +15,13 @@ import pydocformatter.rules.collection as rule_collection
 import pydocformatter.rules.definition as rule_definition
 import pydocformatter.rules.documentation as rule_documentation
 from pydocformatter.cli import settings_check
+from tests import markdown_table_helpers
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 AUDIT_PATH = ROOT / "docs" / "devel" / "rule_settings_audit.md"
 REQUIRED_COLUMNS = ("Rule", "Name", "Rule-specific selection effects", "Implementation settings used", "Implicit/helper settings reviewed", "Options settings to document", "Notes")
+SHARED_BUNDLE_COLUMNS = ("Bundle", "Settings", "Implementation path")
 OPTION_CODE_SPAN_RE = re.compile(r"`([^`]+)`")
 OPTION_BULLET_RE = re.compile(r"^- `(?P<setting>[^`]+)`: (?P<description>.+)$")
 
@@ -90,39 +92,20 @@ def test_rule_settings_audit_covers_direct_rule_settings() -> None:
 
 def _audit_rows() -> tuple[dict[str, str], ...]:
     """Return rows from the tracked per-rule settings audit table."""
-    lines = AUDIT_PATH.read_text(encoding="utf-8").splitlines()
-    heading_index = lines.index("## Per-rule settings table")
-    table_lines: list[str] = []
-    for line in lines[heading_index + 1 :]:
-        if not line.startswith("|"):
-            if table_lines:
-                break
-            continue
-        table_lines.append(line)
-    headers = _split_markdown_row(table_lines[0])
-    assert tuple(headers) == REQUIRED_COLUMNS
-    return tuple(dict(zip(headers, cells, strict=True)) for cells in (_split_markdown_row(line) for line in table_lines[2:]))
+    text = AUDIT_PATH.read_text(encoding="utf-8")
+    label = AUDIT_PATH.as_posix()
+    table = markdown_table_helpers.table_after_heading(text, "## Per-rule settings table", label=label, expected_leading_lines=None)
+    assert markdown_table_helpers.table_headers(table, label=label) == REQUIRED_COLUMNS
+    return markdown_table_helpers.table_rows(table, label=label)
 
 
 def _shared_setting_bundles() -> dict[str, tuple[str, ...]]:
     """Return setting fields grouped by the tracked shared bundle names."""
-    lines = AUDIT_PATH.read_text(encoding="utf-8").splitlines()
-    heading_index = lines.index("## Shared setting bundles")
-    table_lines: list[str] = []
-    for line in lines[heading_index + 1 :]:
-        if not line.startswith("|"):
-            if table_lines:
-                break
-            continue
-        table_lines.append(line)
-    headers = _split_markdown_row(table_lines[0])
-    rows = (dict(zip(headers, _split_markdown_row(line), strict=True)) for line in table_lines[2:])
+    text = AUDIT_PATH.read_text(encoding="utf-8")
+    label = AUDIT_PATH.as_posix()
+    table = markdown_table_helpers.table_after_heading(text, "## Shared setting bundles", label=label)
+    rows = markdown_table_helpers.table_rows(table, label=label)
     return {row["Bundle"].strip("`"): tuple(OPTION_CODE_SPAN_RE.findall(row["Settings"])) for row in rows}
-
-
-def _split_markdown_row(line: str) -> tuple[str, ...]:
-    """Split a simple audit table row into stripped cell text."""
-    return tuple(cell.strip() for cell in line.strip().strip("|").split("|"))
 
 
 def _audited_options(row: dict[str, str]) -> tuple[str, ...]:

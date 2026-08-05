@@ -156,7 +156,7 @@ def lookup(key):
 
 [output=unchanged]
 [findings]
-PDF416: Lines 2-4: Docstring type spelling should be normalized
+PDF416: Lines 2-4: Docstring type spelling should be normalized from '((str))' to 'str'
 ```
 
 ## Options

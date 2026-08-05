@@ -111,7 +111,7 @@ def value(arg):
 
 [output=unchanged]
 [findings]
-PDF406: Line 4: Docstring field ':param arg:' should not be empty
+PDF406: Line 4: Docstring reST field ':param arg:' should not be empty
 ```
 
 Section-like text is ignored when section parsing is disabled:

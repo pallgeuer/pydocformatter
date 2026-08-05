@@ -34,7 +34,7 @@ class PDF408RepeatedSection(RuleBase):
     meta = RuleMetadata(
         code=RuleCode("PDF408"),
         name="repeated-section",
-        message="Docstring section should not be repeated",
+        message="Docstring section or reST field should not be repeated",
         fix_availability=FixAvailability.NEVER,
         stable_since="1.0.0",
         setting_effects=docstring_conventions.convention_setting_effects(disabled=docstring_conventions.UNPARSED_CONVENTIONS),
@@ -90,7 +90,9 @@ def _rest_field_violations(docstring: PDF_definition.DocstringInfo, *, rule: Rul
         label = rest_fields.label(entry)
         if key in seen_keys:
             line = docstring.structure.lines[entry.start_line]
-            violations.append(rule_violations.diagnostic(rule, section_edits.line_numbers(docstring, line), instance_message=f"Docstring field '{label}' repeats earlier field '{seen_keys[key]}'"))
+            violations.append(
+                rule_violations.diagnostic(rule, section_edits.line_numbers(docstring, line), instance_message=f"Docstring reST field '{label}' repeats earlier reST field '{seen_keys[key]}'")
+            )
         else:
             seen_keys[key] = label
     return tuple(violations)

@@ -33,7 +33,7 @@ class PDF205BlankLineBeforeFunctionDocstring(RuleBase):
     meta = RuleMetadata(
         code=RuleCode("PDF205"),
         name="blank-line-before-function-docstring",
-        message="One blank line required before function docstring",
+        message="Function docstring should have one blank line before it",
         fix_availability=FixAvailability.ALWAYS,
         stable_since="1.0.0",
         setting_effects=(RuleSettingEffects(setting="docstring_convention", effects=(RuleSettingEffectValues(effect=RuleSettingEffect.IGNORED, values=tuple(settings_check.DocstringConvention)),)),),

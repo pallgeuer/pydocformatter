@@ -9,7 +9,7 @@ Checks function and method docstrings for directly raised exception classes miss
 
 The rule recognizes direct raises such as `raise ValueError`, `raise ValueError(...)`, `raise errors.ValueError`, and `raise errors.ValueError(...)`. Bare re-raises and dynamic raises such as `raise error` are ignored. Exception names are compared case-sensitively. Qualified names match exactly when both sides are qualified; otherwise the final class-name component is compared, so `errors.CustomError()` matches documented `CustomError` but not documented `other.CustomError`. Repeated occurrences of the same undocumented exception produce one finding at the first enabled occurrence.
 
-Assertion collection is syntactic and does not attempt reachability analysis. Constant-true assertions and assertions inside branches, loops, and exception handlers all count when the option is enabled. Direct raises and assertions share source order and name deduplication. If an assertion owns the first missing `AssertionError` occurrence, the message is `AssertionError from assert statement is missing docstring documentation`; an earlier direct `raise AssertionError` retains the ordinary direct-raise message. Assertions inside nested functions, nested classes, and lambdas do not belong to the enclosing function.
+Assertion collection is syntactic and does not attempt reachability analysis. Constant-true assertions and assertions inside branches, loops, and exception handlers all count when the option is enabled. Direct raises and assertions share source order and name deduplication. If an assertion owns the first missing `AssertionError` occurrence, the message is `AssertionError raised by an assert statement is missing docstring documentation`; an earlier direct `raise AssertionError` retains the ordinary direct-raise message. Assertions inside nested functions, nested classes, and lambdas do not belong to the enclosing function.
 
 The `docstring-include-assertion-errors` option is disabled by default because optimized Python execution can remove assertions and because assertions often express internal invariants rather than public API contracts.
 
@@ -168,7 +168,7 @@ def validate(value):
 
 [output=unchanged]
 [findings]
-PDF506: Line 3: AssertionError from assert statement is missing docstring documentation
+PDF506: Line 3: AssertionError raised by an assert statement is missing docstring documentation
 ```
 
 Direct raises and assertions share source order when deduplicating `AssertionError`:
@@ -193,7 +193,7 @@ def raise_first(value):
 
 [output=unchanged]
 [findings]
-PDF506: Line 3: AssertionError from assert statement is missing docstring documentation
+PDF506: Line 3: AssertionError raised by an assert statement is missing docstring documentation
 PDF506: Line 9: Raised exception 'AssertionError' is missing docstring documentation
 ```
 

@@ -222,7 +222,7 @@ def value(arg):
 
 [output=unchanged]
 [findings]
-PDF410: Lines 2-4: Docstring exception entry should use canonical spelling
+PDF410: Lines 2-4: Docstring exception entry spelling should be normalized from '`ValueError` | TypeError' to 'ValueError, TypeError'
 ```
 
 ```pydocfmt-example
@@ -237,7 +237,7 @@ def value(arg):
 
 [output=unchanged]
 [findings]
-PDF410: Lines 2-4: Docstring warning entry should use canonical spelling
+PDF410: Lines 2-4: Docstring warning entry spelling should be normalized from '`RuntimeWarning` | UserWarning' to 'RuntimeWarning, UserWarning'
 ```
 
 ## Options

@@ -70,7 +70,7 @@ class PDF506MissingExceptionDocumentation(RuleBase):
                 seen.append(occurrence.name)
                 if not any(value_documentation.exception_names_match(occurrence.name, documented_name) for documented_name in documented_names):
                     message = (
-                        "AssertionError from assert statement is missing docstring documentation"
+                        "AssertionError raised by an assert statement is missing docstring documentation"
                         if occurrence.origin is PDF_definition.ExceptionOccurrenceOrigin.ASSERT
                         else f"Raised exception '{occurrence.name}' is missing docstring documentation"
                     )

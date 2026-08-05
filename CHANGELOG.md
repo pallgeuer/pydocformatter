@@ -45,6 +45,9 @@ All notable changes to this project are documented here. The format follows [Kee
 - **Developer documentation:**
   - Corrected the rule settings audit to distinguish disabled rules from rules ignored only by broad selectors, with metadata-backed regression coverage.
   - Distinguished convention opt-in policies from `require-explicit`, with exhaustive conflict-free convention profiles and meaningful explicit-selection defaults enforced by regression tests.
+- **Developer tooling:**
+  - Replaced the repository-local Markdown table formatter, release checksum generator, and pytest working-directory isolation fixtures with the shared `la-dev-codex-plugins` implementations.
+  - Strengthened semantic Markdown table tests with full-document parsing and normalized all generated documentation tables to the shared canonical style.
 - **Internal cleanup:**
   - Centralized setting-effect resolution with disabled precedence across runtime rule selection, documentation generation, and metadata-backed tests.
 - **Rule selection:**
@@ -53,6 +56,7 @@ All notable changes to this project are documented here. The format follows [Kee
   - Collapsed repeated normalized pydocfmt selectors before suppression and PCF006 auditing so check-only and fixing runs preserve coverage without duplicate unused-selector findings.
   - Made inline suppressions after any component token of an implicitly concatenated docstring cover the complete expression for PDF findings while preserving line-local PCF coverage and existing local and standalone attachment boundaries.
 - **Docstring diagnostics:**
+  - Standardized rule metadata and instance messages, added concrete normalization rewrites, and made atomic grouped fixes fall back to rule metadata when they contain distinct diagnostics.
   - Made strict trailing-period rules PDF300 and PDF308 mutually exclusive with their terminal-punctuation alternatives PDF301 and PDF309, with broad convention profiles choosing one alternative consistently.
   - Made PDF409 solely responsible for parsed entry spacing while PDF410 now edits only parser-mapped semantic exception and warning name lists, so both independent fixes compose without overlapping replacements or rule-local syntax reparsing.
   - Made each private attribute documentation placement policy incompatible with every overlapping or opposing policy, and changed PDF523 and PDF525 to convention opt-in rules so broad profiles remain conflict-free.
@@ -104,7 +108,11 @@ All notable changes to this project are documented here. The format follows [Kee
 - **Configuration:**
   - Made ASCII case-insensitive duplicate `docstring-placeholder-markers` diagnostics deterministic when multiple configured spellings have the same normalized value.
   - Reported invalid `docstring-placeholder-markers` entries before checking ASCII case-insensitive duplicates, so Unicode case-folding collisions receive the relevant syntax error.
+- **Developer tooling:**
+  - Restored heading ownership checks for semantic documentation tables, kept Markdown pipe parsing aligned with GitHub Flavored Markdown, and retained a focused downstream release-checksum command contract test.
+  - Limited documentation environments to the base shared tooling package while requesting its consumer-facing pytest integration only in test environments.
 - **Docstring diagnostics:**
+  - Preserved internal punctuation in PDF311 source-word diagnostics, made its display helper robust to punctuation-only tokens, and made PDF312 name only distinct entries implicated by generic-description matches.
   - Made literal `__slots__` inventory conservative for mutable list values and skipped expensive slot metadata analysis in files without an exact `__slots__` name token.
   - Recognized current Sphinx version-directive names and the optional delimiter space in PDF418 malformed directive diagnostics.
   - Fixed PDF414 reStructuredText closing-colon repairs to use bounded syntactic heads instead of description prose, preserve inline parameter types and spaced exception lists, and leave ambiguous or unsupported heads diagnostic-only; made PDF527 recognize narrowly escaped reStructuredText variadic markers; fixed PDF414, PDF415, and PDF527 exact edits on escaped logical lines without physical line mappings.

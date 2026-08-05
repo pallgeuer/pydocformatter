@@ -15,7 +15,7 @@ PDF312 reports parsed return, yield, exception, warning, and method descriptions
 | Warning   | `The warning`                            | `The <name> warning`                                                       |
 | Method    | `The method`                             | `The <name> method`                                                        |
 
-The comparison ignores surrounding ASCII spaces and tabs, ASCII capitalization, and final periods, question marks, or exclamation marks. Name-bearing phrases normalize variadic stars, underscores, and qualified-name dots consistently with PDF306 and PDF307. Leading or trailing underscores may be preserved or omitted only when the documented name has the corresponding boundary. Internal punctuation, markup, additional words, names containing non-ASCII characters, non-space/tab whitespace, suspicious controls, and non-ASCII characters trimmed from the original description boundary prevent a match.
+The comparison ignores surrounding ASCII spaces and tabs, ASCII capitalization, and final periods, question marks, or exclamation marks. Name-bearing phrases normalize variadic stars, underscores, and qualified-name dots consistently with PDF306 and PDF307. Leading or trailing underscores may be preserved or omitted only when the documented name has the corresponding boundary. Diagnostics for multi-name entries display each implicated name once in first-occurrence order. Internal punctuation, markup, additional words, names containing non-ASCII characters, non-space/tab whitespace, suspicious controls, and non-ASCII characters trimmed from the original description boundary prevent a match.
 
 Return, yield, exception, and warning entries are checked only in function-owned docstrings. Method entries are checked only in class-owned docstrings. Missing descriptions, protected-only bodies, malformed entries, and reST type-only fields remain the responsibility of their structural and completeness rules.
 
@@ -62,8 +62,8 @@ class Worker:
 
 [output=unchanged]
 [findings]
-PDF312: Line 5: Method documentation is too generic
-PDF312: Line 6: Method documentation is too generic
+PDF312: Line 5: Method documentation for 'run' is too generic
+PDF312: Line 6: Method documentation for 'close' is too generic
 ```
 
 Named NumPy return entries are checked against their documented names:
@@ -84,7 +84,7 @@ def count():
 
 [output=unchanged]
 [findings]
-PDF312: Line 6: Return documentation is too generic
+PDF312: Line 6: Return documentation for 'count' is too generic
 ```
 
 reStructuredText return, yield, and exception value fields are checked, while type-only fields are not prose descriptions:
@@ -107,8 +107,8 @@ def values():
 [output=unchanged]
 [findings]
 PDF312: Line 4: Return documentation is too generic
-PDF312: Line 5: Yield documentation is too generic
-PDF312: Line 6: Exception documentation is too generic
+PDF312: Line 5: Yield documentation for 'item' is too generic
+PDF312: Line 6: Exception documentation for 'ValueError' is too generic
 ```
 
 Internal punctuation, markup, or additional semantic words prevent a match:

@@ -265,7 +265,7 @@ def value(arg):
 
 [output=unchanged]
 [findings]
-PDF411: Lines 2-4: Docstring type-like token spacing should be normalized
+PDF411: Lines 2-4: Docstring type-like token spacing should be normalized from 'Mapping[ str, object ]' to 'Mapping[str, object]'
 ```
 
 Safely mapped escapes inside a type slot are normalized with the rest of the slot:

@@ -68,14 +68,14 @@ def test_leaves_nonstandard_description_whitespace_unchanged() -> None:
     assert not result.unfixed_findings
 
 
-def test_uses_entry_kind_specific_messages_without_fixing() -> None:
+def test_grouped_distinct_messages_fall_back_to_rule_metadata_without_fixing() -> None:
     source = 'def function():\n    """Summary.\n\n    Raises:\n        ValueError | TypeError: Bad value.\n\n    Warns:\n        RuntimeWarning | UserWarning: Bad warning.\n    """\n'
     result = format_source(source, fix=False)
 
     assert result.new_source == source
     assert not result.fixed_findings
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((5, 8),)
-    assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring exception entry should use canonical spelling; Docstring warning entry should use canonical spelling",)
+    assert tuple(finding.message for finding in result.unfixed_findings) == (PDF410ExceptionEntryNormalization.meta.message,)
 
 
 def test_warning_normalization_ignores_other_parsed_entry_families_in_mixed_docstring() -> None:
@@ -256,7 +256,7 @@ def test_reports_unsafe_exception_entry_without_fixing() -> None:
     assert not result.fixed_findings
     assert tuple(finding.rule for finding in result.unfixed_findings) == (PDF410ExceptionEntryNormalization.meta,)
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((2, 3, 4),)
-    assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring exception entry should use canonical spelling",)
+    assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring exception entry spelling should be normalized from '`ValueError` | TypeError' to 'ValueError, TypeError'",)
 
 
 def test_reports_unsafe_warning_entry_with_warning_message() -> None:
@@ -267,7 +267,9 @@ def test_reports_unsafe_warning_entry_with_warning_message() -> None:
     assert not result.fixed_findings
     assert tuple(finding.rule for finding in result.unfixed_findings) == (PDF410ExceptionEntryNormalization.meta,)
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((2, 3, 4),)
-    assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring warning entry should use canonical spelling",)
+    assert tuple(finding.message for finding in result.unfixed_findings) == (
+        "Docstring warning entry spelling should be normalized from '`RuntimeWarning` | UserWarning' to 'RuntimeWarning, UserWarning'",
+    )
 
 
 def test_ignored_without_supported_convention() -> None:

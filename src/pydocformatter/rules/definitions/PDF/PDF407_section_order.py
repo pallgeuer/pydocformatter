@@ -34,7 +34,7 @@ class PDF407SectionOrder(RuleBase):
     meta = RuleMetadata(
         code=RuleCode("PDF407"),
         name="section-order",
-        message="Docstring sections should be in the configured order",
+        message="Docstring sections or reST fields should be in the configured order",
         fix_availability=FixAvailability.NEVER,
         stable_since="1.0.0",
         setting_effects=docstring_conventions.convention_setting_effects(disabled=docstring_conventions.UNPARSED_CONVENTIONS),
@@ -97,7 +97,7 @@ def _rest_field_violations(docstring: PDF_definition.DocstringInfo, *, rule: Rul
         label = rest_fields.label(entry)
         if rank < max_rank:
             line = docstring.structure.lines[entry.start_line]
-            violations.append(rule_violations.diagnostic(rule, section_edits.line_numbers(docstring, line), instance_message=f"Docstring field '{label}' should appear before '{max_rank_label}'"))
+            violations.append(rule_violations.diagnostic(rule, section_edits.line_numbers(docstring, line), instance_message=f"Docstring reST field '{label}' should appear before '{max_rank_label}'"))
         else:
             max_rank = rank
             max_rank_label = label

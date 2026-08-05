@@ -22,7 +22,7 @@ class PCF006UnusedSuppression(RuleBase):
     meta = RuleMetadata(
         code=RuleCode("PCF006"),
         name="unused-suppression",
-        message="Suppression directive is unused",
+        message="Suppression selector is invalid, unknown, or unused",
         fix_availability=FixAvailability.NEVER,
         stable_since="1.0.0",
         setting_effects=(),

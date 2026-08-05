@@ -208,6 +208,7 @@ def test_reports_concatenated_type_slot_without_fixing() -> None:
     assert not result.fixed_findings
     assert tuple(finding.rule for finding in result.unfixed_findings) == (PDF416TypeSpellingNormalization.meta,)
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((2, 3, 4),)
+    assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring type spelling should be normalized from '((str))' to 'str'",)
 
 
 def test_fixes_safe_docstring_while_reporting_unsafe_peer() -> None:

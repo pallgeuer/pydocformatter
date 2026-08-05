@@ -47,6 +47,9 @@ from types import GenericAlias
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlsplit, urlunsplit
 
+# Third-party imports
+from la_dev_codex_plugins import markdown_tables
+
 # First-party imports
 import pydocformatter.settings as settings_core
 import pydocformatter.rules.collection as rule_collection
@@ -677,9 +680,14 @@ def _related_rule_links(related_rules: tuple[str, ...], page_by_code: dict[str, 
 
 def _link_options_settings(markdown: str, *, settings_path: str, context: str) -> str:
     """Link documented Options settings to the generated Settings page."""
+    try:
+        parsed_tables = markdown_tables.parse_markdown_tables(markdown)
+    except markdown_tables.MarkdownTableError as error:
+        raise ValueError(f"{context}: {error}") from error
+    first_table_cells = {row.line_number: row.cells[0] for table in parsed_tables for row in table.rows if row.cells}
     lines: list[str] = []
     in_options = False
-    for line in markdown.splitlines():
+    for line_number, line in enumerate(markdown.splitlines(), start=1):
         if line.startswith("## "):
             in_options = line.strip() == "## Options"
             lines.append(line)
@@ -691,8 +699,8 @@ def _link_options_settings(markdown: str, *, settings_path: str, context: str) -
             prefix, separator, suffix = line.partition(":")
             lines.append(f"{_link_option_setting_spans(prefix, settings_path=settings_path, context=context)}{separator}{suffix}")
             continue
-        if line.startswith("|"):
-            lines.append(_link_option_table_setting_cell(line, settings_path=settings_path, context=context))
+        if line_number in first_table_cells:
+            lines.append(_link_option_table_setting_cell(line, first_table_cells[line_number], settings_path=settings_path, context=context))
             continue
         lines.append(line)
     return "\n".join(lines)
@@ -708,15 +716,15 @@ def _link_option_setting_spans(text: str, *, settings_path: str, context: str) -
     return OPTION_CODE_SPAN_RE.sub(replace, text)
 
 
-def _link_option_table_setting_cell(line: str, *, settings_path: str, context: str) -> str:
+def _link_option_table_setting_cell(line: str, first_cell: str, *, settings_path: str, context: str) -> str:
     """Link the first Markdown table cell when it names a documented setting."""
-    cells = _split_markdown_table_row(line)
-    if not cells:
+    linked_first_cell = _link_option_setting_spans(first_cell, settings_path=settings_path, context=context)
+    if linked_first_cell == first_cell:
         return line
-    linked_first_cell = _link_option_setting_spans(cells[0], settings_path=settings_path, context=context)
-    if linked_first_cell == cells[0]:
-        return line
-    return _replace_first_markdown_table_cell(line, linked_first_cell)
+    prefix, separator, suffix = line.partition(first_cell)
+    if not separator or prefix.strip() not in {"", "|"} or not suffix.lstrip().startswith("|"):
+        raise ValueError(f"{context}: Parsed first table cell does not match its source row structure")
+    return f"{prefix}{linked_first_cell}{suffix}"
 
 
 def _setting_link(option_key: str, *, settings_path: str, context: str) -> str:
@@ -726,23 +734,6 @@ def _setting_link(option_key: str, *, settings_path: str, context: str) -> str:
     except KeyError:
         raise ValueError(f"{context}: Unknown documented setting option {option_key!r}") from None
     return f"[`{option_key}`]({settings_path}#{anchor})"
-
-
-def _split_markdown_table_row(line: str) -> list[str]:
-    """Split a Markdown table row into raw cell strings."""
-    stripped = line.strip()
-    if not stripped.startswith("|") or not stripped.endswith("|"):
-        return []
-    return stripped[1:-1].split("|")
-
-
-def _replace_first_markdown_table_cell(line: str, cell_text: str) -> str:
-    """Return a table row with only the first cell replaced."""
-    first_pipe = line.find("|")
-    second_pipe = line.find("|", first_pipe + 1)
-    if first_pipe < 0 or second_pipe < 0:
-        return line
-    return f"{line[: first_pipe + 1]}{cell_text}{line[second_pipe:]}"
 
 
 def _write_generated_config(rule_pages: tuple[RulePage, ...]) -> None:
@@ -977,7 +968,11 @@ def _write_generated_markdown(path: pathlib.Path, text: str) -> None:
     """Write generated Markdown under the generated docs directory."""
     output_path = GENERATED_DOCS_DIR / path
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(text, encoding="utf-8")
+    try:
+        normalized = markdown_tables.normalize_markdown_tables(text)
+    except markdown_tables.MarkdownTableError as error:
+        raise ValueError(f"{path.as_posix()}: {error}") from error
+    output_path.write_text(normalized, encoding="utf-8")
 
 
 def _escape_table_cell(text: str) -> str:

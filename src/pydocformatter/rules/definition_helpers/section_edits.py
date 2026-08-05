@@ -183,17 +183,18 @@ def _replacement_results(
 
 
 def combined_instance_message(messages: list[str]) -> str | None:
-    """Return a deduplicated semicolon-joined instance message.
+    """Return one unique instance message or fall back to rule metadata.
 
     Args:
         messages (list[str]): Candidate instance messages collected while scanning one docstring.
 
     Returns:
-        str | None: Stable combined message, or None when no concrete messages were provided.
+        str | None: The sole unique message, or None when no message or multiple distinct messages were provided.
     """
-    if not messages:
+    unique_messages = tuple(dict.fromkeys(messages))
+    if len(unique_messages) != 1:
         return None
-    return "; ".join(dict.fromkeys(messages))
+    return unique_messages[0]
 
 
 def _result_for_replacement_change(rule: RuleMetadata, change: SectionReplacementChange, *, instance_message: str | None) -> rule_violations.RuleViolation:

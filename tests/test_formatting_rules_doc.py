@@ -13,6 +13,7 @@ import pytest
 import pydocformatter.rules.collection as rule_collection
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention
 from pydocformatter.rules.codes import RuleSelector
+from tests import markdown_table_helpers
 
 
 if TYPE_CHECKING:
@@ -27,6 +28,9 @@ EXPECTED_PDF_HEADERS = ("Code", "Name", "Message", "Fixable", "Require explicit"
 EXPECTED_RUFF_HEADERS = ("Code", "Name", "Message", "Fixable", "Since", "Support by pydocformatter")
 PCF_HEADING = "### PCF: pydocformatter comment formatting"
 PDF_HEADING = "### PDF: pydocformatter docstring formatting"
+RUFF_HEADING = "## Ruff rules"
+RULE_TABLE_WRAPPER = '<div class="pydocformatter-rule-table-wrapper" markdown="1">'
+PDF_RULE_TABLE_WRAPPER = '<div class="pydocformatter-rule-table-wrapper pydocformatter-pdf-rule-table-wrapper" markdown="1">'
 CONVENTION_NAMES = {DocstringConvention.NONE: "None", DocstringConvention.PEP257: "PEP257", DocstringConvention.GOOGLE: "Google", DocstringConvention.NUMPY: "NumPy", DocstringConvention.REST: "reST"}
 PYDOCFORMATTER_MAPPING_LABELS = ("Disable", "Related to")
 RUFF_MAPPING_LABELS = ("Replaced by", "Related to")
@@ -34,40 +38,16 @@ PYDOCFORMATTER_CODE_PATTERN = r"P[CD]F\d{3}"
 RUFF_CODE_PATTERN = r"[A-Z]+\d{3,4}"
 
 
-def _table_rows_after_heading(text: str, heading: str) -> list[dict[str, str]]:
-    """Return Markdown table rows immediately following a heading."""
-    table_lines = _table_lines_after_heading(text, heading)
-    headers = _split_markdown_row(table_lines[0])
-    rows = [dict(zip(headers, cells, strict=True)) for cells in (_split_markdown_row(line) for line in table_lines[2:])]
+def _table_rows_after_heading(text: str, heading: str, headers: tuple[str, ...]) -> list[dict[str, str]]:
+    """Return Markdown table rows owned by the expected heading."""
+    wrapper = PDF_RULE_TABLE_WRAPPER if heading == PDF_HEADING else RULE_TABLE_WRAPPER
+    table = markdown_table_helpers.table_after_heading(text, heading, label=FORMAT_RULES_PATH.as_posix(), expected_leading_lines=(wrapper,))
+    assert markdown_table_helpers.table_headers(table, label=FORMAT_RULES_PATH.as_posix()) == headers
+    rows = list(markdown_table_helpers.table_rows(table, label=FORMAT_RULES_PATH.as_posix()))
     for row in rows:
         if "Code" in row:
             row["Code"] = _plain_code_cell(row["Code"])
     return rows
-
-
-def _table_lines_after_heading(text: str, heading: str) -> list[str]:
-    """Return Markdown table lines immediately following a heading."""
-    lines = text.splitlines()
-    heading_index = lines.index(heading)
-    table_lines: list[str] = []
-    for line in lines[heading_index + 1 :]:
-        if not line.strip():
-            if table_lines:
-                break
-            continue
-        if table_lines and not line.startswith("|"):
-            break
-        if line.startswith("|"):
-            table_lines.append(line)
-
-    if len(table_lines) < 2:
-        raise AssertionError(f"No Markdown table found after {heading}")
-    return table_lines
-
-
-def _split_markdown_row(line: str) -> list[str]:
-    """Split a simple Markdown table row into stripped cell values."""
-    return [cell.strip() for cell in line.strip().strip("|").split("|")]
 
 
 def _plain_code_cell(cell: str) -> str:
@@ -137,14 +117,15 @@ def test_rule_list_table_headers_are_sentence_case() -> None:
     """Rule-list table headers must keep sentence-case wording."""
     text = FORMAT_RULES_PATH.read_text(encoding="utf-8")
 
-    assert tuple(_split_markdown_row(_table_lines_after_heading(text, PCF_HEADING)[0])) == EXPECTED_PCF_HEADERS
-    assert tuple(_split_markdown_row(_table_lines_after_heading(text, PDF_HEADING)[0])) == EXPECTED_PDF_HEADERS
-    assert tuple(_split_markdown_row(_table_lines_after_heading(text, "## Ruff rules")[0])) == EXPECTED_RUFF_HEADERS
+    for heading, headers in ((PCF_HEADING, EXPECTED_PCF_HEADERS), (PDF_HEADING, EXPECTED_PDF_HEADERS), (RUFF_HEADING, EXPECTED_RUFF_HEADERS)):
+        wrapper = PDF_RULE_TABLE_WRAPPER if heading == PDF_HEADING else RULE_TABLE_WRAPPER
+        table = markdown_table_helpers.table_after_heading(text, heading, label=FORMAT_RULES_PATH.as_posix(), expected_leading_lines=(wrapper,))
+        assert markdown_table_helpers.table_headers(table, label=FORMAT_RULES_PATH.as_posix()) == headers
 
 
 def test_pydocformatter_rule_tables_match_rule_metadata() -> None:
     text = FORMAT_RULES_PATH.read_text(encoding="utf-8")
-    rows = _table_rows_after_heading(text, PCF_HEADING) + _table_rows_after_heading(text, PDF_HEADING)
+    rows = _table_rows_after_heading(text, PCF_HEADING, EXPECTED_PCF_HEADERS) + _table_rows_after_heading(text, PDF_HEADING, EXPECTED_PDF_HEADERS)
     row_by_code = {row["Code"]: row for row in rows}
     expected_codes = tuple(str(rule_class.meta.code) for rule_class in rule_collection.RULE_COLLECTION.rules)
 
@@ -165,8 +146,8 @@ def test_pydocformatter_rule_tables_match_rule_metadata() -> None:
 
 def test_rule_list_ruff_mapping_clauses_are_canonical_and_reference_known_codes() -> None:
     text = FORMAT_RULES_PATH.read_text(encoding="utf-8")
-    pydocformatter_rows = _table_rows_after_heading(text, PCF_HEADING) + _table_rows_after_heading(text, PDF_HEADING)
-    ruff_rows = _table_rows_after_heading(text, "## Ruff rules")
+    pydocformatter_rows = _table_rows_after_heading(text, PCF_HEADING, EXPECTED_PCF_HEADERS) + _table_rows_after_heading(text, PDF_HEADING, EXPECTED_PDF_HEADERS)
+    ruff_rows = _table_rows_after_heading(text, RUFF_HEADING, EXPECTED_RUFF_HEADERS)
     pydocformatter_codes = {row["Code"] for row in pydocformatter_rows}
     ruff_codes = {row["Code"] for row in ruff_rows}
 
@@ -180,8 +161,8 @@ def test_rule_list_ruff_mapping_clauses_are_canonical_and_reference_known_codes(
 
 def test_rule_list_ruff_replacement_mappings_are_bidirectional() -> None:
     text = FORMAT_RULES_PATH.read_text(encoding="utf-8")
-    pydocformatter_rows = _table_rows_after_heading(text, PCF_HEADING) + _table_rows_after_heading(text, PDF_HEADING)
-    ruff_rows = _table_rows_after_heading(text, "## Ruff rules")
+    pydocformatter_rows = _table_rows_after_heading(text, PCF_HEADING, EXPECTED_PCF_HEADERS) + _table_rows_after_heading(text, PDF_HEADING, EXPECTED_PDF_HEADERS)
+    ruff_rows = _table_rows_after_heading(text, RUFF_HEADING, EXPECTED_RUFF_HEADERS)
     disabled_by_ruff_rule: dict[str, list[str]] = {}
     replaced_by_ruff_rule: dict[str, list[str]] = {}
 
@@ -200,8 +181,8 @@ def test_rule_list_ruff_replacement_mappings_are_bidirectional() -> None:
 
 def test_rule_list_ruff_related_mappings_are_bidirectional() -> None:
     text = FORMAT_RULES_PATH.read_text(encoding="utf-8")
-    pydocformatter_rows = _table_rows_after_heading(text, PCF_HEADING) + _table_rows_after_heading(text, PDF_HEADING)
-    ruff_rows = _table_rows_after_heading(text, "## Ruff rules")
+    pydocformatter_rows = _table_rows_after_heading(text, PCF_HEADING, EXPECTED_PCF_HEADERS) + _table_rows_after_heading(text, PDF_HEADING, EXPECTED_PDF_HEADERS)
+    ruff_rows = _table_rows_after_heading(text, RUFF_HEADING, EXPECTED_RUFF_HEADERS)
     related_by_ruff_rule: dict[str, list[str]] = {}
     related_by_pydocformatter_rule: dict[str, list[str]] = {}
 

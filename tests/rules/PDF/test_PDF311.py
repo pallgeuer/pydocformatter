@@ -3,6 +3,7 @@ import pytest
 
 # First-party imports
 import tests.rules.PDF.helpers as pdf_helpers
+import pydocformatter.rules.definitions.PDF.PDF311_property_docstring_starts_with_verb as PDF311_rule
 from pydocformatter import formatter, rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention
 from pydocformatter.rules.definitions.PDF.PDF302_non_imperative_summary import PDF302NonImperativeSummary
@@ -14,39 +15,56 @@ contexts = pdf_helpers.contexts_for("PDF311")
 format_source = pdf_helpers.formatter_for("PDF311")
 
 
+@pytest.mark.parametrize(("word", "expected"), [("", ""), ("!?", "!?"), ('"Returns"', "Returns"), ("Return's", "Return's")])
+def test_display_word_is_total_and_removes_only_surrounding_punctuation(word: str, expected: str) -> None:
+    """Return punctuation-only tokens unchanged and preserve internal punctuation."""
+    assert PDF311_rule._display_word(word) == expected
+
+
 @pytest.mark.parametrize(
-    "summary",
+    ("summary", "display_word"),
     [
-        "Return the value.",
-        "Returns the value.",
-        "Get the value.",
-        "Gets the value.",
-        "Yield the value.",
-        "Yields the value.",
-        "Fetch the value.",
-        "Fetches the value.",
-        "Retrieve the value.",
-        "Retrieves the value.",
+        ("Return the value.", "Return"),
+        ("Returns the value.", "Returns"),
+        ("Get the value.", "Get"),
+        ("Gets the value.", "Gets"),
+        ("Yield the value.", "Yield"),
+        ("Yields the value.", "Yields"),
+        ("Fetch the value.", "Fetch"),
+        ("Fetches the value.", "Fetches"),
+        ("Retrieve the value.", "Retrieve"),
+        ("Retrieves the value.", "Retrieves"),
     ],
 )
-def test_reports_property_docstrings_that_start_with_disallowed_verbs(summary: str) -> None:
+def test_reports_property_docstrings_that_start_with_disallowed_verbs(summary: str, display_word: str) -> None:
     source = f'class Example:\n    @property\n    def value(self):\n        """{summary}"""\n'
     result = format_source(source)
 
     assert result.new_source == source
     assert not result.fixed_findings
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((4,),)
-    assert tuple(finding.message for finding in result.unfixed_findings) == (f'Property docstring should not start with a verb ("{summary.split(maxsplit=1)[0]}")',)
+    assert tuple(finding.message for finding in result.unfixed_findings) == (f"Property docstring first word {display_word!r} should not be a verb",)
     assert not result.unfixed_findings[0].fixable
     assert PDF311PropertyDocstringStartsWithVerb.meta.name == "property-docstring-starts-with-verb"
 
 
-@pytest.mark.parametrize("summary", ["return the value.", "RETURN the value.", '"Returns" the value.', "(returns) the value.", "Returns: the value."])
-def test_verb_detection_is_case_insensitive_after_normalization(summary: str) -> None:
+@pytest.mark.parametrize(
+    ("summary", "display_word"),
+    [
+        ("return the value.", "return"),
+        ("RETURN the value.", "RETURN"),
+        ('"Returns" the value.', "Returns"),
+        ("(returns) the value.", "returns"),
+        ("Returns: the value.", "Returns"),
+        ("Return's the value.", "Return's"),
+    ],
+)
+def test_verb_detection_is_case_insensitive_after_normalization(summary: str, display_word: str) -> None:
     source = f'class Example:\n    @property\n    def value(self):\n        """{summary}"""\n'
     result = format_source(source)
 
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((4,),)
+    assert tuple(finding.message for finding in result.unfixed_findings) == (f"Property docstring first word {display_word!r} should not be a verb",)
 
 
 @pytest.mark.parametrize("summary", ["The value.", "Computed value.", "Use the value.", "Getter value.", "ReturnValue object."])

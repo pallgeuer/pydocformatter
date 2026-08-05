@@ -99,12 +99,12 @@ def test_rest_fixes_value_and_type_fields_to_bare_names() -> None:
     result = assert_pdf527_lines(source, ((4,), (5,), (6,), (7,), (8,), (9,)), settings=settings)
 
     assert tuple(finding.message for finding in result.unfixed_findings) == (
-        "Docstring parameter '*value' should be written as 'value' without variadic markers under the reStructuredText convention",
-        "Docstring parameter '*value' should be written as 'value' without variadic markers under the reStructuredText convention",
-        "Docstring parameter '*args' should be written as 'args' without variadic markers under the reStructuredText convention",
-        "Docstring parameter '*args' should be written as 'args' without variadic markers under the reStructuredText convention",
-        "Docstring parameter '**kwargs' should be written as 'kwargs' without variadic markers under the reStructuredText convention",
-        "Docstring parameter '**kwargs' should be written as 'kwargs' without variadic markers under the reStructuredText convention",
+        "Docstring parameter '*value' should be written as 'value' without variadic markers under the reST convention",
+        "Docstring parameter '*value' should be written as 'value' without variadic markers under the reST convention",
+        "Docstring parameter '*args' should be written as 'args' without variadic markers under the reST convention",
+        "Docstring parameter '*args' should be written as 'args' without variadic markers under the reST convention",
+        "Docstring parameter '**kwargs' should be written as 'kwargs' without variadic markers under the reST convention",
+        "Docstring parameter '**kwargs' should be written as 'kwargs' without variadic markers under the reST convention",
     )
     assert_pdf527_fix(source, expected, 6, settings=settings)
 

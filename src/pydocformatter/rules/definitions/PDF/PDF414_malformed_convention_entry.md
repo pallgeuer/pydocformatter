@@ -179,8 +179,8 @@ def convert(value):
     """
 
 [findings]
-PDF414: Line 6: reStructuredText field ':type:' is missing its required argument
-PDF414: Line 7: reStructuredText field ':returns:' has an unexpected argument
+PDF414: Line 6: reST field ':type:' is missing its required argument
+PDF414: Line 7: reST field ':returns:' has an unexpected argument
 ```
 
 When more than one signature parameter appears in a malformed head, PDF414 reports the field without guessing where its argument ends:
@@ -198,7 +198,7 @@ def combine(first, second):
 
 [output=unchanged]
 [findings]
-PDF414: Line 4: reStructuredText field ':param:' is missing its closing colon
+PDF414: Line 4: reST field ':param:' is missing its closing colon
 ```
 
 Weak entry-like prose is not enough to trigger PDF414. Here, `unknown` is not a function parameter and `Problem` is not a conventionally named exception:

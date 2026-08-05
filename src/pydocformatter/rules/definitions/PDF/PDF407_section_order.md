@@ -157,7 +157,7 @@ def value(arg):
 
 [output=unchanged]
 [findings]
-PDF407: Line 5: Docstring field ':param arg:' should appear before ':returns:'
+PDF407: Line 5: Docstring reST field ':param arg:' should appear before ':returns:'
 ```
 
 ## Options

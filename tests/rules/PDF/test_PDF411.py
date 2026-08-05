@@ -270,7 +270,7 @@ def test_reports_unsafe_type_like_spacing_without_fixing() -> None:
     assert not result.fixed_findings
     assert tuple(finding.rule for finding in result.unfixed_findings) == (PDF411TypeLikeTokenSpacingNormalization.meta,)
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((2, 3, 4),)
-    assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring type-like token spacing should be normalized",)
+    assert tuple(finding.message for finding in result.unfixed_findings) == ("Docstring type-like token spacing should be normalized from 'Mapping[ str, object ]' to 'Mapping[str, object]'",)
 
 
 def test_local_suppression_before_docstring_suppresses_type_spacing_fix() -> None:
