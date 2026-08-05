@@ -3,7 +3,6 @@ import pytest
 
 # First-party imports
 import tests.rules.PCF.helpers as pcf_helpers
-import pydocformatter.rules.definition_helpers.comments as comment_helpers
 from pydocformatter import formatter, rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, CommentTaskMarkerMode, LineEnding
 from pydocformatter.rules.definition_helpers import inline_markup
@@ -374,15 +373,6 @@ def test_task_marker_no_wrap_mode_normalizes_continuation_indentation_without_jo
     source = "#TODO: alpha beta gamma\n#       delta epsilon extra words\n#       zeta eta\n"
     result = pcf_helpers.format_pcf(source, line_length=24, comment_detect_statements=False)
     assert result.new_source == "# TODO: alpha beta gamma\n#       delta epsilon extra words\n#       zeta eta\n"
-
-
-def test_task_marker_unwrapped_normalization_preserves_supplied_blank_continuations() -> None:
-    texts = ("value = compute()", "", "next = call()")
-    no_wrap = CheckSettings(comment_task_marker_mode=CommentTaskMarkerMode.NO_WRAP)
-    code_like_hanging = CheckSettings(comment_task_marker_mode=CommentTaskMarkerMode.HANGING)
-
-    assert comment_helpers.format_task_marker_lines("TODO", texts, indent="", settings=no_wrap) == ("TODO: value = compute()", "", "      next = call()")
-    assert comment_helpers.format_task_marker_lines("TODO", texts, indent="", settings=code_like_hanging) == ("TODO: value = compute()", "", "      next = call()")
 
 
 def test_task_marker_blank_source_continuation_still_splits_units() -> None:

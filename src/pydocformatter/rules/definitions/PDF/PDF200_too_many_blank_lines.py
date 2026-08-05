@@ -17,6 +17,7 @@ import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 from pydocformatter.cli import settings_check
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase
+from pydocformatter.rules.definition_helpers import docstring_rendering, docstring_sections, docstring_source
 from pydocformatter.rules.models import FixAvailability, RuleCacheBehavior, RuleCheckKind, RuleMetadata
 
 
@@ -68,18 +69,18 @@ def _planned_changes(context: RuleContext) -> tuple[rule_edits.PlannedSourceChan
 
 def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo, *, context: RuleContext, source_lines: Sequence[str]) -> rule_edits.PlannedSourceChange | None:
     """Return one whole-literal replacement for a docstring."""
-    if not PDF_definition.can_canonically_rewrite_simple_docstring(docstring):
+    if not docstring_source.can_canonically_rewrite_simple_docstring(docstring):
         return None
     # Narrow for typing after the safe-mapping predicate.
     if not isinstance(docstring.node, cst.SimpleString):
         return None
     retained_lines = _retained_line_indexes(docstring.structure.blocks, convention=docstring.structure.convention)
-    output_lines: tuple[PDF_definition.DocstringOutputLine, ...]
+    output_lines: tuple[docstring_rendering.DocstringOutputLine, ...]
     if retained_lines is None:
         retained_lines = ()
         output_lines = ()
     else:
-        canonical_margin = PDF_definition.docstring_canonical_margin(docstring, context=context, source_lines=source_lines)
+        canonical_margin = docstring_source.docstring_canonical_margin(docstring, context=context, source_lines=source_lines)
         retained_lines = _with_configured_final_section_blank(docstring, retained_lines, context=context)
         retained_lines = _with_closing_quote_prefix_line(
             docstring, retained_lines, canonical_margin=canonical_margin, keep_final_section_blank=context.settings.docstring_blank_line_after_last_section
@@ -89,12 +90,12 @@ def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo, *, co
     changed_line_numbers = tuple(line.source_line_number for line in docstring.structure.lines if line.index not in retained_line_set and line.source_line_number is not None)
     if not changed_line_numbers:
         return None
-    return PDF_definition.planned_simple_docstring_output_change(
+    return docstring_rendering.planned_simple_docstring_output_change(
         docstring,
         context=context,
         output_lines=output_lines,
         line_numbers=changed_line_numbers,
-        preserve_trailing_newline=bool(retained_lines) and PDF_definition.docstring_value_ends_with_newline(docstring),
+        preserve_trailing_newline=bool(retained_lines) and docstring_source.docstring_value_ends_with_newline(docstring),
     )
 
 
@@ -179,10 +180,10 @@ def _trailing_blank_line(block: PDF_definition.DocstringBlock) -> int | None:
     return None if trailing_blank is None else trailing_blank.start_line
 
 
-def _output_lines(docstring: PDF_definition.DocstringInfo, retained_lines: tuple[int, ...]) -> tuple[PDF_definition.DocstringOutputLine, ...]:
+def _output_lines(docstring: PDF_definition.DocstringInfo, retained_lines: tuple[int, ...]) -> tuple[docstring_rendering.DocstringOutputLine, ...]:
     """Return replacement logical lines for retained docstring indexes."""
     return tuple(
-        PDF_definition.DocstringOutputLine(original=line, strip_docstring_margin=output_index == 0 and line.index != 0, source=None, value=None)
+        docstring_rendering.DocstringOutputLine(original=line, strip_docstring_margin=output_index == 0 and line.index != 0, source=None, value=None)
         for output_index, line_index in enumerate(retained_lines)
         for line in (docstring.structure.lines[line_index],)
     )
@@ -192,7 +193,7 @@ def _with_configured_final_section_blank(docstring: PDF_definition.DocstringInfo
     """Preserve one trailing blank after the final convention section when configured."""
     if not context.settings.docstring_blank_line_after_last_section:
         return retained_lines
-    final_spacing = PDF_definition.final_convention_section_spacing(docstring)
+    final_spacing = docstring_sections.final_convention_section_spacing(docstring)
     if final_spacing is None or final_spacing.final_content_line is None or final_spacing.trailing_blank_line is None:
         return retained_lines
     if final_spacing.trailing_blank_line in retained_lines:
@@ -207,7 +208,7 @@ def _with_closing_quote_prefix_line(docstring: PDF_definition.DocstringInfo, ret
     if not retained_lines:
         return retained_lines
     final_line = docstring.structure.lines[-1]
-    if not PDF_definition.is_same_line_closing_delimiter_prefix(docstring, final_line):
+    if not docstring_source.is_same_line_closing_delimiter_prefix(docstring, final_line):
         return retained_lines
     if final_line.raw_text != canonical_margin:
         return retained_lines
@@ -220,5 +221,5 @@ def _with_closing_quote_prefix_line(docstring: PDF_definition.DocstringInfo, ret
 
 def _is_final_section_trailing_blank(docstring: PDF_definition.DocstringInfo, line_index: int) -> bool:
     """Return whether a line is a blank immediately after the final convention section."""
-    final_spacing = PDF_definition.final_convention_section_spacing(docstring)
+    final_spacing = docstring_sections.final_convention_section_spacing(docstring)
     return final_spacing is not None and final_spacing.section.end_line == line_index

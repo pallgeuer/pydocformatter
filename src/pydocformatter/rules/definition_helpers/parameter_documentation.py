@@ -14,7 +14,7 @@ import libcst as cst
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 import pydocformatter.rules.definition_helpers.decorators as decorator_helpers
 from pydocformatter.cli.settings_check import DocstringConvention
-from pydocformatter.rules.definition_helpers import docstring_sections, documentation_order, missing_documentation, section_edits
+from pydocformatter.rules.definition_helpers import docstring_sections, docstring_source, documentation_order, missing_documentation, section_edits
 
 
 if TYPE_CHECKING:
@@ -205,7 +205,7 @@ def _documented_parameters(docstring: PDF_definition.DocstringInfo, *, include_t
         if entry.kind is not PDF_definition.DocstringEntryKind.PARAMETER or (not include_type_fields and docstring_sections.is_rest_type_field(entry.field_name)):
             continue
         line = docstring.structure.lines[entry.start_line]
-        line_numbers = PDF_definition.docstring_line_numbers(docstring, line)
+        line_numbers = docstring_source.docstring_line_numbers(docstring, line)
         parameters.extend(
             DocumentedParameter(name=name, comparison_name=parameter_comparison_name(name, convention=docstring.structure.convention), line_numbers=line_numbers, name_slot=name_slot)
             for name, name_slot in zip(entry.names, entry.name_slots, strict=True)

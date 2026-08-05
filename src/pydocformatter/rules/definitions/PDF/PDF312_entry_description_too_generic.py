@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 # Standard library imports
+import re
+import string
 import dataclasses
 from typing import TYPE_CHECKING
 
@@ -13,7 +15,7 @@ import pydocformatter.rules.registration as rule_registration
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase
-from pydocformatter.rules.definition_helpers import docstring_conventions, docstring_sections, documentation_style
+from pydocformatter.rules.definition_helpers import ascii_whitespace, docstring_conventions, docstring_sections, docstring_source, unicode_safety
 from pydocformatter.rules.models import FixAvailability, RuleCacheBehavior, RuleCheckKind, RuleMetadata
 
 
@@ -59,6 +61,11 @@ _POLICIES = {
     ),
 }
 
+_ASCII_LOWER_TRANSLATION = str.maketrans(string.ascii_uppercase, string.ascii_lowercase)
+_ASCII_WORD_SEPARATOR = rf"[{re.escape(ascii_whitespace.SPACE_AND_TAB)}]+"
+_ASCII_NAME_SEPARATOR = rf"[{re.escape(ascii_whitespace.SPACE_AND_TAB)}_.]+"
+_NAME_TOKEN_RE = re.compile(r"[a-z0-9]+")
+
 
 @rule_registration.register_rule_to(PDF_definition.PDF)
 class PDF312EntryDescriptionTooGeneric(RuleBase):
@@ -99,22 +106,71 @@ class PDF312EntryDescriptionTooGeneric(RuleBase):
                 policy = _POLICIES.get(entry.kind)
                 if policy is None or docstring.owner.kind is not policy.owner_kind or not entry.description or docstring_sections.is_rest_type_field(entry.field_name):
                     continue
-                if not all(documentation_style.exact_description_fragment_is_safe(docstring.value[fragment.full_start_offset : fragment.full_end_offset]) for fragment in entry.description_lines):
+                if not all(_exact_description_fragment_is_safe(docstring.value[fragment.full_start_offset : fragment.full_end_offset]) for fragment in entry.description_lines):
                     continue
                 matching_names = _generic_description_names(entry, policy=policy)
                 if matching_names is None:
                     continue
                 line = docstring.structure.lines[entry.start_line]
-                results.append(rule_violations.diagnostic(cls.meta, PDF_definition.docstring_line_numbers(docstring, line), instance_message=_instance_message(matching_names, policy=policy)))
+                results.append(rule_violations.diagnostic(cls.meta, docstring_source.docstring_line_numbers(docstring, line), instance_message=_instance_message(matching_names, policy=policy)))
         return tuple(results)
 
 
 def _generic_description_names(entry: PDF_definition.DocstringEntry, *, policy: _DescriptionPolicy) -> tuple[str, ...] | None:
     """Return names implicated by an exact generic description, or None."""
-    if documentation_style.matches_exact_description(entry.description, policy.unnamed_patterns):
+    if _matches_exact_description(entry.description, policy.unnamed_patterns):
         return tuple(dict.fromkeys(entry.names))
-    matching_names = tuple(dict.fromkeys(name for name in entry.names if documentation_style.matches_exact_named_description(entry.description, name, policy.named_templates)))
+    matching_names = tuple(dict.fromkeys(name for name in entry.names if _matches_exact_named_description(entry.description, name, policy.named_templates)))
     return matching_names or None
+
+
+def _matches_exact_description(description: str, sequences: frozenset[tuple[str, ...]]) -> bool:
+    """Return whether prose exactly matches one normalized word sequence."""
+    normalized = _normalized_exact_description(description)
+    if normalized is None:
+        return False
+    return any(re.fullmatch(_ASCII_WORD_SEPARATOR.join(map(re.escape, sequence)), normalized) is not None for sequence in sequences)
+
+
+def _matches_exact_named_description(description: str, name: str, templates: frozenset[tuple[tuple[str, ...], tuple[str, ...]]]) -> bool:
+    """Return whether prose exactly matches one name-bearing template."""
+    normalized = _normalized_exact_description(description)
+    if not name.isascii():
+        return False
+    name_tokens = _name_tokens(name)
+    if normalized is None or not name_tokens:
+        return False
+    boundary_name = name.lstrip("*")
+    leading_underscores = r"(?:_+)?" if boundary_name.startswith("_") else ""
+    trailing_underscores = r"(?:_+)?" if boundary_name.endswith("_") else ""
+    name_pattern = rf"\*{{0,2}}{leading_underscores}{_ASCII_NAME_SEPARATOR.join(map(re.escape, name_tokens))}{trailing_underscores}"
+    for prefix, suffix in templates:
+        parts = (*map(re.escape, prefix), name_pattern, *map(re.escape, suffix))
+        if re.fullmatch(_ASCII_WORD_SEPARATOR.join(parts), normalized) is not None:
+            return True
+    return False
+
+
+def _normalized_exact_description(description: str) -> str | None:
+    """Return exact-matcher prose normalized at its outer boundary."""
+    if unicode_safety.has_nonstandard_whitespace_or_control(description):
+        return None
+    normalized = description.strip(ascii_whitespace.SPACE_AND_TAB).translate(_ASCII_LOWER_TRANSLATION)
+    normalized = normalized.rstrip(".?!").rstrip(ascii_whitespace.SPACE_AND_TAB)
+    if not normalized or not normalized.isascii():
+        return None
+    return normalized
+
+
+def _exact_description_fragment_is_safe(text: str) -> bool:
+    """Return whether one full fragment obeys the exact ASCII layout policy."""
+    return text.isascii() and not unicode_safety.has_nonstandard_whitespace_or_control(text)
+
+
+def _name_tokens(name: str) -> tuple[str, ...]:
+    """Return comparison tokens for a documented name."""
+    stripped = name.strip("*")
+    return tuple(token for token in _NAME_TOKEN_RE.findall(stripped.replace("_", " ").lower()) if token)
 
 
 def _instance_message(names: tuple[str, ...], *, policy: _DescriptionPolicy) -> str:

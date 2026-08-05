@@ -14,7 +14,7 @@ import pydocformatter.rules.registration as rule_registration
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase
-from pydocformatter.rules.definition_helpers import text_layout
+from pydocformatter.rules.definition_helpers import docstring_rendering, docstring_source, text_layout
 from pydocformatter.rules.definitions.PDF.PDF import PDF
 from pydocformatter.rules.models import FixAvailability, RuleCacheBehavior, RuleCheckKind, RuleMetadata
 
@@ -66,7 +66,7 @@ def _planned_changes(context: RuleContext) -> tuple[rule_edits.PlannedSourceChan
 
 def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo, *, context: RuleContext, source_lines: Sequence[str]) -> rule_edits.PlannedSourceChange | None:
     """Return one whole-literal replacement for a summary-only docstring."""
-    if not PDF_definition.can_canonically_rewrite_simple_docstring(docstring, require_multiline=True):
+    if not docstring_source.can_canonically_rewrite_simple_docstring(docstring, require_multiline=True):
         return None
     summary_line = _single_summary_line(docstring)
     if summary_line is None:
@@ -98,9 +98,9 @@ def _rendered_one_line_docstring(docstring: PDF_definition.DocstringInfo, summar
     if source_map is None:
         return None
     strip_docstring_margin = summary_line.index != 0
-    body_source = PDF_definition.docstring_line_source(summary_line, source_map=source_map, strip_docstring_margin=strip_docstring_margin)
+    body_source = docstring_source.docstring_line_source(summary_line, source_map=source_map, strip_docstring_margin=strip_docstring_margin)
     expected_value = summary_line.text if strip_docstring_margin else summary_line.raw_text
-    return PDF_definition.render_simple_docstring_body_with_separator_fallbacks(docstring, body_source=body_source, expected_value=expected_value)
+    return docstring_rendering.render_simple_docstring_body_with_separator_fallbacks(docstring, body_source=body_source, expected_value=expected_value)
 
 
 def _rendered_line_fits(docstring: PDF_definition.DocstringInfo, rendered: str, *, context: RuleContext, source_lines: Sequence[str]) -> bool:

@@ -13,6 +13,7 @@ import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase
+from pydocformatter.rules.definition_helpers import docstring_rendering, docstring_source
 from pydocformatter.rules.definitions.PDF.PDF import PDF
 from pydocformatter.rules.models import FixAvailability, RuleCacheBehavior, RuleCheckKind, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
 
@@ -66,19 +67,19 @@ def _planned_changes(context: RuleContext) -> tuple[rule_edits.PlannedSourceChan
 
 def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo, *, context: RuleContext) -> rule_edits.PlannedSourceChange | None:
     """Return one whole-literal replacement for a docstring."""
-    if not PDF_definition.can_canonically_rewrite_simple_docstring(docstring, require_multiline=True):
+    if not docstring_source.can_canonically_rewrite_simple_docstring(docstring, require_multiline=True):
         return None
-    content_indexes = PDF_definition.docstring_content_indexes(docstring)
+    content_indexes = docstring_source.docstring_content_indexes(docstring)
     if not content_indexes:
         return None
     first_content = content_indexes[0]
     if first_content == 0:
         return None
     output_lines = (
-        PDF_definition.DocstringOutputLine(original=docstring.structure.lines[first_content], strip_docstring_margin=True, source=None, value=None),
-        *(PDF_definition.DocstringOutputLine(original=line, source=None, value=None) for line in docstring.structure.lines[first_content + 1 :]),
+        docstring_rendering.DocstringOutputLine(original=docstring.structure.lines[first_content], strip_docstring_margin=True, source=None, value=None),
+        *(docstring_rendering.DocstringOutputLine(original=line, source=None, value=None) for line in docstring.structure.lines[first_content + 1 :]),
     )
-    line_numbers = PDF_definition.docstring_value_line_numbers(docstring.structure.lines[: first_content + 1])
-    return PDF_definition.planned_simple_docstring_output_change(
-        docstring, context=context, output_lines=output_lines, line_numbers=line_numbers, separator_fallback=PDF_definition.DocstringOutputSeparatorFallback.OPENING
+    line_numbers = docstring_source.docstring_value_line_numbers(docstring.structure.lines[: first_content + 1])
+    return docstring_rendering.planned_simple_docstring_output_change(
+        docstring, context=context, output_lines=output_lines, line_numbers=line_numbers, separator_fallback=docstring_rendering.DocstringOutputSeparatorFallback.OPENING
     )

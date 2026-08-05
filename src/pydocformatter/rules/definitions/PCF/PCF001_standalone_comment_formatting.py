@@ -15,11 +15,10 @@ import pydocformatter.rules.edits as rule_edits
 import pydocformatter.rules.violations as rule_violations
 import pydocformatter.rules.registration as rule_registration
 import pydocformatter.rules.definitions.PCF.PCF as PCF_definition
-import pydocformatter.rules.definition_helpers.comments as comment_helpers
 from pydocformatter.cli.settings_check import CommentTaskMarkerMode
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase
-from pydocformatter.rules.definition_helpers import ascii_whitespace, colon_boundaries, inline_markup, text_layout
+from pydocformatter.rules.definition_helpers import ascii_whitespace, colon_boundaries, comment_formatting, inline_markup, text_layout
 from pydocformatter.rules.models import FixAvailability, RuleCacheBehavior, RuleCheckKind, RuleMetadata
 
 
@@ -98,10 +97,10 @@ def _violations(context: RuleContext) -> tuple[rule_violations.RuleViolation, ..
     data = PCF_definition.PCF.require_data(context)
     violations = list(_empty_comment_violations(data))
     for run in data.standalone_runs:
-        preserved = comment_helpers.preserved_indices(run, settings=context.settings)
+        preserved = comment_formatting.preserved_indices(run, settings=context.settings)
         unicode_barriers = {index for index, comment in enumerate(run.comments) if comment.unicode_occurrences}
         formatting_barriers = preserved | unicode_barriers
-        if comment_helpers.run_contains_code(run, preserved=formatting_barriers, settings=context.settings, ignore_task_markers=True):
+        if comment_formatting.run_contains_code(run, preserved=formatting_barriers, settings=context.settings, ignore_task_markers=True):
             continue
         index = 0
         while index < len(run.comments):
@@ -115,9 +114,9 @@ def _violations(context: RuleContext) -> tuple[rule_violations.RuleViolation, ..
                     violations.append(rule_violations.violation_for_planned_source_change(PCF001StandaloneCommentFormatting.meta, marker_change))
                 index += 1
                 continue
-            task_marker_match = comment_helpers.task_marker_match(run.comments[index].body.rstrip(), settings=context.settings)
-            list_match = comment_helpers.LIST_RE.match(run.comments[index].body.rstrip()) if context.settings.comment_format_list_items else None
-            quote_match = comment_helpers.BLOCK_QUOTE_RE.match(run.comments[index].body.rstrip()) if context.settings.comment_format_block_quotes else None
+            task_marker_match = comment_formatting.task_marker_match(run.comments[index].body.rstrip(), settings=context.settings)
+            list_match = comment_formatting.LIST_RE.match(run.comments[index].body.rstrip()) if context.settings.comment_format_list_items else None
+            quote_match = comment_formatting.BLOCK_QUOTE_RE.match(run.comments[index].body.rstrip()) if context.settings.comment_format_block_quotes else None
             if task_marker_match is not None:
                 formatted = _format_task_marker(data, run, index, match=task_marker_match, preserved=formatting_barriers, settings=context.settings)
             elif list_match is not None:
@@ -158,7 +157,7 @@ def _empty_comment_violations(data: PCF_definition.PCFCategoryData) -> tuple[rul
             or any(character not in " \t\f" for character in comment.raw_content)
         ):
             continue
-        change = PCF_definition.planned_full_line_change(data, comment, f"{comment.indent}#")
+        change = comment_formatting.planned_full_line_change(data, comment, f"{comment.indent}#")
         if change is not None:
             violations.append(rule_violations.violation_for_planned_source_change(PCF001StandaloneCommentFormatting.meta, change))
     return tuple(violations)
@@ -169,8 +168,8 @@ def _change_for_unit(
 ) -> rule_edits.PlannedSourceChange | None:
     """Build a planned replacement when generated unit source differs."""
     code_range = cst_metadata.CodeRange(start=comments[0].range.start, end=comments[-1].range.end)
-    rendered = [PCF_definition.render_comment(output_lines[0], include_indent=False)]
-    rendered.extend(PCF_definition.render_comment(line, indent=indent) for line in output_lines[1:])
+    rendered = [comment_formatting.render_comment(output_lines[0], include_indent=False)]
+    rendered.extend(comment_formatting.render_comment(line, indent=indent) for line in output_lines[1:])
     replacement = line_ending.join(rendered)
     if data.source_for(code_range) == replacement:
         return None
@@ -181,14 +180,14 @@ def _change_for_unit(
 
 def _format_plain(data: PCF_definition.PCFCategoryData, comments: tuple[PCF_definition.CommentInfo, ...], *, indent: str, settings: CheckSettings) -> _FormattedUnit:
     """Return canonical output for ordinary comment payload lines."""
-    width = PCF_definition.available_comment_width(indent, line_length=settings.line_length, tab_width=settings.indent_width)
+    width = comment_formatting.available_comment_width(indent, line_length=settings.line_length, tab_width=settings.indent_width)
     lines = tuple(_SemanticLine(text=comment.body.lstrip(" \t\f"), has_following_newline=_has_following_newline(data, comment)) for comment in comments)
     output, rewrite_blocked = _format_semantic_lines(lines, width=width, initial_prefix="", subsequent_prefix="", settings=settings)
     return _FormattedUnit(end=0, output_lines=output, rewrite_blocked=rewrite_blocked)
 
 
 def _format_task_marker(
-    data: PCF_definition.PCFCategoryData, run: PCF_definition.StandaloneCommentRun, index: int, *, match: comment_helpers.TaskMarkerMatch, preserved: set[int], settings: CheckSettings
+    data: PCF_definition.PCFCategoryData, run: PCF_definition.StandaloneCommentRun, index: int, *, match: comment_formatting.TaskMarkerMatch, preserved: set[int], settings: CheckSettings
 ) -> _FormattedUnit:
     """Return the extent and hanging-indented output of one task marker."""
     first_body = run.comments[index].body
@@ -196,17 +195,17 @@ def _format_task_marker(
     texts = [_SemanticLine(text=first_body[len(first_prefix) :].lstrip(ascii_whitespace.SPACE_AND_TAB), has_following_newline=_has_following_newline(data, run.comments[index]))]
     end = index + 1
     while end < len(run.comments) and end not in preserved:
-        continuation = comment_helpers.task_marker_continuation_text(run.comments[end].body.rstrip(), marker=match.marker)
+        continuation = comment_formatting.task_marker_continuation_text(run.comments[end].body.rstrip(), marker=match.marker)
         if continuation is None:
             break
         continuation_prefix = " " * len(f"{match.marker}: ")
         texts.append(_SemanticLine(text=run.comments[end].body[len(continuation_prefix) :], has_following_newline=_has_following_newline(data, run.comments[end])))
         end += 1
     normalized_texts = tuple(line.text.rstrip() for line in texts)
-    if settings.comment_task_marker_mode == CommentTaskMarkerMode.NO_WRAP or comment_helpers.task_marker_texts_are_code_like(normalized_texts, settings=settings):
+    if settings.comment_task_marker_mode == CommentTaskMarkerMode.NO_WRAP or comment_formatting.task_marker_texts_are_code_like(normalized_texts, settings=settings):
         output, rewrite_blocked = _format_unwrapped_semantic_lines(texts, initial_prefix=f"{match.marker}: ", subsequent_prefix=" " * len(f"{match.marker}: "))
     else:
-        width = PCF_definition.available_comment_width(run.indent, line_length=settings.line_length, tab_width=settings.indent_width)
+        width = comment_formatting.available_comment_width(run.indent, line_length=settings.line_length, tab_width=settings.indent_width)
         output, rewrite_blocked = _format_semantic_lines(tuple(texts), width=width, initial_prefix=f"{match.marker}: ", subsequent_prefix=" " * len(f"{match.marker}: "), settings=settings)
     return _FormattedUnit(end=end, output_lines=output, rewrite_blocked=rewrite_blocked)
 
@@ -220,9 +219,9 @@ def _format_list_item(
     end = index + 1
     while end < len(run.comments) and end not in preserved:
         body = run.comments[end].body.rstrip()
-        if comment_helpers.task_marker_match(body, settings=settings) is not None:
+        if comment_formatting.task_marker_match(body, settings=settings) is not None:
             break
-        if comment_helpers.LIST_RE.match(body) is not None or comment_helpers.BLOCK_QUOTE_RE.match(body) is not None:
+        if comment_formatting.LIST_RE.match(body) is not None or comment_formatting.BLOCK_QUOTE_RE.match(body) is not None:
             break
         if not body[:1].isspace():
             break
@@ -242,7 +241,7 @@ def _format_block_quote(
     texts = [_SemanticLine(text=run.comments[index].body[match.start("text") :], has_following_newline=_has_following_newline(data, run.comments[index]))]
     end = index + 1
     while end < len(run.comments) and end not in preserved:
-        next_match = comment_helpers.BLOCK_QUOTE_RE.match(run.comments[end].body.rstrip())
+        next_match = comment_formatting.BLOCK_QUOTE_RE.match(run.comments[end].body.rstrip())
         if next_match is None or _expanded_structure_prefix(next_match.group("prefix"), indent=run.indent, tab_width=settings.indent_width) != prefix:
             break
         texts.append(_SemanticLine(text=run.comments[end].body[next_match.start("text") :], has_following_newline=_has_following_newline(data, run.comments[end])))
@@ -336,11 +335,11 @@ def _ordinary_paragraph_end(run: PCF_definition.StandaloneCommentRun, index: int
     end = index + 1
     while end < len(run.comments) and end not in preserved:
         body = run.comments[end].body.rstrip()
-        if comment_helpers.task_marker_match(body, settings=settings) is not None:
+        if comment_formatting.task_marker_match(body, settings=settings) is not None:
             break
-        if settings.comment_format_list_items and comment_helpers.LIST_RE.match(body) is not None:
+        if settings.comment_format_list_items and comment_formatting.LIST_RE.match(body) is not None:
             break
-        if settings.comment_format_block_quotes and comment_helpers.BLOCK_QUOTE_RE.match(body) is not None:
+        if settings.comment_format_block_quotes and comment_formatting.BLOCK_QUOTE_RE.match(body) is not None:
             break
         if _is_colon_header(run.comments[end]):
             if _allows_colon_continuation(run.comments[end - 1], run.comments[end]):

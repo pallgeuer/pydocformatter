@@ -12,7 +12,7 @@ import pydocformatter.rules.registration as rule_registration
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase
-from pydocformatter.rules.definition_helpers import docstring_conventions, parameter_documentation
+from pydocformatter.rules.definition_helpers import docstring_conventions, docstring_source, parameter_documentation
 from pydocformatter.rules.definitions.PDF.PDF import PDF
 from pydocformatter.rules.models import FixAvailability, RuleCacheBehavior, RuleCheckKind, RuleMetadata
 
@@ -63,7 +63,7 @@ class PDF500MissingParameterDocumentation(RuleBase):
             if docstring is None or not parameter_documentation.should_check_missing_parameters(definition, docstring, context=context):
                 continue
             documented_names = {parameter.comparison_name for parameter in parameter_documentation.value_documented_parameters(docstring)}
-            docstring_suppression_target = (PDF_definition.docstring_physical_line_numbers(docstring),)
+            docstring_suppression_target = (docstring_source.docstring_physical_line_numbers(docstring),)
             for parameter in parameter_documentation.signature_parameters(definition, context=context):
                 if parameter.implicit_receiver or parameter.unpacked or parameter.comparison_name in documented_names:
                     continue

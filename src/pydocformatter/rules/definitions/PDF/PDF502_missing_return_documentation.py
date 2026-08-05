@@ -12,7 +12,7 @@ import pydocformatter.rules.registration as rule_registration
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase
-from pydocformatter.rules.definition_helpers import docstring_conventions, missing_documentation, value_documentation
+from pydocformatter.rules.definition_helpers import docstring_conventions, docstring_source, missing_documentation, value_documentation
 from pydocformatter.rules.definitions.PDF.PDF import PDF
 from pydocformatter.rules.models import FixAvailability, RuleCacheBehavior, RuleCheckKind, RuleMetadata
 
@@ -63,5 +63,5 @@ class PDF502MissingReturnDocumentation(RuleBase):
                 definition, docstring, context=context, has_relevant_documentation=bool(return_targets)
             ):
                 continue
-            violations.append(rule_violations.diagnostic(cls.meta, facts.meaningful_returns[0].line_numbers, suppression_line_numbers=(PDF_definition.docstring_physical_line_numbers(docstring),)))
+            violations.append(rule_violations.diagnostic(cls.meta, facts.meaningful_returns[0].line_numbers, suppression_line_numbers=(docstring_source.docstring_physical_line_numbers(docstring),)))
         return tuple(violations)

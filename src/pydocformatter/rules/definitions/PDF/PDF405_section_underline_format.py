@@ -12,7 +12,7 @@ import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase
-from pydocformatter.rules.definition_helpers import docstring_conventions, section_edits
+from pydocformatter.rules.definition_helpers import docstring_conventions, docstring_rendering, section_edits
 from pydocformatter.rules.definitions.PDF.PDF import PDF
 from pydocformatter.rules.models import FixAvailability, RuleCacheBehavior, RuleCheckKind, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
 
@@ -67,7 +67,7 @@ def _results(context: RuleContext, *, rule: RuleMetadata) -> tuple[rule_violatio
     for docstring in data.docstrings:
         if docstring.structure.convention is not DocstringConvention.NUMPY:
             continue
-        output_lines: list[PDF_definition.DocstringOutputLine] = []
+        output_lines: list[docstring_rendering.DocstringOutputLine] = []
         line_numbers: list[int] = []
         messages: list[str] = []
         section_by_header = {section.header_line: section for section in docstring.structure.sections}
@@ -79,15 +79,15 @@ def _results(context: RuleContext, *, rule: RuleMetadata) -> tuple[rule_violatio
                 continue
             section = section_by_header.get(line.index)
             if section is None:
-                output_lines.append(PDF_definition.DocstringOutputLine(original=line, source=None, value=None))
+                output_lines.append(docstring_rendering.DocstringOutputLine(original=line, source=None, value=None))
                 continue
-            output_lines.append(PDF_definition.DocstringOutputLine(original=line, source=None, value=None))
+            output_lines.append(docstring_rendering.DocstringOutputLine(original=line, source=None, value=None))
             underline, skipped = _target_underline(docstring, section)
             if underline is None:
                 continue
             line_numbers.extend(section_edits.line_numbers(docstring, line))
             messages.append(f"Docstring section '{section.name}' underline should be normalized")
-            output_lines.append(PDF_definition.DocstringOutputLine(source=underline, value=underline))
+            output_lines.append(docstring_rendering.DocstringOutputLine(source=underline, value=underline))
             skip_indexes.update(skipped)
             changed = True
         if not changed:

@@ -10,7 +10,7 @@ import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase, RuleContext
-from pydocformatter.rules.definition_helpers import docstring_conventions, section_edits
+from pydocformatter.rules.definition_helpers import docstring_conventions, docstring_source, section_edits
 from pydocformatter.rules.models import FixAvailability, RuleCacheBehavior, RuleCheckKind, RuleMetadata
 
 
@@ -56,7 +56,7 @@ class PDF415ConventionEntryIndentation(RuleBase):
             rule_violations.violation_for_optional_planned_source_change(
                 cls.meta,
                 section_edits.planned_convention_entry_change(docstring, issue, context=context),
-                line_numbers=PDF_definition.docstring_line_numbers(docstring, docstring.structure.lines[issue.start_line]),
+                line_numbers=docstring_source.docstring_line_numbers(docstring, docstring.structure.lines[issue.start_line]),
                 instance_message=_instance_message(issue),
             )
             for docstring in data.docstrings

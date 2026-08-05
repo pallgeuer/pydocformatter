@@ -9,9 +9,9 @@ from typing import TYPE_CHECKING
 # First-party imports
 import pydocformatter.rules.violations as rule_violations
 import pydocformatter.rules.registration as rule_registration
-import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase
+from pydocformatter.rules.definition_helpers import docstring_source
 from pydocformatter.rules.definitions.PDF.PDF import PDF
 from pydocformatter.rules.models import FixAvailability, RuleCacheBehavior, RuleCheckKind, RuleMetadata
 
@@ -57,7 +57,7 @@ class PDF213PlaceholderDocstring(RuleBase):
         data = PDF.require_data(context)
         normalized_markers = frozenset(marker.upper() for marker in context.settings.docstring_placeholder_markers)
         return tuple(
-            rule_violations.diagnostic(cls.meta, PDF_definition.docstring_physical_line_numbers(docstring)) for docstring in data.docstrings if _is_placeholder(docstring.value, normalized_markers)
+            rule_violations.diagnostic(cls.meta, docstring_source.docstring_physical_line_numbers(docstring)) for docstring in data.docstrings if _is_placeholder(docstring.value, normalized_markers)
         )
 
 

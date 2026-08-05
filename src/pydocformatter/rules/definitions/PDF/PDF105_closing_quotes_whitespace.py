@@ -16,7 +16,7 @@ import pydocformatter.rules.registration as rule_registration
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase
-from pydocformatter.rules.definition_helpers import ascii_whitespace, text_layout
+from pydocformatter.rules.definition_helpers import ascii_whitespace, docstring_rendering, docstring_source, text_layout
 from pydocformatter.rules.models import FixAvailability, RuleCacheBehavior, RuleCheckKind, RuleMetadata
 
 
@@ -66,10 +66,10 @@ def _planned_changes(context: RuleContext) -> tuple[rule_edits.PlannedSourceChan
 
 def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo) -> rule_edits.PlannedSourceChange | None:
     """Return one source replacement for closing quote whitespace."""
-    if not PDF_definition.can_canonically_rewrite_simple_docstring(docstring):
+    if not docstring_source.can_canonically_rewrite_simple_docstring(docstring):
         return None
     line = docstring.structure.lines[-1]
-    if not PDF_definition.is_same_line_closing_delimiter_prefix(docstring, line) or not text_layout.has_space_tab_content(line.raw_text):
+    if not docstring_source.is_same_line_closing_delimiter_prefix(docstring, line) or not text_layout.has_space_tab_content(line.raw_text):
         return None
     content_end = len(line.raw_text.rstrip(ascii_whitespace.SPACE_AND_TAB))
     if content_end == len(line.raw_text):
@@ -86,13 +86,13 @@ def _escaped_quote_change(docstring: PDF_definition.DocstringInfo, line: PDF_def
     if line.source_line_number is None or not isinstance(docstring.node, cst.SimpleString):
         return None
     target_value_line = line.raw_text[:content_end]
-    target_source_line = PDF_definition.escaped_closing_quote_body_source(docstring.node, target_value_line)
+    target_source_line = docstring_rendering.escaped_closing_quote_body_source(docstring.node, target_value_line)
     if target_source_line is None or target_source_line == target_value_line:
         return None
     replacement_start = _common_prefix_length(target_value_line, target_source_line)
     value_lines = [value_line.raw_text for value_line in docstring.structure.lines]
     value_lines[line.index] = target_value_line
-    return PDF_definition.planned_simple_docstring_source_change(
+    return docstring_source.planned_simple_docstring_source_change(
         docstring,
         replacements=(
             rule_edits.PlannedTextReplacement(
@@ -112,7 +112,7 @@ def _validated_change(docstring: PDF_definition.DocstringInfo, line: PDF_definit
         return None
     value_lines = [value_line.raw_text for value_line in docstring.structure.lines]
     value_lines[line.index] = target_line
-    return PDF_definition.planned_simple_docstring_source_change(
+    return docstring_source.planned_simple_docstring_source_change(
         docstring,
         replacements=(rule_edits.PlannedTextReplacement(start_offset=line.start_offset + content_end, end_offset=line.end_offset, text=replacement_text, line_numbers=(line.source_line_number,)),),
         value_lines=value_lines,

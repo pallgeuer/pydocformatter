@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 import pydocformatter.rules.edits as rule_edits
 import pydocformatter.rules.violations as rule_violations
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
-from pydocformatter.rules.definition_helpers import first_word_capitalization, terminal_punctuation
+from pydocformatter.rules.definition_helpers import docstring_source, first_word_capitalization, terminal_punctuation
 
 
 if TYPE_CHECKING:
@@ -44,13 +44,13 @@ class _SourceSafeReplacementPlanner:
     def __init__(self, context: RuleContext) -> None:
         """Store shared context for direct source replacements."""
         self.context = context
-        self.line_bounds = PDF_definition.line_bounds_for_context(context)
+        self.line_bounds = docstring_source.line_bounds_for_context(context)
 
     def planned_replacement(
         self, target: PDF_definition.EntryDescriptionLineTarget, *, start_offset: int, end_offset: int, replacement: str, expected_source: str | None
     ) -> rule_edits.PlannedSourceChange | None:
         """Return a direct source replacement for a source-safe evaluated replacement."""
-        if not PDF_definition.simple_docstring_replacement_is_source_safe(target.docstring, replacement):
+        if not docstring_source.simple_docstring_replacement_is_source_safe(target.docstring, replacement):
             return None
         source_map = target.docstring.source_map
         if source_map is None or start_offset < 0 or end_offset < start_offset or end_offset > len(source_map.value):
@@ -60,7 +60,7 @@ class _SourceSafeReplacementPlanner:
         line_numbers = line_numbers_for_offsets(target, start_offset=start_offset, end_offset=end_offset)
         return rule_edits.PlannedSourceChange(
             edit=rule_edits.SourceEdit(
-                range=PDF_definition.simple_docstring_source_range(target.docstring, source_map=source_map, start_offset=start_offset, end_offset=end_offset, line_bounds=self.line_bounds),
+                range=docstring_source.simple_docstring_source_range(target.docstring, source_map=source_map, start_offset=start_offset, end_offset=end_offset, line_bounds=self.line_bounds),
                 replacement=replacement,
             ),
             line_numbers=line_numbers,
@@ -159,7 +159,7 @@ def line_numbers(target: PDF_definition.EntryDescriptionLineTarget) -> tuple[int
     Returns:
         Concrete one-based source lines occupied by the target fragment.
     """
-    return PDF_definition.docstring_line_numbers(target.docstring, target.line)
+    return docstring_source.docstring_line_numbers(target.docstring, target.line)
 
 
 def line_numbers_for_offsets(target: PDF_definition.EntryDescriptionLineTarget, *, start_offset: int, end_offset: int) -> tuple[int, ...]:
@@ -178,7 +178,7 @@ def line_numbers_for_offsets(target: PDF_definition.EntryDescriptionLineTarget, 
         return line_numbers(target)
     lines = tuple(line for line in target.docstring.structure.lines if line.source_line_number is not None and line.start_offset <= start_offset and end_offset <= line.end_offset)
     if lines:
-        return PDF_definition.docstring_value_line_numbers(lines)
+        return docstring_source.docstring_value_line_numbers(lines)
     return line_numbers(target)
 
 
@@ -225,6 +225,6 @@ def _planned_replacement(
     value_lines = [structure_line.raw_text for structure_line in docstring.structure.lines]
     value_lines[line.index] = f"{line.raw_text[:line_start]}{replacement}{line.raw_text[line_end:]}"
     replacement_edit = rule_edits.PlannedTextReplacement(start_offset=start_offset, end_offset=end_offset, text=replacement, line_numbers=line_numbers(target))
-    return PDF_definition.planned_simple_docstring_text_change(
-        docstring, context=context, replacement=replacement_edit, expected_value=PDF_definition.join_docstring_value_lines(docstring, value_lines), expected_source=expected_source
+    return docstring_source.planned_simple_docstring_text_change(
+        docstring, context=context, replacement=replacement_edit, expected_value=docstring_source.join_docstring_value_lines(docstring, value_lines), expected_source=expected_source
     )

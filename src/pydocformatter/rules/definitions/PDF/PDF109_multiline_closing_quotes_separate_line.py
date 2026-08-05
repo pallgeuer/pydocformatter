@@ -13,6 +13,7 @@ import pydocformatter.rules.registration as rule_registration
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase
+from pydocformatter.rules.definition_helpers import docstring_rendering, docstring_source
 from pydocformatter.rules.definitions.PDF.PDF import PDF
 from pydocformatter.rules.models import FixAvailability, RuleCacheBehavior, RuleCheckKind, RuleMetadata
 
@@ -65,19 +66,19 @@ def _planned_changes(context: RuleContext) -> tuple[rule_edits.PlannedSourceChan
 
 def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo, *, context: RuleContext, source_lines: Sequence[str]) -> rule_edits.PlannedSourceChange | None:
     """Return one whole-literal replacement for a docstring."""
-    if not PDF_definition.can_canonically_rewrite_simple_docstring(docstring, require_multiline=True):
+    if not docstring_source.can_canonically_rewrite_simple_docstring(docstring, require_multiline=True):
         return None
-    content_indexes = PDF_definition.docstring_content_indexes(docstring)
+    content_indexes = docstring_source.docstring_content_indexes(docstring)
     if not content_indexes:
         return None
     last_content = content_indexes[-1]
-    if last_content < len(docstring.structure.lines) - 1 or PDF_definition.docstring_value_ends_with_newline(docstring):
+    if last_content < len(docstring.structure.lines) - 1 or docstring_source.docstring_value_ends_with_newline(docstring):
         return None
-    canonical_margin = PDF_definition.docstring_canonical_margin(docstring, context=context, source_lines=source_lines)
+    canonical_margin = docstring_source.docstring_canonical_margin(docstring, context=context, source_lines=source_lines)
     final_line = docstring.structure.lines[last_content]
     output_lines = (
-        *(PDF_definition.DocstringOutputLine(original=line, source=None, value=None) for line in docstring.structure.lines),
-        PDF_definition.DocstringOutputLine(source=canonical_margin, value=canonical_margin),
+        *(docstring_rendering.DocstringOutputLine(original=line, source=None, value=None) for line in docstring.structure.lines),
+        docstring_rendering.DocstringOutputLine(source=canonical_margin, value=canonical_margin),
     )
-    line_numbers = PDF_definition.docstring_value_line_numbers((final_line,))
-    return PDF_definition.planned_simple_docstring_output_change(docstring, context=context, output_lines=output_lines, line_numbers=line_numbers, preserve_trailing_newline=False)
+    line_numbers = docstring_source.docstring_value_line_numbers((final_line,))
+    return docstring_rendering.planned_simple_docstring_output_change(docstring, context=context, output_lines=output_lines, line_numbers=line_numbers, preserve_trailing_newline=False)

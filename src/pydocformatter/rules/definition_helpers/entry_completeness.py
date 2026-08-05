@@ -9,6 +9,7 @@ import typing
 # First-party imports
 import pydocformatter.rules.violations as rule_violations
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
+from pydocformatter.rules.definition_helpers import docstring_source
 
 
 if typing.TYPE_CHECKING:
@@ -61,7 +62,7 @@ def missing_raw_entry_description_violations(
     return tuple(
         rule_violations.diagnostic(
             meta,
-            PDF_definition.docstring_line_numbers(docstring, docstring.structure.lines[entry.start_line]),
+            docstring_source.docstring_line_numbers(docstring, docstring.structure.lines[entry.start_line]),
             instance_message=f"{label} '{', '.join(entry.names)}' docstring entry is missing a description",
         )
         for docstring in data.docstrings

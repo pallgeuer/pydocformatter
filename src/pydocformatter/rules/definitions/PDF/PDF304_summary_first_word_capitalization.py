@@ -10,10 +10,9 @@ from typing import TYPE_CHECKING
 import pydocformatter.rules.edits as rule_edits
 import pydocformatter.rules.violations as rule_violations
 import pydocformatter.rules.registration as rule_registration
-import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase
-from pydocformatter.rules.definition_helpers import first_word_capitalization, summary_style
+from pydocformatter.rules.definition_helpers import docstring_source, first_word_capitalization, summary_style
 from pydocformatter.rules.definitions.PDF.PDF import PDF
 from pydocformatter.rules.models import FixAvailability, RuleCacheBehavior, RuleCheckKind, RuleMetadata
 
@@ -78,10 +77,10 @@ def _planned_change(word: summary_style.SummaryWordTarget, *, replacement: str) 
     """Return a safe replacement for one summary first word."""
     docstring = word.docstring
     line = word.line
-    if not PDF_definition.can_canonically_rewrite_simple_docstring(docstring):
+    if not docstring_source.can_canonically_rewrite_simple_docstring(docstring):
         return None
-    start_offset = PDF_definition.value_offset_for_text_column(line, word.text_start_column, require_source_text=True)
-    end_offset = PDF_definition.value_offset_for_text_column(line, word.text_end_column, require_source_text=True)
+    start_offset = docstring_source.value_offset_for_text_column(line, word.text_start_column, require_source_text=True)
+    end_offset = docstring_source.value_offset_for_text_column(line, word.text_end_column, require_source_text=True)
     if start_offset is None or end_offset is None:
         return None
     value_lines = [value_line.raw_text for value_line in docstring.structure.lines]
@@ -89,4 +88,4 @@ def _planned_change(word: summary_style.SummaryWordTarget, *, replacement: str) 
     raw_end_column = end_offset - line.start_offset
     value_lines[line.index] = f"{line.raw_text[:raw_start_column]}{replacement}{line.raw_text[raw_end_column:]}"
     replacement_edit = rule_edits.PlannedTextReplacement(start_offset=start_offset, end_offset=end_offset, text=replacement, line_numbers=summary_style.line_numbers(word))
-    return PDF_definition.planned_simple_docstring_source_change(docstring, replacements=(replacement_edit,), value_lines=value_lines)
+    return docstring_source.planned_simple_docstring_source_change(docstring, replacements=(replacement_edit,), value_lines=value_lines)

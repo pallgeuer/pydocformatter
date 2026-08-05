@@ -9,9 +9,9 @@ from typing import TYPE_CHECKING
 # First-party imports
 import pydocformatter.rules.violations as rule_violations
 import pydocformatter.rules.registration as rule_registration
-import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase
+from pydocformatter.rules.definition_helpers import docstring_source
 from pydocformatter.rules.definitions.PDF.PDF import PDF
 from pydocformatter.rules.models import FixAvailability, RuleCacheBehavior, RuleCheckKind, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
 
@@ -55,7 +55,7 @@ class PDF418MalformedRestDirectiveIntroducer(RuleBase):
         return tuple(
             rule_violations.diagnostic(
                 cls.meta,
-                PDF_definition.docstring_line_numbers(docstring, docstring.structure.lines[issue.start_line]),
+                docstring_source.docstring_line_numbers(docstring, docstring.structure.lines[issue.start_line]),
                 instance_message=f"reST directive '{issue.name}' must be followed by two colons",
             )
             for docstring in data.docstrings

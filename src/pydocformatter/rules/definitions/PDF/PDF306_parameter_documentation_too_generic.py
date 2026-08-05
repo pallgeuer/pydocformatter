@@ -11,7 +11,7 @@ import pydocformatter.rules.registration as rule_registration
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase
-from pydocformatter.rules.definition_helpers import docstring_conventions, docstring_sections, documentation_style, parameter_documentation
+from pydocformatter.rules.definition_helpers import docstring_conventions, docstring_sections, docstring_source, documentation_style, parameter_documentation
 from pydocformatter.rules.definitions.PDF.PDF import PDF
 from pydocformatter.rules.models import FixAvailability, RuleCacheBehavior, RuleCheckKind, RuleMetadata
 
@@ -108,7 +108,7 @@ class PDF306ParameterDocumentationTooGeneric(RuleBase):
                     documentation_style.DocumentedValueTarget(
                         name=entry.names[0],
                         description=entry.description,
-                        line_numbers=PDF_definition.docstring_line_numbers(docstring, line),
+                        line_numbers=docstring_source.docstring_line_numbers(docstring, line),
                         extra_generic_sequences=_extra_generic_sequences(signature_parameter),
                     )
                 )

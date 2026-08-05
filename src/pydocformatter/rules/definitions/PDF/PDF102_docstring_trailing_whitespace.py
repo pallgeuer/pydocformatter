@@ -13,7 +13,7 @@ import pydocformatter.rules.registration as rule_registration
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase
-from pydocformatter.rules.definition_helpers import ascii_whitespace, inline_markup, text_layout
+from pydocformatter.rules.definition_helpers import ascii_whitespace, docstring_source, inline_markup, text_layout
 from pydocformatter.rules.models import FixAvailability, RuleCacheBehavior, RuleCheckKind, RuleMetadata
 
 
@@ -98,7 +98,7 @@ def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo) -> ru
                 start_offset=deletion_start, end_offset=deletion_end, text=source_map.preserved_source_for_value_deletion(deletion_start, deletion_end), line_numbers=line_numbers
             )
         )
-    return PDF_definition.planned_simple_docstring_source_change(docstring, replacements=tuple(replacements), value_lines=value_lines, source_map=source_map)
+    return docstring_source.planned_simple_docstring_source_change(docstring, replacements=tuple(replacements), value_lines=value_lines, source_map=source_map)
 
 
 def _has_following_evaluated_newline(docstring: PDF_definition.DocstringInfo, line: PDF_definition.DocstringValueLine) -> bool:

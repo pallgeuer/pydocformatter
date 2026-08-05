@@ -16,7 +16,7 @@ import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 from pydocformatter.cli import settings_check
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase
-from pydocformatter.rules.definition_helpers import ascii_whitespace, string_literals, text_layout
+from pydocformatter.rules.definition_helpers import ascii_whitespace, docstring_source, string_literals, text_layout
 from pydocformatter.rules.models import FixAvailability, RuleCacheBehavior, RuleCheckKind, RuleMetadata
 
 
@@ -67,9 +67,9 @@ def _planned_changes(context: RuleContext) -> tuple[rule_edits.PlannedSourceChan
 
 def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo, *, context: RuleContext, source_lines: Sequence[str]) -> rule_edits.PlannedSourceChange | None:
     """Return one whole-literal replacement for a docstring."""
-    if not PDF_definition.is_safely_mapped_simple_docstring(docstring, require_multiline=True):
+    if not docstring_source.is_safely_mapped_simple_docstring(docstring, require_multiline=True):
         return None
-    canonical_margin = PDF_definition.docstring_canonical_margin(docstring, context=context, source_lines=source_lines)
+    canonical_margin = docstring_source.docstring_canonical_margin(docstring, context=context, source_lines=source_lines)
     line_targets = _target_raw_lines(docstring, canonical_margin=canonical_margin, context=context)
     changed_lines = tuple(
         (line, line_targets[line.index]) for line in docstring.structure.lines if line.index > 0 and line.source_line_number is not None and line.raw_text != line_targets[line.index].raw_text
@@ -91,7 +91,7 @@ def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo, *, co
             )
 
     value_lines = [line_targets[line.index].raw_text if line.index > 0 else line.raw_text for line in docstring.structure.lines]
-    return PDF_definition.planned_simple_docstring_source_change(docstring, replacements=tuple(replacements), value_lines=value_lines, source_map=source_map)
+    return docstring_source.planned_simple_docstring_source_change(docstring, replacements=tuple(replacements), value_lines=value_lines, source_map=source_map)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -110,7 +110,7 @@ def _target_raw_lines(docstring: PDF_definition.DocstringInfo, *, canonical_marg
     targets[0] = _LineTarget(docstring.structure.lines[0].raw_text, 0, "")
     for line in docstring.structure.lines[1:]:
         if not text_layout.has_space_tab_content(line.raw_text):
-            target = canonical_margin if PDF_definition.is_same_line_closing_delimiter_prefix(docstring, line) else _target_blank_line(line.raw_text, canonical_margin=canonical_margin)
+            target = canonical_margin if docstring_source.is_same_line_closing_delimiter_prefix(docstring, line) else _target_blank_line(line.raw_text, canonical_margin=canonical_margin)
             targets[line.index] = _LineTarget(target, 0, "")
 
     convention_lines = _apply_convention_targets(targets, docstring, canonical_margin=canonical_margin, context=context)

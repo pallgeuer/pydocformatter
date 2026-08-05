@@ -11,7 +11,7 @@ from pydocformatter import formatter, rules_selection
 from pydocformatter.cli.settings_check import CheckSettings
 from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
 from pydocformatter.rules.definition_helpers import source_text, unicode_safety
-from pydocformatter.rules.definitions.PCF.PCF import PCF, CommentKind, CommentPlacement, available_comment_width, render_comment
+from pydocformatter.rules.definitions.PCF.PCF import PCF, CommentKind, CommentPlacement
 from pydocformatter.source_path import SourcePathContext
 
 
@@ -265,11 +265,6 @@ def test_source_for_handles_multiline_ranges_and_preserves_mixed_endings() -> No
     data = PCF.prepare(category_context("# first\r\n# second\n# third"))
     code_range = cst_metadata.CodeRange(start=data.comments[0].range.start, end=data.comments[-1].range.end)
     assert data.source_for(code_range) == "# first\r\n# second\n# third"
-
-
-def test_comment_rendering_and_width_helpers_cover_tabs_tiny_widths_and_empty_content() -> None:
-    assert available_comment_width("\t", line_length=12, tab_width=4, prefix="> ") == 4
-    assert render_comment("", indent="    ") == "    #"
 
 
 def test_prepare_ignores_hashes_inside_all_string_literal_forms() -> None:

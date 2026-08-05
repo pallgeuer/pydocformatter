@@ -1,4 +1,4 @@
-"""Comment structure detection helpers.
+"""Comment formatting and structure detection helpers.
 
 Attributes:
     DISABLED_CODE_RE (re.Pattern[str]): Conservative keyword detector for comment lines that likely contain disabled
@@ -30,7 +30,11 @@ import functools
 import dataclasses
 from typing import TYPE_CHECKING
 
+# Third-party imports
+import libcst.metadata as cst_metadata
+
 # First-party imports
+import pydocformatter.rules.edits as rule_edits
 import pydocformatter.rules.definitions.PCF.PCF as PCF_definition
 from pydocformatter.cli.settings_check import CommentTaskMarkerMode
 from pydocformatter.rules.definition_helpers import ascii_whitespace, inline_markup, rest_directives, text_layout
@@ -464,7 +468,7 @@ def format_task_marker_lines(marker: str, texts: tuple[str, ...], *, indent: str
         return (marker + ":",)
     if task_marker_texts_are_code_like(texts, settings=settings):
         return _normalize_task_marker_lines(marker, texts)
-    width = PCF_definition.available_comment_width(indent, line_length=settings.line_length, tab_width=settings.indent_width)
+    width = available_comment_width(indent, line_length=settings.line_length, tab_width=settings.indent_width)
     return text_layout.wrap_text(body, width=width, initial_indent=prefix, subsequent_indent=" " * len(prefix), tab_width=settings.indent_width, url_aware=settings.url_aware_wrapping)
 
 
@@ -521,3 +525,63 @@ def _text_is_code_like_statement(text: str, *, settings: CheckSettings) -> bool:
 def _text_is_code_like_expression(text: str, *, settings: CheckSettings) -> bool:
     """Return whether text matches enabled expression detection."""
     return bool(settings.comment_detect_expressions and is_nontrivial_expression(text.strip()))
+
+
+def available_comment_width(indent: str, *, line_length: int, tab_width: int, prefix: str = "") -> int:
+    """Return available content width after indentation and comment prefixes.
+
+    Args:
+        indent (str): Source indentation before the comment marker.
+        line_length (int): Maximum configured output line width.
+        tab_width (int): Tab stop width used when measuring indentation.
+        prefix (str): Additional structural prefix, such as a task marker or list prefix, after `# `.
+
+    Returns:
+        int: Remaining display columns available for comment payload text.
+    """
+    return line_length - text_layout.display_width(f"{indent}# {prefix}", tab_width=tab_width)
+
+
+def render_comment(content: str, *, indent: str = "", include_indent: bool = True) -> str:
+    """Render one canonical comment line.
+
+    Args:
+        content (str): Comment payload after the canonical marker space.
+        indent (str): Source indentation to include before the comment marker.
+        include_indent (bool): Whether `indent` should be emitted in the returned line.
+
+    Returns:
+        str: Canonical standalone comment source without a line ending.
+    """
+    prefix = indent if include_indent else ""
+    return f"{prefix}# {content}" if content else f"{prefix}#"
+
+
+def render_inline_trailing_comment(code: str, content: str) -> str:
+    """Return canonical inline trailing-comment source.
+
+    Args:
+        code (str): Source code before the trailing comment marker.
+        content (str): Comment payload after the canonical marker space.
+
+    Returns:
+        str: Source line with two spaces before `#` and canonical marker spacing.
+    """
+    return f"{code}  # {content}" if content else f"{code}  #"
+
+
+def planned_full_line_change(data: PCF_definition.PCFCategoryData, comment: PCF_definition.CommentInfo, replacement: str) -> rule_edits.PlannedSourceChange | None:
+    """Return a full-line source change unless source already matches.
+
+    Args:
+        data (PCF_definition.PCFCategoryData): Prepared PCF source lines used to compare existing source.
+        comment (PCF_definition.CommentInfo): Comment whose physical line should be replaced.
+        replacement (str): Full replacement line without a line ending.
+
+    Returns:
+        rule_edits.PlannedSourceChange | None: Full-line replacement, or None when source already matches.
+    """
+    code_range = cst_metadata.CodeRange(start=cst_metadata.CodePosition(line=comment.range.start.line, column=0), end=comment.range.end)
+    if data.source_for(code_range) == replacement:
+        return None
+    return rule_edits.PlannedSourceChange(edit=rule_edits.SourceEdit(range=code_range, replacement=replacement), line_numbers=(comment.range.start.line,), suppression_line_numbers=())

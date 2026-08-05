@@ -20,7 +20,7 @@ import pydocformatter.rules.registration as rule_registration
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase
-from pydocformatter.rules.definition_helpers import source_text, string_literals, unicode_safety
+from pydocformatter.rules.definition_helpers import docstring_source, source_text, string_literals, unicode_safety
 from pydocformatter.rules.models import FixAvailability, RuleCacheBehavior, RuleCheckKind, RuleMetadata
 
 
@@ -111,7 +111,7 @@ def _map_occurrences(
     parts = docstring.simple_string_parts
     if parts is None:
         return (), {occurrence.code_point for occurrence in occurrences}
-    line_bounds = PDF_definition.line_bounds_for_context(context)
+    line_bounds = docstring_source.line_bounds_for_context(context)
     mapped: list[_MappedOccurrence] = []
     unmapped_code_points: set[int] = set()
     occurrence_index = 0

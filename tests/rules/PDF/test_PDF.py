@@ -29,9 +29,7 @@ from pydocformatter.rules.definitions.PDF.PDF import (
     DocstringBlockKind,
     DocstringEntryKind,
     DocstringKind,
-    escaped_closing_quote_body_source,
     first_summary_block,
-    simple_docstring_body_source_candidates,
 )
 from pydocformatter.source_path import SourcePathContext
 
@@ -599,15 +597,6 @@ def test_prepare_lazily_caches_entry_description_targets_and_structural_adjacenc
     assert adjacency_spy.call_count == adjacency_calls + 1
 
 
-def test_mapping_capability_is_separate_from_canonical_rewrite_policy() -> None:
-    safe, hazardous = PDF.prepare(category_context('"""safe"""\n"""ignored additional"""\nvalue = 1\n"""hazard\u202e"""\n')).docstrings
-
-    assert PDF_definition.is_safely_mapped_simple_docstring(safe)
-    assert PDF_definition.can_canonically_rewrite_simple_docstring(safe)
-    assert PDF_definition.is_safely_mapped_simple_docstring(hazardous)
-    assert not PDF_definition.can_canonically_rewrite_simple_docstring(hazardous)
-
-
 def test_prepare_accepts_only_string_valued_first_expressions_as_docstrings() -> None:
     source = 'def parenthesized():\n    (u"doc")\n    "not an additional docstring"\n\ndef later_string():\n    value = 1\n    "not a docstring"\n'
     data = PDF.prepare(category_context(source))
@@ -627,28 +616,6 @@ def test_require_data_validates_category_data_type() -> None:
     assert PDF.require_data(rule_context(context, data)) is data
     with pytest.raises(TypeError, match="require PDFCategoryData"):
         PDF.require_data(rule_context(context, None))
-
-
-def test_escaped_closing_quote_body_source_skips_single_character_delimiter() -> None:
-    node = cst.ensure_type(cst.parse_expression("'Summary'"), cst.SimpleString)
-
-    assert escaped_closing_quote_body_source(node, "Say '") is None
-
-
-def test_simple_docstring_body_source_candidates_try_value_preserving_both_end_quote_escape_first() -> None:
-    node = cst.ensure_type(cst.parse_expression('"""Summary"""'), cst.SimpleString)
-
-    assert next(simple_docstring_body_source_candidates(node, '"quoted"', expected_value='"quoted"')) == ('\\"quoted\\"', '"quoted"')
-
-
-def test_simple_docstring_body_source_candidates_include_separator_fallback_value_changes() -> None:
-    node = cst.ensure_type(cst.parse_expression('r"""Summary"""'), cst.SimpleString)
-
-    candidates = tuple(simple_docstring_body_source_candidates(node, "Path \\", expected_value="Path \\"))
-
-    assert (" Path \\", " Path \\") in candidates
-    assert ("Path \\ ", "Path \\ ") in candidates
-    assert (" Path \\ ", " Path \\ ") in candidates
 
 
 def block_kinds(blocks: tuple[DocstringBlock, ...]) -> tuple[DocstringBlockKind, ...]:

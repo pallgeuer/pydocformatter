@@ -18,7 +18,7 @@ import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase
-from pydocformatter.rules.definition_helpers import ascii_whitespace, string_literals
+from pydocformatter.rules.definition_helpers import ascii_whitespace, docstring_rendering, docstring_source, string_literals
 from pydocformatter.rules.definitions.PDF.PDF import PDF
 from pydocformatter.rules.models import FixAvailability, RuleCacheBehavior, RuleCheckKind, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
 
@@ -79,27 +79,27 @@ def _planned_changes(context: RuleContext) -> tuple[rule_edits.PlannedSourceChan
 
 def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo, *, context: RuleContext, source_lines: Sequence[str]) -> rule_edits.PlannedSourceChange | None:
     """Return one whole-literal replacement for a docstring."""
-    if not PDF_definition.can_canonically_rewrite_simple_docstring(docstring, require_multiline=True):
+    if not docstring_source.can_canonically_rewrite_simple_docstring(docstring, require_multiline=True):
         return None
-    content_indexes = PDF_definition.docstring_content_indexes(docstring)
+    content_indexes = docstring_source.docstring_content_indexes(docstring)
     if not content_indexes or content_indexes[0] != 0:
         return None
-    canonical_margin = PDF_definition.docstring_canonical_margin(docstring, context=context, source_lines=source_lines)
+    canonical_margin = docstring_source.docstring_canonical_margin(docstring, context=context, source_lines=source_lines)
     first_line = docstring.structure.lines[0]
     moved_text = first_line.raw_text.lstrip(ascii_whitespace.SPACE_AND_TAB)
     output_lines = (
-        PDF_definition.DocstringOutputLine(source="", value=""),
-        PDF_definition.DocstringOutputLine(source=f"{canonical_margin}{moved_text}", value=f"{canonical_margin}{moved_text}"),
-        *(PDF_definition.DocstringOutputLine(original=line, source=None, value=None) for line in docstring.structure.lines[1:]),
+        docstring_rendering.DocstringOutputLine(source="", value=""),
+        docstring_rendering.DocstringOutputLine(source=f"{canonical_margin}{moved_text}", value=f"{canonical_margin}{moved_text}"),
+        *(docstring_rendering.DocstringOutputLine(original=line, source=None, value=None) for line in docstring.structure.lines[1:]),
     )
-    line_numbers = PDF_definition.docstring_value_line_numbers((first_line,))
-    return _planned_fast_body_change(docstring, context=context, output_lines=output_lines, line_numbers=line_numbers) or PDF_definition.planned_simple_docstring_output_change(
+    line_numbers = docstring_source.docstring_value_line_numbers((first_line,))
+    return _planned_fast_body_change(docstring, context=context, output_lines=output_lines, line_numbers=line_numbers) or docstring_rendering.planned_simple_docstring_output_change(
         docstring, context=context, output_lines=output_lines, line_numbers=line_numbers
     )
 
 
 def _planned_fast_body_change(
-    docstring: PDF_definition.DocstringInfo, *, context: RuleContext, output_lines: tuple[PDF_definition.DocstringOutputLine, ...], line_numbers: tuple[int, ...]
+    docstring: PDF_definition.DocstringInfo, *, context: RuleContext, output_lines: tuple[docstring_rendering.DocstringOutputLine, ...], line_numbers: tuple[int, ...]
 ) -> rule_edits.PlannedSourceChange | None:
     """Return a validated replacement without decomposing the whole literal into value fragments."""
     if not isinstance(docstring.node, cst.SimpleString):
@@ -111,10 +111,10 @@ def _planned_fast_body_change(
     if first_line_source is None:
         return None
     moved_text = first_line_source.lstrip(ascii_whitespace.SPACE_AND_TAB)
-    moved_source = f"{PDF_definition.docstring_canonical_margin(docstring, context=context, source_lines=context.source_lines)}{moved_text}"
+    moved_source = f"{docstring_source.docstring_canonical_margin(docstring, context=context, source_lines=context.source_lines)}{moved_text}"
     replacement_body = f"{context.line_ending}{moved_source}{context.line_ending}{rest_source}"
-    expected_value = PDF_definition.docstring_output_expected_value(output_lines, preserve_trailing_newline=PDF_definition.docstring_value_ends_with_newline(docstring))
-    rendered = PDF_definition.render_docstring_output_with_separator_fallback(docstring, body_source=replacement_body, expected_value=expected_value, separator_fallback=None)
+    expected_value = docstring_rendering.docstring_output_expected_value(output_lines, preserve_trailing_newline=docstring_source.docstring_value_ends_with_newline(docstring))
+    rendered = docstring_rendering.render_docstring_output_with_separator_fallback(docstring, body_source=replacement_body, expected_value=expected_value, separator_fallback=None)
     if rendered is None or rendered == docstring.source:
         return None
     return rule_edits.PlannedSourceChange(edit=rule_edits.SourceEdit(range=docstring.range, replacement=rendered), line_numbers=line_numbers, suppression_line_numbers=())

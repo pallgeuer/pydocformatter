@@ -52,6 +52,7 @@ All notable changes to this project are documented here. The format follows [Kee
   - Strengthened semantic Markdown table tests with full-document parsing and normalized all generated documentation tables to the shared canonical style.
 - **Internal cleanup:**
   - Centralized setting-effect resolution with disabled precedence across runtime rule selection, documentation generation, and metadata-backed tests.
+  - Separated reusable docstring source editing, literal rendering, section spacing, and comment formatting from rule category preparation, and returned PDF312-specific phrase matching to its rule module.
 - **Rule selection:**
   - Made stronger selectors silently override incompatible weaker selections by source priority and specificity, while preserving deterministic collection-order errors that name only the equal-strength blockers.
 - **Rule suppressions:**

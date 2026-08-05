@@ -26,6 +26,7 @@ from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.definition_helpers import (
     attribute_documentation,
     docstring_sections,
+    docstring_source,
     entry_completeness,
     parameter_documentation,
     rest_fields,
@@ -496,7 +497,7 @@ def _type_sources(docstring: PDF_definition.DocstringInfo, entry: PDF_definition
 
 def _entry_line_numbers(docstring: PDF_definition.DocstringInfo, entry: PDF_definition.DocstringEntry) -> tuple[int, ...]:
     """Return source line numbers for one parsed docstring entry."""
-    return PDF_definition.docstring_line_numbers(docstring, docstring.structure.lines[entry.start_line])
+    return docstring_source.docstring_line_numbers(docstring, docstring.structure.lines[entry.start_line])
 
 
 def _parameter_annotation(name: str, parameters: cst.Parameters) -> cst.Annotation | None:

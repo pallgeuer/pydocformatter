@@ -13,7 +13,7 @@ import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase
-from pydocformatter.rules.definition_helpers import ascii_whitespace, docstring_conventions, docstring_sections, section_edits, text_layout, unicode_safety
+from pydocformatter.rules.definition_helpers import ascii_whitespace, docstring_conventions, docstring_rendering, docstring_sections, section_edits, text_layout, unicode_safety
 from pydocformatter.rules.definitions.PDF.PDF import PDF
 from pydocformatter.rules.models import FixAvailability, RuleCacheBehavior, RuleCheckKind, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
 
@@ -71,7 +71,7 @@ def _results(context: RuleContext, *, rule: RuleMetadata) -> tuple[rule_violatio
     for docstring in data.docstrings:
         if docstring.structure.convention is not DocstringConvention.GOOGLE:
             continue
-        output_lines: list[PDF_definition.DocstringOutputLine] = []
+        output_lines: list[docstring_rendering.DocstringOutputLine] = []
         line_numbers: list[int] = []
         messages: list[str] = []
         protected_indexes = _protected_or_parsed_line_indexes(docstring)
@@ -79,12 +79,12 @@ def _results(context: RuleContext, *, rule: RuleMetadata) -> tuple[rule_violatio
         for line in docstring.structure.lines:
             target = None if line.index in protected_indexes else _google_trailing_content_target(line, context=context)
             if target is None:
-                output_lines.append(PDF_definition.DocstringOutputLine(original=line, source=None, value=None))
+                output_lines.append(docstring_rendering.DocstringOutputLine(original=line, source=None, value=None))
                 continue
             header, content, name = target
             line_numbers.extend(section_edits.line_numbers(docstring, line))
             messages.append(f"Docstring section '{name}' should be followed by a line break")
-            output_lines.extend((PDF_definition.DocstringOutputLine(source=header, value=header), PDF_definition.DocstringOutputLine(source=content, value=content)))
+            output_lines.extend((docstring_rendering.DocstringOutputLine(source=header, value=header), docstring_rendering.DocstringOutputLine(source=content, value=content)))
             changed = True
         if not changed:
             continue

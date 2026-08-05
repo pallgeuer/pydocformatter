@@ -14,7 +14,7 @@ import libcst as cst
 import pydocformatter.rules.violations as rule_violations
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 from pydocformatter.cli import settings_check
-from pydocformatter.rules.definition_helpers import docstring_conventions, docstring_sections, documentation_order, missing_documentation
+from pydocformatter.rules.definition_helpers import docstring_conventions, docstring_sections, docstring_source, documentation_order, missing_documentation
 
 
 if TYPE_CHECKING:
@@ -152,7 +152,7 @@ def _documented_attributes(docstring: PDF_definition.DocstringInfo, *, include_t
         if entry.kind is not PDF_definition.DocstringEntryKind.ATTRIBUTE or (not include_type_fields and docstring_sections.is_rest_type_field(entry.field_name)):
             continue
         line = docstring.structure.lines[entry.start_line]
-        line_numbers = PDF_definition.docstring_line_numbers(docstring, line)
+        line_numbers = docstring_source.docstring_line_numbers(docstring, line)
         attributes.extend(DocumentedAttribute(name=name, line_numbers=line_numbers) for name in entry.names if name)
     return tuple(attributes)
 
@@ -242,8 +242,8 @@ def missing_suppression_targets(data: PDF_definition.PDFCategoryData, owner: PDF
     targets: list[tuple[int, ...]] = []
     owner_docstring = data.docstring_for(owner)
     if owner_docstring is not None:
-        targets.append(PDF_definition.docstring_physical_line_numbers(owner_docstring))
-    targets.extend(PDF_definition.docstring_physical_line_numbers(docstring) for docstring in data.attached_attribute_docstrings_by_name(owner).get(attribute_name, ()))
+        targets.append(docstring_source.docstring_physical_line_numbers(owner_docstring))
+    targets.extend(docstring_source.docstring_physical_line_numbers(docstring) for docstring in data.attached_attribute_docstrings_by_name(owner).get(attribute_name, ()))
     return tuple(dict.fromkeys(targets))
 
 
@@ -379,7 +379,7 @@ def duplicate_attribute_violations(
                 violations.append(
                     rule_violations.diagnostic(
                         meta,
-                        PDF_definition.docstring_physical_line_numbers(attached_docstring),
+                        docstring_source.docstring_physical_line_numbers(attached_docstring),
                         instance_message=f"Attached docstring for {owner_label.lower()} attribute '{attribute.name}' duplicates {owner_label.lower()} docstring attribute documentation",
                     )
                 )
@@ -445,7 +445,7 @@ def private_attached_attribute_violations(
                 continue
             violations.append(
                 rule_violations.diagnostic(
-                    meta, PDF_definition.docstring_physical_line_numbers(docstring), instance_message=f"Private {owner_label.lower()} attribute '{name}' should not have an attached docstring"
+                    meta, docstring_source.docstring_physical_line_numbers(docstring), instance_message=f"Private {owner_label.lower()} attribute '{name}' should not have an attached docstring"
                 )
             )
     return tuple(violations)
@@ -483,7 +483,7 @@ def attribute_docstring_must_be_owner_violations(
             violations.append(
                 rule_violations.diagnostic(
                     meta,
-                    PDF_definition.docstring_physical_line_numbers(docstring),
+                    docstring_source.docstring_physical_line_numbers(docstring),
                     instance_message=f"{privacy_label} {owner_label.lower()} attribute '{name}' must use {owner_label.lower()} docstring documentation, not attached docstring",
                 )
             )

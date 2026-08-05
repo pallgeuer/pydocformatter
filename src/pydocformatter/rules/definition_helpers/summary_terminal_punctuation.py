@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 # First-party imports
 import pydocformatter.rules.edits as rule_edits
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
-from pydocformatter.rules.definition_helpers import ascii_whitespace, terminal_punctuation
+from pydocformatter.rules.definition_helpers import ascii_whitespace, docstring_source, terminal_punctuation
 
 
 if TYPE_CHECKING:
@@ -50,7 +50,7 @@ def result_for_target(
     Returns:
         rule_violations.RuleViolation | None: Violation for a bad ending, or None when the summary already complies.
     """
-    line_numbers = PDF_definition.docstring_line_numbers(target.docstring, target.line)
+    line_numbers = docstring_source.docstring_line_numbers(target.docstring, target.line)
     return terminal_punctuation.violation(
         text=target.line.text,
         policy=policy,
@@ -66,7 +66,7 @@ def _planned_change(target: PDF_definition.SummaryLineTarget, context: RuleConte
     """Return a safe insertion or terminal-character replacement for a summary."""
     docstring = target.docstring
     line = target.line
-    if not PDF_definition.is_safely_mapped_simple_docstring(docstring):
+    if not docstring_source.is_safely_mapped_simple_docstring(docstring):
         return None
     terminal_offset = line.start_offset + len(line.raw_text.rstrip(ascii_whitespace.SPACE_AND_TAB))
     start_offset = terminal_offset if expected_terminal is None else terminal_offset - 1
@@ -75,8 +75,8 @@ def _planned_change(target: PDF_definition.SummaryLineTarget, context: RuleConte
     line_end = terminal_offset - line.start_offset
     value_lines[line.index] = f"{line.raw_text[:line_start]}{replacement_text}{line.raw_text[line_end:]}"
     replacement = rule_edits.PlannedTextReplacement(
-        start_offset=start_offset, end_offset=terminal_offset, text=replacement_text, line_numbers=PDF_definition.docstring_line_numbers(target.docstring, target.line)
+        start_offset=start_offset, end_offset=terminal_offset, text=replacement_text, line_numbers=docstring_source.docstring_line_numbers(target.docstring, target.line)
     )
-    return PDF_definition.planned_simple_docstring_text_change(
-        docstring, context=context, replacement=replacement, expected_value=PDF_definition.join_docstring_value_lines(docstring, value_lines), expected_source=expected_terminal
+    return docstring_source.planned_simple_docstring_text_change(
+        docstring, context=context, replacement=replacement, expected_value=docstring_source.join_docstring_value_lines(docstring, value_lines), expected_source=expected_terminal
     )

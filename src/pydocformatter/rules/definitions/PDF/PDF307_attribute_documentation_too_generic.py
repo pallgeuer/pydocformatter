@@ -12,7 +12,7 @@ import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase
-from pydocformatter.rules.definition_helpers import docstring_conventions, docstring_sections, documentation_style
+from pydocformatter.rules.definition_helpers import docstring_conventions, docstring_sections, docstring_source, documentation_style
 from pydocformatter.rules.definitions.PDF.PDF import PDF
 from pydocformatter.rules.models import FixAvailability, RuleCacheBehavior, RuleCheckKind, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
 
@@ -84,7 +84,7 @@ def _entry_targets(docstring: PDF_definition.DocstringInfo) -> tuple[documentati
         if entry.kind is not PDF_definition.DocstringEntryKind.ATTRIBUTE or len(entry.names) != 1 or not entry.description or _is_rest_type_entry(entry):
             continue
         line = docstring.structure.lines[entry.start_line]
-        targets.append(documentation_style.DocumentedValueTarget(name=entry.names[0], description=entry.description, line_numbers=PDF_definition.docstring_line_numbers(docstring, line)))
+        targets.append(documentation_style.DocumentedValueTarget(name=entry.names[0], description=entry.description, line_numbers=docstring_source.docstring_line_numbers(docstring, line)))
     return tuple(targets)
 
 
@@ -103,4 +103,4 @@ def _attached_docstring_target(docstring: PDF_definition.DocstringInfo) -> docum
     line = PDF_definition.first_non_adornment_line(docstring, block.start_line, block.end_line)
     if line is None:
         return None
-    return documentation_style.DocumentedValueTarget(name=docstring.owner.targets[0], description=line.text, line_numbers=PDF_definition.docstring_line_numbers(docstring, line))
+    return documentation_style.DocumentedValueTarget(name=docstring.owner.targets[0], description=line.text, line_numbers=docstring_source.docstring_line_numbers(docstring, line))

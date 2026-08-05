@@ -31,10 +31,107 @@ from __future__ import annotations
 # Standard library imports
 import re
 import enum
+import typing
 import dataclasses
+from collections.abc import Sequence
 
 # First-party imports
 from pydocformatter.cli import settings_check
+
+
+class _BlockKind(typing.Protocol):
+    """Parsed block-kind shape needed by section spacing analysis."""
+
+    @property
+    def value(self) -> str:
+        """Stable block-kind value."""
+        ...
+
+
+class _DocstringBlockLike(typing.Protocol):
+    """Parsed block shape needed by section spacing analysis."""
+
+    @property
+    def kind(self) -> _BlockKind:
+        """Semantic block kind."""
+        ...
+
+    @property
+    def start_line(self) -> int:
+        """First included logical line."""
+        ...
+
+    @property
+    def end_line(self) -> int:
+        """Exclusive final logical line."""
+        ...
+
+    @property
+    def children(self) -> Sequence[_DocstringBlockLike]:
+        """Nested parsed blocks."""
+        ...
+
+
+class _DocstringValueLineLike(typing.Protocol):
+    """Parsed value-line shape needed by section spacing analysis."""
+
+    @property
+    def index(self) -> int:
+        """Zero-based logical line index."""
+        ...
+
+    @property
+    def text(self) -> str:
+        """Visible logical line text."""
+        ...
+
+
+class _DocstringStructureLike(typing.Protocol):
+    """Parsed structure shape needed by section spacing analysis."""
+
+    @property
+    def convention(self) -> settings_check.DocstringConvention:
+        """Convention used for parsing."""
+        ...
+
+    @property
+    def blocks(self) -> Sequence[_DocstringBlockLike]:
+        """Top-level parsed blocks."""
+        ...
+
+    @property
+    def lines(self) -> Sequence[_DocstringValueLineLike]:
+        """Parsed logical value lines."""
+        ...
+
+
+class _DocstringInfoLike(typing.Protocol):
+    """Parsed docstring shape needed by section spacing analysis."""
+
+    @property
+    def structure(self) -> _DocstringStructureLike:
+        """Convention-aware parsed structure."""
+        ...
+
+    @property
+    def value(self) -> str:
+        """Evaluated docstring value."""
+        ...
+
+
+@dataclasses.dataclass(frozen=True)
+class FinalConventionSectionSpacing:
+    """Spacing facts for the final recognized convention section.
+
+    Attributes:
+        section (_DocstringBlockLike): Final convention section block in a docstring.
+        final_content_line (int | None): Last nonblank logical line in that section, if one exists.
+        trailing_blank_line (int | None): Blank logical line immediately after the section content, if present.
+    """
+
+    section: _DocstringBlockLike
+    final_content_line: int | None
+    trailing_blank_line: int | None
 
 
 class RestFieldRole(enum.Enum):
@@ -503,3 +600,70 @@ def repeated_section_key(convention: settings_check.DocstringConvention, section
     if convention == settings_check.DocstringConvention.NUMPY:
         return NUMPY_REPEATED_SECTION_KEYS.get(normalized, normalized)
     return normalized
+
+
+def final_convention_section(docstring: _DocstringInfoLike) -> _DocstringBlockLike | None:
+    """Return the final top-level convention section, if there is one.
+
+    Args:
+        docstring (_DocstringInfoLike): Parsed docstring whose convention-aware block tree should be inspected.
+
+    Returns:
+        The final non-blank section block, or None when the convention has no parseable sections or the docstring ends with another block kind.
+    """
+    if not convention_parses_sections(docstring.structure.convention):
+        return None
+    non_blank_blocks = tuple(block for block in docstring.structure.blocks if block.kind.value != "blank")
+    if not non_blank_blocks or non_blank_blocks[-1].kind.value != "section":
+        return None
+    return non_blank_blocks[-1]
+
+
+def final_convention_section_spacing(docstring: _DocstringInfoLike) -> FinalConventionSectionSpacing | None:
+    """Return final convention section content and trailing blank facts.
+
+    Args:
+        docstring (_DocstringInfoLike): Parsed docstring whose last convention section should be analyzed.
+
+    Returns:
+        Section spacing facts for the final section, or None when there is no final parseable convention section.
+    """
+    section = final_convention_section(docstring)
+    if section is None:
+        return None
+    return FinalConventionSectionSpacing(
+        section=section, final_content_line=_final_section_content_line(docstring, section), trailing_blank_line=_final_section_trailing_blank_line(docstring, section)
+    )
+
+
+def _final_section_content_line(docstring: _DocstringInfoLike, section: _DocstringBlockLike) -> int | None:
+    """Return the final non-header, non-blank line in a convention section."""
+    header = next((child for child in section.children if child.kind.value == "section-header"), None)
+    header_lines = range(header.start_line, header.end_line) if header is not None else range(0)
+    for index in range(section.end_line - 1, section.start_line - 1, -1):
+        if index in header_lines:
+            continue
+        if docstring.structure.lines[index].text.strip():
+            return index
+    return None
+
+
+def _final_section_trailing_blank_line(docstring: _DocstringInfoLike, section: _DocstringBlockLike) -> int | None:
+    """Return the retained trailing blank line after final section content."""
+    trailing_child_blank = section.children[-1] if section.children and section.children[-1].kind.value == "blank" else None
+    if trailing_child_blank is not None:
+        return _first_non_closing_quote_prefix_line(docstring, start=trailing_child_blank.start_line, end=trailing_child_blank.end_line)
+    blank_block = next((block for block in docstring.structure.blocks if block.start_line == section.end_line and block.kind.value == "blank"), None)
+    if blank_block is None:
+        return None
+    return _first_non_closing_quote_prefix_line(docstring, start=blank_block.start_line, end=blank_block.end_line)
+
+
+def _first_non_closing_quote_prefix_line(docstring: _DocstringInfoLike, *, start: int, end: int) -> int | None:
+    """Return the first blank line that is not only a same-line closing quote prefix."""
+    for index in range(start, end):
+        line = docstring.structure.lines[index]
+        is_closing_prefix = line.index == len(docstring.structure.lines) - 1 and docstring.value != "" and not docstring.value.endswith(("\r\n", "\r", "\n"))
+        if not is_closing_prefix:
+            return index
+    return None

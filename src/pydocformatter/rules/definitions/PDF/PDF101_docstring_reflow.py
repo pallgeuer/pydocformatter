@@ -18,7 +18,7 @@ import pydocformatter.rules.registration as rule_registration
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase
-from pydocformatter.rules.definition_helpers import ascii_whitespace, inline_markup, string_literals, text_layout
+from pydocformatter.rules.definition_helpers import ascii_whitespace, docstring_source, inline_markup, string_literals, text_layout
 from pydocformatter.rules.models import FixAvailability, RuleCacheBehavior, RuleCheckKind, RuleMetadata
 
 
@@ -192,7 +192,7 @@ def _opening_delimiter_width(docstring: PDF_definition.DocstringInfo, region: PD
 
 def _closing_delimiter_width(docstring: PDF_definition.DocstringInfo, region: PDF_definition.ReflowRegion) -> int:
     """Return closing delimiter width when PDF101 keeps it on the final generated line."""
-    if region.end_offset != len(docstring.value) or PDF_definition.docstring_value_ends_with_newline(docstring) or not isinstance(docstring.node, cst.SimpleString):
+    if region.end_offset != len(docstring.value) or docstring_source.docstring_value_ends_with_newline(docstring) or not isinstance(docstring.node, cst.SimpleString):
         return 0
     return len(docstring.node.quote)
 

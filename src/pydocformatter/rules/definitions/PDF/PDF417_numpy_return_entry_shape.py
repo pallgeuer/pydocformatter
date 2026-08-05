@@ -13,7 +13,7 @@ import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase
-from pydocformatter.rules.definition_helpers import docstring_conventions
+from pydocformatter.rules.definition_helpers import docstring_conventions, docstring_source
 from pydocformatter.rules.definitions.PDF.PDF import PDF
 from pydocformatter.rules.models import FixAvailability, RuleCacheBehavior, RuleCheckKind, RuleMetadata
 
@@ -69,7 +69,7 @@ class PDF417NumpyReturnEntryShape(RuleBase):
                     message = _entry_message(entry, section_entry_count=len(entries))
                     if message is None:
                         continue
-                    line_numbers = PDF_definition.docstring_line_numbers(docstring, docstring.structure.lines[entry.start_line])
+                    line_numbers = docstring_source.docstring_line_numbers(docstring, docstring.structure.lines[entry.start_line])
                     violations.append(rule_violations.diagnostic(cls.meta, line_numbers, instance_message=message))
         return tuple(violations)
 

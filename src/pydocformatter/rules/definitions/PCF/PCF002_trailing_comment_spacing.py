@@ -12,6 +12,7 @@ import pydocformatter.rules.registration as rule_registration
 import pydocformatter.rules.definitions.PCF.PCF as PCF_definition
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase
+from pydocformatter.rules.definition_helpers import comment_formatting
 from pydocformatter.rules.models import FixAvailability, RuleCacheBehavior, RuleCheckKind, RuleMetadata
 
 
@@ -65,11 +66,11 @@ def _planned_changes(context: RuleContext) -> tuple[rule_edits.PlannedSourceChan
         if comment.unicode_occurrences:
             replacement = f"{code}  {comment.text}"
         elif comment.kind == PCF_definition.CommentKind.REGULAR:
-            replacement = PCF_definition.render_inline_trailing_comment(code, comment.content)
+            replacement = comment_formatting.render_inline_trailing_comment(code, comment.content)
         else:
             directive_text = comment.text.rstrip(" \t\f")
             replacement = f"{code}  {directive_text}"
-        change = PCF_definition.planned_full_line_change(data, comment, replacement)
+        change = comment_formatting.planned_full_line_change(data, comment, replacement)
         if change is not None:
             changes.append(change)
     return tuple(changes)

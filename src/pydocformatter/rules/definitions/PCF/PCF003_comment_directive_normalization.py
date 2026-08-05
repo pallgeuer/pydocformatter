@@ -14,6 +14,7 @@ import pydocformatter.rules.definitions.PCF.PCF as PCF_definition
 import pydocformatter.rules.definition_helpers.directives as directive_helpers
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase
+from pydocformatter.rules.definition_helpers import comment_formatting
 from pydocformatter.rules.models import FixAvailability, RuleCacheBehavior, RuleCheckKind, RuleMetadata
 
 
@@ -84,10 +85,10 @@ def _planned_changes(context: RuleContext) -> tuple[rule_edits.PlannedSourceChan
             continue
         content = _normalized_directive_content(comment.content)
         if comment.placement == PCF_definition.CommentPlacement.TRAILING:
-            replacement = f"{comment.line_prefix}{PCF_definition.render_comment(content, include_indent=False)}"
+            replacement = f"{comment.line_prefix}{comment_formatting.render_comment(content, include_indent=False)}"
         else:
-            replacement = PCF_definition.render_comment(content, indent=comment.indent)
-        change = PCF_definition.planned_full_line_change(data, comment, replacement)
+            replacement = comment_formatting.render_comment(content, indent=comment.indent)
+        change = comment_formatting.planned_full_line_change(data, comment, replacement)
         if change is not None:
             changes.append(change)
     return tuple(changes)

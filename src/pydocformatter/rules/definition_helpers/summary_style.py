@@ -9,6 +9,7 @@ import dataclasses
 
 # First-party imports
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
+from pydocformatter.rules.definition_helpers import docstring_source
 from pydocformatter.rules.definitions.PDF.PDF import SummaryLineTarget
 
 
@@ -71,7 +72,7 @@ def line_numbers(target: SummaryLineTarget | SummaryWordTarget) -> tuple[int, ..
     Returns:
         tuple[int, ...]: One-based physical source lines occupied by the target's docstring line.
     """
-    return PDF_definition.docstring_line_numbers(target.docstring, target.line)
+    return docstring_source.docstring_line_numbers(target.docstring, target.line)
 
 
 def normalize_word(word: str) -> str:

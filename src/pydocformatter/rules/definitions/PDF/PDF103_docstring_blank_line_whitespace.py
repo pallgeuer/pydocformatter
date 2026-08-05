@@ -14,7 +14,7 @@ import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 from pydocformatter.cli import settings_check
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase
-from pydocformatter.rules.definition_helpers import text_layout
+from pydocformatter.rules.definition_helpers import docstring_source, text_layout
 from pydocformatter.rules.models import FixAvailability, RuleCacheBehavior, RuleCheckKind, RuleMetadata
 
 
@@ -66,11 +66,11 @@ def _planned_changes(context: RuleContext) -> tuple[rule_edits.PlannedSourceChan
 
 def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo, *, context: RuleContext, source_lines: Sequence[str]) -> rule_edits.PlannedSourceChange | None:
     """Return one whole-literal replacement for a docstring."""
-    if not PDF_definition.can_canonically_rewrite_simple_docstring(docstring):
+    if not docstring_source.can_canonically_rewrite_simple_docstring(docstring):
         return None
-    canonical_margin = PDF_definition.docstring_canonical_margin(docstring, context=context, source_lines=source_lines)
+    canonical_margin = docstring_source.docstring_canonical_margin(docstring, context=context, source_lines=source_lines)
     targets = tuple(_line_target(docstring, line, canonical_margin=canonical_margin, context=context) for line in docstring.structure.lines)
-    return PDF_definition.planned_simple_docstring_line_change(docstring, raw_line_targets=targets)
+    return docstring_source.planned_simple_docstring_line_change(docstring, raw_line_targets=targets)
 
 
 def _line_target(docstring: PDF_definition.DocstringInfo, line: PDF_definition.DocstringValueLine, *, canonical_margin: str, context: RuleContext) -> str | None:
@@ -79,7 +79,7 @@ def _line_target(docstring: PDF_definition.DocstringInfo, line: PDF_definition.D
         return None
     if text_layout.has_space_tab_content(line.raw_text):
         return None
-    if PDF_definition.is_same_line_closing_delimiter_prefix(docstring, line):
+    if docstring_source.is_same_line_closing_delimiter_prefix(docstring, line):
         return canonical_margin
     if context.settings.docstring_blank_line_style == settings_check.DocstringBlankLineStyle.ALIGNED:
         return canonical_margin

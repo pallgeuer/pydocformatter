@@ -14,7 +14,7 @@ import libcst as cst
 # First-party imports
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 import pydocformatter.rules.definition_helpers.decorators as decorator_helpers
-from pydocformatter.rules.definition_helpers import docstring_sections, exception_names
+from pydocformatter.rules.definition_helpers import docstring_sections, docstring_source, exception_names
 
 
 if TYPE_CHECKING:
@@ -225,7 +225,7 @@ def documented_entries(docstring: PDF_definition.DocstringInfo, kind: PDF_defini
         entries.extend(
             DocumentedEntry(
                 name=name,
-                line_numbers=PDF_definition.docstring_line_numbers(docstring, line),
+                line_numbers=docstring_source.docstring_line_numbers(docstring, line),
                 has_content=_entry_has_content(entry),
                 has_value_entry=not docstring_sections.is_rest_type_field(entry.field_name),
             )
@@ -264,7 +264,7 @@ def value_documentation_targets(docstring: PDF_definition.DocstringInfo, kind: P
             continue
         section_has_content = _section_has_content(docstring, section)
         line = docstring.structure.lines[section.header_line]
-        entries.append(DocumentedEntry(name=None, line_numbers=PDF_definition.docstring_line_numbers(docstring, line), has_content=section_has_content, has_value_entry=True))
+        entries.append(DocumentedEntry(name=None, line_numbers=docstring_source.docstring_line_numbers(docstring, line), has_content=section_has_content, has_value_entry=True))
     section_entries = {entry for section in docstring.structure.sections for entry in section.entries}
     for entry in docstring.structure.entries:
         if entry in section_entries or entry.kind is not kind:
@@ -274,7 +274,7 @@ def value_documentation_targets(docstring: PDF_definition.DocstringInfo, kind: P
         entries.append(
             DocumentedEntry(
                 name=None,
-                line_numbers=PDF_definition.docstring_line_numbers(docstring, line),
+                line_numbers=docstring_source.docstring_line_numbers(docstring, line),
                 has_content=entry_has_content,
                 has_value_entry=not docstring_sections.is_rest_type_field(entry.field_name),
             )
