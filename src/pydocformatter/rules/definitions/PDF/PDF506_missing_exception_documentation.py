@@ -56,25 +56,23 @@ class PDF506MissingExceptionDocumentation(RuleBase):
             return ()
         violations: list[rule_violations.RuleViolation] = []
         for definition, docstring, facts in value_documentation.documented_function_facts(context):
-            documented_names = tuple(
-                entry.name for entry in value_documentation.documented_entries(docstring, PDF_definition.DocstringEntryKind.EXCEPTION, require_content=False) if entry.name is not None
-            )
+            exception_occurrences = value_documentation.effective_exception_occurrences(facts, settings=context.settings)
+            if not exception_occurrences:
+                continue
             if not missing_documentation.should_check_missing_documentation(
                 definition, docstring, context=context, has_relevant_documentation=value_documentation.has_exception_documentation(docstring)
             ):
                 continue
-            seen: list[str] = []
-            for occurrence in value_documentation.effective_exception_occurrences(facts, settings=context.settings):
-                if any(value_documentation.exception_names_match(occurrence.name, seen_name) for seen_name in seen):
-                    continue
-                seen.append(occurrence.name)
-                if not any(value_documentation.exception_names_match(occurrence.name, documented_name) for documented_name in documented_names):
-                    message = (
-                        "AssertionError raised by an assert statement is missing docstring documentation"
-                        if occurrence.origin is PDF_definition.ExceptionOccurrenceOrigin.ASSERT
-                        else f"Raised exception '{occurrence.name}' is missing docstring documentation"
-                    )
-                    violations.append(
-                        rule_violations.diagnostic(cls.meta, occurrence.line_numbers, suppression_line_numbers=(PDF_definition.docstring_physical_line_numbers(docstring),), instance_message=message)
-                    )
+            documented_names = tuple(
+                entry.name for entry in value_documentation.documented_entries(docstring, PDF_definition.DocstringEntryKind.EXCEPTION, require_content=False) if entry.name is not None
+            )
+            for occurrence in value_documentation.missing_exception_occurrences(exception_occurrences, documented_names):
+                message = (
+                    "AssertionError raised by an assert statement is missing docstring documentation"
+                    if occurrence.origin is PDF_definition.ExceptionOccurrenceOrigin.ASSERT
+                    else f"Raised exception '{occurrence.name}' is missing docstring documentation"
+                )
+                violations.append(
+                    rule_violations.diagnostic(cls.meta, occurrence.line_numbers, suppression_line_numbers=(PDF_definition.docstring_physical_line_numbers(docstring),), instance_message=message)
+                )
         return tuple(violations)

@@ -85,6 +85,17 @@ def test_reports_private_class_attribute_docstrings_in_source_order() -> None:
     )
 
 
+def test_reports_private_class_attribute_docstrings_across_owners_in_source_order() -> None:
+    source = 'class First:\n    _first = 1\n    """First value."""\n\nclass Second:\n    _second, *_aliases = values\n    """Second values."""\n'
+    result = assert_pdf516_lines(source, ((3,), (7,), (7,)))
+
+    assert tuple(finding.message for finding in result.unfixed_findings) == (
+        "Private class attribute '_first' should not have an attached docstring",
+        "Private class attribute '_second' should not have an attached docstring",
+        "Private class attribute '_aliases' should not have an attached docstring",
+    )
+
+
 def test_reports_multiline_private_class_attribute_docstring_lines() -> None:
     source = 'class Client:\n    _token: str\n    """Internal token.\n\n    Used for tests.\n    """\n'
 

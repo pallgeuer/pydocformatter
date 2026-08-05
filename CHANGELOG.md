@@ -43,6 +43,7 @@ All notable changes to this project are documented here. The format follows [Kee
 - **Documentation:**
   - Renamed the generated rule index label `Convention-explicit` to `Convention opt-in` and the public rule compatibility table column `Explicit` to `Require explicit`.
 - **Developer documentation:**
+  - Refreshed the complete rule performance audit for all 139 tracked rules and recorded the measured class attached-attribute and exception-inventory optimizations.
   - Corrected the rule settings audit to distinguish disabled rules from rules ignored only by broad selectors, with metadata-backed regression coverage.
   - Distinguished convention opt-in policies from `require-explicit`, with exhaustive conflict-free convention profiles and meaningful explicit-selection defaults enforced by regression tests.
 - **Developer tooling:**
@@ -72,6 +73,7 @@ All notable changes to this project are documented here. The format follows [Kee
   - Parse docstrings after collecting complete owner parameter, attribute, and method inventories, and keep invalid standard reStructuredText field arity structural but outside semantic entry collections.
   - Required reStructuredText value fields for parameter, return, yield, and attribute documentation coverage, while keeping orphan type fields available to type, duplicate, empty, extraneous, and PDF722 checks without indirect missing-description findings.
 - **Command performance:**
+  - Indexed attached attribute docstrings by owner for PDF516, PDF518, and PDF522, and adaptively indexed large PDF506 and PDF507 exception inventories while preserving source order and qualified-name matching semantics.
   - Centralized lazy entry-description target caches for PDF308, PDF309, and PDF310 so PDF308 and PDF309 share each parsed entry's following structural block and terminal target once per analyzed file, retaining a measured 31% improvement on a 10,000-entry punctuation benchmark without regressing smaller cases.
   - Normalized the configured PDF213 placeholder marker inventory once per analyzed file instead of once per docstring.
   - Reused successfully parsed configuration documents, closest-config discovery results, and resolved source profiles within each invocation.

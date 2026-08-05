@@ -216,6 +216,23 @@ def test_deduplicates_repeated_missing_exception_by_name() -> None:
     assert_pdf506_lines(source, ((4,),))
 
 
+def test_qualified_representative_does_not_retain_matching_unqualified_occurrence() -> None:
+    source = 'def function():\n    """Validate."""\n    raise first.CustomError\n    raise CustomError\n    raise second.CustomError\n'
+    result = format_source(source)
+
+    assert_pdf506_lines(source, ((3,), (5,)))
+    assert tuple(finding.message for finding in result.unfixed_findings) == (
+        "Raised exception 'first.CustomError' is missing docstring documentation",
+        "Raised exception 'second.CustomError' is missing docstring documentation",
+    )
+
+
+def test_unqualified_representative_suppresses_later_qualified_occurrences() -> None:
+    source = 'def function():\n    """Validate."""\n    raise CustomError\n    raise first.CustomError\n    raise second.CustomError\n'
+
+    assert_pdf506_lines(source, ((3,),))
+
+
 def test_ignores_bare_raise_dynamic_raise_warning_docs_missing_docstrings_abstracts_stubs_and_nested_raises() -> None:
     source = 'def bare():\n    """Validate."""\n    try:\n        call()\n    except ValueError:\n        raise\n\n\ndef dynamic(error):\n    """Validate."""\n    raise error\n\n\ndef dynamic_subscript(errors):\n    """Validate."""\n    raise errors[0]\n\n\ndef warning_doc():\n    """Validate.\n\n    Warns:\n        ValueError: Bad value.\n    """\n    raise ValueError("bad")\n\n\ndef undocumented():\n    raise ValueError("bad")\n\n\n@abc.abstractmethod\ndef abstract():\n    """Validate."""\n    raise ValueError("bad")\n\n\ndef stub():\n    """Validate."""\n    raise NotImplementedError\n\n\ndef outer():\n    """Validate."""\n    def inner():\n        raise ValueError("bad")\n'
 

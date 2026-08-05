@@ -882,6 +882,24 @@ DocumentedFunctionFact = tuple[DefinitionInfo, DocstringInfo, FunctionFacts]
 
 
 @dataclasses.dataclass(frozen=True)
+class _AttachedAttributeDocstrings:
+    """Owner-specific attached attribute docstring views.
+
+    Attributes:
+        name_pairs (tuple[tuple[str, DocstringInfo], ...]): Target names paired with attached docstrings in source and
+            assignment-target order.
+        by_name (Mapping[str, tuple[DocstringInfo, ...]]): Attached docstrings grouped by target name in first-seen
+            target order.
+    """
+
+    name_pairs: tuple[tuple[str, DocstringInfo], ...]
+    by_name: Mapping[str, tuple[DocstringInfo, ...]]
+
+
+_EMPTY_ATTACHED_ATTRIBUTE_DOCSTRINGS = _AttachedAttributeDocstrings(name_pairs=(), by_name=MappingProxyType({}))
+
+
+@dataclasses.dataclass(frozen=True)
 class PDFCategoryData:
     """Prepared definitions and docstrings shared by PDF rules.
 
@@ -905,7 +923,7 @@ class PDFCategoryData:
     function_facts_by_definition_id: Mapping[int, FunctionFacts]
     _docstrings_by_owner_id: dict[int, DocstringInfo] | None = dataclasses.field(default=None, init=False, repr=False, compare=False)
     _attributes_by_owner_id: Mapping[int, tuple[AttributeInfo, ...]] | None = dataclasses.field(default=None, init=False, repr=False, compare=False)
-    _attached_attribute_docstrings_by_owner_id: Mapping[int, Mapping[str, tuple[DocstringInfo, ...]]] | None = dataclasses.field(default=None, init=False, repr=False, compare=False)
+    _attached_attribute_docstrings_by_owner_id: Mapping[int, _AttachedAttributeDocstrings] | None = dataclasses.field(default=None, init=False, repr=False, compare=False)
     _documented_function_facts: tuple[DocumentedFunctionFact, ...] | None = dataclasses.field(default=None, init=False, repr=False, compare=False)
     _typed_documentation_targets: dict[typed_documentation_models.TypedDocumentationSubject, tuple[typed_documentation_models.TypedDocumentationTarget, ...]] | None = dataclasses.field(
         default=None, init=False, repr=False, compare=False
@@ -963,21 +981,43 @@ class PDFCategoryData:
         Returns:
             Read-only mapping from attribute target name to all attached docstrings collected for that name.
         """
+        return self._attached_attribute_docstrings(owner).by_name
+
+    def attached_attribute_docstring_name_pairs(self, owner: DefinitionInfo) -> tuple[tuple[str, DocstringInfo], ...]:
+        """Return attached attribute docstrings in source and assignment-target order.
+
+        Args:
+            owner (DefinitionInfo): Definition whose attached attribute docstrings should be paired with their targets.
+
+        Returns:
+            Target names paired with attached docstrings in existing diagnostic order.
+        """
+        return self._attached_attribute_docstrings(owner).name_pairs
+
+    def _attached_attribute_docstrings(self, owner: DefinitionInfo) -> _AttachedAttributeDocstrings:
+        """Return cached attached attribute docstring views for an owner."""
         docstrings_by_owner_id = self._attached_attribute_docstrings_by_owner_id
         if docstrings_by_owner_id is None:
-            mutable_index: dict[int, dict[str, list[DocstringInfo]]] = {}
+            mutable_pairs: dict[int, list[tuple[str, DocstringInfo]]] = {}
+            mutable_by_name: dict[int, dict[str, list[DocstringInfo]]] = {}
             for docstring in self.docstrings:
                 docstring_owner = docstring.owner
                 if not isinstance(docstring_owner, AttributeInfo):
                     continue
-                owner_docstrings = mutable_index.setdefault(id(docstring_owner.parent), {})
+                owner_id = id(docstring_owner.parent)
+                owner_pairs = mutable_pairs.setdefault(owner_id, [])
+                owner_docstrings_by_name = mutable_by_name.setdefault(owner_id, {})
                 for name in dict.fromkeys(docstring_owner.targets):
-                    owner_docstrings.setdefault(name, []).append(docstring)
+                    owner_pairs.append((name, docstring))
+                    owner_docstrings_by_name.setdefault(name, []).append(docstring)
             docstrings_by_owner_id = MappingProxyType({
-                owner_id: MappingProxyType({name: tuple(name_docstrings) for name, name_docstrings in owner_docstrings.items()}) for owner_id, owner_docstrings in mutable_index.items()
+                owner_id: _AttachedAttributeDocstrings(
+                    name_pairs=tuple(owner_pairs), by_name=MappingProxyType({name: tuple(name_docstrings) for name, name_docstrings in mutable_by_name[owner_id].items()})
+                )
+                for owner_id, owner_pairs in mutable_pairs.items()
             })
             object.__setattr__(self, "_attached_attribute_docstrings_by_owner_id", docstrings_by_owner_id)
-        return docstrings_by_owner_id.get(id(owner), MappingProxyType({}))
+        return docstrings_by_owner_id.get(id(owner), _EMPTY_ATTACHED_ATTRIBUTE_DOCSTRINGS)
 
     def entry_description_first_line_targets(self) -> tuple[EntryDescriptionLineTarget, ...]:
         """Return cached first nonempty entry-description fragments.

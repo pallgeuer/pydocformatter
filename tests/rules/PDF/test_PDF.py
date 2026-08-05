@@ -168,6 +168,7 @@ def test_prepare_collects_attribute_docstrings_and_owner_metadata() -> None:
     assert data._attached_attribute_docstrings_by_owner_id is None
     attached_docstrings = data.attached_attribute_docstrings_by_name(data.definitions[0])
     assert set(attached_docstrings) == {"module_plain", "module_annotated", "module_a", "module_b"}
+    assert tuple(name for name, _ in data.attached_attribute_docstring_name_pairs(data.definitions[0])) == ("module_plain", "module_annotated", "module_a", "module_b")
     with pytest.raises(TypeError):
         typing.cast("dict[str, tuple[object, ...]]", attached_docstrings)["other"] = ()
     assert data._attached_attribute_docstrings_by_owner_id is not None
@@ -393,6 +394,24 @@ def test_attached_attribute_docstrings_by_name_deduplicates_repeated_assignment_
 
     assert tuple(attached_docstrings) == ("_token",)
     assert attached_docstrings["_token"] == (data.docstrings[0],)
+    assert data.attached_attribute_docstring_name_pairs(data.definitions[0]) == (("_token", data.docstrings[0]),)
+
+
+def test_attached_attribute_docstring_views_preserve_owner_source_and_target_order() -> None:
+    source = 'class First:\n    _primary, public = values\n    """First values."""\n\n    later = 1\n    """Later value."""\n\nclass Second:\n    other, other = values\n    """Other value."""\n'
+    data = PDF.prepare(category_context(source))
+    owners = {definition.qualified_name: definition for definition in data.definitions}
+
+    first_pairs = data.attached_attribute_docstring_name_pairs(owners["First"])
+    second_pairs = data.attached_attribute_docstring_name_pairs(owners["Second"])
+
+    assert tuple((name, docstring.value) for name, docstring in first_pairs) == (("_primary", "First values."), ("public", "First values."), ("later", "Later value."))
+    assert tuple((name, docstring.value) for name, docstring in second_pairs) == (("other", "Other value."),)
+    assert data.attached_attribute_docstring_name_pairs(owners["First"]) is first_pairs
+    assert tuple(data.attached_attribute_docstrings_by_name(owners["First"])) == ("_primary", "public", "later")
+    assert tuple(docstring.value for docstring in data.attached_attribute_docstrings_by_name(owners["First"])["_primary"]) == ("First values.",)
+    assert not data.attached_attribute_docstring_name_pairs(owners["<module>"])
+    assert not data.attached_attribute_docstrings_by_name(owners["<module>"])
 
 
 def test_prepare_collects_tuple_unpacked_attribute_docstrings_and_owner_metadata() -> None:

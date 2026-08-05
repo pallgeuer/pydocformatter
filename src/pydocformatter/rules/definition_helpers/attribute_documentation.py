@@ -386,19 +386,6 @@ def duplicate_attribute_violations(
     return tuple(violations)
 
 
-def _attached_attribute_docstring_name_pairs(data: PDF_definition.PDFCategoryData, owner: PDF_definition.DefinitionInfo) -> tuple[tuple[str, PDF_definition.DocstringInfo], ...]:
-    """Return attached attribute docstrings by source order and target order."""
-    pairs: list[tuple[str, PDF_definition.DocstringInfo]] = []
-    for docstring in data.docstrings:
-        docstring_owner = docstring.owner
-        if not isinstance(docstring_owner, PDF_definition.AttributeInfo):
-            continue
-        if docstring_owner.parent is not owner:
-            continue
-        pairs.extend((name, docstring) for name in dict.fromkeys(docstring_owner.targets))
-    return tuple(pairs)
-
-
 def private_owner_attribute_violations(
     data: PDF_definition.PDFCategoryData, *, meta: rule_models.RuleMetadata, owner_kind: PDF_definition.DefinitionKind, owner_label: str
 ) -> tuple[rule_violations.RuleViolation, ...]:
@@ -450,7 +437,7 @@ def private_attached_attribute_violations(
     for definition in data.definitions:
         if definition.kind is not owner_kind:
             continue
-        for name, docstring in _attached_attribute_docstring_name_pairs(data, definition):
+        for name, docstring in data.attached_attribute_docstring_name_pairs(definition):
             if not is_private_attribute_name(name):
                 continue
             owner = docstring.owner
@@ -487,7 +474,7 @@ def attribute_docstring_must_be_owner_violations(
     for definition in data.definitions:
         if definition.kind is not owner_kind:
             continue
-        for name, docstring in _attached_attribute_docstring_name_pairs(data, definition):
+        for name, docstring in data.attached_attribute_docstring_name_pairs(definition):
             if is_private_attribute_name(name) is public:
                 continue
             owner = docstring.owner
