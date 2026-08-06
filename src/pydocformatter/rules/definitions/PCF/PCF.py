@@ -7,7 +7,6 @@ from __future__ import annotations
 import re
 import enum
 import dataclasses
-from collections.abc import Mapping
 from typing import TYPE_CHECKING
 
 # Third-party imports
@@ -242,11 +241,9 @@ class PCF(RuleCategoryBase[PCFCategoryData]):
         context.module.visit(collector)
         source_lines_with_endings = context.source_lines
         source_lines = [line.rstrip("\r\n") for line in source_lines_with_endings]
+        collected_comments = sorted(collector.comments, key=lambda comment: (context.positions[comment.node].start.line, context.positions[comment.node].start.column))
         comments = tuple(
-            sorted(
-                (_comment_info(comment.node, positions=context.positions, source_lines=source_lines, syntax_sensitive=comment.syntax_sensitive) for comment in collector.comments),
-                key=lambda comment: (comment.range.start.line, comment.range.start.column),
-            )
+            _comment_info(comment.node, code_range=context.positions[comment.node], source_lines=source_lines, syntax_sensitive=comment.syntax_sensitive) for comment in collected_comments
         )
         return PCFCategoryData(
             source_lines=source_lines_with_endings,
@@ -273,9 +270,8 @@ class PCF(RuleCategoryBase[PCFCategoryData]):
         return context.category_data
 
 
-def _comment_info(node: cst.Comment, *, positions: Mapping[cst.CSTNode, cst_metadata.CodeRange], source_lines: list[str], syntax_sensitive: bool) -> CommentInfo:
-    """Build source information for one comment node."""
-    code_range = positions[node]
+def _comment_info(node: cst.Comment, *, code_range: cst_metadata.CodeRange, source_lines: list[str], syntax_sensitive: bool) -> CommentInfo:
+    """Build original-source information for one comment node."""
     source_line = source_lines[code_range.start.line - 1]
     line_prefix = source_line[: code_range.start.column]
     placement = CommentPlacement.STANDALONE if not line_prefix.strip(" \t\f") else CommentPlacement.TRAILING

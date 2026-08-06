@@ -7,7 +7,6 @@ import itertools
 import dataclasses
 
 # Third-party imports
-import libcst as cst
 import pytest
 import libcst.metadata as cst_metadata
 
@@ -17,8 +16,7 @@ import pydocformatter.rules.definitions.PDF.PDF414_malformed_convention_entry as
 import pydocformatter.rules.definitions.PDF.PDF415_convention_entry_indentation as PDF415_definition
 from pydocformatter import formatter, rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention
-from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
-from pydocformatter.rules.definition_helpers import attribute_documentation, source_text, string_literals, unicode_safety, value_documentation
+from pydocformatter.rules.definition_helpers import attribute_documentation, string_literals, unicode_safety, value_documentation
 from pydocformatter.rules.definitions.PDF.PDF import (
     PDF,
     AttributeInfo,
@@ -31,7 +29,7 @@ from pydocformatter.rules.definitions.PDF.PDF import (
     DocstringKind,
     first_summary_block,
 )
-from pydocformatter.source_path import SourcePathContext
+from tests import rule_helpers
 
 
 if typing.TYPE_CHECKING:
@@ -39,6 +37,7 @@ if typing.TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
     # First-party imports
+    from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
     from pydocformatter.rules.definitions.PDF.PDF import DocstringBlock, DocstringStructure, DocstringTextFragment
 
 
@@ -52,36 +51,11 @@ def entry_type_text(entry: PDF_definition.DocstringEntry) -> str | None:
 
 
 def category_context(source: str, *, settings: CheckSettings | None = None) -> RuleCategoryContext:
-    module = cst.parse_module(source)
-    metadata_wrapper = cst_metadata.MetadataWrapper(module, unsafe_skip_copy=True)
-    return RuleCategoryContext(
-        path="example.py",
-        source_path=SourcePathContext.for_path("example.py"),
-        settings=CheckSettings() if settings is None else settings,
-        module=module,
-        metadata_wrapper=metadata_wrapper,
-        positions=metadata_wrapper.resolve(cst_metadata.PositionProvider),
-        line_ending="\r\n" if "\r\n" in source else "\n",
-        source=source,
-        source_lines=tuple(source_text.source_lines(source)),
-        line_bounds=None,
-    )
+    return rule_helpers.direct_rule_category_context(source, settings=CheckSettings() if settings is None else settings)
 
 
 def rule_context(context: RuleCategoryContext, data: object | None) -> RuleContext:
-    return RuleContext(
-        path=context.path,
-        source_path=context.source_path,
-        settings=context.settings,
-        module=context.module,
-        metadata_wrapper=context.metadata_wrapper,
-        positions=context.positions,
-        line_ending=context.line_ending,
-        source=context.source,
-        source_lines=context.source_lines,
-        line_bounds=context.line_bounds,
-        category_data=data,
-    )
+    return rule_helpers.direct_rule_context(context, category_data=data)
 
 
 def test_prepare_collects_definitions_docstrings_and_owner_metadata() -> None:
@@ -1176,6 +1150,15 @@ def test_google_return_yield_and_raise_entries_preserve_generic_looking_type_tex
     assert (entry.kind, entry.names, entry_type_text(entry), entry.description) == (expected_kind, expected_names, expected_type, entry_text.rpartition(":")[2].strip())
 
 
+@pytest.mark.parametrize(("section", "field"), [("Returns", ":returns:"), ("Yields", ":yields:")])
+def test_google_return_and_yield_sections_reject_blank_generic_entry_heads(section: str, field: str) -> None:
+    structure = structure_for(f"{section}:\n    {field}\n       x", settings=CheckSettings(docstring_convention=DocstringConvention.GOOGLE))
+
+    assert structure.entries == ()
+    assert tuple((child.kind, child.start_line, child.end_line) for child in structure.blocks[0].children) == ((DocstringBlockKind.SECTION_HEADER, 0, 1), (DocstringBlockKind.VERBATIM, 1, 3))
+    assert structure.reflow_regions == ()
+
+
 def test_google_malformed_exception_entry_skips_continuation_before_later_entry() -> None:
     value = "Raises:\n    If the value is bad: explain the condition.\n        `ValueError` | TypeError : prose continuation.\n    `RuntimeError` | LookupError: Bad runtime."
     structure = structure_for(value, settings=CheckSettings(docstring_convention=DocstringConvention.GOOGLE))
@@ -1230,7 +1213,7 @@ def test_indented_google_section_name_is_entry_description_text() -> None:
     )
 
 
-def test_indented_google_section_headers_are_recognized_as_malformed_sections() -> None:
+def test_indented_google_section_headers_preserve_entry_reflow_depth() -> None:
     value = "Summary.\n\n  Args:\n      value: Description.\n\n  Returns:\n      str: Result."
     structure = structure_for(value, settings=CheckSettings(docstring_convention=DocstringConvention.GOOGLE))
 
@@ -1240,8 +1223,8 @@ def test_indented_google_section_headers_are_recognized_as_malformed_sections() 
         (DocstringEntryKind.RETURN, (), "str", "Result."),
     )
     assert tuple((region.initial_indent, region.subsequent_indent) for region in structure.reflow_regions if region.kind == DocstringBlockKind.SECTION_ENTRY) == (
-        ("    value: ", "        "),
-        ("    str: ", "        "),
+        ("      value: ", "          "),
+        ("      str: ", "          "),
     )
 
 
@@ -1308,7 +1291,10 @@ def test_indented_numpy_section_headers_are_recognized_as_malformed_sections() -
         (DocstringEntryKind.PARAMETER, ("value",), "int", "Description."),
         (DocstringEntryKind.RETURN, (), "str", "Result."),
     )
-    assert tuple((region.initial_indent, region.subsequent_indent) for region in structure.reflow_regions if region.kind == DocstringBlockKind.SECTION_ENTRY) == (("    ", "    "), ("    ", "    "))
+    assert tuple((region.initial_indent, region.subsequent_indent) for region in structure.reflow_regions if region.kind == DocstringBlockKind.SECTION_ENTRY) == (
+        ("      ", "      "),
+        ("      ", "      "),
+    )
 
 
 @pytest.mark.parametrize("header", ["Parameters\n----------", "PARAMETERS\n==========", "Other Parameters", "Returns"])
@@ -1749,7 +1735,7 @@ def test_rest_field_continuation_and_tabbed_prefix_have_exact_reflow_indentation
     assert entry.description == "First line. Second line."
     assert reflow_texts(region.lines) == ("First line.", "Second line.")
     assert region.initial_indent == "\t:param value: "
-    assert region.subsequent_indent == " " * 16
+    assert region.subsequent_indent == f"\t{' ' * 14}"
 
 
 def test_rest_field_stops_before_a_peer_list_item() -> None:
@@ -1797,7 +1783,7 @@ def test_structure_records_the_explicit_docstring_convention(convention: Docstri
     [
         ("- first\n  continuation\n+ second\n* third", ((0, 2), (2, 3), (3, 4)), (("- ", "  "), ("+ ", "  "), ("* ", "  "))),
         ("1. first\n   continuation\n2) second", ((0, 2), (2, 3)), (("1. ", "   "), ("2) ", "   "))),
-        ("\n\t- tabbed\n\t\tcontinuation", ((1, 3),), (("\t- ", " " * 6),)),
+        ("\n\t- tabbed\n\t\tcontinuation", ((1, 3),), (("\t- ", "\t  "),)),
     ],
 )
 def test_list_markers_boundaries_and_reflow_prefixes(value: str, expected_ranges: tuple[tuple[int, int], ...], expected_regions: tuple[tuple[str, str], ...]) -> None:
@@ -2038,15 +2024,14 @@ def test_code_fence_setting_controls_whether_fenced_section_syntax_is_opaque() -
     assert tuple(section.name for section in disabled.sections) == ("Args", "Returns", "Returns")
 
 
-def test_indent_width_changes_generated_tab_prefix_width_without_changing_semantics() -> None:
+def test_indent_width_preserves_tabbed_hanging_prefix_spelling_and_semantics() -> None:
     value = "\n\t- First line.\n\t\tContinuation."
     narrow = structure_for(value, settings=CheckSettings(indent_width=2))
     wide = structure_for(value, settings=CheckSettings(indent_width=8))
     assert narrow.blocks == wide.blocks
     assert narrow.entries == wide.entries
     assert narrow.reflow_regions[0].initial_indent == wide.reflow_regions[0].initial_indent == "\t- "
-    assert narrow.reflow_regions[0].subsequent_indent == " " * 4
-    assert wide.reflow_regions[0].subsequent_indent == " " * 10
+    assert narrow.reflow_regions[0].subsequent_indent == wide.reflow_regions[0].subsequent_indent == "\t  "
 
 
 def test_complex_mixed_structure_partitions_lines_and_orders_semantic_regions() -> None:

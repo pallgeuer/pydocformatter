@@ -8,6 +8,8 @@ Attributes:
     StringList (TypeAlias): Repeated string setting values from TOML or comma-separated CLI input.
     MultiStringMap (TypeAlias): Ordered mapping representation for glob-pattern keys whose values are rule-selector or
         string lists.
+    PerFileSettingsMap (TypeAlias): Ordered mapping representation for glob-pattern keys whose values are field-keyed
+        settings overrides.
     SettingValidator (TypeAlias): Callable contract for converting raw setting input into the normalized value stored on
         a settings dataclass.
     SettingCLIAction (TypeAlias): Argparse action specifier accepted by setting definitions when exposing a field as a
@@ -19,8 +21,6 @@ Attributes:
     SettingCLIMetavar (TypeAlias): Display placeholder passed to argparse for generated setting option help.
     SettingsOverridesType (TypeAlias): Runtime type shape accepted for inline `--config` overrides before field-specific
         validation runs.
-    PerFileSettingsMap (TypeAlias): Ordered mapping representation for glob-pattern keys whose values are field-keyed
-        settings overrides.
     DEFAULT_SOURCE_PRIORITY (int): Base priority for settings supplied by dataclass defaults.
     CONFIG_FILE_SOURCE_PRIORITY (int): Priority assigned to values loaded from discovered or explicit TOML configuration
         files.

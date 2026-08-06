@@ -80,7 +80,7 @@ def _assert_clean_example_has_no_hidden_fix_changes(executed: markdown_example_h
     module = cst.parse_module(executed.example.input_source)
     selected_rule_by_code = {selected_rule.rule.code: selected_rule for selected_rule in executed.selection.for_path(executed.path)}
     errors: list[str] = []
-    fixed_module, fixed_findings, source_changed = rule_runner._run_fix_pass(
+    pass_result = rule_runner._run_fix_pass(
         module,
         path=executed.path,
         settings=executed.settings,
@@ -92,9 +92,9 @@ def _assert_clean_example_has_no_hidden_fix_changes(executed: markdown_example_h
     )
 
     assert errors == [], f"{executed.label}: unexpected direct fix errors: {errors}"
-    assert fixed_findings == (), f"{executed.label}: direct fix reported findings after a clean check"
-    assert not source_changed, f"{executed.label}: direct fix changed source after a clean check"
-    assert fixed_module.code == executed.example.input_source, f"{executed.label}: direct fix returned different source after a clean check"
+    assert pass_result.findings == (), f"{executed.label}: direct fix reported findings after a clean check"
+    assert not pass_result.changed, f"{executed.label}: direct fix changed source after a clean check"
+    assert pass_result.source_seed.source == executed.example.input_source, f"{executed.label}: direct fix returned different source after a clean check"
 
 
 def _assert_initial_check_findings_accounted_after_fixing(executed: markdown_example_helpers.MarkdownExampleOutcome) -> None:

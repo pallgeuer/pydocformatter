@@ -75,7 +75,12 @@ class StoreCommitResult:
 
 
 class CacheStore:
-    """Best-effort synchronous cache store confined to the parent process."""
+    """Best-effort synchronous cache store confined to the parent process.
+
+    Attributes:
+        layout (directory.CacheLayout): Owned cache paths used by the store.
+        busy_timeout_ms (int): Maximum SQLite lock wait in milliseconds before persistence is skipped.
+    """
 
     def __init__(self, layout: directory.CacheLayout, *, busy_timeout_ms: int = _BUSY_TIMEOUT_MS) -> None:
         """Initialize a lazy cache store without creating or opening filesystem paths.

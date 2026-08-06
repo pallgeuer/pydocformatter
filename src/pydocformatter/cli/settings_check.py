@@ -23,12 +23,12 @@ Attributes:
     DEFAULT_COMMENT_TASK_MARKERS (tuple[str, ...]): Task marker labels recognized by default in comments.
     PARALLELISM_CONSTRAINT_MESSAGE (str): Shared validation text for the worker-count setting accepted by the check
         command.
+    SETTINGS_SCHEMA (SettingsSchema[CheckSettings]): Complete `pydocfmt check` schema used for config loading, CLI
+        option generation, validation, and settings display.
     CHECK_SETTING_DEFINITIONS (tuple[CheckSettingDefinition, ...]): Check setting metadata with co-located clean-proof
         identity roles.
     DIRECT_ANALYSIS_DEFINITIONS (tuple[SettingDefinition[Any], ...]): Schema-ordered setting definitions whose effective
         values determine clean analysis.
-    SETTINGS_SCHEMA (SettingsSchema[CheckSettings]): Complete `pydocfmt check` schema used for config loading, CLI
-        option generation, validation, and settings display.
 """
 
 # Standard library imports
@@ -217,8 +217,8 @@ class CheckSettings:
         parallelism (float): Number or ratio of logical CPU cores to use for internal file-level parallelism.
         docstring_convention (DocstringConvention): Convention used to parse semantic docstring sections.
         docstring_blank_line_style (DocstringBlankLineStyle): Whitespace style used by PDF103 for blank docstring lines.
-        docstring_blank_line_after_last_section (bool): Whether PDF200 and PDF201 keep one blank line after the last
-            convention section.
+        docstring_blank_line_after_last_section (bool): Whether PDF108, PDF200, and PDF201 preserve one blank line after
+            the last convention section.
         docstring_missing_documentation (DocstringMissingDocumentation): When missing-documentation rules report missing
             documentation.
         docstring_missing_documentation_public_only (bool): Whether broad missing-documentation checks are limited to
@@ -377,8 +377,8 @@ class CheckSettingsOverrides(TypedDict, total=False):
         parallelism (float): Number or ratio of logical CPU cores to use for internal file-level parallelism.
         docstring_convention (DocstringConvention): Convention used to parse semantic docstring sections.
         docstring_blank_line_style (DocstringBlankLineStyle): Whitespace style used by PDF103 for blank docstring lines.
-        docstring_blank_line_after_last_section (bool): Whether PDF200 and PDF201 keep one blank line after the last
-            convention section.
+        docstring_blank_line_after_last_section (bool): Whether PDF108, PDF200, and PDF201 preserve one blank line after
+            the last convention section.
         docstring_missing_documentation (DocstringMissingDocumentation): When missing-documentation rules report missing
             documentation.
         docstring_missing_documentation_public_only (bool): Whether broad missing-documentation checks are limited to
@@ -918,7 +918,7 @@ SETTINGS_SCHEMA = SettingsSchema(
             value_type=bool,
             group=SettingsGroup.DOCSTRING_FORMATTING,
             help="Keep one blank line after the last docstring section.",
-            documentation="Whether PDF200 and PDF201 keep one blank line after the last recognized Google or NumPy docstring section.",
+            documentation="Whether PDF108, PDF200, and PDF201 preserve one blank line after the last recognized Google or NumPy docstring section.",
         ),
         CheckSettingDefinition(
             cache_identity_role=CacheIdentityRole.DIRECT_ANALYSIS_VALUE,

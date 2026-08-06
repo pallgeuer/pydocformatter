@@ -9,6 +9,12 @@ This rule rewrites safely mapped simple string docstrings by replacing the compl
 
 PDF101 treats each reflowable semantic region independently. It joins consecutive physical lines in the same region before wrapping, so a finding can be emitted even when no individual input line is over the configured line length. Blank lines, standalone colon-ended lines, protected structures, lines carrying high-confidence PDF414 or PDF415 diagnostics, and PDF418 malformed directive blocks remain region boundaries. PDF418 protection is parser-owned and applies whenever directive parsing is enabled, even when PDF418 itself is not selected.
 
+When reflow creates a continuation without a reusable prior body-line margin, PDF101 uses the same canonical docstring margin as PDF100. Standalone parenthesized attribute docstrings therefore use their surrounding statement indentation, attached docstrings after an earlier semicolon-delimited statement use space indentation to the opening quote column as a hanging margin, and simple suites use one configured indent unit beyond their source-line indentation.
+
+Google entry heads and NumPy entry descriptions retain their structural depth during reflow. Google entries keep their actual parsed entry indentation and add one configured indent unit for continuation lines; NumPy descriptions use one configured indent unit beyond the actual entry-head indentation. This includes sections that are collectively displaced. When a NumPy exception or warning description moves between the entry-head line and a continuation line, PDF101 retains the required separator after the colon so both layouts make the same wrapping decision. PDF100 may separately normalize a section's absolute indentation, while PDF415 validates and repairs malformed relative relationships.
+
+Structured entry prefixes move onto their own line when they leave too little useful room for description text, including Google entries and inline NumPy exception or warning entries. List and reStructuredText field continuations preserve the exact space/tab spelling of their structural base and add only the spaces required for the syntactic hanging width.
+
 Within each logical line, PDF101 preserves a conservative set of recognized inline markup as indivisible source-aware tokens: non-empty same-line backtick spans whose opening and closing delimiter runs have equal length; inline and full or collapsed reference-style Markdown links and images; CommonMark-style URI and email autolinks; and boundary-valid reStructuredText interpreted text, prefix and suffix roles, phrase and anonymous references, embedded targets, inline literals, and substitution references. Escaped and nested Markdown labels, empty inline labels or destinations, link titles delimited by `"..."`, `'...'`, or `(...)`, and destination parentheses nested up to three levels are supported. reStructuredText role names use alphanumeric components separated by isolated `-`, `_`, `+`, `:`, or `.` characters. The complete whitespace-delimited punctuation envelope around a recognized construct stays together, and exact source spelling inside the token is retained.
 
 Emphasis, raw HTML or XML, Markdown shortcut references and definitions, and multiline inline constructs are not parsed as safe inline constructs. Generic unmatched brackets, pipes, and angle brackets remain ordinary prose unless stronger syntax identifies an attempted supported construct. A line-leading run of at least three backticks or tildes is treated as ordinary fence-like text rather than ambiguous inline markup, including when an info string follows the opener; whether a complete fenced block is protected is controlled separately by docstring parsing. For a bare single-backtick dialect collision, an escaped inner backtick remains content when a later valid closer exists; otherwise, strong evidence such as a missing closer, incomplete recognized prefix, or excessive destination nesting makes the region ambiguous. PDF101 reports an ambiguous region only when its canonical layout would differ and does not attach an unsafe fix. Safe non-ambiguous regions in the same docstring can still be combined into a separate whole-literal fix.
@@ -99,6 +105,33 @@ def fetch(path, payload, timeout):
             line.
         timeout (float): Number of seconds to wait before failing.
 
+    """
+```
+
+Narrow NumPy exception and warning entries use the same stable prefix-splitting policy:
+
+```pydocfmt-example
+[settings]
+line-length = 17
+docstring-convention = "numpy"
+
+[input]
+def warn():
+    """Warn.
+
+    Warns
+    -----
+    E, F: Bad.
+    """
+
+[output]
+def warn():
+    """Warn.
+
+    Warns
+    -----
+    E, F:
+        Bad.
     """
 ```
 

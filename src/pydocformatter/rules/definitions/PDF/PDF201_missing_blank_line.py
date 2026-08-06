@@ -5,7 +5,6 @@ from __future__ import annotations
 
 # Standard library imports
 import itertools
-from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
 # Third-party imports
@@ -64,11 +63,10 @@ class PDF201MissingBlankLine(RuleBase):
 def _planned_changes(context: RuleContext) -> tuple[rule_edits.PlannedSourceChange, ...]:
     """Return all safe missing blank-line insertions."""
     data = PDF_definition.PDF.require_data(context)
-    source_lines = context.source_lines
-    return tuple(change for docstring in data.docstrings if (change := _planned_change_for_docstring(docstring, context=context, source_lines=source_lines)) is not None)
+    return tuple(change for docstring in data.docstrings if (change := _planned_change_for_docstring(docstring, context=context)) is not None)
 
 
-def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo, *, context: RuleContext, source_lines: Sequence[str]) -> rule_edits.PlannedSourceChange | None:
+def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo, *, context: RuleContext) -> rule_edits.PlannedSourceChange | None:
     """Return one whole-literal replacement for a docstring."""
     if not docstring_source.can_canonically_rewrite_simple_docstring(docstring):
         return None
@@ -78,7 +76,7 @@ def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo, *, co
     insert_after = _insertions_after_lines(docstring, context=context)
     if not insert_before and not insert_after:
         return None
-    canonical_margin = docstring_source.docstring_canonical_margin(docstring, context=context, source_lines=source_lines)
+    canonical_margin = docstring_source.docstring_canonical_margin(docstring, context=context)
     blank_source = _blank_line_source(context, canonical_margin=canonical_margin)
     output_lines, line_numbers = _output_lines_and_line_numbers(docstring, insert_before=insert_before, insert_after=insert_after, blank_source=blank_source, canonical_margin=canonical_margin)
     return docstring_rendering.planned_simple_docstring_output_change(docstring, context=context, output_lines=output_lines, line_numbers=tuple(dict.fromkeys(line_numbers)))

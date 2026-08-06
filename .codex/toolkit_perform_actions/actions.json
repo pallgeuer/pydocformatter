@@ -111,7 +111,7 @@
         "prompt": "Adversarially investigate whether pydocformatter's auto-fixes always converge. Study the complete set of fixable rules and their interactions, then craft and execute targeted input snippets designed to make one rule's fix create a new finding for another rule, eventually returning to an earlier source state or finding state. Try hard to identify at least one genuine fix loop, and preferably multiple distinct loops involving different rule combinations. Produce an enumerated list of confirmed loops and credible near misses. For each confirmed loop, name every involved rule, provide the minimal reproducing input and relevant settings, show the ordered sequence of source or finding states across formatter passes until the cycle repeats, and explain the underlying interaction. Clearly distinguish proven cycles from hypotheses.",
         "requires_interactive": false,
         "custom_codex_args": [],
-        "notes": ""
+        "notes": "Suitable follow-up prompt:\n\n> /plan Analyze the detected loops/divergences and what the cleanest, most robust/general solution would be for each. Make an implementation plan."
       }
     },
     "find-rule-overlaps": {

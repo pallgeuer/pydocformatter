@@ -21,7 +21,7 @@ A convention section can therefore need only PDF100 when all of its elements are
 
 PDF415 handles indentation of otherwise parseable entries. Malformed delimiters, missing types, and unbalanced Google types belong to PDF414; when one line could resemble both a malformed next entry and an under-indented continuation, the syntax diagnosis takes precedence.
 
-The rule repairs mapped entry and continuation lines with the configured indentation style and width. Diagnosed lines that cannot be repaired are excluded from PDF101 prose reflow so another formatting rule cannot silently rewrite the relationship.
+The rule repairs mapped entry and continuation lines with the configured indentation style and width. Diagnosed lines that cannot be repaired are excluded from PDF101 prose reflow so another formatting rule cannot silently rewrite the relationship. Once the relationship is valid, PDF101 preserves the actual Google entry base and NumPy entry-head indentation while adding one configured indent unit for generated continuations, so collectively displaced sections remain stable until PDF100 optionally normalizes their absolute margin.
 
 ## Why is this useful?
 Incorrect entry indentation can move intended documentation outside its section or make a description look like a new top-level block. Documentation tools and semantic checks may then miss parameters, return values, yields, or exceptions even though the text appears visually nearby.

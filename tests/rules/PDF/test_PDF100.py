@@ -1,47 +1,29 @@
+# Future imports
+from __future__ import annotations
+
+# Standard library imports
+from typing import TYPE_CHECKING
+
 # Third-party imports
-import libcst as cst
-import libcst.metadata as cst_metadata
+import pytest
 
 # First-party imports
 from pydocformatter import formatter, rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention, IndentStyle, LineEnding
-from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
-from pydocformatter.rules.definition_helpers import source_text
 from pydocformatter.rules.definitions.PDF.PDF import PDF
 from pydocformatter.rules.definitions.PDF.PDF100_docstring_indentation import PDF100DocstringIndentation
-from pydocformatter.source_path import SourcePathContext
 from tests import rule_helpers
+
+
+if TYPE_CHECKING:
+    # First-party imports
+    from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
 
 
 def contexts(source: str, *, settings: CheckSettings | None = None) -> tuple[RuleCategoryContext, RuleContext]:
     """Return matching category and rule contexts for source."""
-    module = cst.parse_module(source)
-    wrapper = cst_metadata.MetadataWrapper(module, unsafe_skip_copy=True)
-    category = RuleCategoryContext(
-        path="example.py",
-        source_path=SourcePathContext.for_path("example.py"),
-        settings=CheckSettings(select=("PDF100",)) if settings is None else settings,
-        module=module,
-        metadata_wrapper=wrapper,
-        positions=wrapper.resolve(cst_metadata.PositionProvider),
-        line_ending="\r\n" if "\r\n" in source else "\n",
-        source=source,
-        source_lines=tuple(source_text.source_lines(source)),
-        line_bounds=None,
-    )
-    return category, RuleContext(
-        path=category.path,
-        source_path=category.source_path,
-        settings=category.settings,
-        module=category.module,
-        metadata_wrapper=category.metadata_wrapper,
-        positions=category.positions,
-        line_ending=category.line_ending,
-        source=category.source,
-        source_lines=category.source_lines,
-        line_bounds=category.line_bounds,
-        category_data=PDF.prepare(category),
-    )
+    resolved_settings = CheckSettings(select=("PDF100",)) if settings is None else settings
+    return rule_helpers.prepared_direct_rule_contexts(PDF, source, settings=resolved_settings)
 
 
 def format_pdf002(source: str, *, settings: CheckSettings | None = None, fix: bool = True) -> formatter.FormatterResult:
@@ -66,20 +48,20 @@ def test_normalizes_under_indented_plain_continuation_lines() -> None:
     assert result.new_source == 'def function():\n    """Summary.\n    First continuation.\n    Second continuation.\n    """\n'
 
 
-def test_preserves_canonical_margin_for_under_indented_same_line_closing_quotes() -> None:
+def test_leaves_under_indented_same_line_closing_quotes_to_pdf103() -> None:
     source = 'def function():\n    """Summary.\n  Body.\n  """\n'
-    expected = 'def function():\n    """Summary.\n    Body.\n    """\n'
+    expected = 'def function():\n    """Summary.\n    Body.\n  """\n'
     result = format_pdf002(source)
 
     assert result.new_source == expected
     assert not format_pdf002(result.new_source).modified
 
 
-def test_preserves_same_line_closing_quotes_margin_when_pdf006_is_selected() -> None:
+def test_leaves_same_line_closing_quotes_to_pdf103_when_pdf105_is_selected() -> None:
     source = 'def function():\n    """Summary.\n  Body.\n  """\n'
     result = format_pdf002(source, settings=CheckSettings(select=("PDF100", "PDF105")))
 
-    assert result.new_source == 'def function():\n    """Summary.\n    Body.\n    """\n'
+    assert result.new_source == 'def function():\n    """Summary.\n    Body.\n  """\n'
 
 
 def test_module_docstring_uses_empty_canonical_margin() -> None:
@@ -136,7 +118,36 @@ def test_space_indent_style_expands_tabbed_docstring_base_without_changing_openi
     source = 'class Example:\n\tdef method(self):\n\t\t"""Summary.\n\t\tBody.\n\t\t"""\n'
     result = format_pdf002(source)
 
-    assert result.new_source == 'class Example:\n\tdef method(self):\n\t\t"""Summary.\n                Body.\n                """\n'
+    assert result.new_source == 'class Example:\n\tdef method(self):\n\t\t"""Summary.\n                Body.\n\t\t"""\n'
+
+
+def test_pdf100_and_pdf103_converge_on_tabbed_closing_delimiter_prefix() -> None:
+    source = 'def function():\n    """Summary.\n\t"""\n'
+    settings = CheckSettings(select=("PDF100", "PDF103"))
+    result = format_pdf002(source, settings=settings)
+
+    assert result.new_source == 'def function():\n    """Summary.\n    """\n'
+    assert not result.errors
+    assert not format_pdf002(result.new_source, settings=settings).modified
+
+
+@pytest.mark.parametrize(
+    ("convention", "source", "expected", "expected_fixed_count"),
+    [
+        (DocstringConvention.GOOGLE, 'def f():\n\t"""Args:\n\t"""\n', 'def f():\n\t"""Args:\n\t"""\n', 0),
+        (DocstringConvention.NUMPY, 'def f():\n\t"""Notes\n\t-----\n\t"""\n', 'def f():\n\t"""Notes\n        -----\n\t"""\n', 1),
+    ],
+)
+def test_pdf100_and_pdf103_converge_on_tabbed_first_line_section_closing_prefixes(convention: DocstringConvention, source: str, expected: str, expected_fixed_count: int) -> None:
+    settings = CheckSettings(select=("PDF100", "PDF103"), docstring_convention=convention, indent_style=IndentStyle.SPACE)
+    result = format_pdf002(source, settings=settings)
+
+    assert result.new_source == expected
+    assert result.fixed_findings[PDF100DocstringIndentation.meta] == expected_fixed_count
+    assert not result.errors
+    repeated = format_pdf002(result.new_source, settings=settings)
+    assert not repeated.modified
+    assert not repeated.errors
 
 
 def test_tab_indent_style_preserves_plain_docstring_tab_indentation() -> None:
@@ -146,11 +157,11 @@ def test_tab_indent_style_preserves_plain_docstring_tab_indentation() -> None:
     assert result.new_source == source
 
 
-def test_blank_line_normalization_accepts_empty_and_canonical_states() -> None:
+def test_leaves_blank_line_whitespace_to_pdf103() -> None:
     source = 'def function():\n    """Summary.\n\n      \n  \n    Done.\n    """\n'
     result = format_pdf002(source)
 
-    assert result.new_source == 'def function():\n    """Summary.\n\n    \n\n    Done.\n    """\n'
+    assert result.new_source == source
 
 
 def test_non_space_tab_whitespace_lines_are_not_blank_indentation_lines() -> None:
@@ -289,7 +300,18 @@ def test_already_canonical_multiline_docstring_has_no_fix_or_finding() -> None:
 
     assert rule_helpers.rule_findings(PDF100DocstringIndentation, context) == ()
     assert result.module.code == source
+    assert result.source == source
     assert result.fixed_findings == ()
+
+
+def test_direct_fix_preserves_exact_source_normalized_by_libcst() -> None:
+    source = '\fdef function():\n    """Summary.\n      Body.\n    """\n\n  # C.\n'
+    _, context = contexts(source)
+
+    result = rule_helpers.rule_fix_result(PDF100DocstringIndentation, context)
+
+    assert result.source == '\fdef function():\n    """Summary.\n    Body.\n    """\n\n  # C.\n'
+    assert result.module.code == 'def function():\n    """Summary.\n    Body.\n    """\n  # C.\n'
 
 
 def test_check_fix_line_numbers_and_fix_false_findings_agree() -> None:

@@ -14,7 +14,7 @@ from __future__ import annotations
 import collections
 import dataclasses
 from collections.abc import Mapping
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NamedTuple
 
 # Third-party imports
 import libcst as cst
@@ -40,7 +40,7 @@ if TYPE_CHECKING:
     from pydocformatter.source_path import SourcePathContext
 
 
-MAX_FIX_ITERATIONS = 20
+MAX_FIX_ITERATIONS = 30
 UTF8_BOM = "\ufeff"
 
 
@@ -49,14 +49,14 @@ class RuleRunResult:
     """Result of running selected rules against one parsed module.
 
     Attributes:
-        module (cst.Module): Final module after all selected fix passes.
+        source (str): Exact final source before any LibCST rendering normalization.
         fixed_findings (tuple[RuleFinding, ...]): Findings fixed during the run.
         unfixed_findings (tuple[RuleFinding, ...]): Findings still present after checking the final module.
-        source_changed (bool): Whether any fix pass changed the source.
+        source_changed (bool): Whether the exact final source differs from the initial source.
         errors (tuple[str, ...]): Operational errors raised by rule preparation, checking, or fixing.
     """
 
-    module: cst.Module
+    source: str
     fixed_findings: tuple[RuleFinding, ...]
     unfixed_findings: tuple[RuleFinding, ...]
     source_changed: bool
@@ -88,10 +88,23 @@ class _ModulePassContext:
 
 @dataclasses.dataclass(frozen=True)
 class _ModuleSourceSeed:
-    """Trusted source text for one parsed module object."""
+    """Parsed module, exact source, and proven LibCST position mapping."""
 
     module: cst.Module
     source: str
+    offset_map: source_text.SourceOffsetMap
+
+
+class _SourceAlignmentError(Exception):
+    """Raised when LibCST-rendered positions cannot map safely to exact source."""
+
+
+class _FixPassResult(NamedTuple):
+    """Validated source seed, findings, and change state produced by one fix pass."""
+
+    source_seed: _ModuleSourceSeed
+    findings: tuple[RuleFinding, ...]
+    changed: bool
 
 
 def run_rule_plan(
@@ -107,10 +120,10 @@ def run_rule_plan(
         execution_plan (RuleExecutionPlan): Final ordered rules and their collection.
         fix (bool): Whether enabled fixes should be applied before the final check.
         source_path (SourcePathContext): Precomputed path semantics shared with cache identity.
-        source (str | None): Original source aligned with `module` when available.
+        source (str | None): Exact original source when available.
 
     Returns:
-        RuleRunResult: Final module, findings, change state, and operational errors.
+        RuleRunResult: Final source, findings, change state, and operational errors.
     """
     errors: list[str] = []
     selected_rules = execution_plan.selected_rules
@@ -118,10 +131,18 @@ def run_rule_plan(
     fixed_findings: list[RuleFinding] = []
     last_iteration_findings: tuple[RuleFinding, ...] = ()
     reached_iteration_limit = False
-    source_changed = False
-    source_seed = _ModuleSourceSeed(module=module, source=_module_aligned_source(source)) if source is not None else None
+    repeated_source_iterations: tuple[int, int] | None = None
+    initial_source = _module_aligned_source(source) if source is not None else None
+    if initial_source is None:
+        source_seed = _module_source_seed(module)
+    else:
+        try:
+            source_seed = _module_source_seed(module, source=initial_source)
+        except _SourceAlignmentError as error:
+            return RuleRunResult(source=initial_source, fixed_findings=(), unfixed_findings=(), source_changed=False, errors=(_source_alignment_error(path, error),))
+    initial_source_seed = source_seed
 
-    def run_check_pass(check_module: cst.Module, check_errors: list[str]) -> tuple[RuleFinding, ...]:
+    def run_check_pass(check_module: cst.Module, check_errors: list[str], *, check_source_seed: _ModuleSourceSeed) -> tuple[RuleFinding, ...]:
         return _run_check_pass(
             check_module,
             path=path,
@@ -130,42 +151,67 @@ def run_rule_plan(
             execution_plan=execution_plan,
             selected_rule_by_code=selected_rule_by_code,
             errors=check_errors,
-            source_seed=source_seed,
+            source_seed=check_source_seed,
             source_path=source_path,
         )
 
     if fix:
         precheck_errors: list[str] = []
-        precheck_findings = run_check_pass(module, precheck_errors)
+        precheck_findings = run_check_pass(module, precheck_errors, check_source_seed=source_seed)
         if not precheck_errors and not any(finding.fixable for finding in precheck_findings):
-            return RuleRunResult(module=module, fixed_findings=(), unfixed_findings=precheck_findings, source_changed=False, errors=())
+            return RuleRunResult(source=source_seed.source, fixed_findings=(), unfixed_findings=precheck_findings, source_changed=False, errors=())
 
-        for _ in range(1, MAX_FIX_ITERATIONS + 1):
-            module, iteration_findings, changed = _run_fix_pass(
-                module,
-                path=path,
-                settings=settings,
-                line_ending=line_ending,
-                execution_plan=execution_plan,
-                selected_rule_by_code=selected_rule_by_code,
-                errors=errors,
-                source_seed=source_seed,
-                source_path=source_path,
-            )
-            fixed_findings.extend(iteration_findings)
-            last_iteration_findings = iteration_findings
-            source_changed = source_changed or changed
-            if not changed:
+        source_iterations = {source_seed.source: (0, 0)}
+        for iteration in range(1, MAX_FIX_ITERATIONS + 1):
+            try:
+                pass_result = _run_fix_pass(
+                    module,
+                    path=path,
+                    settings=settings,
+                    line_ending=line_ending,
+                    execution_plan=execution_plan,
+                    selected_rule_by_code=selected_rule_by_code,
+                    errors=errors,
+                    source_seed=source_seed,
+                    source_path=source_path,
+                )
+            except _SourceAlignmentError as error:
+                return RuleRunResult(
+                    source=initial_source_seed.source, fixed_findings=(), unfixed_findings=precheck_findings, source_changed=False, errors=(*errors, _source_alignment_error(path, error))
+                )
+            source_seed = pass_result.source_seed
+            module = source_seed.module
+            fixed_findings.extend(pass_result.findings)
+            last_iteration_findings = pass_result.findings
+            if not pass_result.changed:
                 break
+            if (previous_source_state := source_iterations.get(source_seed.source)) is not None:
+                previous_iteration, surviving_finding_count = previous_source_state
+                repeated_source_iterations = (previous_iteration, iteration)
+                del fixed_findings[surviving_finding_count:]
+                break
+            source_iterations[source_seed.source] = (iteration, len(fixed_findings))
         else:
             reached_iteration_limit = True
 
-    unfixed_findings = run_check_pass(module, errors)
+    unfixed_findings = run_check_pass(module, errors, check_source_seed=source_seed)
 
-    if reached_iteration_limit and any(finding.fixable for finding in unfixed_findings):
+    if repeated_source_iterations is not None and any(finding.fixable for finding in unfixed_findings):
+        errors.append(
+            _fix_repeated_source_error(
+                path,
+                first_iteration=repeated_source_iterations[0],
+                repeated_iteration=repeated_source_iterations[1],
+                last_iteration_findings=last_iteration_findings,
+                unfixed_findings=unfixed_findings,
+            )
+        )
+    elif reached_iteration_limit and any(finding.fixable for finding in unfixed_findings):
         errors.append(_fix_iteration_limit_error(path, last_iteration_findings=last_iteration_findings, unfixed_findings=unfixed_findings))
 
-    return RuleRunResult(module=module, fixed_findings=tuple(fixed_findings), unfixed_findings=unfixed_findings, source_changed=source_changed, errors=tuple(errors))
+    return RuleRunResult(
+        source=source_seed.source, fixed_findings=tuple(fixed_findings), unfixed_findings=unfixed_findings, source_changed=source_seed.source != initial_source_seed.source, errors=tuple(errors)
+    )
 
 
 def _run_fix_pass(
@@ -179,11 +225,12 @@ def _run_fix_pass(
     errors: list[str],
     source_path: SourcePathContext,
     source_seed: _ModuleSourceSeed | None = None,
-) -> tuple[cst.Module, tuple[RuleFinding, ...], bool]:
+) -> _FixPassResult:
     """Run one ordered pass of effectively fixable rules."""
     pass_findings: list[RuleFinding] = []
     changed = False
     pass_context: _ModulePassContext | None = None
+    current_source_seed = source_seed if source_seed is not None else _module_source_seed(module)
     for category_class in execution_plan.collection.categories:
         category_rule_classes = tuple(
             rule_class
@@ -201,7 +248,7 @@ def _run_fix_pass(
             line_ending=line_ending,
             rule_collection=execution_plan.collection,
             errors=errors,
-            source_seed=source_seed,
+            source_seed=current_source_seed,
             source_path=source_path,
         )
         if prepared_category is None:
@@ -218,7 +265,7 @@ def _run_fix_pass(
                     line_ending=line_ending,
                     rule_collection=execution_plan.collection,
                     errors=errors,
-                    source_seed=source_seed,
+                    source_seed=current_source_seed,
                     source_path=source_path,
                 )
                 if prepared_category is None:
@@ -247,25 +294,23 @@ def _run_fix_pass(
             if planned_changes is None:
                 continue
             try:
-                fixed_module = rule_edits.apply_context_source_changes(prepared_category.context, planned_changes)
+                applied_changes = rule_edits.apply_context_source_changes(prepared_category.context, planned_changes)
             except Exception as error:
                 errors.append(f"{path}: {rule_class.meta.code} automatic fix failed: {error}")
                 continue
+            fixed_source_seed = _module_source_seed_for_parsed_source(applied_changes.module, applied_changes.source)
             fixed_findings = tuple(violation.finding for violation in fixable_violations)
-            try:
-                result_changed = fixed_module.code != prepared_category.context.source
-            except Exception as error:
-                errors.append(f"{path}: {rule_class.meta.code} automatic fix source generation failed: {error}")
-                continue
+            result_changed = applied_changes.source != prepared_category.context.source
             if result_changed != bool(fixed_findings):
                 errors.append(f"{path}: {rule_class.meta.code} automatic fix must change source if and only if it reports fixed findings")
                 continue
             if result_changed:
-                module = fixed_module
+                current_source_seed = fixed_source_seed
+                module = current_source_seed.module
                 pass_context = None
                 pass_findings.extend(fixed_findings)
                 changed = True
-    return module, tuple(pass_findings), changed
+    return _FixPassResult(source_seed=current_source_seed, findings=tuple(pass_findings), changed=changed)
 
 
 def _run_check_pass(
@@ -368,9 +413,10 @@ def _pass_context_for(module: cst.Module, pass_context: _ModulePassContext | Non
     """Return shared source and metadata for the current module state."""
     if pass_context is not None and pass_context.module is module:
         return pass_context
-    source = source_seed.source if source_seed is not None and source_seed.module is module else module.code
+    current_source_seed = source_seed if source_seed is not None and source_seed.module is module else _module_source_seed(module)
+    source = current_source_seed.source
     metadata_wrapper = cst_metadata.MetadataWrapper(module, unsafe_skip_copy=True)
-    positions = metadata_wrapper.resolve(cst_metadata.PositionProvider)
+    positions = current_source_seed.offset_map.positions(metadata_wrapper.resolve(cst_metadata.PositionProvider))
     source_lines = tuple(source_text.source_lines(source))
     suppression_index = suppressions.suppression_index(module, positions=positions, source_lines=source_lines, collection=collection)
     return _ModulePassContext(
@@ -382,6 +428,32 @@ def _pass_context_for(module: cst.Module, pass_context: _ModulePassContext | Non
         line_bounds=source_text.line_bounds_from_lines(source_lines),
         suppression_index=suppression_index,
     )
+
+
+def _module_source_seed(module: cst.Module, *, source: str | None = None) -> _ModuleSourceSeed:
+    """Return a module seed with positions proven to map onto exact source."""
+    rendered_source = module.code
+    exact_source = rendered_source if source is None else source
+    try:
+        offset_map = source_text.source_offset_map(module, exact_source, rendered_source=rendered_source)
+    except ValueError as error:
+        raise _SourceAlignmentError(str(error)) from None
+    return _ModuleSourceSeed(module=module, source=exact_source, offset_map=offset_map)
+
+
+def _module_source_seed_for_parsed_source(module: cst.Module, source: str) -> _ModuleSourceSeed:
+    """Return a source seed for a module parsed from the supplied exact source."""
+    rendered_source = module.code
+    try:
+        offset_map = source_text.source_offset_map_for_parsed_source(module, source, rendered_source=rendered_source)
+    except ValueError as error:
+        raise _SourceAlignmentError(str(error)) from None
+    return _ModuleSourceSeed(module=module, source=source, offset_map=offset_map)
+
+
+def _source_alignment_error(path: str, error: _SourceAlignmentError) -> str:
+    """Return one operational error for unsafe exact-source alignment."""
+    return f"{path}: Exact source could not be aligned safely with LibCST rendering: {error}"
 
 
 def _module_aligned_source(source: str) -> str:
@@ -522,9 +594,21 @@ def _apply_effective_fixability(finding: RuleFinding, *, selected_rule: Selected
 
 def _fix_iteration_limit_error(path: str, *, last_iteration_findings: tuple[RuleFinding, ...], unfixed_findings: tuple[RuleFinding, ...]) -> str:
     """Return an operational error describing likely non-converging rules."""
+    likely_rules = _likely_finding_details(last_iteration_findings, unfixed_findings=unfixed_findings)
+    return f"{path}: Automatic fixes did not converge after {MAX_FIX_ITERATIONS} iterations; likely rules and lines: {likely_rules}"
+
+
+def _fix_repeated_source_error(path: str, *, first_iteration: int, repeated_iteration: int, last_iteration_findings: tuple[RuleFinding, ...], unfixed_findings: tuple[RuleFinding, ...]) -> str:
+    """Return an operational error describing a repeated automatic-fix source state."""
+    likely_rules = _likely_finding_details(last_iteration_findings, unfixed_findings=unfixed_findings)
+    cycle_length = repeated_iteration - first_iteration
+    return f"{path}: Automatic fixes repeated a source state after {repeated_iteration} iterations (cycle length {cycle_length}); likely rules and lines: {likely_rules}"
+
+
+def _likely_finding_details(last_iteration_findings: tuple[RuleFinding, ...], *, unfixed_findings: tuple[RuleFinding, ...]) -> str:
+    """Return sorted rule and line details for likely non-converging findings."""
     likely_findings = last_iteration_findings + tuple(finding for finding in unfixed_findings if finding.fixable)
     details: dict[RuleMetadata, set[int]] = collections.defaultdict(set)
     for finding in likely_findings:
         details[finding.rule].update(finding.line_numbers)
-    likely_rules = ", ".join(f"{rule.code} lines {', '.join(map(str, sorted(lines))) or 'unknown'}" for rule, lines in sorted(details.items())) if details else "unknown"
-    return f"{path}: Automatic fixes did not converge after {MAX_FIX_ITERATIONS} iterations; likely rules and lines: {likely_rules}"
+    return ", ".join(f"{rule.code} lines {', '.join(map(str, sorted(lines))) or 'unknown'}" for rule, lines in sorted(details.items())) if details else "unknown"

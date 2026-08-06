@@ -1,3 +1,6 @@
+# Future imports
+from __future__ import annotations
+
 # Standard library imports
 import typing
 
@@ -9,43 +12,22 @@ import libcst.metadata as cst_metadata
 # First-party imports
 from pydocformatter import formatter, rules_selection
 from pydocformatter.cli.settings_check import CheckSettings
-from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
-from pydocformatter.rules.definition_helpers import source_text, unicode_safety
+from pydocformatter.rules.definition_helpers import unicode_safety
 from pydocformatter.rules.definitions.PCF.PCF import PCF, CommentKind, CommentPlacement
-from pydocformatter.source_path import SourcePathContext
+from tests import rule_helpers
+
+
+if typing.TYPE_CHECKING:
+    # First-party imports
+    from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
 
 
 def category_context(source: str) -> RuleCategoryContext:
-    module = cst.parse_module(source)
-    metadata_wrapper = cst_metadata.MetadataWrapper(module, unsafe_skip_copy=True)
-    return RuleCategoryContext(
-        path="example.py",
-        source_path=SourcePathContext.for_path("example.py"),
-        settings=CheckSettings(),
-        module=module,
-        metadata_wrapper=metadata_wrapper,
-        positions=metadata_wrapper.resolve(cst_metadata.PositionProvider),
-        line_ending="\r\n" if "\r\n" in source else "\n",
-        source=source,
-        source_lines=tuple(source_text.source_lines(source)),
-        line_bounds=None,
-    )
+    return rule_helpers.direct_rule_category_context(source, settings=CheckSettings())
 
 
 def rule_context(context: RuleCategoryContext, data: object | None) -> RuleContext:
-    return RuleContext(
-        path=context.path,
-        source_path=context.source_path,
-        settings=context.settings,
-        module=context.module,
-        metadata_wrapper=context.metadata_wrapper,
-        positions=context.positions,
-        line_ending=context.line_ending,
-        source=context.source,
-        source_lines=context.source_lines,
-        line_bounds=context.line_bounds,
-        category_data=data,
-    )
+    return rule_helpers.direct_rule_context(context, category_data=data)
 
 
 def parent_metadata_resolves_for_format(source: str, *, settings: CheckSettings, monkeypatch: pytest.MonkeyPatch, fix: bool = False) -> tuple[int, formatter.FormatterResult]:
@@ -127,6 +109,42 @@ def test_prepare_skips_module_visit_when_source_has_no_hash(monkeypatch: pytest.
     assert data.comments == ()
     assert data.standalone_runs == ()
     assert data.trailing_comments == ()
+
+
+def test_prepare_uses_original_source_coordinates_when_libcst_normalizes_empty_lines() -> None:
+    source = 'def f():\n    """D."""\n\n \t# C.\n'
+    context = category_context(source)
+
+    data = PCF.prepare(context)
+
+    assert context.module.code == 'def f():\n    """D."""\n \t# C.\n'
+    assert len(data.comments) == 1
+    comment = data.comments[0]
+    assert comment.range == cst_metadata.CodeRange(start=cst_metadata.CodePosition(4, 2), end=cst_metadata.CodePosition(4, 6))
+    assert comment.text == "# C."
+    assert comment.placement is CommentPlacement.STANDALONE
+    assert comment.indent == " \t"
+    assert comment.line_prefix == " \t"
+    assert data.source_for(comment.range) == "# C."
+
+
+def test_prepare_collects_multiline_fstring_and_later_comments_on_python_311() -> None:
+    source = 'x = f"""{1\n#inner\n}"""\n#outer\n'
+
+    data = PCF.prepare(category_context(source))
+
+    assert tuple((comment.text, comment.range) for comment in data.comments) == (
+        ("#inner", cst_metadata.CodeRange(start=cst_metadata.CodePosition(2, 0), end=cst_metadata.CodePosition(2, 6))),
+        ("#outer", cst_metadata.CodeRange(start=cst_metadata.CodePosition(4, 0), end=cst_metadata.CodePosition(4, 6))),
+    )
+
+
+def test_prepare_keeps_repeated_multiline_fstring_comments_at_exact_positions() -> None:
+    source = 'x = f"""{1\n#same\n}"""\n#same\n'
+
+    data = PCF.prepare(category_context(source))
+
+    assert tuple((comment.text, comment.range.start) for comment in data.comments) == (("#same", cst_metadata.CodePosition(2, 0)), ("#same", cst_metadata.CodePosition(4, 0)))
 
 
 def test_prepare_classifies_suspicious_unicode_once_per_comment(monkeypatch: pytest.MonkeyPatch) -> None:

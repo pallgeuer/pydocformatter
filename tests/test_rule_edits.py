@@ -26,6 +26,7 @@ from pydocformatter.rules.definition import RuleCategoryContext
 from pydocformatter.rules.definition_helpers import source_text
 from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleFinding, RuleMetadata
 from pydocformatter.source_path import SourcePathContext
+from tests import rule_helpers
 
 
 def test_planned_source_changes_apply_edits_and_create_violations() -> None:
@@ -49,7 +50,8 @@ def test_planned_source_changes_apply_edits_and_create_violations() -> None:
     result = rule_edits.apply_source_edits(module, tuple(change.edit for change in changes))
     violations = rule_violations.violations_for_planned_source_changes(rule, changes)
 
-    assert result.code == "value = 2\n"
+    assert result.module.code == "value = 2\n"
+    assert result.source == "value = 2\n"
     assert tuple(violation.finding for violation in violations) == (RuleFinding(rule=rule, line_numbers=(1,), suppression_line_numbers=((2,),), instance_fixable=None),)
     assert (violations[0].fix.planned_changes() if violations[0].fix is not None else ()) == changes
 
@@ -421,7 +423,10 @@ def test_suppression_string_indexes_retain_distinct_same_line_expressions() -> N
 def test_empty_edits_return_original_module() -> None:
     module = cst.parse_module("x = 1\n")
 
-    assert rule_edits.apply_source_edits(module, ()) is module
+    result = rule_edits.apply_source_edits(module, ())
+
+    assert result.module is module
+    assert result.source == "x = 1\n"
 
 
 def test_multiple_unsorted_edits_support_unicode_and_adjacent_ranges() -> None:
@@ -435,7 +440,8 @@ def test_multiple_unsorted_edits_support_unicode_and_adjacent_ranges() -> None:
 
     result = rule_edits.apply_source_edits(module, edits)
 
-    assert result.code == "name = 'ω'\ngamma= 2\n"
+    assert result.module.code == "name = 'ω'\ngamma= 2\n"
+    assert result.source == "name = 'ω'\ngamma= 2\n"
 
 
 def test_cached_source_and_line_bounds_apply_without_reading_module_code(mocker: MockerFixture) -> None:
@@ -452,7 +458,8 @@ def test_cached_source_and_line_bounds_apply_without_reading_module_code(mocker:
     result = rule_edits.apply_source_edits(module, edits, source=source, line_bounds=source_text.line_bounds_from_lines(lines))
     mocker.stopall()
 
-    assert result.code == "alpha = 1\ngamma = 2\n"
+    assert result.module.code == "alpha = 1\ngamma = 2\n"
+    assert result.source == "alpha = 1\ngamma = 2\n"
 
 
 def test_cached_source_and_line_bounds_must_be_provided_together() -> None:
@@ -498,7 +505,53 @@ def test_context_source_changes_apply_cached_context_source_without_reading_modu
     result = rule_edits.apply_context_source_changes(context, changes)
     mocker.stopall()
 
-    assert result.code == "alpha = 1\ngamma = 2\n"
+    assert result.module.code == "alpha = 1\ngamma = 2\n"
+    assert result.source == "alpha = 1\ngamma = 2\n"
+
+
+def test_context_source_changes_retain_exact_source_normalized_by_libcst() -> None:
+    source = 'def f():\n    """D."""\n\n \t#bad\n'
+    module = cst.parse_module(source)
+    metadata_wrapper = cst_metadata.MetadataWrapper(module, unsafe_skip_copy=True)
+    lines = tuple(source_text.source_lines(source))
+    offset_map = source_text.source_offset_map(module, source)
+    context = RuleCategoryContext(
+        path="example.py",
+        source_path=SourcePathContext.for_path("example.py"),
+        settings=CheckSettings(),
+        module=module,
+        metadata_wrapper=metadata_wrapper,
+        positions=offset_map.positions(metadata_wrapper.resolve(cst_metadata.PositionProvider)),
+        line_ending="\n",
+        source=source,
+        source_lines=lines,
+        line_bounds=source_text.line_bounds_from_lines(lines),
+    )
+    changes = (
+        rule_edits.PlannedSourceChange(
+            edit=rule_edits.SourceEdit(cst_metadata.CodeRange(start=cst_metadata.CodePosition(4, 2), end=cst_metadata.CodePosition(4, 6)), "# good"), line_numbers=(4,), suppression_line_numbers=()
+        ),
+    )
+
+    result = rule_edits.apply_context_source_changes(context, changes)
+
+    assert result.source == 'def f():\n    """D."""\n\n \t# good\n'
+    assert result.module.code == 'def f():\n    """D."""\n \t# good\n'
+
+
+def test_context_source_changes_compute_missing_bounds_from_exact_source() -> None:
+    source = "\fx = 1\n"
+    context = dataclasses.replace(rule_helpers.direct_rule_category_context(source, settings=CheckSettings()), line_bounds=None)
+    changes = (
+        rule_edits.PlannedSourceChange(
+            edit=rule_edits.SourceEdit(cst_metadata.CodeRange(start=cst_metadata.CodePosition(1, 5), end=cst_metadata.CodePosition(1, 6)), "2"), line_numbers=(1,), suppression_line_numbers=()
+        ),
+    )
+
+    result = rule_edits.apply_context_source_changes(context, changes)
+
+    assert result.source == "\fx = 2\n"
+    assert result.module.code == "x = 2\n"
 
 
 def test_cached_source_edits_support_no_final_newline() -> None:
@@ -509,7 +562,8 @@ def test_cached_source_edits_support_no_final_newline() -> None:
 
     result = rule_edits.apply_source_edits(module, edits, source=source, line_bounds=source_text.line_bounds_from_lines(lines))
 
-    assert result.code == "alpha = 1\nbeta = 3"
+    assert result.module.code == "alpha = 1\nbeta = 3"
+    assert result.source == "alpha = 1\nbeta = 3"
 
 
 def test_overlapping_edits_are_rejected() -> None:
@@ -546,4 +600,5 @@ def test_edits_preserve_crlf_parser_configuration() -> None:
 
     result = rule_edits.apply_source_edits(module, (edit,))
 
-    assert result.code == "first = 1\r\nrenamed = 2\r\n"
+    assert result.module.code == "first = 1\r\nrenamed = 2\r\n"
+    assert result.source == "first = 1\r\nrenamed = 2\r\n"

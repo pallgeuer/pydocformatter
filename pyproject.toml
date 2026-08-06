@@ -116,17 +116,21 @@ indent-style = "space"
 indent-width = 4
 line-ending = "lf"
 respect-gitignore = true
-extend-select = ["PDF300", "PDF302", "PDF305", "PDF510", "PDF701", "PDF705", "PDF709", "PDF713", "PDF717"]
+force-exclude = true
+extend-select = ["PDF300", "PDF302", "PDF305", "PDF510", "PDF528", "PDF701", "PDF705", "PDF709", "PDF713", "PDF717"]
 ignore = ["PDF519", "PDF521", "PDF522", "PDF524"]
 require-explicit = []
 
 [tool.pydocfmt.docstring]
 convention = "google"
 missing-documentation = "all-docstrings"
+require-init-attribute-documentation = true
 
 [tool.pydocfmt.comment]
 detect-code = true
 detect-expressions = true
+join-standalone-lines = true
+task-marker-mode = "hanging"
 
 [tool.pydocfmt.per-file-ignores]
 "tests/**/test_*.py" = ["PDF6"]

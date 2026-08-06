@@ -7,15 +7,15 @@ Checks for excess blank logical lines inside safely rewritable docstrings.
 
 A blank logical line is an evaluated docstring line with no non-whitespace content after docstring indentation has been mapped by pydocformatter's parser. Lines that contain only spaces, tabs, or other Unicode whitespace are blank for PDF200. PDF103 is responsible for normalizing the exact whitespace spelling of a retained blank line.
 
-PDF200 keeps at most one blank line between adjacent semantic chunks. It removes blank lines before the first chunk, removes blank lines after the last chunk, and collapses runs of multiple blank lines between chunks to one blank line. It only removes excess blank lines; it does not insert missing blank lines between chunks that are already adjacent.
+PDF200 keeps at most one blank line between adjacent semantic chunks. It removes semantic blank lines before the first chunk, removes semantic blank lines after the last chunk, and collapses runs of multiple blank lines between chunks to one blank line. It only removes excess blank lines; it does not insert missing blank lines between chunks that are already adjacent.
 
 A chunk is any non-blank semantic block recognized by the docstring parser, including summaries, paragraphs, sections, section entries, reST fields under the reST convention, lists, headings, doctests, code fences, literal blocks, directives, tables, block quotes, and verbatim blocks. Blank lines inside opaque protected blocks are preserved, while blank-line runs around those protected blocks are still collapsed. Directive and literal-block bodies keep their internal blank lines, but trailing blank runs after their indented bodies are treated as exterior spacing between chunks.
 
 With Google or NumPy conventions enabled, spacing is applied recursively inside recognized sections. Extra blank lines between a section header and its first body item are removed entirely, and extra blank lines between consecutive convention entries are removed entirely. Extra blank lines between adjacent whole sections collapse to one retained blank line. Other blank-line runs inside sections are still collapsed to one retained blank line unless they are inside opaque protected content.
 
-The `docstring-blank-line-after-last-section` setting changes the trailing spacing rule for the final recognized Google or NumPy section. When enabled, PDF200 collapses trailing blank-line runs after the final recognized section to exactly one blank line. Otherwise, PDF200 removes blank lines after the final section. The setting has no effect unless the active `docstring-convention` parses the final block as a Google or NumPy section.
+The `docstring-blank-line-after-last-section` setting changes the trailing spacing rule for the final recognized Google or NumPy section. When enabled, PDF200 collapses trailing blank-line runs after the final recognized section to exactly one blank line. Otherwise, PDF200 removes blank lines after the final section. The trailing run is recognized from logical line order even when malformed indentation makes a nested terminal section own the blank block. The setting has no effect unless the active `docstring-convention` parses the final block as a Google or NumPy section.
 
-When the closing quotes are already on their own canonical indentation line, PDF200 preserves that final quote-prefix line while removing extra blank lines before it. If the final whitespace-only line before the closing quotes is not at the canonical docstring margin, PDF200 treats it as excess blank content and removes it, which can move same-line closing quotes onto the preceding content line.
+PDF200 is neutral about delimiter placement. When the opening quotes already end a physical line, PDF200 preserves their first whitespace-only suffix line while removing any additional leading blanks; PDF106 and PDF107 own compact or separate opening placement. PDF200 likewise preserves one existing whitespace-only prefix before the closing quotes exactly as written while removing excess semantic trailing blanks; closing placement and indentation rules own any subsequent normalization.
 
 Docstrings with no chunks are collapsed to an empty docstring when they can be safely rewritten. This includes multi-line blank-only docstrings and one-line whitespace-only docstrings.
 
@@ -44,7 +44,8 @@ def area(radius: float) -> float:
 
 [output]
 def area(radius: float) -> float:
-    """Return the area.
+    """
+    Return the area.
 
     The radius must be non-negative.
     """
@@ -62,12 +63,14 @@ def area(radius: float) -> float:
 [output=unchanged]
 ```
 
-Closing quote prefix lines are preserved only when they are already at the canonical docstring margin:
+Opening suffix and closing prefix lines are preserved without choosing a delimiter layout or normalizing their whitespace:
 
 ```pydocfmt-example
 [input]
 def function():
-    """Summary.
+    """
+
+    Summary.
 
 
     """
@@ -78,11 +81,13 @@ def odd_prefix():
 
 [output]
 def function():
-    """Summary.
+    """
+    Summary.
     """
 
 def odd_prefix():
-    """Summary."""
+    """Summary.
+      """
 ```
 
 Blank-only docstrings collapse to empty docstrings:
@@ -337,5 +342,3 @@ When `PDF000` is also selected outside this rule-specific example context, it ca
 
 ## Options
 - `docstring-blank-line-after-last-section`: Keeps exactly one trailing blank line after the final recognized section when enabled.
-- `indent-style`: Indentation style used when generated blank-line output needs docstring indentation.
-- `indent-width`: Indentation width used when generated blank-line output needs docstring indentation and tab measurement.

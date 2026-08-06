@@ -7,15 +7,18 @@ Checks for indentation inside safely rewritable multi-line simple docstrings.
 
 PDF100 leaves the first evaluated docstring line unchanged, so whitespace immediately after the opening quotes is handled by PDF104. For every later evaluated line, PDF100 first determines the docstring's canonical margin:
 
-- For block-suite docstrings, the canonical margin is the raw indentation before the docstring's opening quotes.
+- For block-suite docstrings, the canonical margin is the raw spaces and tabs before the docstring's opening quotes after any indentation form feed. Python treats a form feed in leading indentation as a column reset; pydocformatter preserves it outside the literal but never copies it into generated docstring content.
 - If the opening quotes are wrapped in harmless expression syntax and appear after only whitespace on their source line, the canonical margin is the literal's visual column.
-- If harmless expression syntax appears before the opening quotes on the same source line, such as `("""...`, the canonical margin is the surrounding statement indentation.
+- If the docstring follows another small statement on the same source line, such as `value = 1; ("""...`, generated continuation lines use space indentation to the opening quote column as a hanging margin.
+- If harmless expression syntax appears before the opening quotes without an earlier small statement on the same line, such as a standalone `("""...`, the canonical margin is the surrounding statement indentation.
 - For single-line-suite docstrings, such as `def f(): """...`, the canonical margin is the line indentation plus one configured indent unit.
 - For module docstrings at column zero, the canonical margin is empty.
 
 Outside recognized Google or NumPy convention sections, PDF100 removes the minimum shared visual indentation from non-blank continuation lines and prefixes the canonical margin. This means over-indented and under-indented continuation lines are normalized without flattening meaningful relative indentation. Lists, doctests, code fences, literal blocks, directives, tables, block quotes, and other protected or preformatted structures keep their internal shape relative to the surrounding docstring.
 
-Blank continuation lines may be empty or exactly the canonical margin. Empty and canonical blank lines are kept. Blank lines that start with the canonical margin plus extra whitespace are reduced to the canonical margin, and other whitespace-only blank lines become empty. PDF103 may still enforce a stricter blank-line whitespace preference later.
+When a reStructuredText field, list item, or block quote starts on the first evaluated line, PDF100 treats the canonical margin as an implicit base for its later lines. It rebases that margin while preserving the parser-recognized hanging or quote prefix, including its tab spelling. PDF101 can therefore wrap the structure without competing with PDF100 over its continuation indentation.
+
+PDF100 leaves every spaces/tabs-only evaluated line unchanged, including ordinary blank lines and whitespace before opening or closing quotes. PDF103 solely owns that whitespace and applies the configured blank-line style without competing indentation normalization from PDF100.
 
 With `docstring-convention = "google"`, recognized section headers align to the canonical margin, entry first lines align one configured indent unit under it, and entry continuation lines align two configured indent units under it. With `docstring-convention = "numpy"`, recognized section headers, underline adornments, and entry declaration lines align to the canonical margin, and entry descriptions align one configured indent unit under it.
 
@@ -253,7 +256,7 @@ def describe(value):
     """
 ```
 
-Blank continuation lines are normalized only to PDF100's accepted states:
+Blank continuation lines are left unchanged for PDF103:
 
 ```pydocfmt-example
 [input]
@@ -265,14 +268,7 @@ def describe():
     Done.
     """
 
-[output]
-def describe():
-    """Describe the value.
-
-    
-
-    Done.
-    """
+[output=unchanged]
 ```
 
 Generated convention indentation can use tabs while preserving the source line's existing base indentation:

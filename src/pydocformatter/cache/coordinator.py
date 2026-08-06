@@ -100,7 +100,13 @@ class _ProbeOutcome(enum.StrEnum):
 
 
 class CacheCoordinator:
-    """Coordinate cache work around worker execution in the parent process."""
+    """Coordinate cache work around worker execution in the parent process.
+
+    Attributes:
+        store (cache_store.CacheStore): Parent-owned persistent proof store.
+        engine_key (bytes): Analysis-engine identity used for cache lookups and updates.
+        parallelism (int): Concurrency limit for source validation.
+    """
 
     def __init__(self, store: cache_store.CacheStore, *, engine_key: bytes, parallelism: int) -> None:
         """Initialize one invocation coordinator with no open SQLite connection.

@@ -5,7 +5,6 @@ from __future__ import annotations
 
 # Standard library imports
 import typing
-from collections.abc import Sequence
 
 # Third-party imports
 import libcst as cst
@@ -22,6 +21,9 @@ if typing.TYPE_CHECKING:
     from pydocformatter.rules.definitions.PDF.PDF import DocstringInfo, DocstringValueLine
 
 
+_INDENTATION_WHITESPACE = f"{ascii_whitespace.SPACE_AND_TAB}\f"
+
+
 def is_same_line_closing_delimiter_prefix(docstring: DocstringInfo, line: DocstringValueLine) -> bool:
     """Return whether a value line prefixes same-line closing quotes.
 
@@ -33,6 +35,19 @@ def is_same_line_closing_delimiter_prefix(docstring: DocstringInfo, line: Docstr
         True when the line is the final logical line of a non-empty docstring value without a trailing newline.
     """
     return line.index == len(docstring.structure.lines) - 1 and docstring.value != "" and not docstring_value_ends_with_newline(docstring)
+
+
+def is_same_line_opening_delimiter_suffix(docstring: DocstringInfo, line: DocstringValueLine) -> bool:
+    """Return whether a value line follows opening quotes before a physical line break.
+
+    Args:
+        docstring (DocstringInfo): Simple or suite docstring that owns the logical line.
+        line (DocstringValueLine): Logical value line to compare against the docstring opener position.
+
+    Returns:
+        True when the first mapped logical line contains only ASCII spaces and tabs before a later physical line.
+    """
+    return line.index == 0 and line.source_line_number is not None and len(docstring.structure.lines) > 1 and not line.raw_text.strip(ascii_whitespace.SPACE_AND_TAB)
 
 
 def is_safely_mapped_simple_docstring(docstring: DocstringInfo, *, require_multiline: bool = False) -> bool:
@@ -65,25 +80,41 @@ def can_canonically_rewrite_simple_docstring(docstring: DocstringInfo, *, requir
     return is_safely_mapped_simple_docstring(docstring, require_multiline=require_multiline) and not docstring.has_unicode_rewrite_barrier
 
 
-def docstring_canonical_margin(docstring: DocstringInfo, *, context: RuleContext, source_lines: Sequence[str] | None = None) -> str:
+def docstring_canonical_margin(docstring: DocstringInfo, *, context: RuleContext) -> str:
     """Return the raw indentation margin for continuation and aligned blank lines.
 
     Args:
         docstring (DocstringInfo): Docstring whose opening source column determines the reusable margin.
         context (RuleContext): Rule context providing file source and indentation settings.
-        source_lines (Sequence[str] | None): Optional alternate source text to use after a planned rewrite has been
-            applied.
 
     Returns:
         Raw whitespace prefix that should be used for generated continuation lines in the docstring body.
     """
-    lines = source_lines if source_lines is not None else context.source_lines
-    source_line = lines[docstring.range.start.line - 1]
-    line_indent = source_line[: len(source_line) - len(source_line.lstrip(ascii_whitespace.SPACE_AND_TAB))]
+    source_line = context.source_lines[docstring.range.start.line - 1]
     if isinstance(docstring.statement, cst.SimpleStatementSuite):
-        return f"{line_indent}{text_layout.indent_unit(context.settings)}"
-    prefix = source_line[: docstring.range.start.column]
-    return prefix if prefix.strip() == "" else line_indent
+        return f"{_effective_indentation(source_line)}{text_layout.indent_unit(context.settings)}"
+    source_prefix = source_line[: docstring.range.start.column]
+    if _has_preceding_small_statement(docstring):
+        return " " * len(source_prefix.rsplit("\f", maxsplit=1)[-1])
+    if not source_prefix.strip(_INDENTATION_WHITESPACE):
+        return source_prefix.rsplit("\f", maxsplit=1)[-1]
+    return _effective_indentation(source_line)
+
+
+def _effective_indentation(source_line: str) -> str:
+    """Return leading spaces and tabs after the final indentation form feed."""
+    physical_indent = source_line[: len(source_line) - len(source_line.lstrip(_INDENTATION_WHITESPACE))]
+    return physical_indent.rsplit("\f", maxsplit=1)[-1]
+
+
+def _has_preceding_small_statement(docstring: DocstringInfo) -> bool:
+    """Return whether an attached docstring follows another statement on its source line."""
+    if not isinstance(docstring.statement, cst.SimpleStatementLine):
+        return False
+    for index, statement in enumerate(docstring.statement.body):
+        if statement is docstring.expression:
+            return index > 0
+    return False
 
 
 def planned_simple_docstring_line_change(docstring: DocstringInfo, *, raw_line_targets: tuple[str | None, ...]) -> rule_edits.PlannedSourceChange | None:

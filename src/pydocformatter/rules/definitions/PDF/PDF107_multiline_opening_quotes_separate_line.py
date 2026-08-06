@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 # Standard library imports
-from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
 # Third-party imports
@@ -73,18 +72,17 @@ class PDF107MultilineOpeningQuotesSeparateLine(RuleBase):
 def _planned_changes(context: RuleContext) -> tuple[rule_edits.PlannedSourceChange, ...]:
     """Return all safe opening-quote separate-line changes."""
     data = PDF_definition.PDF.require_data(context)
-    source_lines = context.source_lines
-    return tuple(change for docstring in data.docstrings if (change := _planned_change_for_docstring(docstring, context=context, source_lines=source_lines)) is not None)
+    return tuple(change for docstring in data.docstrings if (change := _planned_change_for_docstring(docstring, context=context)) is not None)
 
 
-def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo, *, context: RuleContext, source_lines: Sequence[str]) -> rule_edits.PlannedSourceChange | None:
+def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo, *, context: RuleContext) -> rule_edits.PlannedSourceChange | None:
     """Return one whole-literal replacement for a docstring."""
     if not docstring_source.can_canonically_rewrite_simple_docstring(docstring, require_multiline=True):
         return None
     content_indexes = docstring_source.docstring_content_indexes(docstring)
     if not content_indexes or content_indexes[0] != 0:
         return None
-    canonical_margin = docstring_source.docstring_canonical_margin(docstring, context=context, source_lines=source_lines)
+    canonical_margin = docstring_source.docstring_canonical_margin(docstring, context=context)
     first_line = docstring.structure.lines[0]
     moved_text = first_line.raw_text.lstrip(ascii_whitespace.SPACE_AND_TAB)
     output_lines = (
@@ -111,7 +109,7 @@ def _planned_fast_body_change(
     if first_line_source is None:
         return None
     moved_text = first_line_source.lstrip(ascii_whitespace.SPACE_AND_TAB)
-    moved_source = f"{docstring_source.docstring_canonical_margin(docstring, context=context, source_lines=context.source_lines)}{moved_text}"
+    moved_source = f"{docstring_source.docstring_canonical_margin(docstring, context=context)}{moved_text}"
     replacement_body = f"{context.line_ending}{moved_source}{context.line_ending}{rest_source}"
     expected_value = docstring_rendering.docstring_output_expected_value(output_lines, preserve_trailing_newline=docstring_source.docstring_value_ends_with_newline(docstring))
     rendered = docstring_rendering.render_docstring_output_with_separator_fallback(docstring, body_source=replacement_body, expected_value=expected_value, separator_fallback=None)

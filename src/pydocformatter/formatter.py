@@ -322,14 +322,9 @@ def _format_source_plan(source: str, path: str, *, settings: CheckSettings, exec
     errors = list(run_result.errors)
 
     if run_result.source_changed:
-        try:
-            new_source = run_result.module.code
-            if source.startswith(UTF8_BOM) and not new_source.startswith(UTF8_BOM):
-                new_source = UTF8_BOM + new_source
-        except Exception as error:
-            errors.append(f"Failed to generate formatted source for {path}: {error}")
-            new_source = source
-            fixed_findings.clear()
+        new_source = run_result.source
+        if source.startswith(UTF8_BOM) and not new_source.startswith(UTF8_BOM):
+            new_source = UTF8_BOM + new_source
     else:
         new_source = source
 

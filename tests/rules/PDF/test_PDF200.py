@@ -1,47 +1,30 @@
+# Future imports
+from __future__ import annotations
+
+# Standard library imports
+from typing import TYPE_CHECKING
+
 # Third-party imports
-import libcst as cst
-import libcst.metadata as cst_metadata
+import pytest
 
 # First-party imports
 from pydocformatter import formatter, rules_selection
-from pydocformatter.cli.settings_check import CheckSettings, DocstringBlankLineStyle, DocstringConvention, IndentStyle, LineEnding
-from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
-from pydocformatter.rules.definition_helpers import source_text
+from pydocformatter.cli.settings_check import CheckSettings, DocstringBlankLineStyle, DocstringConvention, LineEnding
 from pydocformatter.rules.definitions.PDF.PDF import PDF
+from pydocformatter.rules.definitions.PDF.PDF107_multiline_opening_quotes_separate_line import PDF107MultilineOpeningQuotesSeparateLine
 from pydocformatter.rules.definitions.PDF.PDF200_too_many_blank_lines import PDF200TooManyBlankLines
-from pydocformatter.source_path import SourcePathContext
 from tests import rule_helpers
+
+
+if TYPE_CHECKING:
+    # First-party imports
+    from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
 
 
 def contexts(source: str, *, settings: CheckSettings | None = None) -> tuple[RuleCategoryContext, RuleContext]:
     """Return matching category and rule contexts for source."""
-    module = cst.parse_module(source)
-    wrapper = cst_metadata.MetadataWrapper(module, unsafe_skip_copy=True)
-    category = RuleCategoryContext(
-        path="example.py",
-        source_path=SourcePathContext.for_path("example.py"),
-        settings=CheckSettings(select=("PDF200",)) if settings is None else settings,
-        module=module,
-        metadata_wrapper=wrapper,
-        positions=wrapper.resolve(cst_metadata.PositionProvider),
-        line_ending="\r\n" if "\r\n" in source else "\n",
-        source=source,
-        source_lines=tuple(source_text.source_lines(source)),
-        line_bounds=None,
-    )
-    return category, RuleContext(
-        path=category.path,
-        source_path=category.source_path,
-        settings=category.settings,
-        module=category.module,
-        metadata_wrapper=category.metadata_wrapper,
-        positions=category.positions,
-        line_ending=category.line_ending,
-        source=category.source,
-        source_lines=category.source_lines,
-        line_bounds=category.line_bounds,
-        category_data=PDF.prepare(category),
-    )
+    resolved_settings = CheckSettings(select=("PDF200",)) if settings is None else settings
+    return rule_helpers.prepared_direct_rule_contexts(PDF, source, settings=resolved_settings)
 
 
 def format_pdf100(source: str, *, settings: CheckSettings | None = None, fix: bool = True) -> formatter.FormatterResult:
@@ -57,10 +40,10 @@ def test_collapses_leading_internal_and_trailing_extra_blank_lines() -> None:
     fixed = rule_helpers.rule_fix_result(PDF200TooManyBlankLines, context)
     check_only = format_pdf100(source, fix=False)
 
-    assert fixed.module.code == 'def function():\n    """Summary.\n\n    Body.\n    """\n'
-    assert tuple(finding.line_numbers for finding in findings) == ((2, 3, 6, 8),)
-    assert tuple(finding.line_numbers for finding in fixed.fixed_findings) == ((2, 3, 6, 8),)
-    assert tuple(finding.line_numbers for finding in check_only.unfixed_findings) == ((2, 3, 6, 8),)
+    assert fixed.module.code == 'def function():\n    """\n    Summary.\n\n    Body.\n    """\n'
+    assert tuple(finding.line_numbers for finding in findings) == ((3, 6, 8),)
+    assert tuple(finding.line_numbers for finding in fixed.fixed_findings) == ((3, 6, 8),)
+    assert tuple(finding.line_numbers for finding in check_only.unfixed_findings) == ((3, 6, 8),)
     _, fixed_context = contexts(fixed.module.code)
     assert rule_helpers.rule_findings(PDF200TooManyBlankLines, fixed_context) == ()
 
@@ -164,6 +147,17 @@ def test_final_numpy_section_blank_line_follows_setting() -> None:
     assert not format_pdf100(enabled_result.new_source, settings=enabled_settings).modified
 
 
+@pytest.mark.parametrize("nested_headers", [" Notes", " Notes\n  Notes"])
+def test_nested_final_numpy_section_preserves_exactly_one_configured_blank(nested_headers: str) -> None:
+    source = f'"""\nNotes\n{nested_headers}\n\n\n"""\n'
+    settings = CheckSettings(select=("PDF200",), docstring_convention=DocstringConvention.NUMPY, docstring_blank_line_after_last_section=True)
+    result = format_pdf100(source, settings=settings)
+
+    assert result.new_source == f'"""\nNotes\n{nested_headers}\n\n"""\n'
+    assert result.fixed_findings[PDF200TooManyBlankLines.meta] == 1
+    assert not format_pdf100(result.new_source, settings=settings).modified
+
+
 def test_final_section_setting_does_not_preserve_convention_like_trailing_blank_without_matching_convention() -> None:
     source = 'def function(value):\n    """Summary.\n\n    Args:\n        value: Description.\n\n\n    """\n'
     settings = CheckSettings(select=("PDF200",), docstring_convention=DocstringConvention.NONE, docstring_blank_line_after_last_section=True)
@@ -256,21 +250,20 @@ def test_module_trailing_newline_before_closing_quotes_is_preserved() -> None:
     assert not format_pdf100(result.new_source).modified
 
 
-def test_simple_suite_closing_quote_prefix_uses_configured_margin() -> None:
+def test_simple_suite_closing_quote_prefix_is_preserved_verbatim() -> None:
     source = 'def function(): """Summary.\n\n\n  """\n'
-    result = format_pdf100(source, settings=CheckSettings(select=("PDF200",), indent_width=2))
+    result = format_pdf100(source)
 
     assert result.new_source == 'def function(): """Summary.\n  """\n'
-    assert not format_pdf100(result.new_source, settings=CheckSettings(select=("PDF200",), indent_width=2)).modified
+    assert not format_pdf100(result.new_source).modified
 
 
-def test_simple_suite_closing_quote_prefix_uses_configured_tab_margin() -> None:
+def test_simple_suite_tab_closing_quote_prefix_is_preserved_verbatim() -> None:
     source = 'def function(): """Summary.\n\n\n\t"""\n'
-    settings = CheckSettings(select=("PDF200",), indent_style=IndentStyle.TAB)
-    result = format_pdf100(source, settings=settings)
+    result = format_pdf100(source)
 
     assert result.new_source == 'def function(): """Summary.\n\t"""\n'
-    assert not format_pdf100(result.new_source, settings=settings).modified
+    assert not format_pdf100(result.new_source).modified
 
 
 def test_parenthesized_docstring_closing_quote_prefix_uses_quote_column_margin() -> None:
@@ -281,11 +274,33 @@ def test_parenthesized_docstring_closing_quote_prefix_uses_quote_column_margin()
     assert not format_pdf100(result.new_source).modified
 
 
-def test_same_line_closing_quotes_move_to_content_line_when_blank_prefix_is_removed() -> None:
+def test_noncanonical_closing_quote_prefix_is_preserved_for_owning_rules() -> None:
     source = 'def function():\n    """Summary.\n      """\n'
     result = format_pdf100(source)
 
-    assert result.new_source == 'def function():\n    """Summary."""\n'
+    assert result.new_source == source
+    assert not result.fixed_findings
+
+
+def test_pdf107_and_pdf200_converge_with_one_opening_separator() -> None:
+    source = 'def function():\n    """Summary.\n    Body."""\n'
+    settings = CheckSettings(select=("PDF107", "PDF200"))
+    result = formatter.format_source(source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
+
+    assert result.new_source == 'def function():\n    """\n    Summary.\n    Body."""\n'
+    assert result.fixed_findings[PDF107MultilineOpeningQuotesSeparateLine.meta] == 1
+    assert not result.errors
+    assert not formatter.format_source(result.new_source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True).modified
+
+
+def test_opening_quote_suffix_whitespace_and_crlf_are_preserved() -> None:
+    source = 'def function():\r\n    """ \t\r\n\r\n    Summary.\r\n    """\r\n'
+    settings = CheckSettings(select=("PDF200",), line_ending=LineEnding.CR_LF)
+    result = format_pdf100(source, settings=settings)
+
+    assert result.new_source == 'def function():\r\n    """ \t\r\n    Summary.\r\n    """\r\n'
+    assert result.fixed_findings[PDF200TooManyBlankLines.meta] == 1
+    assert not format_pdf100(result.new_source, settings=settings).modified
 
 
 def test_preserves_crlf_for_generated_separators() -> None:

@@ -1,10 +1,10 @@
 """Rule category registration.
 
 Attributes:
-    DEFAULT_RULE_REGISTRY (RuleRegistry): Import-time registry populated by rule category decorators before the
-        immutable rule collection is built.
     CategoryClassT (TypeVar): Concrete rule category class type preserved by registration decorators.
     RuleClassT (TypeVar): Concrete rule class type preserved by registration decorators.
+    DEFAULT_RULE_REGISTRY (RuleRegistry): Import-time registry populated by rule category decorators before the
+        immutable rule collection is built.
 """
 
 # Future imports

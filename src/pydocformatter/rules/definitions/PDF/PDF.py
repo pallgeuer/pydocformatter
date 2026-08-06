@@ -1581,6 +1581,8 @@ def _match_generic_entry(text: str, *, require_indent: bool = True) -> _Conventi
     regex_match = _GENERIC_ENTRY_PATTERN.match(text)
     if regex_match is None or (require_indent and not regex_match.group("indent")):
         return None
+    if not regex_match.group("name").strip(ascii_whitespace.SPACE_AND_TAB):
+        return None
     return _entry_match_from_regex(regex_match)
 
 
@@ -1672,6 +1674,13 @@ def _balanced_delimiter_end(text: str, opening: int) -> int | None:
                 return index
         index += 1
     return None
+
+
+def _description_reflow_prefix(prefix: str, *, joins_continuation: bool) -> str:
+    """Return an entry prefix with required spacing before joined description text."""
+    if joins_continuation and not prefix.endswith((" ", "\t")):
+        return f"{prefix} "
+    return prefix
 
 
 class _DocstringParser:
@@ -2025,10 +2034,9 @@ class _DocstringParser:
             if not first_description and entry_end == index + 1:
                 self._record_google_continuation_issue(index + 1, end, entry=entry, entry_indent=text_layout.leading_width(self.lines[index].raw_indent))
             unit = text_layout.indent_unit(self.settings)
-            prefix = f"{unit}{self.lines[index].text[len(match.indent) : match.description_start]}"
-            if description_lines and not first_description and not prefix.endswith((" ", "\t")):
-                prefix = f"{prefix} "
-            self._add_reflow(DocstringBlockKind.SECTION_ENTRY, index, entry_end, lines=tuple(description_fragments), initial_indent=prefix, subsequent_indent=unit * 2)
+            prefix = self.lines[index].text[: match.description_start]
+            prefix = _description_reflow_prefix(prefix, joins_continuation=bool(description_lines and not first_description))
+            self._add_reflow(DocstringBlockKind.SECTION_ENTRY, index, entry_end, lines=tuple(description_fragments), initial_indent=prefix, subsequent_indent=f"{match.indent}{unit}")
             index = entry_end
         return tuple(entries)
 
@@ -2070,13 +2078,10 @@ class _DocstringParser:
                     if not description_lines and entry_end == index + 1:
                         self._record_numpy_continuation_issue(index + 1, end, entry=entry, entry_indent=text_layout.leading_width(self.lines[index].raw_indent))
                     if description_lines:
+                        prefix = self.lines[index].text[: exception_match.start("description")]
+                        prefix = _description_reflow_prefix(prefix, joins_continuation=first_description_line is None or not first_description_line.text)
                         self._add_reflow(
-                            DocstringBlockKind.SECTION_ENTRY,
-                            index,
-                            entry_end,
-                            lines=tuple(description_fragments),
-                            initial_indent=self.lines[index].text[: exception_match.start("description")],
-                            subsequent_indent=text_layout.indent_unit(self.settings),
+                            DocstringBlockKind.SECTION_ENTRY, index, entry_end, lines=tuple(description_fragments), initial_indent=prefix, subsequent_indent=self._numpy_description_indent(index)
                         )
                 index = entry_end
                 continue
@@ -2156,8 +2161,8 @@ class _DocstringParser:
                         index + 1,
                         entry_end,
                         lines=tuple(description_fragments),
-                        initial_indent=text_layout.indent_unit(self.settings),
-                        subsequent_indent=text_layout.indent_unit(self.settings),
+                        initial_indent=self._numpy_description_indent(index),
+                        subsequent_indent=self._numpy_description_indent(index),
                     )
                 index = entry_end
                 continue
@@ -2182,10 +2187,14 @@ class _DocstringParser:
                 index + 1,
                 entry_end,
                 lines=description_fragments,
-                initial_indent=text_layout.indent_unit(self.settings),
-                subsequent_indent=text_layout.indent_unit(self.settings),
+                initial_indent=self._numpy_description_indent(index),
+                subsequent_indent=self._numpy_description_indent(index),
             )
         return entry
+
+    def _numpy_description_indent(self, entry_line: int) -> str:
+        """Return one configured indentation unit beyond a NumPy entry head."""
+        return f"{self.lines[entry_line].text_indent}{text_layout.indent_unit(self.settings)}"
 
     def _record_google_head_issue(self, index: int, *, kind: DocstringEntryKind) -> None:
         """Record a high-confidence malformed Google entry head."""
@@ -2485,10 +2494,8 @@ class _DocstringParser:
         else:
             self._record_convention_entry_issue(ConventionEntryIssue(kind=issue_kind, start_line=start, field_name=field))
         prefix = self.lines[start].text[: match.start("description")]
-        subsequent_indent = " " * len(prefix.expandtabs(self.settings.indent_width))
-        if reflow_runs and reflow_runs[0].start_line == start and (first_description_line is None or not first_description_line.text) and not prefix.endswith((" ", "\t")):
-            prefix = f"{prefix} "
-            subsequent_indent = " " * len(prefix.expandtabs(self.settings.indent_width))
+        prefix = _description_reflow_prefix(prefix, joins_continuation=bool(reflow_runs and reflow_runs[0].start_line == start and (first_description_line is None or not first_description_line.text)))
+        subsequent_indent = self._hanging_indent(prefix, base_indent=match.group("indent"))
         for run in reflow_runs:
             run_indent = prefix if run.start_line == start else self.lines[run.start_line].text_indent
             run_subsequent_indent = subsequent_indent if run.start_line == start else run_indent
@@ -2531,8 +2538,14 @@ class _DocstringParser:
         prefix = f"{match.group('indent')}{match.group('marker')} "
         first_line = self._reflow_line_from_text_span(start, match.start("text"), len(self.lines[start].text))
         lines = (() if first_line is None else (first_line,)) + self._stripped_reflow_lines(start + 1, block_end)
-        self._add_reflow(DocstringBlockKind.LIST_ITEM, start, block_end, lines=tuple(lines), initial_indent=prefix, subsequent_indent=" " * len(prefix.expandtabs(self.settings.indent_width)))
+        self._add_reflow(DocstringBlockKind.LIST_ITEM, start, block_end, lines=tuple(lines), initial_indent=prefix, subsequent_indent=self._hanging_indent(prefix, base_indent=match.group("indent")))
         return DocstringBlock(DocstringBlockKind.LIST_ITEM, start, block_end), block_end
+
+    def _hanging_indent(self, prefix: str, *, base_indent: str) -> str:
+        """Return a hanging indent that preserves its structural base spelling."""
+        prefix_width = text_layout.display_width(prefix, tab_width=self.settings.indent_width)
+        base_width = text_layout.display_width(base_indent, tab_width=self.settings.indent_width)
+        return f"{base_indent}{' ' * max(0, prefix_width - base_width)}"
 
     def _parse_block_quote(self, start: int, end: int, match: re.Match[str]) -> tuple[DocstringBlock, int]:
         """Parse a block quote run and register its reflow region."""

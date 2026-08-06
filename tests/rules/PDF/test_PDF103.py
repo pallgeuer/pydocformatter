@@ -1,47 +1,26 @@
-# Third-party imports
-import libcst as cst
-import libcst.metadata as cst_metadata
+# Future imports
+from __future__ import annotations
+
+# Standard library imports
+from typing import TYPE_CHECKING
 
 # First-party imports
 from pydocformatter import formatter, rules_selection
 from pydocformatter.cli import settings_check
-from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
-from pydocformatter.rules.definition_helpers import source_text
 from pydocformatter.rules.definitions.PDF.PDF import PDF
 from pydocformatter.rules.definitions.PDF.PDF103_docstring_blank_line_whitespace import PDF103DocstringBlankLineWhitespace
-from pydocformatter.source_path import SourcePathContext
 from tests import rule_helpers
+
+
+if TYPE_CHECKING:
+    # First-party imports
+    from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
 
 
 def contexts(source: str, *, settings: settings_check.CheckSettings | None = None) -> tuple[RuleCategoryContext, RuleContext]:
     """Return matching category and rule contexts for source."""
-    module = cst.parse_module(source)
-    wrapper = cst_metadata.MetadataWrapper(module, unsafe_skip_copy=True)
-    category = RuleCategoryContext(
-        path="example.py",
-        source_path=SourcePathContext.for_path("example.py"),
-        settings=settings_check.CheckSettings(select=("PDF103",)) if settings is None else settings,
-        module=module,
-        metadata_wrapper=wrapper,
-        positions=wrapper.resolve(cst_metadata.PositionProvider),
-        line_ending="\r\n" if "\r\n" in source else "\n",
-        source=source,
-        source_lines=tuple(source_text.source_lines(source)),
-        line_bounds=None,
-    )
-    return category, RuleContext(
-        path=category.path,
-        source_path=category.source_path,
-        settings=category.settings,
-        module=category.module,
-        metadata_wrapper=category.metadata_wrapper,
-        positions=category.positions,
-        line_ending=category.line_ending,
-        source=category.source,
-        source_lines=category.source_lines,
-        line_bounds=category.line_bounds,
-        category_data=PDF.prepare(category),
-    )
+    resolved_settings = settings_check.CheckSettings(select=("PDF103",)) if settings is None else settings
+    return rule_helpers.prepared_direct_rule_contexts(PDF, source, settings=resolved_settings)
 
 
 def format_pdf004(source: str, *, settings: settings_check.CheckSettings | None = None, fix: bool = True) -> formatter.FormatterResult:

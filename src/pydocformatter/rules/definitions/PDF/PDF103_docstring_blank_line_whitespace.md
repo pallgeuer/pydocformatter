@@ -7,7 +7,7 @@ Checks for whitespace-only blank lines inside safely rewritable docstrings. A bl
 
 By default, PDF103 makes ordinary blank docstring lines truly blank. With `docstring-blank-line-style = "aligned"`, ordinary blank lines are aligned to the docstring's base/quote indentation. A whitespace-only final line before same-line closing quotes is always aligned so the closing quotes remain at the docstring margin.
 
-PDF103 owns whitespace-only opening quote lines and whitespace-only closing quote lines. PDF104 and PDF105 only handle quote-adjacent whitespace when the same line also contains non-empty docstring content. PDF102 owns trailing spaces and tabs on non-empty docstring lines.
+PDF103 solely owns every whitespace-only docstring line, including ordinary blank lines and whitespace before opening or closing quotes. PDF100 leaves all such lines unchanged, including when their indentation uses tabs or differs from the docstring body. PDF104 and PDF105 only handle quote-adjacent whitespace when the same line also contains non-empty docstring content. PDF102 owns trailing spaces and tabs on non-empty docstring lines.
 
 PDF103 only rewrites safely mapped simple docstring literals. It skips concatenated docstrings and simple literals where evaluated lines cannot be mapped back to physical source lines safely, such as docstrings that contain escaped newline sequences.
 

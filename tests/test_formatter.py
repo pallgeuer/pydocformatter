@@ -37,7 +37,7 @@ import pydocformatter.rules.registration as rule_registration
 from pydocformatter import file_selection, formatter, rules_selection
 from pydocformatter.cli import settings_check
 from pydocformatter.cli.global_args import GlobalArgs
-from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention, DocstringMissingDocumentation, LineEnding
+from pydocformatter.cli.settings_check import CheckSettings, DocstringBlankLineStyle, DocstringConvention, DocstringMissingDocumentation, IndentStyle, LineEnding
 from pydocformatter.formatter import FormatterResult
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition_helpers import source_text
@@ -191,8 +191,8 @@ def test_rule_source_formatter_requires_precomputed_rule_selection() -> None:
     assert signature.parameters["rule_selection"].default is inspect.Parameter.empty
 
 
-def test_max_fix_iterations_is_twenty() -> None:
-    assert rule_runner.MAX_FIX_ITERATIONS == 20
+def test_max_fix_iterations_is_thirty() -> None:
+    assert rule_runner.MAX_FIX_ITERATIONS == 30
 
 
 def test_formatter_result_tracks_modified_and_findings_explicitly() -> None:
@@ -494,12 +494,17 @@ def test_rule_formatter_interface_is_noop_and_preserves_display_path(monkeypatch
         assert target.read_text(encoding="utf-8") == '"""Module."""\n\nx = 1\n'
 
 
-def test_rule_source_formatter_seeds_initial_check_context_without_module_code(mocker: MockerFixture) -> None:
+def test_rule_source_formatter_renders_once_to_align_initial_check_context(mocker: MockerFixture) -> None:
     observed_contexts: list[tuple[str, tuple[str, ...], source_text.LineBounds | None]] = []
+    original_code_property = inspect.getattr_static(cst.Module, "code")
+    if not isinstance(original_code_property, property) or original_code_property.fget is None:
+        raise AssertionError("Expected LibCST Module.code to be a property")
+    original_code_getter = typing.cast("typing.Callable[[cst.Module], str]", original_code_property.fget)
+    code_accesses: list[cst.Module] = []
 
-    def _raise_code_access(module: cst.Module) -> str:
-        del module
-        raise AssertionError("Module.code should not be read for seeded initial check contexts")
+    def _count_code_access(module: cst.Module) -> str:
+        code_accesses.append(module)
+        return original_code_getter(module)
 
     class TST(rule_base.RuleCategoryBase):
         meta = rule_models.RuleCategoryMetadata(prefix="TST", name="test", url=None)
@@ -531,13 +536,14 @@ def test_rule_source_formatter_seeds_initial_check_context_without_module_code(m
     source = "\ufeffx = 1\r\ny = 2\r\n"
     expected_context_source = source.removeprefix("\ufeff")
     expected_lines = tuple(source_text.source_lines(expected_context_source))
-    mocker.patch.object(cst.Module, "code", new=property(_raise_code_access))
+    mocker.patch.object(cst.Module, "code", new=property(_count_code_access))
     result = formatter.format_source(source, "a.py", settings=CheckSettings(), rule_selection=isolated_rule_selection(TST), fix=False)
 
     assert result.new_source == source
     assert not result.modified
     assert result.errors == ()
     assert observed_contexts == [(expected_context_source, expected_lines, source_text.line_bounds_from_lines(expected_lines))]
+    assert len(code_accesses) == 1
 
 
 def test_rule_source_formatter_aligns_bom_seed_with_libcst_positions() -> None:
@@ -552,10 +558,15 @@ def test_rule_source_formatter_aligns_bom_seed_with_libcst_positions() -> None:
 
 def test_rule_source_formatter_aligns_trailing_cr_seed_with_libcst_positions(mocker: MockerFixture) -> None:
     observed_contexts: list[tuple[str, tuple[str, ...], source_text.LineBounds | None]] = []
+    original_code_property = inspect.getattr_static(cst.Module, "code")
+    if not isinstance(original_code_property, property) or original_code_property.fget is None:
+        raise AssertionError("Expected LibCST Module.code to be a property")
+    original_code_getter = typing.cast("typing.Callable[[cst.Module], str]", original_code_property.fget)
+    code_accesses: list[cst.Module] = []
 
-    def _raise_code_access(module: cst.Module) -> str:
-        del module
-        raise AssertionError("Module.code should not be read for seeded initial check contexts")
+    def _count_code_access(module: cst.Module) -> str:
+        code_accesses.append(module)
+        return original_code_getter(module)
 
     class TST(rule_base.RuleCategoryBase):
         meta = rule_models.RuleCategoryMetadata(prefix="TST", name="test", url=None)
@@ -583,16 +594,150 @@ def test_rule_source_formatter_aligns_trailing_cr_seed_with_libcst_positions(moc
     source = "x = 1\ry = 2\r"
     expected_context_source = "x = 1\ry = 2"
     expected_lines = tuple(source_text.source_lines(expected_context_source))
-    mocker.patch.object(cst.Module, "code", new=property(_raise_code_access))
+    mocker.patch.object(cst.Module, "code", new=property(_count_code_access))
     result = formatter.format_source(source, "a.py", settings=CheckSettings(), rule_selection=isolated_rule_selection(TST), fix=False)
 
     assert result.new_source == source
     assert not result.modified
     assert result.errors == ()
     assert observed_contexts == [(expected_context_source, expected_lines, source_text.line_bounds_from_lines(expected_lines))]
+    assert len(code_accesses) == 1
 
 
-def test_rule_runner_recomputes_source_after_seeded_fix_replaces_module(mocker: MockerFixture) -> None:
+@pytest.mark.parametrize(
+    ("source", "expected"),
+    [
+        ('\f"""summary   """\nx = 1\n', '\f"""Summary."""\nx = 1\n'),
+        ('x = 1\n\fdef f():\n    """summary   """\n', 'x = 1\n\fdef f():\n    """Summary."""\n'),
+        ('\f"""summary   """\n\n  # c\n', '\f"""Summary."""\n\n  # c\n'),
+    ],
+)
+def test_rule_source_formatter_maps_form_feed_normalization_to_exact_source(source: str, expected: str) -> None:
+    settings = CheckSettings(select=("PDF",))
+    selection = rules_selection.select_rules(settings)
+
+    result = formatter.format_source(source, "a.py", settings=settings, rule_selection=selection, fix=True)
+    assert result.new_source is not None
+    repeated = formatter.format_source(result.new_source, "a.py", settings=settings, rule_selection=selection, fix=True)
+
+    assert result.new_source == expected
+    assert not result.errors
+    assert not repeated.modified
+    assert not repeated.errors
+
+
+def test_rule_runner_fails_closed_when_initial_source_alignment_is_unprovable() -> None:
+    class TST(rule_base.RuleCategoryBase):
+        meta = rule_models.RuleCategoryMetadata(prefix="TST", name="test", url=None)
+
+    @rule_registration.register_rule_to(TST)
+    class TST001Noop(rule_base.RuleBase):
+        meta = rule_models.RuleMetadata(
+            code=rule_codes.RuleCode("TST001"),
+            name="noop",
+            message="Noop",
+            fix_availability=rule_models.FixAvailability.NEVER,
+            stable_since="1.0.0",
+            setting_effects=(),
+            incompatible_with=(),
+            check_kind=rule_models.RuleCheckKind.STANDARD,
+        )
+        violations = classmethod(no_violations)
+
+    source = "y = 1\n"
+    module = cst.parse_module("x = 1\n")
+    selection = isolated_rule_selection(TST)
+
+    result = rule_runner.run_rule_plan(
+        module,
+        path="a.py",
+        settings=CheckSettings(),
+        line_ending="\n",
+        execution_plan=selection.execution_plan_for_path("a.py"),
+        fix=True,
+        source_path=SourcePathContext.for_path("a.py"),
+        source=source,
+    )
+
+    assert result.source == source
+    assert not result.source_changed
+    assert result.fixed_findings == ()
+    assert result.unfixed_findings == ()
+    assert len(result.errors) == 1
+    assert result.errors[0].startswith("a.py: Exact source could not be aligned safely with LibCST rendering:")
+
+
+def test_formatter_right_biases_duplicate_omitted_footer_trivia() -> None:
+    source = '"""D."""\ndef function():\n    """f"""\n\f\n\f\n'
+    expected = '"""D."""\ndef function():\n    """f."""\n\f\n\f\n'
+    settings = CheckSettings(select=("PDF300",))
+    selection = rules_selection.select_rules(settings)
+
+    result = formatter.format_source(source, "a.py", settings=settings, rule_selection=selection, fix=True)
+    assert result.new_source is not None
+    repeated = formatter.format_source(result.new_source, "a.py", settings=settings, rule_selection=selection, fix=True)
+
+    assert result.new_source == expected
+    assert {rule.code.tag: count for rule, count in result.fixed_findings.items()} == {"PDF300": 1}
+    assert not result.errors
+    assert not repeated.modified
+    assert not repeated.errors
+
+
+def test_rule_runner_rolls_back_when_post_fix_source_alignment_is_unprovable(mocker: MockerFixture) -> None:
+    class TST(rule_base.RuleCategoryBase):
+        meta = rule_models.RuleCategoryMetadata(prefix="TST", name="test", url=None)
+
+    @rule_registration.register_rule_to(TST)
+    class TST001InsertLeadingLine(rule_base.RuleBase):
+        meta = rule_models.RuleMetadata(
+            code=rule_codes.RuleCode("TST001"),
+            name="insert-leading-line",
+            message="Insert leading line",
+            fix_availability=rule_models.FixAvailability.ALWAYS,
+            stable_since="1.0.0",
+            setting_effects=(),
+            incompatible_with=(),
+            check_kind=rule_models.RuleCheckKind.STANDARD,
+        )
+        violations = classmethod(insert_leading_line_violations)
+
+    original_run_fix_pass = rule_runner._run_fix_pass
+
+    def fail_parsed_source_seed(module: cst.Module, source: str) -> rule_runner._ModuleSourceSeed:
+        del module, source
+        raise rule_runner._SourceAlignmentError("forced post-fix mismatch")
+
+    def run_fix_pass_with_prior_error(module: cst.Module, **kwargs: typing.Any) -> rule_runner._FixPassResult:
+        errors = typing.cast("list[str]", kwargs["errors"])
+        errors.append("a.py: earlier automatic fix failed")
+        return original_run_fix_pass(module, **kwargs)
+
+    mocker.patch.object(rule_runner, "_module_source_seed_for_parsed_source", side_effect=fail_parsed_source_seed)
+    mocker.patch.object(rule_runner, "_run_fix_pass", side_effect=run_fix_pass_with_prior_error)
+    source = "x = 1\n"
+    module = cst.parse_module(source)
+    selection = isolated_rule_selection(TST)
+
+    result = rule_runner.run_rule_plan(
+        module,
+        path="a.py",
+        settings=CheckSettings(),
+        line_ending="\n",
+        execution_plan=selection.execution_plan_for_path("a.py"),
+        fix=True,
+        source_path=SourcePathContext.for_path("a.py"),
+        source=source,
+    )
+
+    assert result.source == source
+    assert not result.source_changed
+    assert result.fixed_findings == ()
+    assert result.unfixed_findings == (RuleFinding(rule=TST001InsertLeadingLine.meta, line_numbers=(1,), instance_fixable=None),)
+    assert result.errors == ("a.py: earlier automatic fix failed", "a.py: Exact source could not be aligned safely with LibCST rendering: forced post-fix mismatch")
+
+
+def test_rule_runner_retains_exact_source_after_seeded_fix_replaces_module(mocker: MockerFixture) -> None:
     original_code_property = inspect.getattr_static(cst.Module, "code")
     if not isinstance(original_code_property, property) or original_code_property.fget is None:
         raise AssertionError("Expected LibCST Module.code to be a property")
@@ -660,11 +805,14 @@ def test_rule_runner_recomputes_source_after_seeded_fix_replaces_module(mocker: 
     )
 
     assert result.source_changed
+    assert result.source == "\nx = 1\n"
     assert result.fixed_findings == (RuleFinding(rule=TST001InsertLeadingLine.meta, line_numbers=(1,), instance_fixable=None),)
     assert result.errors == ()
     assert observed_sources
     assert set(observed_sources) == {"x = 1\n", "\nx = 1\n"}
-    assert any(accessed_module is result.module for accessed_module in code_accesses)
+    assert len(code_accesses) == 2
+    assert code_accesses[0] is module
+    assert code_accesses[1] is not module
 
 
 def test_rule_runner_skips_fix_hooks_when_precheck_has_no_fixable_findings() -> None:
@@ -712,7 +860,7 @@ def test_rule_runner_skips_fix_hooks_when_precheck_has_no_fixable_findings() -> 
     check_result = rule_runner.run_rule_plan(module, path="a.py", settings=settings, line_ending="\n", execution_plan=execution_plan, fix=False, source_path=source_path)
     fix_result = rule_runner.run_rule_plan(module, path="a.py", settings=settings, line_ending="\n", execution_plan=execution_plan, fix=True, source_path=source_path)
 
-    assert fix_result.module is module
+    assert fix_result.source == module.code
     assert not fix_result.source_changed
     assert fix_result.fixed_findings == ()
     assert fix_result.unfixed_findings == check_result.unfixed_findings
@@ -857,8 +1005,9 @@ def test_rule_fix_pass_same_module_noop_skips_source_comparison(mocker: MockerFi
     selection = isolated_rule_selection(TST)
     selected_rule_by_code = {selected_rule.rule.code: selected_rule for selected_rule in selection.for_path("a.py")}
     errors: list[str] = []
+    source_seed = rule_runner._module_source_seed(module, source="x = 1\n")
     mocker.patch.object(cst.Module, "code", new=property(_raise_code_access))
-    result_module, findings, changed = rule_runner._run_fix_pass(
+    pass_result = rule_runner._run_fix_pass(
         module,
         path="a.py",
         settings=settings,
@@ -867,8 +1016,11 @@ def test_rule_fix_pass_same_module_noop_skips_source_comparison(mocker: MockerFi
         selected_rule_by_code=selected_rule_by_code,
         errors=errors,
         source_path=SourcePathContext.for_path("a.py"),
-        source_seed=rule_runner._ModuleSourceSeed(module=module, source="x = 1\n"),
+        source_seed=source_seed,
     )
+    result_module = pass_result.source_seed.module
+    findings = pass_result.findings
+    changed = pass_result.changed
 
     assert result_module is module
     assert findings == ()
@@ -914,7 +1066,7 @@ def test_rule_fix_pass_rejects_same_source_reported_fix(mocker: MockerFixture) -
     selected_rule_by_code = {selected_rule.rule.code: selected_rule for selected_rule in selection.for_path("a.py")}
     errors: list[str] = []
     mocker.patch.object(cst.Module, "code", new=property(_count_code_access))
-    result_module, findings, changed = rule_runner._run_fix_pass(
+    pass_result = rule_runner._run_fix_pass(
         module,
         path="a.py",
         settings=settings,
@@ -924,6 +1076,9 @@ def test_rule_fix_pass_rejects_same_source_reported_fix(mocker: MockerFixture) -
         errors=errors,
         source_path=SourcePathContext.for_path("a.py"),
     )
+    result_module = pass_result.source_seed.module
+    findings = pass_result.findings
+    changed = pass_result.changed
 
     assert result_module is module
     assert findings == ()
@@ -959,7 +1114,7 @@ def test_rule_fix_pass_does_not_apply_suppressed_violations() -> None:
     selected_rule_by_code = {selected_rule.rule.code: selected_rule for selected_rule in selection.for_path("a.py")}
     errors: list[str] = []
 
-    result_module, findings, changed = rule_runner._run_fix_pass(
+    pass_result = rule_runner._run_fix_pass(
         module,
         path="a.py",
         settings=settings,
@@ -969,6 +1124,9 @@ def test_rule_fix_pass_does_not_apply_suppressed_violations() -> None:
         errors=errors,
         source_path=SourcePathContext.for_path("a.py"),
     )
+    result_module = pass_result.source_seed.module
+    findings = pass_result.findings
+    changed = pass_result.changed
 
     assert result_module is module
     assert findings == ()
@@ -1065,7 +1223,7 @@ def test_rule_fix_pass_rejects_violation_fixability_mismatch() -> None:
     selected_rule_by_code = {selected_rule.rule.code: selected_rule for selected_rule in selection.for_path("a.py")}
     errors: list[str] = []
 
-    result_module, findings, changed = rule_runner._run_fix_pass(
+    pass_result = rule_runner._run_fix_pass(
         module,
         path="a.py",
         settings=settings,
@@ -1075,6 +1233,9 @@ def test_rule_fix_pass_rejects_violation_fixability_mismatch() -> None:
         errors=errors,
         source_path=SourcePathContext.for_path("a.py"),
     )
+    result_module = pass_result.source_seed.module
+    findings = pass_result.findings
+    changed = pass_result.changed
 
     assert result_module is module
     assert findings == ()
@@ -1114,7 +1275,7 @@ def test_rule_fix_pass_rejects_mismatched_source_change_targets() -> None:
     selected_rule_by_code = {selected_rule.rule.code: selected_rule for selected_rule in selection.for_path("a.py")}
     errors: list[str] = []
 
-    result_module, findings, changed = rule_runner._run_fix_pass(
+    pass_result = rule_runner._run_fix_pass(
         module,
         path="a.py",
         settings=settings,
@@ -1124,6 +1285,9 @@ def test_rule_fix_pass_rejects_mismatched_source_change_targets() -> None:
         errors=errors,
         source_path=SourcePathContext.for_path("a.py"),
     )
+    result_module = pass_result.source_seed.module
+    findings = pass_result.findings
+    changed = pass_result.changed
 
     assert result_module is module
     assert findings == ()
@@ -1323,7 +1487,7 @@ def test_rule_fix_pass_reuses_position_metadata_across_unchanged_categories(mock
     selected_rule_by_code = {selected_rule.rule.code: selected_rule for selected_rule in selection.for_path("a.py")}
     errors: list[str] = []
     mocker.patch.object(cst_metadata.MetadataWrapper, "resolve", autospec=True, side_effect=_count_position_resolve)
-    result_module, findings, changed = rule_runner._run_fix_pass(
+    pass_result = rule_runner._run_fix_pass(
         module,
         path="a.py",
         settings=settings,
@@ -1333,6 +1497,9 @@ def test_rule_fix_pass_reuses_position_metadata_across_unchanged_categories(mock
         errors=errors,
         source_path=SourcePathContext.for_path("a.py"),
     )
+    result_module = pass_result.source_seed.module
+    findings = pass_result.findings
+    changed = pass_result.changed
 
     assert result_module is module
     assert findings == ()
@@ -1396,7 +1563,7 @@ def test_rule_fix_pass_reports_position_metadata_errors_as_category_preparation(
     selected_rule_by_code = {selected_rule.rule.code: selected_rule for selected_rule in selection.for_path("a.py")}
     errors: list[str] = []
     mocker.patch.object(cst_metadata.MetadataWrapper, "resolve", autospec=True, side_effect=_raise_position_resolve)
-    result_module, findings, changed = rule_runner._run_fix_pass(
+    pass_result = rule_runner._run_fix_pass(
         module,
         path="a.py",
         settings=settings,
@@ -1406,6 +1573,9 @@ def test_rule_fix_pass_reports_position_metadata_errors_as_category_preparation(
         errors=errors,
         source_path=SourcePathContext.for_path("a.py"),
     )
+    result_module = pass_result.source_seed.module
+    findings = pass_result.findings
+    changed = pass_result.changed
 
     assert result_module is module
     assert findings == ()
@@ -1484,7 +1654,7 @@ def test_rule_fix_pass_refreshes_position_metadata_after_changed_module(mocker: 
     selected_rule_by_code = {selected_rule.rule.code: selected_rule for selected_rule in selection.for_path("a.py")}
     errors: list[str] = []
     mocker.patch.object(cst_metadata.MetadataWrapper, "resolve", autospec=True, side_effect=_count_position_resolve)
-    result_module, findings, changed = rule_runner._run_fix_pass(
+    pass_result = rule_runner._run_fix_pass(
         module,
         path="a.py",
         settings=settings,
@@ -1494,6 +1664,9 @@ def test_rule_fix_pass_refreshes_position_metadata_after_changed_module(mocker: 
         errors=errors,
         source_path=SourcePathContext.for_path("a.py"),
     )
+    result_module = pass_result.source_seed.module
+    findings = pass_result.findings
+    changed = pass_result.changed
 
     assert result_module.code == "\nx = 1\n"
     assert findings == (RuleFinding(rule=TST001InsertLeadingLine.meta, line_numbers=(1,), instance_fixable=None),)
@@ -1759,7 +1932,61 @@ def test_rule_source_formatter_applies_per_file_ignores() -> None:
     assert result.unfixed_findings == ()
 
 
-def test_rule_source_formatter_reports_non_converging_fixes_and_keeps_latest_source(mocker: MockerFixture) -> None:
+@pytest.mark.parametrize(
+    ("source", "settings"),
+    [
+        ('def function():\n    """Summary.\n\t"""\n', CheckSettings()),
+        ('value = 1\n("""Notes:\n Details.\n""")\n', CheckSettings()),
+        (
+            'def function():\n    """Returns\n    -------\n    int\n        Description long enough to wrap across multiple lines at a short line width for testing.\n    """\n',
+            CheckSettings(docstring_convention=DocstringConvention.NUMPY, line_length=60),
+        ),
+    ],
+)
+def test_broad_rule_selection_converges_for_former_rule_cycle_sources(source: str, settings: CheckSettings) -> None:
+    selection = rules_selection.select_rules(settings)
+    result = formatter.format_source(source, "a.py", settings=settings, rule_selection=selection, fix=True)
+    assert result.new_source is not None
+    repeated = formatter.format_source(result.new_source, "a.py", settings=settings, rule_selection=selection, fix=True)
+
+    assert not result.errors
+    assert not repeated.modified
+    assert not repeated.errors
+
+
+@pytest.mark.parametrize(
+    ("source", "settings"),
+    [
+        ('def f():\n\t"""S.\n\n\t"""\n', CheckSettings(select=("PDF100", "PDF103"), docstring_blank_line_style=DocstringBlankLineStyle.ALIGNED)),
+        ('def f():\n\t"""Args:\n\t"""\n', CheckSettings(select=("PDF100", "PDF103"), docstring_convention=DocstringConvention.GOOGLE, indent_style=IndentStyle.SPACE)),
+        (
+            'def f():\n    """\n    Yields:\n        :yields:\n           x\n    """\n',
+            CheckSettings(select=("PDF100", "PDF101"), docstring_convention=DocstringConvention.GOOGLE, indent_style=IndentStyle.SPACE, line_length=17),
+        ),
+        ('def f():\n    """S.\n\n    Warns\n    -----\n    E, F: Bad.\n    """\n', CheckSettings(select=("PDF101", "PDF409"), docstring_convention=DocstringConvention.NUMPY, line_length=17)),
+        (
+            'def f():\n    """S.\n\n    Examples:\n        >>> x\n    \n    - a b c d\n    """\n',
+            CheckSettings(select=("PDF100", "PDF101"), docstring_convention=DocstringConvention.GOOGLE, line_length=16, indent_style=IndentStyle.TAB),
+        ),
+        ('def f(): """:return: x\ny""";pass\n', CheckSettings(select=("PDF100", "PDF101"), docstring_convention=DocstringConvention.REST, line_length=24, indent_style=IndentStyle.TAB)),
+        ('"""x\n\tArgs\n\tx (i): x\n"""\n', CheckSettings(select=("PDF101", "PDF415"), docstring_convention=DocstringConvention.GOOGLE, indent_style=IndentStyle.TAB)),
+        ('"""\nNotes\n Notes\n"""\n', CheckSettings(select=("PDF200", "PDF201"), docstring_convention=DocstringConvention.NUMPY, docstring_blank_line_after_last_section=True)),
+        ('"""\nNotes\n Notes\n"""\n', CheckSettings(select=("PDF201",), docstring_convention=DocstringConvention.NUMPY, docstring_blank_line_after_last_section=True)),
+        ('def f(): """\n\tReturns\n""";pass\n', CheckSettings(select=("PDF405",), docstring_convention=DocstringConvention.NUMPY)),
+    ],
+)
+def test_detected_rule_cycle_sources_converge(source: str, settings: CheckSettings) -> None:
+    selection = rules_selection.select_rules(settings)
+    result = formatter.format_source(source, "a.py", settings=settings, rule_selection=selection, fix=True)
+    assert result.new_source is not None
+    repeated = formatter.format_source(result.new_source, "a.py", settings=settings, rule_selection=selection, fix=True)
+
+    assert not result.errors
+    assert not repeated.modified
+    assert not repeated.errors
+
+
+def test_rule_source_formatter_reports_repeated_source_state(mocker: MockerFixture) -> None:
     class TST(rule_base.RuleCategoryBase):
         meta = rule_models.RuleCategoryMetadata(prefix="TST", name="test", url=None)
 
@@ -1789,10 +2016,170 @@ def test_rule_source_formatter_reports_non_converging_fixes_and_keeps_latest_sou
     settings = CheckSettings()
     mocker.patch.object(rule_runner, "MAX_FIX_ITERATIONS", 3)
     result = formatter.format_source("x = 1\n", "a.py", settings=settings, rule_selection=isolated_rule_selection(TST), fix=True)
+    output = StringIO()
+    check_command.print_results_grouped((), (result,), output=output)
 
-    assert result.new_source == "x = 2\n"
-    assert result.fixed_findings == collections.Counter({TST001Toggle.meta: 3})
+    assert result.new_source == "x = 1\n"
+    assert not result.fixed_findings
     assert result.unfixed_findings == (RuleFinding(rule=TST001Toggle.meta, line_numbers=(1,), instance_fixable=None),)
+    assert len(result.errors) == 1
+    assert "repeated a source state after 2 iterations (cycle length 2)" in result.errors[0]
+    assert "TST001 lines 1" in result.errors[0]
+    assert "Fixed" not in output.getvalue()
+
+
+def test_rule_source_formatter_reports_same_pass_source_cycle() -> None:
+    class TST(rule_base.RuleCategoryBase):
+        meta = rule_models.RuleCategoryMetadata(prefix="TST", name="test", url=None)
+
+    @rule_registration.register_rule_to(TST)
+    class TST001OneToTwo(rule_base.RuleBase):
+        meta = rule_models.RuleMetadata(
+            code=rule_codes.RuleCode("TST001"),
+            name="one-to-two",
+            message="Change one to two",
+            fix_availability=rule_models.FixAvailability.ALWAYS,
+            stable_since="1.0.0",
+            setting_effects=(),
+            incompatible_with=(),
+            check_kind=rule_models.RuleCheckKind.STANDARD,
+        )
+
+        @classmethod
+        def violations(cls, context: rule_base.RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
+            return (source_replacement_violation(cls.meta, context, "x = 2\n"),) if context.source == "x = 1\n" else ()
+
+    @rule_registration.register_rule_to(TST)
+    class TST002TwoToOne(rule_base.RuleBase):
+        meta = rule_models.RuleMetadata(
+            code=rule_codes.RuleCode("TST002"),
+            name="two-to-one",
+            message="Change two to one",
+            fix_availability=rule_models.FixAvailability.ALWAYS,
+            stable_since="1.0.0",
+            setting_effects=(),
+            incompatible_with=(),
+            check_kind=rule_models.RuleCheckKind.STANDARD,
+        )
+
+        @classmethod
+        def violations(cls, context: rule_base.RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
+            return (source_replacement_violation(cls.meta, context, "x = 1\n"),) if context.source == "x = 2\n" else ()
+
+    settings = CheckSettings()
+    result = formatter.format_source("x = 1\n", "a.py", settings=settings, rule_selection=isolated_rule_selection(TST), fix=True)
+
+    assert result.new_source == "x = 1\n"
+    assert not result.fixed_findings
+    assert result.unfixed_findings == (RuleFinding(rule=TST001OneToTwo.meta, line_numbers=(1,), instance_fixable=None),)
+    assert len(result.errors) == 1
+    assert "repeated a source state after 1 iterations (cycle length 1)" in result.errors[0]
+    assert "TST001 lines 1" in result.errors[0]
+    assert "TST002 lines 1" in result.errors[0]
+
+
+def test_rule_source_formatter_retains_only_fixes_before_repeated_source_cycle() -> None:
+    class TST(rule_base.RuleCategoryBase):
+        meta = rule_models.RuleCategoryMetadata(prefix="TST", name="test", url=None)
+
+    @rule_registration.register_rule_to(TST)
+    class TST001TwoToOne(rule_base.RuleBase):
+        meta = rule_models.RuleMetadata(
+            code=rule_codes.RuleCode("TST001"),
+            name="two-to-one",
+            message="Change two to one",
+            fix_availability=rule_models.FixAvailability.ALWAYS,
+            stable_since="1.0.0",
+            setting_effects=(),
+            incompatible_with=(),
+            check_kind=rule_models.RuleCheckKind.STANDARD,
+        )
+
+        @classmethod
+        def violations(cls, context: rule_base.RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
+            replacement = "stage = 1\nvalue = 1\n"
+            return (source_replacement_violation(cls.meta, context, replacement),) if context.source == "stage = 1\nvalue = 2\n" else ()
+
+    @rule_registration.register_rule_to(TST)
+    class TST002PromoteStage(rule_base.RuleBase):
+        meta = rule_models.RuleMetadata(
+            code=rule_codes.RuleCode("TST002"),
+            name="promote-stage",
+            message="Promote stage",
+            fix_availability=rule_models.FixAvailability.ALWAYS,
+            stable_since="1.0.0",
+            setting_effects=(),
+            incompatible_with=(),
+            check_kind=rule_models.RuleCheckKind.STANDARD,
+        )
+
+        @classmethod
+        def violations(cls, context: rule_base.RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
+            replacement = "stage = 1\nvalue = 1\n"
+            return (source_replacement_violation(cls.meta, context, replacement),) if context.source == "stage = 0\nvalue = 1\n" else ()
+
+    @rule_registration.register_rule_to(TST)
+    class TST003OneToTwo(rule_base.RuleBase):
+        meta = rule_models.RuleMetadata(
+            code=rule_codes.RuleCode("TST003"),
+            name="one-to-two",
+            message="Change one to two",
+            fix_availability=rule_models.FixAvailability.ALWAYS,
+            stable_since="1.0.0",
+            setting_effects=(),
+            incompatible_with=(),
+            check_kind=rule_models.RuleCheckKind.STANDARD,
+        )
+
+        @classmethod
+        def violations(cls, context: rule_base.RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
+            replacement = "stage = 1\nvalue = 2\n"
+            return (source_replacement_violation(cls.meta, context, replacement),) if context.source == "stage = 1\nvalue = 1\n" else ()
+
+    settings = CheckSettings()
+    result = formatter.format_source("stage = 0\nvalue = 1\n", "a.py", settings=settings, rule_selection=isolated_rule_selection(TST), fix=True)
+
+    assert result.new_source == "stage = 1\nvalue = 2\n"
+    assert result.fixed_findings == collections.Counter({TST002PromoteStage.meta: 1, TST003OneToTwo.meta: 1})
+    assert result.unfixed_findings == (RuleFinding(rule=TST001TwoToOne.meta, line_numbers=(1,), instance_fixable=None),)
+    assert len(result.errors) == 1
+    assert "repeated a source state after 2 iterations (cycle length 1)" in result.errors[0]
+
+
+def test_rule_source_formatter_retains_iteration_limit_for_unique_source_states(mocker: MockerFixture) -> None:
+    class TST(rule_base.RuleCategoryBase):
+        meta = rule_models.RuleCategoryMetadata(prefix="TST", name="test", url=None)
+
+    class IncrementInteger(cst.CSTTransformer):
+        def leave_Integer(self, original_node: cst.Integer, updated_node: cst.Integer) -> cst.Integer:
+            del self, original_node
+            return updated_node.with_changes(value=str(int(updated_node.value) + 1))
+
+    @rule_registration.register_rule_to(TST)
+    class TST001Increment(rule_base.RuleBase):
+        meta = rule_models.RuleMetadata(
+            code=rule_codes.RuleCode("TST001"),
+            name="increment",
+            message="Increment",
+            fix_availability=rule_models.FixAvailability.ALWAYS,
+            stable_since="1.0.0",
+            setting_effects=(),
+            incompatible_with=(),
+            check_kind=rule_models.RuleCheckKind.STANDARD,
+        )
+
+        @classmethod
+        def violations(cls, context: rule_base.RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
+            incremented = context.module.visit(IncrementInteger()).code
+            return (source_replacement_violation(cls.meta, context, incremented),)
+
+    settings = CheckSettings()
+    mocker.patch.object(rule_runner, "MAX_FIX_ITERATIONS", 3)
+    result = formatter.format_source("x = 1\n", "a.py", settings=settings, rule_selection=isolated_rule_selection(TST), fix=True)
+
+    assert result.new_source == "x = 4\n"
+    assert result.fixed_findings == collections.Counter({TST001Increment.meta: 3})
+    assert result.unfixed_findings == (RuleFinding(rule=TST001Increment.meta, line_numbers=(1,), instance_fixable=None),)
     assert len(result.errors) == 1
     assert "did not converge after 3 iterations" in result.errors[0]
     assert "TST001 lines 1" in result.errors[0]

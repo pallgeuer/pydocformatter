@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 # Standard library imports
-from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
 # First-party imports
@@ -60,11 +59,10 @@ class PDF109MultilineClosingQuotesSeparateLine(RuleBase):
 def _planned_changes(context: RuleContext) -> tuple[rule_edits.PlannedSourceChange, ...]:
     """Return all safe closing-quote separate-line changes."""
     data = PDF_definition.PDF.require_data(context)
-    source_lines = context.source_lines
-    return tuple(change for docstring in data.docstrings if (change := _planned_change_for_docstring(docstring, context=context, source_lines=source_lines)) is not None)
+    return tuple(change for docstring in data.docstrings if (change := _planned_change_for_docstring(docstring, context=context)) is not None)
 
 
-def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo, *, context: RuleContext, source_lines: Sequence[str]) -> rule_edits.PlannedSourceChange | None:
+def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo, *, context: RuleContext) -> rule_edits.PlannedSourceChange | None:
     """Return one whole-literal replacement for a docstring."""
     if not docstring_source.can_canonically_rewrite_simple_docstring(docstring, require_multiline=True):
         return None
@@ -74,7 +72,7 @@ def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo, *, co
     last_content = content_indexes[-1]
     if last_content < len(docstring.structure.lines) - 1 or docstring_source.docstring_value_ends_with_newline(docstring):
         return None
-    canonical_margin = docstring_source.docstring_canonical_margin(docstring, context=context, source_lines=source_lines)
+    canonical_margin = docstring_source.docstring_canonical_margin(docstring, context=context)
     final_line = docstring.structure.lines[last_content]
     output_lines = (
         *(docstring_rendering.DocstringOutputLine(original=line, source=None, value=None) for line in docstring.structure.lines),

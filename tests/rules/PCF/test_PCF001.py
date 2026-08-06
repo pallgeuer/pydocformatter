@@ -18,6 +18,55 @@ def test_default_standalone_formatting_processes_physical_lines_independently() 
     assert not result.errors
 
 
+@pytest.mark.parametrize("settings", [CheckSettings(select=("PCF001",)), CheckSettings()])
+def test_libcst_normalized_empty_line_before_canonical_comment_is_error_free(settings: CheckSettings) -> None:
+    source = 'def f():\n    """D."""\n\n \t# C.\n'
+
+    result = pcf_helpers.format_pcf_settings(source, settings=settings)
+
+    assert result.new_source == source
+    assert not result.modified
+    assert not result.errors
+
+
+@pytest.mark.parametrize("line_ending", ["\n", "\r\n"])
+def test_formats_original_source_comment_after_libcst_normalized_empty_line(line_ending: str) -> None:
+    source = line_ending.join(("def f():", '    """D."""', "", " \t#This is a long comment that needs wrapping correctly.", ""))
+    expected = line_ending.join(("def f():", '    """D."""', "", " \t# This is a long comment", " \t# that needs wrapping", " \t# correctly.", ""))
+    settings = CheckSettings(select=("PCF001",), line_length=32)
+
+    checked = pcf_helpers.format_pcf_settings(source, settings=settings, fix=False)
+    fixed = pcf_helpers.format_pcf_settings(source, settings=settings)
+    assert fixed.new_source is not None
+    repeated = pcf_helpers.format_pcf_settings(fixed.new_source, settings=settings)
+
+    assert tuple(finding.line_numbers for finding in checked.unfixed_findings) == ((4,),)
+    assert not checked.errors
+    assert fixed.new_source == expected
+    assert fixed.fixed_findings[PCF001StandaloneCommentFormatting.meta] == 1
+    assert not fixed.errors
+    assert repeated.new_source == expected
+    assert not repeated.modified
+    assert not repeated.errors
+
+
+def test_formats_multiline_fstring_and_later_standalone_comments_on_python_311() -> None:
+    source = 'x = f"""{1\n#inner\n}"""\n#Outer comment needs a space.\n'
+    expected = 'x = f"""{1\n# inner\n}"""\n# Outer comment needs a space.\n'
+    settings = CheckSettings(select=("PCF001",))
+
+    checked = pcf_helpers.format_pcf_settings(source, settings=settings, fix=False)
+    fixed = pcf_helpers.format_pcf_settings(source, settings=settings)
+    repeated = pcf_helpers.format_pcf_settings(expected, settings=settings)
+
+    assert tuple(finding.line_numbers for finding in checked.unfixed_findings) == ((2,), (4,))
+    assert fixed.new_source == expected
+    assert fixed.fixed_findings[PCF001StandaloneCommentFormatting.meta] == 2
+    assert not fixed.errors
+    assert not repeated.modified
+    assert not repeated.errors
+
+
 def test_standalone_joining_is_opt_in() -> None:
     source = "# First prose line.\n# Second prose line with more words.\n"
 

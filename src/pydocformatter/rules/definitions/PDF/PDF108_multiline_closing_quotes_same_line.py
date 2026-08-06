@@ -13,7 +13,7 @@ import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase
-from pydocformatter.rules.definition_helpers import docstring_rendering, docstring_source
+from pydocformatter.rules.definition_helpers import docstring_rendering, docstring_sections, docstring_source
 from pydocformatter.rules.definitions.PDF.PDF import PDF
 from pydocformatter.rules.models import FixAvailability, RuleCacheBehavior, RuleCheckKind, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
 
@@ -76,6 +76,8 @@ def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo, *, co
     """Return one whole-literal replacement for a docstring."""
     if not docstring_source.can_canonically_rewrite_simple_docstring(docstring, require_multiline=True):
         return None
+    if context.settings.docstring_blank_line_after_last_section and _has_required_final_section_blank(docstring):
+        return None
     content_indexes = docstring_source.docstring_content_indexes(docstring)
     if not content_indexes:
         return None
@@ -92,3 +94,9 @@ def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo, *, co
         preserve_trailing_newline=False,
         separator_fallback=docstring_rendering.DocstringOutputSeparatorFallback.CLOSING,
     )
+
+
+def _has_required_final_section_blank(docstring: PDF_definition.DocstringInfo) -> bool:
+    """Return whether a final convention section has its configured trailing blank."""
+    final_spacing = docstring_sections.final_convention_section_spacing(docstring)
+    return final_spacing is not None and final_spacing.final_content_line is not None and final_spacing.trailing_blank_line is not None

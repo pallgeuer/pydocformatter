@@ -631,8 +631,9 @@ def final_convention_section_spacing(docstring: _DocstringInfoLike) -> FinalConv
     section = final_convention_section(docstring)
     if section is None:
         return None
+    final_content_line = _final_section_content_line(docstring, section)
     return FinalConventionSectionSpacing(
-        section=section, final_content_line=_final_section_content_line(docstring, section), trailing_blank_line=_final_section_trailing_blank_line(docstring, section)
+        section=section, final_content_line=final_content_line, trailing_blank_line=_final_section_trailing_blank_line(docstring, section, final_content_line=final_content_line)
     )
 
 
@@ -648,11 +649,12 @@ def _final_section_content_line(docstring: _DocstringInfoLike, section: _Docstri
     return None
 
 
-def _final_section_trailing_blank_line(docstring: _DocstringInfoLike, section: _DocstringBlockLike) -> int | None:
+def _final_section_trailing_blank_line(docstring: _DocstringInfoLike, section: _DocstringBlockLike, *, final_content_line: int | None) -> int | None:
     """Return the retained trailing blank line after final section content."""
-    trailing_child_blank = section.children[-1] if section.children and section.children[-1].kind.value == "blank" else None
-    if trailing_child_blank is not None:
-        return _first_non_closing_quote_prefix_line(docstring, start=trailing_child_blank.start_line, end=trailing_child_blank.end_line)
+    if final_content_line is not None:
+        trailing_blank_line = _first_non_closing_quote_prefix_line(docstring, start=final_content_line + 1, end=section.end_line)
+        if trailing_blank_line is not None:
+            return trailing_blank_line
     blank_block = next((block for block in docstring.structure.blocks if block.start_line == section.end_line and block.kind.value == "blank"), None)
     if blank_block is None:
         return None

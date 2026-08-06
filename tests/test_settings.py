@@ -316,6 +316,12 @@ def test_settings_group_does_not_determine_cache_identity_role() -> None:
     assert definitions["fixable"].cache_identity_role is pydocformatter_settings.CacheIdentityRole.CLEAN_PROOF_IRRELEVANT
 
 
+def test_last_section_blank_line_setting_documents_every_affected_rule() -> None:
+    definition = next(definition for definition in pydocformatter_settings.CHECK_SETTING_DEFINITIONS if definition.field == "docstring_blank_line_after_last_section")
+
+    assert all(rule_code in definition.documentation for rule_code in ("PDF108", "PDF200", "PDF201"))
+
+
 def test_analysis_settings_identity_and_precomputed_definitions_follow_schema_order() -> None:
     profile = pydocformatter_settings.SETTINGS_SCHEMA.load_profile(global_values=pydocformatter_global_args.GlobalArgs(isolated=True))
     expected_fields = tuple(

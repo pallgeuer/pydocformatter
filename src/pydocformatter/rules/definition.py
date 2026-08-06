@@ -43,9 +43,9 @@ class RuleCategoryContext:
         settings (CheckSettings): Resolved check settings for `path`.
         module (cst.Module): Parsed LibCST module currently being checked or fixed.
         metadata_wrapper (cst_metadata.MetadataWrapper): Metadata wrapper for resolving LibCST providers.
-        positions (Mapping[cst.CSTNode, cst_metadata.CodeRange]): Position metadata for nodes in `module`.
+        positions (Mapping[cst.CSTNode, cst_metadata.CodeRange]): Node positions remapped onto exact source.
         line_ending (str): Line ending to use for generated source text.
-        source (str): Current module source aligned with `module`.
+        source (str): Exact current module source with LibCST positions remapped onto it.
         source_lines (tuple[str, ...]): Current source split into physical lines.
         line_bounds (source_text.LineBounds | None): Cached source offset lookup table, if available.
     """

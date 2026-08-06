@@ -45,7 +45,7 @@ def test_replacement_accumulator_groups_ordered_span_edits_and_uses_default_for_
 
     assert violation.finding.message == PDF409DocstringEntrySpacing.meta.message
     assert violation.fix is not None
-    module = rule_edits.apply_context_source_changes(context, violation.fix.planned_changes())
+    module = rule_edits.apply_context_source_changes(context, violation.fix.planned_changes()).module
     assert module.code == source.replace("value (int)", "value (float)").replace("other (bool)", "other (bytes)").replace("str: Result.", "complex: Result.")
 
 
@@ -89,7 +89,7 @@ def test_replacement_accumulator_accepts_precomputed_replacements() -> None:
 
     assert violation.fix is not None
     assert violation.finding.message == "Normalize type"
-    module = rule_edits.apply_context_source_changes(context, violation.fix.planned_changes())
+    module = rule_edits.apply_context_source_changes(context, violation.fix.planned_changes()).module
     assert module.code == source.replace("integer", "int")
 
 
@@ -152,7 +152,7 @@ def test_replacement_accumulator_applies_same_line_fallback_edits_against_origin
     (violation,) = accumulator.results()
 
     assert violation.fix is not None
-    module = rule_edits.apply_context_source_changes(context, violation.fix.planned_changes())
+    module = rule_edits.apply_context_source_changes(context, violation.fix.planned_changes()).module
     assert module.code == source.replace("dict[integ\\x65r, string]", "dict[int, bytes]")
 
 
@@ -182,5 +182,5 @@ def test_planned_line_text_change_uses_owner_line_for_exact_escaped_logical_line
     change = section_edits.planned_line_text_change(docstring, line, 0, 0, "    ", context=context)
 
     assert change is not None
-    module = rule_edits.apply_context_source_changes(category, (change,))
+    module = rule_edits.apply_context_source_changes(category, (change,)).module
     assert module.code == source.replace("\\nvalue:", "\\n    value:")

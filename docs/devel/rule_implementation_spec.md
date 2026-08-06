@@ -78,6 +78,10 @@ Classify inherent fix availability by the rule's designed corrections, not by ob
 
 Source fixes are planned source edits only. Rules do not return replacement LibCST modules, mutate the `RuleContext`, or apply edits themselves.
 
+Canonical source-edit application returns `AppliedSourceChanges`, which retains both the reparsed LibCST module and the exact edited source. Production execution and direct-rule test helpers must consume this same result contract; callers must not substitute `module.code` when exact source can differ through LibCST normalization.
+
+The rule runner may skip structural reparsing only when the module was parsed directly from the accompanying exact source. Arbitrary module/source pairs must be reparsed and structurally compared before rendered positions are mapped onto exact source.
+
 Reusable parsing, rendering, and source-edit behavior belongs in existing helpers under `src/pydocformatter/rules/definition_helpers/` or `src/pydocformatter/rules/edits.py` when it has more than one rule-level use.
 
 ## Documentation and tests

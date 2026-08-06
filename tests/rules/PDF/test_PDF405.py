@@ -1,6 +1,9 @@
+# Third-party imports
+import pytest
+
 # First-party imports
 from pydocformatter import formatter, rules_selection
-from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention
+from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention, IndentStyle
 from pydocformatter.rules.definitions.PDF.PDF405_section_underline_format import PDF405SectionUnderlineFormat
 
 
@@ -82,6 +85,19 @@ def test_numpy_section_underline_uses_section_name_indentation() -> None:
     assert result.new_source == 'def function(value):\n    """Summary.\n\n      Parameters\n      ----------\n      value : int\n          Description.\n    """\n'
     assert result.fixed_findings[PDF405SectionUnderlineFormat.meta] == 1
     assert not format_source(result.new_source).modified
+
+
+@pytest.mark.parametrize("prefix", ["\t", " \t", "\t  "])
+@pytest.mark.parametrize("indent_width", [2, 4, 8])
+def test_numpy_section_underline_maps_tabbed_section_name_indentation(prefix: str, indent_width: int) -> None:
+    source = f'def f(): """\n{prefix}Returns\n""";pass\n'
+    settings = CheckSettings(select=("PDF405",), docstring_convention=DocstringConvention.NUMPY, indent_style=IndentStyle.TAB, indent_width=indent_width)
+    result = format_source(source, settings=settings)
+
+    assert result.new_source == f'def f(): """\n{prefix}Returns\n{prefix}-------\n""";pass\n'
+    assert result.fixed_findings[PDF405SectionUnderlineFormat.meta] == 1
+    assert not result.errors
+    assert not format_source(result.new_source, settings=settings).modified
 
 
 def test_correct_numpy_section_underline_is_unchanged() -> None:

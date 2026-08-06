@@ -40,6 +40,9 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Changed
 
+- **Fix execution:**
+  - Increased the maximum number of automatic fix iterations from 20 to 30.
+  - Made canonical source-edit application return both the reparsed module and exact edited source, centralized direct-rule test contexts with production-equivalent position remapping and source bounds, and kept the final LibCST module internal to rule execution.
 - **Documentation:**
   - Renamed the generated rule index label `Convention-explicit` to `Convention opt-in` and the public rule compatibility table column `Explicit` to `Require explicit`.
 - **Developer documentation:**
@@ -47,6 +50,7 @@ All notable changes to this project are documented here. The format follows [Kee
   - Corrected the rule settings audit to distinguish disabled rules from rules ignored only by broad selectors, with metadata-backed regression coverage.
   - Distinguished convention opt-in policies from `require-explicit`, with exhaustive conflict-free convention profiles and meaningful explicit-selection defaults enforced by regression tests.
 - **Developer tooling:**
+  - Expanded the repository's own pydocformatter policy with attribute declaration-order checks, constructor-assigned attribute coverage, joined comment reflow, hanging task-marker formatting, and consistent forced exclusions.
   - Updated the fixed documentation, test, and development dependency pins and migrated Ruff selectors and suppressions to the human-readable names supported by Ruff 0.16.
   - Replaced the repository-local Markdown table formatter, release checksum generator, and pytest working-directory isolation fixtures with the shared `la-dev-codex-plugins` implementations.
   - Strengthened semantic Markdown table tests with full-document parsing and normalized all generated documentation tables to the shared canonical style.
@@ -115,7 +119,15 @@ All notable changes to this project are documented here. The format follows [Kee
 - **Developer tooling:**
   - Restored heading ownership checks for semantic documentation tables, kept Markdown pipe parsing aligned with GitHub Flavored Markdown, and retained a focused downstream release-checksum command contract test.
   - Limited documentation environments to the base shared tooling package while requesting its consumer-facing pytest integration only in test environments.
+- **Fix execution:**
+  - Remapped LibCST positions onto exact source with structurally verified, parser-consistent right-biased, linear-time sparse alignment, preserving adjacent form feeds and omitted comment or blank lines, rejecting semantic mismatches, and retaining accumulated diagnostics when an unprovable post-fix alignment rolls back all partial fixes.
+  - Kept checks and fixes active for valid sources with repeated omitted trivia, avoided redundant structural reparsing of internally produced edited source, and reported only automatic fixes that survive a repeated-source cycle.
+- **Comment formatting:**
+  - Derived PCF comment ranges from exact-source-remapped LibCST positions, preserving exact edited source across reparsing and recognizing multiline f-string comments consistently on Python 3.11.
 - **Docstring diagnostics:**
+  - Excluded indentation form feeds from canonical docstring margins so generated continuation, blank, and delimiter lines cannot copy tokenizer trivia into evaluated docstring values.
+  - Eliminated fix cycles between PDF107 and PDF200, PDF108 and PDF201, PDF100 and PDF103, PDF100 and PDF101, PDF101 and PDF409, and PDF101 and PDF415 by assigning all whitespace-only lines to PDF103, sharing canonical attached-docstring margins, preserving relative Google and NumPy entry indentation and entry separators, retaining first-line structural and tab-based hanging indentation, making PDF200 delimiter-placement neutral, and preserving configured final-section spacing ahead of PDF108's compact closing style. Retained whitespace ownership inside first-line convention sections, rejected empty generic Google return and yield entry heads, made nested terminal-section spacing reach a fixed point, and corrected PDF405's tabbed section-underline source mapping.
+  - Stopped automatic fixing as soon as an exact source state repeats, reported the cycle length and likely rules and lines, and retained the existing iteration limit for non-repeating changes.
   - Preserved internal punctuation in PDF311 source-word diagnostics, made its display helper robust to punctuation-only tokens, and made PDF312 name only distinct entries implicated by generic-description matches.
   - Made literal `__slots__` inventory conservative for mutable list values and skipped expensive slot metadata analysis in files without an exact `__slots__` name token.
   - Recognized current Sphinx version-directive names and the optional delimiter space in PDF418 malformed directive diagnostics.

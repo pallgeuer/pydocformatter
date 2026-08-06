@@ -77,7 +77,20 @@ class PlannedTextReplacement:
     line_numbers: tuple[int, ...]
 
 
-def apply_context_source_changes(context: RuleCategoryContext, changes: tuple[PlannedSourceChange, ...]) -> cst.Module:
+@dataclasses.dataclass(frozen=True)
+class AppliedSourceChanges:
+    """Reparsed module and exact edited source.
+
+    Attributes:
+        module (cst.Module): Module reparsed from the edited source.
+        source (str): Exact edited source before LibCST rendering normalization.
+    """
+
+    module: cst.Module
+    source: str
+
+
+def apply_context_source_changes(context: RuleCategoryContext, changes: tuple[PlannedSourceChange, ...]) -> AppliedSourceChanges:
     """Apply planned source changes using cached context source data when available.
 
     Args:
@@ -85,15 +98,14 @@ def apply_context_source_changes(context: RuleCategoryContext, changes: tuple[Pl
         changes (tuple[PlannedSourceChange, ...]): Planned source-level changes to apply in order-independent form.
 
     Returns:
-        cst.Module: Reparsed module after applying the planned changes.
+        AppliedSourceChanges: Reparsed module and exact source after applying the planned changes.
     """
     edits = tuple(change.edit for change in changes)
-    if context.line_bounds is None:
-        return apply_source_edits(context.module, edits)
-    return apply_source_edits(context.module, edits, source=context.source, line_bounds=context.line_bounds)
+    line_bounds = source_text.line_bounds_from_lines(context.source_lines) if context.line_bounds is None else context.line_bounds
+    return apply_source_edits(context.module, edits, source=context.source, line_bounds=line_bounds)
 
 
-def apply_source_edits(module: cst.Module, edits: tuple[SourceEdit, ...], *, source: str | None = None, line_bounds: source_text.LineBounds | None = None) -> cst.Module:
+def apply_source_edits(module: cst.Module, edits: tuple[SourceEdit, ...], *, source: str | None = None, line_bounds: source_text.LineBounds | None = None) -> AppliedSourceChanges:
     """Apply non-overlapping source edits to a module and parse the result.
 
     Args:
@@ -103,7 +115,7 @@ def apply_source_edits(module: cst.Module, edits: tuple[SourceEdit, ...], *, sou
         line_bounds (source_text.LineBounds | None): Absolute offsets for each physical source line.
 
     Returns:
-        cst.Module: Reparsed module after applying all source edits.
+        AppliedSourceChanges: Reparsed module and exact source after applying all source edits.
 
     Raises:
         ValueError: If only one of `source` and `line_bounds` is supplied or if edit ranges overlap.
@@ -111,7 +123,7 @@ def apply_source_edits(module: cst.Module, edits: tuple[SourceEdit, ...], *, sou
     if (source is None) != (line_bounds is None):
         raise ValueError("source and line_bounds must be provided together")
     if not edits:
-        return module
+        return AppliedSourceChanges(module=module, source=module.code if source is None else source)
 
     edit_source = module.code if source is None else source
     edit_line_bounds = source_text.line_bounds_from_lines(source_text.source_lines(edit_source)) if line_bounds is None else line_bounds
@@ -134,7 +146,8 @@ def apply_source_edits(module: cst.Module, edits: tuple[SourceEdit, ...], *, sou
         chunks.extend((edit_source[cursor:start], edit.replacement))
         cursor = end
     chunks.append(edit_source[cursor:])
-    return cst.parse_module("".join(chunks), config=module.config_for_parsing)
+    edited_source = "".join(chunks)
+    return AppliedSourceChanges(module=cst.parse_module(edited_source, config=module.config_for_parsing), source=edited_source)
 
 
 def _range_offsets(code_range: cst_metadata.CodeRange, *, line_bounds: tuple[tuple[int, int], ...]) -> tuple[int, int]:

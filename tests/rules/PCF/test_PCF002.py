@@ -108,6 +108,23 @@ def test_spacing_check_reports_original_line() -> None:
     assert tuple(finding.line_numbers for finding in checked.unfixed_findings) == ((1,),)
 
 
+def test_formats_multiline_fstring_trailing_comment_on_python_311() -> None:
+    source = 'x = f"""{(\n    1#inner\n)}"""\n#outer\n'
+    expected = 'x = f"""{(\n    1  # inner\n)}"""\n#outer\n'
+    settings = CheckSettings(select=("PCF002",))
+
+    checked = formatter.format_source(source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=False)
+    fixed = formatter.format_source(source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
+    repeated = formatter.format_source(expected, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
+
+    assert tuple(finding.line_numbers for finding in checked.unfixed_findings) == ((2,),)
+    assert fixed.new_source == expected
+    assert fixed.fixed_findings[PCF002TrailingCommentSpacing.meta] == 1
+    assert not fixed.errors
+    assert not repeated.modified
+    assert not repeated.errors
+
+
 def test_spacing_fixes_preserve_unicode_barriers_in_regular_and_directive_payloads() -> None:
     source = "regular = 1#Keep\u202epayload  \ndirective = 2#noqa\u2060  \n"
     settings = CheckSettings(select=("PCF002",))

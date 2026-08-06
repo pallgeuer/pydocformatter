@@ -12,7 +12,7 @@ import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase
-from pydocformatter.rules.definition_helpers import docstring_conventions, docstring_rendering, section_edits
+from pydocformatter.rules.definition_helpers import docstring_conventions, docstring_rendering, docstring_source, section_edits
 from pydocformatter.rules.definitions.PDF.PDF import PDF
 from pydocformatter.rules.models import FixAvailability, RuleCacheBehavior, RuleCheckKind, RuleMetadata, RuleSettingEffect, RuleSettingEffects, RuleSettingEffectValues
 
@@ -100,7 +100,8 @@ def _results(context: RuleContext, *, rule: RuleMetadata) -> tuple[rule_violatio
 def _target_underline(docstring: PDF_definition.DocstringInfo, section: PDF_definition.DocstringSection) -> tuple[str | None, tuple[int, ...]]:
     """Return the canonical NumPy underline and existing underline lines to replace."""
     header = docstring.structure.lines[section.header_line]
-    underline = f"{header.raw_text[: header.text_raw_start_column + section_edits.section_name_start_column(header)]}{'-' * len(section.name)}"
+    prefix_end = docstring_source.value_offset_for_text_column(header, section_edits.section_name_start_column(header)) - header.start_offset
+    underline = f"{header.raw_text[:prefix_end]}{'-' * len(section.name)}"
     next_index = section.header_line + 1
     if next_index >= len(docstring.structure.lines):
         return underline, ()

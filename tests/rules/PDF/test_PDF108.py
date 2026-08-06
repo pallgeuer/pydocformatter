@@ -1,48 +1,28 @@
-# Third-party imports
-import libcst as cst
-import libcst.metadata as cst_metadata
+# Future imports
+from __future__ import annotations
+
+# Standard library imports
+from typing import TYPE_CHECKING
 
 # First-party imports
 from pydocformatter import formatter, rules_selection
-from pydocformatter.cli.settings_check import CheckSettings, LineEnding
-from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
-from pydocformatter.rules.definition_helpers import source_text
+from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention, LineEnding
 from pydocformatter.rules.definitions.PDF.PDF import PDF
 from pydocformatter.rules.definitions.PDF.PDF106_multiline_opening_quotes_same_line import PDF106MultilineOpeningQuotesSameLine
 from pydocformatter.rules.definitions.PDF.PDF108_multiline_closing_quotes_same_line import PDF108MultilineClosingQuotesSameLine
-from pydocformatter.source_path import SourcePathContext
+from pydocformatter.rules.definitions.PDF.PDF201_missing_blank_line import PDF201MissingBlankLine
 from tests import rule_helpers
+
+
+if TYPE_CHECKING:
+    # First-party imports
+    from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
 
 
 def contexts(source: str, *, settings: CheckSettings | None = None) -> tuple[RuleCategoryContext, RuleContext]:
     """Return matching category and rule contexts for source."""
-    module = cst.parse_module(source)
-    wrapper = cst_metadata.MetadataWrapper(module, unsafe_skip_copy=True)
-    category = RuleCategoryContext(
-        path="example.py",
-        source_path=SourcePathContext.for_path("example.py"),
-        settings=CheckSettings(select=("PDF108",)) if settings is None else settings,
-        module=module,
-        metadata_wrapper=wrapper,
-        positions=wrapper.resolve(cst_metadata.PositionProvider),
-        line_ending="\r\n" if "\r\n" in source else "\n",
-        source=source,
-        source_lines=tuple(source_text.source_lines(source)),
-        line_bounds=None,
-    )
-    return category, RuleContext(
-        path=category.path,
-        source_path=category.source_path,
-        settings=category.settings,
-        module=category.module,
-        metadata_wrapper=category.metadata_wrapper,
-        positions=category.positions,
-        line_ending=category.line_ending,
-        source=category.source,
-        source_lines=category.source_lines,
-        line_bounds=category.line_bounds,
-        category_data=PDF.prepare(category),
-    )
+    resolved_settings = CheckSettings(select=("PDF108",)) if settings is None else settings
+    return rule_helpers.prepared_direct_rule_contexts(PDF, source, settings=resolved_settings)
 
 
 def format_pdf104(source: str, *, settings: CheckSettings | None = None, fix: bool = True) -> formatter.FormatterResult:
@@ -206,3 +186,65 @@ def test_pdf102_and_pdf104_normalize_compact_opt_in_pair_together() -> None:
     assert result.fixed_findings[PDF106MultilineOpeningQuotesSameLine.meta] == 1
     assert result.fixed_findings[PDF108MultilineClosingQuotesSameLine.meta] == 1
     assert not formatter.format_source(result.new_source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True).modified
+
+
+def test_required_final_google_section_blank_takes_precedence() -> None:
+    source = 'def function(value):\n    """Args:\n        value: Description.\n\n    """\n'
+    settings = CheckSettings(select=("PDF108",), docstring_convention=DocstringConvention.GOOGLE, docstring_blank_line_after_last_section=True)
+    result = format_pdf104(source, settings=settings)
+
+    assert result.new_source == source
+    assert not result.fixed_findings
+    assert not result.unfixed_findings
+
+
+def test_required_final_numpy_section_blank_takes_precedence() -> None:
+    source = 'def function(value):\n    """Parameters\n    ----------\n    value : int\n        Description.\n\n    """\n'
+    settings = CheckSettings(select=("PDF108",), docstring_convention=DocstringConvention.NUMPY, docstring_blank_line_after_last_section=True)
+    result = format_pdf104(source, settings=settings)
+
+    assert result.new_source == source
+    assert not result.fixed_findings
+    assert not result.unfixed_findings
+
+
+def test_pdf108_and_pdf201_converge_with_required_final_section_blank() -> None:
+    source = 'def function(value):\n    """Args:\n        value: Description."""\n'
+    settings = CheckSettings(select=("PDF108", "PDF201"), docstring_convention=DocstringConvention.GOOGLE, docstring_blank_line_after_last_section=True)
+    result = formatter.format_source(source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
+
+    assert result.new_source == 'def function(value):\n    """Args:\n        value: Description.\n\n    """\n'
+    assert result.fixed_findings[PDF201MissingBlankLine.meta] == 1
+    assert result.fixed_findings.get(PDF108MultilineClosingQuotesSameLine.meta, 0) == 0
+    assert not result.errors
+    assert not formatter.format_source(result.new_source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True).modified
+
+
+def test_pdf108_pdf200_and_pdf201_collapse_to_one_required_final_section_blank() -> None:
+    source = 'def function(value):\n    """Args:\n        value: Description.\n\n\n    """\n'
+    settings = CheckSettings(select=("PDF108", "PDF200", "PDF201"), docstring_convention=DocstringConvention.GOOGLE, docstring_blank_line_after_last_section=True)
+    result = formatter.format_source(source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
+
+    assert result.new_source == 'def function(value):\n    """Args:\n        value: Description.\n\n    """\n'
+    assert result.fixed_findings
+    assert not result.errors
+    assert not formatter.format_source(result.new_source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True).modified
+
+
+def test_final_section_blank_precedence_requires_matching_convention_and_content() -> None:
+    google_source = 'def function(value):\n    """Args:\n        value: Description.\n\n    """\n'
+    header_only_source = 'def function():\n    """Args:\n\n    """\n'
+    google_settings = CheckSettings(select=("PDF108",), docstring_convention=DocstringConvention.GOOGLE, docstring_blank_line_after_last_section=True)
+    none_settings = CheckSettings(select=("PDF108",), docstring_convention=DocstringConvention.NONE, docstring_blank_line_after_last_section=True)
+
+    assert format_pdf104(google_source, settings=none_settings).new_source == 'def function(value):\n    """Args:\n        value: Description."""\n'
+    assert format_pdf104(header_only_source, settings=google_settings).new_source == 'def function():\n    """Args:"""\n'
+
+
+def test_disabled_final_section_blank_setting_keeps_compact_closing_policy() -> None:
+    source = 'def function(value):\n    """Args:\n        value: Description.\n\n    """\n'
+    settings = CheckSettings(select=("PDF108",), docstring_convention=DocstringConvention.GOOGLE, docstring_blank_line_after_last_section=False)
+    result = format_pdf104(source, settings=settings)
+
+    assert result.new_source == 'def function(value):\n    """Args:\n        value: Description."""\n'
+    assert result.fixed_findings[PDF108MultilineClosingQuotesSameLine.meta] == 1

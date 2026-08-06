@@ -11,6 +11,8 @@ Checks safely mapped simple multiline docstrings with content and moves the clos
 
 PDF108 treats spaces and tabs as removable blank-line whitespace while looking for the final content line. If the final content line is followed by one or more logical lines containing only spaces and tabs, those logical lines are removed and the closing quotes are rendered immediately after the final content.
 
+When `docstring-blank-line-after-last-section` is enabled, a semantic trailing blank after the final recognized Google or NumPy section takes precedence over compact closing quotes. PDF108 leaves the closing delimiter separate when that required blank is present. If the blank is missing, PDF201 can insert it and PDF108 then preserves it on later formatting passes.
+
 If moving the closing quotes directly after final content would collide with the closing delimiter, PDF108 first tries to escape delimiter quote characters while preserving the evaluated docstring value. If no value-preserving spelling is available while keeping the original prefix and delimiter, PDF108 keeps one ASCII space before the closing quotes instead, such as for raw strings ending in an odd run of backslashes.
 
 The rule can also remove a trailing evaluated newline before the closing delimiter, as long as the docstring has content.
@@ -41,6 +43,23 @@ def area(radius: float) -> float:
     """Return the area.
 
     The radius must be non-negative."""
+```
+
+The configured trailing blank after a final Google or NumPy section keeps the closing quotes separate:
+
+```pydocfmt-example
+[settings]
+docstring-convention = "google"
+docstring-blank-line-after-last-section = true
+
+[input]
+def area(radius: float) -> float:
+    """Args:
+        radius: Circle radius.
+
+    """
+
+[output=unchanged]
 ```
 
 Space/tab-only logical lines before the closing quotes are removed as part of the same move:
@@ -213,4 +232,4 @@ def not_docstring() -> None:
 ```
 
 ## Options
-None.
+- `docstring-blank-line-after-last-section`: Preserves separate closing quotes when the final recognized Google or NumPy section already has its required trailing blank.

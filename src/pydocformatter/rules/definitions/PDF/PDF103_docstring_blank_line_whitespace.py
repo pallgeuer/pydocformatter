@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 # Standard library imports
-from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
 # First-party imports
@@ -60,15 +59,14 @@ class PDF103DocstringBlankLineWhitespace(RuleBase):
 def _planned_changes(context: RuleContext) -> tuple[rule_edits.PlannedSourceChange, ...]:
     """Return all safe blank-line whitespace changes."""
     data = PDF_definition.PDF.require_data(context)
-    source_lines = context.source_lines
-    return tuple(change for docstring in data.docstrings if (change := _planned_change_for_docstring(docstring, context=context, source_lines=source_lines)) is not None)
+    return tuple(change for docstring in data.docstrings if (change := _planned_change_for_docstring(docstring, context=context)) is not None)
 
 
-def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo, *, context: RuleContext, source_lines: Sequence[str]) -> rule_edits.PlannedSourceChange | None:
+def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo, *, context: RuleContext) -> rule_edits.PlannedSourceChange | None:
     """Return one whole-literal replacement for a docstring."""
     if not docstring_source.can_canonically_rewrite_simple_docstring(docstring):
         return None
-    canonical_margin = docstring_source.docstring_canonical_margin(docstring, context=context, source_lines=source_lines)
+    canonical_margin = docstring_source.docstring_canonical_margin(docstring, context=context)
     targets = tuple(_line_target(docstring, line, canonical_margin=canonical_margin, context=context) for line in docstring.structure.lines)
     return docstring_source.planned_simple_docstring_line_change(docstring, raw_line_targets=targets)
 

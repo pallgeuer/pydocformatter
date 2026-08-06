@@ -7,7 +7,7 @@ Rule is disabled if `docstring-convention` is `none`, `pep257`, `google`, or `re
 ## What it does
 PDF405 reports recognized NumPy sections whose underline is missing, separated from the section name by blank lines, uses the wrong adornment character, or does not match the section-name length. The target underline is a line of hyphens immediately after the section name, with the same evaluated indentation as the section name.
 
-The fix inserts, moves, or replaces the underline in safely mapped simple docstrings. It removes only blank lines between the section name and a misplaced underline. Concatenated docstrings and unsafe source mappings are reported without a fix.
+The fix inserts, moves, or replaces the underline in safely mapped simple docstrings. It maps the parsed section-name column back to evaluated source before copying the header prefix, so tabbed and mixed-indentation prefixes are preserved exactly. It removes only blank lines between the section name and a misplaced underline. Concatenated docstrings and unsafe source mappings are reported without a fix.
 
 ## Why is this useful?
 NumPy-style section underlines are part of the section syntax. Normalizing them lets pydocformatter treat the header as one stable structure.

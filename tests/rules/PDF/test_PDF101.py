@@ -1,50 +1,31 @@
+# Future imports
+from __future__ import annotations
+
+# Standard library imports
+from typing import TYPE_CHECKING
+
 # Third-party imports
-import libcst as cst
 import pytest
-import libcst.metadata as cst_metadata
 
 # First-party imports
 from pydocformatter import formatter, rules_selection
-from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention, LineEnding
-from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
-from pydocformatter.rules.definition_helpers import source_text
+from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention, IndentStyle, LineEnding
 from pydocformatter.rules.definitions.PDF.PDF import PDF
 from pydocformatter.rules.definitions.PDF.PDF101_docstring_reflow import PDF101DocstringReflow
 from pydocformatter.rules.definitions.PDF.PDF201_missing_blank_line import PDF201MissingBlankLine
 from pydocformatter.rules.definitions.PDF.PDF300_summary_trailing_period import PDF300SummaryTrailingPeriod
-from pydocformatter.source_path import SourcePathContext
 from tests import rule_helpers
+
+
+if TYPE_CHECKING:
+    # First-party imports
+    from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
 
 
 def contexts(source: str, *, settings: CheckSettings | None = None) -> tuple[RuleCategoryContext, RuleContext]:
     """Return matching category and rule contexts for source."""
-    module = cst.parse_module(source)
-    wrapper = cst_metadata.MetadataWrapper(module, unsafe_skip_copy=True)
-    category = RuleCategoryContext(
-        path="example.py",
-        source_path=SourcePathContext.for_path("example.py"),
-        settings=CheckSettings(select=("PDF101",)) if settings is None else settings,
-        module=module,
-        metadata_wrapper=wrapper,
-        positions=wrapper.resolve(cst_metadata.PositionProvider),
-        line_ending="\r\n" if "\r\n" in source else "\n",
-        source=source,
-        source_lines=tuple(source_text.source_lines(source)),
-        line_bounds=None,
-    )
-    return category, RuleContext(
-        path=category.path,
-        source_path=category.source_path,
-        settings=category.settings,
-        module=category.module,
-        metadata_wrapper=category.metadata_wrapper,
-        positions=category.positions,
-        line_ending=category.line_ending,
-        source=category.source,
-        source_lines=category.source_lines,
-        line_bounds=category.line_bounds,
-        category_data=PDF.prepare(category),
-    )
+    resolved_settings = CheckSettings(select=("PDF101",)) if settings is None else settings
+    return rule_helpers.prepared_direct_rule_contexts(PDF, source, settings=resolved_settings)
 
 
 def format_pdf001(source: str, *, settings: CheckSettings | None = None, fix: bool = True) -> formatter.FormatterResult:
@@ -96,6 +77,26 @@ def test_reflows_same_line_docstrings_without_splitting_summary() -> None:
     assert result.fixed_findings[PDF101DocstringReflow.meta] == 3
     assert result.fixed_findings[PDF201MissingBlankLine.meta] == 0
     assert result.fixed_findings[PDF300SummaryTrailingPeriod.meta] == 0
+    assert not format_pdf001(result.new_source, settings=settings).modified
+
+
+def test_pdf100_and_pdf101_share_parenthesized_attribute_docstring_margin() -> None:
+    source = 'value = 1\n("""Notes:\n Details.\n""")\n'
+    settings = CheckSettings(select=("PDF100", "PDF101"), line_length=60)
+    result = format_pdf001(source, settings=settings)
+
+    assert result.new_source == 'value = 1\n("""Notes:\nDetails.\n""")\n'
+    assert not result.errors
+    assert not format_pdf001(result.new_source, settings=settings).modified
+
+
+def test_pdf100_and_pdf101_preserve_semicolon_attribute_hanging_margin() -> None:
+    source = 'value = 1; ("""A summary long enough to wrap onto a continuation line under the configured narrow line length.""")\n'
+    settings = CheckSettings(select=("PDF100", "PDF101"), line_length=60)
+    result = format_pdf001(source, settings=settings)
+
+    assert result.new_source == 'value = 1; ("""A summary long enough to wrap onto a\n            continuation line under the configured narrow\n            line length.""")\n'
+    assert not result.errors
     assert not format_pdf001(result.new_source, settings=settings).modified
 
 
@@ -161,14 +162,15 @@ def test_reflows_rest_field_continuation_description_with_separator_space() -> N
     assert not format_pdf001(result.new_source, settings=CheckSettings(select=("PDF101",), line_length=76, docstring_convention=DocstringConvention.REST)).modified
 
 
-def test_reflows_malformed_google_section_entries_with_canonical_indentation() -> None:
+def test_reflows_displaced_google_section_entries_with_preserved_indentation() -> None:
     source = 'def function(value):\n    """Do work.\n\n      Args:\n          value: Description words long enough to wrap around the target line width for checking indentation.\n    """\n'
     result = format_pdf001(source, settings=CheckSettings(select=("PDF101",), line_length=72, docstring_convention=DocstringConvention.GOOGLE))
 
     assert (
         result.new_source
-        == 'def function(value):\n    """Do work.\n\n      Args:\n        value: Description words long enough to wrap around the target\n            line width for checking indentation.\n    """\n'
+        == 'def function(value):\n    """Do work.\n\n      Args:\n          value: Description words long enough to wrap around the target\n              line width for checking indentation.\n    """\n'
     )
+    assert not format_pdf001(result.new_source, settings=CheckSettings(select=("PDF101",), line_length=72, docstring_convention=DocstringConvention.GOOGLE)).modified
 
 
 def test_reflows_long_google_entry_prefix_with_description_on_following_lines() -> None:
@@ -192,6 +194,36 @@ def test_reflows_google_exception_entries_with_fixed_continuation_indent() -> No
         result.new_source
         == 'def function(value):\n    """Do work.\n\n    Raises:\n        VeryLongCustomApplicationError: An error with enough descriptive\n            words to require wrapping after an exception name.\n    """\n'
     )
+
+
+@pytest.mark.parametrize("section", ["Raises", "Warns"])
+@pytest.mark.parametrize("entry", ["E, F: Bad.", "E, F:\n        Bad."])
+def test_reflows_narrow_numpy_exception_entries_to_stable_split_form(section: str, entry: str) -> None:
+    source = f'def f():\n    """S.\n\n    {section}\n    {"-" * len(section)}\n    {entry}\n    """\n'
+    expected = f'def f():\n    """S.\n\n    {section}\n    {"-" * len(section)}\n    E, F:\n        Bad.\n    """\n'
+    settings = CheckSettings(select=("PDF101",), docstring_convention=DocstringConvention.NUMPY, line_length=17)
+    result = format_pdf001(source, settings=settings)
+
+    assert result.new_source == expected
+    assert not result.errors
+    assert not format_pdf001(result.new_source, settings=settings).modified
+
+
+def test_keeps_numpy_exception_entry_inline_when_description_has_sufficient_room() -> None:
+    source = 'def f():\n    """S.\n\n    Warns\n    -----\n    E, F: Bad.\n    """\n'
+    settings = CheckSettings(select=("PDF101",), docstring_convention=DocstringConvention.NUMPY, line_length=18)
+
+    assert not format_pdf001(source, settings=settings).modified
+
+
+def test_pdf101_and_pdf409_converge_on_narrow_numpy_exception_entry() -> None:
+    source = 'def f():\n    """S.\n\n    Warns\n    -----\n    E, F: Bad.\n    """\n'
+    settings = CheckSettings(select=("PDF101", "PDF409"), docstring_convention=DocstringConvention.NUMPY, line_length=17)
+    result = format_pdf001(source, settings=settings)
+
+    assert result.new_source == 'def f():\n    """S.\n\n    Warns\n    -----\n    E, F:\n        Bad.\n    """\n'
+    assert not result.errors
+    assert not format_pdf001(result.new_source, settings=settings).modified
 
 
 def test_google_entry_continuation_indent_uses_configured_indent_width() -> None:
@@ -219,7 +251,7 @@ def test_reflows_malformed_numpy_section_descriptions_with_canonical_indentation
 
     assert (
         result.new_source
-        == 'def function(value):\n    """Do work.\n\n      Parameters\n      ----------\n      value : int\n        Description words long enough to wrap around the target line\n        width for checking indentation.\n    """\n'
+        == 'def function(value):\n    """Do work.\n\n      Parameters\n      ----------\n      value : int\n          Description words long enough to wrap around the target line\n          width for checking indentation.\n    """\n'
     )
 
 
@@ -329,11 +361,70 @@ def test_tab_indented_docstrings_preserve_tabs_and_use_configured_tab_width() ->
     assert width_eight.new_source == 'class Example:\n\tdef method(self):\n\t\t"""Summary words that should wrap\n\t\taccording to tab-expanded indentation\n\t\twidth."""\n'
 
 
+@pytest.mark.parametrize(
+    ("source", "expected"),
+    [
+        ('def f():\n    """S.\n\n    \t- a b c d e f g\n    """\n', 'def f():\n    """S.\n\n    \t- a b c d e\n    \t  f g\n    """\n'),
+        ('def f():\n    """S.\n\n      - a b c d e f g\n    """\n', 'def f():\n    """S.\n\n      - a b c d e f\n        g\n    """\n'),
+    ],
+)
+def test_list_hanging_indent_preserves_structural_base(source: str, expected: str) -> None:
+    settings = CheckSettings(select=("PDF101",), line_length=20, indent_style=IndentStyle.TAB)
+    result = format_pdf001(source, settings=settings)
+
+    assert result.new_source == expected
+    assert not format_pdf001(result.new_source, settings=settings).modified
+
+
+def test_rest_field_hanging_indent_preserves_tabbed_structural_base() -> None:
+    source = 'def f():\n    """S.\n\n    \t:param x: a b c d e f g\n    """\n'
+    settings = CheckSettings(select=("PDF101",), docstring_convention=DocstringConvention.REST, line_length=24, indent_style=IndentStyle.TAB)
+    result = format_pdf001(source, settings=settings)
+
+    assert result.new_source == 'def f():\n    """S.\n\n    \t:param x: a b c\n    \t          d e f\n    \t          g\n    """\n'
+    assert not format_pdf001(result.new_source, settings=settings).modified
+
+
+@pytest.mark.parametrize(
+    ("source", "convention", "line_length", "indent_width", "expected"),
+    [
+        ('def f(): """:return: x\ny""";pass\n', DocstringConvention.REST, 24, 2, 'def f(): """:return: x\n\t   y""";pass\n'),
+        ('def f(): """:return: x\ny""";pass\n', DocstringConvention.REST, 24, 4, 'def f(): """:return: x\n\t     y""";pass\n'),
+        ('def f(): """:return: x\ny""";pass\n', DocstringConvention.REST, 24, 8, 'def f(): """:return: x\n\ty""";pass\n'),
+        ('def f(): """- a b c d e f g h i\nx""";pass\n', DocstringConvention.NONE, 20, 4, 'def f(): """- a b c\n\t  d e f g h i\n\t  x""";pass\n'),
+        ('def f(): """> a b c d e f g h i\n> x""";pass\n', DocstringConvention.NONE, 20, 4, 'def f(): """> a b c\n\t> d e f g h\n\t> i x""";pass\n'),
+    ],
+)
+def test_pdf100_preserves_first_line_structural_hanging_indent(source: str, convention: DocstringConvention, line_length: int, indent_width: int, expected: str) -> None:
+    settings = CheckSettings(select=("PDF100", "PDF101"), docstring_convention=convention, line_length=line_length, indent_style=IndentStyle.TAB, indent_width=indent_width)
+    result = format_pdf001(source, settings=settings)
+
+    assert result.new_source == expected
+    assert not result.errors
+    assert not format_pdf001(result.new_source, settings=settings).modified
+
+
 def test_fallback_prefix_uses_cst_physical_lines_when_form_feed_precedes_docstring() -> None:
     source = 'x = 1\f\nclass Example:\n\tdef method(self):\n\t\t"""Summary words that should wrap according to tab-expanded indentation width."""\n'
     result = format_pdf001(source, settings=CheckSettings(select=("PDF101",), line_length=54, indent_width=4))
 
     assert result.new_source == 'x = 1\f\nclass Example:\n\tdef method(self):\n\t\t"""Summary words that should wrap according to\n\t\ttab-expanded indentation width."""\n'
+
+
+def test_module_docstring_reflow_does_not_copy_leading_form_feed_into_value() -> None:
+    source = '\f"""This module docstring summary contains enough words to require wrapping without introducing form feeds into generated continuation lines."""\n'
+    settings = CheckSettings(select=("PDF101",), line_length=72)
+
+    result = format_pdf001(source, settings=settings)
+    assert result.new_source is not None
+    repeated = format_pdf001(result.new_source, settings=settings)
+    module_docstring = compile(result.new_source, "example.py", "exec").co_consts[0]
+
+    assert result.modified
+    assert result.new_source.count("\f") == 1
+    assert isinstance(module_docstring, str)
+    assert "\f" not in module_docstring
+    assert not repeated.modified
 
 
 def test_reflow_preserves_raw_tab_indent_when_dedent_crosses_tab_stop() -> None:

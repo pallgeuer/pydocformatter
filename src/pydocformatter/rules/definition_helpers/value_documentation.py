@@ -49,9 +49,9 @@ class _ExceptionNameIndex:
     """Exception names indexed for exact qualified and final-component matching.
 
     Attributes:
+        all_final_names (set[str]): Final components supplied by every indexed name.
         qualified_names (set[str]): Qualified names available for exact qualified-to-qualified matches.
         unqualified_final_names (set[str]): Final components supplied by unqualified names.
-        all_final_names (set[str]): Final components supplied by every indexed name.
     """
 
     __slots__ = ("all_final_names", "qualified_names", "unqualified_final_names")

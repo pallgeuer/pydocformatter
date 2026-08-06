@@ -9,7 +9,7 @@ import pytest
 # First-party imports
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 import pydocformatter.rules.definitions.PDF.PDF415_convention_entry_indentation as PDF415_definition
-from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention
+from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention, IndentStyle
 from pydocformatter.rules.definitions.PDF.PDF100_docstring_indentation import PDF100DocstringIndentation
 from pydocformatter.rules.definitions.PDF.PDF101_docstring_reflow import PDF101DocstringReflow
 from pydocformatter.rules.definitions.PDF.PDF414_malformed_convention_entry import PDF414MalformedConventionEntry
@@ -328,7 +328,36 @@ def test_pdf101_reflows_after_pdf415_repairs_numpy_continuation_indentation() ->
         "    Description at entry indentation that would otherwise be wrapped.", "        Description at entry indentation that\n        would otherwise be wrapped."
     )
     assert result.fixed_findings == {PDF101DocstringReflow.meta: 1, PDF415ConventionEntryIndentation.meta: 1}
+
+
+def test_pdf101_preserves_google_entry_indentation_repaired_by_pdf415() -> None:
+    """Keep PDF415's tabbed entry base while reflowing its description."""
+    source = '"""x\n\tArgs\n\tx (i): words long enough to wrap across lines robustly\n"""\n'
+    settings = CheckSettings(select=("PDF101", "PDF415"), docstring_convention=DocstringConvention.GOOGLE, indent_style=IndentStyle.TAB, indent_width=4, line_length=32)
+    result = format_source(source, settings=settings)
+
+    assert result.new_source == '"""x\n\tArgs\n\t\tx (i): words long enough\n\t\t\tto wrap across lines\n\t\t\trobustly\n"""\n'
+    assert result.fixed_findings == {PDF101DocstringReflow.meta: 1, PDF415ConventionEntryIndentation.meta: 1}
+    assert not result.errors
+    assert not format_source(result.new_source, settings=settings).modified
     assert not result.unfixed_findings
+
+
+@pytest.mark.parametrize("entry_indent", ["", "  "])
+def test_pdf101_and_pdf415_preserve_numpy_description_depth_during_reflow(entry_indent: str) -> None:
+    """Keep reflowed descriptions one indentation unit beyond the actual entry head."""
+    source = (
+        f'def convert():\n    """Returns\n    -------\n    {entry_indent}int\n    {entry_indent}    Description long enough to wrap across multiple lines at a short line width for testing.\n    """\n'
+    )
+    settings = CheckSettings(select=("PDF101", "PDF415"), docstring_convention=DocstringConvention.NUMPY, line_length=60)
+    result = format_source(source, settings=settings)
+
+    assert (
+        result.new_source
+        == f'def convert():\n    """Returns\n    -------\n    {entry_indent}int\n    {entry_indent}    Description long enough to wrap across multiple\n    {entry_indent}    lines at a short line width for testing.\n    """\n'
+    )
+    assert not result.errors
+    assert not format_source(result.new_source, settings=settings).modified
 
 
 @pytest.mark.parametrize("selector", ["PDF415", "PDF4", "PDF", "ALL"])

@@ -5,7 +5,6 @@ from __future__ import annotations
 
 # Standard library imports
 import dataclasses
-from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
 # First-party imports
@@ -61,15 +60,14 @@ class PDF100DocstringIndentation(RuleBase):
 def _planned_changes(context: RuleContext) -> tuple[rule_edits.PlannedSourceChange, ...]:
     """Return all safe docstring indentation changes."""
     data = PDF_definition.PDF.require_data(context)
-    lines = context.source_lines
-    return tuple(change for docstring in data.docstrings if (change := _planned_change_for_docstring(docstring, context=context, source_lines=lines)) is not None)
+    return tuple(change for docstring in data.docstrings if (change := _planned_change_for_docstring(docstring, context=context)) is not None)
 
 
-def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo, *, context: RuleContext, source_lines: Sequence[str]) -> rule_edits.PlannedSourceChange | None:
+def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo, *, context: RuleContext) -> rule_edits.PlannedSourceChange | None:
     """Return one whole-literal replacement for a docstring."""
     if not docstring_source.is_safely_mapped_simple_docstring(docstring, require_multiline=True):
         return None
-    canonical_margin = docstring_source.docstring_canonical_margin(docstring, context=context, source_lines=source_lines)
+    canonical_margin = docstring_source.docstring_canonical_margin(docstring, context=context)
     line_targets = _target_raw_lines(docstring, canonical_margin=canonical_margin, context=context)
     changed_lines = tuple(
         (line, line_targets[line.index]) for line in docstring.structure.lines if line.index > 0 and line.source_line_number is not None and line.raw_text != line_targets[line.index].raw_text
@@ -96,11 +94,12 @@ def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo, *, co
 
 @dataclasses.dataclass(frozen=True)
 class _LineTarget:
-    """Target raw line text and the visual margin stripped from its suffix."""
+    """Target raw text, stripped visual margin, prefix, and style-normalization policy."""
 
     raw_text: str
     strip_width: int
     prefix: str
+    normalize_style: bool = True
 
 
 def _target_raw_lines(docstring: PDF_definition.DocstringInfo, *, canonical_margin: str, context: RuleContext) -> tuple[_LineTarget, ...]:
@@ -110,11 +109,11 @@ def _target_raw_lines(docstring: PDF_definition.DocstringInfo, *, canonical_marg
     targets[0] = _LineTarget(docstring.structure.lines[0].raw_text, 0, "")
     for line in docstring.structure.lines[1:]:
         if not text_layout.has_space_tab_content(line.raw_text):
-            target = canonical_margin if docstring_source.is_same_line_closing_delimiter_prefix(docstring, line) else _target_blank_line(line.raw_text, canonical_margin=canonical_margin)
-            targets[line.index] = _LineTarget(target, 0, "")
+            targets[line.index] = _LineTarget(line.raw_text, 0, "", normalize_style=False)
 
-    convention_lines = _apply_convention_targets(targets, docstring, canonical_margin=canonical_margin, context=context)
-    plain_indexes = tuple(line.index for line in docstring.structure.lines[1:] if targets[line.index] is None and line.index not in convention_lines and _has_indentation_content(line.raw_text))
+    covered_lines = _apply_convention_targets(targets, docstring, canonical_margin=canonical_margin, context=context)
+    covered_lines.update(_apply_first_line_structural_targets(targets, docstring, canonical_margin=canonical_margin))
+    plain_indexes = tuple(line.index for line in docstring.structure.lines[1:] if targets[line.index] is None and line.index not in covered_lines and _has_indentation_content(line.raw_text))
     _apply_common_margin_targets(targets, docstring, plain_indexes, canonical_margin)
 
     for line in docstring.structure.lines[1:]:
@@ -122,18 +121,9 @@ def _target_raw_lines(docstring: PDF_definition.DocstringInfo, *, canonical_marg
             targets[line.index] = _LineTarget(line.raw_text, 0, "")
         if context.settings.indent_style == settings_check.IndentStyle.SPACE:
             line_target = targets[line.index]
-            if line_target is not None:
+            if line_target is not None and line_target.normalize_style:
                 targets[line.index] = dataclasses.replace(line_target, raw_text=_space_normalized_target_text(line_target, context=context))
     return tuple(target if target is not None else _LineTarget("", 0, "") for target in targets)
-
-
-def _target_blank_line(raw_text: str, *, canonical_margin: str) -> str:
-    """Return the accepted blank-line indentation state."""
-    if raw_text in {"", canonical_margin}:
-        return raw_text
-    if raw_text.startswith(canonical_margin):
-        return canonical_margin
-    return ""
 
 
 def _has_indentation_content(raw_text: str) -> bool:
@@ -173,11 +163,28 @@ def _apply_convention_targets(targets: list[_LineTarget | None], docstring: PDF_
     return covered
 
 
+def _apply_first_line_structural_targets(targets: list[_LineTarget | None], docstring: PDF_definition.DocstringInfo, *, canonical_margin: str) -> set[int]:
+    """Rebase continuations whose structural prefix begins on the first line."""
+    covered: set[int] = set()
+    kinds = {PDF_definition.DocstringBlockKind.REST_FIELD, PDF_definition.DocstringBlockKind.LIST_ITEM, PDF_definition.DocstringBlockKind.BLOCK_QUOTE}
+    canonical_width = text_layout.leading_width(canonical_margin)
+    for region in docstring.structure.reflow_regions:
+        if region.start_line != 0 or region.kind not in kinds:
+            continue
+        indexes = tuple(index for index in range(1, region.end_line) if _has_indentation_content(docstring.structure.lines[index].raw_text))
+        for index in indexes:
+            line = docstring.structure.lines[index]
+            targets[index] = _LineTarget(f"{canonical_margin}{text_layout.strip_indent(line.raw_text, canonical_width)}", canonical_width, canonical_margin)
+        covered.update(indexes)
+    return covered
+
+
 def _preserve_targets(targets: list[_LineTarget | None], docstring: PDF_definition.DocstringInfo, indexes: range) -> None:
-    """Assign unchanged targets for structurally non-rewritable lines."""
+    """Assign unchanged targets without replacing targets owned by earlier policies."""
     for index in indexes:
-        line = docstring.structure.lines[index]
-        targets[index] = _LineTarget(line.raw_text, 0, "")
+        if targets[index] is None:
+            line = docstring.structure.lines[index]
+            targets[index] = _LineTarget(line.raw_text, 0, "")
 
 
 def _apply_fixed_prefix_targets(targets: list[_LineTarget | None], docstring: PDF_definition.DocstringInfo, indexes: range | tuple[int, ...], prefix: str) -> None:

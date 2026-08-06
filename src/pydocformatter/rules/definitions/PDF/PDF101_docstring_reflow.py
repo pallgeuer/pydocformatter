@@ -5,7 +5,6 @@ from __future__ import annotations
 
 # Standard library imports
 import dataclasses
-from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
 # Third-party imports
@@ -18,7 +17,7 @@ import pydocformatter.rules.registration as rule_registration
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase
-from pydocformatter.rules.definition_helpers import ascii_whitespace, docstring_source, inline_markup, string_literals, text_layout
+from pydocformatter.rules.definition_helpers import docstring_source, inline_markup, string_literals, text_layout
 from pydocformatter.rules.models import FixAvailability, RuleCacheBehavior, RuleCheckKind, RuleMetadata
 
 
@@ -88,7 +87,7 @@ def _docstring_violations_for_literal(docstring: PDF_definition.DocstringInfo, *
         return ()
     source_map = docstring.source_map
     fragments = source_map.fragments if source_map is not None else tuple(string_literals.StringValueFragment(value=char, source=char) for char in docstring.value)
-    fallback_prefix = _fallback_line_prefix(context.source_lines, docstring=docstring, context=context)
+    fallback_prefix = docstring_source.docstring_canonical_margin(docstring, context=context)
     replacements: list[_RegionReplacement] = []
     ambiguous_violations: list[rule_violations.RuleViolation] = []
     unsafe_reflow_needed = False
@@ -140,7 +139,7 @@ def _replacement_for_region(
     subsequent_width = context.settings.line_length - text_layout.display_width(subsequent_base, tab_width=context.settings.indent_width)
     final_suffix_width = _closing_delimiter_width(docstring, region)
     width = min(initial_width, subsequent_width)
-    if _should_split_google_entry_prefix(region, width=width, tab_width=context.settings.indent_width):
+    if _should_split_entry_prefix(region, width=width, tab_width=context.settings.indent_width):
         wrapped, ambiguous = _wrapped_region_lines(
             docstring,
             region,
@@ -197,14 +196,14 @@ def _closing_delimiter_width(docstring: PDF_definition.DocstringInfo, region: PD
     return len(docstring.node.quote)
 
 
-def _should_split_google_entry_prefix(region: PDF_definition.ReflowRegion, *, width: int, tab_width: int) -> bool:
-    """Return whether a Google entry prefix should stand alone before wrapped description text."""
+def _should_split_entry_prefix(region: PDF_definition.ReflowRegion, *, width: int, tab_width: int) -> bool:
+    """Return whether an entry prefix should stand alone before wrapped description text."""
     if region.kind is not PDF_definition.DocstringBlockKind.SECTION_ENTRY:
         return False
     if text_layout.display_width(region.initial_indent, tab_width=tab_width) <= text_layout.display_width(region.subsequent_indent, tab_width=tab_width):
         return False
-    # Move very long Google entry prefixes onto their own line when the first description line would have too little
-    # useful room.
+    # Move very long entry prefixes onto their own line when the first description line would have too little useful
+    # room.
     return width - text_layout.display_width(region.initial_indent, tab_width=tab_width) < max(8, tab_width * 2)
 
 
@@ -325,13 +324,3 @@ def _raw_generated_line(docstring: PDF_definition.DocstringInfo, line_index: int
     if not generated_text.startswith(margin_line.text_indent):
         return f"{fallback_prefix}{generated_text}"
     return f"{margin_line.raw_indent}{generated_text[len(margin_line.text_indent) :]}"
-
-
-def _fallback_line_prefix(source_lines: Sequence[str], *, docstring: PDF_definition.DocstringInfo, context: RuleContext) -> str:
-    """Return the generated body-line prefix when no prior body line exists."""
-    source_line = source_lines[docstring.range.start.line - 1]
-    if isinstance(docstring.statement, cst.SimpleStatementSuite):
-        source_indent = source_line[: len(source_line) - len(source_line.lstrip(ascii_whitespace.SPACE_AND_TAB))]
-        return f"{source_indent}{text_layout.indent_unit(context.settings)}"
-    prefix = source_line[: docstring.range.start.column]
-    return prefix if prefix.strip() == "" else " " * docstring.range.start.column
