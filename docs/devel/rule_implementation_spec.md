@@ -32,8 +32,9 @@ Every rule class defines `meta = RuleMetadata(...)` with:
 - `incompatible_with`: A tuple, explicitly `()` when empty.
 - `check_kind`: The rule execution kind.
 - `cache_behavior`: An intentional persistent-cache dependency declaration. Built-in file-local rules pass `cache_behavior=RuleCacheBehavior.FILE_LOCAL` directly to `RuleMetadata(...)`; omitting the argument fails closed as uncacheable.
+- `allows_directive_self_suppression`: An exceptional opt-in for rules whose finding describes selector representation on the same bracket directive. It defaults to `False`; PCF008 and PCF009 opt in so converting the selector can be suppressed by that selector.
 
-Rule incompatibilities must be declared on both rules. Rule collection rejects one-sided, self-referential, unknown, or duplicate incompatibilities.
+`RuleMetadata` validates the complete public rule-name grammar when each record is constructed, including the prohibition on names whose uppercase spelling is a valid code selector. Rule incompatibilities must be declared on both rules. Rule collection rejects one-sided, self-referential, unknown, or duplicate incompatibilities, and rejects catalogs where an exact rule code is also a broad selector for another collected rule.
 
 After normal selector precedence and selection gates are applied, incompatible rules are ranked by their effective selector source priority and specificity. A stronger rule silently overrides weaker incompatible rules. Equal-strength conflicts retain the earlier rule in collection order and produce an operational error. Resolution considers the complete incompatibility graph strongest-first before restoring normal collection order for execution.
 
@@ -53,6 +54,8 @@ def violations(cls, context: RuleContext) -> tuple[RuleViolation, ...]: ...
 `violations()` must be a class method accepting exactly one required positional argument named `context`. Suppression-audit rules may omit `violations()` when the runner synthesizes their findings.
 
 Rule code reads source state from `RuleContext`. Category-level shared data is prepared by `RuleCategoryBase.prepare()` and exposed through `context.category_data`; categories that provide typed data should also provide a checked accessor such as `PDF.require_data(context)` or `PCF.require_data(context)`.
+
+The runner collects source suppressions, string-expression topology, and recognized bracketed pydocfmt and Ruff directives in one traversal per exact module source state. It exposes the resulting `BracketDirectiveIndex` through both category and rule contexts. Suppression parsing, PCF category preparation, normalization, auditing, and representation policies consume the same parsed directive objects by comment range instead of reparsing comment text. A source-changing pass rebuilds both indexes together with the module metadata.
 
 Categories whose source directives may cover complete string expressions override `RuleCategoryBase.suppression_expression_ranges()` and return the exact line-and-column `CodeRange` values eligible for that category. The default is no expanded expression coverage. Derive these ranges from the same prepared category data that identifies the semantic expressions instead of independently approximating their syntax in the suppression parser. The suppression parser discovers prefix-neutral candidate ranges, and the runner authorizes them only while filtering the active category.
 

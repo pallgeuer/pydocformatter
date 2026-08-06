@@ -297,6 +297,21 @@ def test_equivalent_selector_syntax_and_specificity_do_not_change_rule_or_analys
     )
 
 
+def test_equivalent_rule_code_and_name_share_rule_and_analysis_keys(tmp_path: Path) -> None:
+    target = tmp_path / "module.py"
+    code_profile = _loaded_profile(tmp_path, select=("PDF300",), require_explicit=())
+    name_profile = _loaded_profile(tmp_path, select=("summary-trailing-period",), require_explicit=())
+    code_rules = rules_selection.select_rules(code_profile.settings, profile=code_profile).for_path(str(target))
+    name_rules = rules_selection.select_rules(name_profile.settings, profile=name_profile).for_path(str(target))
+
+    assert tuple(rule.rule.code.tag for rule in code_rules) == tuple(rule.rule.code.tag for rule in name_rules) == ("PDF300",)
+    assert cache_fingerprint.selected_rules_key(code_rules) == cache_fingerprint.selected_rules_key(name_rules)
+    assert (
+        cache_fingerprint.analysis_fingerprint(settings_check.analysis_settings_identity(code_profile), code_rules)[1]
+        == cache_fingerprint.analysis_fingerprint(settings_check.analysis_settings_identity(name_profile), name_rules)[1]
+    )
+
+
 def test_selector_source_priority_does_not_change_rule_or_analysis_keys(tmp_path: Path) -> None:
     target = tmp_path / "module.py"
     inline = settings_check.SETTINGS_SCHEMA.load_profile(global_values=GlobalArgs(isolated=True, config_options=('select = ["PDF300"]',)), path=str(tmp_path))

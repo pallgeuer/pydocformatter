@@ -17,7 +17,7 @@ import libcst.metadata as cst_metadata
 import pydocformatter.rules.registration as rule_registration
 from pydocformatter import docs_urls
 from pydocformatter.rules.definition import RuleCategoryBase
-from pydocformatter.rules.definition_helpers import source_text, unicode_safety
+from pydocformatter.rules.definition_helpers import directives, source_text, unicode_safety
 from pydocformatter.rules.models import RuleCategoryMetadata
 
 
@@ -163,12 +163,15 @@ class PCFCategoryData:
         standalone_runs (tuple[StandaloneCommentRun, ...]): Consecutive standalone comments eligible for block-level
             formatting.
         trailing_comments (tuple[CommentInfo, ...]): Trailing comments eligible for spacing or extraction rules.
+        bracket_directives (tuple[directives.BracketDirective, ...]): Parsed pydocfmt and Ruff bracket directives in
+            source order.
     """
 
     source_lines: tuple[str, ...]
     comments: tuple[CommentInfo, ...]
     standalone_runs: tuple[StandaloneCommentRun, ...]
     trailing_comments: tuple[CommentInfo, ...]
+    bracket_directives: tuple[directives.BracketDirective, ...]
 
     def source_for(self, code_range: cst_metadata.CodeRange) -> str:
         """Return exact source text for a half-open LibCST code range.
@@ -233,10 +236,13 @@ class PCF(RuleCategoryBase[PCFCategoryData]):
 
         Returns:
             PCFCategoryData: Source lines, all comments, standalone runs, and trailing comments prepared for PCF rules.
+
+        Raises:
+            TypeError: If the category context lacks the shared bracket-directive index.
         """
         del cls
         if "#" not in context.source:
-            return PCFCategoryData(source_lines=context.source_lines, comments=(), standalone_runs=(), trailing_comments=())
+            return PCFCategoryData(source_lines=context.source_lines, comments=(), standalone_runs=(), trailing_comments=(), bracket_directives=())
         collector = _CommentCollector()
         context.module.visit(collector)
         source_lines_with_endings = context.source_lines
@@ -245,11 +251,15 @@ class PCF(RuleCategoryBase[PCFCategoryData]):
         comments = tuple(
             _comment_info(comment.node, code_range=context.positions[comment.node], source_lines=source_lines, syntax_sensitive=comment.syntax_sensitive) for comment in collected_comments
         )
+        if context.bracket_directive_index is None:
+            raise TypeError("PCF category preparation requires a bracket-directive index")
+        bracket_directives = tuple(directive for comment in comments if (directive := context.bracket_directive_index.get(comment.range)) is not None)
         return PCFCategoryData(
             source_lines=source_lines_with_endings,
             comments=comments,
             standalone_runs=_standalone_runs(comments),
             trailing_comments=tuple(comment for comment in comments if comment.placement == CommentPlacement.TRAILING),
+            bracket_directives=bracket_directives,
         )
 
     @classmethod

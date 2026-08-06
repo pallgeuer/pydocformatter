@@ -52,7 +52,7 @@ def convention_setting_effects(*, disabled: tuple[settings_check.DocstringConven
         disabled (tuple[settings_check.DocstringConvention, ...]): Conventions that should always remove the rule from
             active selection.
         ignored (tuple[settings_check.DocstringConvention, ...]): Conventions that should remove broad rule selections
-            while allowing exact rule-code selection to restore the rule.
+            while allowing exact rule-code or rule-name selection to restore the rule.
 
     Returns:
         tuple[RuleSettingEffects, ...]: Metadata setting effects for `docstring_convention`.

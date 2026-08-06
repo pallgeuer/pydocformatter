@@ -117,9 +117,29 @@ indent-width = 4
 line-ending = "lf"
 respect-gitignore = true
 force-exclude = true
-extend-select = ["PDF300", "PDF302", "PDF305", "PDF510", "PDF528", "PDF701", "PDF705", "PDF709", "PDF713", "PDF717"]
-ignore = ["PDF519", "PDF521", "PDF522", "PDF524"]
-require-explicit = []
+extend-select = [
+    "summary-trailing-period",
+    "non-imperative-summary",
+    "summary-starts-with-this",
+    "missing-public-module-attribute-documentation",
+    "attribute-documentation-order",
+    "parameter-type-required",
+    "return-type-required",
+    "yield-type-required",
+    "class-attribute-type-required",
+    "module-attribute-type-required",
+    "rule-codes-in-suppression-comments",
+]
+ignore = [
+    "public-class-attribute-docstring-must-be-attached",
+    "public-module-attribute-docstring-must-be-attached",
+    "private-class-attribute-docstring-must-be-owner",
+    "private-module-attribute-docstring-must-be-owner",
+]
+require-explicit = [
+    "rule-codes-in-suppression-comments",
+    "rule-names-in-suppression-comments",
+]
 
 [tool.pydocfmt.docstring]
 convention = "google"

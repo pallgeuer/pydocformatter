@@ -14,7 +14,8 @@ import libcst.metadata as cst_metadata
 # First-party imports
 import pydocformatter.rules.edits as rule_edits
 import pydocformatter.rules.runner as rule_runner
-from pydocformatter.rules import line_endings
+import pydocformatter.rules.collection as rule_collection
+from pydocformatter.rules import line_endings, suppressions
 from pydocformatter.rules.definition import RuleCategoryBase, RuleCategoryContext, RuleContext
 from pydocformatter.rules.definition_helpers import source_text
 from pydocformatter.rules.models import RuleFinding
@@ -60,17 +61,20 @@ def direct_rule_category_context(source: str, *, settings: CheckSettings, path: 
     metadata_wrapper = cst_metadata.MetadataWrapper(module, unsafe_skip_copy=True)
     offset_map = source_text.source_offset_map(module, exact_source)
     source_lines = tuple(source_text.source_lines(exact_source))
+    positions = offset_map.positions(metadata_wrapper.resolve(cst_metadata.PositionProvider))
+    directive_indexes = suppressions.source_directive_indexes(module, positions=positions, source_lines=source_lines, collection=rule_collection.RULE_COLLECTION)
     return RuleCategoryContext(
         path=path,
         source_path=SourcePathContext.for_path(path),
         settings=settings,
         module=module,
         metadata_wrapper=metadata_wrapper,
-        positions=offset_map.positions(metadata_wrapper.resolve(cst_metadata.PositionProvider)),
+        positions=positions,
         line_ending=line_endings.resolve_line_ending(source, line_ending=settings.line_ending),
         source=exact_source,
         source_lines=source_lines,
         line_bounds=source_text.line_bounds_from_lines(source_lines),
+        bracket_directive_index=directive_indexes.bracket_directive_index,
     )
 
 
@@ -95,6 +99,7 @@ def direct_rule_context(category_context: RuleCategoryContext, *, category_data:
         source=category_context.source,
         source_lines=category_context.source_lines,
         line_bounds=category_context.line_bounds,
+        bracket_directive_index=category_context.bracket_directive_index,
         category_data=category_data,
     )
 

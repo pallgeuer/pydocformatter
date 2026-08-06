@@ -86,6 +86,14 @@ def test_pydocfmt_rule_rejects_unknown_rule() -> None:
     assert "Invalid value 'BAD999'" in result.stderr
 
 
+def test_pydocfmt_rule_rejects_rule_name() -> None:
+    result = cli_helpers.run_cli(pydocfmt_cli.main, ["pydocfmt", "rule", "docstring-reflow"])
+
+    assert result.exit_code == 2
+    assert result.stdout == ""
+    assert "Invalid value 'docstring-reflow'" in result.stderr
+
+
 def test_pydocfmt_rule_rejects_rule_with_all() -> None:
     result = cli_helpers.run_cli(pydocfmt_cli.main, ["pydocfmt", "rule", "PDF101", "--all"])
 

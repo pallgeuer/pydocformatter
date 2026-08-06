@@ -96,6 +96,7 @@ SHOW_RULES_CASES = (
             CheckSettings(docstring_convention=settings_check.DocstringConvention.REST, extend_select=("PDF301",)),
             id="rest-exact-incompatibility-override",
         ),
+        pytest.param(("--select", "docstring-reflow"), CheckSettings(select=("docstring-reflow",)), id="exact-name-select"),
     ]
 )
 
@@ -360,26 +361,38 @@ def test_rule_cli_settings_are_applied(mocker: MockerFixture) -> None:
             "--output-format",
             "grouped",
             "--select",
-            "PCF,PDF",
+            "standalone-comment-formatting,PDF",
             "--ignore",
-            "PCF002,PDF101",
+            "trailing-comment-spacing,docstring-reflow",
+            "--extend-select",
+            "summary-too-long",
+            "--require-explicit",
+            "docstring-reflow",
             "--fixable",
             "ALL",
             "--unfixable",
-            "PCF001",
+            "standalone-comment-formatting",
+            "--extend-fixable",
+            "docstring-reflow",
             "--per-file-ignores",
-            '{"tests/*.py" = ["PCF001"]}',
+            '{"tests/*.py" = ["standalone-comment-formatting"]}',
+            "--extend-per-file-ignores",
+            '{"generated/*.py" = ["docstring-reflow"]}',
         ]
         mocker.patch("pydocformatter.rules_selection.select_rules", return_value=mocker.Mock(errors=()), autospec=True)
         _patch_disk_formatter(mocker, fake_format)
         result = cli_helpers.run_cli(pydocfmt_cli.main, argv)
 
         assert result.exit_code == 0
-        assert called_settings[0].select == ("PCF", "PDF")
-        assert called_settings[0].ignore == ("PCF002", "PDF101")
+        assert called_settings[0].select == ("standalone-comment-formatting", "PDF")
+        assert called_settings[0].ignore == ("trailing-comment-spacing", "docstring-reflow")
+        assert called_settings[0].extend_select == ("summary-too-long",)
+        assert called_settings[0].require_explicit == ("docstring-reflow",)
         assert called_settings[0].fixable == ("ALL",)
-        assert called_settings[0].unfixable == ("PCF001",)
-        assert called_settings[0].per_file_ignores == (("tests/*.py", ("PCF001",)),)
+        assert called_settings[0].unfixable == ("standalone-comment-formatting",)
+        assert called_settings[0].extend_fixable == ("docstring-reflow",)
+        assert called_settings[0].per_file_ignores == (("tests/*.py", ("standalone-comment-formatting",)),)
+        assert called_settings[0].extend_per_file_ignores == (("generated/*.py", ("docstring-reflow",)),)
         assert called_settings[0].output_format == "grouped"
 
 

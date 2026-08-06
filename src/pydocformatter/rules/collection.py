@@ -9,6 +9,7 @@ Attributes:
 from __future__ import annotations
 
 # Standard library imports
+import enum
 import inspect
 import pkgutil
 import importlib
@@ -19,20 +20,53 @@ from types import ModuleType
 from typing import TYPE_CHECKING, TypeVar
 
 # First-party imports
+import pydocformatter.rules.models as rule_models
 import pydocformatter.rules.definitions as rule_definitions
 import pydocformatter.rules.registration as rule_registration
-from pydocformatter.rules.codes import RuleCode
+from pydocformatter.rules.codes import RuleCode, RuleSelector
 from pydocformatter.rules.definition import RuleBase, RuleCategoryBase
 from pydocformatter.rules.registration import RuleError
 
 
 if TYPE_CHECKING:
     # First-party imports
-    from pydocformatter.rules.codes import RuleSelector
     from pydocformatter.rules.registration import RuleRegistry
 
 
 _BaseT = TypeVar("_BaseT")
+
+
+class RuleSelectorResolutionKind(enum.Enum):
+    """Classification of a collection-aware rule selector.
+
+    Attributes:
+        NAME: Registered exact rule name.
+        CODE: Valid broad or exact code selector.
+        UNKNOWN_NAME: Syntactically valid rule name absent from the collection.
+        INVALID: Text matching neither selector grammar.
+    """
+
+    NAME = "name"
+    CODE = "code"
+    UNKNOWN_NAME = "unknown-name"
+    INVALID = "invalid"
+
+
+@dataclasses.dataclass(frozen=True)
+class RuleSelectorResolution:
+    """Collection-aware resolution of one original selector string.
+
+    Attributes:
+        kind (RuleSelectorResolutionKind): Syntactic and catalog classification.
+        selector (RuleSelector | None): Existing code selector representation used for successful resolution.
+        matching_rules (tuple[type[RuleBase], ...]): Collected rules covered by the resolved selector.
+        exact_rule (type[RuleBase] | None): Concrete rule selected by an exact code or registered name.
+    """
+
+    kind: RuleSelectorResolutionKind
+    selector: RuleSelector | None
+    matching_rules: tuple[type[RuleBase], ...]
+    exact_rule: type[RuleBase] | None
 
 
 @dataclasses.dataclass(frozen=True, init=False)
@@ -44,12 +78,14 @@ class RuleCollection:
         category_class (dict[str, type[RuleCategoryBase]]): Category classes indexed by rule-code prefix.
         rules (tuple[type[RuleBase], ...]): Registered rule classes in deterministic rule-code order.
         rule_class (dict[RuleCode, type[RuleBase]]): Rule classes indexed by full rule code.
+        rule_class_by_name (dict[str, type[RuleBase]]): Rule classes indexed by canonical rule name in collection order.
     """
 
     categories: tuple[type[RuleCategoryBase], ...]
     category_class: dict[str, type[RuleCategoryBase]]
     rules: tuple[type[RuleBase], ...]
     rule_class: dict[RuleCode, type[RuleBase]]
+    rule_class_by_name: dict[str, type[RuleBase]]
 
     def __init__(self, categories: Iterable[type[RuleCategoryBase]]) -> None:
         """Create a deterministically ordered rule collection from category classes.
@@ -58,8 +94,8 @@ class RuleCollection:
             categories (Iterable[type[RuleCategoryBase]]): Registered category classes to validate and index.
 
         Raises:
-            RuleError: If a category is invalid, prefixes or rule codes collide, or incompatibility metadata is
-                inconsistent.
+            RuleError: If a category is invalid, prefixes, rule codes, or rule names collide, an exact rule code is also
+                a broad selector, or incompatibility metadata is inconsistent.
         """
         category_class_by_prefix: dict[str, type[RuleCategoryBase]] = {}
         for category in categories:
@@ -72,18 +108,32 @@ class RuleCollection:
 
         sorted_category_class = dict(sorted(category_class_by_prefix.items()))
         rule_class_by_code: dict[RuleCode, type[RuleBase]] = {}
+        rule_class_by_name: dict[str, type[RuleBase]] = {}
         for category in sorted_category_class.values():
             for code, rule in category.ordered_code_class_map().items():
                 if code in rule_class_by_code:
                     raise RuleError(f"Duplicate rule code: {code}")
+                if rule.meta.name in rule_class_by_name:
+                    raise RuleError(f"Duplicate rule name: {rule.meta.name}")
                 rule_class_by_code[code] = rule
+                rule_class_by_name[rule.meta.name] = rule
 
         object.__setattr__(self, "categories", tuple(sorted_category_class.values()))
         object.__setattr__(self, "category_class", sorted_category_class)
         object.__setattr__(self, "rules", tuple(rule_class_by_code.values()))
         object.__setattr__(self, "rule_class", rule_class_by_code)
+        object.__setattr__(self, "rule_class_by_name", rule_class_by_name)
 
+        self._validate_exact_rule_code_selectors()
         self._validate_rule_incompatibilities()
+
+    def _validate_exact_rule_code_selectors(self) -> None:
+        """Reject full rule codes that also select another collected rule."""
+        for rule in self.rules:
+            code = rule.meta.code
+            matching_codes = tuple(matching_rule.meta.code for matching_rule in self.matching_rules(RuleSelector(code.tag)))
+            if matching_codes != (code,):
+                raise RuleError(f"Rule code {code} is also a broad selector matching: {', '.join(str(matching_code) for matching_code in matching_codes)}")
 
     @classmethod
     def from_registry(cls, registry: RuleRegistry) -> RuleCollection:
@@ -131,6 +181,27 @@ class RuleCollection:
             tuple[type[RuleBase], ...]: Rule classes covered by the selector in collection order.
         """
         return tuple(rule for rule in self.rules if selector.selects_code(rule.meta.code))
+
+    def resolve_selector(self, selector: str) -> RuleSelectorResolution:
+        """Resolve a rule name or code selector against this collection.
+
+        Args:
+            selector (str): Original case-sensitive selector text.
+
+        Returns:
+            RuleSelectorResolution: Classification and existing code-selector representation for the input.
+        """
+        if (rule_class := self.rule_class_by_name.get(selector)) is not None:
+            code = rule_class.meta.code
+            return RuleSelectorResolution(kind=RuleSelectorResolutionKind.NAME, selector=RuleSelector(code.tag), matching_rules=(rule_class,), exact_rule=rule_class)
+        if RuleSelector.is_valid_tag(selector):
+            code_selector = RuleSelector(selector)
+            matching_rules = self.matching_rules(code_selector)
+            exact_rule = self.rule_class.get(RuleCode(selector)) if RuleCode.is_valid_tag(selector) else None
+            return RuleSelectorResolution(kind=RuleSelectorResolutionKind.CODE, selector=code_selector, matching_rules=matching_rules, exact_rule=exact_rule)
+        if rule_models.is_valid_rule_name(selector):
+            return RuleSelectorResolution(kind=RuleSelectorResolutionKind.UNKNOWN_NAME, selector=None, matching_rules=(), exact_rule=None)
+        return RuleSelectorResolution(kind=RuleSelectorResolutionKind.INVALID, selector=None, matching_rules=(), exact_rule=None)
 
 
 def import_package_rule_categories(*, package: ModuleType, registry: RuleRegistry | None = None) -> None:

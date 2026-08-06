@@ -1,6 +1,6 @@
 # Rule suppressions
 
-This document specifies how pydocfmt source comments suppress pydocformatter rule findings and automatic fixes. Suppression payloads use pydocformatter rule selectors such as `PDF101`, `PDF`, `PCF001`, `PCF`, and `ALL`.
+This document specifies how pydocfmt source comments suppress pydocformatter rule findings and automatic fixes. Bracketed pydocfmt suppression payloads accept selectors such as `PDF101`, `docstring-reflow`, `PDF`, `PCF001`, `PCF`, and `ALL`.
 
 Rule suppression directives in source code filter both check findings and automatic fixes. A suppressed finding is not reported, and a suppressed fix is not applied.
 
@@ -20,7 +20,7 @@ value = compute() # noqa
 [output=unchanged]
 ```
 
-Explicit `# noqa: ...` payloads suppress known pydocformatter selectors in the payload. Foreign codes are ignored by pydocfmt:
+Explicit `# noqa: ...` payloads suppress known pydocformatter code selectors in the payload. Rule names are not accepted in generic `noqa` comments, and foreign codes are ignored by pydocfmt:
 
 ```pydocfmt-example
 [settings]
@@ -97,7 +97,7 @@ value = 1 # trailing
 [output=unchanged]
 ```
 
-Standalone `# pydocfmt: noqa: ...` and `# pydocfmt: file-ignore[...]` suppress matching selectors for the whole file, regardless of where the directive appears:
+Standalone `# pydocfmt: noqa: ...` and `# pydocfmt: file-ignore[...]` suppress matching selectors for the whole file, regardless of where the directive appears. The `noqa` form remains code-only, while `file-ignore` also accepts exact canonical names:
 
 ```pydocfmt-example
 [settings]
@@ -108,7 +108,7 @@ line-length = 48
 def first():
     """This is a long summary that needs wrapping into more than one physical line."""
 
-# pydocfmt: noqa: PDF101
+# pydocfmt: file-ignore[docstring-reflow]
 
 def second():
     """This is another long summary that needs wrapping into more than one physical line."""
@@ -142,7 +142,7 @@ line-length = 48
 
 [input]
 def generated_function():
-    # pydocfmt: ignore[PDF101]
+    # pydocfmt: ignore[docstring-reflow]
     """This is a long generated summary that needs to stay on one physical source line."""
 
 [output=unchanged]
@@ -259,7 +259,7 @@ def generated_function():
 
 ## Selectors and audit behavior
 
-Selector text is matched case-insensitively after directive normalization. Valid selector prefixes such as `PDF` and `PCF` match all selected rules under that prefix. `ALL` matches all selected pydocformatter rules.
+Bracketed pydocfmt selector text is matched case-insensitively. Registered names resolve first and normalize to lowercase; code-shaped tokens normalize to uppercase and use the existing code-selector grammar; unknown name-shaped tokens normalize to lowercase; and invalid tokens retain their exact spelling. Valid selector prefixes such as `PDF` and `PCF` match all selected rules under that prefix, and `ALL` matches all selected pydocformatter rules. Names are exact only: there are no name prefixes, wildcards, or aliases. Generic `# noqa` and `# pydocfmt: noqa` payloads remain code-only.
 
 `PCF006` audits pydocfmt directives and known explicit pydocformatter selectors in `# noqa: ...`. It does not audit blanket `# noqa`, foreign `# noqa` codes, or selectors for pydocformatter rules that are not selected in the current run.
 
@@ -278,7 +278,7 @@ select = ["PCF001", "PCF006"]
 PCF006: Line 1: Suppression selector 'PCF001' did not suppress any findings
 ```
 
-Each distinct normalized selector in a list is evaluated independently. Exact repeats are collapsed by first occurrence even when PCF003 is not selected, while overlapping selectors such as `PDF` and `PDF528` remain independent:
+A registered name and its exact code share one semantic selector identity for suppression coverage and auditing. Repeats do not produce duplicate audit findings, but source spelling and multiplicity remain unchanged unless a selected fixing rule owns the rewrite. Broad selectors such as `PDF`, `PDF5`, and `ALL` remain distinct because their future-facing semantics differ:
 
 ```pydocfmt-example
 [settings]
@@ -322,20 +322,33 @@ value = compute()  # noqa: F401, PCF002
 PCF006: Line 1: Suppression selector 'PCF002' did not suppress any findings
 ```
 
-Invalid or unknown pydocfmt selector payloads are reported by `PCF006`:
+Invalid or unknown pydocfmt selector payloads are reported by `PCF006`. Canonical-looking absent names are unknown, while text matching neither grammar is invalid:
 
 ```pydocfmt-example
 [settings]
 select = ["PCF006"]
 
 [input]
-# pydocfmt: ignore[not-a-rule]
+# pydocfmt: ignore[not-a-rule, bad!]
 # Short comment.
 
 [output=unchanged]
 [findings]
-PCF006: Line 1: Invalid pydocfmt suppression selector 'NOT-A-RULE'
+PCF006: Line 1: Unknown pydocfmt suppression selector 'not-a-rule'
+PCF006: Line 1: Invalid pydocfmt suppression selector 'bad!'
 ```
+
+`PCF003` canonicalizes recognized bracketed pydocfmt codes to uppercase and names to lowercase, uses comma-space separators, normalizes a whitespace-only selector list to `[]`, removes an accepted trailing comma and terminal directive whitespace, and retains the first semantic code/name alias. Invalid tokens keep their exact spelling. Its Ruff normalization retains exact-text deduplication for `ignore` and `file-ignore`, while preserving the order and multiplicity of `disable` and `enable` payloads.
+
+## Suppression representation policies
+
+`PCF008` (`rule-codes-in-suppression-comments`) enforces names, while `PCF009` (`rule-names-in-suppression-comments`) enforces codes. They are mutually incompatible and both require explicit selection by default. Broad selectors remain permitted under either policy because they have no exact alternative.
+
+For bracketed `pydocfmt: ignore` and `pydocfmt: file-ignore` directives, both policies emit one finding per affected directive and safely convert every recognized exact local selector in one atomic fix. The targeted policy-only fix preserves selector order, rationale text, line endings, unrelated directive spelling and multiplicity, and malformed or foreign tokens while removing only aliases of identities touched by the conversion. PCF003 owns general list deduplication, so selecting it as well yields a globally normalized list independently of which representation policy runs first.
+
+The policies also inspect Ruff's bracketed `ignore`, `file-ignore`, `disable`, and `enable` directives. PCF008 reports alphabetic-prefix-and-numeric-suffix tokens such as `F401`, while PCF009 reports safe name-shaped tokens such as `unused-import`. Broad Ruff selectors such as `F`, `PLR`, and `ALL` remain permitted under both policies because they have no exact alternative. Ruff findings are diagnostic-only because pydocformatter deliberately does not bundle or query Ruff's rule catalog, cannot prove code/name equivalence, and does not invoke Ruff. This is why both rules have `Sometimes` fix availability.
+
+PCF008 and PCF009 opt into directive-line self-suppression through rule metadata. A selector for the active representation policy can therefore suppress that policy's finding on the same local bracket directive; other rules do not gain this exceptional coverage.
 
 `PCF006` can itself be suppressed:
 
@@ -351,7 +364,7 @@ select = ["PCF006"]
 [output=unchanged]
 ```
 
-Unsupported range-style pydocfmt comments are protected comments, but they are not suppression directives:
+Comments using the unrecognized pydocfmt actions `disable[...]` and `enable[...]` are protected as tool comments, but they do not suppress findings or fixes:
 
 ```pydocfmt-example
 [settings]
@@ -359,15 +372,15 @@ select = ["PDF101"]
 line-length = 48
 
 [input]
-# pydocfmt: disable[PDF101]
+# pydocfmt: disable[PDF101]  # Unsupported by pydocfmt.
 """This is a long module summary that needs wrapping into more than one physical line."""
-# pydocfmt: enable[PDF101]
+# pydocfmt: enable[PDF101]  # Unsupported by pydocfmt.
 
 [output]
-# pydocfmt: disable[PDF101]
+# pydocfmt: disable[PDF101]  # Unsupported by pydocfmt.
 """This is a long module summary that needs
 wrapping into more than one physical line."""
-# pydocfmt: enable[PDF101]
+# pydocfmt: enable[PDF101]  # Unsupported by pydocfmt.
 ```
 
 ## Suppressed fixes

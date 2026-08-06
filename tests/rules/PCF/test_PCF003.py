@@ -177,6 +177,16 @@ def test_directive_normalization_reports_original_lines_in_check_mode() -> None:
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((2,), (3,))
 
 
+def test_directive_normalization_respects_configured_unfixable_selection_in_fix_mode() -> None:
+    source = "value = compute()#noqa\n"
+    settings = CheckSettings(select=("PCF003",), unfixable=("PCF003",))
+
+    result = formatter.format_source(source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
+
+    assert result.new_source == source
+    assert tuple((finding.rule, finding.fixable) for finding in result.unfixed_findings) == ((PCF003CommentDirectiveNormalization.meta, False),)
+
+
 def test_directive_normalization_applies_in_syntax_sensitive_positions_without_extraction() -> None:
     source = "@decorator#noqa\ndef function():\n    call(\n        value,# type: ignore[arg-type]\n    )\n    if enabled:#nosec\n        pass\n"
     result = pcf_helpers.format_pcf(source, line_length=8)
@@ -234,3 +244,50 @@ def test_directive_normalization_skips_only_payloads_containing_unicode_barriers
 
     assert result.new_source == "first = 1# noqa\nsecond = 2#NOQA\u2060\n#RUFF : noqa\u2060\n# type: ignore\nthird = 3# type: ignore\n"
     assert result.fixed_findings[PCF003CommentDirectiveNormalization.meta] == 3
+
+
+def test_directive_normalization_canonicalizes_names_and_deduplicates_semantic_aliases() -> None:
+    source = "# PYDOCFMT : ignore [ Docstring-Reflow, pdf101, PCF, ]  # reason\n"
+
+    result = pcf_helpers.format_pcf(source)
+
+    assert result.new_source == "# pydocfmt: ignore[docstring-reflow, PCF]  # reason\n"
+
+
+def test_directive_normalization_retains_first_semantic_alias_in_both_orders() -> None:
+    code_first = pcf_helpers.format_pcf("# pydocfmt: ignore[PDF101, docstring-reflow]\n")
+    name_first = pcf_helpers.format_pcf("# pydocfmt: ignore[docstring-reflow, PDF101]\n")
+
+    assert code_first.new_source == "# pydocfmt: ignore[PDF101]\n"
+    assert name_first.new_source == "# pydocfmt: ignore[docstring-reflow]\n"
+
+
+def test_directive_normalization_does_not_rewrite_tokens_in_an_unsafe_pydocfmt_list() -> None:
+    source = "# PYDOCFMT : IGNORE [ pdf101,, Docstring-Reflow, ]  # reason\n"
+
+    result = pcf_helpers.format_pcf(source)
+
+    assert result.new_source == "# pydocfmt: ignore[ pdf101,, Docstring-Reflow, ]  # reason\n"
+
+
+def test_directive_normalization_preserves_invalid_pydocfmt_token_spelling() -> None:
+    source = "# PYDOCFMT : IGNORE [ foo_bar, foo_bar, FOO_BAR, future.rule ]\n"
+
+    result = pcf_helpers.format_pcf(source)
+
+    assert result.new_source == "# pydocfmt: ignore[foo_bar, FOO_BAR, future.rule]\n"
+
+
+def test_directive_normalization_collapses_whitespace_only_pydocfmt_list() -> None:
+    result = pcf_helpers.format_pcf("# pydocfmt: ignore[ ]\n")
+
+    assert result.new_source == "# pydocfmt: ignore[]\n"
+
+
+@pytest.mark.parametrize("source", ["# pydocfmt: ignore[PDF101]   \n", "value = 1# pydocfmt: ignore[PDF101]\t\f\n"])
+def test_directive_normalization_owns_terminal_whitespace_for_bracket_directives(source: str) -> None:
+    settings = CheckSettings(select=("PCF003",))
+
+    result = formatter.format_source(source, "example.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
+
+    assert result.new_source == source.rstrip(" \t\f\n") + "\n"

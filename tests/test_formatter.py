@@ -39,8 +39,9 @@ from pydocformatter.cli import settings_check
 from pydocformatter.cli.global_args import GlobalArgs
 from pydocformatter.cli.settings_check import CheckSettings, DocstringBlankLineStyle, DocstringConvention, DocstringMissingDocumentation, IndentStyle, LineEnding
 from pydocformatter.formatter import FormatterResult
+from pydocformatter.rules import suppressions
 from pydocformatter.rules.codes import RuleCode
-from pydocformatter.rules.definition_helpers import source_text
+from pydocformatter.rules.definition_helpers import directives, source_text
 from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleFinding, RuleMetadata
 from pydocformatter.source_path import SourcePathContext
 from tests import cli_helpers
@@ -248,7 +249,7 @@ def test_rule_finding_uses_rule_defaults_with_per_finding_overrides() -> None:
 def test_rule_metadata_and_finding_keys_are_sortable() -> None:
     later_rule = RuleMetadata(
         code=RuleCode("PDF999"),
-        name="later",
+        name="later-rule",
         message="Later",
         fix_availability=FixAvailability.ALWAYS,
         stable_since="1.0.0",
@@ -634,7 +635,7 @@ def test_rule_runner_fails_closed_when_initial_source_alignment_is_unprovable() 
     class TST001Noop(rule_base.RuleBase):
         meta = rule_models.RuleMetadata(
             code=rule_codes.RuleCode("TST001"),
-            name="noop",
+            name="no-op",
             message="Noop",
             fix_availability=rule_models.FixAvailability.NEVER,
             stable_since="1.0.0",
@@ -780,7 +781,7 @@ def test_rule_runner_retains_exact_source_after_seeded_fix_replaces_module(mocke
     class TSW001Noop(rule_base.RuleBase):
         meta = rule_models.RuleMetadata(
             code=rule_codes.RuleCode("TSW001"),
-            name="noop",
+            name="no-op",
             message="Noop",
             fix_availability=rule_models.FixAvailability.ALWAYS,
             stable_since="1.0.0",
@@ -825,7 +826,7 @@ def test_rule_runner_skips_fix_hooks_when_precheck_has_no_fixable_findings() -> 
     class TST001Manual(rule_base.RuleBase):
         meta = rule_models.RuleMetadata(
             code=rule_codes.RuleCode("TST001"),
-            name="manual",
+            name="manual-rule",
             message="Manual",
             fix_availability=rule_models.FixAvailability.NEVER,
             stable_since="1.0.0",
@@ -986,7 +987,7 @@ def test_rule_fix_pass_same_module_noop_skips_source_comparison(mocker: MockerFi
     class TST001Noop(rule_base.RuleBase):
         meta = rule_models.RuleMetadata(
             code=rule_codes.RuleCode("TST001"),
-            name="noop",
+            name="no-op",
             message="Noop",
             fix_availability=rule_models.FixAvailability.ALWAYS,
             stable_since="1.0.0",
@@ -1318,7 +1319,7 @@ def test_rule_check_pass_reuses_position_metadata_across_categories(mocker: Mock
     class TST001Noop(rule_base.RuleBase):
         meta = rule_models.RuleMetadata(
             code=rule_codes.RuleCode("TST001"),
-            name="noop",
+            name="noop-tst",
             message="Noop",
             fix_availability=rule_models.FixAvailability.NEVER,
             stable_since="1.0.0",
@@ -1341,7 +1342,7 @@ def test_rule_check_pass_reuses_position_metadata_across_categories(mocker: Mock
     class TSW001Noop(rule_base.RuleBase):
         meta = rule_models.RuleMetadata(
             code=rule_codes.RuleCode("TSW001"),
-            name="noop",
+            name="noop-tsw",
             message="Noop",
             fix_availability=rule_models.FixAvailability.NEVER,
             stable_since="1.0.0",
@@ -1394,7 +1395,7 @@ def test_rule_check_pass_reports_position_metadata_errors_as_category_preparatio
     class TST001Noop(rule_base.RuleBase):
         meta = rule_models.RuleMetadata(
             code=rule_codes.RuleCode("TST001"),
-            name="noop",
+            name="no-op",
             message="Noop",
             fix_availability=rule_models.FixAvailability.NEVER,
             stable_since="1.0.0",
@@ -1448,7 +1449,7 @@ def test_rule_fix_pass_reuses_position_metadata_across_unchanged_categories(mock
     class TST001Noop(rule_base.RuleBase):
         meta = rule_models.RuleMetadata(
             code=rule_codes.RuleCode("TST001"),
-            name="noop",
+            name="noop-tst",
             message="Noop",
             fix_availability=rule_models.FixAvailability.ALWAYS,
             stable_since="1.0.0",
@@ -1471,7 +1472,7 @@ def test_rule_fix_pass_reuses_position_metadata_across_unchanged_categories(mock
     class TSW001Noop(rule_base.RuleBase):
         meta = rule_models.RuleMetadata(
             code=rule_codes.RuleCode("TSW001"),
-            name="noop",
+            name="noop-tsw",
             message="Noop",
             fix_availability=rule_models.FixAvailability.ALWAYS,
             stable_since="1.0.0",
@@ -1524,13 +1525,85 @@ def test_rule_checks_fixes_and_rebuilt_contexts_reuse_one_source_path(mocker: Mo
     assert all(call.kwargs["source_path"] is source_path for call in category_context.call_args_list)
 
 
+def test_rule_pass_parses_each_comment_for_bracket_directives_once(mocker: MockerFixture) -> None:
+    parse_bracket_directive = mocker.spy(directives, "parse_bracket_directive")
+    source = "# pydocfmt: ignore[PCF003]\n# Ordinary comment.\nvalue = 1\n"
+    settings = CheckSettings(select=("PCF003",))
+
+    formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=False)
+
+    assert parse_bracket_directive.call_count == 2
+
+
+def test_source_directive_indexes_build_both_indexes_in_one_traversal(mocker: MockerFixture) -> None:
+    source = "value = 1  # pydocfmt: ignore[PDF101]\n"
+    module = cst.parse_module(source)
+    metadata_wrapper = cst_metadata.MetadataWrapper(module)
+    positions = metadata_wrapper.resolve(cst_metadata.PositionProvider)
+    module_visit = mocker.spy(cst.Module, "visit")
+
+    indexes = suppressions.source_directive_indexes(metadata_wrapper.module, positions=positions, source_lines=tuple(source_text.source_lines(source)), collection=rule_collection.RULE_COLLECTION)
+
+    assert module_visit.call_count == 1
+    directive = next(iter(indexes.bracket_directive_index.by_range.values()))
+    assert indexes.suppression_index.directives[0].selectors[0].matched_codes == directive.tokens[0].matched_codes
+
+
+def test_source_directive_indexes_skip_traversal_for_comment_free_source(mocker: MockerFixture) -> None:
+    source = "value = 1\n"
+    module = cst.parse_module(source)
+    metadata_wrapper = cst_metadata.MetadataWrapper(module)
+    positions = metadata_wrapper.resolve(cst_metadata.PositionProvider)
+    module_visit = mocker.spy(cst.Module, "visit")
+
+    indexes = suppressions.source_directive_indexes(metadata_wrapper.module, positions=positions, source_lines=tuple(source_text.source_lines(source)), collection=rule_collection.RULE_COLLECTION)
+
+    assert module_visit.call_count == 0
+    assert indexes.suppression_index.directives == ()
+    assert indexes.bracket_directive_index.by_range == {}
+
+
+def test_bracket_directive_coordinates_require_complete_comment_text() -> None:
+    code_range = cst_metadata.CodeRange(start=cst_metadata.CodePosition(1, 0), end=cst_metadata.CodePosition(1, 28))
+
+    complete = directives.parse_bracket_directive("# pydocfmt: ignore[PDF101]", collection=rule_collection.RULE_COLLECTION, comment_range=code_range)
+    stripped = directives.parse_bracket_directive("pydocfmt: ignore[PDF101]", collection=rule_collection.RULE_COLLECTION)
+
+    assert complete is not None
+    assert complete.selectors_range == cst_metadata.CodeRange(start=cst_metadata.CodePosition(1, 19), end=cst_metadata.CodePosition(1, 25))
+    assert stripped is not None
+    assert stripped.selectors_range is None
+    with pytest.raises(ValueError, match="coordinates require complete comment text"):
+        directives.parse_bracket_directive("pydocfmt: ignore[PDF101]", collection=rule_collection.RULE_COLLECTION, comment_range=code_range)
+
+
+def test_bracket_directive_models_retain_only_consumed_state() -> None:
+    assert tuple(field.name for field in dataclasses.fields(directives.BracketDirectiveToken)) == (
+        "original",
+        "normalized",
+        "raw_segment",
+        "source_order",
+        "segment_index",
+        "kind",
+        "matched_codes",
+        "resolved_code",
+        "resolved_name",
+        "semantic_identity",
+        "survives_deduplication",
+    )
+    assert tuple(field.name for field in dataclasses.fields(directives.BracketDirectiveIndex)) == ("by_range",)
+
+
 @pytest.mark.parametrize("context_class", [rule_base.RuleCategoryContext, rule_base.RuleContext])
 def test_direct_rule_context_construction_requires_non_optional_source_path(context_class: type[object]) -> None:
     parameter = inspect.signature(context_class).parameters["source_path"]
 
     assert parameter.kind is inspect.Parameter.KEYWORD_ONLY
     assert parameter.default is inspect.Parameter.empty
-    assert typing.get_type_hints(context_class)["source_path"] is SourcePathContext
+    type_hints = typing.get_type_hints(context_class)
+
+    assert type_hints["source_path"] is SourcePathContext
+    assert type_hints["bracket_directive_index"] == directives.BracketDirectiveIndex | None
 
 
 def test_rule_fix_pass_reports_position_metadata_errors_as_category_preparation(mocker: MockerFixture) -> None:
@@ -1547,7 +1620,7 @@ def test_rule_fix_pass_reports_position_metadata_errors_as_category_preparation(
     class TST001Noop(rule_base.RuleBase):
         meta = rule_models.RuleMetadata(
             code=rule_codes.RuleCode("TST001"),
-            name="noop",
+            name="no-op",
             message="Noop",
             fix_availability=rule_models.FixAvailability.ALWAYS,
             stable_since="1.0.0",
@@ -1628,7 +1701,7 @@ def test_rule_fix_pass_refreshes_position_metadata_after_changed_module(mocker: 
     class TSW001Noop(rule_base.RuleBase):
         meta = rule_models.RuleMetadata(
             code=rule_codes.RuleCode("TSW001"),
-            name="noop",
+            name="no-op",
             message="Noop",
             fix_availability=rule_models.FixAvailability.ALWAYS,
             stable_since="1.0.0",
@@ -1910,7 +1983,7 @@ def test_rule_source_formatter_applies_per_file_ignores() -> None:
     class TST001Check(rule_base.RuleBase):
         meta = rule_models.RuleMetadata(
             code=rule_codes.RuleCode("TST001"),
-            name="check",
+            name="check-rule",
             message="Check",
             fix_availability=rule_models.FixAvailability.NEVER,
             stable_since="1.0.0",
@@ -1999,7 +2072,7 @@ def test_rule_source_formatter_reports_repeated_source_state(mocker: MockerFixtu
     class TST001Toggle(rule_base.RuleBase):
         meta = rule_models.RuleMetadata(
             code=rule_codes.RuleCode("TST001"),
-            name="toggle",
+            name="toggle-rule",
             message="Toggle",
             fix_availability=rule_models.FixAvailability.ALWAYS,
             stable_since="1.0.0",
@@ -2159,7 +2232,7 @@ def test_rule_source_formatter_retains_iteration_limit_for_unique_source_states(
     class TST001Increment(rule_base.RuleBase):
         meta = rule_models.RuleMetadata(
             code=rule_codes.RuleCode("TST001"),
-            name="increment",
+            name="increment-rule",
             message="Increment",
             fix_availability=rule_models.FixAvailability.ALWAYS,
             stable_since="1.0.0",
@@ -2738,7 +2811,7 @@ def test_unused_suppression_reports_unused_and_invalid_pydocfmt_selectors() -> N
     invalid = formatter.format_source("# pydocfmt: ignore[not-a-rule]\n# Short comment.\n", "a.py", settings=settings, rule_selection=selection, fix=False)
 
     assert tuple(finding.message for finding in unused.unfixed_findings) == ("Suppression selector 'PCF001' did not suppress any findings",)
-    assert tuple(finding.message for finding in invalid.unfixed_findings) == ("Invalid pydocfmt suppression selector 'NOT-A-RULE'",)
+    assert tuple(finding.message for finding in invalid.unfixed_findings) == ("Unknown pydocfmt suppression selector 'not-a-rule'",)
 
 
 def test_unused_suppression_reports_partially_unused_selector_lists() -> None:
@@ -2766,7 +2839,7 @@ def test_unused_suppression_audits_repeated_normalized_selectors_once_in_check_m
 
 
 @pytest.mark.parametrize(
-    ("selectors", "message"), [("PDF999, pdf999", "Unknown pydocfmt suppression selector 'PDF999'"), ("not-a-rule, NOT-A-RULE", "Invalid pydocfmt suppression selector 'NOT-A-RULE'")]
+    ("selectors", "message"), [("PDF999, pdf999", "Unknown pydocfmt suppression selector 'PDF999'"), ("not-a-rule, NOT-A-RULE", "Unknown pydocfmt suppression selector 'not-a-rule'")]
 )
 def test_unused_suppression_validates_repeated_normalized_invalid_or_unknown_selectors_once(selectors: str, message: str) -> None:
     source = f"# pydocfmt: ignore[{selectors}]\n# Short comment.\n"

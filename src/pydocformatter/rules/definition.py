@@ -19,7 +19,7 @@ import libcst.metadata as cst_metadata
 
 # First-party imports
 from pydocformatter.cli.settings_check import CheckSettings
-from pydocformatter.rules.definition_helpers import source_text
+from pydocformatter.rules.definition_helpers import directives, source_text
 from pydocformatter.rules.models import RuleCategoryMetadata, RuleCheckKind, RuleMetadata
 from pydocformatter.source_path import SourcePathContext
 from pydocformatter.utils import misc
@@ -48,6 +48,8 @@ class RuleCategoryContext:
         source (str): Exact current module source with LibCST positions remapped onto it.
         source_lines (tuple[str, ...]): Current source split into physical lines.
         line_bounds (source_text.LineBounds | None): Cached source offset lookup table, if available.
+        bracket_directive_index (directives.BracketDirectiveIndex | None): Bracket directives parsed once for the
+            current source.
     """
 
     path: str
@@ -60,6 +62,7 @@ class RuleCategoryContext:
     source: str
     source_lines: tuple[str, ...]
     line_bounds: source_text.LineBounds | None = dataclasses.field(kw_only=True)
+    bracket_directive_index: directives.BracketDirectiveIndex | None = dataclasses.field(default=None, kw_only=True)
 
 
 @dataclasses.dataclass(frozen=True)

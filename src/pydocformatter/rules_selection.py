@@ -14,7 +14,7 @@ import pydocformatter.settings as settings_core
 import pydocformatter.rules.collection as rule_collection
 from pydocformatter.cli.settings_check import DEFAULT_REQUIRE_EXPLICIT
 from pydocformatter.rules.codes import ALL_RULE_SELECTOR_TAG, RuleCode, RuleSelector
-from pydocformatter.rules.collection import RuleCollection
+from pydocformatter.rules.collection import RuleCollection, RuleSelectorResolutionKind
 from pydocformatter.rules.models import FixAvailability, RuleMetadata, RuleSettingEffect
 from pydocformatter.utils import misc
 from pydocformatter.utils.globs import BaseRelativeGlobMatcher
@@ -269,7 +269,7 @@ def _apply_setting_effects(settings: CheckSettings, *, enabled_strengths: dict[R
 
 
 def _resolve_require_explicit_codes(settings: CheckSettings, *, collection: RuleCollection, errors: list[str], field_priorities: Mapping[str, int] | None) -> frozenset[RuleCode]:
-    """Return rules that broad selectors cannot enable without exact rule-code selection."""
+    """Return rules that broad selectors cannot enable without exact code or name selection."""
     report_unknown = settings.require_explicit != DEFAULT_REQUIRE_EXPLICIT or _field_priority("require_explicit", field_priorities) > settings_core.DEFAULT_SOURCE_PRIORITY
     return frozenset(_resolve_rule_specificities(settings.require_explicit, collection=collection, context="require-explicit rules", errors=errors, report_unknown=report_unknown))
 
@@ -368,16 +368,28 @@ def _resolve_rule_strengths(
     """Resolve selectors to rule-code source strengths and append nonfatal errors for unusable selectors."""
     rule_strengths: dict[RuleCode, _SelectorStrength] = {}
     for selector_group in selector_groups:
+        seen_selector_tags: set[str] = set()
         for selector_tag in selector_group.selectors:
-            selector = _parse_selector(selector_tag, context=context, errors=errors)
-            if selector is None:
+            resolution = collection.resolve_selector(selector_tag)
+            if resolution.kind == RuleSelectorResolutionKind.INVALID:
+                errors.append(f"{context} contains invalid selector: {selector_tag}")
                 continue
+            if resolution.kind == RuleSelectorResolutionKind.UNKNOWN_NAME:
+                if report_unknown:
+                    errors.append(f"{context} contains unknown rule name: {selector_tag}")
+                continue
+            selector = resolution.selector
+            if selector is None:
+                raise AssertionError("Successful selector resolution must contain a code selector")
 
-            matching_rules = collection.matching_rules(selector)
+            matching_rules = resolution.matching_rules
             if not matching_rules:
                 if report_unknown and selector_tag != ALL_RULE_SELECTOR_TAG:
                     errors.append(f"{context} contains unknown selector: {selector_tag}")
                 continue
+            if selector.tag in seen_selector_tags:
+                continue
+            seen_selector_tags.add(selector.tag)
 
             if require_available_fix:
                 fixable_rules = tuple(rule for rule in matching_rules if rule.meta.fix_availability != FixAvailability.NEVER)
@@ -406,12 +418,3 @@ def _selector_specificity(selector: RuleSelector) -> int:
     if selector.tag == ALL_RULE_SELECTOR_TAG:
         return 0
     return len(selector.tag)
-
-
-def _parse_selector(selector: str, *, context: str, errors: list[str]) -> RuleSelector | None:
-    """Parse one selector and append a nonfatal error if it is invalid."""
-    if not RuleSelector.is_valid_tag(selector):
-        errors.append(f"{context} contains invalid selector: {selector}")
-        return None
-
-    return RuleSelector(selector)

@@ -9,11 +9,25 @@ import enum
 import dataclasses
 
 # First-party imports
+import pydocformatter.rules.codes as rule_codes
 from pydocformatter.rules import line_targets
 from pydocformatter.rules.codes import ALL_RULE_SELECTOR_TAG, RuleCode
 
 
 _RULE_PREFIX_RE = re.compile(r"^[A-Z]+$")
+_RULE_NAME_RE = re.compile(r"^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$")
+
+
+def is_valid_rule_name(name: str) -> bool:
+    """Return whether a string is a canonical rule name.
+
+    Args:
+        name (str): Candidate lowercase ASCII kebab-case rule name.
+
+    Returns:
+        bool: Whether the name satisfies the public rule-name grammar.
+    """
+    return _RULE_NAME_RE.fullmatch(name) is not None and not rule_codes.RuleSelector.is_valid_tag(name.upper())
 
 
 class FixAvailability(enum.StrEnum):
@@ -130,6 +144,8 @@ class RuleMetadata:
         incompatible_with (tuple[RuleCode, ...]): Rule codes that cannot be selected together with this rule.
         check_kind (RuleCheckKind): Check-pass phase used to run the rule.
         cache_behavior (RuleCacheBehavior): Declared dependency behavior for persistent caching.
+        allows_directive_self_suppression (bool): Whether a local bracket suppression may cover a finding on its own
+            directive line.
     """
 
     code: RuleCode
@@ -141,6 +157,7 @@ class RuleMetadata:
     incompatible_with: tuple[RuleCode, ...]
     check_kind: RuleCheckKind = dataclasses.field(kw_only=True)
     cache_behavior: RuleCacheBehavior = dataclasses.field(default=RuleCacheBehavior.UNCACHEABLE, kw_only=True)
+    allows_directive_self_suppression: bool = dataclasses.field(default=False, kw_only=True)
 
     def __post_init__(self) -> None:
         """Validate rule metadata fields."""
@@ -152,8 +169,12 @@ class RuleMetadata:
             raise TypeError(f"Expected RuleCheckKind, got {type(self.check_kind).__name__}")
         if not isinstance(self.cache_behavior, RuleCacheBehavior):
             raise TypeError(f"Expected RuleCacheBehavior, got {type(self.cache_behavior).__name__}")
+        if not isinstance(self.allows_directive_self_suppression, bool):
+            raise TypeError(f"Expected bool for allows_directive_self_suppression, got {type(self.allows_directive_self_suppression).__name__}")
         if not self.name:
             raise ValueError(f"{self.code}: Rule name must not be empty")
+        if not is_valid_rule_name(self.name):
+            raise ValueError(f"{self.code}: Invalid rule name: {self.name!r}")
         if not self.message:
             raise ValueError(f"{self.code}: Rule message must not be empty")
         if not self.stable_since:

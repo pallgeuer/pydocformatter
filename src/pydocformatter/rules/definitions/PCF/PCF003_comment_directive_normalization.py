@@ -32,7 +32,6 @@ _PYDOCFMT_SELECTOR_RE = re.compile(r"^(?:ALL|[A-Za-z]+[0-9]*)$")
 _TYPE_IGNORE_RE = re.compile(r"^type\s*:\s*ignore(?P<codes>\[[^\]]*\])?(?P<rest>.*)$", re.IGNORECASE)
 _TY_IGNORE_RE = re.compile(r"^ty\s*:\s*ignore(?P<codes>\[[^\]]*\])?(?P<rest>.*)$", re.IGNORECASE)
 _PREFIXED_NOQA_RE = re.compile(r"^(?P<head>ruff|flake8)\s*:\s*noqa(?:\s*:\s*(?P<codes>[^#]*?))?(?P<rest>[ \t\f]+#.*|)$", re.IGNORECASE)
-_RUFF_BRACKET_RE = re.compile(r"^ruff\s*:\s*(?P<action>ignore|disable|enable|file-ignore)\s*(?P<codes>\[[^\]]*\])(?P<rest>.*)$", re.IGNORECASE)
 _RUFF_ISORT_RE = re.compile(r"^ruff\s*:\s*isort\s*:\s*(?P<value>.*)$", re.IGNORECASE)
 _NOINSPECTION_RE = re.compile(r"^noinspection(?:\s+(?P<inspections>.*))?$", re.IGNORECASE)
 _LANGUAGE_INJECTION_RE = re.compile(r"^language\s*=\s*(?P<language>\S+)(?P<rest>.*)$", re.IGNORECASE)
@@ -77,21 +76,36 @@ class PCF003CommentDirectiveNormalization(RuleBase):
 def _planned_changes(context: RuleContext) -> tuple[rule_edits.PlannedSourceChange, ...]:
     """Return all directive normalization changes for the current source."""
     data = PCF_definition.PCF.require_data(context)
+    bracket_directive_by_range = {directive.comment_range: directive for directive in data.bracket_directives}
     changes: list[rule_edits.PlannedSourceChange] = []
     for comment in data.comments:
         if comment.kind not in {PCF_definition.CommentKind.TYPE_DIRECTIVE, PCF_definition.CommentKind.TOOL_DIRECTIVE}:
             continue
-        if comment.unicode_occurrences:
+        bracket_directive = bracket_directive_by_range.get(comment.range)
+        if comment.unicode_occurrences and (bracket_directive is None or not _has_only_terminal_form_feeds(comment)):
             continue
-        content = _normalized_directive_content(comment.content)
-        if comment.placement == PCF_definition.CommentPlacement.TRAILING:
-            replacement = f"{comment.line_prefix}{comment_formatting.render_comment(content, include_indent=False)}"
-        else:
-            replacement = comment_formatting.render_comment(content, indent=comment.indent)
+        normalized_comment = _normalized_bracket_comment(bracket_directive) if bracket_directive is not None else None
+        if normalized_comment is None:
+            normalized_comment = comment_formatting.render_comment(_normalized_directive_content(comment.content), include_indent=False)
+        replacement = f"{comment.line_prefix}{normalized_comment}" if comment.placement == PCF_definition.CommentPlacement.TRAILING else f"{comment.indent}{normalized_comment}"
         change = comment_formatting.planned_full_line_change(data, comment, replacement)
         if change is not None:
             changes.append(change)
     return tuple(changes)
+
+
+def _has_only_terminal_form_feeds(comment: PCF_definition.CommentInfo) -> bool:
+    """Return whether every suspicious occurrence is removable terminal form-feed whitespace."""
+    terminal_start = len(comment.raw_content.rstrip(" \t\f"))
+    return all(occurrence.code_point == ord("\f") and occurrence.offset >= terminal_start for occurrence in comment.unicode_occurrences)
+
+
+def _normalized_bracket_comment(directive: directive_helpers.BracketDirective) -> str | None:
+    """Return normalized text for a shared bracket directive supported by PCF003."""
+    if directive.tool is directive_helpers.DirectiveTool.PYDOCFMT and directive.action not in {"ignore", "file-ignore"}:
+        return None
+    selectors = directive.normalized_selectors() if directive.safe_list else directive.raw_selectors
+    return f"# {directive.tool.value}: {directive.action}[{selectors}]{directive.suffix[1:]}".rstrip(" \t\f")
 
 
 def _normalized_directive_content(content: str) -> str:
@@ -104,17 +118,9 @@ def _normalized_directive_content(content: str) -> str:
         return _normalized_noqa("noqa", match.group("selectors"), match.group("rest"))
     if (match := directive_helpers.PYDOCFMT_NOQA_RE.match(content)) is not None:
         return _normalized_pydocfmt_noqa(match.group("selectors"), match.group("rest"))
-    if (match := directive_helpers.PYDOCFMT_BRACKET_RE.match(content)) is not None and match.group("action").lower() in {"ignore", "file-ignore"}:
-        action = match.group("action").lower()
-        codes = _normalized_bracketed_list(match.group("codes"), item_re=_PYDOCFMT_SELECTOR_RE, deduplicate=True, allow_trailing_comma=True, uppercase=True)
-        return f"pydocfmt: {action}{codes}{match.group('rest')}"
     if (match := _PREFIXED_NOQA_RE.match(content)) is not None:
         head = match.group("head").lower()
         return _normalized_noqa(f"{head}: noqa", match.group("codes"), match.group("rest"))
-    if (match := _RUFF_BRACKET_RE.match(content)) is not None:
-        action = match.group("action").lower()
-        codes = _normalized_bracketed_list(match.group("codes"), item_re=_LIST_ITEM_RE, deduplicate=action not in {"disable", "enable"}, allow_trailing_comma=True)
-        return f"ruff: {action}{codes}{match.group('rest')}"
     if (match := _RUFF_ISORT_RE.match(content)) is not None:
         return _normalized_colon_payload("ruff", _normalized_colon_value("isort", match.group("value")))
     if (match := _NOINSPECTION_RE.match(content)) is not None:

@@ -5,9 +5,9 @@ This document specifies how `pydocfmt` discovers rule definitions and resolves r
 ## Ruff compatibility deltas
 
 - **D1: Rule catalog and selector prefixes.**
-  pydocformatter has its own rule catalog and requires selectors to use complete pydocformatter rule prefixes such as `PDF` or `PCF`. The selector `P` does not match `PDF` or `PCF` rules.
+  pydocformatter has its own rule catalog and accepts either code selectors with complete pydocformatter prefixes such as `PDF` or `PCF`, or exact canonical rule names such as `docstring-reflow`. The selector `P` does not match `PDF` or `PCF` rules, and names do not support prefix matching.
 - **D2: Supported settings.**
-  pydocformatter implements `select`, `ignore`, `extend-select`, `per-file-ignores`, `extend-per-file-ignores`, `fixable`, `unfixable`, and `extend-fixable`. Ruff settings that have no pydocformatter equivalent, such as deprecated `extend-ignore`, preview-rule settings, fix-safety settings, and `external`, are outside this compatibility surface.
+  pydocformatter implements `select`, `ignore`, `extend-select`, `per-file-ignores`, `extend-per-file-ignores`, `fixable`, `unfixable`, and `extend-fixable`, and adds the pydocformatter-specific `require-explicit` setting. Ruff settings that have no pydocformatter equivalent, such as deprecated `extend-ignore`, preview-rule settings, fix-safety settings, and `external`, are outside this compatibility surface.
 - **D3: Selector errors.**
   pydocformatter records selector validation problems as operational errors so one run can report all rule-selection issues together. Ruff may fail earlier while parsing or resolving its own configuration.
 - **D4: Fixability selector validation.**
@@ -44,8 +44,9 @@ Rule classes register with their category through `@register_rule_to(PDF)`. Rule
 - `setting_effects`: Immutable metadata mapping resolved setting fields and triggering values to `Ignored` or `Disabled` selection effects.
 - `incompatible_with`: An immutable tuple of `RuleCode` values for rules that cannot be selected together with this rule.
 - `check_kind`: A `RuleCheckKind` value used to distinguish standard source-check rules from suppression-audit rules during rule collection and execution ordering.
+- `allows_directive_self_suppression`: Whether a local bracket selector may suppress a finding reported on its own directive line. This is false by default and enabled only for representation policies whose finding is about that selector.
 
-`RuleBase` rejects subclasses without `meta`, or with non-`RuleMetadata` metadata, at class definition time. `RuleMetadata` rejects non-`RuleCode` codes, non-`FixAvailability` fix availability values, non-`RuleCheckKind` check kinds, empty names, messages, or stable versions, malformed setting-effect records, malformed incompatibility tuples, and duplicate incompatible codes. Category registration rejects rules whose code prefix differs from the category prefix and rejects duplicate rule codes from different classes.
+`RuleBase` rejects subclasses without `meta`, or with non-`RuleMetadata` metadata, at class definition time. `RuleMetadata` rejects non-`RuleCode` codes, non-`FixAvailability` fix availability values, non-`RuleCheckKind` check kinds, non-Boolean self-suppression capabilities, invalid or empty names, empty messages or stable versions, malformed setting-effect records, malformed incompatibility tuples, and duplicate incompatible codes. Collection construction rejects duplicate names across the complete catalog and exact rule codes that would also act as broad selectors for another collected rule. Category registration rejects rules whose code prefix differs from the category prefix and rejects duplicate rule codes from different classes.
 
 ## Rule codes
 
@@ -63,9 +64,15 @@ Examples:
 - `PCF100` is valid with prefix `PCF`, number string `100`, and number `100`.
 - `bad`, `001`, and `ALL001` are invalid.
 
+## Rule names
+
+Every rule also has one globally unique canonical name. Names match `[a-z][a-z0-9]*(?:-[a-z0-9]+)*`, but their uppercase spelling must not be a valid code selector. Names are case-sensitive in configuration and select exactly one registered rule. For example, `docstring-reflow` selects `PDF101` with the same strength as the full code. Names have no prefix, wildcard, fuzzy-match, or alias forms.
+
+Code-shaped spellings such as `pdf101`, `pdf`, `all`, and `noop` are therefore invalid rule names, including when the current catalog has no matching code prefix. Codes remain uppercase and names remain lowercase.
+
 ## Collection
 
-`RuleCollection` stores category classes in deterministic prefix order in `categories`, exposes the same order through `category_class`, and flattens their rules into deterministic rule-code order in `rules` and `rule_class`.
+`RuleCollection` stores category classes in deterministic prefix order in `categories`, exposes the same order through `category_class`, and flattens their rules into deterministic rule-code order in `rules` and `rule_class`. `rule_class_by_name` indexes the same classes by canonical name while preserving collection order.
 
 Collection behavior:
 
@@ -74,6 +81,8 @@ Collection behavior:
 - Categories expose their rules in rule-code order and allow idempotent re-registration of the same rule class.
 - `matching_rules(selector)` returns matching rule classes in collection order.
 - `matching_rules_exist(selector)` returns whether any collected rule matches the selector.
+- `resolve_selector(text)` distinguishes registered names, valid code selectors, unknown canonical-looking names, and invalid text.
+- Every exact collected rule code must select only its own rule; catalogs containing codes such as `PDF1` and `PDF10` together are rejected because `PDF1` would be both exact and broad.
 - Incompatibility declarations must reference collected rules, cannot reference the declaring rule itself, and must be declared mutually by both rules.
 
 Built-in categories use the default registry through `@register_rule_category`, and their rules use `@register_rule_to(category)`. Tests and custom rule packages can use an isolated `RuleRegistry` with `register_rule_category_to(registry)`, pass that registry to `import_package_rule_categories`, then call `RuleCollection.from_registry(registry)`.
@@ -90,10 +99,13 @@ Rule selectors are:
 - Full rule code: `PDF101`.
 - Complete prefix: `PDF`.
 - Complete prefix plus leading digits: `PDF10`, matching rule codes whose numeric string starts with `10`.
+- Exact canonical rule name: `docstring-reflow`, matching only `PDF101`.
 
-Selectors are case-sensitive and must use complete rule prefixes. For example, `P` does not match rules with prefix `PDF`.
+Selectors are case-sensitive. Code selectors must use complete rule prefixes, so `P` does not match rules with prefix `PDF`. Names must use their exact canonical lowercase spelling.
 
-Selectors outside the grammar are operational errors. Selectors that match no collected rule are operational errors, except `ALL`, which may match an empty collection without error. Invalid or unknown selectors resolve to no rules and resolution continues.
+Selectors outside both grammars are operational errors. A canonical-looking name absent from the collection is reported specifically as an unknown rule name. Code selectors that match no collected rule are unknown selectors, except `ALL`, which may match an empty collection without error. Invalid or unknown selectors resolve to no rules and resolution continues.
+
+Successful names are reduced immediately to the corresponding concrete `RuleCode`. A code and its name in the same selector group therefore contribute one semantic rule match while preserving exact-match evidence. Broad selectors remain distinct, while collection validation guarantees that a collected full code is never also broad for another rule. Final selection and persistent cache identity use the resolved ordered rule codes, so equivalent code and name spellings do not create distinct analysis identities.
 
 ## Source priority and specificity
 
@@ -110,7 +122,8 @@ Source priority values:
 Specificity values:
 
 - `ALL` has specificity `0`.
-- Any other selector has specificity equal to `len(selector)`.
+- A code selector other than `ALL` has specificity equal to its code-selector length.
+- An exact name resolves to its full rule code and therefore has full-code specificity.
 
 Resolution rule:
 
@@ -134,8 +147,8 @@ Examples:
 After normal `select` and `ignore` precedence is resolved, each selected rule's metadata is evaluated against the resolved `CheckSettings` values. Effects from all declared setting fields are combined:
 
 - `Disabled` takes precedence over `Ignored`.
-- `Ignored` removes a rule selected through `ALL`, a category prefix, or a partial selector, but any participating exact rule-code selector restores it, including one retained alongside a higher-priority broad `extend-select`.
-- `Disabled` always removes a rule, including one selected by exact rule code.
+- `Ignored` removes a rule selected through `ALL`, a category prefix, or a partial selector, but any participating exact rule-code or rule-name selector restores it, including one retained alongside a higher-priority broad `extend-select`.
+- `Disabled` always removes a rule, including one selected by exact code or name.
 - Convention `Ignored` effects can encode a profile's choice among antagonistic rules, including a choice to broadly select neither alternative.
 - Configured `ignore` selectors and matching per-file ignores still suppress an exactly restored ignored rule.
 - Setting effects do not change effective fixability.
@@ -148,7 +161,7 @@ Defaults:
 - `select = ["ALL"]`
 - `ignore = []`
 - `extend-select = []`
-- `require-explicit` defaults to the exact rule-code selectors in the runtime `DEFAULT_REQUIRE_EXPLICIT` setting.
+- `require-explicit` defaults to exact selectors in the runtime `DEFAULT_REQUIRE_EXPLICIT` setting.
 
 Global enabled rules are resolved per rule:
 
@@ -158,11 +171,11 @@ Global enabled rules are resolved per rule:
 - For each rule, track the strongest matching enabling selector by source priority and specificity.
 - For each rule, track the strongest matching disabling selector by source priority and specificity.
 - Select the rule only when the enabling selector strength is greater than the disabling selector strength.
-- Resolve `require-explicit` as rule selectors. Any selected rule matched by `require-explicit` is removed unless an exact rule-code selector also participated in enabling it.
+- Resolve `require-explicit` as rule selectors. Any selected rule matched by `require-explicit` is removed unless an exact rule-code or rule-name selector also participated in enabling it.
 
 The output `rules` tuple preserves deterministic rule-code order after filtering.
 
-`require-explicit` is intended for otherwise applicable rules that should remain available through exact selection without being enabled by broad selectors such as `ALL`, `PDF`, or `PCF`. For a rule matched by `require-explicit`, `select = ["ALL"]` does not enable it, while including the rule's exact code in `extend-select` enables it. Setting `require-explicit = []` removes this gate, but it does not override configured ignores, `Ignored` or `Disabled` setting effects, per-file ignores, or incompatibility resolution. Each built-in default entry changes broad selection in at least one settings profile where those independent gates permit the rule.
+`require-explicit` is intended for otherwise applicable rules that should remain available through exact selection without being enabled by broad selectors such as `ALL`, `PDF`, or `PCF`. For a rule matched by `require-explicit`, `select = ["ALL"]` does not enable it, while including either the rule's exact code or canonical name in `extend-select` enables it. Setting `require-explicit = []` removes this gate, but it does not override configured ignores, `Ignored` or `Disabled` setting effects, per-file ignores, or incompatibility resolution. Each built-in default entry changes broad selection in at least one settings profile where those independent gates permit the rule.
 
 ## Rule incompatibilities
 
@@ -176,7 +189,7 @@ After normal selection precedence, setting effects, and explicit-selection requi
 - A discarded rule does not prevent a weaker compatible rule from being retained.
 - Per-file ignores run later and do not restore rules discarded by incompatibility resolution.
 
-The built-in opposing pairs (e.g. `PDF106`/`PDF107` and `PDF108`/`PDF109`) are mutually incompatible. Convention-specific setting effects keep every broad built-in convention profile conflict-free by selecting at most one rule from each incompatible pair; a profile may select neither alternative. Exact selection can restore an ignored rule and silently override an incompatible rule selected through a weaker broad selector. Selecting both rules exactly at the same source priority retains the lower ordered rule and reports the higher ordered rule as disabled.
+The built-in opposing pairs (e.g. `PDF106`/`PDF107`, `PDF108`/`PDF109`, and `PCF008`/`PCF009`) are mutually incompatible. Convention-specific setting effects keep every broad built-in convention profile conflict-free by selecting at most one rule from each incompatible PDF pair; a profile may select neither alternative. Exact code or name selection can restore an ignored rule and silently override an incompatible rule selected through a weaker broad selector. Selecting both rules exactly at the same source priority retains the lower ordered rule and reports the higher ordered rule as disabled.
 
 `docstring-convention = "pep257"` is the default named convention profile. It does not parse Google sections, NumPy sections, or reStructuredText fields, and it applies PEP 257/pydocstyle-compatible broad-rule carve-outs. `docstring-convention = "none"` also avoids convention-specific parsing, but keeps the stricter generic no-convention rule profile for rules that can act without convention parsing.
 
@@ -228,6 +241,12 @@ Rule-selection CLI list options accept comma-separated selector values per optio
 
 ```bash
 pydocfmt check --select PDF200,PDF110 --ignore PDF203
+```
+
+Exact names can be mixed with code selectors:
+
+```bash
+pydocfmt check --select docstring-reflow,PCF --ignore unused-suppression
 ```
 
 Whitespace around command-line comma-list entries is stripped before validation. This is a pydocformatter CLI parsing delta from Ruff, which treats the whitespace as part of the selector.
@@ -283,6 +302,7 @@ Rule selection is tolerant of selector errors. `select_rules()` accumulates nonf
 Current error wording:
 
 - Invalid selector: `"{context} contains invalid selector: {selector}"`
+- Unknown rule name: `"{context} contains unknown rule name: {selector}"`
 - Unknown selector: `"{context} contains unknown selector: {selector}"`
 - Fixability selector that only matches rules with no available fixes: `"{context} selector {selector!r} only matches rules with no available fixes"`
 - Equal-strength incompatible selected rule: `"Selected rule {rule} is incompatible with earlier selected rule[s] {conflicts}; {rule} has been disabled"`

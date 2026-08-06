@@ -9,6 +9,7 @@ import sys
 import typing
 import inspect
 import pkgutil
+import tomllib
 import argparse
 import tempfile
 import importlib
@@ -429,7 +430,7 @@ def _valid_rule_package_files(package_name: str) -> dict[str, str]:
             f"from {package_name}.PDF.PDF import PDF\n\n"
             "@rule_registration.register_rule_to(PDF)\n"
             "class PDF101Test(RuleBase):\n"
-            "    meta = RuleMetadata(code=RuleCode('PDF101'), name='test', message='Test', fix_availability=FixAvailability.ALWAYS, stable_since='1.0.0', setting_effects=(), incompatible_with=(), check_kind=RuleCheckKind.STANDARD)\n"
+            "    meta = RuleMetadata(code=RuleCode('PDF101'), name='test-rule', message='Test', fix_availability=FixAvailability.ALWAYS, stable_since='1.0.0', setting_effects=(), incompatible_with=(), check_kind=RuleCheckKind.STANDARD)\n"
             "    @classmethod\n"
             "    def violations(cls, context):\n"
             "        del cls, context\n"
@@ -726,7 +727,7 @@ def test_import_package_rule_categories_rejects_registered_rules_outside_categor
         "from pydocformatter.rules.codes import RuleCode\n"
         "from pydocformatter.rules.models import FixAvailability, RuleCheckKind, RuleMetadata\n\n"
         "class PDF100External(RuleBase):\n"
-        "    meta = RuleMetadata(code=RuleCode('PDF100'), name='external', message='External', fix_availability=FixAvailability.ALWAYS, stable_since='1.0.0', setting_effects=(), incompatible_with=(), check_kind=RuleCheckKind.STANDARD)\n"
+        "    meta = RuleMetadata(code=RuleCode('PDF100'), name='external-rule', message='External', fix_availability=FixAvailability.ALWAYS, stable_since='1.0.0', setting_effects=(), incompatible_with=(), check_kind=RuleCheckKind.STANDARD)\n"
         "    @classmethod\n"
         "    def violations(cls, context):\n"
         "        del cls, context\n"
@@ -907,11 +908,14 @@ def test_rule_metadata_derives_prefix_and_number_from_code() -> None:
         "incompatible_with",
         "check_kind",
         "cache_behavior",
+        "allows_directive_self_suppression",
     )
     assert rule.cache_behavior is rule_models.RuleCacheBehavior.UNCACHEABLE
+    assert not rule.allows_directive_self_suppression
     assert not hasattr(RuleMetadata, "file_local")
-    assert all(field.default is dataclasses.MISSING for field in dataclasses.fields(RuleMetadata)[:-1])
-    assert dataclasses.fields(RuleMetadata)[-1].default is rule_models.RuleCacheBehavior.UNCACHEABLE
+    assert all(field.default is dataclasses.MISSING for field in dataclasses.fields(RuleMetadata)[:-2])
+    assert dataclasses.fields(RuleMetadata)[-2].default is rule_models.RuleCacheBehavior.UNCACHEABLE
+    assert dataclasses.fields(RuleMetadata)[-1].default is False
     assert all(field.default_factory is dataclasses.MISSING for field in dataclasses.fields(RuleMetadata))
     assert rule.check_kind == RuleCheckKind.STANDARD
     assert rule.setting_effects == ()
@@ -1033,6 +1037,29 @@ def test_rule_metadata_validates_rule_code() -> None:
             setting_effects=(),
             incompatible_with=(),
             check_kind=typing.cast("typing.Any", "standard"),
+        )
+    with pytest.raises(TypeError, match="Expected bool for allows_directive_self_suppression, got str"):
+        RuleMetadata(
+            code=RuleCode("PDF101"),
+            name="bad-rule",
+            message="Bad rule",
+            fix_availability=FixAvailability.ALWAYS,
+            stable_since="1.0.0",
+            setting_effects=(),
+            incompatible_with=(),
+            check_kind=RuleCheckKind.STANDARD,
+            allows_directive_self_suppression=typing.cast("typing.Any", "yes"),
+        )
+    with pytest.raises(ValueError, match="PDF101: Rule name must not be empty"):
+        RuleMetadata(
+            code=RuleCode("PDF101"),
+            name="",
+            message="Bad rule",
+            fix_availability=FixAvailability.ALWAYS,
+            stable_since="1.0.0",
+            setting_effects=(),
+            incompatible_with=(),
+            check_kind=RuleCheckKind.STANDARD,
         )
     with pytest.raises(TypeError, match="missing 1 required positional argument: 'stable_since'"):
         RuleMetadata(code=RuleCode("PDF101"), name="bad-rule", message="Bad rule", fix_availability=FixAvailability.ALWAYS, setting_effects=(), incompatible_with=(), check_kind=RuleCheckKind.STANDARD)  # ty: ignore[missing-argument]
@@ -1396,6 +1423,109 @@ def test_rule_collection_matching_rules_returns_rule_classes() -> None:
     assert collection.matching_rules(RuleSelector("PDF")) == (PDF101SampleRule, PDF110SampleRule)
 
 
+def test_rule_collection_indexes_names_in_collection_order() -> None:
+    collection = sample_collection()
+
+    assert tuple(collection.rule_class_by_name) == ("comment-reflow-required", "docstring-reflow", "summary-too-long")
+    assert tuple(collection.rule_class_by_name.values()) == collection.rules
+    assert collection.rule_class_by_name["docstring-reflow"] is PDF101SampleRule
+
+
+@pytest.mark.parametrize("name", ["UPPERCASE", "under_score", "-leading", "trailing-", "repeated--separator", "caf\u00e9", "1leading", "contains.dot", "pdf101", "pdf", "all", "noop"])
+def test_rule_metadata_rejects_malformed_or_code_shaped_rule_names(name: str) -> None:
+    with pytest.raises(ValueError, match=r"TST001: Invalid rule name:"):
+        RuleMetadata(
+            code=RuleCode("TST001"),
+            name=name,
+            message="Malformed name",
+            fix_availability=FixAvailability.NEVER,
+            stable_since="1.0.0",
+            setting_effects=(),
+            incompatible_with=(),
+            check_kind=RuleCheckKind.STANDARD,
+        )
+
+
+def test_rule_collection_rejects_exact_codes_that_are_also_broad_selectors() -> None:
+    class TSTAmbiguousCodeCategory(RuleCategoryBase):
+        meta = RuleCategoryMetadata(prefix="TST", name="ambiguous codes", url=None)
+
+    class TST1SampleRule(RuleBase):
+        meta = RuleMetadata(
+            code=RuleCode("TST1"),
+            name="short-code-rule",
+            message="Short code",
+            fix_availability=FixAvailability.NEVER,
+            stable_since="1.0.0",
+            setting_effects=(),
+            incompatible_with=(),
+            check_kind=RuleCheckKind.STANDARD,
+        )
+        violations = classmethod(_no_violations)
+
+    class TST10SampleRule(RuleBase):
+        meta = dataclasses.replace(TST1SampleRule.meta, code=RuleCode("TST10"), name="long-code-rule", message="Long code")
+        violations = classmethod(_no_violations)
+
+    rule_registration.register_rule_to(TSTAmbiguousCodeCategory)(TST1SampleRule)
+    rule_registration.register_rule_to(TSTAmbiguousCodeCategory)(TST10SampleRule)
+
+    with pytest.raises(rule_registration.RuleError, match=r"Rule code TST1 is also a broad selector matching: TST1, TST10"):
+        rule_collection.RuleCollection((TSTAmbiguousCodeCategory,))
+
+
+def test_rule_collection_rejects_duplicate_names_across_categories() -> None:
+    class TSTDuplicateNameCategory(RuleCategoryBase):
+        meta = RuleCategoryMetadata(prefix="TST", name="duplicate name one", url=None)
+
+    class TSWDuplicateNameCategory(RuleCategoryBase):
+        meta = RuleCategoryMetadata(prefix="TSW", name="duplicate name two", url=None)
+
+    class TST001DuplicateName(RuleBase):
+        meta = RuleMetadata(
+            code=RuleCode("TST001"),
+            name="duplicate-name",
+            message="Duplicate name one",
+            fix_availability=FixAvailability.NEVER,
+            stable_since="1.0.0",
+            setting_effects=(),
+            incompatible_with=(),
+            check_kind=RuleCheckKind.STANDARD,
+        )
+        violations = classmethod(_no_violations)
+
+    class TSW001DuplicateName(RuleBase):
+        meta = dataclasses.replace(TST001DuplicateName.meta, code=RuleCode("TSW001"), message="Duplicate name two")
+        violations = classmethod(_no_violations)
+
+    rule_registration.register_rule_to(TSTDuplicateNameCategory)(TST001DuplicateName)
+    rule_registration.register_rule_to(TSWDuplicateNameCategory)(TSW001DuplicateName)
+
+    with pytest.raises(rule_registration.RuleError, match="Duplicate rule name: duplicate-name"):
+        rule_collection.RuleCollection((TSTDuplicateNameCategory, TSWDuplicateNameCategory))
+
+
+def test_rule_collection_resolves_names_codes_unknown_names_and_invalid_text() -> None:
+    collection = sample_collection()
+
+    name = collection.resolve_selector("docstring-reflow")
+    code = collection.resolve_selector("PDF101")
+    broad = collection.resolve_selector("PDF")
+    unknown_name = collection.resolve_selector("unknown-rule")
+    invalid = collection.resolve_selector("not valid")
+
+    assert (name.kind, name.selector) == (rule_collection.RuleSelectorResolutionKind.NAME, RuleSelector("PDF101"))
+    assert code.kind is rule_collection.RuleSelectorResolutionKind.CODE
+    assert broad.kind is rule_collection.RuleSelectorResolutionKind.CODE
+    assert unknown_name.kind is rule_collection.RuleSelectorResolutionKind.UNKNOWN_NAME
+    assert invalid.kind is rule_collection.RuleSelectorResolutionKind.INVALID
+    assert (name.matching_rules, name.exact_rule) == ((PDF101SampleRule,), PDF101SampleRule)
+    assert (code.matching_rules, code.exact_rule) == ((PDF101SampleRule,), PDF101SampleRule)
+    assert (broad.matching_rules, broad.exact_rule) == ((PDF101SampleRule, PDF110SampleRule), None)
+    assert (unknown_name.matching_rules, unknown_name.exact_rule) == ((), None)
+    assert (invalid.matching_rules, invalid.exact_rule) == ((), None)
+
+
 def test_builtin_rule_setting_effect_matrix() -> None:
     for rule_class in rule_collection.RULE_COLLECTION.rules:
         for setting_effects in rule_class.meta.setting_effects:
@@ -1536,6 +1666,71 @@ def test_select_rules_resolves_selection_and_fixability() -> None:
     assert tuple(rule.fixable for rule in selection.rules) == (True,)
 
 
+def test_select_rules_treats_exact_names_like_full_codes() -> None:
+    by_code = rules_selection.select_rules(CheckSettings(select=("PDF101",), fixable=("PDF101",)), collection=sample_collection())
+    by_name = rules_selection.select_rules(CheckSettings(select=("docstring-reflow",), fixable=("docstring-reflow",)), collection=sample_collection())
+
+    assert by_code.errors == by_name.errors == ()
+    assert by_code.rules == by_name.rules
+    assert tuple((rule.enabled_specificity, rule.fixable) for rule in by_name.rules) == ((len("PDF101"), True),)
+
+
+def test_names_work_in_every_selector_bearing_setting() -> None:
+    ignored = rules_selection.select_rules(CheckSettings(select=("PDF",), ignore=("docstring-reflow",)), collection=sample_collection())
+    extended = rules_selection.select_rules(CheckSettings(select=(), extend_select=("docstring-reflow",)), collection=sample_collection())
+    unfixable = rules_selection.select_rules(CheckSettings(select=("docstring-reflow",), fixable=("PDF",), unfixable=("docstring-reflow",)), collection=sample_collection())
+    extended_fixable = rules_selection.select_rules(CheckSettings(select=("PDF",), fixable=(), extend_fixable=("docstring-reflow",)), collection=sample_collection())
+    per_file = rules_selection.select_rules(
+        CheckSettings(select=("PDF",), per_file_ignores=(("tests/*.py", ("docstring-reflow",)),), extend_per_file_ignores=(("generated/*.py", ("summary-too-long",)),)), collection=sample_collection()
+    )
+
+    assert tuple(str(rule.rule.code) for rule in ignored.rules) == ("PDF110",)
+    assert tuple(str(rule.rule.code) for rule in extended.rules) == ("PDF101",)
+    assert tuple((str(rule.rule.code), rule.fixable) for rule in unfixable.rules) == (("PDF101", False),)
+    assert tuple((str(rule.rule.code), rule.fixable) for rule in extended_fixable.rules) == (("PDF101", True), ("PDF110", False))
+    assert tuple(str(rule.rule.code) for rule in per_file.for_path("tests/a.py")) == ("PDF110",)
+    assert tuple(str(rule.rule.code) for rule in per_file.for_path("generated/a.py")) == ("PDF101",)
+
+
+def test_inline_configuration_resolves_rule_names() -> None:
+    profile = SETTINGS_SCHEMA.load_profile(global_values=GlobalArgs(isolated=True, config_options=('select = ["docstring-reflow"]',)), path=os.getcwd())
+
+    selection = rules_selection.select_rules(profile.settings, profile=profile)
+
+    assert tuple(str(rule.rule.code) for rule in selection.rules) == ("PDF101",)
+    assert selection.errors == ()
+
+
+def test_name_in_require_explicit_gates_broad_selection_and_exact_name_satisfies_it() -> None:
+    broad = rules_selection.select_rules(CheckSettings(select=("PDF",), require_explicit=("docstring-reflow",)), collection=sample_collection())
+    exact = rules_selection.select_rules(CheckSettings(select=("PDF",), extend_select=("docstring-reflow",), require_explicit=("docstring-reflow",)), collection=sample_collection())
+
+    assert tuple(str(rule.rule.code) for rule in broad.rules) == ("PDF110",)
+    assert tuple(str(rule.rule.code) for rule in exact.rules) == ("PDF101", "PDF110")
+
+
+def test_exact_name_restores_ignored_setting_effect_but_not_disabled_rule() -> None:
+    ignored = rules_selection.select_rules(CheckSettings(select=("ignored-by-setting",), docstring_convention=DocstringConvention.GOOGLE), collection=setting_effect_collection())
+    disabled = rules_selection.select_rules(CheckSettings(select=("disabled-by-setting",), docstring_convention=DocstringConvention.GOOGLE), collection=setting_effect_collection())
+
+    assert tuple(str(rule.rule.code) for rule in ignored.rules) == ("TST001",)
+    assert disabled.rules == ()
+
+
+def test_code_and_name_aliases_merge_exact_evidence_without_duplicate_selection() -> None:
+    selection = rules_selection.select_rules(CheckSettings(select=("PDF", "PDF101", "docstring-reflow")), collection=sample_collection())
+
+    assert tuple(str(rule.rule.code) for rule in selection.rules) == ("PDF101", "PDF110")
+    assert next(rule for rule in selection.rules if str(rule.rule.code) == "PDF101").enabled_specificity == len("PDF101")
+
+
+@pytest.mark.parametrize(("selectors", "expected_selector"), [(("PDF110", "summary-too-long"), "PDF110"), (("summary-too-long", "PDF110"), "summary-too-long")])
+def test_code_and_name_aliases_retain_first_diagnostic_provenance(selectors: tuple[str, ...], expected_selector: str) -> None:
+    selection = rules_selection.select_rules(CheckSettings(select=("PDF",), fixable=selectors), collection=sample_collection())
+
+    assert selection.errors == (f"fixable rules selector '{expected_selector}' only matches rules with no available fixes",)
+
+
 def test_select_rules_requires_exact_selection_for_require_explicit_rules() -> None:
     require_explicit_codes = CheckSettings().require_explicit
     defaults = rules_selection.select_rules(CheckSettings(select=("ALL",)))
@@ -1565,6 +1760,20 @@ def test_default_require_explicit_selectors_are_exact_known_rule_codes() -> None
 
     assert tuple(selector for selector in default_selectors if not RuleCode.is_valid_tag(selector)) == ()
     assert tuple(selector for selector in default_selectors if selector not in known_rule_codes) == ()
+
+
+def test_project_pydocfmt_config_uses_names_for_exact_rule_selectors() -> None:
+    with (Path(__file__).parents[1] / "pyproject.toml").open("rb") as file:
+        config = tomllib.load(file)["tool"]["pydocfmt"]
+    configured_selectors: list[tuple[str, str]] = []
+    for field in ("select", "ignore", "extend-select", "require-explicit", "fixable", "unfixable", "extend-fixable"):
+        configured_selectors.extend((field, selector) for selector in config.get(field, ()))
+    for field in ("per-file-ignores", "extend-per-file-ignores"):
+        for pattern, selectors in config.get(field, {}).items():
+            configured_selectors.extend((f"{field}[{pattern!r}]", selector) for selector in selectors)
+    known_rule_codes = frozenset(rule_class.meta.code.tag for rule_class in rule_collection.RULE_COLLECTION.rules)
+
+    assert tuple((field, selector) for field, selector in configured_selectors if selector in known_rule_codes) == ()
 
 
 def test_default_require_explicit_rules_have_a_broad_selection_counterfactual() -> None:
@@ -1703,6 +1912,19 @@ def test_select_rules_reports_only_equal_strength_incompatibilities() -> None:
 
     assert tuple(rule.rule.code.tag for rule in selection.rules) == ("TST001", "TST003")
     assert selection.errors == ("Selected rule TST004 is incompatible with earlier selected rule TST001; TST004 has been disabled",)
+
+
+def test_suppression_policy_names_use_existing_incompatibility_resolution() -> None:
+    equal = rules_selection.select_rules(CheckSettings(select=("rule-codes-in-suppression-comments", "rule-names-in-suppression-comments")))
+    stronger_second = rules_selection.select_rules(
+        CheckSettings(select=("rule-codes-in-suppression-comments",), extend_select=("rule-names-in-suppression-comments",)),
+        field_priorities={"select": settings_core.CONFIG_FILE_SOURCE_PRIORITY, "extend_select": settings_core.ARGUMENT_SOURCE_PRIORITY},
+    )
+
+    assert tuple(str(rule.rule.code) for rule in equal.rules) == ("PCF008",)
+    assert equal.errors == ("Selected rule PCF009 is incompatible with earlier selected rule PCF008; PCF009 has been disabled",)
+    assert tuple(str(rule.rule.code) for rule in stronger_second.rules) == ("PCF009",)
+    assert stronger_second.errors == ()
 
 
 def test_select_rules_resolves_incompatibilities_globally_by_strength() -> None:

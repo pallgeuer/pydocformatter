@@ -21,7 +21,7 @@ import libcst.metadata as cst_metadata
 # First-party imports
 import pydocformatter.rules.violations as rule_violations
 import pydocformatter.rules.definition_helpers.directives as directive_helpers
-from pydocformatter.rules.codes import ALL_RULE_SELECTOR_TAG, RuleCode, RuleSelector
+from pydocformatter.rules.codes import ALL_RULE_SELECTOR_TAG, RuleCode
 from pydocformatter.rules.models import RuleFinding
 
 
@@ -29,6 +29,7 @@ if TYPE_CHECKING:
     # First-party imports
     from pydocformatter.rules.collection import RuleCollection
     from pydocformatter.rules.models import RuleMetadata
+
 
 SuppressionSelectorKey = tuple[int, int]
 
@@ -126,6 +127,19 @@ class SuppressionIndex:
 
 
 @dataclasses.dataclass(frozen=True)
+class SourceDirectiveIndexes:
+    """Suppression and bracket-directive indexes for one exact source state.
+
+    Attributes:
+        suppression_index (SuppressionIndex): Parsed source suppressions.
+        bracket_directive_index (directive_helpers.BracketDirectiveIndex): Bracket directives indexed by comment range.
+    """
+
+    suppression_index: SuppressionIndex
+    bracket_directive_index: directive_helpers.BracketDirectiveIndex
+
+
+@dataclasses.dataclass(frozen=True)
 class SuppressionDirective:
     """One parsed source suppression directive.
 
@@ -194,6 +208,7 @@ class SuppressionSelector:
         invalid_message (str | None): Precomputed diagnostic text for selectors that failed to parse or match rules.
         candidate_expression_ranges (tuple[cst_metadata.CodeRange, ...]): Prefix-neutral string-expression ranges that
             can expand coverage when authorized by the active rule category.
+        directive_line (int | None): Physical line available to rules that opt into directive self-suppression.
     """
 
     text: str
@@ -202,6 +217,7 @@ class SuppressionSelector:
     audit: bool
     invalid_message: str | None = None
     candidate_expression_ranges: tuple[cst_metadata.CodeRange, ...] = ()
+    directive_line: int | None = None
 
     def suppresses(self, finding: RuleFinding, *, active_category_prefix: str, authorized_expression_ranges: frozenset[cst_metadata.CodeRange] = frozenset()) -> bool:
         """Return whether this selector suppresses one finding.
@@ -220,6 +236,8 @@ class SuppressionSelector:
         if finding.rule.code not in self.matched_codes:
             return False
         coverage_options = [self.coverage_lines]
+        if self.directive_line is not None and finding.rule.allows_directive_self_suppression:
+            coverage_options.append(frozenset((self.directive_line,)))
         if finding.rule.code.prefix == active_category_prefix:
             coverage_options.extend(self.coverage_lines | _range_lines(code_range) for code_range in self.candidate_expression_ranges if code_range in authorized_expression_ranges)
         return any(bool(target) and set(target).issubset(coverage_lines) for target in finding.suppression_targets for coverage_lines in coverage_options)
@@ -235,6 +253,8 @@ class _CommentInfo:
     text: str
     standalone: bool
     pydocfmt_local: bool
+    range: cst_metadata.CodeRange
+    bracket_directive: directive_helpers.BracketDirective | None
 
     @property
     def content(self) -> str:
@@ -258,12 +278,14 @@ class _StringComponent:
 class _SourceCollector(cst.CSTVisitor):
     """Collect comments and string-component relationships for suppression attachment."""
 
-    def __init__(self, positions: Mapping[cst.CSTNode, cst_metadata.CodeRange], source_lines: tuple[str, ...]) -> None:
+    def __init__(self, positions: Mapping[cst.CSTNode, cst_metadata.CodeRange], source_lines: tuple[str, ...], collection: RuleCollection) -> None:
         """Initialize empty source object collections."""
         self.positions = positions
         self.source_lines = source_lines
+        self.collection = collection
         self.comments: list[_CommentInfo] = []
         self.string_components: list[_StringComponent] = []
+        self.bracket_directives_by_range: dict[cst_metadata.CodeRange, directive_helpers.BracketDirective] = {}
         self._expression_ranges: list[cst_metadata.CodeRange] = []
 
     def visit_Comment(self, node: cst.Comment) -> None:
@@ -271,7 +293,9 @@ class _SourceCollector(cst.CSTVisitor):
         code_range = self.positions[node]
         source_line = self.source_lines[code_range.start.line - 1].rstrip("\r\n")
         line_prefix = source_line[: code_range.start.column]
-        content = node.value.removeprefix("#").strip()
+        bracket_directive = directive_helpers.parse_bracket_directive(node.value, collection=self.collection, comment_range=code_range)
+        if bracket_directive is not None:
+            self.bracket_directives_by_range[code_range] = bracket_directive
         self.comments.append(
             _CommentInfo(
                 line=code_range.start.line,
@@ -279,7 +303,9 @@ class _SourceCollector(cst.CSTVisitor):
                 indent=line_prefix if not line_prefix.strip(" \t\f") else line_prefix[: len(line_prefix) - len(line_prefix.lstrip(" \t\f"))],
                 text=node.value,
                 standalone=not line_prefix.strip(" \t\f"),
-                pydocfmt_local=_is_pydocfmt_local_ignore(content),
+                pydocfmt_local=_is_pydocfmt_local_ignore(bracket_directive),
+                range=code_range,
+                bracket_directive=bracket_directive,
             )
         )
 
@@ -299,8 +325,8 @@ class _SourceCollector(cst.CSTVisitor):
         self._expression_ranges.pop()
 
 
-def suppression_index(module: cst.Module, *, positions: Mapping[cst.CSTNode, cst_metadata.CodeRange], source_lines: tuple[str, ...], collection: RuleCollection) -> SuppressionIndex:
-    """Return parsed suppression directives for a module source state.
+def source_directive_indexes(module: cst.Module, *, positions: Mapping[cst.CSTNode, cst_metadata.CodeRange], source_lines: tuple[str, ...], collection: RuleCollection) -> SourceDirectiveIndexes:
+    """Return suppression and bracket-directive indexes for a module source state.
 
     Args:
         module (cst.Module): Parsed source module to scan for comments and string-expression topology.
@@ -310,11 +336,11 @@ def suppression_index(module: cst.Module, *, positions: Mapping[cst.CSTNode, cst
         collection (RuleCollection): Rule collection used to resolve suppression selectors to concrete rule codes.
 
     Returns:
-        SuppressionIndex: Parsed suppression directives ordered by source location.
+        SourceDirectiveIndexes: Both directive indexes built by one source traversal.
     """
     if not any("#" in line for line in source_lines):
-        return SuppressionIndex(directives=())
-    collector = _SourceCollector(positions, source_lines)
+        return SourceDirectiveIndexes(suppression_index=SuppressionIndex(directives=()), bracket_directive_index=directive_helpers.BracketDirectiveIndex(by_range={}))
+    collector = _SourceCollector(positions, source_lines, collection)
     module.visit(collector)
     comments = tuple(sorted(collector.comments, key=lambda comment: (comment.line, comment.column)))
     string_components_by_end_line = _string_components_by_end_line(collector.string_components)
@@ -323,28 +349,21 @@ def suppression_index(module: cst.Module, *, positions: Mapping[cst.CSTNode, cst
     directives: list[SuppressionDirective] = []
     directives.extend(_line_directives(comments, string_components_by_end_line=string_components_by_end_line, collection=collection))
     directives.extend(_pydocfmt_file_directives(comments, source_line_count=len(source_lines), collection=collection))
-    directives.extend(
-        _pydocfmt_local_directives(comments, expression_ranges_by_start_line=expression_ranges_by_start_line, comments_by_line=comments_by_line, source_lines=source_lines, collection=collection)
+    directives.extend(_pydocfmt_local_directives(comments, expression_ranges_by_start_line=expression_ranges_by_start_line, comments_by_line=comments_by_line, source_lines=source_lines))
+    return SourceDirectiveIndexes(
+        suppression_index=SuppressionIndex(directives=tuple(directives)), bracket_directive_index=directive_helpers.BracketDirectiveIndex(by_range=collector.bracket_directives_by_range)
     )
-    return SuppressionIndex(directives=tuple(directives))
 
 
 def _line_directives(comments: tuple[_CommentInfo, ...], *, string_components_by_end_line: Mapping[int, tuple[_StringComponent, ...]], collection: RuleCollection) -> tuple[SuppressionDirective, ...]:
     """Return inline pydocfmt and noqa suppression directives."""
     directives: list[SuppressionDirective] = []
     for comment in comments:
-        if not comment.standalone and (pydocfmt_match := directive_helpers.PYDOCFMT_BRACKET_RE.match(comment.content)) is not None and pydocfmt_match.group("action").lower() == "ignore":
+        bracket_directive = comment.bracket_directive
+        if not comment.standalone and bracket_directive is not None and bracket_directive.tool is directive_helpers.DirectiveTool.PYDOCFMT and bracket_directive.action == "ignore":
             coverage_lines = _line_coverage(comment.line)
             candidate_expression_ranges = _inline_candidate_expression_ranges(comment, coverage_lines=coverage_lines, string_components=string_components_by_end_line.get(comment.line, ()))
-            selectors = _selectors(
-                pydocfmt_match.group("selectors"),
-                default_text=ALL_RULE_SELECTOR_TAG,
-                coverage_lines=coverage_lines,
-                candidate_expression_ranges=candidate_expression_ranges,
-                collection=collection,
-                audit=True,
-                include_invalid=True,
-            )
+            selectors = _selectors_from_bracket(bracket_directive, coverage_lines=coverage_lines, candidate_expression_ranges=candidate_expression_ranges, audit=True)
             directives.append(SuppressionDirective(line=comment.line, selectors=selectors))
             continue
         match = directive_helpers.NOQA_RE.match(comment.content)
@@ -381,8 +400,10 @@ def _pydocfmt_file_directives(comments: tuple[_CommentInfo, ...], *, source_line
         match = directive_helpers.PYDOCFMT_NOQA_RE.match(content)
         if match is not None:
             selectors_text = match.group("selectors")
-        elif (bracket_match := directive_helpers.PYDOCFMT_BRACKET_RE.match(content)) is not None and bracket_match.group("action").lower() == "file-ignore":
-            selectors_text = bracket_match.group("selectors")
+        elif (bracket_directive := comment.bracket_directive) is not None and bracket_directive.tool is directive_helpers.DirectiveTool.PYDOCFMT and bracket_directive.action == "file-ignore":
+            selectors = _selectors_from_bracket(bracket_directive, coverage_lines=coverage_lines, audit=True)
+            directives.append(SuppressionDirective(line=comment.line, selectors=selectors))
+            continue
         else:
             continue
         selectors = _selectors(selectors_text, default_text=ALL_RULE_SELECTOR_TAG, coverage_lines=coverage_lines, collection=collection, audit=True, include_invalid=True)
@@ -396,7 +417,6 @@ def _pydocfmt_local_directives(
     expression_ranges_by_start_line: Mapping[int, tuple[cst_metadata.CodeRange, ...]],
     comments_by_line: dict[int, tuple[_CommentInfo, ...]],
     source_lines: tuple[str, ...],
-    collection: RuleCollection,
 ) -> tuple[SuppressionDirective, ...]:
     """Return local pydocfmt suppression directives attached to following source."""
     local_lines = {comment.line for comment in comments if comment.standalone and comment.pydocfmt_local}
@@ -406,37 +426,78 @@ def _pydocfmt_local_directives(
         candidate_expression_ranges = expression_ranges_by_start_line.get(target_line, ())
         for line in block:
             comment = next(comment for comment in comments_by_line[line] if comment.standalone and comment.pydocfmt_local)
-            match = directive_helpers.PYDOCFMT_BRACKET_RE.match(comment.content)
-            if match is None:
+            bracket_directive = comment.bracket_directive
+            if bracket_directive is None or bracket_directive.tool is not directive_helpers.DirectiveTool.PYDOCFMT or bracket_directive.action != "ignore":
                 continue
             selectors = tuple(
-                _local_selector(
-                    selector, target_line=target_line, candidate_expression_ranges=candidate_expression_ranges, comments_by_line=comments_by_line, source_lines=source_lines, collection=collection
+                _local_bracket_selector(
+                    token, directive_line=line, target_line=target_line, candidate_expression_ranges=candidate_expression_ranges, comments_by_line=comments_by_line, source_lines=source_lines
                 )
-                for selector in _selector_texts(match.group("selectors"), include_empty=True)
+                for token in bracket_directive.retained_tokens
             )
+            if not selectors:
+                selectors = (SuppressionSelector(text="", matched_codes=frozenset(), coverage_lines=frozenset(), audit=True, invalid_message="Invalid pydocfmt suppression selector ''"),)
             directives.append(SuppressionDirective(line=line, selectors=selectors))
     return tuple(directives)
 
 
-def _local_selector(
-    text: str,
+def _local_bracket_selector(
+    token: directive_helpers.BracketDirectiveToken,
     *,
+    directive_line: int,
     target_line: int,
     candidate_expression_ranges: tuple[cst_metadata.CodeRange, ...],
     comments_by_line: dict[int, tuple[_CommentInfo, ...]],
     source_lines: tuple[str, ...],
-    collection: RuleCollection,
 ) -> SuppressionSelector:
     """Return one selector for a local suppression directive."""
-    matched_codes, invalid_message = _matched_codes(text, include_invalid=True, collection=collection)
+    matched_codes, invalid_message = _matched_codes_for_bracket_token(token)
     if invalid_message is not None:
-        return SuppressionSelector(text=text, matched_codes=frozenset(), coverage_lines=frozenset(), audit=True, invalid_message=invalid_message)
+        return SuppressionSelector(text=token.normalized, matched_codes=frozenset(), coverage_lines=frozenset(), audit=True, invalid_message=invalid_message)
     prefixes = {code.prefix for code in matched_codes}
     coverage_lines: set[int] = set()
-    if "PCF" in prefixes or text == ALL_RULE_SELECTOR_TAG:
+    if "PCF" in prefixes or token.normalized == ALL_RULE_SELECTOR_TAG:
         coverage_lines.update(_comment_target_coverage(target_line, comments_by_line=comments_by_line, source_lines=source_lines))
-    return SuppressionSelector(text=text, matched_codes=matched_codes, coverage_lines=frozenset(coverage_lines), audit=True, candidate_expression_ranges=candidate_expression_ranges)
+    return SuppressionSelector(
+        text=token.normalized, matched_codes=matched_codes, coverage_lines=frozenset(coverage_lines), audit=True, candidate_expression_ranges=candidate_expression_ranges, directive_line=directive_line
+    )
+
+
+def _selectors_from_bracket(
+    directive: directive_helpers.BracketDirective, *, coverage_lines: frozenset[int], audit: bool, candidate_expression_ranges: tuple[cst_metadata.CodeRange, ...] = ()
+) -> tuple[SuppressionSelector, ...]:
+    """Return suppression entries from one shared pydocfmt bracket model."""
+    selectors: list[SuppressionSelector] = []
+    for token in directive.retained_tokens:
+        matched_codes, invalid_message = _matched_codes_for_bracket_token(token)
+        selectors.append(
+            SuppressionSelector(
+                text=token.normalized, matched_codes=matched_codes, coverage_lines=coverage_lines, audit=audit, invalid_message=invalid_message, candidate_expression_ranges=candidate_expression_ranges
+            )
+        )
+    if not selectors:
+        selectors.append(
+            SuppressionSelector(
+                text="",
+                matched_codes=frozenset(),
+                coverage_lines=coverage_lines,
+                audit=audit,
+                invalid_message="Invalid pydocfmt suppression selector ''",
+                candidate_expression_ranges=candidate_expression_ranges,
+            )
+        )
+    return tuple(selectors)
+
+
+def _matched_codes_for_bracket_token(token: directive_helpers.BracketDirectiveToken) -> tuple[frozenset[RuleCode], str | None]:
+    """Return concrete codes and audit diagnostics for one shared pydocfmt token."""
+    if token.kind in {directive_helpers.DirectiveTokenKind.PYDOCFMT_EXACT_CODE, directive_helpers.DirectiveTokenKind.PYDOCFMT_EXACT_NAME, directive_helpers.DirectiveTokenKind.PYDOCFMT_BROAD_CODE}:
+        if not token.matched_codes:
+            raise AssertionError("Known pydocfmt directive token must match at least one rule code")
+        return token.matched_codes, None
+    if token.kind is directive_helpers.DirectiveTokenKind.UNKNOWN:
+        return frozenset(), f"Unknown pydocfmt suppression selector '{token.normalized}'"
+    return frozenset(), f"Invalid pydocfmt suppression selector '{token.normalized}'"
 
 
 def _selectors(
@@ -481,10 +542,10 @@ def _selector_texts(selectors_text: str, *, include_empty: bool) -> tuple[str, .
 
 def _matched_codes(text: str, *, include_invalid: bool, collection: RuleCollection) -> tuple[frozenset[RuleCode], str | None]:
     """Return rule codes matched by a suppression selector."""
-    if not RuleSelector.is_valid_tag(text):
+    resolution = collection.resolve_selector(text)
+    if resolution.selector is None:
         return frozenset(), f"Invalid pydocfmt suppression selector '{text}'" if include_invalid else None
-    selector = RuleSelector(text)
-    matched_codes = frozenset(rule.meta.code for rule in collection.rules if selector.selects_code(rule.meta.code))
+    matched_codes = frozenset(rule.meta.code for rule in resolution.matching_rules)
     if not matched_codes:
         return frozenset(), f"Unknown pydocfmt suppression selector '{text}'" if include_invalid else None
     return matched_codes, None
@@ -596,7 +657,6 @@ def _local_blocks(local_lines: set[int]) -> tuple[tuple[int, ...], ...]:
     return tuple(blocks)
 
 
-def _is_pydocfmt_local_ignore(content: str) -> bool:
-    """Return whether comment content is a local pydocfmt ignore directive."""
-    match = directive_helpers.PYDOCFMT_BRACKET_RE.match(content)
-    return match is not None and match.group("action").lower() == "ignore"
+def _is_pydocfmt_local_ignore(directive: directive_helpers.BracketDirective | None) -> bool:
+    """Return whether a parsed comment is a local pydocfmt ignore directive."""
+    return directive is not None and directive.tool is directive_helpers.DirectiveTool.PYDOCFMT and directive.action == "ignore"

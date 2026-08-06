@@ -16,6 +16,10 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Added
 
+- **Rule selection:**
+  - Added exact canonical rule-name selectors across selection, fixability, explicit-selection, per-file-ignore, CLI, inline-configuration, and settings-profile inputs, with catalog-wide name validation and deterministic lookup.
+- **Suppression policies:**
+  - Added PCF008 and PCF009 as explicitly selected, mutually incompatible policies for name-only or code-only bracketed pydocfmt and Ruff suppression comments, including safe local conversions and diagnostic-only Ruff findings.
 - **Docstring diagnostics:**
   - Added effectively opt-in PDF528 to report module and class attribute documentation that does not follow the complete first-seen source inventory order.
   - Added PDF418 to report high-confidence malformed reStructuredText directive introducers while preserving their bodies as structured content for other docstring rules.
@@ -58,10 +62,14 @@ All notable changes to this project are documented here. The format follows [Kee
   - Centralized setting-effect resolution with disabled precedence across runtime rule selection, documentation generation, and metadata-backed tests.
   - Separated reusable docstring source editing, literal rendering, section spacing, and comment formatting from rule category preparation, and returned PDF312-specific phrase matching to its rule module.
 - **Rule selection:**
+  - Resolved exact code/name aliases to one concrete rule identity with full-code selection strength and shared cache identity, while distinguishing unknown canonical names from malformed selectors.
   - Made stronger selectors silently override incompatible weaker selections by source priority and specificity, while preserving deterministic collection-order errors that name only the equal-strength blockers.
+  - Rejected code-shaped canonical rule names and catalogs where one full rule code would also broadly select another rule.
 - **Rule suppressions:**
+  - Accepted mixed-case canonical names in bracketed pydocfmt `ignore` and `file-ignore` comments, semantically deduplicated exact code/name aliases by first occurrence, and extended PCF003 and PCF006 to consume the shared directive model.
   - Collapsed repeated normalized pydocfmt selectors before suppression and PCF006 auditing so check-only and fixing runs preserve coverage without duplicate unused-selector findings.
   - Made inline suppressions after any component token of an implicitly concatenated docstring cover the complete expression for PDF findings while preserving line-local PCF coverage and existing local and standalone attachment boundaries.
+  - Collected bracket directives and source suppressions in one source traversal per pass, made directive self-suppression an explicit rule-metadata capability for PCF008 and PCF009, and kept their policy fixes independent from PCF003's general deduplication.
 - **Docstring diagnostics:**
   - Standardized rule metadata and instance messages, added concrete normalization rewrites, and made atomic grouped fixes fall back to rule metadata when they contain distinct diagnostics.
   - Made strict trailing-period rules PDF300 and PDF308 mutually exclusive with their terminal-punctuation alternatives PDF301 and PDF309, with broad convention profiles choosing one alternative consistently.
@@ -124,6 +132,7 @@ All notable changes to this project are documented here. The format follows [Kee
   - Kept checks and fixes active for valid sources with repeated omitted trivia, avoided redundant structural reparsing of internally produced edited source, and reported only automatic fixes that survive a repeated-source cycle.
 - **Comment formatting:**
   - Derived PCF comment ranges from exact-source-remapped LibCST positions, preserving exact edited source across reparsing and recognizing multiline f-string comments consistently on Python 3.11.
+  - Preserved invalid pydocfmt selector spelling, normalized whitespace-only selector lists, removed terminal whitespace from recognized bracket directives, and permitted broad Ruff selectors under both representation policies while retaining exact-code diagnostics.
 - **Docstring diagnostics:**
   - Excluded indentation form feeds from canonical docstring margins so generated continuation, blank, and delimiter lines cannot copy tokenizer trivia into evaluated docstring values.
   - Eliminated fix cycles between PDF107 and PDF200, PDF108 and PDF201, PDF100 and PDF103, PDF100 and PDF101, PDF101 and PDF409, and PDF101 and PDF415 by assigning all whitespace-only lines to PDF103, sharing canonical attached-docstring margins, preserving relative Google and NumPy entry indentation and entry separators, retaining first-line structural and tab-based hanging indentation, making PDF200 delimiter-placement neutral, and preserving configured final-section spacing ahead of PDF108's compact closing style. Retained whitespace ownership inside first-line convention sections, rejected empty generic Google return and yield entry heads, made nested terminal-section spacing reach a fixed point, and corrected PDF405's tabbed section-underline source mapping.

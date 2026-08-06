@@ -25,7 +25,7 @@ import pydocformatter.rules.edits as rule_edits
 import pydocformatter.rules.violations as rule_violations
 from pydocformatter.rules import line_targets, suppressions
 from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
-from pydocformatter.rules.definition_helpers import source_text
+from pydocformatter.rules.definition_helpers import directives, source_text
 from pydocformatter.rules.models import RuleCheckKind, RuleFinding
 
 
@@ -84,6 +84,7 @@ class _ModulePassContext:
     source_lines: tuple[str, ...]
     line_bounds: source_text.LineBounds
     suppression_index: suppressions.SuppressionIndex
+    bracket_directive_index: directives.BracketDirectiveIndex
 
 
 @dataclasses.dataclass(frozen=True)
@@ -418,7 +419,7 @@ def _pass_context_for(module: cst.Module, pass_context: _ModulePassContext | Non
     metadata_wrapper = cst_metadata.MetadataWrapper(module, unsafe_skip_copy=True)
     positions = current_source_seed.offset_map.positions(metadata_wrapper.resolve(cst_metadata.PositionProvider))
     source_lines = tuple(source_text.source_lines(source))
-    suppression_index = suppressions.suppression_index(module, positions=positions, source_lines=source_lines, collection=collection)
+    directive_indexes = suppressions.source_directive_indexes(module, positions=positions, source_lines=source_lines, collection=collection)
     return _ModulePassContext(
         module=module,
         metadata_wrapper=metadata_wrapper,
@@ -426,7 +427,8 @@ def _pass_context_for(module: cst.Module, pass_context: _ModulePassContext | Non
         source=source,
         source_lines=source_lines,
         line_bounds=source_text.line_bounds_from_lines(source_lines),
-        suppression_index=suppression_index,
+        suppression_index=directive_indexes.suppression_index,
+        bracket_directive_index=directive_indexes.bracket_directive_index,
     )
 
 
@@ -477,6 +479,7 @@ def _category_context(pass_context: _ModulePassContext, *, path: str, source_pat
         source=pass_context.source,
         source_lines=pass_context.source_lines,
         line_bounds=pass_context.line_bounds,
+        bracket_directive_index=pass_context.bracket_directive_index,
     )
 
 
@@ -494,6 +497,7 @@ def _rule_context(prepared_category: _PreparedCategory) -> RuleContext:
         source=category_context.source,
         source_lines=category_context.source_lines,
         line_bounds=category_context.line_bounds,
+        bracket_directive_index=category_context.bracket_directive_index,
         category_data=prepared_category.data,
     )
 

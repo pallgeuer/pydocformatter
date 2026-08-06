@@ -73,6 +73,8 @@ DEFAULT_RULE_SELECT = (ALL_RULE_SELECTOR_TAG,)
 DEFAULT_RULE_FIXABLE = (ALL_RULE_SELECTOR_TAG,)
 DEFAULT_REQUIRE_EXPLICIT = (
     "PCF005",
+    "PCF008",
+    "PCF009",
     "PDF003",
     "PDF516",
     "PDF517",
@@ -267,7 +269,7 @@ class CheckSettings:
         select (StringList): Base selected pydocformatter rule selectors.
         ignore (StringList): Rule selectors to ignore.
         extend_select (StringList): Additional selected rule selectors.
-        require_explicit (StringList): Rule selectors that require exact rule-code selection.
+        require_explicit (StringList): Rule selectors that require exact rule-code or rule-name selection.
         per_file_ignores (MultiStringMap): File-pattern-specific ignored selectors.
         extend_per_file_ignores (MultiStringMap): Additional file-specific ignores.
         per_file_settings (PerFileSettingsMap): File-pattern-specific formatter setting overrides.
@@ -427,7 +429,7 @@ class CheckSettingsOverrides(TypedDict, total=False):
         select (StringList): Base selected pydocformatter rule selectors.
         ignore (StringList): Rule selectors to ignore.
         extend_select (StringList): Additional selected rule selectors.
-        require_explicit (StringList): Rule selectors that require exact rule-code selection.
+        require_explicit (StringList): Rule selectors that require exact rule-code or rule-name selection.
         per_file_ignores (MultiStringMap): File-pattern-specific ignored selectors.
         extend_per_file_ignores (MultiStringMap): Additional file-specific ignores.
         per_file_settings (PerFileSettingsMap): File-pattern-specific formatter setting overrides.
@@ -1210,10 +1212,10 @@ SETTINGS_SCHEMA = SettingsSchema(
             field="require_explicit",
             value_type=StringList,
             group=SettingsGroup.RULE_SELECTION,
-            help="Comma-separated rule selector(s) that require exact rule-code selection.",
+            help="Comma-separated rule selector(s) that require exact rule-code or rule-name selection.",
             validator=settings_core.validate_non_empty_string_list,
             cli={"metavar": "RULE"},
-            documentation=f"Rule selectors that broad rule selectors do not enable unless an exact rule-code selector also participates; {_setting_default_clause('require_explicit', StringList)}.",
+            documentation=f"Rule selectors that broad rule selectors do not enable unless an exact rule-code or rule-name selector also participates; {_setting_default_clause('require_explicit', StringList)}.",
         ),
         CheckSettingDefinition(
             cache_identity_role=CacheIdentityRole.FINAL_RULE_CODES,

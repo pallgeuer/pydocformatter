@@ -18,6 +18,7 @@ if TYPE_CHECKING:
 
 # First-party imports
 import pydocformatter.rules.edits as rule_edits
+import pydocformatter.rules.collection as rule_collection
 import pydocformatter.rules.violations as rule_violations
 from pydocformatter.cli.settings_check import CheckSettings
 from pydocformatter.rules import suppressions
@@ -390,12 +391,30 @@ def test_suppression_selector_requires_an_exact_authorized_expression_range() ->
     assert selector.suppresses(finding, active_category_prefix="PDF", authorized_expression_ranges=frozenset((candidate_range,)))
 
 
+def test_directive_self_suppression_is_controlled_by_rule_metadata() -> None:
+    disabled_rule = RuleMetadata(
+        code=RuleCode("TST001"),
+        name="test-rule",
+        message="Test message",
+        fix_availability=FixAvailability.NEVER,
+        stable_since="1.0.0",
+        setting_effects=(),
+        incompatible_with=(),
+        check_kind=RuleCheckKind.STANDARD,
+    )
+    enabled_rule = dataclasses.replace(disabled_rule, allows_directive_self_suppression=True)
+    selector = suppressions.SuppressionSelector(text="TST001", matched_codes=frozenset((disabled_rule.code,)), coverage_lines=frozenset((2,)), audit=True, directive_line=1)
+
+    assert not selector.suppresses(rule_violations.diagnostic(disabled_rule, (1,)).finding, active_category_prefix="TST")
+    assert selector.suppresses(rule_violations.diagnostic(enabled_rule, (1,)).finding, active_category_prefix="TST")
+
+
 def test_suppression_source_collector_indexes_only_complete_string_expressions() -> None:
     component_count = 100
     source = "value = (\n" + '    "x"\n' * component_count + ")\n"
     module = cst.parse_module(source)
     wrapper = cst_metadata.MetadataWrapper(module)
-    collector = suppressions._SourceCollector(wrapper.resolve(cst_metadata.PositionProvider), tuple(source.splitlines(keepends=True)))
+    collector = suppressions._SourceCollector(wrapper.resolve(cst_metadata.PositionProvider), tuple(source.splitlines(keepends=True)), rule_collection.RULE_COLLECTION)
 
     wrapper.module.visit(collector)
     components_by_end_line = suppressions._string_components_by_end_line(collector.string_components)
@@ -410,7 +429,7 @@ def test_suppression_string_indexes_retain_distinct_same_line_expressions() -> N
     source = 'first = "a"; second = ("b" "c")\n'
     module = cst.parse_module(source)
     wrapper = cst_metadata.MetadataWrapper(module)
-    collector = suppressions._SourceCollector(wrapper.resolve(cst_metadata.PositionProvider), tuple(source.splitlines(keepends=True)))
+    collector = suppressions._SourceCollector(wrapper.resolve(cst_metadata.PositionProvider), tuple(source.splitlines(keepends=True)), rule_collection.RULE_COLLECTION)
 
     wrapper.module.visit(collector)
     components_by_end_line = suppressions._string_components_by_end_line(collector.string_components)

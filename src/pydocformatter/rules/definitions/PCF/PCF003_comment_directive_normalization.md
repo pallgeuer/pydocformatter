@@ -9,7 +9,7 @@ PCF003 handles comments already classified as type comments or known tool direct
 
 Ruff `disable[...]` and `enable[...]` range payloads are not deduplicated because Ruff pairs range boundaries by identical codes in identical order. PCF003 still normalizes their directive heads, bracket spacing, comma spacing, and accepted trailing commas without changing item order or multiplicity. Ruff-prefixed isort action comments such as `ruff: isort: skip_file` are normalized as nested directives. PyCharm `language=` injection comments normalize only the directive head and preserve the language ID and optional `prefix=`/`suffix=` payload. PyCharm `@formatter:on` and `@formatter:off` marker comments are normalized as individual directive lines only; they do not disable pydocformatter for a range of code.
 
-For pydocfmt directives, this rule normalizes only the supported suppression forms: `pydocfmt: noqa`, `pydocfmt: ignore[...]`, and `pydocfmt: file-ignore[...]`. It does not add support for range-style `pydocfmt: disable[...]` or `pydocfmt: enable[...]` comments.
+For pydocfmt directives, this rule normalizes only the supported suppression forms: `pydocfmt: noqa`, `pydocfmt: ignore[...]`, and `pydocfmt: file-ignore[...]`. It normalizes a whitespace-only bracket payload to `[]`, preserves the spelling of invalid selector tokens, and removes terminal ASCII whitespace from recognized bracket directives. Comments using unrecognized pydocfmt actions such as `disable[...]` or `enable[...]` are not normalized.
 
 Unknown or ambiguous payload text is preserved after safe prefix cleanup. Ordinary comments remain outside this rule.
 
@@ -68,12 +68,14 @@ Safe list families remove duplicates after applying their family-specific normal
 [input]
 #noqa: f401,F401,e501,E501
 #PYDOCFMT : ignore [ pdf101, PDF101, pcf001, ]
+#PYDOCFMT : file-ignore [ foo_bar, foo_bar, FOO_BAR, future.rule ]
 # type: ignore[assignment, ty:assignment, assignment]
 # noinspection PyTypeChecker, PyTypeChecker, pytypechecker
 
 [output]
 # noqa: F401, E501
 # pydocfmt: ignore[PDF101, PCF001]
+# pydocfmt: file-ignore[foo_bar, FOO_BAR, future.rule]
 # type: ignore[assignment, ty:assignment]
 # noinspection PyTypeChecker, pytypechecker
 ```
