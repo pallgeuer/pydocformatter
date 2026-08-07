@@ -34,7 +34,7 @@ class PDF410ExceptionEntryNormalization(RuleBase):
         name="exception-entry-normalization",
         message="Docstring exception or warning entry should use canonical spelling",
         fix_availability=FixAvailability.USUALLY,
-        stable_since="1.0.0",
+        stable_since="1.1.0",
         setting_effects=docstring_conventions.convention_setting_effects(disabled=docstring_conventions.UNPARSED_CONVENTIONS),
         incompatible_with=(),
         check_kind=RuleCheckKind.STANDARD,

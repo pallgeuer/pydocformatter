@@ -390,7 +390,7 @@ def test_adjacent_pydocfmt_examples_generate_separate_tab_sets() -> None:
     """Adjacent structured examples must not merge into one tabbed set."""
     source = """```pydocfmt-example
 [settings]
-select = ["PCF001"]
+select = ["PCF000"]
 
 [input]
 # first
@@ -400,7 +400,7 @@ select = ["PCF001"]
 
 ```pydocfmt-example
 [settings]
-select = ["PCF002"]
+select = ["PCF001"]
 
 [input]
 value = 1 # comment
@@ -430,7 +430,7 @@ def test_generated_adjacent_examples_render_as_separate_tab_sets(generated_site:
 def test_rule_examples_select_before_tab_when_settings_exist(generated_site: tuple[pathlib.Path, pathlib.Path]) -> None:
     """Generated examples with settings must still select the Before tab by default."""
     generated_docs_dir, _ = generated_site
-    page = next(page for page in generate_zensical.rule_pages() if page.code == "PCF001")
+    page = next(page for page in generate_zensical.rule_pages() if page.code == "PCF000")
     markdown = (generated_docs_dir / page.path).read_text(encoding="utf-8")
 
     settings_index = markdown.index('=== "Settings"')
@@ -442,7 +442,7 @@ def test_rule_examples_select_before_tab_when_settings_exist(generated_site: tup
 def test_rule_examples_collapse_unchanged_before_after_tabs(generated_site: tuple[pathlib.Path, pathlib.Path]) -> None:
     """Generated unchanged examples must use a single selected Before equals After tab."""
     generated_docs_dir, _ = generated_site
-    page = next(page for page in generate_zensical.rule_pages() if page.code == "PCF001")
+    page = next(page for page in generate_zensical.rule_pages() if page.code == "PCF000")
     markdown = (generated_docs_dir / page.path).read_text(encoding="utf-8")
     collapsed_section = markdown.split('===+ "Before = After"', maxsplit=1)[1].split("\n===+", maxsplit=1)[0]
 
@@ -478,7 +478,7 @@ def test_rule_examples_escape_markdown_in_path_titles() -> None:
 def test_rule_options_link_to_settings(generated_site: tuple[pathlib.Path, pathlib.Path]) -> None:
     """Generated rule Options entries must link setting names to Settings headings."""
     generated_docs_dir, _ = generated_site
-    page = next(page for page in generate_zensical.rule_pages() if page.code == "PCF001")
+    page = next(page for page in generate_zensical.rule_pages() if page.code == "PCF000")
     markdown = (generated_docs_dir / page.path).read_text(encoding="utf-8")
 
     assert "- [`line-length`](../settings.md#line-length):" in markdown

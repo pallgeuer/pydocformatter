@@ -36,7 +36,7 @@ class PDF407SectionOrder(RuleBase):
         name="section-order",
         message="Docstring sections or reST fields should be in the configured order",
         fix_availability=FixAvailability.NEVER,
-        stable_since="1.0.0",
+        stable_since="1.1.0",
         setting_effects=docstring_conventions.convention_setting_effects(disabled=docstring_conventions.UNPARSED_CONVENTIONS),
         incompatible_with=(),
         check_kind=RuleCheckKind.STANDARD,

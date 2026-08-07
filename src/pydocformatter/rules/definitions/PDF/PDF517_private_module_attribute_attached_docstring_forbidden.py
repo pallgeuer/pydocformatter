@@ -35,7 +35,7 @@ class PDF517PrivateModuleAttributeAttachedDocstringForbidden(RuleBase):
         name="private-module-attribute-attached-docstring-forbidden",
         message="Private module attribute should not have an attached docstring",
         fix_availability=FixAvailability.NEVER,
-        stable_since="1.0.0",
+        stable_since="1.1.0",
         setting_effects=(),
         incompatible_with=(RuleCode("PDF524"), RuleCode("PDF525")),
         check_kind=RuleCheckKind.STANDARD,

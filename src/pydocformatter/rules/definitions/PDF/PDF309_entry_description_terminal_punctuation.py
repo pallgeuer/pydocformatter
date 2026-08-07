@@ -35,7 +35,7 @@ class PDF309EntryDescriptionTerminalPunctuation(RuleBase):
         name="entry-description-terminal-punctuation",
         message="Docstring entry description should end with terminal punctuation",
         fix_availability=FixAvailability.SOMETIMES,
-        stable_since="1.0.0",
+        stable_since="1.1.0",
         setting_effects=docstring_conventions.convention_setting_effects(disabled=docstring_conventions.UNPARSED_CONVENTIONS, ignored=(DocstringConvention.NUMPY, DocstringConvention.REST)),
         incompatible_with=(RuleCode("PDF308"),),
         check_kind=RuleCheckKind.STANDARD,

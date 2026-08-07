@@ -1,4 +1,4 @@
-"""PCF007 comment-suspicious-unicode rule."""
+"""PCF201 comment-suspicious-unicode rule."""
 
 # Future imports
 from __future__ import annotations
@@ -27,15 +27,15 @@ if TYPE_CHECKING:
 
 
 @rule_registration.register_rule_to(PCF_definition.PCF)
-class PCF007CommentSuspiciousUnicode(RuleBase):
-    """Rule implementation for PCF007.
+class PCF201CommentSuspiciousUnicode(RuleBase):
+    """Rule implementation for PCF201.
 
     Attributes:
         meta (RuleMetadata): Static metadata used for registration, diagnostics, and rule selection.
     """
 
     meta = RuleMetadata(
-        code=RuleCode("PCF007"),
+        code=RuleCode("PCF201"),
         name="comment-suspicious-unicode",
         message="Comment contains suspicious Unicode",
         fix_availability=FixAvailability.SOMETIMES,
@@ -71,9 +71,9 @@ def _violations_for_comment(comment: PCF_definition.CommentInfo) -> tuple[rule_v
         changes = tuple(_change(comment, item) for item in group) if all(item.can_fix for item in group) else ()
         message = f"Comment contains suspicious Unicode character {occurrence.code_point_text}"
         violations.append(
-            rule_violations.violation_for_grouped_planned_source_changes(PCF007CommentSuspiciousUnicode.meta, changes, instance_message=message)
+            rule_violations.violation_for_grouped_planned_source_changes(PCF201CommentSuspiciousUnicode.meta, changes, instance_message=message)
             if changes
-            else rule_violations.diagnostic(PCF007CommentSuspiciousUnicode.meta, (comment.range.start.line,), instance_message=message)
+            else rule_violations.diagnostic(PCF201CommentSuspiciousUnicode.meta, (comment.range.start.line,), instance_message=message)
         )
     return tuple(violations)
 

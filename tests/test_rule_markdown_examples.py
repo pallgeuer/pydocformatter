@@ -130,7 +130,7 @@ def test_parse_rule_markdown_examples_preserves_nested_shorter_fences() -> None:
 [output=unchanged]
 ````
 """,
-        rule_code="PCF001",
+        rule_code="PCF000",
     )
 
     assert examples[0].input_source == "# ```python\n# value = 1\n# ```\n"

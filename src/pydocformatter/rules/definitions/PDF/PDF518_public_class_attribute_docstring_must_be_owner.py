@@ -35,7 +35,7 @@ class PDF518PublicClassAttributeDocstringMustBeOwner(RuleBase):
         name="public-class-attribute-docstring-must-be-owner",
         message="Public class attribute must use class docstring documentation, not attached docstring",
         fix_availability=FixAvailability.NEVER,
-        stable_since="1.0.0",
+        stable_since="1.1.0",
         setting_effects=(),
         incompatible_with=(RuleCode("PDF519"),),
         check_kind=RuleCheckKind.STANDARD,

@@ -32,7 +32,7 @@ Every rule class defines `meta = RuleMetadata(...)` with:
 - `incompatible_with`: A tuple, explicitly `()` when empty.
 - `check_kind`: The rule execution kind.
 - `cache_behavior`: An intentional persistent-cache dependency declaration. Built-in file-local rules pass `cache_behavior=RuleCacheBehavior.FILE_LOCAL` directly to `RuleMetadata(...)`; omitting the argument fails closed as uncacheable.
-- `allows_directive_self_suppression`: An exceptional opt-in for rules whose finding describes selector representation on the same bracket directive. It defaults to `False`; PCF008 and PCF009 opt in so converting the selector can be suppressed by that selector.
+- `allows_directive_self_suppression`: An exceptional opt-in for rules whose finding describes selector representation on the same bracket directive. It defaults to `False`; PCF102 and PCF103 opt in so converting the selector can be suppressed by that selector.
 
 `RuleMetadata` validates the complete public rule-name grammar when each record is constructed, including the prohibition on names whose uppercase spelling is a valid code selector. Rule incompatibilities must be declared on both rules. Rule collection rejects one-sided, self-referential, unknown, or duplicate incompatibilities, and rejects catalogs where an exact rule code is also a broad selector for another collected rule.
 

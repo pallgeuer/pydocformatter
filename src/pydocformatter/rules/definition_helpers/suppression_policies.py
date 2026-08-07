@@ -1,4 +1,4 @@
-"""Suppression-selector representation policies shared by PCF008 and PCF009."""
+"""Suppression-selector representation policies shared by PCF102 and PCF103."""
 
 # Future imports
 from __future__ import annotations

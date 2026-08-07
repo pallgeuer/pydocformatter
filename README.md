@@ -153,7 +153,7 @@ PDF203: Lines 5-6: Docstring summary spans 2 lines and does not fit on one line
 PDF500: Line 4: Function parameter 'default_role' is missing docstring documentation
 ```
 
-[`PDF101`](https://pallgeuer.github.io/pydocformatter/rules/docstring-reflow/) and [`PCF001`](https://pallgeuer.github.io/pydocformatter/rules/standalone-comment-formatting/) apply the safe wrapping changes. [`PDF203`](https://pallgeuer.github.io/pydocformatter/rules/summary-too-long/) and [`PDF500`](https://pallgeuer.github.io/pydocformatter/rules/missing-parameter-documentation/) remain as diagnostic-only findings for the author to resolve, including in particular that the docstring summary line now does not fit on one line, when in general it should.
+[`PDF101`](https://pallgeuer.github.io/pydocformatter/rules/docstring-reflow/) and [`PCF000`](https://pallgeuer.github.io/pydocformatter/rules/standalone-comment-formatting/) apply the safe wrapping changes. [`PDF203`](https://pallgeuer.github.io/pydocformatter/rules/summary-too-long/) and [`PDF500`](https://pallgeuer.github.io/pydocformatter/rules/missing-parameter-documentation/) remain as diagnostic-only findings for the author to resolve, including in particular that the docstring summary line now does not fit on one line, when in general it should.
 
 ### Trailing comments and stale suppressions
 
@@ -168,7 +168,7 @@ line-length = 72
 
 
 def _retry_delay(attempt):
-    # pydocfmt: ignore[PCF001]
+    # pydocfmt: ignore[PCF000]
     # Keep retry delays bounded.
     delay = min(2**attempt, 60)#Cap exponential backoff so temporary failures do not stall a worker indefinitely.
     return delay
@@ -178,7 +178,7 @@ def _retry_delay(attempt):
 
 
 def _retry_delay(attempt):
-    # pydocfmt: ignore[PCF001]
+    # pydocfmt: ignore[PCF000]
     # Keep retry delays bounded.
 
     # Cap exponential backoff so temporary failures do not stall a
@@ -187,10 +187,10 @@ def _retry_delay(attempt):
     return delay
 
 [findings]
-PCF006: Line 5: Suppression selector 'PCF001' did not suppress any findings
+PCF101: Line 5: Suppression selector 'PCF000' did not suppress any findings
 ```
 
-[`PCF002`](https://pallgeuer.github.io/pydocformatter/rules/trailing-comment-spacing/) normalizes the trailing-comment delimiter before [`PCF004`](https://pallgeuer.github.io/pydocformatter/rules/trailing-comment-extraction/) moves and wraps the explanation. The blank line preserves separation from the independently authored comment above it. [`PCF006`](https://pallgeuer.github.io/pydocformatter/rules/unused-suppression/) reports the stale suppression but deliberately does not delete it.
+[`PCF001`](https://pallgeuer.github.io/pydocformatter/rules/trailing-comment-spacing/) normalizes the trailing-comment delimiter before [`PCF002`](https://pallgeuer.github.io/pydocformatter/rules/trailing-comment-extraction/) moves and wraps the explanation. The blank line preserves separation from the independently authored comment above it. [`PCF101`](https://pallgeuer.github.io/pydocformatter/rules/unused-suppression/) reports the stale suppression but deliberately does not delete it.
 
 ## Using pydocformatter with Ruff
 

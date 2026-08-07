@@ -36,7 +36,7 @@ class PDF405SectionUnderlineFormat(RuleBase):
         name="section-underline-format",
         message="Docstring section underline should be normalized",
         fix_availability=FixAvailability.USUALLY,
-        stable_since="1.0.0",
+        stable_since="1.1.0",
         setting_effects=(
             RuleSettingEffects(
                 setting="docstring_convention", effects=(RuleSettingEffectValues(effect=RuleSettingEffect.DISABLED, values=docstring_conventions.conventions_except(DocstringConvention.NUMPY)),)

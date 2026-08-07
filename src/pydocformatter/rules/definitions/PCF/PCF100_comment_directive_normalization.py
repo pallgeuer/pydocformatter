@@ -1,4 +1,4 @@
-"""PCF003 comment-directive-normalization rule."""
+"""PCF100 comment-directive-normalization rule."""
 
 # Future imports
 from __future__ import annotations
@@ -41,19 +41,19 @@ _COLON_VALUE_RE = re.compile(r"^(?P<head>pyright|mypy|ruff|flake8|fmt|isort|prag
 
 
 @rule_registration.register_rule_to(PCF_definition.PCF)
-class PCF003CommentDirectiveNormalization(RuleBase):
-    """Rule implementation for PCF003.
+class PCF100CommentDirectiveNormalization(RuleBase):
+    """Rule implementation for PCF100.
 
     Attributes:
         meta (RuleMetadata): Static metadata used for registration, diagnostics, and rule selection.
     """
 
     meta = RuleMetadata(
-        code=RuleCode("PCF003"),
+        code=RuleCode("PCF100"),
         name="comment-directive-normalization",
         message="Directive comment should be normalized",
         fix_availability=FixAvailability.ALWAYS,
-        stable_since="1.0.0",
+        stable_since="1.1.0",
         setting_effects=(),
         incompatible_with=(),
         check_kind=RuleCheckKind.STANDARD,
@@ -101,7 +101,7 @@ def _has_only_terminal_form_feeds(comment: PCF_definition.CommentInfo) -> bool:
 
 
 def _normalized_bracket_comment(directive: directive_helpers.BracketDirective) -> str | None:
-    """Return normalized text for a shared bracket directive supported by PCF003."""
+    """Return normalized text for a shared bracket directive supported by PCF100."""
     if directive.tool is directive_helpers.DirectiveTool.PYDOCFMT and directive.action not in {"ignore", "file-ignore"}:
         return None
     selectors = directive.normalized_selectors() if directive.safe_list else directive.raw_selectors

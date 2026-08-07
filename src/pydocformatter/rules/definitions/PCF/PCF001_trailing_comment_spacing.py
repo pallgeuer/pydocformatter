@@ -1,4 +1,4 @@
-"""PCF002 trailing-comment-spacing rule."""
+"""PCF001 trailing-comment-spacing rule."""
 
 # Future imports
 from __future__ import annotations
@@ -23,19 +23,19 @@ if TYPE_CHECKING:
 
 
 @rule_registration.register_rule_to(PCF_definition.PCF)
-class PCF002TrailingCommentSpacing(RuleBase):
-    """Rule implementation for PCF002.
+class PCF001TrailingCommentSpacing(RuleBase):
+    """Rule implementation for PCF001.
 
     Attributes:
         meta (RuleMetadata): Static metadata used for registration, diagnostics, and rule selection.
     """
 
     meta = RuleMetadata(
-        code=RuleCode("PCF002"),
+        code=RuleCode("PCF001"),
         name="trailing-comment-spacing",
         message="Trailing comment spacing should be normalized",
         fix_availability=FixAvailability.ALWAYS,
-        stable_since="1.0.0",
+        stable_since="1.1.0",
         setting_effects=(),
         incompatible_with=(),
         check_kind=RuleCheckKind.STANDARD,

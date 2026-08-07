@@ -191,7 +191,7 @@ def test_setting_definition_derives_defaults_from_type() -> None:
     assert int_definition.validator(1, "line-length") == 1
     assert float_definition.validator(FRACTIONAL_PARALLELISM, "parallelism") == FRACTIONAL_PARALLELISM
     assert string_list_definition.validator(["*.py"], "include") == ("*.py",)
-    assert string_map_definition.validator({"tests/*.py": ["PCF001"]}, "per-file-ignores") == (("tests/*.py", ("PCF001",)),)
+    assert string_map_definition.validator({"tests/*.py": ["PCF000"]}, "per-file-ignores") == (("tests/*.py", ("PCF000",)),)
 
 
 def test_setting_definition_respects_explicit_cli_options_during_defaulting() -> None:
@@ -993,7 +993,7 @@ def test_setting_documentation_default_mentions_match_resolved_defaults() -> Non
 
 
 def test_setting_documentation_omits_long_string_list_defaults() -> None:
-    short_default = '["PCF005", "PDF003", "PDF516", "PDF517", "PDF518"]'
+    short_default = '["PCF200", "PDF003", "PDF516", "PDF517", "PDF518"]'
 
     assert len(short_default) == 50
     assert pydocformatter_settings._documented_default_text(short_default, pydocformatter_settings_core.StringList) == short_default
@@ -1145,7 +1145,7 @@ def test_rule_settings_accept_all_rule_prefixes(monkeypatch: pytest.MonkeyPatch)
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
         (root / "pyproject.toml").write_text(
-            '[tool.pydocfmt]\nselect = ["PDF", "PCF"]\nignore = ["PDF101"]\nfixable = ["ALL"]\n[tool.pydocfmt.per-file-ignores]\n"tests/*.py" = ["PCF001"]\n', encoding="utf-8"
+            '[tool.pydocfmt]\nselect = ["PDF", "PCF"]\nignore = ["PDF101"]\nfixable = ["ALL"]\n[tool.pydocfmt.per-file-ignores]\n"tests/*.py" = ["PCF000"]\n', encoding="utf-8"
         )
         monkeypatch.chdir(root)
         config = pydocformatter_settings.SETTINGS_SCHEMA.load()
@@ -1153,7 +1153,7 @@ def test_rule_settings_accept_all_rule_prefixes(monkeypatch: pytest.MonkeyPatch)
     assert config.select == ("PDF", "PCF")
     assert config.ignore == ("PDF101",)
     assert config.fixable == ("ALL",)
-    assert config.per_file_ignores == (("tests/*.py", ("PCF001",)),)
+    assert config.per_file_ignores == (("tests/*.py", ("PCF000",)),)
 
 
 def test_nested_docstring_table_settings_are_loaded_from_pyproject(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -1222,12 +1222,12 @@ def test_unrelated_nested_setting_table_is_rejected() -> None:
 def test_inline_per_file_rule_settings_are_applied(monkeypatch: pytest.MonkeyPatch) -> None:
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
-        (root / "pyproject.toml").write_text('[tool.pydocfmt]\nper-file-ignores = {"tests/*.py" = ["PCF001"]}\nextend-per-file-ignores = {"generated/*.py" = ["PCF002"]}\n', encoding="utf-8")
+        (root / "pyproject.toml").write_text('[tool.pydocfmt]\nper-file-ignores = {"tests/*.py" = ["PCF000"]}\nextend-per-file-ignores = {"generated/*.py" = ["PCF001"]}\n', encoding="utf-8")
         monkeypatch.chdir(root)
         config = pydocformatter_settings.SETTINGS_SCHEMA.load()
 
-    assert config.per_file_ignores == (("tests/*.py", ("PCF001",)),)
-    assert config.extend_per_file_ignores == (("generated/*.py", ("PCF002",)),)
+    assert config.per_file_ignores == (("tests/*.py", ("PCF000",)),)
+    assert config.extend_per_file_ignores == (("generated/*.py", ("PCF001",)),)
 
 
 def test_per_file_settings_are_loaded(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -1328,15 +1328,15 @@ def test_command_line_setting_has_priority_over_config_per_file_setting(monkeypa
 
 
 def test_cli_rule_overrides_are_applied() -> None:
-    config = pydocformatter_settings.SETTINGS_SCHEMA.load(field_overrides=CheckSettingsOverrides(select=("PCF",), ignore=("PCF002",), per_file_ignores=(("tests/*.py", ("PCF001",)),)))
+    config = pydocformatter_settings.SETTINGS_SCHEMA.load(field_overrides=CheckSettingsOverrides(select=("PCF",), ignore=("PCF001",), per_file_ignores=(("tests/*.py", ("PCF000",)),)))
 
     assert config.select == ("PCF",)
-    assert config.ignore == ("PCF002",)
-    assert config.per_file_ignores == (("tests/*.py", ("PCF001",)),)
+    assert config.ignore == ("PCF001",)
+    assert config.per_file_ignores == (("tests/*.py", ("PCF000",)),)
 
 
 def test_format_settings_returns_stable_toml_output() -> None:
-    settings = CheckSettings(line_ending=LineEnding.LF, select=("PDF", "PCF"), per_file_ignores=(('tests/"quoted"/*.py', ("PCF001",)),))
+    settings = CheckSettings(line_ending=LineEnding.LF, select=("PDF", "PCF"), per_file_ignores=(('tests/"quoted"/*.py', ("PCF000",)),))
 
     output = pydocformatter_settings.SETTINGS_SCHEMA.format(settings)
     expected_require_explicit = ", ".join(f'"{selector}"' for selector in CheckSettings().require_explicit)
@@ -1348,7 +1348,7 @@ def test_format_settings_returns_stable_toml_output() -> None:
     assert 'line-ending = "lf"\n' in output
     assert 'select = ["PDF", "PCF"]\n' in output
     assert f"require-explicit = [{expected_require_explicit}]\n" in output
-    assert 'per-file-ignores = {"tests/\\"quoted\\"/*.py" = ["PCF001"]}\n' in output
+    assert 'per-file-ignores = {"tests/\\"quoted\\"/*.py" = ["PCF000"]}\n' in output
 
 
 def test_parallelism_setting_accepts_numbers() -> None:
@@ -1817,10 +1817,10 @@ def test_explicit_non_pyproject_file_rejects_pyproject_style_table() -> None:
 
 
 def test_inline_config_option_is_applied() -> None:
-    config = pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(config_options=('line-length = 101\nignore = ["PCF001"]',)))
+    config = pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(config_options=('line-length = 101\nignore = ["PCF000"]',)))
 
     assert config.line_length == 101
-    assert config.ignore == ("PCF001",)
+    assert config.ignore == ("PCF000",)
 
 
 def test_inline_config_options_override_config_files() -> None:
@@ -1842,14 +1842,14 @@ def test_command_line_overrides_override_inline_config_options() -> None:
 
 
 def test_load_accepts_argparse_namespace_overrides() -> None:
-    args = argparse.Namespace(line_length=103, select=["PDF,PCF"], require_explicit=["PCF005, PDF003"], per_file_ignores=['{"tests/*.py" = ["PCF001"]}'])
+    args = argparse.Namespace(line_length=103, select=["PDF,PCF"], require_explicit=["PCF200, PDF003"], per_file_ignores=['{"tests/*.py" = ["PCF000"]}'])
 
     config = pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(config_options=("line-length = 102",)), args=args)
 
     assert config.line_length == 103
     assert config.select == ("PDF", "PCF")
-    assert config.require_explicit == ("PCF005", "PDF003")
-    assert config.per_file_ignores == (("tests/*.py", ("PCF001",)),)
+    assert config.require_explicit == ("PCF200", "PDF003")
+    assert config.per_file_ignores == (("tests/*.py", ("PCF000",)),)
 
 
 def test_toml_map_cli_repeated_patterns_append_values() -> None:

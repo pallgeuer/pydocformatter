@@ -19,7 +19,7 @@ All notable changes to this project are documented here. The format follows [Kee
 - **Rule selection:**
   - Added exact canonical rule-name selectors across selection, fixability, explicit-selection, per-file-ignore, CLI, inline-configuration, and settings-profile inputs, with catalog-wide name validation and deterministic lookup.
 - **Suppression policies:**
-  - Added PCF008 and PCF009 as explicitly selected, mutually incompatible policies for name-only or code-only bracketed pydocfmt and Ruff suppression comments, including safe local conversions and diagnostic-only Ruff findings.
+  - Added PCF102 and PCF103 as explicitly selected, mutually incompatible policies for name-only or code-only bracketed pydocfmt and Ruff suppression comments, including safe local conversions and diagnostic-only Ruff findings.
 - **Docstring diagnostics:**
   - Added effectively opt-in PDF528 to report module and class attribute documentation that does not follow the complete first-seen source inventory order.
   - Added PDF418 to report high-confidence malformed reStructuredText directive introducers while preserving their bodies as structured content for other docstring rules.
@@ -36,7 +36,7 @@ All notable changes to this project are documented here. The format follows [Kee
   - Added PDF720 and PDF721 to report named raised-exception and emitted-warning entries without prose descriptions.
   - Added PDF722 to report reStructuredText type fields without one-to-one corresponding value fields.
 - **Unicode safety:**
-  - Added PDF004 and PCF007 to report explicit suspicious bidi, invisible-format, control, and separator characters in evaluated docstrings and literal comments, with exact fixes for nonbreaking indentation spaces.
+  - Added PDF004 and PCF201 to report explicit suspicious bidi, invisible-format, control, and separator characters in evaluated docstrings and literal comments, with exact fixes for nonbreaking indentation spaces.
 - **Persistent caching:**
   - Added strict persistent clean-proof caching for disk-backed checks and fixes, with complete source hashing, semantic analysis-setting and final-rule-code invalidation, shared invocation-local analysis fingerprints, engine/path invalidation, miss-only process execution, bounded parent-side probes, and source-free warm results.
   - Added `cache` and `cache-dir` settings, `--cache`/`--no-cache`, `--cache-dir`, opt-in `--cache-stats`, safe project cache self-pruning, and the ownership-checked `pydocfmt clean` command with its own `--cache-dir` override.
@@ -44,13 +44,30 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Changed
 
+- **Breaking PCF rule-code reassignment:**
+  - Reorganized PCF codes into general comment formatting (`PCF0xx`), directives and suppressions (`PCF1xx`), and ASCII/Unicode character policies (`PCF2xx`). Canonical rule-name selectors remain unchanged, while old code selectors are not retained as aliases.
+
+| Previous code | New code | Rule name                            |
+|---------------|----------|--------------------------------------|
+| `PCF001`      | `PCF000` | `standalone-comment-formatting`      |
+| `PCF002`      | `PCF001` | `trailing-comment-spacing`           |
+| `PCF004`      | `PCF002` | `trailing-comment-extraction`        |
+| `PCF003`      | `PCF100` | `comment-directive-normalization`    |
+| `PCF006`      | `PCF101` | `unused-suppression`                 |
+| `PCF008`      | `PCF102` | `rule-codes-in-suppression-comments` |
+| `PCF009`      | `PCF103` | `rule-names-in-suppression-comments` |
+| `PCF005`      | `PCF200` | `comment-ascii-only`                 |
+| `PCF007`      | `PCF201` | `comment-suspicious-unicode`         |
+
+- **Rule stability:**
+  - Marked every current built-in rule as stable since 1.1.0 after auditing direct changes and observable shared execution, source-editing, selection, and suppression changes since v1.0.0.
 - **Fix execution:**
   - Increased the maximum number of automatic fix iterations from 20 to 30.
   - Made canonical source-edit application return both the reparsed module and exact edited source, centralized direct-rule test contexts with production-equivalent position remapping and source bounds, and kept the final LibCST module internal to rule execution.
 - **Documentation:**
   - Renamed the generated rule index label `Convention-explicit` to `Convention opt-in` and the public rule compatibility table column `Explicit` to `Require explicit`.
 - **Developer documentation:**
-  - Refreshed the complete rule performance audit for all 139 tracked rules and recorded the measured class attached-attribute and exception-inventory optimizations.
+  - Refreshed the complete rule performance audit for all 141 tracked rules and recorded the measured class attached-attribute and exception-inventory optimizations.
   - Corrected the rule settings audit to distinguish disabled rules from rules ignored only by broad selectors, with metadata-backed regression coverage.
   - Distinguished convention opt-in policies from `require-explicit`, with exhaustive conflict-free convention profiles and meaningful explicit-selection defaults enforced by regression tests.
 - **Developer tooling:**
@@ -66,10 +83,10 @@ All notable changes to this project are documented here. The format follows [Kee
   - Made stronger selectors silently override incompatible weaker selections by source priority and specificity, while preserving deterministic collection-order errors that name only the equal-strength blockers.
   - Rejected code-shaped canonical rule names and catalogs where one full rule code would also broadly select another rule.
 - **Rule suppressions:**
-  - Accepted mixed-case canonical names in bracketed pydocfmt `ignore` and `file-ignore` comments, semantically deduplicated exact code/name aliases by first occurrence, and extended PCF003 and PCF006 to consume the shared directive model.
-  - Collapsed repeated normalized pydocfmt selectors before suppression and PCF006 auditing so check-only and fixing runs preserve coverage without duplicate unused-selector findings.
+  - Accepted mixed-case canonical names in bracketed pydocfmt `ignore` and `file-ignore` comments, semantically deduplicated exact code/name aliases by first occurrence, and extended PCF100 and PCF101 to consume the shared directive model.
+  - Collapsed repeated normalized pydocfmt selectors before suppression and PCF101 auditing so check-only and fixing runs preserve coverage without duplicate unused-selector findings.
   - Made inline suppressions after any component token of an implicitly concatenated docstring cover the complete expression for PDF findings while preserving line-local PCF coverage and existing local and standalone attachment boundaries.
-  - Collected bracket directives and source suppressions in one source traversal per pass, made directive self-suppression an explicit rule-metadata capability for PCF008 and PCF009, and kept their policy fixes independent from PCF003's general deduplication.
+  - Collected bracket directives and source suppressions in one source traversal per pass, made directive self-suppression an explicit rule-metadata capability for PCF102 and PCF103, and kept their policy fixes independent from PCF100's general deduplication.
 - **Docstring diagnostics:**
   - Standardized rule metadata and instance messages, added concrete normalization rewrites, and made atomic grouped fixes fall back to rule metadata when they contain distinct diagnostics.
   - Made strict trailing-period rules PDF300 and PDF308 mutually exclusive with their terminal-punctuation alternatives PDF301 and PDF309, with broad convention profiles choosing one alternative consistently.
@@ -115,9 +132,9 @@ All notable changes to this project are documented here. The format follows [Kee
   - Added `docstring-placeholder-markers` for configuring the exact marker inventory used by PDF213, including an empty-list opt-out that does not change rule selection.
   - Extended settings profiles with the auto-discovered project root so default cache locations are stable across nested paths and relocated workspaces.
 - **Comment formatting:**
-  - Made PCF003 stably remove repeated normalized items from validated set-like directive lists while preserving first occurrence, author order, namespaces, rationale tails, malformed payloads, and Ruff range-boundary multiplicity.
+  - Made PCF100 stably remove repeated normalized items from validated set-like directive lists while preserving first occurrence, author order, namespaces, rationale tails, malformed payloads, and Ruff range-boundary multiplicity.
   - Recognized the complete Unicode-aware reStructuredText directive-name grammar, including namespaced directives and the optional space before `::`, when preserving directive blocks in standalone and extracted trailing comments.
-  - Made PCF001 normalize regular standalone comments containing only ASCII space, tab, or form-feed payloads to bare `#` while preserving deliberate hash separators and source line endings.
+  - Made PCF000 normalize regular standalone comments containing only ASCII space, tab, or form-feed payloads to bare `#` while preserving deliberate hash separators and source line endings.
 
 ### Fixed
 
@@ -162,20 +179,20 @@ All notable changes to this project are documented here. The format follows [Kee
   - Kept every PDF414 and PDF415 issue line as a distinct non-reflowable structural boundary so PDF101 cannot merge malformed entries or erase their diagnostics.
   - Compared convention indentation using raw evaluated whitespace, replaced regex-compatible entry matching with explicit match data, and centralized exhaustive issue precedence and message ownership without changing diagnostic identities.
 - **Markup-aware reflow:**
-  - Preserved recognized inline Markdown and reStructuredText constructs as indivisible source-aware tokens in PDF101, PCF001, and PCF004, while reporting ambiguous constructs without unsafe reflow or extraction fixes.
+  - Preserved recognized inline Markdown and reStructuredText constructs as indivisible source-aware tokens in PDF101, PCF000, and PCF002, while reporting ambiguous constructs without unsafe reflow or extraction fixes.
   - Recognized angle-bracket Markdown destinations and escaped parentheses in destinations without splitting valid links or images.
-  - Retained space- and backslash-based Markdown hard breaks during PDF101, PDF102, and PCF001 formatting, including exact docstring source spellings.
+  - Retained space- and backslash-based Markdown hard breaks during PDF101, PDF102, and PCF000 formatting, including exact docstring source spellings.
   - Preserved zero-value source continuations and original line endings through simple-string fixes, canonicalizing continuations only inside PDF101 regions that are actually reflowed.
   - Made PDF101 report one whole-docstring diagnostic when required reflow cannot be source-mapped safely, and made PDF102 preserve source continuations inside every exact whitespace deletion.
   - Capitalized only the first evaluated character for PDF310 fixes so later escapes and source continuations remain unchanged.
   - Treated line-leading backtick and tilde fence openers with optional info strings consistently across docstring and comment parsing.
-  - Shared semantic-line segmentation and inline scans across PDF101, PCF001, and PCF004 instead of rescanning the same text during wrapping.
+  - Shared semantic-line segmentation and inline scans across PDF101, PCF000, and PCF002 instead of rescanning the same text during wrapping.
   - Avoided markup-parser work for delimiter-free source-identical and source-aware prose, indexed escape and physical-line lookups, lazily materialized heavyweight string source maps, and removed repeated immutable envelope growth for long markup-heavy text.
   - Kept ambiguity evidence from identical malformed inline constructs distinct across joined logical lines.
-  - Classified PCF001 and PCF004 as usually fixable because conservative ambiguity findings may intentionally omit fixes.
+  - Classified PCF000 and PCF002 as usually fixable because conservative ambiguity findings may intentionally omit fixes.
 - **Unicode safety:**
   - Preserved diagnostic Unicode hazards through docstring and comment formatting, including protected comment structures and diagnostic whitespace at docstring boundaries; deferred unsafe payload reconstruction, kept accepted interior nonbreaking spaces indivisible during wrapping, and stabilized partial-mapping diagnostic order.
-  - Reused prepared comment classifications and binary-searched source-position mapping while retaining canonical PCF004 width and syntax eligibility.
+  - Reused prepared comment classifications and binary-searched source-position mapping while retaining canonical PCF002 width and syntax eligibility.
   - Cached docstring Unicode classifications and shared simple-string mappings, separated mapping capability from canonical rewrite policy, derived reportable membership from exhaustive diagnostic labels, and made inline rewrite barriers typed.
 - **Rule suppressions:**
   - Kept PCF coverage line-local when an inline directive follows the final token of a concatenated string expression.

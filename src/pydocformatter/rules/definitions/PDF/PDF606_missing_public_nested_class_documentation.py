@@ -34,7 +34,7 @@ class PDF606MissingPublicNestedClassDocumentation(RuleBase):
         name="missing-public-nested-class-documentation",
         message="Public nested class is missing docstring",
         fix_availability=FixAvailability.NEVER,
-        stable_since="1.0.0",
+        stable_since="1.1.0",
         setting_effects=(),
         incompatible_with=(),
         check_kind=RuleCheckKind.STANDARD,

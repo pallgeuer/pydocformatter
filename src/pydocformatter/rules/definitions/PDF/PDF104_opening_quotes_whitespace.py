@@ -35,7 +35,7 @@ class PDF104OpeningQuotesWhitespace(RuleBase):
         name="opening-quotes-whitespace",
         message="Docstring has extra whitespace after opening quotes",
         fix_availability=FixAvailability.ALWAYS,
-        stable_since="1.0.0",
+        stable_since="1.1.0",
         setting_effects=(),
         incompatible_with=(),
         check_kind=RuleCheckKind.STANDARD,

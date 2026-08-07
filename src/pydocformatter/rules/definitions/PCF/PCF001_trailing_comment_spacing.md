@@ -1,11 +1,11 @@
-# trailing-comment-spacing (PCF002)
+# trailing-comment-spacing (PCF001)
 
 Fix is always available.
 
 ## What it does
 Checks each trailing comment independently. The spacing between code and the opening `#` is normalized to exactly two spaces. Ordinary trailing comments are also normalized to one space after `#` for non-empty content and no trailing whitespace. An empty ordinary trailing comment becomes `code  #` without a trailing space.
 
-PCF002 never moves or wraps comments and does not consult `line-length`. Use PCF004 for overlong trailing-comment extraction. For protected type comments and tool directives, PCF002 only normalizes the spacing before the opening `#`, strips trailing line whitespace, and otherwise preserves the directive text from `#` onward. Use PCF003 to normalize safe marker spacing and syntax from `#` onward for known trailing directives.
+PCF001 never moves or wraps comments and does not consult `line-length`. Use PCF002 for overlong trailing-comment extraction. For protected type comments and tool directives, PCF001 only normalizes the spacing before the opening `#`, strips trailing line whitespace, and otherwise preserves the directive text from `#` onward. Use PCF100 to normalize safe marker spacing and syntax from `#` onward for known trailing directives.
 
 Only the text from the start of the physical line through the comment token is replaced. The existing line ending after that physical line, source outside the replacement, mixed line endings, and the file's final-newline state are retained.
 
@@ -42,7 +42,7 @@ value = compute()  #
 other = compute()  #
 ```
 
-PCF002 only normalizes spacing, even when the resulting line is overlong and PCF004 would be needed to move it:
+PCF001 only normalizes spacing, even when the resulting line is overlong and PCF002 would be needed to move it:
 
 ```pydocfmt-example
 [settings]

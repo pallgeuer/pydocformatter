@@ -85,12 +85,12 @@ class SuppressionIndex:
         return frozenset(used)
 
     def unused_findings(self, used_selector_keys: frozenset[SuppressionSelectorKey], *, selected_rule_codes: frozenset[RuleCode], rule: RuleMetadata) -> tuple[RuleFinding, ...]:
-        """Return PCF006-style findings for invalid or unused audited selectors.
+        """Return PCF101-style findings for invalid or unused audited selectors.
 
         Args:
             used_selector_keys (frozenset[SuppressionSelectorKey]): Selector keys consumed while filtering findings.
             selected_rule_codes (frozenset[RuleCode]): Rules active for the current file after selection and ignores.
-            rule (RuleMetadata): PCF006 metadata to attach to unused-suppression findings.
+            rule (RuleMetadata): PCF101 metadata to attach to unused-suppression findings.
 
         Returns:
             tuple[RuleFinding, ...]: Diagnostics for invalid selectors and selected-but-unused suppressions.
@@ -179,7 +179,7 @@ class SuppressionDirective:
             directive_index (int): Position of this directive in the source-level directive tuple.
             used_selector_keys (frozenset[SuppressionSelectorKey]): Selector keys consumed while filtering findings.
             selected_rule_codes (frozenset[RuleCode]): Rules active for the current file after selection and ignores.
-            rule (RuleMetadata): PCF006 metadata to attach to unused-suppression findings.
+            rule (RuleMetadata): PCF101 metadata to attach to unused-suppression findings.
 
         Returns:
             list[RuleFinding]: Diagnostics for invalid selectors and selected-but-unused suppressions on this directive.
@@ -204,7 +204,7 @@ class SuppressionSelector:
         text (str): Original selector text used for unused-suppression messages.
         matched_codes (frozenset[RuleCode]): Concrete rules covered by the selector.
         coverage_lines (frozenset[int]): One-based source lines that the directive is allowed to suppress.
-        audit (bool): Whether PCF006 should report this selector when it is invalid or unused.
+        audit (bool): Whether PCF101 should report this selector when it is invalid or unused.
         invalid_message (str | None): Precomputed diagnostic text for selectors that failed to parse or match rules.
         candidate_expression_ranges (tuple[cst_metadata.CodeRange, ...]): Prefix-neutral string-expression ranges that
             can expand coverage when authorized by the active rule category.

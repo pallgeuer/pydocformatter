@@ -1,4 +1,4 @@
-"""PCF006 unused-suppression rule."""
+"""PCF101 unused-suppression rule."""
 
 # Future imports
 from __future__ import annotations
@@ -12,19 +12,19 @@ from pydocformatter.rules.models import FixAvailability, RuleCacheBehavior, Rule
 
 
 @rule_registration.register_rule_to(PCF_definition.PCF)
-class PCF006UnusedSuppression(RuleBase):
-    """Rule implementation for PCF006.
+class PCF101UnusedSuppression(RuleBase):
+    """Rule implementation for PCF101.
 
     Attributes:
         meta (RuleMetadata): Static metadata used for registration, diagnostics, and rule selection.
     """
 
     meta = RuleMetadata(
-        code=RuleCode("PCF006"),
+        code=RuleCode("PCF101"),
         name="unused-suppression",
         message="Suppression selector is invalid, unknown, or unused",
         fix_availability=FixAvailability.NEVER,
-        stable_since="1.0.0",
+        stable_since="1.1.0",
         setting_effects=(),
         incompatible_with=(),
         check_kind=RuleCheckKind.SUPPRESSION_AUDIT,

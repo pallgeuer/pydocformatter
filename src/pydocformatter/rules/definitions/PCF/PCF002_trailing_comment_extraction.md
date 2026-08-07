@@ -1,9 +1,9 @@
-# trailing-comment-extraction (PCF004)
+# trailing-comment-extraction (PCF002)
 
 Fix is usually available.
 
 ## What it does
-Checks overlong ordinary trailing comments after canonical spacing. When the complete canonical code-plus-comment line exceeds `line-length`, PCF004 can remove whitespace immediately before the comment, move the comment directly above the physical code line at the code line's indentation, and wrap it as a standalone block.
+Checks overlong ordinary trailing comments after canonical spacing. When the complete canonical code-plus-comment line exceeds `line-length`, PCF002 can remove whitespace immediately before the comment, move the comment directly above the physical code line at the code line's indentation, and wrap it as a standalone block.
 
 When `comment-trailing-extraction-syntax-aware` is enabled, overlong comments in decorators, compound statement headers, arguments, and parenthesized or continuation contexts remain inline to preserve their physical association. Syntax-aware extraction applies to function, class, loop, conditional, `with`, `try`/`except`/`else`/`finally`, `match`, and `case` headers, plus decorators, arguments, and parenthesized or continuation contexts. It does not protect ordinary trailing comments merely because they appear inside a compound statement body.
 
@@ -11,9 +11,9 @@ When `comment-trailing-extraction-content-aware` is enabled, overlong comments r
 
 When `comment-task-marker-mode` is `no-wrap` or `hanging`, extracted task-marker comments use the same task-marker treatment as standalone task markers. Content-aware code detection checks the task-marker payload rather than the full `TODO:`-style prefix, so annotation-like marker text such as `TODO: fix_parser` is not mistaken for Python code.
 
-When a moved block would directly follow an existing same-indent standalone comment, a blank line keeps the independently authored comments separate. The rule generates the complete canonical block itself and therefore works when PCF001 is disabled.
+When a moved block would directly follow an existing same-indent standalone comment, a blank line keeps the independently authored comments separate. The rule generates the complete canonical block itself and therefore works when PCF000 is disabled.
 
-That directly generated block uses the same unconditional atomic inline-markup recognition as PDF101 and PCF001. Non-empty same-line backtick spans with matching delimiter runs, supported Markdown links and images, CommonMark-style autolinks, and boundary-valid reStructuredText interpreted text, roles, references, embedded targets, literals, and substitutions are never split internally. Markdown link support includes escaped or nested labels, empty inline components, all three standard title delimiters, and destination parentheses nested up to three levels. Emphasis, raw HTML or XML, shortcut references, definitions, and multiline constructs are not recognized as atomic inline markup. A line-leading run of at least three backticks or tildes is fence-like ordinary text rather than ambiguous inline markup, including when an info string follows the opener; the content-aware structure checks can still keep it inline when configured to preserve fences. `url-aware-wrapping` only selects balanced rather than greedy breaks around destination-bearing constructs.
+That directly generated block uses the same unconditional atomic inline-markup recognition as PDF101 and PCF000. Non-empty same-line backtick spans with matching delimiter runs, supported Markdown links and images, CommonMark-style autolinks, and boundary-valid reStructuredText interpreted text, roles, references, embedded targets, literals, and substitutions are never split internally. Markdown link support includes escaped or nested labels, empty inline components, all three standard title delimiters, and destination parentheses nested up to three levels. Emphasis, raw HTML or XML, shortcut references, definitions, and multiline constructs are not recognized as atomic inline markup. A line-leading run of at least three backticks or tildes is fence-like ordinary text rather than ambiguous inline markup, including when an info string follows the opener; the content-aware structure checks can still keep it inline when configured to preserve fences. `url-aware-wrapping` only selects balanced rather than greedy breaks around destination-bearing constructs.
 
 After ordinary-comment, canonical overlong-line, and syntax-position eligibility checks, suspicious Unicode or strong evidence of incomplete or over-bounded inline markup produces an unfixable finding instead of extraction. Generic unmatched delimiters without stronger supported-markup evidence remain ordinary comment text. This ambiguity guard runs before the configurable content-awareness filter, is always active, and is not disabled by `comment-trailing-extraction-content-aware = false`. Trailing-comment whitespace is normalized rather than interpreted as a hard break because extraction does not create a semantic line relationship with the code moved below it.
 
@@ -23,7 +23,7 @@ Widths use tab-expanded columns with `indent-width` as the tab size. If indentat
 Extracting ordinary long comments prevents explanatory text from obscuring code, while rule selection and safety settings let projects keep harmless spacing normalization without enabling comment movement.
 
 ## Ruff compatibility
-Ruff can report overlong lines and spacing issues, but it does not extract and wrap trailing comments in this way. PCF004 leaves Ruff, type-checker, formatter, and security directives unchanged.
+Ruff can report overlong lines and spacing issues, but it does not extract and wrap trailing comments in this way. PCF002 leaves Ruff, type-checker, formatter, and security directives unchanged.
 
 ## Examples
 An overlong trailing comment moves above the code and wraps as a standalone block:
@@ -119,7 +119,7 @@ def function(
 [output=unchanged]
 ```
 
-When extraction is suppressed, PCF004 leaves the original inline spacing unchanged. PCF002 owns trailing code-to-`#` delimiter spacing, and PCF003 owns directive normalization for recognized directives that remain inline:
+When extraction is suppressed, PCF002 leaves the original inline spacing unchanged. PCF001 owns trailing code-to-`#` delimiter spacing, and PCF100 owns directive normalization for recognized directives that remain inline:
 
 ```pydocfmt-example
 [settings]
@@ -206,7 +206,7 @@ if enabled:
 value = compute()
 ```
 
-PCF004 generates markup-aware wrapping itself, so selecting it without PCF001 still keeps a complete inline link indivisible. With URL-aware wrapping enabled, it can balance the surrounding words to avoid isolating the destination-bearing token:
+PCF002 generates markup-aware wrapping itself, so selecting it without PCF000 still keeps a complete inline link indivisible. With URL-aware wrapping enabled, it can balance the surrounding words to avoid isolating the destination-bearing token:
 
 ```pydocfmt-example
 [settings]
@@ -236,7 +236,7 @@ value = compute()  # Read [the label](missing destination words that need moving
 [output=unchanged]
 
 [findings]
-PCF004: Line 1: Trailing comment should be extracted
+PCF002: Line 1: Trailing comment should be extracted
 ```
 
 Content-aware extraction recognizes namespaced reStructuredText directives only with a valid two-colon delimiter. The valid directive remains inline, while a one-colon lookalike is ordinary extractable prose:

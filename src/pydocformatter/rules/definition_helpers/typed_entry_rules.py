@@ -57,7 +57,7 @@ def metadata(code: str, name: str, message: str, *, convention_opt_in: bool, inc
         name=name,
         message=message,
         fix_availability=fix_availability,
-        stable_since="1.0.0",
+        stable_since="1.1.0",
         setting_effects=_CONVENTION_OPT_IN_EFFECT if convention_opt_in else _SUPPORTED_CONVENTION_EFFECT,
         incompatible_with=tuple(RuleCode(code) for code in incompatible_with),
         check_kind=RuleCheckKind.STANDARD,

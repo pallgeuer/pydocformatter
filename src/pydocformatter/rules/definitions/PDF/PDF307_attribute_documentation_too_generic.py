@@ -39,7 +39,7 @@ class PDF307AttributeDocumentationTooGeneric(RuleBase):
         name="attribute-documentation-too-generic",
         message="Attribute documentation is too generic",
         fix_availability=FixAvailability.NEVER,
-        stable_since="1.0.0",
+        stable_since="1.1.0",
         setting_effects=(
             RuleSettingEffects(
                 setting="docstring_convention",

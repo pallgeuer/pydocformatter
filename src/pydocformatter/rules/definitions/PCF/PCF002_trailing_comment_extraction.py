@@ -1,4 +1,4 @@
-"""PCF004 trailing-comment-extraction rule."""
+"""PCF002 trailing-comment-extraction rule."""
 
 # Future imports
 from __future__ import annotations
@@ -22,19 +22,19 @@ if TYPE_CHECKING:
 
 
 @rule_registration.register_rule_to(PCF_definition.PCF)
-class PCF004TrailingCommentExtraction(RuleBase):
-    """Rule implementation for PCF004.
+class PCF002TrailingCommentExtraction(RuleBase):
+    """Rule implementation for PCF002.
 
     Attributes:
         meta (RuleMetadata): Static metadata used for registration, diagnostics, and rule selection.
     """
 
     meta = RuleMetadata(
-        code=RuleCode("PCF004"),
+        code=RuleCode("PCF002"),
         name="trailing-comment-extraction",
         message="Trailing comment should be extracted",
         fix_availability=FixAvailability.USUALLY,
-        stable_since="1.0.0",
+        stable_since="1.1.0",
         setting_effects=(),
         incompatible_with=(),
         check_kind=RuleCheckKind.STANDARD,
@@ -69,18 +69,18 @@ def _violations(context: RuleContext) -> tuple[rule_violations.RuleViolation, ..
         if context.settings.comment_trailing_extraction_syntax_aware and comment.syntax_sensitive:
             continue
         if comment.unicode_occurrences:
-            violations.append(rule_violations.diagnostic(PCF004TrailingCommentExtraction.meta, (comment.range.start.line,)))
+            violations.append(rule_violations.diagnostic(PCF002TrailingCommentExtraction.meta, (comment.range.start.line,)))
             continue
         scan = inline_markup.scan_text(comment.content)
         if scan.rewrite_blocked:
-            violations.append(rule_violations.diagnostic(PCF004TrailingCommentExtraction.meta, (comment.range.start.line,)))
+            violations.append(rule_violations.diagnostic(PCF002TrailingCommentExtraction.meta, (comment.range.start.line,)))
             continue
         if context.settings.comment_trailing_extraction_content_aware and comment_formatting.trailing_content_is_unsafe(comment.body, settings=context.settings):
             continue
         replacement = _extracted_replacement(comment, code=code, context=context, comments_by_line=comments_by_line, scan=scan)
         change = comment_formatting.planned_full_line_change(data, comment, replacement)
         if change is not None:
-            violations.append(rule_violations.violation_for_planned_source_change(PCF004TrailingCommentExtraction.meta, change))
+            violations.append(rule_violations.violation_for_planned_source_change(PCF002TrailingCommentExtraction.meta, change))
     return tuple(violations)
 
 

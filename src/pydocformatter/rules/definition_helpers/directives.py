@@ -160,7 +160,7 @@ class BracketDirective:
         return tuple(token for token in self.tokens if token.survives_deduplication)
 
     def normalized_selectors(self) -> str:
-        """Render canonical selector-list contents for safe PCF003 normalization.
+        """Render canonical selector-list contents for safe PCF100 normalization.
 
         Returns:
             str: Canonically spelled, spaced, and deduplicated selector list.

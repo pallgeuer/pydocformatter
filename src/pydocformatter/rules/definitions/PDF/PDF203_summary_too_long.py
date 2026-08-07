@@ -34,7 +34,7 @@ class PDF203SummaryTooLong(RuleBase):
         name="summary-too-long",
         message="Docstring summary does not fit on one line",
         fix_availability=FixAvailability.NEVER,
-        stable_since="1.0.0",
+        stable_since="1.1.0",
         setting_effects=(),
         incompatible_with=(),
         check_kind=RuleCheckKind.STANDARD,

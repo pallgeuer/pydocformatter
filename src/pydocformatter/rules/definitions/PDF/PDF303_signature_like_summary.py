@@ -35,7 +35,7 @@ class PDF303SignatureLikeSummary(RuleBase):
         name="signature-like-summary",
         message="Docstring summary should not include a function signature",
         fix_availability=FixAvailability.NEVER,
-        stable_since="1.0.0",
+        stable_since="1.1.0",
         setting_effects=(RuleSettingEffects(setting="docstring_convention", effects=(RuleSettingEffectValues(effect=RuleSettingEffect.IGNORED, values=(DocstringConvention.NUMPY,)),)),),
         incompatible_with=(),
         check_kind=RuleCheckKind.STANDARD,

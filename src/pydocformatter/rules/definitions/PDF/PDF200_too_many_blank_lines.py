@@ -39,7 +39,7 @@ class PDF200TooManyBlankLines(RuleBase):
         name="too-many-blank-lines",
         message="Docstring has too many blank lines",
         fix_availability=FixAvailability.ALWAYS,
-        stable_since="1.0.0",
+        stable_since="1.1.0",
         setting_effects=(),
         incompatible_with=(),
         check_kind=RuleCheckKind.STANDARD,

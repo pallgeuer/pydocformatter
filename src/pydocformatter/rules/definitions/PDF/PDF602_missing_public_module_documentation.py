@@ -34,7 +34,7 @@ class PDF602MissingPublicModuleDocumentation(RuleBase):
         name="missing-public-module-documentation",
         message="Public module is missing docstring",
         fix_availability=FixAvailability.NEVER,
-        stable_since="1.0.0",
+        stable_since="1.1.0",
         setting_effects=(),
         incompatible_with=(),
         check_kind=RuleCheckKind.STANDARD,

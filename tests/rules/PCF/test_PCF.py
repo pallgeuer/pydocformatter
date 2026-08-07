@@ -224,7 +224,7 @@ def test_prepare_classifies_shebang_and_encoding_cookie_boundaries(source: str, 
         "# mypy: ignore-errors",
         "# pydocfmt: noqa",
         "# pydocfmt: ignore[PDF101]",
-        "# pydocfmt: file-ignore[PCF001]",
+        "# pydocfmt: file-ignore[PCF000]",
         "# ruff: noqa",
         "# ruff: ignore[F401]",
         "# ruff: disable[E741, F841]",
@@ -306,17 +306,17 @@ def test_prepare_classifies_comments_in_parenthesized_decorator_and_compound_sta
     )
 
 
-def test_pcf001_does_not_resolve_parent_metadata(monkeypatch: pytest.MonkeyPatch) -> None:
-    settings = CheckSettings(select=("PCF001",), line_length=24)
+def test_pcf000_does_not_resolve_parent_metadata(monkeypatch: pytest.MonkeyPatch) -> None:
+    settings = CheckSettings(select=("PCF000",), line_length=24)
 
     resolves, result = parent_metadata_resolves_for_format("#standalone words that should wrap\n", settings=settings, monkeypatch=monkeypatch)
 
     assert resolves == 0
-    assert tuple(finding.rule.code.tag for finding in result.unfixed_findings) == ("PCF001",)
+    assert tuple(finding.rule.code.tag for finding in result.unfixed_findings) == ("PCF000",)
 
 
-def test_pcf004_does_not_resolve_parent_metadata_for_overlong_syntax_sensitive_comment(monkeypatch: pytest.MonkeyPatch) -> None:
-    settings = CheckSettings(select=("PCF004",), line_length=32)
+def test_pcf002_does_not_resolve_parent_metadata_for_overlong_syntax_sensitive_comment(monkeypatch: pytest.MonkeyPatch) -> None:
+    settings = CheckSettings(select=("PCF002",), line_length=32)
 
     resolves, result = parent_metadata_resolves_for_format("if enabled:  # explanation long enough to move above the header\n    pass\n", settings=settings, monkeypatch=monkeypatch)
 
@@ -324,8 +324,8 @@ def test_pcf004_does_not_resolve_parent_metadata_for_overlong_syntax_sensitive_c
     assert not result.unfixed_findings
 
 
-def test_pcf004_does_not_resolve_parent_metadata_for_ordinary_overlong_trailing_comment(monkeypatch: pytest.MonkeyPatch) -> None:
-    settings = CheckSettings(select=("PCF004",), line_length=32)
+def test_pcf002_does_not_resolve_parent_metadata_for_ordinary_overlong_trailing_comment(monkeypatch: pytest.MonkeyPatch) -> None:
+    settings = CheckSettings(select=("PCF002",), line_length=32)
 
     resolves, result = parent_metadata_resolves_for_format("value = compute()  # explanation long enough to move above the statement\n", settings=settings, monkeypatch=monkeypatch)
 
@@ -333,8 +333,8 @@ def test_pcf004_does_not_resolve_parent_metadata_for_ordinary_overlong_trailing_
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((1,),)
 
 
-def test_pcf004_does_not_resolve_parent_metadata_when_syntax_awareness_is_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
-    settings = CheckSettings(select=("PCF004",), line_length=32, comment_trailing_extraction_syntax_aware=False)
+def test_pcf002_does_not_resolve_parent_metadata_when_syntax_awareness_is_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
+    settings = CheckSettings(select=("PCF002",), line_length=32, comment_trailing_extraction_syntax_aware=False)
 
     resolves, result = parent_metadata_resolves_for_format("if enabled:  # explanation long enough to move above the header\n    pass\n", settings=settings, monkeypatch=monkeypatch)
 
@@ -342,8 +342,8 @@ def test_pcf004_does_not_resolve_parent_metadata_when_syntax_awareness_is_disabl
     assert tuple(finding.line_numbers for finding in result.unfixed_findings) == ((1,),)
 
 
-def test_pcf004_does_not_resolve_parent_metadata_for_short_trailing_comment(monkeypatch: pytest.MonkeyPatch) -> None:
-    settings = CheckSettings(select=("PCF004",), line_length=88)
+def test_pcf002_does_not_resolve_parent_metadata_for_short_trailing_comment(monkeypatch: pytest.MonkeyPatch) -> None:
+    settings = CheckSettings(select=("PCF002",), line_length=88)
 
     resolves, result = parent_metadata_resolves_for_format("if enabled:  # short\n    pass\n", settings=settings, monkeypatch=monkeypatch)
 

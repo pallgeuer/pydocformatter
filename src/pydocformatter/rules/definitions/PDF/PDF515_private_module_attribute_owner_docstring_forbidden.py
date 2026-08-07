@@ -35,7 +35,7 @@ class PDF515PrivateModuleAttributeOwnerDocstringForbidden(RuleBase):
         name="private-module-attribute-owner-docstring-forbidden",
         message="Module docstring documents a private attribute",
         fix_availability=FixAvailability.NEVER,
-        stable_since="1.0.0",
+        stable_since="1.1.0",
         setting_effects=docstring_conventions.convention_setting_effects(disabled=docstring_conventions.UNPARSED_CONVENTIONS),
         incompatible_with=(RuleCode("PDF524"), RuleCode("PDF525")),
         check_kind=RuleCheckKind.STANDARD,

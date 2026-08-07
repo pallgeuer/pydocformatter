@@ -34,7 +34,7 @@ class PDF610MissingPublicMethodDocumentation(RuleBase):
         name="missing-public-method-documentation",
         message="Public method is missing docstring",
         fix_availability=FixAvailability.NEVER,
-        stable_since="1.0.0",
+        stable_since="1.1.0",
         setting_effects=(),
         incompatible_with=(),
         check_kind=RuleCheckKind.STANDARD,

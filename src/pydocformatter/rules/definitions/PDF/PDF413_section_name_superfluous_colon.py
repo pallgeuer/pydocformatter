@@ -49,7 +49,7 @@ class PDF413SectionNameSuperfluousColon(RuleBase):
         name="section-name-superfluous-colon",
         message="Docstring section name should not end with a colon",
         fix_availability=FixAvailability.USUALLY,
-        stable_since="1.0.0",
+        stable_since="1.1.0",
         setting_effects=(
             RuleSettingEffects(
                 setting="docstring_convention", effects=(RuleSettingEffectValues(effect=RuleSettingEffect.DISABLED, values=docstring_conventions.conventions_except(DocstringConvention.NUMPY)),)

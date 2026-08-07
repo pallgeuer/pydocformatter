@@ -1,4 +1,4 @@
-"""Focused named-selector tests for PCF006 and suppression matching."""
+"""Focused named-selector tests for PCF101 and suppression matching."""
 
 # Future imports
 from __future__ import annotations
@@ -24,10 +24,10 @@ def test_canonical_name_suppresses_local_and_file_wide_findings() -> None:
     assert file_result.unfixed_findings == ()
 
 
-def test_mixed_case_name_is_accepted_and_normalized_by_pcf003() -> None:
+def test_mixed_case_name_is_accepted_and_normalized_by_pcf100() -> None:
     source = "# pydocfmt: ignore[Docstring-Reflow]\nvalue = 1\n"
 
-    result = format_source(source, select=("PCF003",), fix=True)
+    result = format_source(source, select=("PCF100",), fix=True)
 
     assert result.new_source == "# pydocfmt: ignore[docstring-reflow]\nvalue = 1\n"
 
@@ -36,8 +36,8 @@ def test_code_name_alias_pair_is_audited_once_when_unused() -> None:
     code_first = "# pydocfmt: ignore[PDF101, docstring-reflow]\nvalue = 1\n"
     name_first = "# pydocfmt: ignore[docstring-reflow, PDF101]\nvalue = 1\n"
 
-    code_result = format_source(code_first, select=("PDF101", "PCF006"))
-    name_result = format_source(name_first, select=("PDF101", "PCF006"))
+    code_result = format_source(code_first, select=("PDF101", "PCF101"))
+    name_result = format_source(name_first, select=("PDF101", "PCF101"))
 
     assert tuple(finding.message for finding in code_result.unfixed_findings) == ("Suppression selector 'PDF101' did not suppress any findings",)
     assert tuple(finding.message for finding in name_result.unfixed_findings) == ("Suppression selector 'docstring-reflow' did not suppress any findings",)
@@ -46,7 +46,7 @@ def test_code_name_alias_pair_is_audited_once_when_unused() -> None:
 def test_code_name_alias_pair_suppresses_one_finding_without_unused_diagnostic() -> None:
     source = 'def function():\n    """This is a long summary that needs to wrap onto more than one physical line."""  # pydocfmt: ignore[docstring-reflow, PDF101]\n'
 
-    result = format_source(source, select=("PDF101", "PCF006"))
+    result = format_source(source, select=("PDF101", "PCF101"))
 
     assert result.unfixed_findings == ()
 
@@ -54,7 +54,7 @@ def test_code_name_alias_pair_suppresses_one_finding_without_unused_diagnostic()
 def test_every_matching_broad_and_exact_alias_selector_receives_usage_credit() -> None:
     source = 'def function():\n    """This is a long summary that needs to wrap onto more than one physical line."""  # pydocfmt: ignore[PDF, docstring-reflow, PDF101]\n'
 
-    result = format_source(source, select=("PDF101", "PCF006"))
+    result = format_source(source, select=("PDF101", "PCF101"))
 
     assert result.unfixed_findings == ()
 
@@ -62,7 +62,7 @@ def test_every_matching_broad_and_exact_alias_selector_receives_usage_credit() -
 def test_broad_and_exact_selectors_remain_distinct_for_unused_auditing() -> None:
     source = "# pydocfmt: ignore[ALL, PDF101]\nvalue = 1\n"
 
-    result = format_source(source, select=("PDF101", "PCF006"))
+    result = format_source(source, select=("PDF101", "PCF101"))
 
     assert tuple(finding.message for finding in result.unfixed_findings) == ("Suppression selector 'ALL' did not suppress any findings", "Suppression selector 'PDF101' did not suppress any findings")
 
@@ -70,7 +70,7 @@ def test_broad_and_exact_selectors_remain_distinct_for_unused_auditing() -> None
 def test_semantic_deduplication_is_scoped_to_each_directive() -> None:
     source = "# pydocfmt: file-ignore[docstring-reflow, PDF101]\n# pydocfmt: ignore[PDF101, docstring-reflow]\nvalue = 1\n"
 
-    result = format_source(source, select=("PDF101", "PCF006"))
+    result = format_source(source, select=("PDF101", "PCF101"))
 
     assert tuple(finding.message for finding in result.unfixed_findings) == (
         "Suppression selector 'docstring-reflow' did not suppress any findings",
@@ -92,7 +92,7 @@ def test_generic_and_pydocfmt_noqa_remain_code_only() -> None:
 def test_synthesized_unused_suppression_finding_can_be_suppressed_by_rule_name() -> None:
     source = "# pydocfmt: file-ignore[unused-suppression]\n# pydocfmt: ignore[]\n# Short comment.\n"
 
-    result = format_source(source, select=("PCF006",))
+    result = format_source(source, select=("PCF101",))
 
     assert result.unfixed_findings == ()
 
@@ -100,9 +100,9 @@ def test_synthesized_unused_suppression_finding_can_be_suppressed_by_rule_name()
 def test_non_ascii_confusable_name_is_invalid_and_cannot_suppress_a_rule() -> None:
     source = '# pydocfmt: file-ignore[docstring-blan\u212a-line-whitespace]\n"""Summary.\n \nMore.\n"""\n'
 
-    result = format_source(source, select=("PDF103", "PCF006"))
+    result = format_source(source, select=("PDF103", "PCF101"))
 
     assert tuple((str(finding.rule.code), finding.line_numbers, finding.message) for finding in result.unfixed_findings) == (
         ("PDF103", (3,), "Blank docstring line has whitespace"),
-        ("PCF006", (1,), "Invalid pydocfmt suppression selector 'docstring-blan\u212a-line-whitespace'"),
+        ("PCF101", (1,), "Invalid pydocfmt suppression selector 'docstring-blan\u212a-line-whitespace'"),
     )

@@ -37,7 +37,7 @@ class PDF110OneLineDocstring(RuleBase):
         name="one-line-docstring",
         message="Docstring with one content line should be one line",
         fix_availability=FixAvailability.ALWAYS,
-        stable_since="1.0.0",
+        stable_since="1.1.0",
         setting_effects=(),
         incompatible_with=(),
         check_kind=RuleCheckKind.STANDARD,

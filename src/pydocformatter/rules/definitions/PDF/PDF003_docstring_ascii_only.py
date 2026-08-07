@@ -39,7 +39,7 @@ class PDF003DocstringAsciiOnly(RuleBase):
         name="docstring-ascii-only",
         message="Docstring source contains non-ASCII characters",
         fix_availability=FixAvailability.USUALLY,
-        stable_since="1.0.0",
+        stable_since="1.1.0",
         setting_effects=(),
         incompatible_with=(),
         check_kind=RuleCheckKind.STANDARD,

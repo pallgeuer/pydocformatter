@@ -1527,8 +1527,8 @@ def test_rule_checks_fixes_and_rebuilt_contexts_reuse_one_source_path(mocker: Mo
 
 def test_rule_pass_parses_each_comment_for_bracket_directives_once(mocker: MockerFixture) -> None:
     parse_bracket_directive = mocker.spy(directives, "parse_bracket_directive")
-    source = "# pydocfmt: ignore[PCF003]\n# Ordinary comment.\nvalue = 1\n"
-    settings = CheckSettings(select=("PCF003",))
+    source = "# pydocfmt: ignore[PCF100]\n# Ordinary comment.\nvalue = 1\n"
+    settings = CheckSettings(select=("PCF100",))
 
     formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=False)
 
@@ -2584,7 +2584,7 @@ def test_inline_directive_on_any_concatenated_docstring_component_suppresses_who
     first_suffix = f"  {directive}" if component == "first" else ""
     middle_suffix = f"  {directive}" if component == "middle" else ""
     source = f'def function():\n    (""{first_suffix}\n     ""{middle_suffix}\n     " ")\n'
-    settings = CheckSettings(select=("PDF202", "PCF006"))
+    settings = CheckSettings(select=("PDF202", "PCF101"))
     result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=False)
 
     assert result.new_source == source
@@ -2594,7 +2594,7 @@ def test_inline_directive_on_any_concatenated_docstring_component_suppresses_who
 
 def test_inline_component_directive_suppresses_whole_expression_fix() -> None:
     source = 'def function():\n    ("Summary "  # pydocfmt: ignore[PDF000]\n     "continued.")\n'
-    settings = CheckSettings(select=("PDF000", "PCF006"))
+    settings = CheckSettings(select=("PDF000", "PCF101"))
     result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
 
     assert result.new_source == source
@@ -2605,7 +2605,7 @@ def test_inline_component_directive_suppresses_whole_expression_fix() -> None:
 
 def test_inline_component_directive_suppresses_semantically_owned_pdf_finding() -> None:
     source = 'def function():\n    ("Return a value "  # noqa: PDF502\n     "without a section.")\n    return 1\n'
-    settings = CheckSettings(select=("PDF502", "PCF006"), docstring_convention=DocstringConvention.GOOGLE, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS)
+    settings = CheckSettings(select=("PDF502", "PCF101"), docstring_convention=DocstringConvention.GOOGLE, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS)
     result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=False)
 
     assert result.unfixed_findings == ()
@@ -2613,7 +2613,7 @@ def test_inline_component_directive_suppresses_semantically_owned_pdf_finding() 
 
 def test_inline_component_directive_suppresses_unmapped_entry_pdf_finding() -> None:
     source = 'def function(value: int):\n    ("Summary.\\n\\n"  # noqa: PDF700\n     "Args:\\n    value (int):")\n'
-    settings = CheckSettings(select=("PDF700", "PCF006"), docstring_convention=DocstringConvention.GOOGLE)
+    settings = CheckSettings(select=("PDF700", "PCF101"), docstring_convention=DocstringConvention.GOOGLE)
     result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=False)
 
     assert result.unfixed_findings == ()
@@ -2621,19 +2621,19 @@ def test_inline_component_directive_suppresses_unmapped_entry_pdf_finding() -> N
 
 def test_inline_all_component_directive_does_not_expand_pcf_coverage() -> None:
     source = 'def function():\n    (""  # noqa: ALL\n     # This generated explanatory comment is intentionally much too long for the configured line length.\n     " ")\n'
-    settings = CheckSettings(select=("PDF202", "PCF001", "PCF006"), line_length=48)
+    settings = CheckSettings(select=("PDF202", "PCF000", "PCF101"), line_length=48)
     result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=False)
 
-    assert tuple((finding.rule.code.tag, finding.line_numbers) for finding in result.unfixed_findings) == (("PCF001", (3,)),)
+    assert tuple((finding.rule.code.tag, finding.line_numbers) for finding in result.unfixed_findings) == (("PCF000", (3,)),)
 
 
-@pytest.mark.parametrize("directive", ["# noqa: PCF001", "# pydocfmt: ignore[PCF001]"])
+@pytest.mark.parametrize("directive", ["# noqa: PCF000", "# pydocfmt: ignore[PCF000]"])
 def test_inline_final_component_directive_keeps_pcf_coverage_line_local(directive: str) -> None:
     source = f'def function():\n    ("Summary."\n     # This generated explanatory comment is intentionally much too long for the configured line length.\n     " Continued."  {directive}\n    )\n'
-    settings = CheckSettings(select=("PCF001", "PCF006"), line_length=48)
+    settings = CheckSettings(select=("PCF000", "PCF101"), line_length=48)
     result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=False)
 
-    assert tuple((finding.rule.code.tag, finding.line_numbers) for finding in result.unfixed_findings) == (("PCF001", (3,)), ("PCF006", (4,)))
+    assert tuple((finding.rule.code.tag, finding.line_numbers) for finding in result.unfixed_findings) == (("PCF000", (3,)), ("PCF101", (4,)))
 
 
 @pytest.mark.parametrize("directive", ["# noqa: PDF502", "# pydocfmt: ignore[PDF502]"])
@@ -2642,24 +2642,24 @@ def test_inline_ordinary_string_directive_does_not_expand_pdf_coverage(directive
     middle_suffix = f"  {directive}" if component == "middle" else ""
     final_suffix = f"  {directive}" if component == "final" else ""
     source = f'def function():\n    """Return a value."""\n    return ("a"\n            "b"{middle_suffix}\n            "c"{final_suffix}\n           )\n'
-    settings = CheckSettings(select=("PDF502", "PCF006"), docstring_convention=DocstringConvention.GOOGLE, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS)
+    settings = CheckSettings(select=("PDF502", "PCF101"), docstring_convention=DocstringConvention.GOOGLE, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS)
     result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=False)
     directive_line = 4 if component == "middle" else 5
 
-    assert tuple((finding.rule.code.tag, finding.line_numbers) for finding in result.unfixed_findings) == (("PDF502", (3,)), ("PCF006", (directive_line,)))
+    assert tuple((finding.rule.code.tag, finding.line_numbers) for finding in result.unfixed_findings) == (("PDF502", (3,)), ("PCF101", (directive_line,)))
 
 
 def test_local_ordinary_string_directive_does_not_expand_pdf_coverage() -> None:
     source = 'def function():\n    """Return a value."""\n    # pydocfmt: ignore[PDF502]\n    return ("a"\n            "b")\n'
-    settings = CheckSettings(select=("PDF502", "PCF006"), docstring_convention=DocstringConvention.GOOGLE, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS)
+    settings = CheckSettings(select=("PDF502", "PCF101"), docstring_convention=DocstringConvention.GOOGLE, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS)
     result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=False)
 
-    assert tuple((finding.rule.code.tag, finding.line_numbers) for finding in result.unfixed_findings) == (("PDF502", (4,)), ("PCF006", (3,)))
+    assert tuple((finding.rule.code.tag, finding.line_numbers) for finding in result.unfixed_findings) == (("PDF502", (4,)), ("PCF101", (3,)))
 
 
 def test_inline_component_directive_expands_for_supported_attached_docstring() -> None:
     source = 'value = 1\n("Notes:\\n"  # noqa: PDF212\n "    Details.")\n'
-    settings = CheckSettings(select=("PDF212", "PCF006"), docstring_convention=DocstringConvention.GOOGLE)
+    settings = CheckSettings(select=("PDF212", "PCF101"), docstring_convention=DocstringConvention.GOOGLE)
     result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=False)
 
     assert result.unfixed_findings == ()
@@ -2667,26 +2667,26 @@ def test_inline_component_directive_expands_for_supported_attached_docstring() -
 
 def test_local_pdf_directive_before_delimiter_only_parenthesis_remains_unused() -> None:
     source = 'def function():\n    # pydocfmt: ignore[PDF202]\n    (\n        ""\n        " "\n    )\n'
-    settings = CheckSettings(select=("PDF202", "PCF006"))
+    settings = CheckSettings(select=("PDF202", "PCF101"))
     result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=False)
 
-    assert tuple((finding.rule.code.tag, finding.line_numbers) for finding in result.unfixed_findings) == (("PDF202", (4, 5)), ("PCF006", (2,)))
+    assert tuple((finding.rule.code.tag, finding.line_numbers) for finding in result.unfixed_findings) == (("PDF202", (4, 5)), ("PCF101", (2,)))
 
 
 def test_standalone_directive_between_components_remains_line_local() -> None:
     source = 'def function():\n    (""\n     # noqa: PDF202\n     " ")\n'
-    settings = CheckSettings(select=("PDF202", "PCF006"))
+    settings = CheckSettings(select=("PDF202", "PCF101"))
     result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=False)
 
-    assert tuple((finding.rule.code.tag, finding.line_numbers) for finding in result.unfixed_findings) == (("PDF202", (2, 3, 4)), ("PCF006", (3,)))
+    assert tuple((finding.rule.code.tag, finding.line_numbers) for finding in result.unfixed_findings) == (("PDF202", (2, 3, 4)), ("PCF101", (3,)))
 
 
 def test_inline_component_directive_does_not_cover_another_string_expression() -> None:
     source = 'def first():\n    ("Content"  # noqa: PDF202\n     ".")\n\n\ndef second():\n    (""\n     " ")\n'
-    settings = CheckSettings(select=("PDF202", "PCF006"))
+    settings = CheckSettings(select=("PDF202", "PCF101"))
     result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=False)
 
-    assert tuple((finding.rule.code.tag, finding.line_numbers) for finding in result.unfixed_findings) == (("PDF202", (7, 8)), ("PCF006", (2,)))
+    assert tuple((finding.rule.code.tag, finding.line_numbers) for finding in result.unfixed_findings) == (("PDF202", (7, 8)), ("PCF101", (2,)))
 
 
 def test_preceding_pydocfmt_directive_suppresses_immediately_following_docstring() -> None:
@@ -2699,7 +2699,7 @@ def test_preceding_pydocfmt_directive_suppresses_immediately_following_docstring
 
 def test_local_selector_list_shares_following_expression_candidates() -> None:
     source = "# pydocfmt: ignore[PDF001, PDF202]\n'''   '''\n"
-    settings = CheckSettings(select=("PDF001", "PDF202", "PCF006"))
+    settings = CheckSettings(select=("PDF001", "PDF202", "PCF101"))
     result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=False)
 
     assert result.unfixed_findings == ()
@@ -2714,15 +2714,15 @@ def test_preceding_pydocfmt_directive_does_not_skip_blank_lines() -> None:
 
 
 def test_preceding_pydocfmt_directive_suppresses_following_standalone_comment_run_check_and_fix() -> None:
-    source = "# pydocfmt: ignore[PCF001]\n# This is a long comment that needs wrapping into more than one physical line.\n# This line belongs to the same comment run.\n"
-    settings = CheckSettings(select=("PCF001",), line_length=42)
+    source = "# pydocfmt: ignore[PCF000]\n# This is a long comment that needs wrapping into more than one physical line.\n# This line belongs to the same comment run.\n"
+    settings = CheckSettings(select=("PCF000",), line_length=42)
     selection = rules_selection.select_rules(settings)
 
-    without_directive = formatter.format_source(source.replace("# pydocfmt: ignore[PCF001]\n", ""), "a.py", settings=settings, rule_selection=selection, fix=False)
+    without_directive = formatter.format_source(source.replace("# pydocfmt: ignore[PCF000]\n", ""), "a.py", settings=settings, rule_selection=selection, fix=False)
     check_result = formatter.format_source(source, "a.py", settings=settings, rule_selection=selection, fix=False)
     fix_result = formatter.format_source(source, "a.py", settings=settings, rule_selection=selection, fix=True)
 
-    assert all(finding.rule.code.tag == "PCF001" for finding in without_directive.unfixed_findings)
+    assert all(finding.rule.code.tag == "PCF000" for finding in without_directive.unfixed_findings)
     assert without_directive.unfixed_findings
     assert check_result.unfixed_findings == ()
     assert fix_result.new_source == source
@@ -2730,8 +2730,8 @@ def test_preceding_pydocfmt_directive_suppresses_following_standalone_comment_ru
 
 
 def test_preceding_pydocfmt_directive_suppresses_following_trailing_comment() -> None:
-    source = "# pydocfmt: ignore[PCF002]\nvalue = 1 # trailing\n"
-    settings = CheckSettings(select=("PCF002",))
+    source = "# pydocfmt: ignore[PCF001]\nvalue = 1 # trailing\n"
+    settings = CheckSettings(select=("PCF001",))
     result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
 
     assert result.new_source == source
@@ -2740,7 +2740,7 @@ def test_preceding_pydocfmt_directive_suppresses_following_trailing_comment() ->
 
 
 def test_local_all_selector_suppresses_following_docstring_or_comment_target() -> None:
-    settings = CheckSettings(select=("PDF101", "PCF002", "PCF006"), line_length=48)
+    settings = CheckSettings(select=("PDF101", "PCF001", "PCF101"), line_length=48)
     selection = rules_selection.select_rules(settings)
     docstring_source = '# pydocfmt: ignore[ALL]\n"""This is a long module summary that needs wrapping into more than one physical line."""\n'
     comment_source = "# pydocfmt: ignore[ALL]\nvalue = 1 # trailing\n"
@@ -2777,9 +2777,9 @@ def test_bare_noqa_without_payload_suppresses_closing_docstring_line() -> None:
     assert result.unfixed_findings == ()
 
 
-def test_bare_noqa_suppresses_pcf_findings_without_blanket_pcf006_audit() -> None:
+def test_bare_noqa_suppresses_pcf_findings_without_blanket_pcf101_audit() -> None:
     source = "value = 1 # noqa\n"
-    settings = CheckSettings(select=("PCF002", "PCF006"))
+    settings = CheckSettings(select=("PCF001", "PCF101"))
     result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
 
     assert result.new_source == source
@@ -2788,10 +2788,10 @@ def test_bare_noqa_suppresses_pcf_findings_without_blanket_pcf006_audit() -> Non
 
 
 def test_bare_noqa_pydocformatter_selectors_suppress_and_are_audited() -> None:
-    used_source = "value = 1 # noqa: PCF002\n"
-    unused_source = "value = 1  # noqa: PCF002\n"
+    used_source = "value = 1 # noqa: PCF001\n"
+    unused_source = "value = 1  # noqa: PCF001\n"
     foreign_source = "value = 1  # noqa: F401\n"
-    settings = CheckSettings(select=("PCF002", "PCF006"))
+    settings = CheckSettings(select=("PCF001", "PCF101"))
     selection = rules_selection.select_rules(settings)
 
     used = formatter.format_source(used_source, "a.py", settings=settings, rule_selection=selection, fix=False)
@@ -2799,43 +2799,43 @@ def test_bare_noqa_pydocformatter_selectors_suppress_and_are_audited() -> None:
     foreign = formatter.format_source(foreign_source, "a.py", settings=settings, rule_selection=selection, fix=False)
 
     assert used.unfixed_findings == ()
-    assert tuple((finding.rule.code.tag, finding.message) for finding in unused.unfixed_findings) == (("PCF006", "Suppression selector 'PCF002' did not suppress any findings"),)
+    assert tuple((finding.rule.code.tag, finding.message) for finding in unused.unfixed_findings) == (("PCF101", "Suppression selector 'PCF001' did not suppress any findings"),)
     assert foreign.unfixed_findings == ()
 
 
 def test_unused_suppression_reports_unused_and_invalid_pydocfmt_selectors() -> None:
-    settings = CheckSettings(select=("PCF001", "PCF006"))
+    settings = CheckSettings(select=("PCF000", "PCF101"))
     selection = rules_selection.select_rules(settings)
 
-    unused = formatter.format_source("# pydocfmt: ignore[PCF001]\n# Short comment.\n", "a.py", settings=settings, rule_selection=selection, fix=False)
+    unused = formatter.format_source("# pydocfmt: ignore[PCF000]\n# Short comment.\n", "a.py", settings=settings, rule_selection=selection, fix=False)
     invalid = formatter.format_source("# pydocfmt: ignore[not-a-rule]\n# Short comment.\n", "a.py", settings=settings, rule_selection=selection, fix=False)
 
-    assert tuple(finding.message for finding in unused.unfixed_findings) == ("Suppression selector 'PCF001' did not suppress any findings",)
+    assert tuple(finding.message for finding in unused.unfixed_findings) == ("Suppression selector 'PCF000' did not suppress any findings",)
     assert tuple(finding.message for finding in invalid.unfixed_findings) == ("Unknown pydocfmt suppression selector 'not-a-rule'",)
 
 
 def test_unused_suppression_reports_partially_unused_selector_lists() -> None:
-    source = "# pydocfmt: ignore[PCF001, PCF002]\n# This is a long comment that needs wrapping into more than one physical line.\n"
-    settings = CheckSettings(select=("PCF001", "PCF002", "PCF006"), line_length=42)
+    source = "# pydocfmt: ignore[PCF000, PCF001]\n# This is a long comment that needs wrapping into more than one physical line.\n"
+    settings = CheckSettings(select=("PCF000", "PCF001", "PCF101"), line_length=42)
     result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=False)
 
-    assert tuple((finding.rule.code.tag, finding.message) for finding in result.unfixed_findings) == (("PCF006", "Suppression selector 'PCF002' did not suppress any findings"),)
+    assert tuple((finding.rule.code.tag, finding.message) for finding in result.unfixed_findings) == (("PCF101", "Suppression selector 'PCF001' did not suppress any findings"),)
 
 
 @pytest.mark.parametrize(
     "source",
     [
-        "# pydocfmt: ignore[PCF001, pcf001]\n# Short comment.\n",
-        "# pydocfmt: file-ignore[PCF001, pcf001]\n# Short comment.\n",
-        "# pydocfmt: noqa: PCF001, pcf001\n# Short comment.\n",
-        "# noqa: PCF001, pcf001\n# Short comment.\n",
+        "# pydocfmt: ignore[PCF000, pcf000]\n# Short comment.\n",
+        "# pydocfmt: file-ignore[PCF000, pcf000]\n# Short comment.\n",
+        "# pydocfmt: noqa: PCF000, pcf000\n# Short comment.\n",
+        "# noqa: PCF000, pcf000\n# Short comment.\n",
     ],
 )
 def test_unused_suppression_audits_repeated_normalized_selectors_once_in_check_mode(source: str) -> None:
-    settings = CheckSettings(select=("PCF001", "PCF006"))
+    settings = CheckSettings(select=("PCF000", "PCF101"))
     result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=False)
 
-    assert tuple(finding.message for finding in result.unfixed_findings) == ("Suppression selector 'PCF001' did not suppress any findings",)
+    assert tuple(finding.message for finding in result.unfixed_findings) == ("Suppression selector 'PCF000' did not suppress any findings",)
 
 
 @pytest.mark.parametrize(
@@ -2843,17 +2843,17 @@ def test_unused_suppression_audits_repeated_normalized_selectors_once_in_check_m
 )
 def test_unused_suppression_validates_repeated_normalized_invalid_or_unknown_selectors_once(selectors: str, message: str) -> None:
     source = f"# pydocfmt: ignore[{selectors}]\n# Short comment.\n"
-    settings = CheckSettings(select=("PCF006",))
+    settings = CheckSettings(select=("PCF101",))
     result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=False)
 
     assert tuple(finding.message for finding in result.unfixed_findings) == (message,)
 
 
 def test_repeated_suppression_selectors_preserve_used_and_overlapping_selector_semantics() -> None:
-    repeated_source = "# pydocfmt: ignore[PCF001, pcf001]\n# This is a long comment that needs wrapping into more than one physical line.\n"
-    overlapping_source = "# pydocfmt: ignore[PCF, PCF001]\n# Short comment.\n"
-    interleaved_source = "# pydocfmt: ignore[PCF002, PCF001, pcf002]\n# Short comment.\n"
-    settings = CheckSettings(select=("PCF001", "PCF002", "PCF006"), line_length=42)
+    repeated_source = "# pydocfmt: ignore[PCF000, pcf000]\n# This is a long comment that needs wrapping into more than one physical line.\n"
+    overlapping_source = "# pydocfmt: ignore[PCF, PCF000]\n# Short comment.\n"
+    interleaved_source = "# pydocfmt: ignore[PCF001, PCF000, pcf001]\n# Short comment.\n"
+    settings = CheckSettings(select=("PCF000", "PCF001", "PCF101"), line_length=42)
     selection = rules_selection.select_rules(settings)
 
     repeated = formatter.format_source(repeated_source, "a.py", settings=settings, rule_selection=selection, fix=False)
@@ -2863,50 +2863,50 @@ def test_repeated_suppression_selectors_preserve_used_and_overlapping_selector_s
     assert repeated.unfixed_findings == ()
     assert tuple(finding.message for finding in overlapping.unfixed_findings) == (
         "Suppression selector 'PCF' did not suppress any findings",
-        "Suppression selector 'PCF001' did not suppress any findings",
+        "Suppression selector 'PCF000' did not suppress any findings",
     )
     assert tuple(finding.message for finding in interleaved.unfixed_findings) == (
-        "Suppression selector 'PCF002' did not suppress any findings",
         "Suppression selector 'PCF001' did not suppress any findings",
+        "Suppression selector 'PCF000' did not suppress any findings",
     )
 
 
 def test_repeated_suppression_selector_deduplication_is_scoped_to_each_directive() -> None:
-    source = "# pydocfmt: file-ignore[PCF001, pcf001]\n# noqa: PCF001, pcf001\n# Short comment.\n"
-    settings = CheckSettings(select=("PCF001", "PCF006"))
+    source = "# pydocfmt: file-ignore[PCF000, pcf000]\n# noqa: PCF000, pcf000\n# Short comment.\n"
+    settings = CheckSettings(select=("PCF000", "PCF101"))
     result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=False)
 
     assert tuple(finding.message for finding in result.unfixed_findings) == (
-        "Suppression selector 'PCF001' did not suppress any findings",
-        "Suppression selector 'PCF001' did not suppress any findings",
+        "Suppression selector 'PCF000' did not suppress any findings",
+        "Suppression selector 'PCF000' did not suppress any findings",
     )
 
 
 def test_directive_fix_and_unused_suppression_audit_converge_on_one_selector() -> None:
-    source = "# PYDOCFMT : ignore [ pcf001, PCF001, ]\n# Short comment.\n"
-    settings = CheckSettings(select=("PCF001", "PCF003", "PCF006"))
+    source = "# PYDOCFMT : ignore [ pcf000, PCF000, ]\n# Short comment.\n"
+    settings = CheckSettings(select=("PCF000", "PCF100", "PCF101"))
     result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
 
-    assert result.new_source == "# pydocfmt: ignore[PCF001]\n# Short comment.\n"
-    assert tuple((rule.code.tag, count) for rule, count in result.fixed_findings.items()) == (("PCF003", 1),)
-    assert tuple(finding.message for finding in result.unfixed_findings) == ("Suppression selector 'PCF001' did not suppress any findings",)
+    assert result.new_source == "# pydocfmt: ignore[PCF000]\n# Short comment.\n"
+    assert tuple((rule.code.tag, count) for rule, count in result.fixed_findings.items()) == (("PCF100", 1),)
+    assert tuple(finding.message for finding in result.unfixed_findings) == ("Suppression selector 'PCF000' did not suppress any findings",)
 
 
 def test_unused_suppression_does_not_report_selectors_for_disabled_rules() -> None:
     source = '# pydocfmt: ignore[PDF101]\n"""This is a long module summary that needs wrapping into more than one physical line."""\n'
-    settings = CheckSettings(select=("PCF006",), line_length=48)
+    settings = CheckSettings(select=("PCF101",), line_length=48)
     result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=False)
 
     assert result.unfixed_findings == ()
 
 
-def test_pydocfmt_directive_can_suppress_pcf006() -> None:
-    settings = CheckSettings(select=("PCF006",))
+def test_pydocfmt_directive_can_suppress_pcf101() -> None:
+    settings = CheckSettings(select=("PCF101",))
     selection = rules_selection.select_rules(settings)
     sources = (
-        "# pydocfmt: file-ignore[PCF006]\n# pydocfmt: ignore[]\n# Short comment.\n",
-        "# pydocfmt: noqa: PCF006\n# pydocfmt: ignore[]\n# Short comment.\n",
-        "# pydocfmt: ignore[PCF006]\n# pydocfmt: noqa: not-a-rule\n# Short comment.\n",
+        "# pydocfmt: file-ignore[PCF101]\n# pydocfmt: ignore[]\n# Short comment.\n",
+        "# pydocfmt: noqa: PCF101\n# pydocfmt: ignore[]\n# Short comment.\n",
+        "# pydocfmt: ignore[PCF101]\n# pydocfmt: noqa: not-a-rule\n# Short comment.\n",
     )
 
     for source in sources:
@@ -2916,7 +2916,7 @@ def test_pydocfmt_directive_can_suppress_pcf006() -> None:
 
 def test_file_level_pydocfmt_directive_suppresses_findings_anywhere_in_file() -> None:
     source = 'def first():\n    """This is a long summary that needs wrapping into more than one physical line."""\n\n# pydocfmt: noqa: PDF101\n\ndef second():\n    """This is another long summary that needs wrapping into more than one physical line."""\n'
-    settings = CheckSettings(select=("PDF101", "PCF006"), line_length=48)
+    settings = CheckSettings(select=("PDF101", "PCF101"), line_length=48)
     result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=False)
 
     assert result.unfixed_findings == ()
@@ -2924,7 +2924,7 @@ def test_file_level_pydocfmt_directive_suppresses_findings_anywhere_in_file() ->
 
 def test_file_ignore_prefix_selector_suppresses_multiple_pdf_rules() -> None:
     source = '# pydocfmt: file-ignore[PDF]\ndef function():\n    """   This is a long summary that needs wrapping into more than one physical line."""\n'
-    settings = CheckSettings(select=("PDF101", "PDF104", "PCF006"), line_length=48)
+    settings = CheckSettings(select=("PDF101", "PDF104", "PCF101"), line_length=48)
     result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=False)
 
     assert result.unfixed_findings == ()
@@ -2932,7 +2932,7 @@ def test_file_ignore_prefix_selector_suppresses_multiple_pdf_rules() -> None:
 
 def test_file_level_blanket_pydocfmt_noqa_suppresses_mixed_pcf_and_pdf_findings() -> None:
     source = '# pydocfmt: noqa\ndef function():\n    """This is a long summary that needs wrapping into more than one physical line."""\n\nvalue = 1 # trailing\n'
-    settings = CheckSettings(select=("PDF101", "PCF002", "PCF006"), line_length=48)
+    settings = CheckSettings(select=("PDF101", "PCF001", "PCF101"), line_length=48)
     result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
 
     assert result.new_source == source
@@ -2942,47 +2942,47 @@ def test_file_level_blanket_pydocfmt_noqa_suppresses_mixed_pcf_and_pdf_findings(
 
 def test_adjacent_local_directives_stack_for_one_following_docstring() -> None:
     source = 'def function():\n    # pydocfmt: ignore[PDF101]\n    # pydocfmt: ignore[PDF104]\n    """   This is a long summary that needs wrapping into more than one physical line."""\n'
-    settings = CheckSettings(select=("PDF101", "PDF104", "PCF006"), line_length=48)
+    settings = CheckSettings(select=("PDF101", "PDF104", "PCF101"), line_length=48)
     result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=False)
 
     assert result.unfixed_findings == ()
 
 
 def test_local_directive_wrong_target_type_is_unused_and_does_not_suppress_other_findings() -> None:
-    source = '# pydocfmt: ignore[PCF001]\n"""This is a long module summary that needs wrapping into more than one physical line."""\n'
-    settings = CheckSettings(select=("PCF001", "PDF101", "PCF006"), line_length=48)
+    source = '# pydocfmt: ignore[PCF000]\n"""This is a long module summary that needs wrapping into more than one physical line."""\n'
+    settings = CheckSettings(select=("PCF000", "PDF101", "PCF101"), line_length=48)
     result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=False)
 
     assert collections.Counter((finding.rule.code.tag, finding.message) for finding in result.unfixed_findings) == collections.Counter((
-        ("PCF006", "Suppression selector 'PCF001' did not suppress any findings"),
+        ("PCF101", "Suppression selector 'PCF000' did not suppress any findings"),
         ("PDF101", "Docstring chunk needs reflow"),
     ))
 
 
 def test_local_comment_directive_suppresses_only_first_contiguous_comment_run() -> None:
-    source = "# pydocfmt: ignore[PCF001]\n# This is a long comment that needs wrapping into more than one physical line.\n\n# This is another long comment that needs wrapping into more than one physical line.\n"
-    settings = CheckSettings(select=("PCF001", "PCF006"), line_length=42)
+    source = "# pydocfmt: ignore[PCF000]\n# This is a long comment that needs wrapping into more than one physical line.\n\n# This is another long comment that needs wrapping into more than one physical line.\n"
+    settings = CheckSettings(select=("PCF000", "PCF101"), line_length=42)
     result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=False)
 
-    assert tuple((finding.rule.code.tag, finding.line_numbers) for finding in result.unfixed_findings) == (("PCF001", (4,)),)
+    assert tuple((finding.rule.code.tag, finding.line_numbers) for finding in result.unfixed_findings) == (("PCF000", (4,)),)
 
 
 def test_local_comment_directive_does_not_cross_indent_or_protected_boundaries() -> None:
-    indented_source = "# pydocfmt: ignore[PCF001]\n# This is a long comment that needs wrapping into more than one physical line.\n    # This is another long comment that needs wrapping into more than one physical line.\n"
-    protected_source = "# pydocfmt: ignore[PCF001]\n# This is a long comment that needs wrapping into more than one physical line.\n# noqa\n# This is another long comment that needs wrapping into more than one physical line.\n"
-    settings = CheckSettings(select=("PCF001", "PCF006"), line_length=42)
+    indented_source = "# pydocfmt: ignore[PCF000]\n# This is a long comment that needs wrapping into more than one physical line.\n    # This is another long comment that needs wrapping into more than one physical line.\n"
+    protected_source = "# pydocfmt: ignore[PCF000]\n# This is a long comment that needs wrapping into more than one physical line.\n# noqa\n# This is another long comment that needs wrapping into more than one physical line.\n"
+    settings = CheckSettings(select=("PCF000", "PCF101"), line_length=42)
     selection = rules_selection.select_rules(settings)
 
     indented = formatter.format_source(indented_source, "a.py", settings=settings, rule_selection=selection, fix=False)
     protected = formatter.format_source(protected_source, "a.py", settings=settings, rule_selection=selection, fix=False)
 
-    assert tuple((finding.rule.code.tag, finding.line_numbers) for finding in indented.unfixed_findings) == (("PCF001", (3,)),)
-    assert tuple((finding.rule.code.tag, finding.line_numbers) for finding in protected.unfixed_findings) == (("PCF001", (4,)),)
+    assert tuple((finding.rule.code.tag, finding.line_numbers) for finding in indented.unfixed_findings) == (("PCF000", (3,)),)
+    assert tuple((finding.rule.code.tag, finding.line_numbers) for finding in protected.unfixed_findings) == (("PCF000", (4,)),)
 
 
 def test_trailing_pydocfmt_ignore_suppresses_pcf_findings() -> None:
-    source = "value = 1 # pydocfmt: ignore[PCF002]\n"
-    settings = CheckSettings(select=("PCF002", "PCF006"))
+    source = "value = 1 # pydocfmt: ignore[PCF001]\n"
+    settings = CheckSettings(select=("PCF001", "PCF101"))
     result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
 
     assert result.new_source == source
@@ -2992,7 +2992,7 @@ def test_trailing_pydocfmt_ignore_suppresses_pcf_findings() -> None:
 
 def test_pydocfmt_directive_with_trailing_reason_still_suppresses() -> None:
     source = '# pydocfmt: ignore[PDF101] because generated\n"""This is a long module summary that needs wrapping into more than one physical line."""\n'
-    settings = CheckSettings(select=("PDF101", "PCF006"), line_length=48)
+    settings = CheckSettings(select=("PDF101", "PCF101"), line_length=48)
     result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=False)
 
     assert result.unfixed_findings == ()
@@ -3008,7 +3008,7 @@ def test_pydocfmt_directive_with_trailing_reason_still_suppresses() -> None:
     ],
 )
 def test_local_docstring_directive_suppresses_owner_diagnostics_reported_outside_docstring(rule_code: str, source: str) -> None:
-    settings = CheckSettings(select=(rule_code, "PCF006"), docstring_convention=DocstringConvention.GOOGLE, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS)
+    settings = CheckSettings(select=(rule_code, "PCF101"), docstring_convention=DocstringConvention.GOOGLE, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS)
     result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=False)
     assert result.unfixed_findings == ()
 
@@ -3030,19 +3030,19 @@ def test_owner_docstring_suppression_preserves_report_lines_without_directive(ru
 
 def test_report_line_directive_still_suppresses_owner_docstring_diagnostic() -> None:
     source = 'def function():\n    """Return a value."""\n    return 1  # pydocfmt: ignore[PDF502]\n'
-    settings = CheckSettings(select=("PDF502", "PCF006"), docstring_convention=DocstringConvention.GOOGLE, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS)
+    settings = CheckSettings(select=("PDF502", "PCF101"), docstring_convention=DocstringConvention.GOOGLE, docstring_missing_documentation=DocstringMissingDocumentation.ALL_DOCSTRINGS)
     result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=False)
 
     assert result.unfixed_findings == ()
 
 
 def test_suppressed_and_unsuppressed_fixes_for_same_rule_are_filtered_independently() -> None:
-    source = "# pydocfmt: ignore[PCF002]\nfirst = 1 # first\nsecond = 2 # second\n"
-    settings = CheckSettings(select=("PCF002", "PCF006"))
+    source = "# pydocfmt: ignore[PCF001]\nfirst = 1 # first\nsecond = 2 # second\n"
+    settings = CheckSettings(select=("PCF001", "PCF101"))
     result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
 
-    assert result.new_source == "# pydocfmt: ignore[PCF002]\nfirst = 1 # first\nsecond = 2  # second\n"
-    assert result.fixed_findings == collections.Counter({next(rule.rule for rule in rules_selection.select_rules(settings).rules if rule.rule.code.tag == "PCF002"): 1})
+    assert result.new_source == "# pydocfmt: ignore[PCF001]\nfirst = 1 # first\nsecond = 2  # second\n"
+    assert result.fixed_findings == collections.Counter({next(rule.rule for rule in rules_selection.select_rules(settings).rules if rule.rule.code.tag == "PCF001"): 1})
     assert result.unfixed_findings == ()
 
 
@@ -3073,7 +3073,7 @@ def test_unsupported_pydocfmt_disable_enable_directives_do_not_suppress_findings
 
 
 def test_unused_suppression_reports_unknown_valid_selector_and_empty_payload() -> None:
-    settings = CheckSettings(select=("PCF006",))
+    settings = CheckSettings(select=("PCF101",))
     selection = rules_selection.select_rules(settings)
 
     unknown = formatter.format_source("# pydocfmt: ignore[PDF999]\n# Short comment.\n", "a.py", settings=settings, rule_selection=selection, fix=False)
@@ -3083,9 +3083,9 @@ def test_unused_suppression_reports_unknown_valid_selector_and_empty_payload() -
     assert tuple(finding.message for finding in empty.unfixed_findings) == ("Invalid pydocfmt suppression selector ''",)
 
 
-def test_file_level_blanket_directive_suppresses_pcf006_unused_report() -> None:
+def test_file_level_blanket_directive_suppresses_pcf101_unused_report() -> None:
     source = "# pydocfmt: noqa\nvalue = 1\n"
-    settings = CheckSettings(select=("PCF001", "PCF006"))
+    settings = CheckSettings(select=("PCF000", "PCF101"))
     result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=False)
 
     assert result.unfixed_findings == ()
@@ -3094,7 +3094,7 @@ def test_file_level_blanket_directive_suppresses_pcf006_unused_report() -> None:
 def test_suppressed_and_unsuppressed_summary_fixes_are_filtered_independently() -> None:
     source = 'def first():\n    # pydocfmt: ignore[PDF300]\n    """return value"""\n\ndef second():\n    """return value"""\n'
     expected = 'def first():\n    # pydocfmt: ignore[PDF300]\n    """return value"""\n\ndef second():\n    """return value."""\n'
-    settings = CheckSettings(select=("PDF300", "PCF006"))
+    settings = CheckSettings(select=("PDF300", "PCF101"))
     result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
 
     assert result.new_source == expected
@@ -3105,18 +3105,18 @@ def test_suppressed_and_unsuppressed_summary_fixes_are_filtered_independently() 
 def test_normalized_suppression_directive_still_suppresses_later_pdf_fix() -> None:
     source = 'def first():\n    # PYDOCFMT : ignore [ pdf300, ]  # reason\n    """return value"""\n\ndef second():\n    """return value"""\n'
     expected = 'def first():\n    # pydocfmt: ignore[PDF300]  # reason\n    """return value"""\n\ndef second():\n    """return value."""\n'
-    settings = CheckSettings(select=("PCF003", "PDF300", "PCF006"))
+    settings = CheckSettings(select=("PCF100", "PDF300", "PCF101"))
     result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
 
     assert result.new_source == expected
-    assert {rule.code.tag: count for rule, count in result.fixed_findings.items()} == {"PCF003": 1, "PDF300": 1}
+    assert {rule.code.tag: count for rule, count in result.fixed_findings.items()} == {"PCF100": 1, "PDF300": 1}
     assert result.unfixed_findings == ()
 
 
 def test_suppressed_and_unsuppressed_section_fixes_are_filtered_independently() -> None:
     source = 'def first(value):\n    # pydocfmt: ignore[PDF404]\n    """Summary.\n\n    Args\n        value: Description.\n    """\n\ndef second(value):\n    """Summary.\n\n    Args\n        value: Description.\n    """\n'
     expected = 'def first(value):\n    # pydocfmt: ignore[PDF404]\n    """Summary.\n\n    Args\n        value: Description.\n    """\n\ndef second(value):\n    """Summary.\n\n    Args:\n        value: Description.\n    """\n'
-    settings = CheckSettings(select=("PDF404", "PCF006"), docstring_convention=DocstringConvention.GOOGLE)
+    settings = CheckSettings(select=("PDF404", "PCF101"), docstring_convention=DocstringConvention.GOOGLE)
     result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
 
     assert result.new_source == expected
@@ -3124,12 +3124,12 @@ def test_suppressed_and_unsuppressed_section_fixes_are_filtered_independently() 
     assert result.unfixed_findings == ()
 
 
-def test_suppressed_and_unsuppressed_pcf003_fixes_are_filtered_independently() -> None:
-    source = "# pydocfmt: ignore[PCF003]\n#NOQA\n\n#RUFF : ignore [ F401 ]\n"
-    expected = "# pydocfmt: ignore[PCF003]\n#NOQA\n\n# ruff: ignore[F401]\n"
-    settings = CheckSettings(select=("PCF003", "PCF006"))
+def test_suppressed_and_unsuppressed_pcf100_fixes_are_filtered_independently() -> None:
+    source = "# pydocfmt: ignore[PCF100]\n#NOQA\n\n#RUFF : ignore [ F401 ]\n"
+    expected = "# pydocfmt: ignore[PCF100]\n#NOQA\n\n# ruff: ignore[F401]\n"
+    settings = CheckSettings(select=("PCF100", "PCF101"))
     result = formatter.format_source(source, "a.py", settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
 
     assert result.new_source == expected
-    assert {rule.code.tag: count for rule, count in result.fixed_findings.items()} == {"PCF003": 1}
+    assert {rule.code.tag: count for rule, count in result.fixed_findings.items()} == {"PCF100": 1}
     assert result.unfixed_findings == ()

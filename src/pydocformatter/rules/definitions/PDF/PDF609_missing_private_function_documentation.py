@@ -34,7 +34,7 @@ class PDF609MissingPrivateFunctionDocumentation(RuleBase):
         name="missing-private-function-documentation",
         message="Private function is missing docstring",
         fix_availability=FixAvailability.NEVER,
-        stable_since="1.0.0",
+        stable_since="1.1.0",
         setting_effects=(),
         incompatible_with=(),
         check_kind=RuleCheckKind.STANDARD,

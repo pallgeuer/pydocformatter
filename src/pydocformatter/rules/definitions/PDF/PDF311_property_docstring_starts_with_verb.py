@@ -36,7 +36,7 @@ class PDF311PropertyDocstringStartsWithVerb(RuleBase):
         name="property-docstring-starts-with-verb",
         message="Property docstring should not start with a verb",
         fix_availability=FixAvailability.NEVER,
-        stable_since="1.0.0",
+        stable_since="1.1.0",
         setting_effects=(),
         incompatible_with=(),
         check_kind=RuleCheckKind.STANDARD,

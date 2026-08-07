@@ -1,4 +1,4 @@
-"""PCF001 standalone-comment-formatting rule."""
+"""PCF000 standalone-comment-formatting rule."""
 
 # Future imports
 from __future__ import annotations
@@ -32,19 +32,19 @@ if TYPE_CHECKING:
 
 
 @rule_registration.register_rule_to(PCF_definition.PCF)
-class PCF001StandaloneCommentFormatting(RuleBase):
-    """Rule implementation for PCF001.
+class PCF000StandaloneCommentFormatting(RuleBase):
+    """Rule implementation for PCF000.
 
     Attributes:
         meta (RuleMetadata): Static metadata used for registration, diagnostics, and rule selection.
     """
 
     meta = RuleMetadata(
-        code=RuleCode("PCF001"),
+        code=RuleCode("PCF000"),
         name="standalone-comment-formatting",
         message="Standalone comment needs formatting",
         fix_availability=FixAvailability.USUALLY,
-        stable_since="1.0.0",
+        stable_since="1.1.0",
         setting_effects=(),
         incompatible_with=(),
         check_kind=RuleCheckKind.STANDARD,
@@ -111,7 +111,7 @@ def _violations(context: RuleContext) -> tuple[rule_violations.RuleViolation, ..
                 comment = run.comments[index]
                 marker_change = _marker_only_change(data, (comment,))
                 if marker_change is not None:
-                    violations.append(rule_violations.violation_for_planned_source_change(PCF001StandaloneCommentFormatting.meta, marker_change))
+                    violations.append(rule_violations.violation_for_planned_source_change(PCF000StandaloneCommentFormatting.meta, marker_change))
                 index += 1
                 continue
             task_marker_match = comment_formatting.task_marker_match(run.comments[index].body.rstrip(), settings=context.settings)
@@ -136,11 +136,11 @@ def _violations(context: RuleContext) -> tuple[rule_violations.RuleViolation, ..
                     marker_change = _marker_only_change(data, comments)
                     violations.append(
                         rule_violations.violation_for_optional_planned_source_change(
-                            PCF001StandaloneCommentFormatting.meta, marker_change, line_numbers=tuple(comment.range.start.line for comment in comments)
+                            PCF000StandaloneCommentFormatting.meta, marker_change, line_numbers=tuple(comment.range.start.line for comment in comments)
                         )
                     )
                 else:
-                    violations.append(rule_violations.violation_for_planned_source_change(PCF001StandaloneCommentFormatting.meta, canonical_change))
+                    violations.append(rule_violations.violation_for_planned_source_change(PCF000StandaloneCommentFormatting.meta, canonical_change))
             index = formatted.end
     violations.sort(key=lambda violation: violation.finding.line_numbers)
     return tuple(violations)
@@ -159,7 +159,7 @@ def _empty_comment_violations(data: PCF_definition.PCFCategoryData) -> tuple[rul
             continue
         change = comment_formatting.planned_full_line_change(data, comment, f"{comment.indent}#")
         if change is not None:
-            violations.append(rule_violations.violation_for_planned_source_change(PCF001StandaloneCommentFormatting.meta, change))
+            violations.append(rule_violations.violation_for_planned_source_change(PCF000StandaloneCommentFormatting.meta, change))
     return tuple(violations)
 
 

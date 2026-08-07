@@ -35,7 +35,7 @@ class PDF511ExtraneousModuleAttributeDocumentation(RuleBase):
         name="extraneous-module-attribute-documentation",
         message="Module docstring documents an attribute that is not present",
         fix_availability=FixAvailability.NEVER,
-        stable_since="1.0.0",
+        stable_since="1.1.0",
         setting_effects=docstring_conventions.convention_setting_effects(disabled=docstring_conventions.UNPARSED_CONVENTIONS),
         incompatible_with=(),
         check_kind=RuleCheckKind.STANDARD,

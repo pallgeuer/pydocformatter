@@ -31,7 +31,7 @@ def test_pydocfmt_rule_prints_rule_json() -> None:
     assert output["url"] == "https://pallgeuer.github.io/pydocformatter/rules/summary-too-long/"
     assert output["fix"] == "Fix is not available."
     assert output["fix_availability"] == "Never"
-    assert output["status"] == {"Stable": {"since": "v1.0.0"}}
+    assert output["status"] == {"Stable": {"since": "v1.1.0"}}
     assert output["explanation"].startswith("## What it does\n")
     assert "# summary-too-long (PDF203)" not in output["explanation"]
     assert "Fix is not available." not in output["explanation"]
@@ -53,9 +53,9 @@ def test_pydocfmt_rule_prints_all_rules() -> None:
 
     output = result.stdout
     assert result.exit_code == 0
-    assert "# standalone-comment-formatting (PCF001)\n" in output
+    assert "# standalone-comment-formatting (PCF000)\n" in output
     assert "# one-line-docstring (PDF110)\n" in output
-    assert output.index("# standalone-comment-formatting (PCF001)") < output.index("# docstring-reflow (PDF101)")
+    assert output.index("# standalone-comment-formatting (PCF000)") < output.index("# docstring-reflow (PDF101)")
 
 
 def test_pydocfmt_rule_prints_all_rules_json() -> None:

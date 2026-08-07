@@ -1,4 +1,4 @@
-"""PCF009 rule-names-in-suppression-comments rule."""
+"""PCF102 rule-codes-in-suppression-comments rule."""
 
 # Future imports
 from __future__ import annotations
@@ -22,21 +22,21 @@ if TYPE_CHECKING:
 
 
 @rule_registration.register_rule_to(PCF_definition.PCF)
-class PCF009RuleNamesInSuppressionComments(RuleBase):
-    """Enforce rule codes in bracketed pydocfmt and Ruff suppression comments.
+class PCF102RuleCodesInSuppressionComments(RuleBase):
+    """Enforce rule names in bracketed pydocfmt and Ruff suppression comments.
 
     Attributes:
         meta (RuleMetadata): Static metadata used for registration, diagnostics, and rule selection.
     """
 
     meta = RuleMetadata(
-        code=RuleCode("PCF009"),
-        name="rule-names-in-suppression-comments",
-        message="Suppression comment should use rule codes instead of names",
+        code=RuleCode("PCF102"),
+        name="rule-codes-in-suppression-comments",
+        message="Suppression comment should use rule names instead of codes",
         fix_availability=FixAvailability.SOMETIMES,
         stable_since="1.1.0",
         setting_effects=(),
-        incompatible_with=(RuleCode("PCF008"),),
+        incompatible_with=(RuleCode("PCF103"),),
         check_kind=RuleCheckKind.STANDARD,
         cache_behavior=RuleCacheBehavior.FILE_LOCAL,
         allows_directive_self_suppression=True,
@@ -44,12 +44,12 @@ class PCF009RuleNamesInSuppressionComments(RuleBase):
 
     @classmethod
     def violations(cls, context: RuleContext) -> tuple[rule_violations.RuleViolation, ...]:
-        """Return code-policy violations for the current source.
+        """Return name-policy violations for the current source.
 
         Args:
             context (RuleContext): Current source and prepared PCF directive data.
 
         Returns:
-            tuple[rule_violations.RuleViolation, ...]: Fixable local name findings and diagnostic-only Ruff findings.
+            tuple[rule_violations.RuleViolation, ...]: Fixable local code findings and diagnostic-only Ruff findings.
         """
-        return suppression_policies.violations(context, rule=cls.meta, prefer_names=False)
+        return suppression_policies.violations(context, rule=cls.meta, prefer_names=True)

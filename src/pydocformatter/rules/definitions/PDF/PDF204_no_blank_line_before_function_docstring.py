@@ -34,7 +34,7 @@ class PDF204NoBlankLineBeforeFunctionDocstring(RuleBase):
         name="no-blank-line-before-function-docstring",
         message="Function docstring should have no blank lines before it",
         fix_availability=FixAvailability.ALWAYS,
-        stable_since="1.0.0",
+        stable_since="1.1.0",
         setting_effects=(),
         incompatible_with=(RuleCode("PDF205"),),
         check_kind=RuleCheckKind.STANDARD,

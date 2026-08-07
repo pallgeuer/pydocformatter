@@ -38,7 +38,7 @@ class PDF002DocstringBackslashRawPrefix(RuleBase):
         name="docstring-backslash-raw-prefix",
         message="Docstring with backslashes should use a raw string prefix",
         fix_availability=FixAvailability.SOMETIMES,
-        stable_since="1.0.0",
+        stable_since="1.1.0",
         setting_effects=(),
         incompatible_with=(),
         check_kind=RuleCheckKind.STANDARD,

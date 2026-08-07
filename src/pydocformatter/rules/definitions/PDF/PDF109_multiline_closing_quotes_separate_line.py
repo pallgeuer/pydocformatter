@@ -36,7 +36,7 @@ class PDF109MultilineClosingQuotesSeparateLine(RuleBase):
         name="multiline-closing-quotes-separate-line",
         message="Multi-line docstring closing quotes should be on a separate line",
         fix_availability=FixAvailability.ALWAYS,
-        stable_since="1.0.0",
+        stable_since="1.1.0",
         setting_effects=(),
         incompatible_with=(RuleCode("PDF108"),),
         check_kind=RuleCheckKind.STANDARD,

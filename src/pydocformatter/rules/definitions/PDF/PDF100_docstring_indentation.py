@@ -37,7 +37,7 @@ class PDF100DocstringIndentation(RuleBase):
         name="docstring-indentation",
         message="Docstring line is incorrectly indented",
         fix_availability=FixAvailability.ALWAYS,
-        stable_since="1.0.0",
+        stable_since="1.1.0",
         setting_effects=(),
         incompatible_with=(),
         check_kind=RuleCheckKind.STANDARD,

@@ -248,9 +248,9 @@ def test_local_component_and_closing_line_suppressions_cover_the_whole_docstring
 
 def test_interstitial_suppression_does_not_cover_a_concatenated_docstring() -> None:
     source = 'def function():\n    ("Args:\\n"\n     # noqa: PDF212\n     "    value: Description.")\n'
-    result = format_source(source, settings=CheckSettings(select=("PCF006", "PDF212")))
+    result = format_source(source, settings=CheckSettings(select=("PCF101", "PDF212")))
 
-    assert tuple((finding.rule.code.tag, finding.line_numbers) for finding in result.unfixed_findings) == (("PDF212", (2, 3, 4)), ("PCF006", (3,)))
+    assert tuple((finding.rule.code.tag, finding.line_numbers) for finding in result.unfixed_findings) == (("PDF212", (2, 3, 4)), ("PCF101", (3,)))
 
 
 def test_compact_suite_docstrings_are_checked_on_their_single_physical_line() -> None:

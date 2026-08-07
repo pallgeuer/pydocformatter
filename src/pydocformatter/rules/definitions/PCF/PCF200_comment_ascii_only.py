@@ -1,4 +1,4 @@
-"""PCF005 comment-ascii-only rule."""
+"""PCF200 comment-ascii-only rule."""
 
 # Future imports
 from __future__ import annotations
@@ -22,19 +22,19 @@ if TYPE_CHECKING:
 
 
 @rule_registration.register_rule_to(PCF_definition.PCF)
-class PCF005CommentAsciiOnly(RuleBase):
-    """Rule implementation for PCF005.
+class PCF200CommentAsciiOnly(RuleBase):
+    """Rule implementation for PCF200.
 
     Attributes:
         meta (RuleMetadata): Static metadata used for registration, diagnostics, and rule selection.
     """
 
     meta = RuleMetadata(
-        code=RuleCode("PCF005"),
+        code=RuleCode("PCF200"),
         name="comment-ascii-only",
         message="Comment contains non-ASCII characters",
         fix_availability=FixAvailability.NEVER,
-        stable_since="1.0.0",
+        stable_since="1.1.0",
         setting_effects=(),
         incompatible_with=(),
         check_kind=RuleCheckKind.STANDARD,

@@ -162,9 +162,9 @@ class PDF170UsuallyFixableSampleRule(RuleBase):
     violations = classmethod(_no_violations)
 
 
-class PCF001SampleRule(RuleBase):
+class PCF000SampleRule(RuleBase):
     meta = RuleMetadata(
-        code=RuleCode("PCF001"),
+        code=RuleCode("PCF000"),
         name="comment-reflow-required",
         message="Comment chunk needs reflow",
         fix_availability=FixAvailability.ALWAYS,
@@ -265,7 +265,7 @@ class TST004FourthIncompatibleSampleRule(RuleBase):
 
 rule_registration.register_rule_to(PDFSampleCategory)(PDF101SampleRule)
 rule_registration.register_rule_to(PDFSampleCategory)(PDF110SampleRule)
-rule_registration.register_rule_to(PCFSampleCategory)(PCF001SampleRule)
+rule_registration.register_rule_to(PCFSampleCategory)(PCF000SampleRule)
 rule_registration.register_rule_to(PDFSpecificityCategory)(PDF142SampleRule)
 rule_registration.register_rule_to(PDFSpecificityCategory)(PDF150SampleRule)
 rule_registration.register_rule_to(PDFFixAvailabilityCategory)(PDF110SampleRule)
@@ -565,6 +565,42 @@ def test_every_builtin_rule_intentionally_declares_file_local_cache_behavior() -
         assert rule_class.meta.cache_behavior is rule_models.RuleCacheBehavior.FILE_LOCAL
 
 
+def test_every_builtin_rule_is_stable_since_1_1_0() -> None:
+    """Every current built-in rule must declare stability for the next release."""
+    assert rule_collection.RULE_COLLECTION.rules
+    assert {rule_class.meta.stable_since for rule_class in rule_collection.RULE_COLLECTION.rules} == {"1.1.0"}
+
+
+def test_builtin_pcf_rule_codes_follow_semantic_ranges() -> None:
+    """PCF codes must group formatting, suppression, and character rules."""
+    expected_code_by_name = {
+        "standalone-comment-formatting": "PCF000",
+        "trailing-comment-spacing": "PCF001",
+        "trailing-comment-extraction": "PCF002",
+        "comment-directive-normalization": "PCF100",
+        "unused-suppression": "PCF101",
+        "rule-codes-in-suppression-comments": "PCF102",
+        "rule-names-in-suppression-comments": "PCF103",
+        "comment-ascii-only": "PCF200",
+        "comment-suspicious-unicode": "PCF201",
+    }
+    pcf_rules = rule_collection.RULE_COLLECTION.category_class["PCF"].ordered_rules()
+
+    assert {rule_class.meta.name: rule_class.meta.code.tag for rule_class in pcf_rules} == expected_code_by_name
+    assert tuple(rule_class.meta.code.tag for rule_class in pcf_rules) == tuple(expected_code_by_name.values())
+    for selector, expected_codes in {
+        "PCF0": ("PCF000", "PCF001", "PCF002"),
+        "PCF1": ("PCF100", "PCF101", "PCF102", "PCF103"),
+        "PCF2": ("PCF200", "PCF201"),
+        "PCF": tuple(expected_code_by_name.values()),
+    }.items():
+        assert tuple(rule_class.meta.code.tag for rule_class in rule_collection.RULE_COLLECTION.matching_rules(RuleSelector(selector))) == expected_codes
+    for retired_code in ("PCF003", "PCF004", "PCF005", "PCF006", "PCF007", "PCF008", "PCF009"):
+        resolution = rule_collection.RULE_COLLECTION.resolve_selector(retired_code)
+        assert resolution.kind is rule_collection.RuleSelectorResolutionKind.CODE
+        assert (resolution.matching_rules, resolution.exact_rule) == ((), None)
+
+
 def test_cacheable_rule_sources_have_no_advisory_external_dependency_markers() -> None:
     forbidden_modules = {"datetime", "http", "os", "pathlib", "random", "socket", "subprocess", "time", "urllib"}
     forbidden_calls = {"eval", "exec", "getenv", "open", "popen", "system", "urlopen"}
@@ -646,7 +682,7 @@ def test_rule_modules_import_before_collection_without_changing_default_collecti
                 "assert 'pydocformatter.rules.collection' not in sys.modules\n"
                 "import pydocformatter.rules.collection as rule_collection\n"
                 "codes = {str(rule.meta.code) for rule in rule_collection.RULE_COLLECTION.rules}\n"
-                "assert {'PCF001', 'PCF002', 'PDF000', 'PDF101', 'PDF203'} <= codes\n"
+                "assert {'PCF000', 'PCF001', 'PDF000', 'PDF101', 'PDF203'} <= codes\n"
                 "print(PCF.meta.prefix, PDF.meta.prefix)\n"
             ),
         ],
@@ -1272,7 +1308,7 @@ def test_rule_category_rejects_rule_with_different_prefix() -> None:
     with pytest.raises(rule_registration.RuleError, match="Registered rule must inherit RuleBase"):
         rule_registration.register_rule_to(PDFTestCategory)(typing.cast("type[RuleBase]", object))
     with pytest.raises(rule_registration.RuleError, match="Rule code prefix 'PCF' does not match rule category prefix 'PDF'"):
-        rule_registration.register_rule_to(PDFTestCategory)(PCF001SampleRule)
+        rule_registration.register_rule_to(PDFTestCategory)(PCF000SampleRule)
 
 
 def test_rule_collection_rejects_duplicate_category_prefixes() -> None:
@@ -1409,9 +1445,9 @@ def test_rule_collection_orders_rules_and_rule_class_index_the_same_way() -> Non
 
     assert collection.categories == (PCFSampleCategory, PDFSampleCategory)
     assert tuple(collection.category_class.values()) == collection.categories
-    assert collection.rules == (PCF001SampleRule, PDF101SampleRule, PDF110SampleRule)
+    assert collection.rules == (PCF000SampleRule, PDF101SampleRule, PDF110SampleRule)
     assert tuple(collection.rule_class.values()) == collection.rules
-    assert PCFSampleCategory.ordered_rules() == (PCF001SampleRule,)
+    assert PCFSampleCategory.ordered_rules() == (PCF000SampleRule,)
     assert PDFSampleCategory.ordered_rules() == (PDF101SampleRule, PDF110SampleRule)
     assert tuple(PDFSampleCategory.ordered_code_class_map().values()) == PDFSampleCategory.ordered_rules()
     assert PDFReverseRegistrationCategory.ordered_rules() == (PDF101SampleRule, PDF110SampleRule)
@@ -1735,7 +1771,7 @@ def test_select_rules_requires_exact_selection_for_require_explicit_rules() -> N
     require_explicit_codes = CheckSettings().require_explicit
     defaults = rules_selection.select_rules(CheckSettings(select=("ALL",)))
     prefixed = rules_selection.select_rules(CheckSettings(select=("PDF",)))
-    mixed_broad = rules_selection.select_rules(CheckSettings(select=("ALL", "PCF001")))
+    mixed_broad = rules_selection.select_rules(CheckSettings(select=("ALL", "PCF000")))
 
     assert defaults.errors == ()
     assert prefixed.errors == ()
@@ -1921,9 +1957,9 @@ def test_suppression_policy_names_use_existing_incompatibility_resolution() -> N
         field_priorities={"select": settings_core.CONFIG_FILE_SOURCE_PRIORITY, "extend_select": settings_core.ARGUMENT_SOURCE_PRIORITY},
     )
 
-    assert tuple(str(rule.rule.code) for rule in equal.rules) == ("PCF008",)
-    assert equal.errors == ("Selected rule PCF009 is incompatible with earlier selected rule PCF008; PCF009 has been disabled",)
-    assert tuple(str(rule.rule.code) for rule in stronger_second.rules) == ("PCF009",)
+    assert tuple(str(rule.rule.code) for rule in equal.rules) == ("PCF102",)
+    assert equal.errors == ("Selected rule PCF103 is incompatible with earlier selected rule PCF102; PCF103 has been disabled",)
+    assert tuple(str(rule.rule.code) for rule in stronger_second.rules) == ("PCF103",)
     assert stronger_second.errors == ()
 
 
@@ -2129,8 +2165,8 @@ def test_select_rules_reports_selector_operational_errors() -> None:
 def test_select_rules_applies_per_file_ignores() -> None:
     selection = rules_selection.select_rules(CheckSettings(select=("ALL",), per_file_ignores=(("tests/*.py", ("PDF101",)),)), collection=sample_collection())
 
-    assert tuple(rule.rule.code.tag for rule in selection.for_path("src/a.py")) == ("PCF001", "PDF101", "PDF110")
-    assert tuple(rule.rule.code.tag for rule in selection.for_path("tests/a.py")) == ("PCF001", "PDF110")
+    assert tuple(rule.rule.code.tag for rule in selection.for_path("src/a.py")) == ("PCF000", "PDF101", "PDF110")
+    assert tuple(rule.rule.code.tag for rule in selection.for_path("tests/a.py")) == ("PCF000", "PDF110")
 
 
 def test_ruff_spec_negated_per_file_ignore_patterns_ignore_everywhere_else() -> None:
@@ -2234,14 +2270,14 @@ def test_ruff_spec_per_file_ignores_apply_to_explicit_files(monkeypatch: pytest.
 
 
 def test_print_rules_prints_active_rules_with_effective_fixability() -> None:
-    selection = rules_selection.select_rules(CheckSettings(select=("ALL",), unfixable=("PCF001",)), collection=sample_collection())
+    selection = rules_selection.select_rules(CheckSettings(select=("ALL",), unfixable=("PCF000",)), collection=sample_collection())
     output = StringIO()
 
     check.print_rules(selection, output=output)
 
     assert (
         output.getvalue()
-        == "PCF001 comment-reflow-required (Comment chunk needs reflow)\nPDF101* docstring-reflow (Docstring chunk needs reflow)\nPDF110 summary-too-long (Docstring summary does not fit on one line)\n"
+        == "PCF000 comment-reflow-required (Comment chunk needs reflow)\nPDF101* docstring-reflow (Docstring chunk needs reflow)\nPDF110 summary-too-long (Docstring summary does not fit on one line)\n"
     )
 
 

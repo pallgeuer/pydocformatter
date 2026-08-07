@@ -1,4 +1,4 @@
-# comment-suspicious-unicode (PCF007)
+# comment-suspicious-unicode (PCF201)
 
 Fix is sometimes available.
 
@@ -25,11 +25,11 @@ Invisible controls and bidi formatting can make comments misleading in editors a
 
 ## Ruff compatibility
 
-PCF007 is related to Ruff's `RUF003` and `PLE2502`, `PLE2510`, `PLE2512`, `PLE2513`, `PLE2514`, and `PLE2515` rules, but has comment-specific scope and fix behavior.
+PCF201 is related to Ruff's `RUF003` and `PLE2502`, `PLE2510`, `PLE2512`, `PLE2513`, `PLE2514`, and `PLE2515` rules, but has comment-specific scope and fix behavior.
 
 ## Examples
 
-The canonical PCF007 fix replaces a leading no-break space after the syntactic hash:
+The canonical PCF201 fix replaces a leading no-break space after the syntactic hash:
 
 ```pydocfmt-example
 [input]
@@ -61,8 +61,8 @@ Repeated bidi controls are grouped, while a different invisible character receiv
 
 [output=unchanged]
 [findings]
-PCF007: Line 1: Comment contains suspicious Unicode character U+202E RIGHT-TO-LEFT OVERRIDE
-PCF007: Line 1: Comment contains suspicious Unicode character U+200B ZERO WIDTH SPACE
+PCF201: Line 1: Comment contains suspicious Unicode character U+202E RIGHT-TO-LEFT OVERRIDE
+PCF201: Line 1: Comment contains suspicious Unicode character U+200B ZERO WIDTH SPACE
 ```
 
 Shebangs, encoding cookies, type comments, and tool directives are checked rather than exempted as protected comment kinds:
@@ -76,10 +76,10 @@ value = 1  # type: int⁠
 
 [output=unchanged]
 [findings]
-PCF007: Line 1: Comment contains suspicious Unicode character U+202E RIGHT-TO-LEFT OVERRIDE
-PCF007: Line 2: Comment contains suspicious Unicode character U+200B ZERO WIDTH SPACE
-PCF007: Line 3: Comment contains suspicious Unicode character U+2060 WORD JOINER
-PCF007: Line 4: Comment contains suspicious Unicode character U+00AD SOFT HYPHEN
+PCF201: Line 1: Comment contains suspicious Unicode character U+202E RIGHT-TO-LEFT OVERRIDE
+PCF201: Line 2: Comment contains suspicious Unicode character U+200B ZERO WIDTH SPACE
+PCF201: Line 3: Comment contains suspicious Unicode character U+2060 WORD JOINER
+PCF201: Line 4: Comment contains suspicious Unicode character U+00AD SOFT HYPHEN
 ```
 
 ASCII escape notation, interior nonbreaking prose spaces, and a nonbreaking space after a second hash are accepted:

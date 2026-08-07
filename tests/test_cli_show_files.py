@@ -48,8 +48,8 @@ PDF101_RULE = RuleMetadata(
     incompatible_with=(),
     check_kind=RuleCheckKind.STANDARD,
 )
-PCF001_RULE = RuleMetadata(
-    code=RuleCode("PCF001"),
+PCF000_RULE = RuleMetadata(
+    code=RuleCode("PCF000"),
     name="comment-formatting-needed",
     message="Comment needs formatting",
     fix_availability=FixAvailability.ALWAYS,
@@ -1184,7 +1184,7 @@ def test_pydocfmt_diff_output_file_writes_summary_without_diff(mocker: MockerFix
         def fake_format(path: str, *, file: TextIO | None = None, settings: CheckSettings, rule_selection: RuleSelection, fix: bool, write: bool) -> FormatterResult:
             del file, settings, rule_selection, fix, write
             return FormatterResult(
-                path=path, old_source="x = 1\n", new_source="x = 2\n", modified=True, fixed_findings=collections.Counter({PDF101_RULE: 1, PCF001_RULE: 2}), unfixed_findings=(), errors=()
+                path=path, old_source="x = 1\n", new_source="x = 2\n", modified=True, fixed_findings=collections.Counter({PDF101_RULE: 1, PCF000_RULE: 2}), unfixed_findings=(), errors=()
             )
 
         argv = ["pydocfmt", "check", "--diff", "--output-file", str(output_file), str(target)]

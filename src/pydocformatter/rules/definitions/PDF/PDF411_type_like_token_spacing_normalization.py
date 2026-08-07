@@ -35,7 +35,7 @@ class PDF411TypeLikeTokenSpacingNormalization(RuleBase):
         name="type-like-token-spacing-normalization",
         message="Docstring type-like token spacing should be normalized",
         fix_availability=FixAvailability.USUALLY,
-        stable_since="1.0.0",
+        stable_since="1.1.0",
         setting_effects=docstring_conventions.convention_setting_effects(disabled=docstring_conventions.UNPARSED_CONVENTIONS),
         incompatible_with=(),
         check_kind=RuleCheckKind.STANDARD,

@@ -35,7 +35,7 @@ class PDF524PrivateModuleAttributeDocstringMustBeOwner(RuleBase):
         name="private-module-attribute-docstring-must-be-owner",
         message="Private module attribute must use module docstring documentation, not attached docstring",
         fix_availability=FixAvailability.NEVER,
-        stable_since="1.0.0",
+        stable_since="1.1.0",
         setting_effects=(),
         incompatible_with=(RuleCode("PDF515"), RuleCode("PDF517"), RuleCode("PDF525")),
         check_kind=RuleCheckKind.STANDARD,

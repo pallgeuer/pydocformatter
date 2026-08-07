@@ -34,7 +34,7 @@ class PDF616ForbiddenFunctionDocstring(RuleBase):
         name="forbidden-function-docstring",
         message="Function decorated with forbidden decorator should not have a docstring",
         fix_availability=FixAvailability.NEVER,
-        stable_since="1.0.0",
+        stable_since="1.1.0",
         setting_effects=(),
         incompatible_with=(),
         check_kind=RuleCheckKind.STANDARD,
