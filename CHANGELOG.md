@@ -71,6 +71,7 @@ All notable changes to this project are documented here. The format follows [Kee
 - **Documentation:**
   - Renamed the generated rule index label `Convention-explicit` to `Convention opt-in` and the public rule compatibility table column `Explicit` to `Require explicit`.
 - **Developer documentation:**
+  - Reran and refreshed the complete test performance audit for all 160 tracked test modules and 15 shared/support modules, identifying repeated read-only documentation-site generation as the only new high-potential coverage-preserving opportunity.
   - Reran and refreshed the complete rule performance audit for all 141 tracked rules, including current inventory, measurements, source analysis, and the retained class attached-attribute and exception-inventory optimizations.
   - Corrected the rule settings audit to distinguish disabled rules from rules ignored only by broad selectors, with metadata-backed regression coverage.
   - Distinguished convention opt-in policies from `require-explicit`, with exhaustive conflict-free convention profiles and meaningful explicit-selection defaults enforced by regression tests.
