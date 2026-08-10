@@ -2,6 +2,8 @@
 
 This document specifies how pydocformatter rule categories, rule implementations, adjacent rule documentation, and rule tests are structured.
 
+Maintainers creating a new rule should also follow the [new rule development workflow](new_rule_workflow.md) for planning, polishing, review, and final verification.
+
 ## Rule identity and layout
 
 Rule categories live under `src/pydocformatter/rules/definitions/<PREFIX>/`. Each category package contains a prefix-named category module, adjacent category documentation, and zero or more rule modules:
