@@ -144,6 +144,7 @@ All notable changes to this project are documented here. The format follows [Kee
 ### Fixed
 
 - **Cross-platform behavior:**
+  - Kept surrogate-path gitignore encoding coverage independent of host filesystem filename restrictions and ran Ubuntu 20.04 dependency synchronization and tests with one consistent unprivileged user environment.
   - Deduplicated case-insensitive, hard-link, and symlink path aliases by physical file identity while treating zero-valued inode information as unusable, and made a missing Git executable produce an actionable `--no-respect-gitignore` diagnostic.
   - Kept invalid-escape docstring and annotation analysis and deeply nested type-token validation stable on Python 3.12 through 3.14, including conservative lone-carriage-return handling, closed test-owned SQLite connections explicitly for consistent musl runs, and retained isolated pytest temporary boundaries through Python 3.14 multiprocessing shutdown.
   - Removed dependencies on private argparse interfaces while preserving CLI help output across direct, inherited, subparser, and mutually exclusive argument registration, and made deep type-token fallback independent of tokenizer diagnostic wording.

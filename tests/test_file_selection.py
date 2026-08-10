@@ -907,26 +907,16 @@ def test_ruff_spec_slash_directory_exclude_filters_descendant_file(monkeypatch: 
 
 
 def test_gitignore_query_encodes_surrogate_paths(mocker: MockerFixture) -> None:
-    settings = CheckSettings(respect_gitignore=True)
-    with tempfile.TemporaryDirectory() as td:
-        root = Path(td)
-        git_helpers.write_git_marker(root)
-        surrogate_path = "bad_\udcff.py"
-        target = root / surrogate_path
-        target.write_text("", encoding="utf-8")
-        expected_command = ["git", "-C", str(root), "check-ignore", "--stdin", "--no-index", "-z"]
+    git_root = "/repo"
+    surrogate_path = "bad_\udcff.py"
+    expected_command = ["git", "-C", git_root, "check-ignore", "--stdin", "--no-index", "-z"]
+    run_mock = mocker.patch("pydocformatter.file_selection.subprocess.run", return_value=subprocess.CompletedProcess(expected_command, 0, stdout=b"bad_\xff.py\0", stderr=b""), autospec=True)
 
-        def fake_run(*args: object, **kwargs: object) -> subprocess.CompletedProcess[bytes]:
-            assert args[0] == expected_command
-            stdin_bytes = kwargs["input"]
-            assert stdin_bytes == b"bad_\xff.py\0"
-            return subprocess.CompletedProcess(expected_command, 0, stdout=b"bad_\xff.py\0", stderr=b"")
+    ignored_paths, error = file_selection._query_git_ignored_paths(git_root, [surrogate_path])
 
-        mocker.patch("pydocformatter.file_selection.subprocess.run", side_effect=fake_run, autospec=True)
-        selection = file_selection.select_files([str(root)], _resolver(settings))
-
-    assert selection.accepted_paths == ()
-    assert selection.decisions[0].reason == DecisionReason.GITIGNORED
+    run_mock.assert_called_once_with(expected_command, input=b"bad_\xff.py\0", capture_output=True, check=False)
+    assert ignored_paths == {surrogate_path}
+    assert error is None
 
 
 def test_gitignore_query_uses_real_paths_for_symlinked_directory_traversal(mocker: MockerFixture) -> None:

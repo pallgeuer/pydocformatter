@@ -71,18 +71,17 @@ jobs:
       - name: Install uv and select Python
         uses: astral-sh/setup-uv@v8.3.2
         with:
-          enable-cache: true
-          cache-suffix: tests-ubuntu-20.04-python-3.11
+          enable-cache: false
           python-version: "3.11"
-
-      - name: Sync development dependencies
-        run: uv sync --locked --no-default-groups --group dev
 
       - name: Prepare unprivileged test workspace
         run: chown --recursive pydocfmt:pydocfmt "$GITHUB_WORKSPACE"
 
+      - name: Sync development dependencies as an unprivileged user
+        run: runuser --user pydocfmt -- env --unset=UV_CACHE_DIR --unset=UV_PYTHON_INSTALL_DIR HOME=/home/pydocfmt PATH="$PATH" UV_PYTHON=3.11 uv sync --locked --no-default-groups --group dev
+
       - name: Run test suite as an unprivileged user
-        run: runuser --user pydocfmt -- env HOME=/home/pydocfmt PATH="$PATH" UV_PYTHON=3.11 uv run --no-sync pytest -n 0 -q
+        run: runuser --user pydocfmt -- env --unset=UV_CACHE_DIR --unset=UV_PYTHON_INSTALL_DIR HOME=/home/pydocfmt PATH="$PATH" UV_PYTHON=3.11 uv run --no-sync pytest -n 0 -q
 
   alpine-musl:
     name: Alpine Linux musl x64 / Python 3.13
