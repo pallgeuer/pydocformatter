@@ -66,17 +66,19 @@ def test_runtime_rule_url_slug_matches_generated_rule_page_slug() -> None:
         assert docs_urls.rule_url(rule.name) == f"{docs_urls.PUBLIC_DOCS_URL}{page_by_code[rule.code.tag].path.with_suffix('').as_posix()}/"
 
 
-@pytest.fixture
-def generated_site(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> tuple[pathlib.Path, pathlib.Path]:
-    """Generate the documentation site source into a temporary directory."""
-    generated_root = tmp_path / ".generated" / "zensical"
+@pytest.fixture(scope="module")
+def generated_site(tmp_path_factory: pytest.TempPathFactory) -> tuple[pathlib.Path, pathlib.Path]:
+    """Generate one shared documentation site source tree for this module."""
+    temporary_root = tmp_path_factory.mktemp("generated-site")
+    generated_root = temporary_root / ".generated" / "zensical"
     generated_docs_dir = generated_root / "docs"
-    generated_config_path = tmp_path / "zensical.generated.toml"
-    monkeypatch.setattr(generate_zensical, "GENERATED_ROOT", generated_root)
-    monkeypatch.setattr(generate_zensical, "GENERATED_DOCS_DIR", generated_docs_dir)
-    monkeypatch.setattr(generate_zensical, "GENERATED_CONFIG_PATH", generated_config_path)
+    generated_config_path = temporary_root / "zensical.generated.toml"
+    with pytest.MonkeyPatch.context() as monkeypatch:
+        monkeypatch.setattr(generate_zensical, "GENERATED_ROOT", generated_root)
+        monkeypatch.setattr(generate_zensical, "GENERATED_DOCS_DIR", generated_docs_dir)
+        monkeypatch.setattr(generate_zensical, "GENERATED_CONFIG_PATH", generated_config_path)
 
-    generate_zensical.generate()
+        generate_zensical.generate()
 
     return generated_docs_dir, generated_config_path
 

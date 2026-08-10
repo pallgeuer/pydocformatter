@@ -71,11 +71,12 @@ All notable changes to this project are documented here. The format follows [Kee
 - **Documentation:**
   - Renamed the generated rule index label `Convention-explicit` to `Convention opt-in` and the public rule compatibility table column `Explicit` to `Require explicit`.
 - **Developer documentation:**
-  - Reran and refreshed the complete test performance audit for all 160 tracked test modules and 15 shared/support modules, identifying repeated read-only documentation-site generation as the only new high-potential coverage-preserving opportunity.
+  - Reran and refreshed the complete test performance audit for all 160 tracked test modules and 15 shared/support modules, including before-and-after evidence for shared documentation-site generation.
   - Reran and refreshed the complete rule performance audit for all 141 tracked rules, including current inventory, measurements, source analysis, and the retained class attached-attribute and exception-inventory optimizations.
   - Corrected the rule settings audit to distinguish disabled rules from rules ignored only by broad selectors, with metadata-backed regression coverage.
   - Distinguished convention opt-in policies from `require-explicit`, with exhaustive conflict-free convention profiles and meaningful explicit-selection defaults enforced by regression tests.
 - **Developer tooling:**
+  - Generated the read-only documentation test site once per pytest process that runs a consumer instead of once for each of 39 consumers, reducing the measured serial suite from 46.10s to 29.35s and default xdist from 11.98s to 6.85s without changing test coverage or scheduling.
   - Expanded the repository's own pydocformatter policy with attribute declaration-order checks, constructor-assigned attribute coverage, joined comment reflow, hanging task-marker formatting, and consistent forced exclusions.
   - Updated the fixed documentation, test, and development dependency pins and migrated Ruff selectors and suppressions to the human-readable names supported by Ruff 0.16.
   - Replaced the repository-local Markdown table formatter, release checksum generator, and pytest working-directory isolation fixtures with the shared `la-dev-codex-plugins` implementations.
