@@ -6,6 +6,9 @@ from __future__ import annotations
 # Standard library imports
 from typing import TYPE_CHECKING
 
+# Third-party imports
+import libcst as cst
+
 # First-party imports
 import pydocformatter.rules.violations as rule_violations
 import pydocformatter.rules.registration as rule_registration
@@ -33,7 +36,7 @@ class PDF206NoBlankLineAfterFunctionDocstring(RuleBase):
     meta = RuleMetadata(
         code=RuleCode("PDF206"),
         name="no-blank-line-after-function-docstring",
-        message="Function docstring should have no blank lines after it",
+        message="Function docstring has incorrect blank line spacing after it",
         fix_availability=FixAvailability.ALWAYS,
         stable_since="1.1.0",
         setting_effects=(RuleSettingEffects(setting="docstring_convention", effects=(RuleSettingEffectValues(effect=RuleSettingEffect.IGNORED, values=tuple(settings_check.DocstringConvention)),)),),
@@ -52,7 +55,24 @@ class PDF206NoBlankLineAfterFunctionDocstring(RuleBase):
         Returns:
             tuple[rule_violations.RuleViolation, ...]: Rule violations reported for the current source.
         """
-        changes = docstring_statement_spacing.planned_changes(
-            context, owner_kind=PDF_definition.DefinitionKind.FUNCTION, position=docstring_statement_spacing.DocstringStatementSpacingPosition.AFTER, desired_blank_lines=0
-        )
-        return rule_violations.violations_for_planned_source_changes(cls.meta, changes)
+        data = PDF_definition.PDF.require_data(context)
+        return tuple(violation for docstring in data.docstrings if (violation := _violation_for_docstring(docstring, context=context, rule=cls.meta)) is not None)
+
+
+def _violation_for_docstring(docstring: PDF_definition.DocstringInfo, *, context: RuleContext, rule: RuleMetadata) -> rule_violations.RuleViolation | None:
+    """Return the conditional after-docstring spacing violation for one function."""
+    if not isinstance(docstring.owner, PDF_definition.DefinitionInfo) or docstring.owner.kind is not PDF_definition.DefinitionKind.FUNCTION:
+        return None
+    following_statement = docstring_statement_spacing.following_body_statement(docstring)
+    nested_definition = isinstance(following_statement, (cst.FunctionDef, cst.ClassDef))
+    change = docstring_statement_spacing.planned_change_for_docstring(
+        docstring,
+        context=context,
+        owner_kind=PDF_definition.DefinitionKind.FUNCTION,
+        position=docstring_statement_spacing.DocstringStatementSpacingPosition.AFTER,
+        desired_blank_lines=1 if nested_definition else 0,
+    )
+    if change is None:
+        return None
+    message = "Function docstring should have one blank line after it before a nested definition" if nested_definition else "Function docstring should have no blank lines after it"
+    return rule_violations.violation_for_planned_source_change(rule, change, instance_message=message)

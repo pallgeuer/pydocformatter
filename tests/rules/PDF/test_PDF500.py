@@ -318,6 +318,12 @@ def test_stringized_unpack_parameters_are_not_required() -> None:
     assert_pdf500_lines(source, ())
 
 
+def test_invalid_escape_in_stringized_unpack_annotation_is_not_exposed() -> None:
+    source = 'def function(**kwargs: "Unpack[\\d]"):\n    """Summary.\n\n    Args:\n    """\n'
+
+    assert_pdf500_lines(source, ((1,),))
+
+
 def test_reports_positional_only_keyword_only_and_vararg_parameter_lines() -> None:
     source = 'def function(\n    first,\n    /,\n    second,\n    *args,\n    third,\n    **kwargs,\n):\n    """Summary.\n\n    Args:\n        first: First.\n        args: Args.\n        kwargs: Kwargs.\n    """\n'
     result = format_source(source)

@@ -38,12 +38,11 @@ class CategoryMetadataOutput(TypedDict, total=False):
     url: str
 
 
-def add_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> argparse.ArgumentParser:
+def add_parser(subparsers: argparser.SubparserCollection) -> argparse.ArgumentParser:
     """Add the linter subcommand parser.
 
     Args:
-        subparsers (argparse._SubParsersAction[argparse.ArgumentParser]): Parent parser collection that receives the
-            subcommand.
+        subparsers (argparser.SubparserCollection): Parent parser collection that receives the subcommand.
 
     Returns:
         argparse.ArgumentParser: Configured `linter` subcommand parser.

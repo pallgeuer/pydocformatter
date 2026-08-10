@@ -3,6 +3,7 @@
 [![PyPI version](https://img.shields.io/pypi/v/pydocformatter.svg)](https://pypi.org/project/pydocformatter/)
 [![Python versions](https://img.shields.io/pypi/pyversions/pydocformatter.svg)](https://pypi.org/project/pydocformatter/)
 [![CI](https://github.com/pallgeuer/pydocformatter/actions/workflows/pre_commit_checks.yml/badge.svg)](https://github.com/pallgeuer/pydocformatter/actions/workflows/pre_commit_checks.yml)
+[![Platform compatibility](https://github.com/pallgeuer/pydocformatter/actions/workflows/platform_compatibility.yml/badge.svg)](https://github.com/pallgeuer/pydocformatter/actions/workflows/platform_compatibility.yml)
 [![Documentation](https://github.com/pallgeuer/pydocformatter/actions/workflows/build_deploy_docs.yml/badge.svg)](https://github.com/pallgeuer/pydocformatter/actions/workflows/build_deploy_docs.yml)
 [![License: GPL-3.0-or-later](https://img.shields.io/badge/license-GPL--3.0--or--later-blue.svg)](https://www.gnu.org/licenses/gpl-3.0.html)
 
@@ -37,7 +38,11 @@ The [documentation site](https://pallgeuer.github.io/pydocformatter/) is the com
 
 ## Installation
 
-pydocformatter requires Python 3.11 or newer. Add it to a project as a development dependency with uv:
+pydocformatter requires Python 3.11 or newer. Ubuntu 20.04 and newer and macOS 14 and newer are supported. Other POSIX Linux systems, including musl-based distributions, receive best-effort support. Native Windows and WSL are unsupported.
+
+Git is conditionally required for the default gitignore-aware recursive file discovery inside Git worktrees. Install Git or pass `--no-respect-gitignore` when that filtering is not wanted.
+
+Add pydocformatter to a project as a development dependency with uv:
 
 ```bash
 uv add --dev pydocformatter

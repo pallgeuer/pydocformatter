@@ -2,6 +2,14 @@
 
 pydocformatter requires Python 3.11 or newer.
 
+## Platform support
+
+Ubuntu 20.04 and newer and macOS 14 and newer are supported. Other POSIX Linux systems, including musl-based distributions, receive best-effort support. Native Windows and WSL are unsupported.
+
+The current stable Python 3.11 through 3.14 releases are exercised across the supported operating-system matrix. Ubuntu 18.04 and Python prereleases are not part of that matrix.
+
+Git is conditionally required when the default gitignore-aware recursive file discovery processes files inside a Git worktree. Install Git or use `--no-respect-gitignore` when gitignore filtering is not needed. Explicit file arguments and files outside Git worktrees do not require Git.
+
 ## Project dependency
 
 Add pydocformatter to a project environment as a development dependency using `uv` (or manually edit the `pyproject.toml`):

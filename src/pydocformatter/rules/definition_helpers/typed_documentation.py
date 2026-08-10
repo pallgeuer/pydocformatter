@@ -21,6 +21,7 @@ import libcst as cst
 import pydocformatter.rules.edits as rule_edits
 import pydocformatter.rules.violations as rule_violations
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
+import pydocformatter.rules.definition_helpers.string_literals
 import pydocformatter.rules.definition_helpers.typed_documentation_models as typed_models
 from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.definition_helpers import (
@@ -520,7 +521,7 @@ def _annotation_text(annotation: cst.Annotation | None, *, context: RuleContext)
         return None
     expression = annotation.annotation
     if isinstance(expression, cst.SimpleString):
-        evaluated_value = expression.evaluated_value
+        evaluated_value = pydocformatter.rules.definition_helpers.string_literals.evaluated_string_value(expression)
         return evaluated_value if isinstance(evaluated_value, str) else None
     return context.module.code_for_node(expression)
 
@@ -539,7 +540,7 @@ def _yield_annotation_text(annotation: cst.Annotation | None, *, context: RuleCo
     expression = annotation.annotation
     stringized = False
     if isinstance(expression, cst.SimpleString):
-        evaluated_value = expression.evaluated_value
+        evaluated_value = pydocformatter.rules.definition_helpers.string_literals.evaluated_string_value(expression)
         if not isinstance(evaluated_value, str):
             return None
         try:

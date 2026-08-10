@@ -53,13 +53,13 @@ Only the cache root resolved from the current-working-directory profile can rece
 
 `respect-gitignore` is evaluated once from the settings resolved for the current working directory. A closer child config can change include, exclude, and per-file-ignore behavior for files below it, but it does not enable or disable gitignore filtering for that run.
 
-When gitignore filtering is enabled, only accepted discovered files are queried. Explicit files bypass gitignore filtering, including when `force-exclude = true`. Paths are grouped by the nearest detected Git root of their real filesystem path; symlinked traversal paths keep their symlinked display path, but gitignore matching is queried against the real path. Files outside a Git root are not gitignore-filtered. If `git check-ignore` exits with a status other than `0` or `1`, file selection aborts.
+When gitignore filtering is enabled, only accepted discovered files are queried. Explicit files bypass gitignore filtering, including when `force-exclude = true`. Paths are grouped by the nearest detected Git root of their real filesystem path; symlinked traversal paths keep their symlinked display path, but gitignore matching is queried against the real path. Files outside a Git root are not gitignore-filtered. Git is therefore required only when accepted discovered files are checked inside a Git worktree. If the Git executable is unavailable, its invocation fails, or `git check-ignore` exits with a status other than `0` or `1`, file selection aborts with an operational error. Install Git or use `--no-respect-gitignore` to run without gitignore filtering.
 
 Glob lists cannot contain empty strings. Include patterns allow patterns such as `src/`, `src/**`, and `**`.
 
 Existing filesystem paths are displayed as absolute normalized paths. Non-existing explicit paths are displayed as normalized lexical paths, and stdin uses `-`.
 
-Accepted existing paths are deduplicated by normalized real path after gitignore filtering. The retained spelling is chosen by a stable display-path score; duplicate aliases are recorded as ignored duplicate decisions. Non-existing explicit paths are not deduplicated.
+Accepted existing paths are deduplicated by physical device and inode identity after gitignore filtering. This recognizes lexical, symlink, hard-link, and case-insensitive filesystem aliases of the same file. The retained spelling is chosen by a stable display-path score; duplicate aliases are recorded as ignored duplicate decisions. The retained spelling's resolved settings profile is used for the physical file; settings associated only with rejected aliases do not apply. Paths with unusable zero-valued inode information are not deduplicated. Non-existing or uninspectable explicit paths are also not deduplicated.
 
 ## Decision table
 
@@ -115,7 +115,7 @@ Settings outside this list are not part of the Ruff compatibility surface. Per-f
 - **D1: pydocformatter include default.**
   pydocformatter defaults to the runtime `DEFAULT_INCLUDE` patterns, because these are the file types it can process. This intentionally differs from Ruff's broader default include set.
 - **D2: gitignore scope.**
-  pydocformatter applies gitignore-style filtering through a git-based implementation. It does not add a separate Ruff-style `.ignore` file parser, only filters files below detected Git roots, and aborts file selection if gitignore checks fail.
+  pydocformatter applies gitignore-style filtering through a git-based implementation. It does not add a separate Ruff-style `.ignore` file parser, only filters files below detected Git roots, and aborts file selection with an actionable operational error if Git is unavailable or gitignore checks otherwise fail.
 - **D3: show-files detail.**
   `pydocfmt check --show-files` keeps pydocformatter's richer decision output: included files, ignored files, pruned directories, and reasons. Ruff's `--show-files` only prints selected files.
 - **D4: command-line `extend-include`.**

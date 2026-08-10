@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 # Standard library imports
+import os
 import typing
 import argparse
 import tempfile
@@ -391,6 +392,68 @@ def test_selection_deduplicates_symlink_aliases_by_physical_target(monkeypatch: 
     assert selection.decisions[1].reason == DecisionReason.DUPLICATE
 
 
+def test_selection_deduplicates_mixed_case_hard_link_aliases_by_physical_identity(monkeypatch: pytest.MonkeyPatch) -> None:
+    settings = CheckSettings(respect_gitignore=False)
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        target = root / "Module.py"
+        alias = root / "module.py"
+        target.write_text("", encoding="utf-8")
+        try:
+            alias.hardlink_to(target)
+        except OSError as error:
+            pytest.skip(f"hard links with mixed-case names are not available: {error}")
+        monkeypatch.chdir(root)
+        selection = file_selection.select_files([target.name, alias.name], _resolver(settings))
+
+    assert selection.accepted_paths == (str(target),)
+    assert selection.decisions[0].reason == DecisionReason.EXPLICIT_INCLUDED
+    assert selection.decisions[1].reason == DecisionReason.DUPLICATE
+
+
+def test_selection_deduplicates_case_aliases_on_case_insensitive_filesystem(monkeypatch: pytest.MonkeyPatch) -> None:
+    settings = CheckSettings(respect_gitignore=False)
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        target = root / "MixedCase.py"
+        alias = root / "mixedcase.py"
+        target.write_text("", encoding="utf-8")
+        if not alias.exists():
+            pytest.skip("filesystem is case-sensitive")
+        monkeypatch.chdir(root)
+        selection = file_selection.select_files([target.name, alias.name], _resolver(settings))
+
+    assert len(selection.accepted_paths) == 1
+    assert tuple(decision.reason for decision in selection.decisions).count(DecisionReason.DUPLICATE) == 1
+
+
+def test_path_identity_key_returns_none_for_zero_inode(mocker: MockerFixture) -> None:
+    real_stat = os.stat
+    zero_inode_stat = mocker.Mock(spec=os.stat_result, st_dev=11, st_ino=0)
+
+    def selective_stat(path: str | bytes | int | os.PathLike[str] | os.PathLike[bytes], *, follow_symlinks: bool = True) -> os.stat_result:
+        if path == "module.py":
+            return typing.cast("os.stat_result", zero_inode_stat)
+        return real_stat(path, follow_symlinks=follow_symlinks)
+
+    mocker.patch("pydocformatter.file_selection.os.stat", side_effect=selective_stat, autospec=True)
+
+    assert file_selection.path_identity_key("module.py") is None
+
+
+def test_path_identity_key_returns_none_when_stat_fails(mocker: MockerFixture) -> None:
+    real_stat = os.stat
+
+    def selective_stat(path: str | bytes | int | os.PathLike[str] | os.PathLike[bytes], *, follow_symlinks: bool = True) -> os.stat_result:
+        if path == "module.py":
+            raise PermissionError("denied")
+        return real_stat(path, follow_symlinks=follow_symlinks)
+
+    mocker.patch("pydocformatter.file_selection.os.stat", side_effect=selective_stat, autospec=True)
+
+    assert file_selection.path_identity_key("module.py") is None
+
+
 def test_ruff_spec_explicit_file_bypasses_filters_without_force() -> None:
     settings = CheckSettings(respect_gitignore=True, force_exclude=False, include=("*.py",), exclude=("skip.py",))
     with tempfile.TemporaryDirectory() as td:
@@ -471,6 +534,33 @@ def test_ruff_spec_gitignore_check_failure_aborts_file_selection(mocker: MockerF
         mocker.patch("pydocformatter.file_selection.subprocess.run", return_value=subprocess.CompletedProcess(["git"], 128, stdout=b"", stderr=b"fatal: no such command"), autospec=True)
 
         with pytest.raises(file_selection.FileSelectionError, match=rf"{root}: Unable to apply gitignore filtering: fatal: no such command"):
+            file_selection.select_files([str(root)], _resolver(settings))
+
+
+def test_ruff_spec_missing_git_reports_actionable_file_selection_error(mocker: MockerFixture) -> None:
+    settings = CheckSettings(respect_gitignore=True)
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        git_helpers.write_git_marker(root)
+        (root / "a.py").write_text("", encoding="utf-8")
+        mocker.patch("pydocformatter.file_selection.subprocess.run", side_effect=FileNotFoundError, autospec=True)
+
+        with pytest.raises(
+            file_selection.FileSelectionError,
+            match=rf"{root}: Unable to apply gitignore filtering: Git executable was not found; install Git or disable gitignore filtering with --no-respect-gitignore",
+        ):
+            file_selection.select_files([str(root)], _resolver(settings))
+
+
+def test_ruff_spec_git_execution_oserror_reports_context(mocker: MockerFixture) -> None:
+    settings = CheckSettings(respect_gitignore=True)
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        git_helpers.write_git_marker(root)
+        (root / "a.py").write_text("", encoding="utf-8")
+        mocker.patch("pydocformatter.file_selection.subprocess.run", side_effect=PermissionError("denied"), autospec=True)
+
+        with pytest.raises(file_selection.FileSelectionError, match=rf"{root}: Unable to apply gitignore filtering: Unable to execute Git: denied"):
             file_selection.select_files([str(root)], _resolver(settings))
 
 

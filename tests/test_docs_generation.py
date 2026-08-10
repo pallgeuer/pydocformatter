@@ -818,6 +818,19 @@ def test_docs_dependency_group_omits_unused_or_compatibility_packages() -> None:
     assert dependency_names.isdisjoint(FORBIDDEN_DOCS_DEPENDENCIES)
 
 
+def test_project_metadata_and_documentation_publish_platform_contract() -> None:
+    """Platform metadata and primary documentation must publish the supported contract."""
+    pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    classifiers = set(pyproject["project"]["classifiers"])
+
+    assert "Operating System :: OS Independent" not in classifiers
+    assert {"Operating System :: MacOS :: MacOS X", "Operating System :: POSIX", "Operating System :: POSIX :: Linux"} <= classifiers
+    for relative_path in ("README.md", "CONTRIBUTING.md", "docs_site/installation.md", "docs_site/faq.md"):
+        text = (ROOT / relative_path).read_text(encoding="utf-8")
+        for expected in ("Python 3.11", "Ubuntu 20.04", "macOS 14", "POSIX Linux", "Windows", "WSL"):
+            assert expected in text, f"{relative_path} does not document {expected}"
+
+
 def test_generated_docs_do_not_include_api_reference_pages(generated_site: tuple[pathlib.Path, pathlib.Path]) -> None:
     """The generated site must not include custom Python API reference pages."""
     generated_docs_dir, _ = generated_site

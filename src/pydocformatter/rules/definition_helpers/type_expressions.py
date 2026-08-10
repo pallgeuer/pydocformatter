@@ -430,8 +430,73 @@ def _significant_type_tokens(text: str) -> tuple[tokenize.TokenInfo, ...] | None
             if terminated:
                 return None
             tokens.append(token_info)
-    except (IndentationError, SyntaxError, tokenize.TokenError):
+    except tokenize.TokenError:
+        return _fallback_significant_type_tokens(text)
+    except (IndentationError, SyntaxError):
         return None
+    return tuple(tokens)
+
+
+def _fallback_significant_type_tokens(text: str) -> tuple[tokenize.TokenInfo, ...] | None:
+    """Lex the conservative type grammar after tokenizer failure."""
+    tokens: list[tokenize.TokenInfo] = []
+    index = 0
+    line = 1
+    column = 0
+    depth = 0
+    terminated = False
+    operator_chars = frozenset(".[](),|")
+    while index < len(text):
+        char = text[index]
+        if char in " \t\f":
+            index += 1
+            column += 1
+            continue
+        if char == "\\" and index + 1 < len(text) and text[index + 1] == "\n":
+            index += 2
+            line += 1
+            column = 0
+            continue
+        if char == "\\" and text[index + 1 : index + 3] == "\r\n":
+            index += 3
+            line += 1
+            column = 0
+            continue
+        if char == "\\" and index + 1 < len(text) and text[index + 1] == "\r":
+            return None
+        if char == "\r" and text[index : index + 2] != "\r\n":
+            return None
+        if char == "\n" or text[index : index + 2] == "\r\n":
+            index += 2 if char == "\r" else 1
+            line += 1
+            column = 0
+            if depth == 0:
+                terminated = True
+            continue
+        if terminated:
+            return None
+        token_start = (line, column)
+        if text.startswith("...", index):
+            value = "..."
+            token_type = tokenize.OP
+        elif char in operator_chars:
+            value = char
+            token_type = tokenize.OP
+        else:
+            end = index
+            while end < len(text) and text[end] not in " \t\f\r\n\\#" and text[end] not in operator_chars:
+                end += 1
+            value = text[index:end]
+            if not value or not value.isidentifier():
+                return None
+            token_type = tokenize.NAME
+        index += len(value)
+        column += len(value)
+        if value in {"(", "["}:
+            depth += 1
+        elif value in {")", "]"}:
+            depth = max(depth - 1, 0)
+        tokens.append(tokenize.TokenInfo(token_type, value, token_start, (line, column), ""))
     return tuple(tokens)
 
 

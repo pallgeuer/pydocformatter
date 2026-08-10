@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 # Standard library imports
+import ast
 from typing import TYPE_CHECKING
 
 # Third-party imports
@@ -418,7 +419,7 @@ def test_module_docstring_reflow_does_not_copy_leading_form_feed_into_value() ->
     result = format_pdf001(source, settings=settings)
     assert result.new_source is not None
     repeated = format_pdf001(result.new_source, settings=settings)
-    module_docstring = compile(result.new_source, "example.py", "exec").co_consts[0]
+    module_docstring = ast.get_docstring(ast.parse(result.new_source, filename="example.py"), clean=False)
 
     assert result.modified
     assert result.new_source.count("\f") == 1

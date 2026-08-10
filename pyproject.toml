@@ -17,7 +17,9 @@ classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Environment :: Console",
     "Intended Audience :: Developers",
-    "Operating System :: OS Independent",
+    "Operating System :: MacOS :: MacOS X",
+    "Operating System :: POSIX",
+    "Operating System :: POSIX :: Linux",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
@@ -51,12 +53,12 @@ pydocfmt = "pydocformatter.cli.main:main"
 
 [dependency-groups]
 docs = [
-    "la-dev-codex-plugins==0.4.3",
+    "la-dev-codex-plugins==0.4.4",
     "zensical==0.0.53",
 ]
 test = [
     {include-group = "docs"},
-    "la-dev-codex-plugins[pytest]==0.4.3",
+    "la-dev-codex-plugins[pytest]==0.4.4",
     "pytest==9.1.1",
     "pytest-cov==7.1.0",
     "pytest-mock==3.15.1",
@@ -105,6 +107,9 @@ addopts = ["-n", "auto"]
 filterwarnings = ["error"]
 testpaths = ["tests"]
 la_dev_cwd_isolation_unmarked = "shared_guarded"
+la_dev_cwd_isolation_cleanup = "pytest_retained"
+tmp_path_retention_policy = "all"
+tmp_path_retention_count = 3
 
 #
 # pydocfmt
@@ -118,6 +123,7 @@ line-ending = "lf"
 respect-gitignore = true
 force-exclude = true
 extend-select = [
+    "no-blank-line-after-function-docstring",
     "summary-trailing-period",
     "non-imperative-summary",
     "summary-starts-with-this",

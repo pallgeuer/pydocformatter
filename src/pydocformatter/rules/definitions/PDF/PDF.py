@@ -3167,7 +3167,7 @@ def _docstring_info(
     node = expression.value
     if not isinstance(node, (cst.SimpleString, cst.ConcatenatedString)):
         return None
-    value = node.evaluated_value
+    value = string_literals.evaluated_string_value(node)
     if not isinstance(value, str):
         return None
     code_range = context.positions[node]

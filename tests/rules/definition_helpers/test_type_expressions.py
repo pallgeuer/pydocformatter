@@ -89,8 +89,35 @@ def test_parse_type_like_expr_handles_recursive_parser_failure(monkeypatch: pyte
 
 
 def test_parse_type_like_expr_rejects_input_beyond_the_ast_recursion_limit() -> None:
-    """Return safely when a valid token stream exceeds the Python AST parser's depth."""
-    assert type_expressions.parse_type_like_expr(" | ".join(("Type",) * 3000)) is None
+    """Return safely when a valid token stream exceeds the Python AST parser's nesting limit."""
+    assert type_expressions.parse_type_like_expr(f"{'list[' * 3000}Type{']' * 3000}") is None
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("list[pkg.\u0394 | None]", True),
+        ("list[\nint | str\n]", True),
+        ("list[int\\\n| str]", True),
+        ("list[\r\nint | str\r\n]", True),
+        ("list[int\\\r\n| str]", True),
+        ("list[\rint]", False),
+        ("list[int\\\r| str]", False),
+        ("list[int  # comment\n]", False),
+        ("list[int + str]", False),
+        ("list[(int]", False),
+    ],
+)
+def test_type_token_fallback_preserves_conservative_grammar(text: str, expected: bool, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Use the iterative fallback without depending on tokenizer diagnostic text."""
+
+    def raise_token_error(_readline: object) -> object:
+        del _readline
+        raise type_expressions.tokenize.TokenError("implementation-specific diagnostic", (1, 1))
+
+    monkeypatch.setattr(type_expressions.tokenize, "generate_tokens", raise_token_error)
+
+    assert type_expressions.is_type_like_text(text) is expected
 
 
 def test_ast_helpers_process_deep_parsed_types_iteratively() -> None:

@@ -6,7 +6,33 @@ from __future__ import annotations
 # Standard library imports
 import argparse
 from collections.abc import Iterable
-from typing import Any, TypedDict, Unpack
+from typing import Any, Protocol, TypedDict, Unpack
+
+
+class ArgumentContainer(Protocol):
+    """Public argument-adding interface shared by parsers and argument groups."""
+
+    def add_argument(self, *name_or_flags: str, **kwargs: Any) -> argparse.Action:
+        """Add an argument and return its argparse action.
+
+        Args:
+            *name_or_flags (str): Positional name or optional flag spellings.
+            **kwargs (Any): Argparse argument options.
+        """
+        ...
+
+
+class SubparserCollection(Protocol):
+    """Public subparser-adding interface returned by argparse."""
+
+    def add_parser(self, name: str, **kwargs: Any) -> argparse.ArgumentParser:
+        """Add and return a named subparser.
+
+        Args:
+            name (str): Subparser command name.
+            **kwargs (Any): Argparse parser options.
+        """
+        ...
 
 
 class ArgumentParserKwargs(TypedDict, total=False):
@@ -66,18 +92,30 @@ class HelpFormatter(argparse.HelpFormatter):
         """
         super().__init__(prog, max_help_position=32)
 
-    def add_usage(self, usage: str | None, actions: Iterable[argparse.Action], groups: Iterable[argparse._MutuallyExclusiveGroup], prefix: str | None = None) -> None:
+    def add_usage(self, usage: str | None, actions: Iterable[argparse.Action], groups: Iterable[Any], prefix: str | None = None) -> None:
         """Add a usage line with project-specific capitalization.
 
         Args:
             usage (str | None): Explicit usage string, or None to let argparse derive one.
             actions (Iterable[argparse.Action]): Parser actions included in the usage line.
-            groups (Iterable[argparse._MutuallyExclusiveGroup]): Mutually exclusive groups included in usage.
+            groups (Iterable[Any]): Mutually exclusive groups included in usage.
             prefix (str | None): Usage prefix, defaulting to `Usage: `.
         """
         if prefix is None:
             prefix = "Usage: "
         super().add_usage(usage, actions, groups, prefix)
+
+    def start_section(self, heading: str | None) -> None:
+        """Start a help section with project-specific capitalization.
+
+        Args:
+            heading (str | None): Section heading selected by argparse.
+        """
+        if heading == "positional arguments":
+            heading = "Arguments"
+        elif heading == "options":
+            heading = "Options"
+        super().start_section(heading)
 
 
 def create_parser(**kwargs: Unpack[ArgumentParserKwargs]) -> argparse.ArgumentParser:
@@ -93,11 +131,11 @@ def create_parser(**kwargs: Unpack[ArgumentParserKwargs]) -> argparse.ArgumentPa
     return _configure_parser(parser)
 
 
-def create_subparser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser], *, name: str, **kwargs: Unpack[SubparserKwargs]) -> argparse.ArgumentParser:
-    """Create a configured argparse subparser.
+def create_subparser(subparsers: SubparserCollection, *, name: str, **kwargs: Unpack[SubparserKwargs]) -> argparse.ArgumentParser:
+    """Create a project-formatted argparse subparser through a typed boundary.
 
     Args:
-        subparsers (argparse._SubParsersAction[argparse.ArgumentParser]): Parent subparser action to add to.
+        subparsers (SubparserCollection): Parent subparser collection to add to.
         name (str): Command name for the subparser.
         **kwargs (Unpack[SubparserKwargs]): Keyword arguments forwarded to `add_parser`.
 
@@ -109,8 +147,7 @@ def create_subparser(subparsers: argparse._SubParsersAction[argparse.ArgumentPar
 
 
 def _configure_parser(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
-    """Apply project parser defaults."""
-    parser._optionals.title = "Options"
-    parser._positionals.title = "Arguments"
-    parser.add_argument("-h", "--help", action="help", help="Show this help message and exit")
+    """Add project parser defaults through public argparse interfaces."""
+    option_prefix = parser.prefix_chars[0]
+    parser.add_argument(f"{option_prefix}h", f"{option_prefix}{option_prefix}help", action="help", help="Show this help message and exit")
     return parser

@@ -403,6 +403,13 @@ def test_equivalent_stringized_and_complex_type_expressions_do_not_mismatch() ->
     assert codes(result) == ()
 
 
+def test_invalid_escapes_in_stringized_annotations_are_not_exposed() -> None:
+    source = '"""Module.\n\nAttributes:\n    value (int): Value.\n"""\nvalue: "\\d" = 1\n\n\ndef function(argument: "\\d"):\n    """Process a value.\n\n    Args:\n        argument (int): Input value.\n    """\n\n\ndef generate() -> "Generator[\\d]":\n    """Yield values.\n\n    Yields:\n        int: Result value.\n    """\n    yield 1\n'
+    result = check(source, select=("PDF703", "PDF711", "PDF719"))
+
+    assert codes(result) == ()
+
+
 def test_equivalent_import_alias_type_expressions_do_not_mismatch() -> None:
     source = 'from typing import Iterator\nimport typing as t\nimport collections.abc as cabc\n\n"""Module.\n\nAttributes:\n    module_value (Iterator[int]): Module value.\n"""\nmodule_value: t.Iterator[int] = iter(())\n\n\nclass Client:\n    """Client.\n\n    Attributes:\n        timeout (Iterator[int]): Timeout values.\n    """\n\n    timeout: t.Iterator[int]\n\n\ndef function(value: Iterator[int]) -> cabc.Iterator[int]:\n    """Return values.\n\n    Args:\n        value (t.Iterator[int]): Input value.\n\n    Returns:\n        collections.abc.Iterator[int]: Result value.\n    """\n    return value\n\n\ndef generate() -> "Iterator[int]":\n    """Yield values.\n\n    Yields:\n        int: Result value.\n    """\n    yield 1\n'
     result = check(source, select=("PDF703", "PDF707", "PDF711", "PDF715", "PDF719"))

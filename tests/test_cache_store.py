@@ -9,6 +9,7 @@ import sys
 import time
 import typing
 import sqlite3
+import contextlib
 import subprocess
 import dataclasses
 import concurrent.futures
@@ -92,7 +93,7 @@ def test_first_clean_upsert_creates_owned_layout_schema_and_row(tmp_path: Path) 
     assert (store.layout.root / ".gitignore").read_text(encoding="utf-8") == "*\n"
     assert store.layout.version_dir.stat().st_mode & 0o077 == 0
     assert store.lookup(((proof.engine_key, proof.analysis_key, proof.path_key),)).proofs == {(proof.engine_key, proof.analysis_key, proof.path_key): proof}
-    with sqlite3.connect(store.layout.database) as connection:
+    with contextlib.closing(sqlite3.connect(store.layout.database)) as connection, connection:
         assert connection.execute("PRAGMA user_version").fetchone() == (1,)
         assert connection.execute("SELECT COUNT(*) FROM clean_proofs").fetchone() == (1,)
         assert connection.execute("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name").fetchall() == [("cache_state",), ("clean_proofs",)]
@@ -162,7 +163,7 @@ def test_invalid_digest_row_is_ignored_without_affecting_valid_rows(tmp_path: Pa
     store = _store(tmp_path)
     proof = _proof(0)
     store.commit(touches=(), proofs=(proof,))
-    with sqlite3.connect(store.layout.database) as connection:
+    with contextlib.closing(sqlite3.connect(store.layout.database)) as connection, connection:
         connection.execute(
             "INSERT INTO clean_proofs VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             (b"short", proof.analysis_key, "bad.py", proof.path_context_key, proof.source_digest, proof.source_size, None, proof.last_seen_day),
@@ -180,7 +181,7 @@ def test_malformed_requested_path_context_is_reported_as_a_store_failure(tmp_pat
     store = _store(tmp_path)
     proof = _proof(0)
     store.commit(touches=(), proofs=(proof,))
-    with sqlite3.connect(store.layout.database) as connection:
+    with contextlib.closing(sqlite3.connect(store.layout.database)) as connection, connection:
         connection.execute("UPDATE clean_proofs SET path_context_key = ? WHERE engine_key = ? AND analysis_key = ? AND path_key = ?", (b"short", proof.engine_key, proof.analysis_key, proof.path_key))
 
     lookup = store.lookup(((proof.engine_key, proof.analysis_key, proof.path_key),))
@@ -206,7 +207,7 @@ def test_corrupt_database_is_quarantined_and_recreated(tmp_path: Path, database_
 def test_incompatible_schema_is_replaced_on_next_write(tmp_path: Path, schema_kind: str) -> None:
     store = _store(tmp_path)
     cache_directory.ensure_cache_layout(store.layout)
-    with sqlite3.connect(store.layout.database) as connection:
+    with contextlib.closing(sqlite3.connect(store.layout.database)) as connection, connection:
         if schema_kind == "version":
             connection.execute("PRAGMA user_version = 99")
         elif schema_kind == "missing-table":
@@ -226,7 +227,7 @@ def test_incompatible_schema_is_replaced_on_next_write(tmp_path: Path, schema_ki
 def test_stale_incompatible_lookup_cannot_replace_a_fresh_database(tmp_path: Path) -> None:
     stale_store = _store(tmp_path)
     cache_directory.ensure_cache_layout(stale_store.layout)
-    with sqlite3.connect(stale_store.layout.database) as connection:
+    with contextlib.closing(sqlite3.connect(stale_store.layout.database)) as connection, connection:
         connection.execute("PRAGMA user_version = 99")
     stale_lookup = stale_store.lookup(((_digest(1), _digest(2), "module.py"),))
     fresh_proof = _proof(0, path="fresh.py")
@@ -253,7 +254,7 @@ def test_quarantine_moves_wal_and_shm_with_committed_wal_only_data(tmp_path: Pat
 
     assert quarantine is not None
     assert Path(f"{quarantine}-wal").is_file()
-    with sqlite3.connect(quarantine) as connection:
+    with contextlib.closing(sqlite3.connect(quarantine)) as connection, connection:
         assert connection.execute("SELECT value FROM clean_proofs").fetchall() == [("from-wal",)]
 
 
@@ -387,7 +388,7 @@ def test_lookup_requires_exact_ownership_even_for_a_valid_database(tmp_path: Pat
 def test_unowned_incompatible_store_is_not_replaced_on_commit(tmp_path: Path) -> None:
     store = _store(tmp_path)
     store.layout.version_dir.mkdir(parents=True)
-    with sqlite3.connect(store.layout.database) as connection:
+    with contextlib.closing(sqlite3.connect(store.layout.database)) as connection, connection:
         connection.execute("CREATE TABLE unrelated (value INTEGER)")
         connection.execute("PRAGMA user_version = 99")
     original = store.layout.database.read_bytes()

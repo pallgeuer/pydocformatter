@@ -186,7 +186,8 @@ class _SelectionContext:
         resolver (settings_core.SettingsResolver[CheckSettings]): Path-aware resolver shared by the selection run.
         respect_gitignore (bool): Current-working-directory gitignore policy applied to discovered candidates.
         cache_directory_path (str): Normalized absolute lexical cache root used by this invocation.
-        cache_directory_identity (str | None): Normalized physical cache root when its final component is not a symlink.
+        cache_directory_identity (tuple[int, int] | None): Physical cache-root device and inode when its final component
+            is not a symlink.
         cache_directory_name (str): Normalized final cache-root name used to avoid unnecessary physical resolution.
         cache_enabled (bool): Whether an empty run cache root can be claimed by this invocation.
         matcher_cache (dict[int, tuple[_PatternMatcher, _PatternMatcher]]): Include and exclude matchers keyed by shared
@@ -196,7 +197,7 @@ class _SelectionContext:
     resolver: settings_core.SettingsResolver[CheckSettings]
     respect_gitignore: bool
     cache_directory_path: str
-    cache_directory_identity: str | None
+    cache_directory_identity: tuple[int, int] | None
     cache_directory_name: str
     cache_enabled: bool
     matcher_cache: dict[int, tuple[_PatternMatcher, _PatternMatcher]] = dataclasses.field(default_factory=dict)
@@ -453,7 +454,7 @@ def _selection_result(decisions: tuple[FileDecision, ...]) -> SelectionResult:
 def _deduplicated_decisions(decisions: tuple[FileDecision, ...]) -> tuple[FileDecision, ...]:
     """Return decisions with accepted file duplicates marked as rejected."""
     result: list[FileDecision] = []
-    accepted_by_identity: dict[str, int] = {}
+    accepted_by_identity: dict[tuple[int, int], int] = {}
 
     for decision in decisions:
         display_decision = dataclasses.replace(decision, path=_display_path(decision.path))
@@ -488,18 +489,22 @@ def _duplicate_decision(decision: FileDecision) -> FileDecision:
     return FileDecision(path=decision.path, accepted=False, reason=DecisionReason.DUPLICATE, explicit=decision.explicit, profile=decision.profile, respect_gitignore=decision.respect_gitignore)
 
 
-def path_identity_key(path: str) -> str | None:
-    """Return a physical-path key for deduplicating existing files.
+def path_identity_key(path: str) -> tuple[int, int] | None:
+    """Return a physical-file key for deduplicating existing paths.
 
     Args:
         path (str): File path to resolve.
 
     Returns:
-        str | None: Normalized real path key, or None when the path does not exist.
+        tuple[int, int] | None: Device and inode key, or None when the path cannot be inspected.
     """
-    if not os.path.exists(path):
+    try:
+        stat_result = os.stat(path, follow_symlinks=True)
+    except OSError:
         return None
-    return os.path.normcase(os.path.realpath(path))
+    if stat_result.st_ino == 0:
+        return None
+    return stat_result.st_dev, stat_result.st_ino
 
 
 def _display_path(path: str) -> str:
@@ -566,8 +571,10 @@ def _query_git_ignored_paths(git_root: str, relative_paths: list[str]) -> tuple[
     stdin_bytes = ("\0".join(unique_relative_paths) + "\0").encode("utf-8", errors="surrogateescape")
     try:
         process = subprocess.run(["git", "-C", git_root, "check-ignore", "--stdin", "--no-index", "-z"], input=stdin_bytes, capture_output=True, check=False)  # ruff: ignore[subprocess-without-shell-equals-true]
+    except FileNotFoundError:
+        return set(), "Git executable was not found; install Git or disable gitignore filtering with --no-respect-gitignore"
     except OSError as error:
-        return set(), str(error)
+        return set(), f"Unable to execute Git: {error}"
 
     if process.returncode not in {0, 1}:
         error_message = process.stderr.decode("utf-8", errors="replace").strip()

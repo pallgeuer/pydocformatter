@@ -13,6 +13,7 @@ import libcst as cst
 # First-party imports
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 import pydocformatter.rules.definition_helpers.decorators as decorator_helpers
+import pydocformatter.rules.definition_helpers.string_literals
 from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.definition_helpers import docstring_sections, docstring_source, documentation_order, missing_documentation, section_edits
 
@@ -347,7 +348,7 @@ def _unpack_annotation(annotation: cst.Annotation | None) -> UnpackAnnotation:
         return UnpackAnnotation(unpacked=False, target_name=None)
     expression = annotation.annotation
     if isinstance(expression, cst.SimpleString):
-        evaluated_value = expression.evaluated_value
+        evaluated_value = pydocformatter.rules.definition_helpers.string_literals.evaluated_string_value(expression)
         if not isinstance(evaluated_value, str):
             return UnpackAnnotation(unpacked=False, target_name=None)
         try:

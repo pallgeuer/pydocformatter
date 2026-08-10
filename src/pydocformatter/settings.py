@@ -44,10 +44,15 @@ import itertools
 import dataclasses
 from collections.abc import Callable, Iterable, Mapping
 from types import GenericAlias
-from typing import Any, Generic, TypeAlias, TypedDict, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Generic, TypeAlias, TypedDict, TypeVar, cast
 
 # First-party imports
 from pydocformatter.cli.global_args import GlobalArgs
+
+
+if TYPE_CHECKING:
+    # First-party imports
+    import pydocformatter.utils.argparser as argparser_utils
 
 
 SettingsT = TypeVar("SettingsT")
@@ -767,7 +772,7 @@ class SettingsSchema(Generic[SettingsT]):
         return values
 
 
-def _add_setting_argument(parser: argparse._ActionsContainer, definition: SettingDefinition[Any], settings: Any) -> None:
+def _add_setting_argument(parser: argparser_utils.ArgumentContainer, definition: SettingDefinition[Any], settings: Any) -> None:
     """Add one resolved schema definition to an argparse container."""
     if definition.cli is None:
         raise AssertionError(f"Setting definition for {definition.field!r} has no CLI metadata")

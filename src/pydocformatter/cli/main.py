@@ -68,11 +68,11 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def add_version_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> argparse.ArgumentParser:
+def add_version_parser(subparsers: argparser.SubparserCollection) -> argparse.ArgumentParser:
     """Add the version subcommand parser.
 
     Args:
-        subparsers (argparse._SubParsersAction[argparse.ArgumentParser]): Top-level subparser action.
+        subparsers (argparser.SubparserCollection): Top-level subparser collection.
 
     Returns:
         argparse.ArgumentParser: Configured `version` subcommand parser.
@@ -82,14 +82,12 @@ def add_version_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentP
     return version_parser
 
 
-def add_parser_help(
-    parser: argparse.ArgumentParser, subparsers: argparse._SubParsersAction[argparse.ArgumentParser], *, command_parsers: dict[str, argparse.ArgumentParser]
-) -> argparse.ArgumentParser:
+def add_parser_help(parser: argparse.ArgumentParser, subparsers: argparser.SubparserCollection, *, command_parsers: dict[str, argparse.ArgumentParser]) -> argparse.ArgumentParser:
     """Add the help subcommand parser.
 
     Args:
         parser (argparse.ArgumentParser): Top-level parser whose help should be shown without a topic.
-        subparsers (argparse._SubParsersAction[argparse.ArgumentParser]): Top-level subparser action.
+        subparsers (argparser.SubparserCollection): Top-level subparser collection.
         command_parsers (dict[str, argparse.ArgumentParser]): Existing command parsers keyed by command name.
 
     Returns:

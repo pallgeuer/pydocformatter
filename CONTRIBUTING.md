@@ -18,7 +18,9 @@ Feature proposals should describe the use case, intended behavior, configuration
 
 ## Development setup
 
-Development requires Git, [uv](https://docs.astral.sh/uv/), and Python 3.11 or newer. Fork the repository if needed to `YOUR-USERNAME/pydocformatter`, then create the locked development environment from the repository root:
+Development requires Git, [uv](https://docs.astral.sh/uv/), and Python 3.11 or newer. The supported compatibility targets are Ubuntu 20.04 and newer and macOS 14 and newer, with best-effort support for other POSIX Linux systems. Native Windows and WSL are unsupported. CI exercises Python 3.11 through 3.14 across glibc and musl Linux, x64 and ARM64, and Intel and ARM64 macOS environments.
+
+Fork the repository if needed to `YOUR-USERNAME/pydocformatter`, then create the locked development environment from the repository root:
 
 ```bash
 git clone https://github.com/YOUR-USERNAME/pydocformatter.git

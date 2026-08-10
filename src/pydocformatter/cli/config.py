@@ -43,11 +43,11 @@ class ConfigOptionMetadata(TypedDict):
     example: str
 
 
-def add_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> argparse.ArgumentParser:
+def add_parser(subparsers: argparser.SubparserCollection) -> argparse.ArgumentParser:
     """Add the config subcommand parser.
 
     Args:
-        subparsers (argparse._SubParsersAction[argparse.ArgumentParser]): Top-level subparser action.
+        subparsers (argparser.SubparserCollection): Top-level subparser collection.
 
     Returns:
         argparse.ArgumentParser: Configured `config` subcommand parser.

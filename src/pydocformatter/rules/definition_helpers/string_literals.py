@@ -280,6 +280,24 @@ class WrappedSourceLine:
     source: str
 
 
+def evaluated_string_value(node: cst.SimpleString | cst.ConcatenatedString) -> str | bytes | None:
+    """Return a string expression value without exposing interpreter escape warnings.
+
+    Args:
+        node (cst.SimpleString | cst.ConcatenatedString): String expression to evaluate.
+
+    Returns:
+        str | bytes | None: Evaluated value, or None when evaluation fails.
+    """
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            warnings.simplefilter("ignore", SyntaxWarning)
+            return node.evaluated_value
+    except (SyntaxError, ValueError):
+        return None
+
+
 def _source_line(indent: str, tokens: tuple[inline_markup.InlineToken, ...]) -> WrappedSourceLine:
     """Render one source-aware wrapped line."""
     return WrappedSourceLine(value=f"{indent}{' '.join(token.value for token in tokens)}", source=f"{indent}{' '.join(token.source for token in tokens)}")
@@ -324,10 +342,7 @@ def source_map_for_simple_string(node: cst.SimpleString, *, value: str | None = 
     """
     body = simple_string_body_source(node)
     if value is None:
-        try:
-            evaluated_value = node.evaluated_value
-        except (SyntaxError, ValueError):
-            return None
+        evaluated_value = evaluated_string_value(node)
         value = evaluated_value if isinstance(evaluated_value, str) else None
     if body is None or not isinstance(value, str):
         return None
@@ -406,12 +421,7 @@ def simple_string_parts(node: cst.SimpleString | cst.ConcatenatedString, *, valu
     parts: list[SimpleStringPart] = []
     value_start = 0
     for leaf in leaves:
-        try:
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore", DeprecationWarning)
-                leaf_value = leaf.evaluated_value
-        except (SyntaxError, ValueError):
-            return None
+        leaf_value = evaluated_string_value(leaf)
         if not isinstance(leaf_value, str):
             return None
         source_map = source_map_for_simple_string(leaf, value=leaf_value)
@@ -573,7 +583,7 @@ def render_simple_string_from_body_source(prefix: str, quote: str, body_source: 
         expression = cst.parse_expression(rendered)
     except Exception:
         return None
-    if not isinstance(expression, cst.SimpleString) or expression.evaluated_value != expected_value:
+    if not isinstance(expression, cst.SimpleString) or evaluated_string_value(expression) != expected_value:
         return None
     return rendered
 
@@ -749,9 +759,9 @@ def parse_simple_string_escape(body: str, start: int) -> StringEscape | None:
         source = body[start : end + 1]
         try:
             expression = cst.parse_expression(f'"{source}"')
-            evaluated_value = expression.evaluated_value if isinstance(expression, cst.SimpleString) else None
         except Exception:
             return None
+        evaluated_value = evaluated_string_value(expression) if isinstance(expression, cst.SimpleString) else None
         if not isinstance(evaluated_value, str) or len(evaluated_value) != 1:
             return None
         return StringEscape(value=evaluated_value, source=source, end=end + 1)

@@ -44,6 +44,9 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Changed
 
+- **Compatibility:**
+  - Documented support for Python 3.11 and newer on Ubuntu 20.04 and newer and macOS 14 and newer, best-effort support for other POSIX Linux systems, and no native Windows or WSL support.
+  - Added blocking glibc, musl, x64, ARM64, Intel macOS, and ARM64 macOS test coverage across Python 3.11 through 3.14.
 - **Breaking PCF rule-code reassignment:**
   - Reorganized PCF codes into general comment formatting (`PCF0xx`), directives and suppressions (`PCF1xx`), and ASCII/Unicode character policies (`PCF2xx`). Canonical rule-name selectors remain unchanged, while old code selectors are not retained as aliases.
 
@@ -88,6 +91,7 @@ All notable changes to this project are documented here. The format follows [Kee
   - Made inline suppressions after any component token of an implicitly concatenated docstring cover the complete expression for PDF findings while preserving line-local PCF coverage and existing local and standalone attachment boundaries.
   - Collected bracket directives and source suppressions in one source traversal per pass, made directive self-suppression an explicit rule-metadata capability for PCF102 and PCF103, and kept their policy fixes independent from PCF100's general deduplication.
 - **Docstring diagnostics:**
+  - Made PDF206 require one blank line before a first nested function or class definition while retaining no blank line before ordinary function-body statements, matching Ruff formatter output while intentionally reporting the zero-blank nested-definition case accepted by D202.
   - Standardized rule metadata and instance messages, added concrete normalization rewrites, and made atomic grouped fixes fall back to rule metadata when they contain distinct diagnostics.
   - Made strict trailing-period rules PDF300 and PDF308 mutually exclusive with their terminal-punctuation alternatives PDF301 and PDF309, with broad convention profiles choosing one alternative consistently.
   - Made PDF409 solely responsible for parsed entry spacing while PDF410 now edits only parser-mapped semantic exception and warning name lists, so both independent fixes compose without overlapping replacements or rule-local syntax reparsing.
@@ -138,6 +142,10 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Fixed
 
+- **Cross-platform behavior:**
+  - Deduplicated case-insensitive, hard-link, and symlink path aliases by physical file identity while treating zero-valued inode information as unusable, and made a missing Git executable produce an actionable `--no-respect-gitignore` diagnostic.
+  - Kept invalid-escape docstring and annotation analysis and deeply nested type-token validation stable on Python 3.12 through 3.14, including conservative lone-carriage-return handling, closed test-owned SQLite connections explicitly for consistent musl runs, and retained isolated pytest temporary boundaries through Python 3.14 multiprocessing shutdown.
+  - Removed dependencies on private argparse interfaces while preserving CLI help output across direct, inherited, subparser, and mutually exclusive argument registration, and made deep type-token fallback independent of tokenizer diagnostic wording.
 - **Configuration:**
   - Made ASCII case-insensitive duplicate `docstring-placeholder-markers` diagnostics deterministic when multiple configured spellings have the same normalized value.
   - Reported invalid `docstring-placeholder-markers` entries before checking ASCII case-insensitive duplicates, so Unicode case-folding collisions receive the relevant syntax error.

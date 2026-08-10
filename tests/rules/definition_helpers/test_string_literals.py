@@ -1,3 +1,6 @@
+# Standard library imports
+import warnings
+
 # Third-party imports
 import libcst as cst
 import pytest
@@ -217,7 +220,6 @@ def test_simple_string_source_map_accepts_a_pre_evaluated_value() -> None:
     assert string_literals.source_map_for_simple_string(node, value="different") is None
 
 
-@pytest.mark.filterwarnings("ignore:invalid escape sequence.*:DeprecationWarning")
 @pytest.mark.parametrize(
     ("source", "expected"),
     [
@@ -232,7 +234,9 @@ def test_simple_string_source_map_accepts_a_pre_evaluated_value() -> None:
 )
 def test_simple_string_direct_line_mapping_matches_supported_source_semantics(source: str, expected: bool) -> None:
     node = simple_string(source)
-    value = node.evaluated_value
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        value = string_literals.evaluated_string_value(node)
 
     assert isinstance(value, str)
     assert string_literals.simple_string_has_direct_line_mapping(node, value=value) is expected

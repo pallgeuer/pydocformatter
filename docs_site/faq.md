@@ -19,6 +19,14 @@ Broad selectors such as `ALL`, `PDF`, or `PDF5` intentionally skip some rules th
 
 Yes, `pydocfmt check` works with defaults, and all settings can be customized on the command line. It is recommended however to configure pydocformatter statically in your `pyproject.toml` when you need project-specific selection, formatting, or file-discovery behavior.
 
+## Can pydocformatter run on Windows or WSL?
+
+Native Windows and WSL are unsupported. With Python 3.11 or newer, pydocformatter supports Ubuntu 20.04 and newer and macOS 14 and newer, with best-effort support for other POSIX Linux systems.
+
+## Why does pydocformatter need Git?
+
+Git is needed only when the default gitignore-aware recursive file discovery checks accepted files inside a Git worktree. Install Git or pass `--no-respect-gitignore` to disable that filtering. Explicit file arguments and files outside Git worktrees do not invoke Git.
+
 ## Why did a rule report a finding without fixing it?
 
 Some findings are diagnostic-only. Others are fixable only when pydocformatter can prove that the source rewrite preserves the intended docstring or comment semantics.

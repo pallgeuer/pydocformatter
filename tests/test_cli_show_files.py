@@ -899,6 +899,23 @@ def test_pydocfmt_aborts_when_gitignore_check_fails(mocker: MockerFixture) -> No
         format_file.assert_not_called()
 
 
+def test_pydocfmt_missing_git_reports_actionable_error(mocker: MockerFixture) -> None:
+    with _make_git_tree() as td:
+        root = Path(td)
+        argv = ["pydocfmt", "check", "--show-files", str(root)]
+        mocker.patch("pydocformatter.file_selection.subprocess.run", side_effect=FileNotFoundError, autospec=True)
+        format_file = mocker.patch("pydocformatter.formatter.format_disk_file", autospec=True)
+        result = cli_helpers.run_cli(pydocfmt_cli.main, argv)
+
+        assert result.exit_code == 2
+        assert result.stdout == ""
+        assert (
+            f"pydocfmt check: File selection error: {root}: Unable to apply gitignore filtering: Git executable was not found; install Git or disable gitignore filtering with --no-respect-gitignore"
+            in result.stderr
+        )
+        format_file.assert_not_called()
+
+
 def _make_tree_with_invalid_utf8() -> tempfile.TemporaryDirectory[str]:
     """Create a temporary tree containing one valid file and one invalid UTF-8 file."""
     temp_dir = tempfile.TemporaryDirectory()

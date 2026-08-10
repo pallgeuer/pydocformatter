@@ -87,11 +87,11 @@ class OutputError(Exception):
     """Raised when an output stream cannot be opened or prepared."""
 
 
-def add_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> argparse.ArgumentParser:
+def add_parser(subparsers: argparser.SubparserCollection) -> argparse.ArgumentParser:
     """Add the check subcommand parser.
 
     Args:
-        subparsers (argparse._SubParsersAction[argparse.ArgumentParser]): Top-level subparser action.
+        subparsers (argparser.SubparserCollection): Top-level subparser collection.
 
     Returns:
         argparse.ArgumentParser: Configured `check` subcommand parser.

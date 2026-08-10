@@ -395,15 +395,11 @@ def test_settings_schema_add_arguments_adds_groups_in_order() -> None:
 
     pydocformatter_settings.SETTINGS_SCHEMA.add_arguments(parser, CheckSettings())
 
-    group_titles = tuple(group.title for group in parser._action_groups)
-    assert group_titles.index(SettingsGroup.RUN.value) < group_titles.index(SettingsGroup.FORMATTING.value)
-    assert group_titles.index(SettingsGroup.FORMATTING.value) < group_titles.index(SettingsGroup.COMMENT_FORMATTING.value)
-    assert group_titles.index(SettingsGroup.FORMATTING.value) < group_titles.index(SettingsGroup.DOCSTRING_FORMATTING.value)
-    assert group_titles.index(SettingsGroup.DOCSTRING_FORMATTING.value) < group_titles.index(SettingsGroup.COMMENT_FORMATTING.value)
-    assert group_titles.index(SettingsGroup.COMMENT_FORMATTING.value) < group_titles.index(SettingsGroup.RULE_SELECTION.value)
-    assert group_titles.index(SettingsGroup.RULE_SELECTION.value) < group_titles.index(SettingsGroup.FILE_SELECTION.value)
-    assert group_titles.index(SettingsGroup.FILE_SELECTION.value) < group_titles.index(SettingsGroup.CONFIGURATION.value)
-    option_strings = {option for action in parser._actions for option in action.option_strings}
+    help_text = parser.format_help()
+    rendered_groups = tuple(group for group in SettingsGroup if any(definition.group == group and definition.available_in_cli for definition in pydocformatter_settings.SETTINGS_SCHEMA.definitions))
+    group_positions = {group: help_text.index(f"\n{group.value}:\n") for group in rendered_groups}
+    assert tuple(sorted(rendered_groups, key=group_positions.__getitem__)) == rendered_groups
+    option_strings = set(re.findall(r"(?<![\w-])--?[A-Za-z][A-Za-z0-9-]*", help_text))
     schema_option_strings = {
         flag for definition in pydocformatter_settings.SETTINGS_SCHEMA.definitions if definition.available_in_cli for flag in typing.cast("SettingCLIDefinition", definition.cli).flags
     }

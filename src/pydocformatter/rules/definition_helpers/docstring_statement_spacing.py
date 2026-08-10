@@ -80,7 +80,7 @@ def planned_change_for_docstring(
         return None
     if isinstance(docstring.statement, cst.SimpleStatementSuite):
         return None
-    if position is DocstringStatementSpacingPosition.AFTER and not _has_following_body_statement(docstring):
+    if position is DocstringStatementSpacingPosition.AFTER and following_body_statement(docstring) is None:
         return None
     statement_range = context.positions[docstring.statement]
     if position is DocstringStatementSpacingPosition.BEFORE:
@@ -94,15 +94,23 @@ def planned_change_for_docstring(
     )
 
 
-def _has_following_body_statement(docstring: PDF_definition.DocstringInfo) -> bool:
-    """Return whether the docstring statement has a following sibling statement."""
+def following_body_statement(docstring: PDF_definition.DocstringInfo) -> cst.BaseStatement | None:
+    """Return the body statement immediately following a docstring statement.
+
+    Args:
+        docstring (PDF_definition.DocstringInfo): Prepared docstring whose following owner-body statement should be
+            located.
+
+    Returns:
+        cst.BaseStatement | None: Following sibling statement, or None when the docstring has no following statement.
+    """
     if not isinstance(docstring.owner, PDF_definition.DefinitionInfo) or not isinstance(docstring.owner.body, cst.IndentedBlock):
-        return False
+        return None
     body = docstring.owner.body.body
     for index, statement in enumerate(body):
         if statement is docstring.statement:
-            return index < len(body) - 1
-    return False
+            return body[index + 1] if index < len(body) - 1 else None
+    return None
 
 
 def _blank_run_before(statement_range: cst_metadata.CodeRange, *, source_lines: tuple[str, ...]) -> tuple[int, cst_metadata.CodeRange]:
