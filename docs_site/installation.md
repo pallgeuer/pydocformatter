@@ -2,6 +2,10 @@
 
 pydocformatter requires Python 3.11 or newer.
 
+## Python implementation support
+
+pydocformatter officially supports CPython 3.11 or newer. Compatibility with PyPy and GraalPy is intended but is not currently verified or guaranteed. LibCST's native parser does not publish binary wheels for these implementations, so installation may require an unverified source build. Jython and IronPython are unsupported.
+
 ## Platform support
 
 Ubuntu 20.04 and newer and macOS 14 and newer are supported. Other POSIX Linux systems, including musl-based distributions, receive best-effort support. Native Windows and WSL are unsupported.

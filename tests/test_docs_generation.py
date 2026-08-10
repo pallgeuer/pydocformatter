@@ -818,17 +818,24 @@ def test_docs_dependency_group_omits_unused_or_compatibility_packages() -> None:
     assert dependency_names.isdisjoint(FORBIDDEN_DOCS_DEPENDENCIES)
 
 
-def test_project_metadata_and_documentation_publish_platform_contract() -> None:
-    """Platform metadata and primary documentation must publish the supported contract."""
+def test_project_metadata_and_documentation_publish_compatibility_contract() -> None:
+    """Project metadata and primary documentation must publish the supported compatibility contract."""
     pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     classifiers = set(pyproject["project"]["classifiers"])
 
     assert "Operating System :: OS Independent" not in classifiers
     assert {"Operating System :: MacOS :: MacOS X", "Operating System :: POSIX", "Operating System :: POSIX :: Linux"} <= classifiers
+    implementation_classifiers = {classifier for classifier in classifiers if classifier.startswith("Programming Language :: Python :: Implementation :: ")}
+    assert implementation_classifiers == {"Programming Language :: Python :: Implementation :: CPython"}
     for relative_path in ("README.md", "CONTRIBUTING.md", "docs_site/installation.md", "docs_site/faq.md"):
         text = (ROOT / relative_path).read_text(encoding="utf-8")
-        for expected in ("Python 3.11", "Ubuntu 20.04", "macOS 14", "POSIX Linux", "Windows", "WSL"):
+        for expected in ("CPython 3.11", "PyPy", "GraalPy", "Jython", "IronPython", "Ubuntu 20.04", "macOS 14", "POSIX Linux", "Windows", "WSL"):
             assert expected in text, f"{relative_path} does not document {expected}"
+        assert "officially supports CPython" in text
+        assert "Compatibility with PyPy and GraalPy is intended but is not currently verified or guaranteed" in text
+        assert "Jython and IronPython are unsupported" in text
+    installation = (ROOT / "docs_site" / "installation.md").read_text(encoding="utf-8")
+    assert "LibCST's native parser does not publish binary wheels for these implementations" in installation
 
 
 def test_generated_docs_do_not_include_api_reference_pages(generated_site: tuple[pathlib.Path, pathlib.Path]) -> None:

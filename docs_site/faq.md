@@ -19,9 +19,13 @@ Broad selectors such as `ALL`, `PDF`, or `PDF5` intentionally skip some rules th
 
 Yes, `pydocfmt check` works with defaults, and all settings can be customized on the command line. It is recommended however to configure pydocformatter statically in your `pyproject.toml` when you need project-specific selection, formatting, or file-discovery behavior.
 
+## Which Python implementations are supported?
+
+pydocformatter officially supports CPython 3.11 or newer. Compatibility with PyPy and GraalPy is intended but is not currently verified or guaranteed. LibCST's native parser does not publish binary wheels for these implementations, so installation may require an unverified source build. Jython and IronPython are unsupported.
+
 ## Can pydocformatter run on Windows or WSL?
 
-Native Windows and WSL are unsupported. With Python 3.11 or newer, pydocformatter supports Ubuntu 20.04 and newer and macOS 14 and newer, with best-effort support for other POSIX Linux systems.
+Native Windows and WSL are unsupported. With CPython 3.11 or newer, pydocformatter supports Ubuntu 20.04 and newer and macOS 14 and newer, with best-effort support for other POSIX Linux systems.
 
 ## Why does pydocformatter need Git?
 

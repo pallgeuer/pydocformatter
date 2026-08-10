@@ -46,6 +46,7 @@ All notable changes to this project are documented here. The format follows [Kee
 
 - **Compatibility:**
   - Documented support for Python 3.11 and newer on Ubuntu 20.04 and newer and macOS 14 and newer, best-effort support for other POSIX Linux systems, and no native Windows or WSL support.
+  - Clarified that CPython is officially supported, PyPy and GraalPy compatibility is intended but unverified due to LibCST native-parser packaging, and Jython and IronPython are unsupported.
   - Added blocking glibc, musl, x64, ARM64, Intel macOS, and ARM64 macOS test coverage across Python 3.11 through 3.14.
 - **Breaking PCF rule-code reassignment:**
   - Reorganized PCF codes into general comment formatting (`PCF0xx`), directives and suppressions (`PCF1xx`), and ASCII/Unicode character policies (`PCF2xx`). Canonical rule-name selectors remain unchanged, while old code selectors are not retained as aliases.
