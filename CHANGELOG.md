@@ -84,7 +84,7 @@ All notable changes to this project are documented here. The format follows [Kee
   - Replaced the repository-local Markdown table formatter, release checksum generator, and pytest working-directory isolation fixtures with the shared `la-dev-codex-plugins` implementations.
   - Strengthened semantic Markdown table tests with full-document parsing and normalized all generated documentation tables to the shared canonical style.
 - **Internal cleanup:**
-  - Replaced typed-documentation forwarding aliases and their internal consumer paths with imports from the defining model and type-binding modules.
+  - Replaced typed-documentation forwarding aliases and their internal consumer paths with imports from the defining model and type-binding modules, removed the remaining module type-alias wrapper, and centralized each PDF7xx subject's collector, diagnostic label, and required-type policy.
   - Replaced package-mediated first-party submodule imports with direct imports where contextual local aliases meaningfully rename the module.
   - Required callers to explicitly supply correctness-sensitive dataclass state for rule contexts, comment syntax sensitivity, inline token classification, typed-documentation ownership, and following-block structure.
   - Centralized setting-effect resolution with disabled precedence across runtime rule selection, documentation generation, and metadata-backed tests.
@@ -154,15 +154,15 @@ All notable changes to this project are documented here. The format follows [Kee
 
 - **Cross-platform behavior:**
   - Kept surrogate-path gitignore encoding coverage independent of host filesystem filename restrictions and ran Ubuntu 20.04 dependency synchronization and tests with one consistent unprivileged user environment.
-  - Deduplicated case-insensitive, hard-link, and symlink path aliases by physical file identity while treating zero-valued inode information as unusable, and made a missing Git executable produce an actionable `--no-respect-gitignore` diagnostic.
-  - Kept invalid-escape docstring and annotation analysis and deeply nested type-token validation stable on Python 3.12 through 3.14, including conservative lone-carriage-return handling, closed test-owned SQLite connections explicitly for consistent musl runs, and retained isolated pytest temporary boundaries through Python 3.14 multiprocessing shutdown.
-  - Removed dependencies on private argparse interfaces while preserving CLI help output across direct, inherited, subparser, and mutually exclusive argument registration, and made deep type-token fallback independent of tokenizer diagnostic wording.
+  - Deduplicated case-insensitive, hard-link, and symlink path aliases by physical file identity while falling back to normalized real paths for zero-valued inode information, and made a missing Git executable produce an actionable `--no-respect-gitignore` diagnostic.
+  - Kept invalid-escape docstring and annotation analysis and deeply nested type-token validation stable on Python 3.12 through 3.14, preserved terminal lone carriage returns across source fixes, closed test-owned SQLite connections explicitly for consistent musl runs, and retained isolated pytest temporary boundaries through Python 3.14 multiprocessing shutdown.
+  - Removed dependencies on private argparse interfaces while preserving CLI help output across direct, inherited, subparser, mutually exclusive, and mixed-prefix argument registration, and made deep type-token fallback independent of tokenizer diagnostic wording.
 - **Configuration:**
   - Made ASCII case-insensitive duplicate `docstring-placeholder-markers` diagnostics deterministic when multiple configured spellings have the same normalized value.
   - Reported invalid `docstring-placeholder-markers` entries before checking ASCII case-insensitive duplicates, so Unicode case-folding collisions receive the relevant syntax error.
 - **Developer tooling:**
   - Restored heading ownership checks for semantic documentation tables, kept Markdown pipe parsing aligned with GitHub Flavored Markdown, and retained a focused downstream release-checksum command contract test.
-  - Limited documentation environments to the base shared tooling package while requesting its consumer-facing pytest integration only in test environments.
+  - Limited documentation environments to the base shared tooling package, requested its consumer-facing pytest integration only in test environments, and kept cross-platform pytest jobs independent of development-only tools.
 - **Fix execution:**
   - Remapped LibCST positions onto exact source with structurally verified, parser-consistent right-biased, linear-time sparse alignment, preserving adjacent form feeds and omitted comment or blank lines, rejecting semantic mismatches, and retaining accumulated diagnostics when an unprovable post-fix alignment rolls back all partial fixes.
   - Kept checks and fixes active for valid sources with repeated omitted trivia, avoided redundant structural reparsing of internally produced edited source, and reported only automatic fixes that survive a repeated-source cycle.

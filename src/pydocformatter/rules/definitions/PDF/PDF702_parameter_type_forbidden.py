@@ -42,4 +42,4 @@ class PDF702ParameterTypeForbidden(RuleBase):
         Returns:
             tuple[rule_violations.RuleViolation, ...]: Rule violations reported for the current source.
         """
-        return typed_entry_rules.forbidden_type_violations(context, meta=cls.meta, subject=typed_models.TypedDocumentationSubject.PARAMETER, label="Function parameter")
+        return typed_entry_rules.forbidden_type_violations(context, meta=cls.meta, subject=typed_models.TypedDocumentationSubject.PARAMETER)

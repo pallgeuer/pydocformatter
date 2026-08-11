@@ -49,4 +49,4 @@ class PDF713ClassAttributeTypeRequired(RuleBase):
         Returns:
             tuple[rule_violations.RuleViolation, ...]: Rule violations reported for the current source.
         """
-        return typed_entry_rules.required_type_violations(context, meta=cls.meta, subject=typed_models.TypedDocumentationSubject.CLASS_ATTRIBUTE, label="Class attribute")
+        return typed_entry_rules.required_type_violations(context, meta=cls.meta, subject=typed_models.TypedDocumentationSubject.CLASS_ATTRIBUTE)

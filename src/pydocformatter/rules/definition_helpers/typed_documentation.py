@@ -367,7 +367,7 @@ def _module_type_aliases(context: RuleContext) -> module_bindings.TypeAliasMap:
     data = PDF_definition.PDF.require_data(context)
     aliases = data._type_aliases
     if aliases is None:
-        aliases = type_expressions.module_type_aliases(context.module)
+        aliases = module_bindings.module_type_aliases(context.module)
         object.__setattr__(data, "_type_aliases", aliases)
     return aliases
 

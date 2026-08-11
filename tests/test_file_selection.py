@@ -427,7 +427,7 @@ def test_selection_deduplicates_case_aliases_on_case_insensitive_filesystem(monk
     assert tuple(decision.reason for decision in selection.decisions).count(DecisionReason.DUPLICATE) == 1
 
 
-def test_path_identity_key_returns_none_for_zero_inode(mocker: MockerFixture) -> None:
+def test_path_identity_key_uses_normalized_real_path_for_zero_inode(mocker: MockerFixture) -> None:
     real_stat = os.stat
     zero_inode_stat = mocker.Mock(spec=os.stat_result, st_dev=11, st_ino=0)
 
@@ -437,8 +437,46 @@ def test_path_identity_key_returns_none_for_zero_inode(mocker: MockerFixture) ->
         return real_stat(path, follow_symlinks=follow_symlinks)
 
     mocker.patch("pydocformatter.file_selection.os.stat", side_effect=selective_stat, autospec=True)
+    realpath = mocker.patch("pydocformatter.file_selection.os.path.realpath", return_value="/physical/Module.py", autospec=True)
 
-    assert file_selection.path_identity_key("module.py") is None
+    assert file_selection.path_identity_key("module.py") == os.path.normcase("/physical/Module.py")
+    realpath.assert_called_once_with("module.py")
+
+
+def test_selection_zero_inode_fallback_deduplicates_symlink_aliases(monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture) -> None:
+    settings = CheckSettings(respect_gitignore=False)
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        target = root / "a.py"
+        alias = root / "alias.py"
+        target.write_text("", encoding="utf-8")
+        try:
+            alias.symlink_to(target)
+        except OSError as error:
+            pytest.skip(f"symlinks are not available: {error}")
+        real_stat = os.stat
+
+        def zero_inode_stat(path: str | bytes | int | os.PathLike[str] | os.PathLike[bytes], *, follow_symlinks: bool = True) -> os.stat_result:
+            result = real_stat(path, follow_symlinks=follow_symlinks)
+            if isinstance(path, str) and path in {target.name, alias.name}:
+                values = list(result)
+                values[1] = 0
+                return os.stat_result(values)
+            return result
+
+        mocker.patch("pydocformatter.file_selection.os.stat", side_effect=zero_inode_stat, autospec=True)
+        monkeypatch.chdir(root)
+        selection = file_selection.select_files([target.name, alias.name], _resolver(settings))
+
+    assert selection.accepted_paths == (str(target),)
+    assert selection.decisions[1].reason == DecisionReason.DUPLICATE
+
+
+def test_zero_inode_fallback_cannot_deduplicate_distinct_hard_link_paths(mocker: MockerFixture) -> None:
+    zero_inode_stat = mocker.Mock(spec=os.stat_result, st_dev=11, st_ino=0)
+    mocker.patch("pydocformatter.file_selection.os.stat", return_value=zero_inode_stat, autospec=True)
+
+    assert file_selection.path_identity_key("target.py") != file_selection.path_identity_key("alias.py")
 
 
 def test_path_identity_key_returns_none_when_stat_fails(mocker: MockerFixture) -> None:

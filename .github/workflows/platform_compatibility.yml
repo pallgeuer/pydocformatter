@@ -46,8 +46,8 @@ jobs:
           cache-suffix: tests-${{ matrix.runner }}-${{ matrix.python }}
           python-version: ${{ matrix.python }}
 
-      - name: Sync development dependencies
-        run: uv sync --locked --no-default-groups --group dev
+      - name: Sync test dependencies
+        run: uv sync --locked --no-default-groups --group test
 
       - name: Run test suite
         run: uv run --no-sync pytest -n 0 -q
@@ -77,8 +77,8 @@ jobs:
       - name: Prepare unprivileged test workspace
         run: chown --recursive pydocfmt:pydocfmt "$GITHUB_WORKSPACE"
 
-      - name: Sync development dependencies as an unprivileged user
-        run: runuser --user pydocfmt -- env --unset=UV_CACHE_DIR --unset=UV_PYTHON_INSTALL_DIR HOME=/home/pydocfmt PATH="$PATH" UV_PYTHON=3.11 uv sync --locked --no-default-groups --group dev
+      - name: Sync test dependencies as an unprivileged user
+        run: runuser --user pydocfmt -- env --unset=UV_CACHE_DIR --unset=UV_PYTHON_INSTALL_DIR HOME=/home/pydocfmt PATH="$PATH" UV_PYTHON=3.11 uv sync --locked --no-default-groups --group test
 
       - name: Run test suite as an unprivileged user
         run: runuser --user pydocfmt -- env --unset=UV_CACHE_DIR --unset=UV_PYTHON_INSTALL_DIR HOME=/home/pydocfmt PATH="$PATH" UV_PYTHON=3.11 uv run --no-sync pytest -n 0 -q
@@ -100,4 +100,4 @@ jobs:
             --workdir /workspace \
             --entrypoint sh \
             ghcr.io/astral-sh/uv:python3.13-alpine \
-            -c 'apk add --no-cache git && adduser -D -u "$PYDOCFMT_UID" pydocfmt && su pydocfmt -c "HOME=/home/pydocfmt UV_PYTHON=3.13 PYTHONDONTWRITEBYTECODE=1 git config --global --add safe.directory /workspace && HOME=/home/pydocfmt UV_PYTHON=3.13 PYTHONDONTWRITEBYTECODE=1 uv sync --locked --no-default-groups --group dev && HOME=/home/pydocfmt UV_PYTHON=3.13 PYTHONDONTWRITEBYTECODE=1 uv run --no-sync pytest -n 0 -q"'
+            -c 'apk add --no-cache git && adduser -D -u "$PYDOCFMT_UID" pydocfmt && su pydocfmt -c "HOME=/home/pydocfmt UV_PYTHON=3.13 PYTHONDONTWRITEBYTECODE=1 git config --global --add safe.directory /workspace && HOME=/home/pydocfmt UV_PYTHON=3.13 PYTHONDONTWRITEBYTECODE=1 uv sync --locked --no-default-groups --group test && HOME=/home/pydocfmt UV_PYTHON=3.13 PYTHONDONTWRITEBYTECODE=1 uv run --no-sync pytest -n 0 -q"'

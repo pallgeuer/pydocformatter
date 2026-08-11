@@ -10,9 +10,10 @@ from typing import TYPE_CHECKING
 import libcst as cst
 
 # First-party imports
+import pydocformatter.rules.definition_helpers.typed_documentation_models as typed_models
 from pydocformatter import formatter, rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention
-from pydocformatter.rules.definition_helpers import module_bindings, type_expressions
+from pydocformatter.rules.definition_helpers import module_bindings, typed_entry_rules
 
 
 if TYPE_CHECKING:
@@ -69,6 +70,11 @@ def test_typed_rule_fix_availability_matches_semantic_coverage() -> None:
         "PDF717": "Sometimes",
         "PDF719": "Never",
     }
+
+
+def test_typed_entry_subject_specs_cover_every_subject() -> None:
+    """Keep collector, label, and required-type policy metadata complete."""
+    assert set(typed_entry_rules._SUBJECT_SPECS) == set(typed_models.TypedDocumentationSubject)
 
 
 def test_mismatch_rules_remain_diagnostic_when_fixing() -> None:
@@ -426,14 +432,14 @@ def test_quoted_yield_import_aliases_report_mismatches() -> None:
 
 def test_module_type_aliases_are_cached_across_typed_mismatch_rules(monkeypatch: pytest.MonkeyPatch) -> None:
     calls = 0
-    original = type_expressions.module_type_aliases
+    original = module_bindings.module_type_aliases
 
     def counted_module_type_aliases(module: cst.Module) -> module_bindings.TypeAliasMap:
         nonlocal calls
         calls += 1
         return original(module)
 
-    monkeypatch.setattr(type_expressions, "module_type_aliases", counted_module_type_aliases)
+    monkeypatch.setattr(module_bindings, "module_type_aliases", counted_module_type_aliases)
     source = 'from typing import Iterator\n\n\ndef function(value: Iterator[int]) -> "Iterator[int]":\n    """Yield values.\n\n    Args:\n        value (typing.Iterator[int]): Input value.\n\n    Returns:\n        typing.Iterator[int]: Result value.\n\n    Yields:\n        int: Yielded value.\n    """\n    yield 1\n'
     result = check(source, select=("PDF703", "PDF707", "PDF711"))
 
@@ -444,7 +450,7 @@ def test_module_type_aliases_are_cached_across_typed_mismatch_rules(monkeypatch:
 def test_module_type_aliases_treat_top_level_compound_bindings_as_shadowing() -> None:
     source = "from typing import Iterator, Mapping, Sequence\nfor Iterator in []:\n    pass\nwith manager as Mapping:\n    pass\ntry:\n    pass\nexcept Exception as Sequence:\n    pass\n"
 
-    assert type_expressions.module_type_aliases(cst.parse_module(source)) == {}
+    assert module_bindings.module_type_aliases(cst.parse_module(source)) == {}
 
 
 def test_shadowed_import_alias_type_expressions_remain_conservative() -> None:

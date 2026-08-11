@@ -126,6 +126,15 @@ def test_preserves_crlf_when_inserting_blank_line_before_nested_definition() -> 
     assert result.new_source == 'def outer():\r\n    """Docstring."""\r\n\r\n    def inner():\r\n        pass\r\n'
 
 
+@pytest.mark.parametrize("terminal", ["", "\r"])
+def test_preserves_cr_only_final_newline_state_when_inserting_blank_line_before_nested_definition(terminal: str) -> None:
+    source = f'def outer():\r    """Docstring."""\r    def inner():\r        pass{terminal}'
+    result = statement_spacing_helpers.format_source(source, rule_code="PDF206")
+
+    assert result.new_source == f'def outer():\r    """Docstring."""\r\r    def inner():\r        pass{terminal}'
+    assert not statement_spacing_helpers.format_source(result.new_source, rule_code="PDF206").modified
+
+
 def test_suppression_on_docstring_line_suppresses_nested_definition_finding() -> None:
     source = 'def outer():\n    """Docstring."""  # noqa: PDF206\n    def inner():\n        pass\n'
     result = statement_spacing_helpers.format_source(source, rule_code="PDF206")

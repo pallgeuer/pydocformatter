@@ -67,3 +67,13 @@ def test_pydocfmt_top_level_check_flag_is_rejected() -> None:
 
     assert result.exit_code == 2
     assert "unrecognized arguments: --check" in result.stderr
+
+
+@pytest.mark.parametrize("command", [None, "check", "clean", "config", "linter", "rule", "version", "help"])
+def test_pydocfmt_commands_reject_plus_prefixed_help(command: str | None) -> None:
+    """Keep every shipped parser on standard dash-prefixed help options."""
+    argv = ["pydocfmt", *(path for path in (command, "+h") if path is not None)]
+    result = cli_helpers.run_cli(pydocfmt_cli.main, argv, expect_system_exit=True)
+
+    assert result.exit_code != 0
+    assert "+h" in result.stdout + result.stderr

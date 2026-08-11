@@ -6,6 +6,9 @@ from __future__ import annotations
 # Standard library imports
 import argparse
 
+# Third-party imports
+import pytest
+
 # First-party imports
 from pydocformatter.utils import argparser
 
@@ -122,3 +125,13 @@ def test_parser_uses_custom_option_prefix_for_explicit_help() -> None:
 
     assert "\nOptions:\n  +h, ++help" in help_text
     assert "\n  ++verbose" in help_text
+
+
+@pytest.mark.parametrize("prefix_chars", ["+-", "-+"])
+def test_parser_prefers_standard_help_prefix_when_available(prefix_chars: str) -> None:
+    """Use standard help flags whenever the configured prefixes permit them."""
+    parser = argparser.create_parser(prog="example", prefix_chars=prefix_chars)
+    help_text = parser.format_help()
+
+    assert "\nOptions:\n  -h, --help" in help_text
+    assert "+h" not in help_text

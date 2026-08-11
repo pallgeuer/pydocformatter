@@ -59,7 +59,7 @@ Glob lists cannot contain empty strings. Include patterns allow patterns such as
 
 Existing filesystem paths are displayed as absolute normalized paths. Non-existing explicit paths are displayed as normalized lexical paths, and stdin uses `-`.
 
-Accepted existing paths are deduplicated by physical device and inode identity after gitignore filtering. This recognizes lexical, symlink, hard-link, and case-insensitive filesystem aliases of the same file. The retained spelling is chosen by a stable display-path score; duplicate aliases are recorded as ignored duplicate decisions. The retained spelling's resolved settings profile is used for the physical file; settings associated only with rejected aliases do not apply. Paths with unusable zero-valued inode information are not deduplicated. Non-existing or uninspectable explicit paths are also not deduplicated.
+Accepted existing paths are deduplicated by physical device and inode identity after gitignore filtering. This recognizes lexical, symlink, hard-link, and case-insensitive filesystem aliases of the same file. When a filesystem reports an unusable zero-valued inode, a normalized real-path fallback still recognizes lexical, symlink, and case-insensitive aliases, but distinct hard-link paths cannot be identified as aliases. The retained spelling is chosen by a stable display-path score; duplicate aliases are recorded as ignored duplicate decisions. The retained spelling's resolved settings profile is used for the physical file; settings associated only with rejected aliases do not apply. Non-existing or uninspectable explicit paths are not deduplicated.
 
 ## Decision table
 

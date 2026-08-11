@@ -40,4 +40,4 @@ class PDF716ModuleAttributeMissingDescription(RuleBase):
         Returns:
             tuple[rule_violations.RuleViolation, ...]: Rule violations reported for the current source.
         """
-        return typed_entry_rules.missing_description_violations(context, meta=cls.meta, subject=typed_models.TypedDocumentationSubject.MODULE_ATTRIBUTE, label="Module attribute")
+        return typed_entry_rules.missing_description_violations(context, meta=cls.meta, subject=typed_models.TypedDocumentationSubject.MODULE_ATTRIBUTE)

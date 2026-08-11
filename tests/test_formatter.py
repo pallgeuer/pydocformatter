@@ -557,7 +557,7 @@ def test_rule_source_formatter_aligns_bom_seed_with_libcst_positions() -> None:
     assert result.errors == ()
 
 
-def test_rule_source_formatter_aligns_trailing_cr_seed_with_libcst_positions(mocker: MockerFixture) -> None:
+def test_rule_source_formatter_preserves_trailing_cr_seed_with_libcst_positions(mocker: MockerFixture) -> None:
     observed_contexts: list[tuple[str, tuple[str, ...], source_text.LineBounds | None]] = []
     original_code_property = inspect.getattr_static(cst.Module, "code")
     if not isinstance(original_code_property, property) or original_code_property.fget is None:
@@ -593,15 +593,14 @@ def test_rule_source_formatter_aligns_trailing_cr_seed_with_libcst_positions(moc
         violations = classmethod(no_violations)
 
     source = "x = 1\ry = 2\r"
-    expected_context_source = "x = 1\ry = 2"
-    expected_lines = tuple(source_text.source_lines(expected_context_source))
+    expected_lines = tuple(source_text.source_lines(source))
     mocker.patch.object(cst.Module, "code", new=property(_count_code_access))
     result = formatter.format_source(source, "a.py", settings=CheckSettings(), rule_selection=isolated_rule_selection(TST), fix=False)
 
     assert result.new_source == source
     assert not result.modified
     assert result.errors == ()
-    assert observed_contexts == [(expected_context_source, expected_lines, source_text.line_bounds_from_lines(expected_lines))]
+    assert observed_contexts == [(source, expected_lines, source_text.line_bounds_from_lines(expected_lines))]
     assert len(code_accesses) == 1
 
 

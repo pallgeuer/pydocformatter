@@ -148,6 +148,6 @@ def create_subparser(subparsers: SubparserCollection, *, name: str, **kwargs: Un
 
 def _configure_parser(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     """Add project parser defaults through public argparse interfaces."""
-    option_prefix = parser.prefix_chars[0]
+    option_prefix = "-" if "-" in parser.prefix_chars else parser.prefix_chars[0]
     parser.add_argument(f"{option_prefix}h", f"{option_prefix}{option_prefix}help", action="help", help="Show this help message and exit")
     return parser

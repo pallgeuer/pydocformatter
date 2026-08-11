@@ -565,7 +565,7 @@ def test_extraction_boundary_blank_is_only_inserted_after_same_indent_regular_st
 def test_cr_only_source_uses_detected_line_endings_for_all_generated_lines() -> None:
     source = "# alpha beta gamma delta\rvalue = 1 # comment\r"
     result = pcf_helpers.format_pcf(source, line_length=16, line_ending=LineEnding.AUTO)
-    assert result.new_source == "# alpha beta\r# gamma delta\r\r# comment\rvalue = 1"
+    assert result.new_source == "# alpha beta\r# gamma delta\r\r# comment\rvalue = 1\r"
 
 
 def test_complex_trailing_extraction_is_idempotent() -> None:

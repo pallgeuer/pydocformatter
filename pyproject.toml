@@ -68,6 +68,7 @@ test = [
 dev = [
     {include-group = "test"},
     "pre-commit==4.6.1",
+    # When updating Ruff or ty, compare their default exclude directories with each other and pydocformatter's DEFAULT_EXCLUDE.
     "ruff==0.16.1",
     "twine==7.0.0",
     "ty==0.0.66",

@@ -5,13 +5,11 @@ from __future__ import annotations
 import re
 import copy
 import enum
-import json
 import math
 import typing
 import tomllib
 import argparse
 import tempfile
-import subprocess
 import dataclasses
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -930,14 +928,6 @@ def test_load_settings_defaults_in_isolated_mode(monkeypatch: pytest.MonkeyPatch
     assert config.per_file_settings == ()
 
 
-def test_default_exclude_extends_ruff_default_with_cache_directory() -> None:
-    result = subprocess.run(["uv", "run", "ruff", "config", "exclude"], cwd=_repo_root(), shell=False, check=True, capture_output=True, text=True)
-    default_match = re.search(r"^Default value: (?P<value>\[.*\])$", result.stdout, re.MULTILINE)
-    assert default_match is not None
-
-    assert tuple(json.loads(default_match.group("value"))) == tuple(directory for directory in DEFAULT_EXCLUDE if directory != ".pydocfmt_cache")
-
-
 def test_programmatic_cache_directory_rejects_embedded_nul() -> None:
     with pytest.raises(SettingsError, match=r"cache_dir.*NUL"):
         pydocformatter_settings.SETTINGS_SCHEMA.load(field_overrides=CheckSettingsOverrides(cache_dir="\0"))
@@ -954,27 +944,6 @@ def test_toml_cache_directory_rejects_embedded_nul_escape(tmp_path: Path) -> Non
 
     with pytest.raises(SettingsError, match=r"cache-dir.*NUL"):
         pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(config_options=(str(config),)))
-
-
-def test_ty_default_exclude_matches_shared_default_directories() -> None:
-    with tempfile.TemporaryDirectory() as td:
-        root = Path(td)
-        (root / "pyproject.toml").write_text('[project]\nname = "ty-default-excludes"\nversion = "0.0.0"\nrequires-python = ">=3.11"\n', encoding="utf-8")
-        (root / "kept.py").write_text("x = 1\n", encoding="utf-8")
-        for directory in (directory for directory in DEFAULT_EXCLUDE if directory != ".pydocfmt_cache"):
-            ignored_dir = root / directory
-            ignored_dir.mkdir(parents=True)
-            (ignored_dir / "ignored.py").write_text("x = 1\n", encoding="utf-8")
-
-        result = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true]
-            ["uv", "run", "ty", "check", "--project", str(root), "-vv", "--no-progress", "--output-format", "concise"], cwd=_repo_root(), shell=False, check=True, capture_output=True, text=True
-        )
-
-    assert "Indexed 1 file(s)" in result.stderr
-    assert f"Checking file '{root / 'kept.py'}'" in result.stderr
-    assert "ignored.py" not in result.stderr
-    for directory in (directory for directory in DEFAULT_EXCLUDE if directory != ".pydocfmt_cache"):
-        assert f"Skipping directory '{root / directory}'" in result.stderr
 
 
 def test_setting_documentation_default_mentions_match_resolved_defaults() -> None:

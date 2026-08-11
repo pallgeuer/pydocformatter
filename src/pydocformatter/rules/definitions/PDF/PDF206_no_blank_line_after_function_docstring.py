@@ -35,6 +35,7 @@ class PDF206NoBlankLineAfterFunctionDocstring(RuleBase):
 
     meta = RuleMetadata(
         code=RuleCode("PDF206"),
+        # Keep the stable name as the intentional policy opposite of PDF207 despite the nested-definition exception.
         name="no-blank-line-after-function-docstring",
         message="Function docstring has incorrect blank line spacing after it",
         fix_availability=FixAvailability.ALWAYS,

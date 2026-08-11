@@ -460,10 +460,7 @@ def _source_alignment_error(path: str, error: _SourceAlignmentError) -> str:
 
 def _module_aligned_source(source: str) -> str:
     """Return source text aligned with LibCST module source positions."""
-    aligned_source = source.removeprefix(UTF8_BOM)
-    if aligned_source.endswith("\r") and not aligned_source.endswith("\r\n"):
-        return aligned_source[:-1]
-    return aligned_source
+    return source.removeprefix(UTF8_BOM)
 
 
 def _category_context(pass_context: _ModulePassContext, *, path: str, source_path: SourcePathContext, settings: CheckSettings, line_ending: str) -> RuleCategoryContext:

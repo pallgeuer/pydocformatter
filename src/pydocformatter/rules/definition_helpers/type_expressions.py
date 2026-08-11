@@ -12,13 +12,10 @@ import dataclasses
 from typing import TYPE_CHECKING
 
 # First-party imports
-from pydocformatter.rules.definition_helpers import ascii_whitespace, module_bindings, unicode_safety
+from pydocformatter.rules.definition_helpers import ascii_whitespace, unicode_safety
 
 
 if TYPE_CHECKING:
-    # Third-party imports
-    import libcst as cst
-
     # First-party imports
     from pydocformatter.rules.definition_helpers.module_bindings import TypeAliasMap
 
@@ -44,18 +41,6 @@ class _ValidatedTypeTokens:
 
     tokens: tuple[tokenize.TokenInfo, ...]
     has_grouping: bool
-
-
-def module_type_aliases(module: cst.Module) -> TypeAliasMap:
-    """Return conservative absolute import aliases usable for type expression comparison.
-
-    Args:
-        module (cst.Module): Parsed source module whose top-level imports should be inspected.
-
-    Returns:
-        TypeAliasMap: Mapping from unshadowed source names to absolute qualified import names.
-    """
-    return module_bindings.module_type_aliases(module)
 
 
 def parse_type_like_expr(text: str, *, aliases: TypeAliasMap | None = None) -> ast.Expression | None:

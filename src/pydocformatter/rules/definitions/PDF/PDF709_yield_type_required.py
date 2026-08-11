@@ -43,4 +43,4 @@ class PDF709YieldTypeRequired(RuleBase):
         Returns:
             tuple[rule_violations.RuleViolation, ...]: Rule violations reported for the current source.
         """
-        return typed_entry_rules.required_type_violations(context, meta=cls.meta, subject=typed_models.TypedDocumentationSubject.YIELD, label="Function yield")
+        return typed_entry_rules.required_type_violations(context, meta=cls.meta, subject=typed_models.TypedDocumentationSubject.YIELD)

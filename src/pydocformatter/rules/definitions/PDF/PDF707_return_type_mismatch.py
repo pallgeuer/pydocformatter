@@ -40,4 +40,4 @@ class PDF707ReturnTypeMismatch(RuleBase):
         Returns:
             tuple[rule_violations.RuleViolation, ...]: Rule violations reported for the current source.
         """
-        return typed_entry_rules.mismatch_violations(context, meta=cls.meta, subject=typed_models.TypedDocumentationSubject.RETURN, label="Function return")
+        return typed_entry_rules.mismatch_violations(context, meta=cls.meta, subject=typed_models.TypedDocumentationSubject.RETURN)
