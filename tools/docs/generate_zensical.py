@@ -489,7 +489,7 @@ def _write_rule_page(rule_class: type[RuleBase], page: RulePage, *, previous_pag
         "",
         f"Part of the [{rule.code.prefix} rule category]({rule.code.prefix.lower()}.md).",
         "",
-        f"[View source]({_source_url(source_path)}) · [View documentation source]({_source_url(markdown_path)}) · [Search issues](https://github.com/pallgeuer/pydocformatter/issues?q={rule.code})",
+        f"[View source]({_source_url(source_path)}) \u00b7 [View documentation source]({_source_url(markdown_path)}) \u00b7 [Search issues](https://github.com/pallgeuer/pydocformatter/issues?q={rule.code})",
         "",
         body,
         "",

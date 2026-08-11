@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 
 # First-party imports
 import pydocformatter.settings as settings_core
-from pydocformatter.cache import directory as cache_directory
+import pydocformatter.cache.directory as cache_directory
 from pydocformatter.cli import global_args, settings_check
 from pydocformatter.utils import argparser
 

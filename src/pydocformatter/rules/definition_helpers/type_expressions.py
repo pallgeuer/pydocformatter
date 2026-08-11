@@ -1,8 +1,4 @@
-"""Conservative parsing helpers for annotation-like type expressions.
-
-Attributes:
-    TypeAliasMap (TypeAlias): Unshadowed source names mapped to absolute import-qualified names for type comparison.
-"""
+"""Conservative parsing helpers for annotation-like type expressions."""
 
 # Future imports
 from __future__ import annotations
@@ -23,8 +19,8 @@ if TYPE_CHECKING:
     # Third-party imports
     import libcst as cst
 
-
-TypeAliasMap = module_bindings.TypeAliasMap
+    # First-party imports
+    from pydocformatter.rules.definition_helpers.module_bindings import TypeAliasMap
 
 
 @dataclasses.dataclass

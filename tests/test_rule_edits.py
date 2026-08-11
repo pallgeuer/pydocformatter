@@ -459,8 +459,8 @@ def test_multiple_unsorted_edits_support_unicode_and_adjacent_ranges() -> None:
 
     result = rule_edits.apply_source_edits(module, edits)
 
-    assert result.module.code == "name = 'ω'\ngamma= 2\n"
-    assert result.source == "name = 'ω'\ngamma= 2\n"
+    assert result.module.code == "name = '\u03c9'\ngamma= 2\n"
+    assert result.source == "name = '\u03c9'\ngamma= 2\n"
 
 
 def test_cached_source_and_line_bounds_apply_without_reading_module_code(mocker: MockerFixture) -> None:

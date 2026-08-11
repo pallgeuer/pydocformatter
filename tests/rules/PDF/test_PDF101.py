@@ -473,10 +473,10 @@ def test_reflows_escaped_delimiters_and_backslashes_when_source_spelling_is_pres
 
 
 def test_reflow_preserves_mixed_literal_and_escaped_non_ascii_spellings() -> None:
-    source = 'def function():\n    """café \\xe9 words around enough to wrap."""\n'
+    source = 'def function():\n    """caf\xe9 \\xe9 words around enough to wrap."""\n'
     result = format_pdf001(source, settings=CheckSettings(select=("PDF101",), line_length=40))
 
-    assert result.new_source == 'def function():\n    """café \\xe9 words around enough to\n    wrap."""\n'
+    assert result.new_source == 'def function():\n    """caf\xe9 \\xe9 words around enough to\n    wrap."""\n'
     assert not format_pdf001(result.new_source, settings=CheckSettings(select=("PDF101",), line_length=40)).modified
 
 
@@ -528,13 +528,13 @@ def test_reflow_uses_region_offsets_when_description_matches_entry_prefix() -> N
 
 def test_reflow_counts_escaped_non_ascii_source_width_when_wrapping() -> None:
     escaped = 'def function():\n    """\\xe9\\xe9\\xe9 tail words"""\n'
-    literal = 'def function():\n    """ééé tail words"""\n'
+    literal = 'def function():\n    """\xe9\xe9\xe9 tail words"""\n'
 
     escaped_result = format_pdf001(escaped, settings=CheckSettings(select=("PDF101",), line_length=20))
     literal_result = format_pdf001(literal, settings=CheckSettings(select=("PDF101",), line_length=20))
 
     assert escaped_result.new_source == 'def function():\n    """\\xe9\\xe9\\xe9\n    tail words"""\n'
-    assert literal_result.new_source == 'def function():\n    """ééé tail\n    words"""\n'
+    assert literal_result.new_source == 'def function():\n    """\xe9\xe9\xe9 tail\n    words"""\n'
 
 
 @pytest.mark.filterwarnings("ignore:invalid escape sequence.*:DeprecationWarning")

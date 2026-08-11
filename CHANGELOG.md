@@ -76,12 +76,15 @@ All notable changes to this project are documented here. The format follows [Kee
   - Corrected the rule settings audit to distinguish disabled rules from rules ignored only by broad selectors, with metadata-backed regression coverage.
   - Distinguished convention opt-in policies from `require-explicit`, with exhaustive conflict-free convention profiles and meaningful explicit-selection defaults enforced by regression tests.
 - **Developer tooling:**
+  - Enforced ASCII-only source and configuration files with repository-level regression coverage while retaining literal Unicode in documentation examples.
   - Generated the read-only documentation test site once per pytest process that runs a consumer instead of once for each of 39 consumers, reducing the measured serial suite from 46.10s to 29.35s and default xdist from 11.98s to 6.85s without changing test coverage or scheduling.
   - Expanded the repository's own pydocformatter policy with attribute declaration-order checks, constructor-assigned attribute coverage, joined comment reflow, hanging task-marker formatting, and consistent forced exclusions.
   - Updated the fixed documentation, test, and development dependency pins and migrated Ruff selectors and suppressions to the human-readable names supported by Ruff 0.16.
   - Replaced the repository-local Markdown table formatter, release checksum generator, and pytest working-directory isolation fixtures with the shared `la-dev-codex-plugins` implementations.
   - Strengthened semantic Markdown table tests with full-document parsing and normalized all generated documentation tables to the shared canonical style.
 - **Internal cleanup:**
+  - Replaced typed-documentation forwarding aliases and their internal consumer paths with imports from the defining model and type-binding modules.
+  - Replaced package-mediated first-party submodule imports with direct imports where contextual local aliases meaningfully rename the module.
   - Required callers to explicitly supply correctness-sensitive dataclass state for rule contexts, comment syntax sensitivity, inline token classification, typed-documentation ownership, and following-block structure.
   - Centralized setting-effect resolution with disabled precedence across runtime rule selection, documentation generation, and metadata-backed tests.
   - Separated reusable docstring source editing, literal rendering, section spacing, and comment formatting from rule category preparation, and returned PDF312-specific phrase matching to its rule module.

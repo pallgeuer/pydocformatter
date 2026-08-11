@@ -10,6 +10,7 @@ import dataclasses
 import pytest
 
 # First-party imports
+import tests.rules.PDF.helpers as pdf_helpers
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 import pydocformatter.rules.definitions.PDF.PDF414_malformed_convention_entry as PDF414_definition
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention, DocstringMissingDocumentation
@@ -20,7 +21,6 @@ from pydocformatter.rules.definitions.PDF.PDF500_missing_parameter_documentation
 from pydocformatter.rules.definitions.PDF.PDF502_missing_return_documentation import PDF502MissingReturnDocumentation
 from pydocformatter.rules.definitions.PDF.PDF506_missing_exception_documentation import PDF506MissingExceptionDocumentation
 from pydocformatter.rules.models import FixAvailability
-from tests.rules.PDF import helpers as pdf_helpers
 
 
 format_source = pdf_helpers.formatter_for("PDF414")

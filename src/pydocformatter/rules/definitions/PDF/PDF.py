@@ -883,7 +883,7 @@ class PDFCategoryData:
         default=None, init=False, repr=False, compare=False
     )
     _module_bindings: module_bindings.ModuleBindings | None = dataclasses.field(default=None, init=False, repr=False, compare=False)
-    _type_aliases: type_expressions.TypeAliasMap | None = dataclasses.field(default=None, init=False, repr=False, compare=False)
+    _type_aliases: module_bindings.TypeAliasMap | None = dataclasses.field(default=None, init=False, repr=False, compare=False)
     _entry_description_first_line_targets: tuple[EntryDescriptionLineTarget, ...] | None = dataclasses.field(default=None, init=False, repr=False, compare=False)
     _entry_description_terminal_line_targets: tuple[EntryDescriptionLineTarget, ...] | None = dataclasses.field(default=None, init=False, repr=False, compare=False)
 

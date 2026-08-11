@@ -12,7 +12,7 @@ import libcst as cst
 # First-party imports
 from pydocformatter import formatter, rules_selection
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention
-from pydocformatter.rules.definition_helpers import type_expressions
+from pydocformatter.rules.definition_helpers import module_bindings, type_expressions
 
 
 if TYPE_CHECKING:
@@ -428,7 +428,7 @@ def test_module_type_aliases_are_cached_across_typed_mismatch_rules(monkeypatch:
     calls = 0
     original = type_expressions.module_type_aliases
 
-    def counted_module_type_aliases(module: cst.Module) -> type_expressions.TypeAliasMap:
+    def counted_module_type_aliases(module: cst.Module) -> module_bindings.TypeAliasMap:
         nonlocal calls
         calls += 1
         return original(module)

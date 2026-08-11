@@ -22,11 +22,11 @@ def concatenated_string(source: str) -> cst.ConcatenatedString:
 
 
 def test_value_fragments_preserve_literal_and_escaped_non_ascii_spellings() -> None:
-    fragments = string_literals.value_fragments_for_simple_string(simple_string('"""é \\xe9 \\u00e9"""'))
+    fragments = string_literals.value_fragments_for_simple_string(simple_string('"""\xe9 \\xe9 \\u00e9"""'))
 
     assert fragments is not None
-    assert tuple(fragment.value for fragment in fragments) == tuple("é é é")
-    assert "".join(fragment.source for fragment in fragments) == "é \\xe9 \\u00e9"
+    assert tuple(fragment.value for fragment in fragments) == tuple("\xe9 \xe9 \xe9")
+    assert "".join(fragment.source for fragment in fragments) == "\xe9 \\xe9 \\u00e9"
 
 
 def test_value_fragments_validate_named_unicode_escapes() -> None:
@@ -38,13 +38,13 @@ def test_value_fragments_validate_named_unicode_escapes() -> None:
 
 
 def test_render_simple_string_from_fragments_preserves_mixed_spellings() -> None:
-    node = simple_string('"""é \\xe9 words"""')
+    node = simple_string('"""\xe9 \\xe9 words"""')
     fragments = string_literals.value_fragments_for_simple_string(node)
 
     assert fragments is not None
-    rendered = string_literals.render_simple_string_from_fragments(node, fragments, expected_value="é é words")
+    rendered = string_literals.render_simple_string_from_fragments(node, fragments, expected_value="\xe9 \xe9 words")
 
-    assert rendered == '"""é \\xe9 words"""'
+    assert rendered == '"""\xe9 \\xe9 words"""'
 
 
 def test_literalized_whitespace_fragments_convert_normal_whitespace_escapes() -> None:
@@ -73,13 +73,13 @@ def test_literalized_whitespace_fragments_leave_other_escape_spellings_unchanged
 
 
 def test_concatenated_fragments_preserve_component_escape_spellings_in_target_literal() -> None:
-    node = concatenated_string('"é " "\\xe9 " "\\u00e9"')
+    node = concatenated_string('"\xe9 " "\\xe9 " "\\u00e9"')
     fragments = string_literals.fragments_for_concatenated_string(node, target_quote='"""', line_ending="\n")
 
     assert fragments is not None
-    rendered = string_literals.render_simple_string_from_body_source("", '"""', "".join(fragment.source for fragment in fragments), expected_value="é é é")
+    rendered = string_literals.render_simple_string_from_body_source("", '"""', "".join(fragment.source for fragment in fragments), expected_value="\xe9 \xe9 \xe9")
 
-    assert rendered == '"""é \\xe9 \\u00e9"""'
+    assert rendered == '"""\xe9 \\xe9 \\u00e9"""'
 
 
 def test_simple_string_parts_map_complete_concatenated_value_offsets() -> None:
@@ -139,8 +139,8 @@ def test_retarget_fragments_escapes_target_delimiter_without_reescaping_literal_
 
 
 def test_render_value_as_simple_string_uses_explicit_non_ascii_policy() -> None:
-    assert string_literals.render_value_as_simple_string("café", escape_non_ascii=False) == '"""café"""'
-    assert string_literals.render_value_as_simple_string("café", escape_non_ascii=True) == '"""caf\\xe9"""'
+    assert string_literals.render_value_as_simple_string("caf\xe9", escape_non_ascii=False) == '"""caf\xe9"""'
+    assert string_literals.render_value_as_simple_string("caf\xe9", escape_non_ascii=True) == '"""caf\\xe9"""'
 
 
 def test_parse_simple_string_escape_returns_value_source_and_end() -> None:
@@ -251,11 +251,11 @@ def test_parse_simple_string_escape_returns_none_for_invalid_escape() -> None:
 
 
 def test_wrap_source_tokens_counts_escape_source_widths() -> None:
-    words = (inline_markup.InlineToken(value="éé", source="\\xe9\\xe9", kind=None, url_like=False), inline_markup.InlineToken(value="tail", source="tail", kind=None, url_like=False))
+    words = (inline_markup.InlineToken(value="\xe9\xe9", source="\\xe9\\xe9", kind=None, url_like=False), inline_markup.InlineToken(value="tail", source="tail", kind=None, url_like=False))
 
     wrapped = string_literals.wrap_source_tokens(words, width=9, initial_indent="", subsequent_indent="", tab_width=4)
 
-    assert tuple(line.value for line in wrapped) == ("éé", "tail")
+    assert tuple(line.value for line in wrapped) == ("\xe9\xe9", "tail")
     assert tuple(line.source for line in wrapped) == ("\\xe9\\xe9", "tail")
 
 

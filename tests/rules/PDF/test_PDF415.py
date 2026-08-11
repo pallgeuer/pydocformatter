@@ -7,6 +7,7 @@ from __future__ import annotations
 import pytest
 
 # First-party imports
+import tests.rules.PDF.helpers as pdf_helpers
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 import pydocformatter.rules.definitions.PDF.PDF415_convention_entry_indentation as PDF415_definition
 from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention, IndentStyle
@@ -15,7 +16,6 @@ from pydocformatter.rules.definitions.PDF.PDF101_docstring_reflow import PDF101D
 from pydocformatter.rules.definitions.PDF.PDF414_malformed_convention_entry import PDF414MalformedConventionEntry
 from pydocformatter.rules.definitions.PDF.PDF415_convention_entry_indentation import PDF415ConventionEntryIndentation
 from pydocformatter.rules.models import FixAvailability
-from tests.rules.PDF import helpers as pdf_helpers
 
 
 format_source = pdf_helpers.formatter_for("PDF415")

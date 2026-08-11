@@ -1,11 +1,4 @@
-"""Typed docstring entry helpers for owning-docstring rules.
-
-Attributes:
-    TypedDocumentationSubject (TypeAlias): Documented subject groups dispatched by PDF7xx rules.
-    TypedDocumentationTarget (TypeAlias): Code/documentation pair inspected by PDF7xx rules.
-    TypedDocstringEntry (TypeAlias): Logical owning-docstring entry with optional type and description text.
-    TypedDocstringTypeSource (TypeAlias): Docstring type spelling and its source location.
-"""
+"""Typed docstring entry helpers for owning-docstring rules."""
 
 # Future imports
 from __future__ import annotations
@@ -22,13 +15,13 @@ import pydocformatter.rules.edits as rule_edits
 import pydocformatter.rules.violations as rule_violations
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 import pydocformatter.rules.definition_helpers.string_literals
-import pydocformatter.rules.definition_helpers.typed_documentation_models as typed_models
 from pydocformatter.cli.settings_check import DocstringConvention
 from pydocformatter.rules.definition_helpers import (
     attribute_documentation,
     docstring_sections,
     docstring_source,
     entry_completeness,
+    module_bindings,
     parameter_documentation,
     rest_fields,
     section_edits,
@@ -36,6 +29,7 @@ from pydocformatter.rules.definition_helpers import (
     type_expressions,
     value_documentation,
 )
+from pydocformatter.rules.definition_helpers.typed_documentation_models import TypedDocstringEntry, TypedDocstringTypeSource, TypedDocumentationSubject, TypedDocumentationTarget, TypeRemovalCorrection
 
 
 if typing.TYPE_CHECKING:
@@ -58,11 +52,6 @@ _YIELD_CONTAINER_NAMES = (
     "collections.abc.AsyncIterator",
     "collections.abc.AsyncIterable",
 )
-
-TypedDocumentationSubject = typed_models.TypedDocumentationSubject
-TypedDocumentationTarget = typed_models.TypedDocumentationTarget
-TypedDocstringEntry = typed_models.TypedDocstringEntry
-TypedDocstringTypeSource = typed_models.TypedDocstringTypeSource
 
 
 def missing_description_violations(targets: tuple[TypedDocumentationTarget, ...], *, meta: RuleMetadata, label: str) -> tuple[rule_violations.RuleViolation, ...]:
@@ -105,7 +94,7 @@ def required_type_violations(targets: tuple[TypedDocumentationTarget, ...], *, c
 
 
 def forbidden_type_violations(
-    targets: tuple[TypedDocumentationTarget, ...], *, context: RuleContext, meta: RuleMetadata, label: str, correction: typed_models.TypeRemovalCorrection
+    targets: tuple[TypedDocumentationTarget, ...], *, context: RuleContext, meta: RuleMetadata, label: str, correction: TypeRemovalCorrection
 ) -> tuple[rule_violations.RuleViolation, ...]:
     """Return diagnostics for documented targets with docstring types.
 
@@ -114,8 +103,7 @@ def forbidden_type_violations(
         context (RuleContext): Current source context used to construct safe source edits.
         meta (RuleMetadata): Metadata for the PDF7xx rule reporting the findings.
         label (str): Human-readable target label used in per-instance diagnostic messages.
-        correction (typed_models.TypeRemovalCorrection): Explicit policy controlling whether safe type removals are
-            planned.
+        correction (TypeRemovalCorrection): Explicit policy controlling whether safe type removals are planned.
 
     Returns:
         tuple[rule_violations.RuleViolation, ...]: Diagnostics for entries that include forbidden docstring type text.
@@ -123,7 +111,7 @@ def forbidden_type_violations(
     return sort_violations(
         rule_violations.violation_for_optional_planned_source_change(
             meta,
-            _planned_forbidden_type_change(source, context=context) if correction is typed_models.TypeRemovalCorrection.REMOVE else None,
+            _planned_forbidden_type_change(source, context=context) if correction is TypeRemovalCorrection.REMOVE else None,
             line_numbers=source.line_numbers,
             instance_message=f"{label} '{target.name}' docstring entry should not include a type",
         )
@@ -374,7 +362,7 @@ def _cached_targets(context: RuleContext, subject: TypedDocumentationSubject, co
     return targets
 
 
-def _module_type_aliases(context: RuleContext) -> type_expressions.TypeAliasMap:
+def _module_type_aliases(context: RuleContext) -> module_bindings.TypeAliasMap:
     """Return cached module import aliases for type expression comparisons."""
     data = PDF_definition.PDF.require_data(context)
     aliases = data._type_aliases
@@ -568,7 +556,7 @@ def _yield_container_matches(expression: cst.BaseExpression, *, context: RuleCon
     return _normalized_source_name(source_name, _module_type_aliases(context)) in _YIELD_CONTAINER_NAMES
 
 
-def _normalized_source_name(source_name: str, aliases: type_expressions.TypeAliasMap) -> str:
+def _normalized_source_name(source_name: str, aliases: module_bindings.TypeAliasMap) -> str:
     """Return source name with an unshadowed import alias root expanded."""
     root, dot, rest = source_name.partition(".")
     qualified_root = aliases.get(root, root)

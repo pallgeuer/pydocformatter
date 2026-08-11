@@ -174,13 +174,13 @@ def test_fix_keeps_non_ascii_code_points_escaped_for_ascii_source() -> None:
 
 
 def test_fix_preserves_mixed_literal_and_escaped_non_ascii_spellings() -> None:
-    source = '"café " "\\xe9" "\\u00e9"\n'
+    source = '"caf\xe9 " "\\xe9" "\\u00e9"\n'
     _, context = contexts(source)
     result = rule_helpers.rule_fix_result(PDF000DocstringLiteralNormalization, context)
 
-    assert result.module.code == '"""café \\xe9\\u00e9"""\n'
+    assert result.module.code == '"""caf\xe9 \\xe9\\u00e9"""\n'
     _, fixed_context = contexts(result.module.code)
-    assert PDF.require_data(fixed_context).docstrings[0].value == "café \xe9\xe9"
+    assert PDF.require_data(fixed_context).docstrings[0].value == "caf\xe9 \xe9\xe9"
 
 
 @pytest.mark.filterwarnings("ignore:invalid escape sequence.*:DeprecationWarning")

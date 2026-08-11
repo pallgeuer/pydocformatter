@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 
 # First-party imports
 import pydocformatter.rules.registration as rule_registration
+import pydocformatter.rules.definition_helpers.typed_documentation_models as typed_models
 from pydocformatter.rules.definition import RuleBase
 from pydocformatter.rules.definition_helpers import typed_entry_rules
 from pydocformatter.rules.definitions.PDF.PDF import PDF
@@ -48,4 +49,4 @@ class PDF713ClassAttributeTypeRequired(RuleBase):
         Returns:
             tuple[rule_violations.RuleViolation, ...]: Rule violations reported for the current source.
         """
-        return typed_entry_rules.required_type_violations(context, meta=cls.meta, subject=typed_entry_rules.TypedDocumentationSubject.CLASS_ATTRIBUTE, label="Class attribute")
+        return typed_entry_rules.required_type_violations(context, meta=cls.meta, subject=typed_models.TypedDocumentationSubject.CLASS_ATTRIBUTE, label="Class attribute")

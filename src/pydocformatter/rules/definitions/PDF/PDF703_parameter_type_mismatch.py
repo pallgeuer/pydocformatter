@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 
 # First-party imports
 import pydocformatter.rules.registration as rule_registration
+import pydocformatter.rules.definition_helpers.typed_documentation_models as typed_models
 from pydocformatter.rules.definition import RuleBase
 from pydocformatter.rules.definition_helpers import typed_entry_rules
 from pydocformatter.rules.definitions.PDF.PDF import PDF
@@ -39,4 +40,4 @@ class PDF703ParameterTypeMismatch(RuleBase):
         Returns:
             tuple[rule_violations.RuleViolation, ...]: Rule violations reported for the current source.
         """
-        return typed_entry_rules.mismatch_violations(context, meta=cls.meta, subject=typed_entry_rules.TypedDocumentationSubject.PARAMETER, label="Function parameter")
+        return typed_entry_rules.mismatch_violations(context, meta=cls.meta, subject=typed_models.TypedDocumentationSubject.PARAMETER, label="Function parameter")
