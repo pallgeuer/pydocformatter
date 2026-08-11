@@ -76,7 +76,7 @@ All notable changes to this project are documented here. The format follows [Kee
   - Corrected the rule settings audit to distinguish disabled rules from rules ignored only by broad selectors, with metadata-backed regression coverage.
   - Distinguished convention opt-in policies from `require-explicit`, with exhaustive conflict-free convention profiles and meaningful explicit-selection defaults enforced by regression tests.
 - **Developer tooling:**
-  - Enforced ASCII-only source and configuration files with repository-level regression coverage while retaining literal Unicode in documentation examples.
+  - Enforced ASCII-only source, configuration, and documentation files with repository-level regression coverage while explicitly retaining literal Unicode in intentional documentation examples.
   - Generated the read-only documentation test site once per pytest process that runs a consumer instead of once for each of 39 consumers, reducing the measured serial suite from 46.10s to 29.35s and default xdist from 11.98s to 6.85s without changing test coverage or scheduling.
   - Expanded the repository's own pydocformatter policy with attribute declaration-order checks, constructor-assigned attribute coverage, joined comment reflow, hanging task-marker formatting, and consistent forced exclusions.
   - Updated the fixed documentation, test, and development dependency pins and migrated Ruff selectors and suppressions to the human-readable names supported by Ruff 0.16.

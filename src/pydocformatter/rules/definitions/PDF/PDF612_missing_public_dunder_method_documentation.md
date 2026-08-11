@@ -13,7 +13,7 @@ The rule checks methods whose names start and end with double underscores. It ex
 Dunder methods define protocol behavior and often need documentation when a project opts into that policy.
 
 ## Ruff compatibility
-This rule replaces Ruff's `D105`, but uses “dunder” terminology and excludes `__init__`.
+This rule replaces Ruff's `D105`, but uses "dunder" terminology and excludes `__init__`.
 
 ## Examples
 A public dunder method without a docstring is reported:

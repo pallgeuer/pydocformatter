@@ -22,9 +22,9 @@ Closes #
 
 <!-- Replace placeholders with the exact test paths or other commands used. For successful checks, "passed" is sufficient; do not paste full output. Include output only when it explains a failure, warning, skipped check, or other notable result. Use "Not applicable" with a brief reason where appropriate. -->
 
-- Focused tests: `uv run pytest -n 0 <test paths or node IDs>` — Passed/Failed.
-- Full checks: `uv run pre-commit run --all-files` — Passed/Failed.
-- Documentation build: `uv run python tools/docs/generate_zensical.py`, then `uv run zensical build --strict -f zensical.generated.toml` — Passed/Failed.
+- Focused tests: `uv run pytest -n 0 <test paths or node IDs>` - Passed/Failed.
+- Full checks: `uv run pre-commit run --all-files` - Passed/Failed.
+- Documentation build: `uv run python tools/docs/generate_zensical.py`, then `uv run zensical build --strict -f zensical.generated.toml` - Passed/Failed.
 - Manual or platform-specific checks: Passed/Not applicable.
 
 ## Documentation and changelog

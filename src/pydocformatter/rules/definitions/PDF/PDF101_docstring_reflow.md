@@ -25,7 +25,7 @@ PDF101 uses a lossless evaluated-value-to-source map for simple string docstring
 
 PDF101 accounts for the docstring opening and closing delimiters when wrapping generated docstring lines. It does not account for unchanged Python source that follows the closing delimiter on the same physical line, such as `; return None` in a single-line suite.
 
-Recognized markup is always indivisible. When `url-aware-wrapping` is enabled, destination-bearing tokens—bare URLs, autolinks, inline Markdown links or images, and reStructuredText embedded targets—activate balanced line selection around the token. Disabling the setting restores greedy line selection without allowing recognized markup to split.
+Recognized markup is always indivisible. When `url-aware-wrapping` is enabled, destination-bearing tokens such as bare URLs, autolinks, inline Markdown links or images, and reStructuredText embedded targets activate balanced line selection around the token. Disabling the setting restores greedy line selection without allowing recognized markup to split.
 
 ## Why is this useful?
 Consistent wrapping keeps docstrings readable in editors, terminals, review diffs, and generated documentation. Reflowing semantic chunks instead of raw line ranges keeps summaries, paragraphs, parameter descriptions, fields, lists, and quoted text readable without disturbing protected examples or code-like content.

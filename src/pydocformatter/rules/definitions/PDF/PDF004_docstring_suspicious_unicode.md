@@ -8,10 +8,10 @@ Reports an explicit set of suspicious Unicode controls, separators, bidi control
 
 The following characters are reported wherever they occur:
 
-- C0 controls U+0000–U+0008 and U+000B–U+001F, U+007F DELETE, and C1 controls U+0080–U+009F. Tab and line feed are deliberately excluded.
+- C0 controls U+0000-U+0008 and U+000B-U+001F, U+007F DELETE, and C1 controls U+0080-U+009F. Tab and line feed are deliberately excluded.
 - U+2028 LINE SEPARATOR and U+2029 PARAGRAPH SEPARATOR.
-- Bidi controls U+061C, U+200E–U+200F, U+202A–U+202E, and U+2066–U+2069.
-- Invisible format characters U+00AD, U+180E, U+200B, U+2060, U+206A–U+206F, and U+FEFF.
+- Bidi controls U+061C, U+200E-U+200F, U+202A-U+202E, and U+2066-U+2069.
+- Invisible format characters U+00AD, U+180E, U+200B, U+2060, U+206A-U+206F, and U+FEFF.
 
 U+00A0 NO-BREAK SPACE, U+2007 FIGURE SPACE, and U+202F NARROW NO-BREAK SPACE are reported only in logical-line indentation. Indentation starts at the beginning of the evaluated value and after a carriage return or line feed, and continues through whitespace until the first non-whitespace character. These spaces are accepted and preserved after prose begins because they can intentionally keep words together.
 
