@@ -1,1 +1,1 @@
-"""Provide pydocformatter comment-formatting rules."""
+"""Pydocformatter comment-formatting rules."""

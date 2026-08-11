@@ -1,1 +1,1 @@
-"""Provide helpers for pydocformatter rule definitions."""
+"""Helpers for pydocformatter rule definitions."""

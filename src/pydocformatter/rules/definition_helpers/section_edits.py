@@ -9,8 +9,9 @@ Attributes:
 from __future__ import annotations
 
 # Standard library imports
+import typing
 import dataclasses
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 # First-party imports
 import pydocformatter.rules.edits as rule_edits
@@ -201,7 +202,7 @@ def _result_for_replacement_change(rule: RuleMetadata, change: SectionReplacemen
     """Return one violation for a single or grouped section replacement change."""
     if isinstance(change, rule_edits.PlannedSourceChange):
         return result(rule, change.line_numbers, change=change, instance_message=instance_message)
-    return rule_violations.violation_for_grouped_planned_source_changes(rule, cast("tuple[rule_edits.PlannedSourceChange, ...]", change), instance_message=instance_message)
+    return rule_violations.violation_for_grouped_planned_source_changes(rule, typing.cast("tuple[rule_edits.PlannedSourceChange, ...]", change), instance_message=instance_message)
 
 
 def line_numbers(docstring: PDF_definition.DocstringInfo, line: PDF_definition.DocstringValueLine) -> tuple[int, ...]:

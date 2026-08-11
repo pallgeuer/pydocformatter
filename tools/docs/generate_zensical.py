@@ -42,10 +42,10 @@ import pathlib
 import argparse
 import posixpath
 import dataclasses
+import urllib.parse
 from itertools import starmap
 from types import GenericAlias
 from typing import TYPE_CHECKING, Any
-from urllib.parse import urlsplit, urlunsplit
 
 # Third-party imports
 from la_dev_codex_plugins import markdown_tables
@@ -339,7 +339,7 @@ def _rewrite_links(text: str, *, source: pathlib.Path, generated: pathlib.Path) 
 
 def _rewrite_link_target(target: str, *, source: pathlib.Path, generated: pathlib.Path) -> str:
     """Rewrite a single Markdown link target when it points to a moved source document."""
-    split_target = urlsplit(target)
+    split_target = urllib.parse.urlsplit(target)
     if split_target.scheme or split_target.netloc or target.startswith("#") or split_target.path == "":
         return target
     source_target = (ROOT / source.parent / split_target.path).resolve()
@@ -350,13 +350,13 @@ def _rewrite_link_target(target: str, *, source: pathlib.Path, generated: pathli
     generated_target = SOURCE_TO_GENERATED.get(relative_source_target)
     if generated_target is None:
         if relative_source_target in EXTERNAL_SOURCE_DOCS:
-            source_url = urlsplit(_source_url(relative_source_target))
-            return urlunsplit((source_url.scheme, source_url.netloc, source_url.path, split_target.query, split_target.fragment))
+            source_url = urllib.parse.urlsplit(_source_url(relative_source_target))
+            return urllib.parse.urlunsplit((source_url.scheme, source_url.netloc, source_url.path, split_target.query, split_target.fragment))
         if relative_source_target.suffix == ".md" and (ROOT / relative_source_target).exists():
             raise ValueError(f"Markdown link in {source} points to unpublished local document: {target}")
         return target
     relative_generated_target = posixpath.relpath(generated_target.as_posix(), start=generated.parent.as_posix())
-    return urlunsplit(("", "", relative_generated_target, split_target.query, split_target.fragment))
+    return urllib.parse.urlunsplit(("", "", relative_generated_target, split_target.query, split_target.fragment))
 
 
 def _write_rules(rule_pages: tuple[RulePage, ...]) -> None:

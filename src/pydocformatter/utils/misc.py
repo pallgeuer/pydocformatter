@@ -5,10 +5,11 @@ from __future__ import annotations
 
 # Standard library imports
 import os
+import typing
 import operator
 import functools
 from collections.abc import Callable
-from typing import Any, Generic, TypeVar, cast, overload
+from typing import Any, Generic, TypeVar
 
 
 _R_co = TypeVar("_R_co", covariant=True)
@@ -35,13 +36,13 @@ class classproperty(Generic[_R_co]):  # ruff: ignore[invalid-class-name]
                 computed property value.
         """
         self.fget = fget
-        functools.update_wrapper(cast("Callable[..., Any]", self), fget)
+        functools.update_wrapper(typing.cast("Callable[..., Any]", self), fget)
         self.__isabstractmethod__ = getattr(fget, "__isabstractmethod__", False)
 
-    @overload
+    @typing.overload
     def __get__(self, obj: None, owner: type[Any]) -> _R_co: ...
 
-    @overload
+    @typing.overload
     def __get__(self, obj: object, owner: type[Any] | None = None) -> _R_co: ...
 
     def __get__(self, obj: object | None, owner: type[Any] | None = None) -> _R_co:

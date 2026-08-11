@@ -1,1 +1,1 @@
-"""Provide rule infrastructure and built-in rule packages."""
+"""Rule infrastructure and built-in rule packages."""

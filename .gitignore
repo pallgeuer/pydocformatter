@@ -47,3 +47,4 @@ htmlcov
 # Development
 /TODO.txt
 /docs/devel/plans
+/.codex/toolkit_perform_actions/action_catalogue.md

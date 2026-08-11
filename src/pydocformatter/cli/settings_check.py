@@ -34,8 +34,9 @@ Attributes:
 # Standard library imports
 import re
 import enum
+import typing
 import dataclasses
-from typing import Any, TypedDict, cast
+from typing import Any, TypedDict
 
 # First-party imports
 import pydocformatter.settings as settings_core
@@ -665,7 +666,7 @@ def validate_per_file_settings(value: object, context: str) -> PerFileSettingsMa
             is invalid.
     """
     if isinstance(value, tuple):
-        items = cast("tuple[tuple[object, object], ...]", value)
+        items = typing.cast("tuple[tuple[object, object], ...]", value)
     elif isinstance(value, dict):
         items = tuple(value.items())
     else:
@@ -681,12 +682,12 @@ def validate_per_file_settings(value: object, context: str) -> PerFileSettingsMa
             raise settings_core.SettingsError(f"{context} keys must not be empty")
         if isinstance(raw_updates, tuple):
             raw_update_items: dict[str, object] = {}
-            for raw_key, raw_value in cast("tuple[tuple[object, object], ...]", raw_updates):
+            for raw_key, raw_value in typing.cast("tuple[tuple[object, object], ...]", raw_updates):
                 if not isinstance(raw_key, str):
                     raise settings_core.SettingsError(f"{context}.{pattern} keys must be strings")
                 raw_update_items[raw_key] = raw_value
         elif isinstance(raw_updates, dict):
-            raw_update_items = cast("dict[str, object]", raw_updates)
+            raw_update_items = typing.cast("dict[str, object]", raw_updates)
         else:
             raise settings_core.SettingsError(f"{context}.{pattern} must be a table mapping setting keys to values")
         flattened_updates = settings_core._flatten_prefixed_toml_setting_tables(raw_update_items, prefixes=("docstring", "comment"), context=f"{context}.{pattern}")
@@ -743,7 +744,7 @@ def effective_profile_for_path(profile: settings_core.SettingsProfile[CheckSetti
         field_bases[field] = per_file_settings_base
         field_priorities[field] = per_file_settings_priority
     return settings_core.SettingsProfile(
-        settings=dataclasses.replace(profile.settings, **cast("Any", updates)), field_bases=field_bases, field_priorities=field_priorities, project_root=profile.project_root
+        settings=dataclasses.replace(profile.settings, **typing.cast("Any", updates)), field_bases=field_bases, field_priorities=field_priorities, project_root=profile.project_root
     )
 
 
@@ -1330,5 +1331,5 @@ SETTINGS_SCHEMA = SettingsSchema(
     table_path=("tool", "pydocfmt"),
 )
 
-CHECK_SETTING_DEFINITIONS = tuple(cast("CheckSettingDefinition", definition) for definition in SETTINGS_SCHEMA.definitions)
+CHECK_SETTING_DEFINITIONS = tuple(typing.cast("CheckSettingDefinition", definition) for definition in SETTINGS_SCHEMA.definitions)
 DIRECT_ANALYSIS_DEFINITIONS = tuple(definition for definition in CHECK_SETTING_DEFINITIONS if definition.cache_identity_role is CacheIdentityRole.DIRECT_ANALYSIS_VALUE)

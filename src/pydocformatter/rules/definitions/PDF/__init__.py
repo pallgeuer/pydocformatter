@@ -1,1 +1,1 @@
-"""Provide pydocformatter docstring-formatting rules."""
+"""Pydocformatter docstring-formatting rules."""

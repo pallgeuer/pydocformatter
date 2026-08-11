@@ -27,7 +27,6 @@ from pydocformatter.rules.definitions.PDF.PDF import (
     DocstringBlockKind,
     DocstringEntryKind,
     DocstringKind,
-    first_summary_block,
 )
 from tests import rule_helpers
 
@@ -918,7 +917,7 @@ def test_a_leading_protected_block_prevents_a_later_paragraph_becoming_summary()
 def test_first_summary_block_uses_the_category_summary_contract(value: str, expected_kind: DocstringBlockKind | None) -> None:
     source = f'"""{value}"""\n'
     docstring = PDF.prepare(category_context(source)).docstrings[0]
-    summary = first_summary_block(docstring)
+    summary = PDF_definition.first_summary_block(docstring)
 
     assert (None if summary is None else summary.kind) is expected_kind
 

@@ -8,10 +8,11 @@ Attributes:
 from __future__ import annotations
 
 # Standard library imports
+import typing
 import inspect
 import dataclasses
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, ClassVar, Generic, TypeVar, cast
+from typing import TYPE_CHECKING, Any, ClassVar, Generic, TypeVar
 
 # Third-party imports
 import libcst as cst
@@ -141,7 +142,7 @@ def _validate_violations_hook(rule_class: type[RuleBase], hook: object) -> None:
         raise TypeError(f"{rule_class.__name__}.violations must be a @classmethod accepting context")
     if not callable(hook.__func__):
         raise TypeError(f"{rule_class.__name__}.violations must be callable")
-    bound_hook = cast("Any", hook).__get__(None, rule_class)
+    bound_hook = typing.cast("Any", hook).__get__(None, rule_class)
     if not callable(bound_hook):
         raise TypeError(f"{rule_class.__name__}.violations must be callable")
     try:

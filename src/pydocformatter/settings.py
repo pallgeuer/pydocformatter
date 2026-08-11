@@ -38,13 +38,14 @@ import os
 import enum
 import json
 import math
+import typing
 import tomllib
 import argparse
 import itertools
 import dataclasses
 from collections.abc import Callable, Iterable, Mapping
 from types import GenericAlias
-from typing import TYPE_CHECKING, Any, Generic, TypeAlias, TypedDict, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Generic, TypeAlias, TypedDict, TypeVar
 
 # First-party imports
 from pydocformatter.cli.global_args import GlobalArgs
@@ -504,7 +505,7 @@ class SettingDefinition(Generic[SettingValueT]):
             TypeError: If no default validator exists for `value_type` and no validator is supplied.
         """
         resolved_key = key or field.replace("_", "-")
-        resolved_validator = cast("SettingValidator[SettingValueT]", _default_validator_for_type(value_type)) if validator is None else validator
+        resolved_validator = typing.cast("SettingValidator[SettingValueT]", _default_validator_for_type(value_type)) if validator is None else validator
         resolved_documentation = documentation or help
         resolved_example = example or ""
 
@@ -513,9 +514,9 @@ class SettingDefinition(Generic[SettingValueT]):
             if cli is None:
                 cli_options: SettingCLIOptions = {}
             elif isinstance(cli, SettingCLIDefinition):
-                cli_options = cast("SettingCLIOptions", {field.name: getattr(cli, field.name) for field in dataclasses.fields(cli)})
+                cli_options = typing.cast("SettingCLIOptions", {field.name: getattr(cli, field.name) for field in dataclasses.fields(cli)})
             else:
-                cli_options = cast("SettingCLIOptions", dict(cli))
+                cli_options = typing.cast("SettingCLIOptions", dict(cli))
 
             flags = cli_options.get("flags", ()) or (f"--{resolved_key}",)
             action = cli_options.get("action")
@@ -541,7 +542,7 @@ class SettingDefinition(Generic[SettingValueT]):
                 if "value_kind" not in cli_options:
                     value_kind = SettingCLIValueKind.TOML_MAP
             if _is_str_enum_type(value_type) and choices is None:
-                choices = tuple(member.value for member in cast("type[enum.StrEnum]", value_type))
+                choices = tuple(member.value for member in typing.cast("type[enum.StrEnum]", value_type))
 
             show_default = cli_options.get("show_default", value_kind == SettingCLIValueKind.RAW)
 
@@ -1100,7 +1101,7 @@ def _default_validator_for_type(setting_type: type[SettingValueT] | GenericAlias
     if setting_type is float:
         return validate_float()
     if _is_str_enum_type(setting_type):
-        return validate_str_enum(cast("type[enum.StrEnum]", setting_type))
+        return validate_str_enum(typing.cast("type[enum.StrEnum]", setting_type))
     if setting_type == StringList:
         return validate_string_list
     if setting_type == MultiStringMap:
@@ -1223,10 +1224,10 @@ def _load_profile_from_source(
     )
 
     if source.kind is _SettingsProfileSourceKind.EXPLICIT:
-        config_path = cast("str", source.config_path)
+        config_path = typing.cast("str", source.config_path)
         profile = _apply_toml_file_profile(schema, profile, path=config_path, required=True, source_base=cwd_base, source_priority=CONFIG_FILE_SOURCE_PRIORITY, context=context)
     elif source.kind is _SettingsProfileSourceKind.AUTO:
-        config_path = cast("str", source.config_path)
+        config_path = typing.cast("str", source.config_path)
         project_root = os.path.dirname(os.path.abspath(config_path))
         profile = dataclasses.replace(profile, project_root=project_root)
         profile = _apply_toml_file_profile(schema, profile, path=config_path, required=False, source_base=project_root, source_priority=CONFIG_FILE_SOURCE_PRIORITY, context=context)
@@ -1261,7 +1262,7 @@ def _toml_section_at_table_path(config: dict[str, Any], *, path: str, table_path
 
     if not isinstance(section, dict):
         raise SettingsError(f"{path}: The [{'.'.join(table_path)}] section must be a table")
-    return cast("dict[str, Any]", section)
+    return typing.cast("dict[str, Any]", section)
 
 
 def _apply_toml_file_profile(
@@ -1355,7 +1356,7 @@ def _apply_field_values_profile(
 ) -> SettingsProfile[SettingsT]:
     """Validate raw field values and return an updated settings profile."""
     updates = _validated_field_updates(schema, values=values, context=context, key_based=key_based)
-    settings = cast("SettingsT", dataclasses.replace(cast("Any", profile.settings), **updates))
+    settings = typing.cast("SettingsT", dataclasses.replace(typing.cast("Any", profile.settings), **updates))
     field_bases = dict(profile.field_bases)
     field_priorities = dict(profile.field_priorities)
     absolute_source_base = os.path.abspath(source_base)

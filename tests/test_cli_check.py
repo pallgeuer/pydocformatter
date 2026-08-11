@@ -6,12 +6,13 @@ from __future__ import annotations
 # Standard library imports
 import os
 import sys
+import typing
 import tempfile
 import subprocess
 import collections
 from collections.abc import Callable
 from pathlib import Path
-from typing import TYPE_CHECKING, Self, TextIO, cast
+from typing import TYPE_CHECKING, Self, TextIO
 
 # Third-party imports
 import pytest
@@ -934,7 +935,7 @@ def test_format_selected_files_caps_windows_workers_at_process_pool_limit(mocker
     mocker.patch("pydocformatter.cli.check.sys.platform", "win32")
     mocker.patch("pydocformatter.cli.check.concurrent.futures.as_completed", side_effect=tuple, autospec=True)
     check_command.format_selected_files(
-        selected_files, rule_selections=rule_selections, use_stdin=False, fix=False, write=True, parallelism=0.0, executor_factory=cast("check_command._ExecutorFactory", FakeExecutor)
+        selected_files, rule_selections=rule_selections, use_stdin=False, fix=False, write=True, parallelism=0.0, executor_factory=typing.cast("check_command._ExecutorFactory", FakeExecutor)
     )
 
     assert created_max_workers == [61]
@@ -971,7 +972,7 @@ def test_format_selected_files_preserves_selected_order_when_parallel_results_co
 
     mocker.patch("pydocformatter.cli.check.concurrent.futures.as_completed", side_effect=lambda futures: reversed(tuple(futures)), autospec=True)
     batch = check_command.format_selected_files(
-        selected_files, rule_selections=rule_selections, use_stdin=False, fix=False, write=True, parallelism=2.0, executor_factory=cast("check_command._ExecutorFactory", FakeExecutor)
+        selected_files, rule_selections=rule_selections, use_stdin=False, fix=False, write=True, parallelism=2.0, executor_factory=typing.cast("check_command._ExecutorFactory", FakeExecutor)
     )
 
     assert completion_order == ["c.py", "b.py", "a.py"]

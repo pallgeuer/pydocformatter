@@ -5,8 +5,9 @@ from __future__ import annotations
 
 # Standard library imports
 import enum
+import typing
 from collections.abc import Iterable
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 # Third-party imports
 import libcst as cst
@@ -108,7 +109,7 @@ def _qualified_names(expression: cst.BaseExpression, *, context: RuleCategoryCon
         return ()
     if callable(qualified_names):
         qualified_names = qualified_names()
-    return tuple(cast("Iterable[cst_metadata.QualifiedName]", qualified_names))
+    return tuple(typing.cast("Iterable[cst_metadata.QualifiedName]", qualified_names))
 
 
 def _metadata_match(qualified_names: tuple[cst_metadata.QualifiedName, ...], qualified_configured_names: frozenset[str]) -> _StaticMatch:
