@@ -251,7 +251,7 @@ def test_parse_simple_string_escape_returns_none_for_invalid_escape() -> None:
 
 
 def test_wrap_source_tokens_counts_escape_source_widths() -> None:
-    words = (inline_markup.InlineToken(value="éé", source="\\xe9\\xe9"), inline_markup.InlineToken(value="tail", source="tail"))
+    words = (inline_markup.InlineToken(value="éé", source="\\xe9\\xe9", kind=None, url_like=False), inline_markup.InlineToken(value="tail", source="tail", kind=None, url_like=False))
 
     wrapped = string_literals.wrap_source_tokens(words, width=9, initial_indent="", subsequent_indent="", tab_width=4)
 
@@ -260,7 +260,7 @@ def test_wrap_source_tokens_counts_escape_source_widths() -> None:
 
 
 def test_wrap_source_tokens_non_positive_width_uses_one_word_per_line() -> None:
-    words = (inline_markup.InlineToken(value="alpha", source="alpha"), inline_markup.InlineToken(value="beta", source="beta"))
+    words = (inline_markup.InlineToken(value="alpha", source="alpha", kind=None, url_like=False), inline_markup.InlineToken(value="beta", source="beta", kind=None, url_like=False))
 
     wrapped = string_literals.wrap_source_tokens(words, width=0, initial_indent="> ", subsequent_indent="  ", tab_width=4)
 
@@ -269,7 +269,7 @@ def test_wrap_source_tokens_non_positive_width_uses_one_word_per_line() -> None:
 
 
 def test_wrap_source_tokens_allows_distinct_initial_width() -> None:
-    words = tuple(inline_markup.InlineToken(value=word, source=word) for word in ("alpha", "beta", "gamma"))
+    words = tuple(inline_markup.InlineToken(value=word, source=word, kind=None, url_like=False) for word in ("alpha", "beta", "gamma"))
 
     wrapped = string_literals.wrap_source_tokens(words, width=16, initial_width=9, subsequent_width=16, tab_width=4)
 
@@ -278,7 +278,7 @@ def test_wrap_source_tokens_allows_distinct_initial_width() -> None:
 
 
 def test_wrap_source_tokens_reserves_final_suffix_width() -> None:
-    words = tuple(inline_markup.InlineToken(value=word, source=word) for word in ("alpha", "beta", "gamma"))
+    words = tuple(inline_markup.InlineToken(value=word, source=word, kind=None, url_like=False) for word in ("alpha", "beta", "gamma"))
 
     wrapped = string_literals.wrap_source_tokens(words, width=16, final_suffix_width=3, tab_width=4)
 
@@ -287,7 +287,7 @@ def test_wrap_source_tokens_reserves_final_suffix_width() -> None:
 
 
 def test_wrap_source_tokens_respects_variable_widths_indents_and_final_suffix() -> None:
-    words = tuple(inline_markup.InlineToken(value=word, source=word) for word in ("alpha", "beta", "gamma", "delta"))
+    words = tuple(inline_markup.InlineToken(value=word, source=word, kind=None, url_like=False) for word in ("alpha", "beta", "gamma", "delta"))
 
     wrapped = string_literals.wrap_source_tokens(words, width=12, initial_width=12, subsequent_width=18, final_suffix_width=5, initial_indent="> ", subsequent_indent="  ", tab_width=4)
 
@@ -296,7 +296,7 @@ def test_wrap_source_tokens_respects_variable_widths_indents_and_final_suffix() 
 
 
 def test_wrap_source_tokens_keeps_long_words_unsplit_with_variable_widths() -> None:
-    words = tuple(inline_markup.InlineToken(value=word, source=word) for word in ("supercalifragilistic", "short", "words"))
+    words = tuple(inline_markup.InlineToken(value=word, source=word, kind=None, url_like=False) for word in ("supercalifragilistic", "short", "words"))
 
     wrapped = string_literals.wrap_source_tokens(words, width=10, initial_width=10, subsequent_width=10, final_suffix_width=3, tab_width=4)
 
@@ -305,7 +305,7 @@ def test_wrap_source_tokens_keeps_long_words_unsplit_with_variable_widths() -> N
 
 
 def test_wrap_source_tokens_uses_tab_expanded_source_widths_with_variable_widths() -> None:
-    words = tuple(inline_markup.InlineToken(value=word, source=word) for word in ("tab\tword", "tail", "more"))
+    words = tuple(inline_markup.InlineToken(value=word, source=word, kind=None, url_like=False) for word in ("tab\tword", "tail", "more"))
 
     wrapped = string_literals.wrap_source_tokens(words, width=12, initial_width=12, subsequent_width=12, tab_width=4)
 
@@ -314,7 +314,7 @@ def test_wrap_source_tokens_uses_tab_expanded_source_widths_with_variable_widths
 
 
 def test_wrap_source_tokens_can_balance_words_around_url_tokens() -> None:
-    words = tuple(inline_markup.InlineToken(value=word, source=word, url_like=word.startswith("https://")) for word in ("alpha", "beta", "https://example.com/path", "alpha"))
+    words = tuple(inline_markup.InlineToken(value=word, source=word, kind=None, url_like=word.startswith("https://")) for word in ("alpha", "beta", "https://example.com/path", "alpha"))
 
     wrapped = string_literals.wrap_source_tokens(words, width=29, tab_width=4, url_aware=True)
 
@@ -324,9 +324,9 @@ def test_wrap_source_tokens_can_balance_words_around_url_tokens() -> None:
 
 def test_wrap_source_tokens_url_balancing_preserves_source_spelling() -> None:
     words = (
-        inline_markup.InlineToken(value="alpha", source="alpha"),
-        inline_markup.InlineToken(value="https://example.com/path", source="https://example.com/path", url_like=True),
-        inline_markup.InlineToken(value="tail", source=r"t\x61il"),
+        inline_markup.InlineToken(value="alpha", source="alpha", kind=None, url_like=False),
+        inline_markup.InlineToken(value="https://example.com/path", source="https://example.com/path", kind=None, url_like=True),
+        inline_markup.InlineToken(value="tail", source=r"t\x61il", kind=None, url_like=False),
     )
 
     wrapped = string_literals.wrap_source_tokens(words, width=30, tab_width=4, url_aware=True)
@@ -336,7 +336,7 @@ def test_wrap_source_tokens_url_balancing_preserves_source_spelling() -> None:
 
 
 def test_wrap_source_tokens_url_balancing_respects_variable_widths_and_final_suffix() -> None:
-    words = tuple(inline_markup.InlineToken(value=word, source=word, url_like=word.startswith("https://")) for word in ("alpha", "beta", "https://example.com/path", "gamma"))
+    words = tuple(inline_markup.InlineToken(value=word, source=word, kind=None, url_like=word.startswith("https://")) for word in ("alpha", "beta", "https://example.com/path", "gamma"))
 
     wrapped = string_literals.wrap_source_tokens(words, width=35, initial_width=18, subsequent_width=35, final_suffix_width=6, tab_width=4, url_aware=True)
 

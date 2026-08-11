@@ -89,7 +89,7 @@ class CommentInfo:
     line_prefix: str
     text: str
     unicode_occurrences: tuple[unicode_safety.SuspiciousUnicodeOccurrence, ...]
-    syntax_sensitive: bool = False
+    syntax_sensitive: bool
 
     @property
     def raw_content(self) -> str:

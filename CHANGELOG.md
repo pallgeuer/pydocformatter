@@ -82,6 +82,7 @@ All notable changes to this project are documented here. The format follows [Kee
   - Replaced the repository-local Markdown table formatter, release checksum generator, and pytest working-directory isolation fixtures with the shared `la-dev-codex-plugins` implementations.
   - Strengthened semantic Markdown table tests with full-document parsing and normalized all generated documentation tables to the shared canonical style.
 - **Internal cleanup:**
+  - Required callers to explicitly supply correctness-sensitive dataclass state for rule contexts, comment syntax sensitivity, inline token classification, typed-documentation ownership, and following-block structure.
   - Centralized setting-effect resolution with disabled precedence across runtime rule selection, documentation generation, and metadata-backed tests.
   - Separated reusable docstring source editing, literal rendering, section spacing, and comment formatting from rule category preparation, and returned PDF312-specific phrase matching to its rule module.
   - Removed redundant private rule helpers in favor of direct shared-helper calls.

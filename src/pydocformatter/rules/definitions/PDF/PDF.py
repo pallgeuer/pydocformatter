@@ -760,7 +760,7 @@ class EntryDescriptionLineTarget:
 
     docstring: DocstringInfo
     fragment: DocstringTextFragment
-    following_block_kinds: tuple[DocstringBlockKind, ...] = ()
+    following_block_kinds: tuple[DocstringBlockKind, ...]
 
     @property
     def line(self) -> DocstringValueLine:

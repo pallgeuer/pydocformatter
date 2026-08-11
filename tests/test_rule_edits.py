@@ -509,6 +509,7 @@ def test_context_source_changes_apply_cached_context_source_without_reading_modu
         source=source,
         source_lines=lines,
         line_bounds=source_text.line_bounds_from_lines(lines),
+        bracket_directive_index=None,
     )
     changes = (
         rule_edits.PlannedSourceChange(
@@ -545,6 +546,7 @@ def test_context_source_changes_retain_exact_source_normalized_by_libcst() -> No
         source=source,
         source_lines=lines,
         line_bounds=source_text.line_bounds_from_lines(lines),
+        bracket_directive_index=None,
     )
     changes = (
         rule_edits.PlannedSourceChange(

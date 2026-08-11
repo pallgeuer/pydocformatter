@@ -136,8 +136,8 @@ class InlineToken:
 
     value: str
     source: str
-    kind: InlineMarkupKind | None = None
-    url_like: bool = False
+    kind: InlineMarkupKind | None
+    url_like: bool
 
 
 @dataclasses.dataclass(frozen=True)
@@ -298,7 +298,7 @@ def scan_text(text: str) -> InlineScanResult:
         InlineScanResult: Recognized tokens and conservative rewrite barriers.
     """
     if _PLAIN_SCAN_SPECIAL_RE.search(text) is None:
-        return InlineScanResult(tokens=tuple(InlineToken(value=word, source=word, url_like=is_bare_url(word)) for word in text.split()))
+        return InlineScanResult(tokens=tuple(InlineToken(value=word, source=word, kind=None, url_like=is_bare_url(word)) for word in text.split()))
     return scan_fragments(tuple(_TextFragment(value=char, source=char) for char in text))
 
 
@@ -771,7 +771,7 @@ def _plain_tokens(fragments: Sequence[SourceFragment], *, text: str) -> tuple[In
         while end < len(text) and not unicode_safety.is_layout_separator(text[end]):
             end += 1
         value = text[index:end]
-        tokens.append(InlineToken(value=value, source="".join(fragment.source for fragment in fragments[index:end]), url_like=is_bare_url(value)))
+        tokens.append(InlineToken(value=value, source="".join(fragment.source for fragment in fragments[index:end]), kind=None, url_like=is_bare_url(value)))
         index = end
     return tuple(tokens)
 
@@ -829,7 +829,7 @@ def _tokens_for_constructs(fragments: Sequence[SourceFragment], *, text: str, co
         next_envelope = envelopes[envelope_index].start if envelope_index < len(envelopes) else len(text)
         end = min(next_whitespace, next_envelope)
         value = text[index:end]
-        tokens.append(InlineToken(value=value, source="".join(fragment.source for fragment in fragments[index:end]), url_like=is_bare_url(value)))
+        tokens.append(InlineToken(value=value, source="".join(fragment.source for fragment in fragments[index:end]), kind=None, url_like=is_bare_url(value)))
         index = end
     return tuple(tokens)
 

@@ -105,4 +105,4 @@ class TypedDocumentationTarget:
     name: str
     entry: TypedDocstringEntry
     annotation_text: str | None
-    owner: PDF_definition.DefinitionInfo | None = None
+    owner: PDF_definition.DefinitionInfo | None

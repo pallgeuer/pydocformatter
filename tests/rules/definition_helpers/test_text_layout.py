@@ -111,7 +111,7 @@ def test_wrap_text_url_aware_falls_back_to_greedy_when_word_budget_is_exceeded(m
 
 
 def test_wrap_inline_tokens_measures_exact_source_and_renders_evaluated_text() -> None:
-    tokens = (inline_markup.InlineToken(value="alpha", source="alpha"), inline_markup.InlineToken(value="e", source=r"\x65"))
+    tokens = (inline_markup.InlineToken(value="alpha", source="alpha", kind=None, url_like=False), inline_markup.InlineToken(value="e", source=r"\x65", kind=None, url_like=False))
 
     wrapped = text_layout.wrap_inline_tokens(tokens, width=8, tab_width=4)
 
@@ -131,7 +131,7 @@ def test_wrap_scanned_text_does_not_rescan(monkeypatch: pytest.MonkeyPatch) -> N
 
 
 def test_explicit_destination_classification_controls_balancing_independently_of_token_text() -> None:
-    ordinary = tuple(inline_markup.InlineToken(value=word, source=word) for word in ("alpha", "beta", "destination", "alpha"))
+    ordinary = tuple(inline_markup.InlineToken(value=word, source=word, kind=None, url_like=False) for word in ("alpha", "beta", "destination", "alpha"))
     destination = (*ordinary[:2], dataclasses.replace(ordinary[2], url_like=True), ordinary[3])
 
     assert text_layout.wrap_inline_tokens(ordinary, width=16, tab_width=4, url_aware=True) == ("alpha beta", "destination", "alpha")

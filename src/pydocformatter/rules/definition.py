@@ -62,7 +62,7 @@ class RuleCategoryContext:
     source: str
     source_lines: tuple[str, ...]
     line_bounds: source_text.LineBounds | None = dataclasses.field(kw_only=True)
-    bracket_directive_index: directives.BracketDirectiveIndex | None = dataclasses.field(default=None, kw_only=True)
+    bracket_directive_index: directives.BracketDirectiveIndex | None = dataclasses.field(kw_only=True)
 
 
 @dataclasses.dataclass(frozen=True)
