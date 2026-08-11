@@ -3525,15 +3525,10 @@ def _target_attributes(target: cst.BaseAssignTargetExpression, owner: Definition
 def _target_attribute(target: cst.BaseAssignTargetExpression, owner: DefinitionInfo, *, context: RuleCategoryContext) -> _AttributeTarget | None:
     """Return a supported attribute target."""
     if owner.kind in {DefinitionKind.MODULE, DefinitionKind.CLASS} and isinstance(target, cst.Name):
-        return _AttributeTarget(name=target.value, line_numbers=_target_line_numbers(target, context=context))
+        return _AttributeTarget(name=target.value, line_numbers=_node_line_numbers(target, context=context))
     if owner.kind is DefinitionKind.FUNCTION and isinstance(target, cst.Attribute) and isinstance(target.value, cst.Name) and target.value.value == "self" and isinstance(target.attr, cst.Name):
-        return _AttributeTarget(name=target.attr.value, line_numbers=_target_line_numbers(target.attr, context=context))
+        return _AttributeTarget(name=target.attr.value, line_numbers=_node_line_numbers(target.attr, context=context))
     return None
-
-
-def _target_line_numbers(target: cst.CSTNode, *, context: RuleCategoryContext) -> tuple[int, ...]:
-    """Return the source line for an attribute target."""
-    return _node_line_numbers(target, context=context)
 
 
 def _node_line_numbers(node: cst.CSTNode, *, context: RuleCategoryContext) -> tuple[int, ...]:

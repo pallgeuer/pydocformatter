@@ -16,7 +16,7 @@ import pydocformatter.rules.registration as rule_registration
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase
-from pydocformatter.rules.definition_helpers import string_literals
+from pydocformatter.rules.definition_helpers import docstring_source, string_literals
 from pydocformatter.rules.models import FixAvailability, RuleCacheBehavior, RuleCheckKind, RuleMetadata
 
 
@@ -72,7 +72,7 @@ def _violation_for_docstring(docstring: PDF_definition.DocstringInfo, *, context
     if not isinstance(docstring.node, cst.SimpleString) or docstring.node.quote == _TARGET_QUOTE:
         return None
     planned_change = _planned_change_for_docstring(docstring, context=context)
-    return rule_violations.violation_for_optional_planned_source_change(PDF001DocstringQuoteStyle.meta, planned_change, line_numbers=_line_numbers(docstring))
+    return rule_violations.violation_for_optional_planned_source_change(PDF001DocstringQuoteStyle.meta, planned_change, line_numbers=docstring_source.docstring_physical_line_numbers(docstring))
 
 
 def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo, *, context: RuleContext) -> rule_edits.PlannedSourceChange | None:
@@ -80,7 +80,9 @@ def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo, *, co
     rendered = _rendered_docstring(docstring, line_ending=context.line_ending)
     if rendered is None or rendered == docstring.source:
         return None
-    return rule_edits.PlannedSourceChange(edit=rule_edits.SourceEdit(range=docstring.range, replacement=rendered), line_numbers=_line_numbers(docstring), suppression_line_numbers=())
+    return rule_edits.PlannedSourceChange(
+        edit=rule_edits.SourceEdit(range=docstring.range, replacement=rendered), line_numbers=docstring_source.docstring_physical_line_numbers(docstring), suppression_line_numbers=()
+    )
 
 
 def _rendered_docstring(docstring: PDF_definition.DocstringInfo, *, line_ending: str) -> str | None:
@@ -101,8 +103,3 @@ def _rendered_docstring(docstring: PDF_definition.DocstringInfo, *, line_ending:
     retargeted = string_literals.retarget_fragments(fragments, quote=_TARGET_QUOTE, line_ending=line_ending)
     body_source = source_map.body_source_for_fragments(retargeted)
     return string_literals.render_simple_string_from_body_source(docstring.node.prefix, _TARGET_QUOTE, body_source, expected_value=docstring.value)
-
-
-def _line_numbers(docstring: PDF_definition.DocstringInfo) -> tuple[int, ...]:
-    """Return source line numbers covered by a docstring expression."""
-    return tuple(line.line_number for line in docstring.physical_lines)

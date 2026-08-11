@@ -81,16 +81,11 @@ def _entry_targets(docstring: PDF_definition.DocstringInfo) -> tuple[documentati
         return ()
     targets: list[documentation_style.DocumentedValueTarget] = []
     for entry in docstring.structure.entries:
-        if entry.kind is not PDF_definition.DocstringEntryKind.ATTRIBUTE or len(entry.names) != 1 or not entry.description or _is_rest_type_entry(entry):
+        if entry.kind is not PDF_definition.DocstringEntryKind.ATTRIBUTE or len(entry.names) != 1 or not entry.description or docstring_sections.is_rest_type_field(entry.field_name):
             continue
         line = docstring.structure.lines[entry.start_line]
         targets.append(documentation_style.DocumentedValueTarget(name=entry.names[0], description=entry.description, line_numbers=docstring_source.docstring_line_numbers(docstring, line)))
     return tuple(targets)
-
-
-def _is_rest_type_entry(entry: PDF_definition.DocstringEntry) -> bool:
-    """Return whether a parsed entry came from a reST attribute type field."""
-    return docstring_sections.is_rest_type_field(entry.field_name)
 
 
 def _attached_docstring_target(docstring: PDF_definition.DocstringInfo) -> documentation_style.DocumentedValueTarget | None:

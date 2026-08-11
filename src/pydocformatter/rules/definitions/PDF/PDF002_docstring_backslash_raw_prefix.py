@@ -16,7 +16,7 @@ import pydocformatter.rules.registration as rule_registration
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase
-from pydocformatter.rules.definition_helpers import string_literals
+from pydocformatter.rules.definition_helpers import docstring_source, string_literals
 from pydocformatter.rules.models import FixAvailability, RuleCacheBehavior, RuleCheckKind, RuleMetadata
 
 
@@ -71,7 +71,9 @@ def _violation_for_docstring(docstring: PDF_definition.DocstringInfo, *, context
         return None
     planned_change = _planned_change_for_docstring(docstring)
     if planned_change is not None:
-        return rule_violations.violation_for_optional_planned_source_change(PDF002DocstringBackslashRawPrefix.meta, planned_change, line_numbers=_line_numbers(docstring))
+        return rule_violations.violation_for_optional_planned_source_change(
+            PDF002DocstringBackslashRawPrefix.meta, planned_change, line_numbers=docstring_source.docstring_physical_line_numbers(docstring)
+        )
     # Non-fixable violations point only to manually actionable backslash lines; fixable source changes still report the
     # whole docstring range.
     reportable_lines = reportable_backslash_line_numbers(docstring)
@@ -85,7 +87,9 @@ def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo) -> ru
     rendered = _rendered_docstring(docstring)
     if rendered is None or rendered == docstring.source:
         return None
-    return rule_edits.PlannedSourceChange(edit=rule_edits.SourceEdit(range=docstring.range, replacement=rendered), line_numbers=_line_numbers(docstring), suppression_line_numbers=())
+    return rule_edits.PlannedSourceChange(
+        edit=rule_edits.SourceEdit(range=docstring.range, replacement=rendered), line_numbers=docstring_source.docstring_physical_line_numbers(docstring), suppression_line_numbers=()
+    )
 
 
 def _needs_raw_prefix(docstring: PDF_definition.DocstringInfo) -> bool:
@@ -118,10 +122,10 @@ def reportable_backslash_line_numbers(docstring: PDF_definition.DocstringInfo) -
         tuple[int, ...]: One-based physical source lines containing reportable backslash escapes.
     """
     if not isinstance(docstring.node, cst.SimpleString):
-        return _line_numbers(docstring)
+        return docstring_source.docstring_physical_line_numbers(docstring)
     body_source = string_literals.simple_string_body_source(docstring.node)
     if body_source is None:
-        return _line_numbers(docstring)
+        return docstring_source.docstring_physical_line_numbers(docstring)
     reportable_lines: set[int] = set()
     line_number = docstring.physical_lines[0].line_number
     index = 0
@@ -167,8 +171,3 @@ def _line_breaks(text: str) -> int:
         else:
             index += 1
     return count
-
-
-def _line_numbers(docstring: PDF_definition.DocstringInfo) -> tuple[int, ...]:
-    """Return source line numbers covered by a docstring expression."""
-    return tuple(line.line_number for line in docstring.physical_lines)

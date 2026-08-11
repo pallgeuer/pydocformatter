@@ -16,7 +16,7 @@ import pydocformatter.rules.registration as rule_registration
 import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase
-from pydocformatter.rules.definition_helpers import string_literals
+from pydocformatter.rules.definition_helpers import docstring_source, string_literals
 from pydocformatter.rules.models import FixAvailability, RuleCacheBehavior, RuleCheckKind, RuleMetadata
 
 
@@ -69,7 +69,9 @@ def _violation_for_docstring(docstring: PDF_definition.DocstringInfo, *, context
     planned_change = _planned_change_for_docstring(docstring, context=context)
     if planned_change is None and docstring.kind != PDF_definition.DocstringKind.CONCATENATED:
         return None
-    return rule_violations.violation_for_optional_planned_source_change(PDF000DocstringLiteralNormalization.meta, planned_change, line_numbers=_line_numbers(docstring))
+    return rule_violations.violation_for_optional_planned_source_change(
+        PDF000DocstringLiteralNormalization.meta, planned_change, line_numbers=docstring_source.docstring_physical_line_numbers(docstring)
+    )
 
 
 def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo, *, context: RuleContext) -> rule_edits.PlannedSourceChange | None:
@@ -77,7 +79,9 @@ def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo, *, co
     rendered = _rendered_docstring(docstring, line_ending=context.line_ending)
     if rendered is None or rendered == docstring.source:
         return None
-    return rule_edits.PlannedSourceChange(edit=rule_edits.SourceEdit(range=docstring.range, replacement=rendered), line_numbers=_line_numbers(docstring), suppression_line_numbers=())
+    return rule_edits.PlannedSourceChange(
+        edit=rule_edits.SourceEdit(range=docstring.range, replacement=rendered), line_numbers=docstring_source.docstring_physical_line_numbers(docstring), suppression_line_numbers=()
+    )
 
 
 def _rendered_docstring(docstring: PDF_definition.DocstringInfo, *, line_ending: str) -> str | None:
@@ -153,8 +157,3 @@ def _has_non_normal_line_ending(source: str, *, line_ending: str) -> bool:
 def _normalized_simple_docstring_prefix(node: cst.SimpleString) -> str:
     """Return the PDF000-normalized prefix for a simple docstring."""
     return "" if node.prefix.lower() == "u" else node.prefix
-
-
-def _line_numbers(docstring: PDF_definition.DocstringInfo) -> tuple[int, ...]:
-    """Return source line numbers covered by a docstring expression."""
-    return tuple(line.line_number for line in docstring.physical_lines)

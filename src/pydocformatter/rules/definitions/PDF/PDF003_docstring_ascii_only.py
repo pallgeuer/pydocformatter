@@ -17,7 +17,7 @@ import pydocformatter.rules.definitions.PDF.PDF as PDF_definition
 import pydocformatter.rules.definitions.PDF.PDF002_docstring_backslash_raw_prefix as PDF002
 from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase
-from pydocformatter.rules.definition_helpers import source_text, string_literals
+from pydocformatter.rules.definition_helpers import docstring_source, source_text, string_literals
 from pydocformatter.rules.models import FixAvailability, RuleCacheBehavior, RuleCheckKind, RuleMetadata
 
 
@@ -71,7 +71,7 @@ def _violation_for_docstring(docstring: PDF_definition.DocstringInfo, *, context
     return rule_violations.violation_for_optional_planned_source_change(
         PDF003DocstringAsciiOnly.meta,
         planned_change,
-        line_numbers=_line_numbers(docstring),
+        line_numbers=docstring_source.docstring_physical_line_numbers(docstring),
         instance_message=f"Docstring source contains non-ASCII character {source_text.first_non_ascii_code_point(docstring.source)}",
     )
 
@@ -81,7 +81,9 @@ def _planned_change_for_docstring(docstring: PDF_definition.DocstringInfo, *, co
     rendered = _rendered_docstring(docstring, line_ending=context.line_ending)
     if rendered is None or rendered == docstring.source:
         return None
-    return rule_edits.PlannedSourceChange(edit=rule_edits.SourceEdit(range=docstring.range, replacement=rendered), line_numbers=_line_numbers(docstring), suppression_line_numbers=())
+    return rule_edits.PlannedSourceChange(
+        edit=rule_edits.SourceEdit(range=docstring.range, replacement=rendered), line_numbers=docstring_source.docstring_physical_line_numbers(docstring), suppression_line_numbers=()
+    )
 
 
 def _rendered_docstring(docstring: PDF_definition.DocstringInfo, *, line_ending: str) -> str | None:
@@ -119,8 +121,3 @@ def _ascii_prefix(prefix: str) -> str | None:
     if any(char.lower() not in {"r", "u"} for char in prefix):
         return None
     return "".join(char for char in prefix if char.lower() != "r")
-
-
-def _line_numbers(docstring: PDF_definition.DocstringInfo) -> tuple[int, ...]:
-    """Return source line numbers covered by a docstring expression."""
-    return tuple(line.line_number for line in docstring.physical_lines)

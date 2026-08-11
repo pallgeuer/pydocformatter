@@ -100,7 +100,7 @@ class PDF306ParameterDocumentationTooGeneric(RuleBase):
                 continue
             signature_parameters = {parameter.comparison_name: parameter for parameter in parameter_documentation.signature_parameters(definition, context=context) if not parameter.implicit_receiver}
             for entry in docstring.structure.entries:
-                if entry.kind is not PDF_definition.DocstringEntryKind.PARAMETER or len(entry.names) != 1 or not entry.description or _is_rest_type_entry(entry):
+                if entry.kind is not PDF_definition.DocstringEntryKind.PARAMETER or len(entry.names) != 1 or not entry.description or docstring_sections.is_rest_type_field(entry.field_name):
                     continue
                 line = docstring.structure.lines[entry.start_line]
                 signature_parameter = signature_parameters.get(parameter_documentation.parameter_comparison_name(entry.names[0], convention=docstring.structure.convention))
@@ -113,11 +113,6 @@ class PDF306ParameterDocumentationTooGeneric(RuleBase):
                     )
                 )
         return documentation_style.too_generic_violations(tuple(targets), rule=cls.meta, policy=_POLICY)
-
-
-def _is_rest_type_entry(entry: PDF_definition.DocstringEntry) -> bool:
-    """Return whether a parsed entry came from a reST parameter type field."""
-    return docstring_sections.is_rest_type_field(entry.field_name)
 
 
 def _extra_generic_sequences(signature_parameter: parameter_documentation.SignatureParameter | None) -> frozenset[tuple[str, ...]]:
