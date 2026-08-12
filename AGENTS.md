@@ -46,4 +46,4 @@
 - Rule documentation Markdown files follow `src/pydocformatter/rules/templates/rule_template.md` and `src/pydocformatter/rules/templates/rule_category_template.md`.
 - When changing function signatures or class attributes, update all affected docstrings in the same change.
 - Do not lock incidental text into test assertions. If tests fail only because wording changed, determine whether the wording is a public contract and ask when unclear; do not blindly revert the wording.
-- Concisely document significant completed work in CHANGELOG.md under the Unreleased section, using Added/Changed/Fixed/Removed headings and nested bullets beneath short, general bold categories.
+- Concisely document significant completed work in CHANGELOG.md under the Unreleased section, using Added/Changed/Fixed/Removed headings, short general level-four category headings, and outcome bullets beneath those category headings.

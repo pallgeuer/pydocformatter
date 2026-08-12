@@ -102,12 +102,33 @@ rg -n 'stable_since|requires-python|Programming Language :: Python|license|proje
 
 Rewrite the release notes compactly for external users rather than preserving the development diary. The version section must describe the final shipped state, including all material features, fixes, compatibility changes, and migrations, while omitting implementation churn, superseded intermediate behavior, test-only work, and stale changes to code that no longer exists.
 
+Treat moving `Unreleased` content as draft collection only, never as completed release notes. Before editing that section, preserve the development draft for the required comparison below:
+
+```bash
+DRAFT_RELEASE_NOTES="/tmp/pydocformatter-${TAG}-draft-release-notes.md"
+awk '$0 == "## Unreleased" { copy = 1; next } copy && /^---$/ { exit } copy { print }' CHANGELOG.md > "$DRAFT_RELEASE_NOTES"
+test -s "$DRAFT_RELEASE_NOTES"
+```
+
 - Move the relevant `Unreleased` material under `## v<VERSION>` and add `Released YYYY-MM-DD` using `RELEASE_DATE`.
 - Put breaking changes and their replacements where users will see them clearly.
 - Keep the standard `Added`, `Changed`, `Fixed`, and `Removed` categories only where they contain useful entries.
+- Within those standard categories, organize outcomes beneath short general level-four category headings rather than category bullets.
 - Set the new `## Unreleased` section to `None.`. The next user- or developer-relevant change replaces `None.` with the appropriate category and entry.
 - Point the `Unreleased` comparison at `v<VERSION>...HEAD` and add the release comparison from `PREVIOUS_TAG` to `TAG`.
 - Make the version section suitable for copying verbatim into the GitHub release notes.
+
+Complete a separate editorial pass after the mechanical move. Do not continue to the release checks until every draft entry has been deliberately retained, combined, rewritten, or removed and the resulting section has been reviewed on its own:
+
+```bash
+CANDIDATE_RELEASE_NOTES="/tmp/pydocformatter-${TAG}-candidate-release-notes.md"
+awk -v heading="## v${VERSION}" '$0 == heading { copy = 1; next } copy && /^---$/ { exit } copy { print }' CHANGELOG.md > "$CANDIDATE_RELEASE_NOTES"
+test -s "$CANDIDATE_RELEASE_NOTES"
+printf 'Draft lines: %s\nCandidate lines: %s\n' "$(wc -l < "$DRAFT_RELEASE_NOTES")" "$(wc -l < "$CANDIDATE_RELEASE_NOTES")"
+git diff -- CHANGELOG.md
+```
+
+**Required editorial checkpoint:** Record a concise audit confirming that duplicate and superseded entries were combined, maintainer-only implementation churn and test-only work were removed, all material user-facing outcomes and migrations remain, and the final notes read as one coherent external release summary. Merely moving `Unreleased`, changing headings, or preserving every development bullet does not satisfy this section. A substantial release will normally become materially shorter, although clarity and complete user-facing coverage take precedence over a line-count target.
 
 `RELEASE_DATE` is the intended publication date. If publication moves to another day, update the changelog date on `main`, rerun the affected release checks, commit and push the correction, and wait for its workflows before tagging.
 
