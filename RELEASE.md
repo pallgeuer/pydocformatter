@@ -113,7 +113,7 @@ test -s "$DRAFT_RELEASE_NOTES"
 - Move the relevant `Unreleased` material under `## v<VERSION>` and add `Released YYYY-MM-DD` using `RELEASE_DATE`.
 - Put breaking changes and their replacements where users will see them clearly.
 - Keep the standard `Added`, `Changed`, `Fixed`, and `Removed` categories only where they contain useful entries.
-- Within those standard categories, organize outcomes beneath short general level-four category headings rather than category bullets.
+- Within those standard categories, organize outcomes beneath short general level-four category headings rather than category bullets, and preserve horizontal rules between the introduction, release diffs, `Unreleased`, and every released-version section.
 - Set the new `## Unreleased` section to `None.`. The next user- or developer-relevant change replaces `None.` with the appropriate category and entry.
 - Point the `Unreleased` comparison at `v<VERSION>...HEAD` and add the release comparison from `PREVIOUS_TAG` to `TAG`.
 - Make the version section suitable for copying verbatim into the GitHub release notes.

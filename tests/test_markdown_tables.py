@@ -18,7 +18,7 @@ FIX_COMMAND = "uv run la-dev-markdown-tables"
 def test_tracked_markdown_tables_use_canonical_style() -> None:
     """Check every tracked Markdown table with the shared formatter."""
     failures: list[str] = []
-    for path in markdown_tables.tracked_markdown_paths(ROOT):
+    for path in markdown_tables.select_markdown_paths(root=ROOT):
         result = markdown_tables.format_markdown_tables_file(path, check=True)
         failures.extend(f"{change.path}:{change.line_number}: {change.message}" for change in result.changes)
         failures.extend(f"{issue.path}:{issue.line_number}: {issue.message}" for issue in result.issues)

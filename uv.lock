@@ -482,11 +482,11 @@ wheels = [
 
 [[package]]
 name = "la-dev-codex-plugins"
-version = "0.4.4"
+version = "0.5.1"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/b4/24/ba07a8111954d56b99b74883e4025b364250c9633bdd1bff69ced58d6ebe/la_dev_codex_plugins-0.4.4.tar.gz", hash = "sha256:493b0e256ef3dbb14bf28f0354e71357b00cd120720d10bc43475ec2e69a0fae", size = 52899, upload-time = "2026-08-10T12:09:55.742Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/3d/f6/0c77d4c62cbd52f99bf1de4b4dfccb13360facfae10767b11f154a9133f7/la_dev_codex_plugins-0.5.1.tar.gz", hash = "sha256:97831ddbb68ce16047c5f2b988bea87e81795623e98566cad8c6b0486a1dd5cc", size = 52960, upload-time = "2026-08-12T23:14:32.906Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/6a/97/f7030874ac9ca5e33e99dd32ff0411a37d59a2894a0824c74fad977ea460/la_dev_codex_plugins-0.4.4-py3-none-any.whl", hash = "sha256:4fa4a68c8a2e7b4da12d3ab14fbb69cd01de3df8d291d0b869a7bf3ab6c6acd1", size = 53247, upload-time = "2026-08-10T12:09:54.672Z" },
+    { url = "https://files.pythonhosted.org/packages/c6/5c/9499a0a0e29fd9a2455b64fe99c5c598c775052270a54ce72059972ce03e/la_dev_codex_plugins-0.5.1-py3-none-any.whl", hash = "sha256:5e92dccb38c0ee305eb13067e66514e149209ca34d40f14eeefe5a614cd6ed97", size = 53219, upload-time = "2026-08-12T23:14:31.319Z" },
 ]
 
 [package.optional-dependencies]
@@ -804,8 +804,8 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "la-dev-codex-plugins", specifier = "==0.4.4" },
-    { name = "la-dev-codex-plugins", extras = ["pytest"], specifier = "==0.4.4" },
+    { name = "la-dev-codex-plugins", specifier = "==0.5.1" },
+    { name = "la-dev-codex-plugins", extras = ["pytest"], specifier = "==0.5.1" },
     { name = "pre-commit", specifier = "==4.6.2" },
     { name = "pytest", specifier = "==9.1.1" },
     { name = "pytest-cov", specifier = "==7.1.0" },
@@ -817,12 +817,12 @@ dev = [
     { name = "zensical", specifier = "==0.0.53" },
 ]
 docs = [
-    { name = "la-dev-codex-plugins", specifier = "==0.4.4" },
+    { name = "la-dev-codex-plugins", specifier = "==0.5.1" },
     { name = "zensical", specifier = "==0.0.53" },
 ]
 test = [
-    { name = "la-dev-codex-plugins", specifier = "==0.4.4" },
-    { name = "la-dev-codex-plugins", extras = ["pytest"], specifier = "==0.4.4" },
+    { name = "la-dev-codex-plugins", specifier = "==0.5.1" },
+    { name = "la-dev-codex-plugins", extras = ["pytest"], specifier = "==0.5.1" },
     { name = "pytest", specifier = "==9.1.1" },
     { name = "pytest-cov", specifier = "==7.1.0" },
     { name = "pytest-mock", specifier = "==3.15.1" },

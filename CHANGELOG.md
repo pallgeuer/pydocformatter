@@ -17,9 +17,13 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Changed
 
+#### Developer tooling
+
+- Updated the shared language-agnostic development tooling dependency and adopted its Git-aware Markdown path-selection API.
+
 #### Developer documentation
 
-- Standardized changelog categories as non-bulleted level-four headings, condensed the historical v1.1.0 notes into external release outcomes, and added an explicit editorial checkpoint to the release runbook.
+- Standardized changelog categories as non-bulleted level-four headings with horizontal rules between top-level sections, condensed the historical v1.1.0 notes into external release outcomes, and added explicit structural and editorial checkpoints to the release runbook.
 
 ---
 
