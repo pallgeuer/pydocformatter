@@ -99,12 +99,12 @@ def _insertions_before_lines(docstring: PDF_definition.DocstringInfo) -> frozens
 def _insertions_after_lines(docstring: PDF_definition.DocstringInfo, *, context: RuleContext) -> frozenset[int]:
     """Return logical line indexes after which a blank line should be inserted."""
     if not context.settings.docstring_blank_line_after_last_section:
-        return frozenset()
+        return frozenset[int]()
     final_spacing = docstring_sections.final_convention_section_spacing(docstring)
     if final_spacing is None or final_spacing.final_content_line is None:
-        return frozenset()
+        return frozenset[int]()
     if final_spacing.trailing_blank_line is not None:
-        return frozenset()
+        return frozenset[int]()
     return frozenset({final_spacing.final_content_line})
 
 

@@ -76,6 +76,7 @@ All notable changes to this project are documented here. The format follows [Kee
   - Corrected the rule settings audit to distinguish disabled rules from rules ignored only by broad selectors, with metadata-backed regression coverage.
   - Distinguished convention opt-in policies from `require-explicit`, with exhaustive conflict-free convention profiles and meaningful explicit-selection defaults enforced by regression tests.
 - **Developer tooling:**
+  - Enforced ty's sound return and yield boundaries across project source, tests, and documentation tooling.
   - Aligned remaining function imports and package docstrings with the repository's source conventions.
   - Enforced ASCII-only source, configuration, and documentation files with repository-level regression coverage while explicitly retaining literal Unicode in intentional documentation examples.
   - Generated the read-only documentation test site once per pytest process that runs a consumer instead of once for each of 39 consumers, reducing the measured serial suite from 46.10s to 29.35s and default xdist from 11.98s to 6.85s without changing test coverage or scheduling.

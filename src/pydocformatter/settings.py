@@ -677,7 +677,7 @@ class SettingsSchema(Generic[SettingsT]):
         Returns:
             str: TOML-like settings text in schema definition order.
         """
-        lines = [f"[{self.table_name}]"] if self.table_name else []
+        lines: list[str] = [f"[{self.table_name}]"] if self.table_name else []
         for definition in self.definitions:
             if not definition.available_in_toml:
                 continue
@@ -1016,9 +1016,12 @@ def validate_string_list(value: Any, context: str) -> StringList:
     """
     if not isinstance(value, (list, tuple)):
         raise SettingsError(f"{context} must be a list of strings")
-    if not all(isinstance(item, str) for item in value):
-        raise SettingsError(f"{context} must be a list of strings")
-    return tuple(value)
+    validated: list[str] = []
+    for item in value:
+        if not isinstance(item, str):
+            raise SettingsError(f"{context} must be a list of strings")
+        validated.append(item)
+    return tuple(validated)
 
 
 def validate_non_empty_string_list(value: Any, context: str) -> StringList:

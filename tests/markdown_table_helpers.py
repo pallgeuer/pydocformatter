@@ -2,6 +2,7 @@
 
 # Standard library imports
 import re
+import typing
 
 # Third-party imports
 from la_dev_codex_plugins import markdown_tables
@@ -25,7 +26,7 @@ def parsed_tables(text: str, *, label: str) -> tuple[markdown_tables.MarkdownTab
         AssertionError: The shared parser finds a malformed table candidate.
     """
     try:
-        return markdown_tables.parse_markdown_tables(text)
+        return typing.cast("tuple[markdown_tables.MarkdownTable, ...]", markdown_tables.parse_markdown_tables(text))
     except markdown_tables.MarkdownTableError as error:
         raise AssertionError(f"{label}: {error}") from error
 
@@ -40,7 +41,7 @@ def table_headers(table: markdown_tables.MarkdownTable, *, label: str) -> tuple[
     Returns:
         Header cells in source order.
     """
-    headers = table.rows[0].cells
+    headers = typing.cast("tuple[str, ...]", table.rows[0].cells)
     assert headers, f"{label}: table at line {table.start_line} has no columns"
     assert all(headers), f"{label}: table at line {table.start_line} has an empty header"
     assert len(headers) == len(set(headers)), f"{label}: table at line {table.start_line} has duplicate headers"
@@ -62,7 +63,7 @@ def table_rows(table: markdown_tables.MarkdownTable, *, label: str, require_body
     body = table.rows[2:]
     if require_body:
         assert body, f"{label}: table at line {table.start_line} has no body rows"
-    return tuple(dict(zip(headers, row.cells, strict=True)) for row in body)
+    return tuple(dict(zip(headers, typing.cast("tuple[str, ...]", row.cells), strict=True)) for row in body)
 
 
 def table_after_heading(text: str, heading: str, *, label: str, expected_leading_lines: tuple[str, ...] | None = (), require_body: bool = True) -> markdown_tables.MarkdownTable:

@@ -353,7 +353,7 @@ def _cached_targets(context: RuleContext, subject: TypedDocumentationSubject, co
     data = PDF_definition.PDF.require_data(context)
     cached_targets = data._typed_documentation_targets
     if cached_targets is None:
-        cached_targets = {}
+        cached_targets = dict[TypedDocumentationSubject, tuple[TypedDocumentationTarget, ...]]()
         object.__setattr__(data, "_typed_documentation_targets", cached_targets)
     targets = cached_targets.get(subject)
     if targets is None:

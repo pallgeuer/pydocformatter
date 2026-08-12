@@ -54,7 +54,9 @@ def _plain_code_cell(cell: str) -> str:
     """Return the visible rule code from a linked or code-formatted table cell."""
     match = re.fullmatch(r"\[`([^`]+)`\]\([^)]+\)", cell)
     if match:
-        return match.group(1)
+        code = match.group(1)
+        assert isinstance(code, str)
+        return code
     return cell.strip("`")
 
 

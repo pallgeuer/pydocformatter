@@ -257,7 +257,12 @@ def _separate_markdown_lists(text: str) -> str:
 def _markdown_fence(line: str) -> str | None:
     """Return the fence marker that starts a fenced code block."""
     match = MARKDOWN_FENCE_RE.match(line.rstrip("\r\n"))
-    return match.group("fence") if match else None
+    if match is None:
+        return None
+    fence = match.group("fence")
+    if not isinstance(fence, str):
+        raise TypeError("Markdown fence capture must be a string")
+    return fence
 
 
 def _closes_markdown_fence(line: str, fence: str) -> bool:

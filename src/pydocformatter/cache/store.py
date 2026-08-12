@@ -309,7 +309,15 @@ def _schema_is_supported(connection: sqlite3.Connection) -> bool:
 def _table_columns(connection: sqlite3.Connection, table: str) -> tuple[tuple[str, str, int, int], ...]:
     """Return strict name, type, not-null, and primary-key metadata for one table."""
     rows = connection.execute(f"PRAGMA table_info({table})").fetchall()
-    return tuple((row[1], row[2].upper(), row[3], row[5]) for row in rows)
+    columns: list[tuple[str, str, int, int]] = []
+    for row in rows:
+        if len(row) < 6:
+            return ()
+        name, declared_type, not_null, primary_key = row[1], row[2], row[3], row[5]
+        if not isinstance(name, str) or not isinstance(declared_type, str) or type(not_null) is not int or type(primary_key) is not int:
+            return ()
+        columns.append((name, declared_type.upper(), not_null, primary_key))
+    return tuple(columns)
 
 
 def _decode_proof_row(row: tuple[object, ...]) -> CleanProof | None:

@@ -37,6 +37,7 @@ _TYPE_DIRECTIVE_RE = re.compile(r"^#\s*type\s*:", re.IGNORECASE)
 _TOOL_DIRECTIVE_RE = re.compile(
     r"^#\s*(?:noqa\b|nosec\b|nosemgrep\b|pydocfmt\b|pylint\b|pyright\b|mypy\b|ty\s*:|ruff\b|flake8\b|fmt\s*:|isort\s*:|pragma\b|noinspection\b|language\s*=|@formatter\s*:)", re.IGNORECASE
 )
+_EMPTY_RULE_CODES: frozenset[RuleCode] = frozenset()
 
 
 @dataclasses.dataclass(frozen=True)
@@ -496,8 +497,8 @@ def _matched_codes_for_bracket_token(token: directive_helpers.BracketDirectiveTo
             raise AssertionError("Known pydocfmt directive token must match at least one rule code")
         return token.matched_codes, None
     if token.kind is directive_helpers.DirectiveTokenKind.UNKNOWN:
-        return frozenset(), f"Unknown pydocfmt suppression selector '{token.normalized}'"
-    return frozenset(), f"Invalid pydocfmt suppression selector '{token.normalized}'"
+        return _EMPTY_RULE_CODES, f"Unknown pydocfmt suppression selector '{token.normalized}'"
+    return _EMPTY_RULE_CODES, f"Invalid pydocfmt suppression selector '{token.normalized}'"
 
 
 def _selectors(
@@ -544,10 +545,10 @@ def _matched_codes(text: str, *, include_invalid: bool, collection: RuleCollecti
     """Return rule codes matched by a suppression selector."""
     resolution = collection.resolve_selector(text)
     if resolution.selector is None:
-        return frozenset(), f"Invalid pydocfmt suppression selector '{text}'" if include_invalid else None
+        return _EMPTY_RULE_CODES, f"Invalid pydocfmt suppression selector '{text}'" if include_invalid else None
     matched_codes = frozenset(rule.meta.code for rule in resolution.matching_rules)
     if not matched_codes:
-        return frozenset(), f"Unknown pydocfmt suppression selector '{text}'" if include_invalid else None
+        return _EMPTY_RULE_CODES, f"Unknown pydocfmt suppression selector '{text}'" if include_invalid else None
     return matched_codes, None
 
 
@@ -604,7 +605,7 @@ def _comment_target_coverage(line: int, *, comments_by_line: dict[int, tuple[_Co
     line_comments = comments_by_line.get(line, ())
     target = next(iter(line_comments), None)
     if target is None:
-        return frozenset()
+        return frozenset[int]()
     if not target.standalone:
         return frozenset((line,))
     lines = {line}

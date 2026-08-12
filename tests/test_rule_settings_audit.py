@@ -80,7 +80,7 @@ def test_rule_settings_audit_covers_direct_rule_settings() -> None:
         syntax_tree = ast.parse(pathlib.Path(source_path_text).read_text(encoding="utf-8"))
         direct_setting_fields = {node.attr for node in ast.walk(syntax_tree) if isinstance(node, ast.Attribute) and node.attr in known_setting_fields}
         audited_setting_fields: set[str] = set()
-        implementation_tokens = OPTION_CODE_SPAN_RE.findall(row_by_code[code]["Implementation settings used"])
+        implementation_tokens = _option_code_spans(row_by_code[code]["Implementation settings used"])
         unknown_tokens = tuple(token for token in implementation_tokens if token not in shared_bundles and token not in known_setting_fields)
         for token in implementation_tokens:
             audited_setting_fields.update(shared_bundles.get(token, (token,)))
@@ -105,7 +105,7 @@ def _shared_setting_bundles() -> dict[str, tuple[str, ...]]:
     label = AUDIT_PATH.as_posix()
     table = markdown_table_helpers.table_after_heading(text, "## Shared setting bundles", label=label)
     rows = markdown_table_helpers.table_rows(table, label=label)
-    return {row["Bundle"].strip("`"): tuple(OPTION_CODE_SPAN_RE.findall(row["Settings"])) for row in rows}
+    return {row["Bundle"].strip("`"): _option_code_spans(row["Settings"]) for row in rows}
 
 
 def _audited_options(row: dict[str, str]) -> tuple[str, ...]:
@@ -113,7 +113,17 @@ def _audited_options(row: dict[str, str]) -> tuple[str, ...]:
     options = row["Options settings to document"]
     if options == "None":
         return ()
-    return tuple(OPTION_CODE_SPAN_RE.findall(options))
+    return _option_code_spans(options)
+
+
+def _option_code_spans(text: str) -> tuple[str, ...]:
+    """Return code-span payloads from Markdown text."""
+    spans: list[str] = []
+    for match in OPTION_CODE_SPAN_RE.finditer(text):
+        span = match.group(1)
+        assert isinstance(span, str)
+        spans.append(span)
+    return tuple(spans)
 
 
 def _documented_options(rule_code: str, section: str) -> tuple[str, ...]:

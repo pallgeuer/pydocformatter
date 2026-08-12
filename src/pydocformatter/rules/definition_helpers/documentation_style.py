@@ -100,12 +100,12 @@ def _generic_sequences(name_tokens: tuple[str, ...], *, nouns: frozenset[str]) -
 def _name_tokens(name: str) -> tuple[str, ...]:
     """Return comparison tokens for a documented name."""
     stripped = name.strip("*")
-    return tuple(token for token in _TOKEN_RE.findall(stripped.replace("_", " ").lower()) if token)
+    return tuple(match.group() for match in _TOKEN_RE.finditer(stripped.replace("_", " ").lower()))
 
 
 def _text_tokens(text: str) -> tuple[str, ...]:
     """Return normalized word tokens from documentation text."""
-    return tuple(token for token in _TOKEN_RE.findall(text.lower()) if token)
+    return tuple(match.group() for match in _TOKEN_RE.finditer(text.lower()))
 
 
 _TOKEN_RE = re.compile(r"[a-z0-9]+")

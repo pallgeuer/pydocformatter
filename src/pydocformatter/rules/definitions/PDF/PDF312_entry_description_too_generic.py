@@ -170,7 +170,7 @@ def _exact_description_fragment_is_safe(text: str) -> bool:
 def _name_tokens(name: str) -> tuple[str, ...]:
     """Return comparison tokens for a documented name."""
     stripped = name.strip("*")
-    return tuple(token for token in _NAME_TOKEN_RE.findall(stripped.replace("_", " ").lower()) if token)
+    return tuple(match.group() for match in _NAME_TOKEN_RE.finditer(stripped.replace("_", " ").lower()))
 
 
 def _instance_message(names: tuple[str, ...], *, policy: _DescriptionPolicy) -> str:

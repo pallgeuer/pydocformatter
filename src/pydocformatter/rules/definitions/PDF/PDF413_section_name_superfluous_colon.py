@@ -132,7 +132,10 @@ def _unparsed_numpy_colon_section_name(text: str) -> str | None:
     match = _NUMPY_COLON_SECTION_RE.match(text)
     if match is None:
         return None
-    name = match.group("name").rstrip()
+    matched_name = match.group("name")
+    if not isinstance(matched_name, str):
+        raise TypeError("NumPy section-name capture must be a string")
+    name = matched_name.rstrip()
     if docstring_sections.canonical_section_name(DocstringConvention.NUMPY, name) is None:
         return None
     return name

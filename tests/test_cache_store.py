@@ -99,6 +99,19 @@ def test_first_clean_upsert_creates_owned_layout_schema_and_row(tmp_path: Path) 
         assert connection.execute("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name").fetchall() == [("cache_state",), ("clean_proofs",)]
 
 
+@pytest.mark.parametrize(
+    "row", [(0,), (0, b"engine_key", "BLOB", 1, None, 1), (0, "engine_key", b"BLOB", 1, None, 1), (0, "engine_key", "BLOB", True, None, 1), (0, "engine_key", "BLOB", 1, None, False)]
+)
+def test_malformed_table_metadata_is_an_unsupported_schema(row: tuple[object, ...], mocker: MockerFixture) -> None:
+    """Reject dynamically typed SQLite schema metadata before exposing it as strict metadata."""
+    cursor = mocker.Mock()
+    cursor.fetchall.return_value = [row]
+    connection = mocker.Mock(spec=sqlite3.Connection)
+    connection.execute.return_value = cursor
+
+    assert cache_store._table_columns(connection, "clean_proofs") == ()
+
+
 def test_settings_namespaces_keep_separate_proofs_for_one_path(tmp_path: Path) -> None:
     store = _store(tmp_path)
     first = _proof(0, path="module.py", analysis=2)

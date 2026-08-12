@@ -118,9 +118,9 @@ class PDF306ParameterDocumentationTooGeneric(RuleBase):
 def _extra_generic_sequences(signature_parameter: parameter_documentation.SignatureParameter | None) -> frozenset[tuple[str, ...]]:
     """Return parameter-kind-specific generic phrase sequences."""
     if signature_parameter is None:
-        return frozenset()
+        return frozenset[tuple[str, ...]]()
     if signature_parameter.display_name.startswith("**"):
         return _KEYWORD_VARIADIC_GENERIC_SEQUENCES
     if signature_parameter.display_name.startswith("*"):
         return _POSITIONAL_VARIADIC_GENERIC_SEQUENCES
-    return frozenset()
+    return frozenset[tuple[str, ...]]()

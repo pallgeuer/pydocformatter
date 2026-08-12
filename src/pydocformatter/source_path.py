@@ -116,7 +116,7 @@ class SourcePathContextBuilder:
         for key, directory in reversed(pending):
             parts = (*parts, pathlib.Path(directory).name)
             self._package_parts[key] = parts
-        return self._package_parts.get(requested_key, parts)
+        return self._package_parts[requested_key]
 
 
 def _package_initializer_exists(directory: str) -> bool:

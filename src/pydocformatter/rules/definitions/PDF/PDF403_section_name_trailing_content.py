@@ -100,7 +100,10 @@ def _google_trailing_content_target(line: PDF_definition.DocstringValueLine, *, 
     match = _GOOGLE_TRAILING_CONTENT_RE.match(line.text)
     if match is None:
         return None
-    name = match.group("name").rstrip(ascii_whitespace.SPACE_AND_TAB)
+    matched_name = match.group("name")
+    if not isinstance(matched_name, str):
+        raise TypeError("Google section-name capture must be a string")
+    name = matched_name.rstrip(ascii_whitespace.SPACE_AND_TAB)
     canonical = docstring_sections.canonical_section_name(DocstringConvention.GOOGLE, name)
     if canonical is None:
         return None

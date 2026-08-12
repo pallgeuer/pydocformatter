@@ -38,6 +38,7 @@ _RUFF_EXACT_CODE_RE = re.compile(r"^[A-Za-z]+[0-9]+$")
 _RUFF_BROAD_CODE_RE = re.compile(r"^[A-Z]+$")
 _SAFE_FOREIGN_TOKEN_RE = re.compile(r"^[A-Za-z][A-Za-z0-9]*(?:-[A-Za-z0-9]+)*$")
 _SAFE_LIST_TOKEN_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
+_EMPTY_RULE_CODES: frozenset[RuleCode] = frozenset()
 
 DirectiveSemanticIdentity: TypeAlias = RuleCode | tuple[str, str]
 
@@ -287,15 +288,15 @@ def _classify_token(original: str, *, tool: DirectiveTool, collection: RuleColle
     """Classify one nonempty directive token."""
     if tool is DirectiveTool.RUFF:
         if _RUFF_EXACT_CODE_RE.fullmatch(original) is not None:
-            return DirectiveTokenKind.RUFF_EXACT_CODE, original, frozenset(), None, None, ("ruff", original)
+            return DirectiveTokenKind.RUFF_EXACT_CODE, original, _EMPTY_RULE_CODES, None, None, ("ruff", original)
         if _RUFF_BROAD_CODE_RE.fullmatch(original) is not None:
-            return DirectiveTokenKind.RUFF_BROAD_CODE, original, frozenset(), None, None, ("ruff", original)
+            return DirectiveTokenKind.RUFF_BROAD_CODE, original, _EMPTY_RULE_CODES, None, None, ("ruff", original)
         if _SAFE_FOREIGN_TOKEN_RE.fullmatch(original) is not None:
-            return DirectiveTokenKind.RUFF_NAME, original, frozenset(), None, None, ("ruff", original)
-        return DirectiveTokenKind.FOREIGN, original, frozenset(), None, None, ("ruff", original)
+            return DirectiveTokenKind.RUFF_NAME, original, _EMPTY_RULE_CODES, None, None, ("ruff", original)
+        return DirectiveTokenKind.FOREIGN, original, _EMPTY_RULE_CODES, None, None, ("ruff", original)
 
     if not original.isascii():
-        return DirectiveTokenKind.INVALID, original, frozenset(), None, None, ("invalid", original)
+        return DirectiveTokenKind.INVALID, original, _EMPTY_RULE_CODES, None, None, ("invalid", original)
 
     lowered = original.lower()
     name_resolution = collection.resolve_selector(lowered)
@@ -311,10 +312,10 @@ def _classify_token(original: str, *, tool: DirectiveTool, collection: RuleColle
             return DirectiveTokenKind.PYDOCFMT_EXACT_CODE, uppered, matched_codes, rule.code, rule.name, rule.code
         if matched_codes:
             return DirectiveTokenKind.PYDOCFMT_BROAD_CODE, uppered, matched_codes, None, None, ("selector", uppered)
-        return DirectiveTokenKind.UNKNOWN, uppered, frozenset(), None, None, ("unknown", uppered)
+        return DirectiveTokenKind.UNKNOWN, uppered, _EMPTY_RULE_CODES, None, None, ("unknown", uppered)
     if name_resolution.kind.value == "unknown-name":
-        return DirectiveTokenKind.UNKNOWN, lowered, frozenset(), None, None, ("unknown", lowered)
-    return DirectiveTokenKind.INVALID, original, frozenset(), None, None, ("invalid", original)
+        return DirectiveTokenKind.UNKNOWN, lowered, _EMPTY_RULE_CODES, None, None, ("unknown", lowered)
+    return DirectiveTokenKind.INVALID, original, _EMPTY_RULE_CODES, None, None, ("invalid", original)
 
 
 def _range(line: int, start: int, end: int) -> cst_metadata.CodeRange:

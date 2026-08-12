@@ -899,7 +899,7 @@ class PDFCategoryData:
         """
         docstrings_by_owner_id = self._docstrings_by_owner_id
         if docstrings_by_owner_id is None:
-            docstrings_by_owner_id = {}
+            docstrings_by_owner_id = dict[int, DocstringInfo]()
             for docstring in self.docstrings:
                 if isinstance(docstring.owner, DefinitionInfo):
                     docstrings_by_owner_id.setdefault(id(docstring.owner), docstring)
@@ -3312,7 +3312,7 @@ class _SlotNonAssignmentBindingCollector(cst.CSTVisitor):
 def _literal_slot_attributes(context: RuleCategoryContext, definitions: Sequence[DefinitionInfo]) -> Mapping[int, AttributeInfo]:
     """Return synthetic literal slot attributes indexed by effective assignment identity."""
     if not _contains_slot_name_token(context.source):
-        return MappingProxyType({})
+        return MappingProxyType(dict[int, AttributeInfo]())
     scopes = context.metadata_wrapper.resolve(cst_metadata.ScopeProvider)
     parents = context.metadata_wrapper.resolve(cst_metadata.ParentNodeProvider)
     definitions_by_node_id = {id(definition.node): definition for definition in definitions}
