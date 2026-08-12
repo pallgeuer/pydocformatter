@@ -6,13 +6,24 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## Release diffs
 
-- **Unreleased:** <https://github.com/pallgeuer/pydocformatter/compare/v1.0.0...HEAD>
+- **Unreleased:** <https://github.com/pallgeuer/pydocformatter/compare/v1.1.0...HEAD>
+- **v1.1.0:** <https://github.com/pallgeuer/pydocformatter/compare/v1.0.0...v1.1.0>
 - **v1.0.0:** <https://github.com/pallgeuer/pydocformatter/compare/v0.2.0...v1.0.0>
 - **v0.2.0:** <https://github.com/pallgeuer/pydocformatter/releases/tag/v0.2.0>
 
 ---
 
 ## Unreleased
+
+None.
+
+---
+
+## v1.1.0
+
+Released 2026-08-13
+
+**Compatibility warning:** This minor release intentionally includes a breaking reassignment of all PCF rule codes. Existing code-based selectors and suppressions must migrate using the table below because the previous codes are not retained as aliases; canonical rule-name selectors remain unchanged.
 
 ### Added
 
