@@ -1,36 +1,75 @@
+minimum_pre_commit_version: "4.6.0"
+default_install_hook_types: [pre-commit, pre-push]
+
 repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-json
+        stages: [pre-commit, pre-push, manual]
+      - id: check-toml
+        stages: [pre-commit, pre-push, manual]
+      - id: check-yaml
+        stages: [pre-commit, pre-push, manual]
+
+  - repo: https://github.com/pallgeuer/la-dev-codex-plugins
+    rev: v0.4.4
+    hooks:
+      - id: markdown-tables-fix
+        stages: [pre-commit]
+      - id: markdown-tables-check
+        stages: [pre-push, manual]
+
   - repo: local
     hooks:
-      - id: ruff-check
-        name: ruff (linter)
-        entry: uv run ruff check --fix --force-exclude
+      - id: ruff-check-fix
+        name: ruff check (fix)
+        entry: uv run ruff check --fix
         language: system
         types_or: [python, pyi]
+        stages: [pre-commit]
       - id: pydocfmt-fix
         name: pydocfmt (fix)
-        entry: uv run pydocfmt check --fix --force-exclude
+        entry: uv run pydocfmt check --fix
         language: system
         types: [python]
-      - id: ruff-format
-        name: ruff (formatter)
+        stages: [pre-commit]
+      - id: ruff-format-fix
+        name: ruff format (fix)
         entry: uv run ruff format
         language: system
         types_or: [python, pyi, markdown]
-      - id: markdown-tables
-        name: Markdown tables (fix)
-        entry: uv run la-dev-markdown-tables
+        stages: [pre-commit]
+      - id: ruff-check
+        name: ruff check
+        entry: uv run ruff check
         language: system
-        types: [markdown]
+        types_or: [python, pyi]
+        stages: [pre-push, manual]
+      - id: pydocfmt-check
+        name: pydocfmt (check)
+        entry: uv run pydocfmt check
+        language: system
+        types: [python]
+        stages: [pre-push, manual]
+      - id: ruff-format-check
+        name: ruff format (check)
+        entry: uv run ruff format --check
+        language: system
+        types_or: [python, pyi, markdown]
+        stages: [pre-push, manual]
       - id: ty
-        name: ty (type checker)
+        name: ty
         entry: uv run ty check
         language: system
         pass_filenames: false
+        stages: [pre-commit, pre-push, manual]
       - id: pytest
-        name: pytest (test suite)
+        name: pytest
         entry: uv run pytest
         language: system
         pass_filenames: false
+        stages: [pre-commit, pre-push, manual]
 
   # Example of how external users would use the published pydocformatter hooks (choose one of the two hooks):
   # - repo: https://github.com/pallgeuer/pydocformatter

@@ -95,6 +95,8 @@ exclude = [
     "CLAUDE.md",
     ".codex/",
     ".claude/",
+    "/RELEASE.md",
+    "/docs/devel/plans/.gitkeep",
 ]
 
 [tool.hatch.version]

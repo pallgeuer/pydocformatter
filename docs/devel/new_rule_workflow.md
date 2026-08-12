@@ -64,19 +64,23 @@ The workflow starts with rule planning. General development setup, issue agreeme
 ## Verify, commit, and push
 
 1. Review the complete diff and Git status. Remove unintended changes and ensure generated documentation artifacts are not included.
-2. Run the complete local CI-equivalent suite:
+2. Run the complete fix-stage suite, inspect any automatic edits, and rerun it until it passes without further changes:
 
    ```bash
    uv run pre-commit run --all-files
    ```
 
-   Inspect any automatic edits and rerun the suite until it passes without further changes.
+3. Run the non-mutating CI-equivalent manual stage:
 
-3. Generate and build the documentation site (do not run these commands in parallel):
+   ```bash
+   uv run pre-commit run --all-files --hook-stage manual
+   ```
+
+4. Generate and build the documentation site (do not run these commands in parallel):
 
    ```bash
    uv run python tools/docs/generate_zensical.py
    uv run zensical build --strict -f zensical.generated.toml
    ```
 
-4. Commit the verified rule work with a meaningful message (e.g. the `Diff summary:` from Loupe), then push the current branch.
+5. Commit the verified rule work with a meaningful message (e.g. the `Diff summary:` from Loupe), then push the current branch.

@@ -6,11 +6,6 @@ on:
   pull_request:
     branches: [main]
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
 concurrency:
   group: pages
   cancel-in-progress: false
@@ -20,6 +15,9 @@ jobs:
   build:
     name: Build documentation site
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: read
 
     steps:
 
@@ -55,6 +53,9 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: build
+    permissions:
+      pages: write
+      id-token: write
 
     environment:
       name: github-pages

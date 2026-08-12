@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
 
   pre-commit:
@@ -27,4 +30,4 @@ jobs:
         run: uv sync --locked --no-default-groups --group dev
 
       - name: Run pre-commit hooks
-        run: uv run --no-sync pre-commit run --all-files --show-diff-on-failure
+        run: uv run --no-sync pre-commit run --all-files --hook-stage manual --show-diff-on-failure

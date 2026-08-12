@@ -1,8 +1,8 @@
 """Top-level CLI command tests."""
 
 # Standard library imports
-import re
 import tempfile
+import importlib.metadata
 from collections.abc import Callable
 from pathlib import Path
 
@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 
 # First-party imports
+import pydocformatter
 import pydocformatter.cli.main as pydocfmt_cli
 from tests import cli_helpers
 
@@ -43,14 +44,15 @@ def test_pydocfmt_help_check_prints_check_help() -> None:
 
 
 def test_pydocfmt_version_flag_and_command_print_version() -> None:
+    version = importlib.metadata.version("pydocformatter")
+    assert version == pydocformatter.__version__
     outputs = []
     for argv in (["pydocfmt", "--version"], ["pydocfmt", "version"]):
         result = cli_helpers.run_cli(pydocfmt_cli.main, argv)
         assert result.exit_code == 0
         outputs.append(result.stdout)
 
-    assert outputs[0] == outputs[1]
-    assert re.search(r"^pydocfmt \d+\.\d+\.\d+\n$", outputs[0])
+    assert outputs == [f"pydocfmt {version}\n"] * 2
 
 
 def test_pydocfmt_without_command_exits_with_usage_error() -> None:

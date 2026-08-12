@@ -26,7 +26,7 @@ Fork the repository if needed to `YOUR-USERNAME/pydocformatter`, then create the
 git clone https://github.com/YOUR-USERNAME/pydocformatter.git
 cd pydocformatter
 uv sync --locked --no-default-groups --group dev
-uv run pre-commit install
+uv run pre-commit install --hook-type pre-commit --hook-type pre-push
 ```
 
 Verify the checkout with:
@@ -134,13 +134,19 @@ uv run ruff format
 uv run ty check
 ```
 
-The complete local CI-equivalent hook suite runs formatting, linting, type checking, and pytest. It may modify files, so review the diff and rerun it until clean:
+The complete fix-stage hook suite runs formatting, linting, type checking, and pytest. It may modify files, so review the diff and rerun it until clean:
 
 ```bash
 uv run pre-commit run --all-files
 ```
 
-For check-only runs, omit `--fix` and use `uv run ruff format --check`. Select checks in proportion to the change, but run the full hook suite before submitting code or rule changes.
+Run the non-mutating CI-equivalent suite through the manual stage after the fix stage is clean:
+
+```bash
+uv run pre-commit run --all-files --hook-stage manual
+```
+
+For focused check-only runs, omit `--fix` and use `uv run ruff format --check`. Select checks in proportion to the change, but run both complete hook stages before submitting code or rule changes.
 
 ## Documentation site
 
@@ -185,9 +191,9 @@ Before requesting review:
 
 - Review the complete diff for unrelated edits and generated files.
 - Rebase or merge the current `main` branch as appropriate and resolve conflicts deliberately.
-- Run the relevant focused tests and the full pre-commit suite.
+- Run the relevant focused tests, the complete fix-stage pre-commit suite, and the non-mutating manual stage.
 - Complete the pull request template, explaining the problem, behavior change, compatibility implications, and commands used for verification.
 - Link related issues and include concise before-and-after examples for formatter, diagnostic, or CLI output changes.
-- Confirm that both the pre-commit and strict documentation GitHub Actions checks pass.
+- Confirm that the pre-commit, platform-compatibility, and strict documentation GitHub Actions checks pass.
 
 Keep review follow-ups in the same scope. If feedback reveals a separate problem, prefer a new issue or pull request rather than expanding the original change without discussion.

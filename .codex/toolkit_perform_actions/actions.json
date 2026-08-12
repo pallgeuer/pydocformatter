@@ -178,22 +178,6 @@
         "notes": ""
       }
     },
-    "publish-release": {
-      "agnostic": {
-        "gloss": "Release the current code as a new version",
-        "model": "default",
-        "reasoning_effort": "high",
-        "goal_mode": false,
-        "plan_mode": false,
-        "plan_reasoning_effort": "high",
-        "no_edits": false,
-        "prompt_vars": {},
-        "prompt": "Carefully read and follow `RELEASE.md` in order to fully release the current state of code as a new version. Decide on the appropriate next version number based on the changelog and the diff relative to the previous release; see also `docs_site/versioning.md`. Be meticulous in following all required steps, and check that you have done everything required at the end of each section. If anything is unclear or requires user decisions or user input, immediately end your turn after stating what clarifications or actions you need from the user. Check `PYPI_API_TOKEN` in an interactive Bash session in case it is available and needed.",
-        "requires_interactive": true,
-        "custom_codex_args": [],
-        "notes": ""
-      }
-    },
     "update-dev-dependencies": {
       "agnostic": {
         "gloss": "Research, update, and verify all fixed docs/test/dev dependencies",
@@ -204,7 +188,7 @@
         "plan_reasoning_effort": "high",
         "no_edits": false,
         "prompt_vars": {},
-        "prompt": "Update every direct `==` pin in the `docs`, `test`, and `dev` dependency groups in `pyproject.toml` to the latest compatible stable, non-yanked release, preserving exact pins and extras, then update `uv.lock`. Discover pins dynamically; leave runtime/build dependencies and unrelated transitive packages alone. Inspect repository guidance, CI/tool configuration, relevant worktree diffs, and baseline failures before editing, and preserve unrelated changes. For each pin, use live web research and authoritative package metadata, documentation, release notes, changelogs, and repositories to confirm the target, Python/extras compatibility, and material changes. Trace repository usage and handle relevant breaking changes, defaults, deprecations, removals, and interactions. Use the newest compatible stable release, with justification, if latest is incompatible. Adopt new upstream features only when they offer a clear, significant repository-specific improvement with proportionate scope; report larger opportunities separately. Run `uv lock` without custom cache options, inspect the lockfile diff and resolved direct versions, and isolate ambiguous failures. Reproduce CI in order: `uv sync --locked --no-default-groups --group docs`; `uv run --no-sync python tools/docs/generate_zensical.py`; `uv run --no-sync zensical build --clean --strict -f zensical.generated.toml`; `uv sync --locked --no-default-groups --group dev`; `uv lock --check`; `uv run --no-sync pytest -n 0 tests/test_dependency_pins.py`; package-specific focused checks; and `uv run --no-sync pre-commit run --all-files --show-diff-on-failure`. Review generated edits, fix attributable failures without weakening checks, and rerun until clean. Add an Unreleased changelog entry only for material changes or adopted features. Finish with sourced old/new versions, impact and feature decisions, verification results, and residual risks. Complete the goal only when every pin is updated or justified and all applicable checks pass, absent a confirmed pre-existing blocker.",
+        "prompt": "Update every direct `==` pin in the `docs`, `test`, and `dev` dependency groups in `pyproject.toml` to the latest compatible stable, non-yanked release, preserving exact pins and extras, then update `uv.lock`. Discover pins dynamically; leave runtime/build dependencies and unrelated transitive packages alone. Inspect repository guidance, CI/tool configuration, relevant worktree diffs, and baseline failures before editing, and preserve unrelated changes. For each pin, use live web research and authoritative package metadata, documentation, release notes, changelogs, and repositories to confirm the target, Python/extras compatibility, and material changes. Trace repository usage and handle relevant breaking changes, defaults, deprecations, removals, and interactions. Use the newest compatible stable release, with justification, if latest is incompatible. Adopt new upstream features only when they offer a clear, significant repository-specific improvement with proportionate scope; report larger opportunities separately. Run `uv lock` without custom cache options, inspect the lockfile diff and resolved direct versions, and isolate ambiguous failures. Reproduce CI in order: `uv sync --locked --no-default-groups --group docs`; `uv run --no-sync python tools/docs/generate_zensical.py`; `uv run --no-sync zensical build --clean --strict -f zensical.generated.toml`; `uv sync --locked --no-default-groups --group dev`; `uv lock --check`; `uv run --no-sync pytest -n 0 tests/test_dependency_pins.py`; package-specific focused checks; and `uv run --no-sync pre-commit run --all-files --hook-stage manual --show-diff-on-failure`. Review generated edits, fix attributable failures without weakening checks, and rerun until clean. Add an Unreleased changelog entry only for material changes or adopted features. Finish with sourced old/new versions, impact and feature decisions, verification results, and residual risks. Complete the goal only when every pin is updated or justified and all applicable checks pass, absent a confirmed pre-existing blocker.",
         "requires_interactive": false,
         "custom_codex_args": ["--search"],
         "notes": ""

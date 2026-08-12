@@ -76,6 +76,8 @@ All notable changes to this project are documented here. The format follows [Kee
   - Corrected the rule settings audit to distinguish disabled rules from rules ignored only by broad selectors, with metadata-backed regression coverage.
   - Distinguished convention opt-in policies from `require-explicit`, with exhaustive conflict-free convention profiles and meaningful explicit-selection defaults enforced by regression tests.
 - **Developer tooling:**
+  - Split pre-commit into mutating commit-time fixes and non-mutating pre-push, manual, and CI checks; added baseline configuration validation, tightened GitHub workflow permissions, and documented the canonical repository layout and commands.
+  - Required the package version source, installed distribution metadata, and both CLI version forms to agree exactly.
   - Enforced ty's sound return and yield boundaries across project source, tests, and documentation tooling.
   - Aligned remaining function imports and package docstrings with the repository's source conventions.
   - Enforced ASCII-only source, configuration, and documentation files with repository-level regression coverage while explicitly retaining literal Unicode in intentional documentation examples.
@@ -84,6 +86,8 @@ All notable changes to this project are documented here. The format follows [Kee
   - Updated the fixed documentation, test, and development dependency pins and migrated Ruff selectors and suppressions to the human-readable names supported by Ruff 0.16.
   - Replaced the repository-local Markdown table formatter, release checksum generator, and pytest working-directory isolation fixtures with the shared `la-dev-codex-plugins` implementations.
   - Strengthened semantic Markdown table tests with full-document parsing and normalized all generated documentation tables to the shared canonical style.
+- **Release process:**
+  - Adopted the bundled default `publish-release` action and added explicit exact-version and final-publication approval checkpoints around the complete locally tagged artifact preflight, with integrity checks before the approved tag and artifacts become public.
 - **Internal cleanup:**
   - Replaced typed-documentation forwarding aliases and their internal consumer paths with imports from the defining model and type-binding modules, removed the remaining module type-alias wrapper, and centralized each PDF7xx subject's collector, diagnostic label, and required-type policy.
   - Replaced package-mediated first-party submodule imports with direct imports where contextual local aliases meaningfully rename the module.
@@ -153,6 +157,8 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Fixed
 
+- **Packaging:**
+  - Excluded the maintainer release runbook and temporary-plan directory placeholder from source distributions.
 - **Cross-platform behavior:**
   - Kept surrogate-path gitignore encoding coverage independent of host filesystem filename restrictions and ran Ubuntu 20.04 dependency synchronization and tests with one consistent unprivileged user environment.
   - Deduplicated case-insensitive, hard-link, and symlink path aliases by physical file identity while falling back to normalized real paths for zero-valued inode information, and made a missing Git executable produce an actionable `--no-respect-gitignore` diagnostic.
