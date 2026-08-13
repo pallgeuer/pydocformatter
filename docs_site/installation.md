@@ -59,7 +59,7 @@ Use one published repository hook when pre-commit should manage the pydocformatt
 ```yaml
 repos:
   - repo: https://github.com/pallgeuer/pydocformatter
-    rev: v1.1.0
+    rev: v1.2.0
     hooks:
       - id: pydocfmt-check
       # - id: pydocfmt-fix

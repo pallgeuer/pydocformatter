@@ -11,7 +11,7 @@ Use `pydocfmt-check` when commits should fail on findings:
 ```yaml
 repos:
   - repo: https://github.com/pallgeuer/pydocformatter
-    rev: v1.1.0
+    rev: v1.2.0
     hooks:
       - id: pydocfmt-check
 ```
@@ -21,7 +21,7 @@ Use the fixing hook in a local workflow where automatic edits are expected:
 ```yaml
 repos:
   - repo: https://github.com/pallgeuer/pydocformatter
-    rev: v1.1.0
+    rev: v1.2.0
     hooks:
       - id: pydocfmt-fix
 ```

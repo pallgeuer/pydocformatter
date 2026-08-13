@@ -75,7 +75,7 @@ repos:
 
   # Example of how external users would use the published pydocformatter hooks (choose one of the two hooks):
   # - repo: https://github.com/pallgeuer/pydocformatter
-  #   rev: v1.1.0
+  #   rev: v1.2.0
   #   hooks:
   #     - id: pydocfmt-fix
   #     - id: pydocfmt-check
