@@ -34,6 +34,7 @@ All notable changes to this project are documented here. The format follows [Kee
 #### Developer tooling
 
 - Updated the shared language-agnostic development tooling dependency and adopted its Git-aware Markdown path-selection API.
+- Updated pinned documentation and development dependencies and adapted LibCST metadata narrowing for ty 0.0.71.
 - Updated the published and local pre-commit hooks to check `.py`, `.pyi`, `.pyw`, and `.md` files case-insensitively through `types_or`, retaining pre-commit 2.9.0 as the minimum version.
 
 #### Source selection

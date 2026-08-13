@@ -3324,14 +3324,17 @@ def _literal_slot_attributes(context: RuleCategoryContext, definitions: Sequence
     class_scopes = {id(scope): scope for scope in scopes.values() if isinstance(scope, cst_metadata.ClassScope)}
     slot_attributes: dict[int, AttributeInfo] = {}
     for scope in class_scopes.values():
-        owner = definitions_by_node_id.get(id(scope.node))
+        class_node = scope.node
+        if not isinstance(class_node, cst.ClassDef):
+            continue
+        owner = definitions_by_node_id.get(id(class_node))
         if owner is None:
             continue
         events: list[_SlotBindingEvent] = []
         for assignment in scope.assignments:
-            if assignment.name != "__slots__":
+            if assignment.name != "__slots__" or not isinstance(assignment, cst_metadata.Assignment):
                 continue
-            outcome = _slot_binding_outcome(assignment.node, scope.node, parents=parents, context=context)
+            outcome = _slot_binding_outcome(assignment.node, class_node, parents=parents, context=context)
             if outcome.disposition is _SlotBindingDisposition.PRESERVE:
                 continue
             events.append(_SlotBindingEvent(position=_node_position(assignment.node, context=context), outcome=outcome))

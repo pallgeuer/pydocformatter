@@ -108,8 +108,8 @@ def _qualified_names(expression: cst.BaseExpression, *, context: RuleCategoryCon
     except KeyError:
         return ()
     if callable(qualified_names):
-        qualified_names = qualified_names()
-    return tuple(typing.cast("Iterable[cst_metadata.QualifiedName]", qualified_names))
+        qualified_names = typing.cast("typing.Callable[[], Iterable[cst_metadata.QualifiedName]]", qualified_names)()
+    return tuple(qualified_names)
 
 
 def _metadata_match(qualified_names: tuple[cst_metadata.QualifiedName, ...], qualified_configured_names: frozenset[str]) -> _StaticMatch:
