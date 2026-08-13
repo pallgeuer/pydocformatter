@@ -6,7 +6,7 @@
 pydocfmt check
 ```
 
-By default, pydocformatter discovers Python files below the current directory using the configured include, exclude, gitignore, and force-exclude settings.
+By default, pydocformatter discovers Python and Markdown files below the current directory using the configured include, exclude, gitignore, and force-exclude settings. In Markdown it checks supported `python`, `py`, and `python3` fenced blocks and reports diagnostics at their containing-file line numbers. The built-in Markdown extension is `.md`; additional extensions can be mapped explicitly. See [Markdown source](reference/markdown-source.md) for exact assignment, raw-line fence scope, and error behavior.
 
 ## Persistent cache
 

@@ -17,6 +17,8 @@ Fix is always available. (Use `Fix is usually available.`, `Fix is sometimes ava
 
 (Only if rule has `incompatible_with`:) Rule is incompatible with `CODE`.
 
+(Only if rule is module-only:) Rule applies only when `source-context` is `module`.
+
 ## What it does
 Describe the rule's check in one or two short paragraphs.
 

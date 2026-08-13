@@ -159,6 +159,8 @@ class RuleCollection:
                     raise RuleError(f"Rule {code} is incompatible with unknown rule code {incompatible_code}")
                 if code not in incompatible_rule.meta.incompatible_with:
                     raise RuleError(f"Rule incompatibility between {code} and {incompatible_code} must be declared by both rules")
+                if rule.meta.source_contexts != incompatible_rule.meta.source_contexts:
+                    raise RuleError(f"Rule incompatibility between {code} and {incompatible_code} must use identical source contexts")
 
     def matching_rules_exist(self, selector: RuleSelector) -> bool:
         """Return whether a selector matches at least one collected rule.

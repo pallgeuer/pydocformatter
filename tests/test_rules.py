@@ -394,6 +394,26 @@ CONVENTION_OPT_IN_RULE_CODES = tuple(
     for rule_class in rule_collection.RULE_COLLECTION.rules
     if _disabled_docstring_conventions(rule_class.meta) | _ignored_docstring_conventions(rule_class.meta) == frozenset(DocstringConvention)
 )
+RULE_SELECTION_SPEC_PATH = Path(__file__).parents[1] / "docs" / "public" / "rule_selection_spec.md"
+MODULE_ONLY_RULES_LEAD_IN = "The following exhaustive list identifies the built-in module-only rules:"
+FRAGMENT_APPLICABLE_RULES_LEAD_IN = "The following non-exhaustive list highlights built-in rules that remain applicable to fragments:"
+
+
+def _rule_code_list_after_lead_in(text: str, lead_in: str) -> tuple[str, ...]:
+    """Return strict comma-separated rule codes from the list after a lead-in."""
+    assert text.count(lead_in) == 1, f"Expected exactly one {lead_in!r} lead-in"
+    matches = tuple(re.finditer(rf"^{re.escape(lead_in)}\n\n(?P<items>(?:- [^\n]+(?:\n|$))+)", text, flags=re.MULTILINE))
+    assert len(matches) == 1, f"Expected exactly one rule-code list after {lead_in!r}"
+    items = typing.cast("str", matches[0].group("items")).splitlines()
+    codes: list[str] = []
+    for item in items:
+        code_text = item.removeprefix("- ")
+        item_codes = tuple(code_text.split(", "))
+        assert ", ".join(item_codes) == code_text, f"Expected comma-and-space-separated rule codes after {lead_in!r}"
+        assert all(RuleCode.is_valid_tag(code) for code in item_codes), f"Expected only exact rule codes after {lead_in!r}"
+        codes.extend(item_codes)
+    assert len(codes) == len(set(codes)), f"Expected unique rule codes after {lead_in!r}"
+    return tuple(codes)
 
 
 def _write(path: Path, text: str = "x = 1\n") -> None:
@@ -565,10 +585,13 @@ def test_every_builtin_rule_intentionally_declares_file_local_cache_behavior() -
         assert rule_class.meta.cache_behavior is rule_models.RuleCacheBehavior.FILE_LOCAL
 
 
-def test_every_builtin_rule_is_stable_since_1_1_0() -> None:
-    """Every current built-in rule must declare stability for the next release."""
+def test_builtin_rule_stability_versions_match_catalog_additions() -> None:
+    """Built-in rules must declare the release in which their current code became stable."""
     assert rule_collection.RULE_COLLECTION.rules
-    assert {rule_class.meta.stable_since for rule_class in rule_collection.RULE_COLLECTION.rules} == {"1.1.0"}
+    assert {rule_class.meta.code.tag: rule_class.meta.stable_since for rule_class in rule_collection.RULE_COLLECTION.rules if rule_class.meta.stable_since != "1.1.0"} == {
+        "PDF528": "1.2.0",
+        "PDF529": "1.2.0",
+    }
 
 
 def test_builtin_pcf_rule_codes_follow_semantic_ranges() -> None:
@@ -944,13 +967,15 @@ def test_rule_metadata_derives_prefix_and_number_from_code() -> None:
         "incompatible_with",
         "check_kind",
         "cache_behavior",
+        "source_contexts",
         "allows_directive_self_suppression",
     )
     assert rule.cache_behavior is rule_models.RuleCacheBehavior.UNCACHEABLE
     assert not rule.allows_directive_self_suppression
     assert not hasattr(RuleMetadata, "file_local")
-    assert all(field.default is dataclasses.MISSING for field in dataclasses.fields(RuleMetadata)[:-2])
-    assert dataclasses.fields(RuleMetadata)[-2].default is rule_models.RuleCacheBehavior.UNCACHEABLE
+    assert all(field.default is dataclasses.MISSING for field in dataclasses.fields(RuleMetadata)[:-3])
+    assert dataclasses.fields(RuleMetadata)[-3].default is rule_models.RuleCacheBehavior.UNCACHEABLE
+    assert dataclasses.fields(RuleMetadata)[-2].default == rule_models.ALL_SOURCE_CONTEXTS
     assert dataclasses.fields(RuleMetadata)[-1].default is False
     assert all(field.default_factory is dataclasses.MISSING for field in dataclasses.fields(RuleMetadata))
     assert rule.check_kind == RuleCheckKind.STANDARD
@@ -994,6 +1019,22 @@ def test_rule_metadata_derives_prefix_and_number_from_code() -> None:
     assert str(FixAvailability.SOMETIMES) == "Sometimes"
     assert not hasattr(rule, "matches_selector")
     assert not hasattr(rule, "matches_selector_parts")
+
+
+def test_rule_metadata_canonicalizes_source_context_order() -> None:
+    metadata = RuleMetadata(
+        code=RuleCode("PDF999"),
+        name="canonical-source-contexts",
+        message="Canonical source contexts",
+        fix_availability=FixAvailability.NEVER,
+        stable_since="1.0.0",
+        setting_effects=(),
+        incompatible_with=(),
+        check_kind=RuleCheckKind.STANDARD,
+        source_contexts=(rule_models.SourceContext.FRAGMENT, rule_models.SourceContext.MODULE),
+    )
+
+    assert metadata.source_contexts == rule_models.ALL_SOURCE_CONTEXTS
 
 
 def test_rule_metadata_resolves_setting_effects_with_disabled_precedence() -> None:
@@ -1378,6 +1419,60 @@ def test_rule_collection_validates_rule_incompatibilities() -> None:
 
     with pytest.raises(rule_registration.RuleError, match="Rule incompatibility between TST001 and TST002 must be declared by both rules"):
         rule_collection.RuleCollection((TSTAsymmetricCategory,))
+
+    class TSTContextCategory(RuleCategoryBase):
+        meta = RuleCategoryMetadata(prefix="TST", name="context incompatibility", url=None)
+
+    @rule_registration.register_rule_to(TSTContextCategory)
+    class TST001ModuleRule(RuleBase):
+        meta = dataclasses.replace(TST001SelfRule.meta, name="module-incompatible", incompatible_with=(RuleCode("TST002"),), source_contexts=rule_models.MODULE_SOURCE_CONTEXTS)
+        violations = classmethod(_no_violations)
+
+    @rule_registration.register_rule_to(TSTContextCategory)
+    class TST002AllContextRule(RuleBase):
+        meta = RuleMetadata(
+            code=RuleCode("TST002"),
+            name="all-context-incompatible",
+            message="All-context incompatible",
+            fix_availability=FixAvailability.ALWAYS,
+            stable_since="1.0.0",
+            setting_effects=(),
+            incompatible_with=(RuleCode("TST001"),),
+            check_kind=RuleCheckKind.STANDARD,
+        )
+        violations = classmethod(_no_violations)
+
+    with pytest.raises(rule_registration.RuleError, match="Rule incompatibility between TST001 and TST002 must use identical source contexts"):
+        rule_collection.RuleCollection((TSTContextCategory,))
+
+    class TSTEquivalentContextCategory(RuleCategoryBase):
+        meta = RuleCategoryMetadata(prefix="TST", name="equivalent context incompatibility", url=None)
+
+    @rule_registration.register_rule_to(TSTEquivalentContextCategory)
+    class TST001EquivalentContextRule(RuleBase):
+        meta = dataclasses.replace(
+            TST001SelfRule.meta, name="equivalent-context-incompatible", incompatible_with=(RuleCode("TST002"),), source_contexts=(rule_models.SourceContext.FRAGMENT, rule_models.SourceContext.MODULE)
+        )
+        violations = classmethod(_no_violations)
+
+    @rule_registration.register_rule_to(TSTEquivalentContextCategory)
+    class TST002EquivalentContextRule(RuleBase):
+        meta = RuleMetadata(
+            code=RuleCode("TST002"),
+            name="equivalent-context-peer",
+            message="Equivalent context peer",
+            fix_availability=FixAvailability.ALWAYS,
+            stable_since="1.0.0",
+            setting_effects=(),
+            incompatible_with=(RuleCode("TST001"),),
+            check_kind=RuleCheckKind.STANDARD,
+            source_contexts=rule_models.ALL_SOURCE_CONTEXTS,
+        )
+        violations = classmethod(_no_violations)
+
+    collection = rule_collection.RuleCollection((TSTEquivalentContextCategory,))
+
+    assert tuple(rule.meta.source_contexts for rule in collection.rules) == (rule_models.ALL_SOURCE_CONTEXTS, rule_models.ALL_SOURCE_CONTEXTS)
 
 
 def test_rule_base_class_properties_redirect_to_metadata() -> None:
@@ -2167,6 +2262,29 @@ def test_select_rules_applies_per_file_ignores() -> None:
 
     assert tuple(rule.rule.code.tag for rule in selection.for_path("src/a.py")) == ("PCF000", "PDF101", "PDF110")
     assert tuple(rule.rule.code.tag for rule in selection.for_path("tests/a.py")) == ("PCF000", "PDF110")
+
+
+def test_builtin_source_context_rule_metadata_matches_documented_lists() -> None:
+    text = RULE_SELECTION_SPEC_PATH.read_text(encoding="utf-8")
+    module_only_codes = _rule_code_list_after_lead_in(text, MODULE_ONLY_RULES_LEAD_IN)
+    fragment_applicable_codes = _rule_code_list_after_lead_in(text, FRAGMENT_APPLICABLE_RULES_LEAD_IN)
+    rules_by_code = {rule_class.meta.code.tag: rule_class.meta for rule_class in rule_collection.RULE_COLLECTION.rules}
+
+    assert module_only_codes == tuple(code for code, metadata in rules_by_code.items() if metadata.source_contexts == rule_models.MODULE_SOURCE_CONTEXTS)
+    assert set(fragment_applicable_codes) <= rules_by_code.keys()
+    assert set(module_only_codes).isdisjoint(fragment_applicable_codes)
+    assert all(rule_models.SourceContext.FRAGMENT in rules_by_code[code].source_contexts for code in fragment_applicable_codes)
+    assert all(rule_class.meta.source_contexts in {rule_models.ALL_SOURCE_CONTEXTS, rule_models.MODULE_SOURCE_CONTEXTS} for rule_class in rule_collection.RULE_COLLECTION.rules)
+
+
+def test_fragment_applicability_is_hard_but_per_file_module_context_uses_global_candidates() -> None:
+    selection = rules_selection.select_rules(CheckSettings(select=("PDF602",), source_context=rule_models.SourceContext.FRAGMENT))
+
+    assert tuple(rule.rule.code.tag for rule in selection.candidate_rules) == ("PDF602",)
+    assert not selection.rules
+    assert not selection.for_path("example.md")
+    assert tuple(rule.rule.code.tag for rule in selection.for_path("complete.md", source_context=rule_models.SourceContext.MODULE)) == ("PDF602",)
+    assert selection.rules_for_context(rule_models.SourceContext.MODULE) is selection.rules_for_context(rule_models.SourceContext.MODULE)
 
 
 def test_ruff_spec_negated_per_file_ignore_patterns_ignore_everywhere_else() -> None:

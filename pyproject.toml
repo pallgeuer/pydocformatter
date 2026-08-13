@@ -132,7 +132,8 @@ extend-select = [
     "non-imperative-summary",
     "summary-starts-with-this",
     "missing-public-module-attribute-documentation",
-    "attribute-documentation-order",
+    "class-attribute-documentation-order",
+    "module-attribute-documentation-order",
     "parameter-type-required",
     "return-type-required",
     "yield-type-required",
@@ -164,9 +165,11 @@ task-marker-mode = "hanging"
 
 [tool.pydocfmt.per-file-ignores]
 "tests/**/test_*.py" = ["PDF6"]
+"src/pydocformatter/rules/definitions/PDF/PDF.md" = ["public-class-attribute-docstring-must-be-owner"]
 
 [tool.pydocfmt.per-file-settings]
 "tests/**/test_*.py" = { docstring-missing-documentation = "has-section" }
+"docs_site/formatting.md" = { line-length = 72 }
 
 #
 # Ruff

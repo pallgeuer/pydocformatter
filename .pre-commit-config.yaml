@@ -32,7 +32,8 @@ repos:
         name: pydocfmt (fix)
         entry: uv run pydocfmt check --fix
         language: system
-        types: [python]
+        types_or: [python, pyi, markdown]
+        files: (?i)\.(?:py|pyi|pyw|md)$
         stages: [pre-commit]
       - id: ruff-format-fix
         name: ruff format (fix)
@@ -50,7 +51,8 @@ repos:
         name: pydocfmt (check)
         entry: uv run pydocfmt check
         language: system
-        types: [python]
+        types_or: [python, pyi, markdown]
+        files: (?i)\.(?:py|pyi|pyw|md)$
         stages: [pre-push, manual]
       - id: ruff-format-check
         name: ruff format (check)
@@ -85,9 +87,11 @@ repos:
   #       name: pydocfmt (fix)
   #       entry: uv run pydocfmt check --fix --force-exclude
   #       language: system
-  #       types: [python]
+  #       types_or: [python, pyi, markdown]
+  #       files: (?i)\.(?:py|pyi|pyw|md)$
   #     - id: pydocfmt-check
   #       name: pydocfmt (check)
   #       entry: uv run pydocfmt check --force-exclude
   #       language: system
-  #       types: [python]
+  #       types_or: [python, pyi, markdown]
+  #       files: (?i)\.(?:py|pyi|pyw|md)$

@@ -1,4 +1,4 @@
-"""PDF528 attribute-documentation-order rule."""
+"""PDF528 class-attribute-documentation-order rule."""
 
 # Future imports
 from __future__ import annotations
@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 
 
 @rule_registration.register_rule_to(PDF)
-class PDF528AttributeDocumentationOrder(RuleBase):
+class PDF528ClassAttributeDocumentationOrder(RuleBase):
     """Rule implementation for PDF528.
 
     Attributes:
@@ -32,10 +32,10 @@ class PDF528AttributeDocumentationOrder(RuleBase):
 
     meta = RuleMetadata(
         code=RuleCode("PDF528"),
-        name="attribute-documentation-order",
-        message="Docstring attributes are not in declaration order",
+        name="class-attribute-documentation-order",
+        message="Class docstring attributes are not in declaration order",
         fix_availability=FixAvailability.NEVER,
-        stable_since="1.1.0",
+        stable_since="1.2.0",
         setting_effects=docstring_conventions.convention_setting_effects(disabled=docstring_conventions.UNPARSED_CONVENTIONS, ignored=docstring_conventions.PARSED_CONVENTIONS),
         incompatible_with=(),
         check_kind=RuleCheckKind.STANDARD,
@@ -55,7 +55,7 @@ class PDF528AttributeDocumentationOrder(RuleBase):
         data = PDF.require_data(context)
         violations: list[rule_violations.RuleViolation] = []
         for definition in data.definitions:
-            if definition.kind not in {PDF_definition.DefinitionKind.MODULE, PDF_definition.DefinitionKind.CLASS}:
+            if definition.kind is not PDF_definition.DefinitionKind.CLASS:
                 continue
             docstring = data.docstring_for(definition)
             if docstring is None:
@@ -64,7 +64,7 @@ class PDF528AttributeDocumentationOrder(RuleBase):
                 rule_violations.diagnostic(
                     cls.meta,
                     issue.documented_attribute.line_numbers,
-                    instance_message=f"Docstring attribute '{issue.inventory_attribute.name}' should appear before '{issue.preceding_inventory_attribute.name}' to match the source declaration order",
+                    instance_message=f"Class docstring attribute '{issue.inventory_attribute.name}' should appear before '{issue.preceding_inventory_attribute.name}' to match the source declaration order",
                 )
                 for issue in attribute_documentation.attribute_order_issues(data, definition, docstring)
             )

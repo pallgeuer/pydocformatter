@@ -97,7 +97,7 @@ def add_parser(subparsers: argparser.SubparserCollection) -> argparse.ArgumentPa
         argparse.ArgumentParser: Configured `check` subcommand parser.
     """
     parser = argparser.create_subparser(
-        subparsers, name="check", description="Check and optionally fix Python docstrings and comments.", help="Check and optionally fix Python docstrings and comments"
+        subparsers, name="check", description="Check and optionally fix Python docstrings and comments in Python and Markdown sources.", help="Check and optionally fix Python docstrings and comments"
     )
     add_arguments(parser, CheckSettings())
     parser.set_defaults(func=run)
@@ -111,7 +111,7 @@ def add_arguments(parser: argparse.ArgumentParser, settings: CheckSettings) -> N
         parser (argparse.ArgumentParser): Parser that should receive check-command arguments.
         settings (CheckSettings): Settings object supplying current defaults for help text.
     """
-    parser.add_argument("files", nargs="*", default=None, metavar="PATH", help="Python files or directories to check, or '-' to read from stdin (default: current directory).")
+    parser.add_argument("files", nargs="*", default=None, metavar="PATH", help="Python or Markdown files and directories to check, or '-' to read from stdin (default: current directory).")
 
     parser.add_argument("--fix", action=argparse.BooleanOptionalAction, default=False, help="Apply fixes instead of only checking for needed changes.")
     parser.add_argument(
@@ -125,7 +125,7 @@ def add_arguments(parser: argparse.ArgumentParser, settings: CheckSettings) -> N
     SETTINGS_SCHEMA.add_arguments(parser, settings)
 
     miscellaneous = parser.add_argument_group("Miscellaneous")
-    miscellaneous.add_argument("--stdin-filename", default=None, metavar="FILENAME", help="The name of the file when passing it through stdin.")
+    miscellaneous.add_argument("--stdin-filename", default=None, metavar="FILENAME", help="The filename used for stdin diagnostics, settings, and source-language handling.")
     miscellaneous.add_argument("--cache-stats", action="store_true", help="Print concise persistent-cache statistics to stderr.")
     exit_options = miscellaneous.add_mutually_exclusive_group()
     exit_options.add_argument("-e", "--exit-zero", action="store_true", help='Exit with status code "0", even upon detecting formatting violations.')
@@ -175,6 +175,7 @@ def run(args: argparse.Namespace) -> int:
     if args.show_files:
         try:
             files, errors = select_files(paths=args.files, stdin_filename=args.stdin_filename, resolver=settings_context.resolver)[:2]
+            errors.extend(_source_language_errors(files.selected_files))
         except FileSelectionError as error:
             print(f"pydocfmt check: File selection error: {error}", file=sys.stderr)
             return 2
@@ -415,7 +416,7 @@ def format_selected_files(
         selected_file = selected_files[0]
         effective_profile = settings_check.effective_profile_for_path(selected_file.profile, selected_file.path)
         rule_selection = rule_selections[selected_file.profile.key()]
-        result = formatter.format_stream(selected_file.path, file=sys.stdin, settings=effective_profile.settings, rule_selection=rule_selection, fix=fix)
+        result = formatter.format_stream(selected_file.path, file=sys.stdin, settings=effective_profile.settings, rule_selection=rule_selection, fix=fix, apply_language_defaults=False)
         return FormatBatchResult(results=(result,), cache_stats=CacheStats(uncacheable=1), warnings=())
 
     session = cache_session.CacheSession.from_profile(cache_profile, parallelism=resolve_parallelism(parallelism))
@@ -429,7 +430,8 @@ def format_selected_files(
                 index=index,
                 path=selected_file.path,
                 profile=effective_profile,
-                execution_plan=rule_selection.execution_plan_for_path(selected_file.path),
+                source_language=settings_check.source_language_for_path(selected_file.path, effective_profile.settings.extension),
+                execution_plan=rule_selection.execution_plan_for_path(selected_file.path, source_context=effective_profile.settings.source_context),
                 source_path=source_path_builder.for_path(selected_file.path),
                 selection_succeeded=not rule_selection.errors,
                 fix=fix,
@@ -463,6 +465,15 @@ def format_selected_files(
     if any(result is None for result in ordered_results):
         raise AssertionError("Parallel formatting completed without producing a result for every selected file")
     return FormatBatchResult(results=tuple(result for result in ordered_results if result is not None), cache_stats=persistence.stats, warnings=persistence.warnings)
+
+
+def _source_language_errors(selected_files: tuple[file_selection.SelectedFile, ...]) -> list[str]:
+    """Return language-assignment errors for selected files without changing selection decisions."""
+    return [
+        settings_check.unknown_source_language_error(selected_file.path)
+        for selected_file in selected_files
+        if settings_check.source_language_for_path(selected_file.path, selected_file.profile.settings.extension) is None
+    ]
 
 
 def print_cache_stats(stats: CacheStats, *, output: TextIO) -> None:

@@ -4,6 +4,8 @@ Fix is not available.
 
 Rule is disabled if `docstring-convention` is `none` or `pep257`, and ignored by broad selectors under `google`, `numpy`, and `rest`.
 
+Rule applies only when `source-context` is `module`.
+
 ## What it does
 Checks that public module attributes are documented either in the module docstring attribute documentation or by an adjacent attribute docstring.
 

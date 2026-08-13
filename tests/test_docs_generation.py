@@ -29,7 +29,7 @@ from tests import markdown_table_helpers
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 FORBIDDEN_DOCS_DEPENDENCIES = {"mdformat", "mkdocs", "mkdocs-material", "mkdocs-redirects", "mkdocstrings", "mkdocstrings-python", "properdocs"}
-RULE_TABLE_HEADERS = ("Code", "Name", "Summary", "Fix available", "Enabled")
+RULE_TABLE_HEADERS = ("Code", "Name", "Summary", "Fix available", "Enabled", "Source contexts")
 RULE_TABLE_WRAPPER = '<div class="pydocformatter-rule-table-wrapper" markdown="1">'
 SETTINGS_TABLE_WRAPPER = '<div class="pydocformatter-settings-table-wrapper" markdown="1">'
 
@@ -230,6 +230,7 @@ def test_rule_index_explains_table_columns(generated_site: tuple[pathlib.Path, p
     assert '<a id="rule-table-columns"></a>' in explanation
     assert "The `Fix available` column" in explanation
     assert "The `Enabled` column" in explanation
+    assert "The `Source contexts` column" in explanation
     for value in ("Always", "Usually", "Sometimes", "Never", "By default", "Requires explicit", "Convention", "Convention opt-in", "Setting-gated"):
         assert f"- `{value}`:" in explanation
 

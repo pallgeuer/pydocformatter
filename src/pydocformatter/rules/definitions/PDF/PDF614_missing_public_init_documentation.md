@@ -2,6 +2,8 @@
 
 Fix is not available.
 
+Rule applies only when `source-context` is `module`.
+
 ## What it does
 Checks for public `__init__` methods that are missing docstrings.
 

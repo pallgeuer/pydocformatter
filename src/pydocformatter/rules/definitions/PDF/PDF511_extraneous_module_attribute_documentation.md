@@ -4,6 +4,8 @@ Fix is not available.
 
 Rule is disabled if `docstring-convention` is `none` or `pep257`.
 
+Rule applies only when `source-context` is `module`.
+
 ## What it does
 Checks that module docstring attribute entries name attributes that are present at module scope.
 

@@ -27,7 +27,9 @@ Settings use these source priorities:
 - Dedicated command-line options have priority `3`.
 - In-process field overrides used by tests and callers have priority `4`.
 
-For every ordinary setting, the highest-priority specified value wins. The same list setting does not accumulate across configuration and command-line layers. Domain-specific settings can later interpret resolved base and extension fields together; for example, file selection appends resolved `extend-include` to resolved `include`, while rule selection applies its own selector precedence after the fields are resolved.
+For every ordinary setting, the highest-priority specified value wins. The same list setting does not accumulate across configuration and command-line layers. The `extension` map also replaces the complete lower-priority map rather than merging with it; repeated `--extension` occurrences form one command-line map before that layer is applied. Domain-specific settings can later interpret resolved base and extension fields together; for example, file selection appends resolved `extend-include` to resolved `include`, while rule selection applies its own selector precedence after the fields are resolved.
+
+Language assignment adds one path-effective layer for sources assigned to Markdown. After hard-coded defaults and config-file settings are resolved, Markdown sets `source-context = "fragment"` and `docstring-missing-documentation = "has-section"` whenever the winning value for the affected field has priority 0 or 1. Matching per-file settings apply afterward and can override this layer at their own source priority. Inline configuration, dedicated command-line options, and in-process field overrides have priorities 2 through 4 and therefore retain explicitly supplied values instead. Python sources receive no language-specific overlay.
 
 ## Configuration layout
 
@@ -73,6 +75,7 @@ This base model is shared by file-selection patterns, per-file ignores, and per-
 [tool.pydocfmt.per-file-settings]
 "tests/**/*.py" = { docstring-missing-documentation = "has-section" }
 "docs/**/*.py" = { line-length = 100 }
+"docs/complete_modules/*.md" = { source-context = "module", docstring-missing-documentation = "all-docstrings" }
 ```
 
 Per-file settings are TOML-only and have no dedicated CLI option. Each value must be a non-empty table of public setting keys. Nested `docstring` and `comment` tables are accepted inside an override table and are flattened the same way as top-level configuration; specifying the same setting twice in one override table is rejected.
@@ -81,22 +84,22 @@ Patterns use the same source-base behavior as other path-pattern settings. Match
 
 Matching entries are evaluated in configuration order. If more than one matching entry updates the same setting, the later matching entry wins within the per-file-settings table.
 
-Per-file settings apply after file selection and after global rule selection. They affect the `CheckSettings` passed to formatting and rule execution for that file only. Rule selection is not re-run from the per-file effective settings.
+Per-file settings apply after file selection, global selector resolution, and the Markdown language-default overlay. They affect the `CheckSettings` passed to formatting and rule execution for that file only. Rule selectors are not re-resolved, but `source-context` applicability is filtered from the globally resolved rules for each file.
 
-Per-file settings intentionally cannot change which files are selected or which rules are active. The validator rejects:
+Per-file settings intentionally cannot change which files are selected or which rule selectors are active. The validator rejects:
 
 - Rule-selection settings, including `select`, `ignore`, `extend-select`, `require-explicit`, per-file ignores, fixability settings, and related selector settings.
-- File-selection settings, including `include`, `extend-include`, `exclude`, `extend-exclude`, `respect-gitignore`, and `force-exclude`.
+- File-selection and language-assignment settings, including `extension`, `include`, `extend-include`, `exclude`, `extend-exclude`, `respect-gitignore`, and `force-exclude`.
 - Run-level settings, including `output-format` and `parallelism`.
 - Persistent-cache run settings, including `cache` and `cache-dir`.
 - Nested `per-file-settings`.
 - Any setting referenced by rule metadata `setting_effects`, such as `docstring-convention`.
 
-Only formatting, docstring-formatting, and comment-formatting settings that do not affect rule selection are eligible for per-file overrides.
+Only formatting, docstring-formatting, and comment-formatting settings that do not affect selector resolution are eligible for per-file overrides. `source-context` is eligible and filters rules through their hard applicability metadata after selector resolution.
 
 Per-file settings carry the source priority of the `per-file-settings` field itself. A matching per-file override applies to a setting only when the `per-file-settings` source priority is greater than or equal to that setting's current source priority. For example, a command-line `--line-length` value overrides a config-file per-file `line-length` value for every file.
 
-`pydocfmt check --show-settings` remains current-working-directory oriented and does not apply path-specific per-file setting overrides.
+`pydocfmt check --show-settings` remains current-working-directory oriented and displays the resolved base profile. It does not apply path-specific language defaults or per-file setting overrides; those depend on each selected path.
 
 ## Persistent clean-proof cache
 
@@ -114,7 +117,7 @@ pydocfmt check: Cache warning: Cache directory parent does not exist or is not a
 
 The current-working-directory profile selects the only cache store and internal cache root for an invocation. Cache locations from nested path profiles do not select or prune additional stores.
 
-The cache stores only a proof that exact raw source bytes previously completed without findings or operational errors under the same effective analysis-affecting setting values, final ordered path-specific rule codes, implementation, runtime platform, and package/module path context. A positive hit always reads and cryptographically hashes the complete current file. Size and nanosecond mtime can reject a candidate early but can never establish equality. Consequently, a same-size edit with a preserved timestamp is reanalyzed, while a harmless timestamp-only change is conservatively reanalyzed as well.
+The cache stores only a proof that exact raw source bytes previously completed without findings or operational errors under the same resolved source language, effective analysis-affecting setting values, final ordered path-specific rule codes, implementation, runtime platform, and package/module path context. A positive hit always reads and cryptographically hashes the complete current file. Size and nanosecond mtime can reject a candidate early but can never establish equality. Consequently, a same-size edit with a preserved timestamp is reanalyzed, while a harmless timestamp-only change is conservatively reanalyzed as well.
 
 Changing `parallelism` does not require reanalysis of an otherwise valid clean proof; the new value still controls digest-validation threads and miss-analysis processes for the current invocation. Changing fixability also does not require reanalysis when the final ordered rule codes are unchanged, because a clean proof has no finding to relabel or repair.
 
@@ -125,6 +128,10 @@ Cache data is best-effort optimization state. Missing, corrupt, incompatible, lo
 `pydocfmt clean` resolves configuration through the normal global configuration arguments and accepts `--cache-dir PATH` as a direct override. It verifies the exact regular, non-symlinked cache ownership tag and removes only numeric pydocfmt-owned version directories. It keeps the configured root, root-level quarantine-shaped lookalikes, the cache lock, and other unrelated entries, and it refuses unknown or symlinked roots, including empty untagged directories. Entries not reused for 30 days are pruned opportunistically. Runtime writes, lookup, quarantine, incompatible-database replacement, and cleanup require exact ownership; only initial creation may claim an empty untagged directory. Database recovery and cleanup are serialized across processes, and quarantined main, WAL, and shared-memory files are retained and pruned as groups.
 
 ## Setting notes
+
+`extension = {}` is the custom extension-to-language map. The fixed built-ins are `.py`, `.pyi`, and `.pyw` for Python and `.md` for Markdown. Configure custom entries through `[tool.pydocfmt.extension]`, inline `--config`, or repeated `--extension EXT:LANGUAGE`. The map assigns a language after selection and does not add files to `include`; see the [File selection specification](file_selection_spec.md#source-language-assignment) for validation, explicit paths, named stdin, discovery, and failure behavior.
+
+`source-context = "module"` treats parsed Python as an importable module and is the base default. `source-context = "fragment"` treats it as an illustrative or embedded fragment and suppresses rules whose semantics require a complete module, including missing-owner documentation rules and module-attribute ownership rules. Rule applicability is a hard semantic constraint: exact selection does not restore a rule that does not support the effective source context. Every source assigned to Markdown automatically uses `source-context = "fragment"` with `docstring-missing-documentation = "has-section"`; this applies to the built-in `.md` extension and custom Markdown mappings alike. It checks documentation that examples actually contain without demanding documentation solely because an illustrative definition exists. Matching per-file settings can opt intentionally complete embedded modules into different values, while inline configuration, dedicated command-line options, and in-process overrides take precedence over the language defaults.
 
 `line-ending = "auto"` uses the first line ending detected in the source file, defaulting to LF when the file has no line endings. The setting controls rewritten files; files that do not require formatting are not rewritten solely to normalize line endings.
 

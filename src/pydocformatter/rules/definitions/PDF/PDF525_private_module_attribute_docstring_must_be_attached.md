@@ -6,6 +6,8 @@ Rule is disabled if `docstring-convention` is `none` or `pep257`, and ignored by
 
 Rule is incompatible with `PDF515`, `PDF517`, and `PDF524`.
 
+Rule applies only when `source-context` is `module`.
+
 ## What it does
 Checks for private module attributes documented in module docstring attribute entries when private module attribute documentation must use attached docstrings.
 

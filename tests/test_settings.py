@@ -27,7 +27,7 @@ import pydocformatter.settings as pydocformatter_settings_core
 import pydocformatter.cli.global_args as pydocformatter_global_args
 import pydocformatter.cli.settings_check as pydocformatter_settings
 from pydocformatter.cli.settings_check import DEFAULT_EXCLUDE, DEFAULT_INCLUDE, CheckSettings, CheckSettingsOverrides, CommentTaskMarkerMode, IndentStyle, LineEnding, OutputFormat, SettingsGroup
-from pydocformatter.settings import MultiStringMap, SettingCLIDefinition, SettingCLIOptions, SettingCLIValueKind, SettingDefinition, SettingsError, SettingsSchema, StringList
+from pydocformatter.settings import MultiStringMap, SettingCLIDefinition, SettingCLIOptions, SettingCLIValueKind, SettingDefinition, SettingsError, SettingsSchema, StringList, StringMap
 from tests import git_helpers
 
 
@@ -83,6 +83,7 @@ def test_check_settings_schema_uses_generic_settings_definitions() -> None:
     assert hasattr(pydocformatter_settings_core, "SettingCLIOptions")
     assert not hasattr(pydocformatter_settings_core, "SettingCliDefinition")
     assert hasattr(pydocformatter_settings_core, "StringList")
+    assert hasattr(pydocformatter_settings_core, "StringMap")
     assert hasattr(pydocformatter_settings_core, "MultiStringMap")
     assert not hasattr(pydocformatter_settings, "RuleSelectorMap")
 
@@ -260,6 +261,7 @@ def test_cache_identity_roles_have_exact_current_field_membership() -> None:
             "line_ending",
             "indent_style",
             "indent_width",
+            "source_context",
             "docstring_convention",
             "docstring_blank_line_style",
             "docstring_blank_line_after_last_section",
@@ -299,7 +301,7 @@ def test_cache_identity_roles_have_exact_current_field_membership() -> None:
         pydocformatter_settings.CacheIdentityRole.FINAL_RULE_CODES: ("select", "ignore", "extend_select", "require_explicit", "per_file_ignores", "extend_per_file_ignores"),
         pydocformatter_settings.CacheIdentityRole.CLEAN_PROOF_IRRELEVANT: ("output_format", "cache", "cache_dir", "parallelism", "fixable", "unfixable", "extend_fixable"),
         pydocformatter_settings.CacheIdentityRole.DISCOVERY_ONLY: ("include", "extend_include", "exclude", "extend_exclude", "respect_gitignore", "force_exclude"),
-        pydocformatter_settings.CacheIdentityRole.APPLIED_CONFIGURATION: ("per_file_settings",),
+        pydocformatter_settings.CacheIdentityRole.APPLIED_CONFIGURATION: ("per_file_settings", "extension"),
     }
 
     for role, expected_fields in expected.items():
@@ -328,7 +330,7 @@ def test_analysis_settings_identity_and_precomputed_definitions_follow_schema_or
     identity = pydocformatter_settings.analysis_settings_identity(profile)
     identity_fields = tuple(field for field, _ in identity)
 
-    assert identity_fields == expected_fields
+    assert identity_fields == ("source_language", *expected_fields)
     assert len(identity_fields) == len(set(identity_fields))
     assert tuple(definition.field for definition in pydocformatter_settings.DIRECT_ANALYSIS_DEFINITIONS) == expected_fields
 
@@ -343,7 +345,7 @@ def test_setting_definitions_are_iterable_by_group() -> None:
     configuration_fields = tuple(definition.field for definition in pydocformatter_settings.SETTINGS_SCHEMA.definitions if definition.group == SettingsGroup.CONFIGURATION)
 
     assert run_fields == ("output_format", "cache", "cache_dir", "parallelism")
-    assert formatting_fields == ("line_length", "url_aware_wrapping", "line_ending", "indent_style", "indent_width")
+    assert formatting_fields == ("line_length", "url_aware_wrapping", "line_ending", "indent_style", "indent_width", "source_context")
     assert docstring_formatting_fields == (
         "docstring_convention",
         "docstring_blank_line_style",
@@ -384,7 +386,7 @@ def test_setting_definitions_are_iterable_by_group() -> None:
         "comment_detect_expressions",
     )
     assert rule_selection_fields == ("select", "ignore", "extend_select", "require_explicit", "per_file_ignores", "extend_per_file_ignores", "fixable", "unfixable", "extend_fixable")
-    assert file_selection_fields == ("include", "extend_include", "exclude", "extend_exclude", "respect_gitignore", "force_exclude")
+    assert file_selection_fields == ("extension", "include", "extend_include", "exclude", "extend_exclude", "respect_gitignore", "force_exclude")
     assert configuration_fields == ("per_file_settings",)
 
 
@@ -875,7 +877,9 @@ def test_file_selection_spec_defaults_match_settings_defaults() -> None:
     assert tuple(defaults) == tuple(definition.key for definition in file_selection_definitions)
     for definition in file_selection_definitions:
         expected = getattr(config, definition.field)
-        if isinstance(expected, tuple):
+        if definition.value_type == StringMap:
+            expected = dict(expected)
+        elif isinstance(expected, tuple):
             expected = list(expected)
         assert defaults[definition.key] == expected
 
@@ -909,6 +913,7 @@ def test_load_settings_defaults_in_isolated_mode(monkeypatch: pytest.MonkeyPatch
     assert not config.comment_detect_code
     assert config.comment_detect_statements
     assert not config.comment_detect_expressions
+    assert config.extension == ()
     assert config.include == DEFAULT_INCLUDE
     assert config.extend_include == ()
     assert config.exclude == DEFAULT_EXCLUDE
@@ -1195,11 +1200,87 @@ def test_inline_per_file_rule_settings_are_applied(monkeypatch: pytest.MonkeyPat
     assert config.extend_per_file_ignores == (("generated/*.py", ("PCF001",)),)
 
 
+def test_extension_defaults_and_builtin_language_resolution() -> None:
+    settings = CheckSettings()
+
+    assert settings.extension == ()
+    assert pydocformatter_settings.source_language_for_path("module.py", settings.extension) is pydocformatter_settings.SourceLanguage.PYTHON
+    assert pydocformatter_settings.source_language_for_path("module.PYI", settings.extension) is pydocformatter_settings.SourceLanguage.PYTHON
+    assert pydocformatter_settings.source_language_for_path("window.PyW", settings.extension) is pydocformatter_settings.SourceLanguage.PYTHON
+    assert pydocformatter_settings.source_language_for_path("guide.MD", settings.extension) is pydocformatter_settings.SourceLanguage.MARKDOWN
+    assert pydocformatter_settings.source_language_for_path("-", settings.extension) is pydocformatter_settings.SourceLanguage.PYTHON
+    assert pydocformatter_settings.source_language_for_path("script", settings.extension) is None
+
+
+def test_extension_table_normalizes_keys_and_sorts_effective_mapping(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    (tmp_path / "pyproject.toml").write_text('[tool.pydocfmt.extension]\n".RPY" = "python"\nmdx = "markdown"\n', encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+
+    config = pydocformatter_settings.SETTINGS_SCHEMA.load()
+
+    assert config.extension == (("mdx", "markdown"), ("rpy", "python"))
+    assert pydocformatter_settings.source_language_for_path("example.RpY", config.extension) is pydocformatter_settings.SourceLanguage.PYTHON
+    assert pydocformatter_settings.source_language_for_path("guide.MDX", config.extension) is pydocformatter_settings.SourceLanguage.MARKDOWN
+
+
+def test_extension_highest_supplied_layer_replaces_complete_custom_map(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    (tmp_path / "pyproject.toml").write_text('[tool.pydocfmt.extension]\nrpy = "python"\n', encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    args = argparse.Namespace(extension=["qmd:markdown"])
+
+    config = pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(config_options=('extension = {mdx = "markdown"}',)), args=args)
+
+    assert config.extension == (("qmd", "markdown"),)
+
+
+@pytest.mark.parametrize(("inline", "expected"), [pytest.param('extension = {mdx = "markdown"}', (("mdx", "markdown"),), id="replace"), pytest.param("extension = {}", (), id="clear")])
+def test_inline_extension_map_replaces_or_clears_config_file_map(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, inline: str, expected: StringMap) -> None:
+    (tmp_path / "pyproject.toml").write_text('[tool.pydocfmt.extension]\nrpy = "python"\n', encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+
+    config = pydocformatter_settings.SETTINGS_SCHEMA.load(global_values=pydocformatter_global_args.GlobalArgs(config_options=(inline,)))
+
+    assert config.extension == expected
+
+
+@pytest.mark.parametrize(
+    ("value", "message"),
+    [
+        pytest.param(((".RPY", "python"), ("rpy", "python")), "duplicate extension", id="normalized-duplicate"),
+        pytest.param((("py", "python"),), "built-in extension", id="builtin"),
+        pytest.param((("foo.bar", "python"),), "simple filename extension", id="compound"),
+        pytest.param((("*.rpy", "python"),), "simple filename extension", id="glob"),
+        pytest.param((("rpy", "Python"),), "must be one of", id="language-case"),
+        pytest.param((("rpy", "text"),), "must be one of", id="unsupported-language"),
+        pytest.param((("rpy",),), "two-item extension/language pairs", id="singleton-pair"),
+        pytest.param((("rpy", "python", "extra"),), "two-item extension/language pairs", id="oversized-pair"),
+        pytest.param(("rpy",), "two-item extension/language pairs", id="scalar-entry"),
+        pytest.param((None,), "two-item extension/language pairs", id="none-entry"),
+        pytest.param(((1, "python"),), "keys must be strings", id="non-string-extension"),
+        pytest.param((("rpy", 1),), "must be a string source language", id="non-string-language"),
+    ],
+)
+def test_extension_map_rejects_invalid_entries(value: object, message: str) -> None:
+    with pytest.raises(SettingsError, match=message):
+        pydocformatter_settings.SETTINGS_SCHEMA.load(field_overrides={"extension": value})
+
+
+def test_repeated_extension_cli_entries_reject_normalized_duplicates() -> None:
+    with pytest.raises(SettingsError, match="duplicate extension"):
+        pydocformatter_settings.SETTINGS_SCHEMA.load(args=argparse.Namespace(extension=["RPY:python", ".rpy:python"]))
+
+
+@pytest.mark.parametrize("value", ["rpy", ":python", "rpy:"])
+def test_extension_cli_requires_extension_language_pairs(value: str) -> None:
+    with pytest.raises(SettingsError, match="EXT:LANGUAGE"):
+        pydocformatter_settings.SETTINGS_SCHEMA.load(args=argparse.Namespace(extension=[value]))
+
+
 def test_per_file_settings_are_loaded(monkeypatch: pytest.MonkeyPatch) -> None:
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
         (root / "pyproject.toml").write_text(
-            '[tool.pydocfmt.per-file-settings]\n"tests/*.py" = { docstring = { missing-documentation = "has-section", include-assertion-errors = true }, comment = { detect-code = true } }\n"generated/*.py" = { line-length = 100 }\n',
+            '[tool.pydocfmt.per-file-settings]\n"tests/*.py" = { docstring = { missing-documentation = "has-section", include-assertion-errors = true }, comment = { detect-code = true } }\n"generated/*.py" = { line-length = 100 }\n"*.md" = { source-context = "fragment" }\n',
             encoding="utf-8",
         )
         monkeypatch.chdir(root)
@@ -1211,6 +1292,7 @@ def test_per_file_settings_are_loaded(monkeypatch: pytest.MonkeyPatch) -> None:
             (("docstring-missing-documentation", pydocformatter_settings.DocstringMissingDocumentation.HAS_SECTION), ("docstring-include-assertion-errors", True), ("comment-detect-code", True)),
         ),
         ("generated/*.py", (("line-length", 100),)),
+        ("*.md", (("source-context", pydocformatter_settings.SourceContext.FRAGMENT),)),
     )
 
 
@@ -1219,6 +1301,7 @@ def test_per_file_settings_are_loaded(monkeypatch: pytest.MonkeyPatch) -> None:
     [
         pytest.param('per-file-settings = {"tests/*.py" = { select = ["PDF101"] }}', "select", id="rule-selection"),
         pytest.param('per-file-settings = {"tests/*.py" = { include = ["*.py"] }}', "include", id="file-selection"),
+        pytest.param('per-file-settings = {"tests/*.py" = { extension = {rpy = "python"} }}', "extension", id="language-assignment"),
         pytest.param('per-file-settings = {"tests/*.py" = { parallelism = 1 }}', "parallelism", id="run-setting"),
         pytest.param('per-file-settings = {"tests/*.py" = { docstring-convention = "google" }}', "docstring-convention", id="rule-setting-effect"),
     ],
@@ -1262,6 +1345,53 @@ def test_effective_profile_applies_matching_per_file_settings(monkeypatch: pytes
     assert matching.settings.line_length == 100
     assert nonmatching.settings.docstring_missing_documentation == pydocformatter_settings.DocstringMissingDocumentation.ALL_DOCSTRINGS
     assert nonmatching.settings.line_length == 88
+
+
+def test_effective_profile_applies_markdown_language_defaults_to_builtin_and_custom_extensions(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    (tmp_path / "pyproject.toml").write_text(
+        '[tool.pydocfmt]\nsource-context = "module"\ndocstring-missing-documentation = "all-docstrings"\n\n[tool.pydocfmt.extension]\nmdx = "markdown"\n', encoding="utf-8"
+    )
+    monkeypatch.chdir(tmp_path)
+    profile = pydocformatter_settings.SETTINGS_SCHEMA.load_profile()
+
+    markdown = pydocformatter_settings.effective_profile_for_path(profile, str(tmp_path / "guide.md"))
+    custom_markdown = pydocformatter_settings.effective_profile_for_path(profile, str(tmp_path / "guide.mdx"))
+    python = pydocformatter_settings.effective_profile_for_path(profile, str(tmp_path / "module.py"))
+
+    for effective in (markdown, custom_markdown):
+        assert effective.settings.source_context is pydocformatter_settings.SourceContext.FRAGMENT
+        assert effective.settings.docstring_missing_documentation is pydocformatter_settings.DocstringMissingDocumentation.HAS_SECTION
+    assert python.settings.source_context is pydocformatter_settings.SourceContext.MODULE
+    assert python.settings.docstring_missing_documentation is pydocformatter_settings.DocstringMissingDocumentation.ALL_DOCSTRINGS
+
+
+def test_markdown_language_defaults_are_overridden_by_matching_per_file_settings(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    (tmp_path / "pyproject.toml").write_text(
+        '[tool.pydocfmt]\nsource-context = "fragment"\ndocstring-missing-documentation = "has-section"\n\n[tool.pydocfmt.extension]\nmdx = "markdown"\n\n[tool.pydocfmt.per-file-settings]\n"complete/*.mdx" = { source-context = "module", docstring-missing-documentation = "all-docstrings" }\n',
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+    profile = pydocformatter_settings.SETTINGS_SCHEMA.load_profile()
+
+    effective = pydocformatter_settings.effective_profile_for_path(profile, str(tmp_path / "complete" / "module.mdx"))
+
+    assert effective.settings.source_context is pydocformatter_settings.SourceContext.MODULE
+    assert effective.settings.docstring_missing_documentation is pydocformatter_settings.DocstringMissingDocumentation.ALL_DOCSTRINGS
+
+
+@pytest.mark.parametrize(
+    "source_priority", [pydocformatter_settings_core.INLINE_CONFIG_SOURCE_PRIORITY, pydocformatter_settings_core.ARGUMENT_SOURCE_PRIORITY, pydocformatter_settings_core.FIELD_OVERRIDE_SOURCE_PRIORITY]
+)
+def test_explicit_setting_sources_override_markdown_language_defaults(tmp_path: Path, source_priority: int) -> None:
+    settings = CheckSettings(source_context=pydocformatter_settings.SourceContext.MODULE, docstring_missing_documentation=pydocformatter_settings.DocstringMissingDocumentation.ALL_DOCSTRINGS)
+    profile = pydocformatter_settings_core.SettingsProfile(
+        settings=settings, field_bases={}, field_priorities={"source_context": source_priority, "docstring_missing_documentation": source_priority}, project_root=str(tmp_path)
+    )
+
+    effective = pydocformatter_settings.effective_profile_for_path(profile, str(tmp_path / "guide.md"))
+
+    assert effective.settings.source_context is pydocformatter_settings.SourceContext.MODULE
+    assert effective.settings.docstring_missing_documentation is pydocformatter_settings.DocstringMissingDocumentation.ALL_DOCSTRINGS
 
 
 def test_effective_profile_supports_negated_per_file_settings(monkeypatch: pytest.MonkeyPatch) -> None:

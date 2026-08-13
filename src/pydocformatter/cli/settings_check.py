@@ -3,7 +3,8 @@
 Attributes:
     DEFAULT_EXCLUDE (tuple[str, ...]): Directory names excluded from recursive file discovery unless a caller extends or
         replaces file-selection settings.
-    DEFAULT_INCLUDE (tuple[str, ...]): Default filename patterns considered Python source during directory traversal.
+    DEFAULT_INCLUDE (tuple[str, ...]): Default filename patterns considered Python or Markdown source during directory
+        traversal.
     DEFAULT_RULE_SELECT (tuple[str, ...]): Initial broad rule selector used when users do not provide an explicit
         `select` setting.
     DEFAULT_RULE_FIXABLE (tuple[str, ...]): Initial broad fixability selector used when users do not restrict automatic
@@ -23,6 +24,7 @@ Attributes:
     DEFAULT_COMMENT_TASK_MARKERS (tuple[str, ...]): Task marker labels recognized by default in comments.
     PARALLELISM_CONSTRAINT_MESSAGE (str): Shared validation text for the worker-count setting accepted by the check
         command.
+    BUILTIN_EXTENSION_LANGUAGES (dict[str, SourceLanguage]): Fixed extension-to-language assignments.
     SETTINGS_SCHEMA (SettingsSchema[CheckSettings]): Complete `pydocfmt check` schema used for config loading, CLI
         option generation, validation, and settings display.
     CHECK_SETTING_DEFINITIONS (tuple[CheckSettingDefinition, ...]): Check setting metadata with co-located clean-proof
@@ -35,13 +37,15 @@ Attributes:
 import re
 import enum
 import typing
+import pathlib
 import dataclasses
 from typing import Any, TypedDict
 
 # First-party imports
 import pydocformatter.settings as settings_core
 from pydocformatter.rules.codes import ALL_RULE_SELECTOR_TAG
-from pydocformatter.settings import MultiStringMap, PerFileSettingsMap, SettingDefinition, SettingsSchema, StringList
+from pydocformatter.rules.models import SourceContext
+from pydocformatter.settings import MultiStringMap, PerFileSettingsMap, SettingCLIValueKind, SettingDefinition, SettingsSchema, StringList, StringMap
 from pydocformatter.utils.globs import BaseRelativeGlobMatcher
 
 
@@ -69,7 +73,7 @@ DEFAULT_EXCLUDE = (
     "venv",
 )
 
-DEFAULT_INCLUDE = ("*.py", "*.pyi", "*.pyw")
+DEFAULT_INCLUDE = ("*.py", "*.pyi", "*.pyw", "*.md")
 DEFAULT_RULE_SELECT = (ALL_RULE_SELECTOR_TAG,)
 DEFAULT_RULE_FIXABLE = (ALL_RULE_SELECTOR_TAG,)
 DEFAULT_REQUIRE_EXPLICIT = (
@@ -105,7 +109,23 @@ PARALLELISM_CONSTRAINT_MESSAGE = "must be 0, a fractional value greater than 0 a
 _MAX_DOCUMENTED_STRING_LIST_DEFAULT_LENGTH = 50
 _PLACEHOLDER_MARKER_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_-]*$")
 _TASK_MARKER_RE = re.compile(r"^[A-Z][A-Z0-9_-]*$")
+_EXTENSION_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]*$")
 _validate_non_negative_float = settings_core.validate_float(min_value=0)
+
+
+class SourceLanguage(enum.StrEnum):
+    """Supported source languages selected from filename extensions.
+
+    Attributes:
+        PYTHON: Parse a complete Python source or fragment directly.
+        MARKDOWN: Extract and process supported fenced Python blocks from Markdown.
+    """
+
+    PYTHON = "python"
+    MARKDOWN = "markdown"
+
+
+BUILTIN_EXTENSION_LANGUAGES = {"py": SourceLanguage.PYTHON, "pyi": SourceLanguage.PYTHON, "pyw": SourceLanguage.PYTHON, "md": SourceLanguage.MARKDOWN}
 
 
 class IndentStyle(enum.StrEnum):
@@ -180,6 +200,9 @@ class DocstringMissingDocumentation(enum.StrEnum):
     ALL_DOCSTRINGS = "all-docstrings"
 
 
+_MARKDOWN_LANGUAGE_DEFAULTS: tuple[tuple[str, object], ...] = (("source_context", SourceContext.FRAGMENT), ("docstring_missing_documentation", DocstringMissingDocumentation.HAS_SECTION))
+
+
 class CommentTaskMarkerMode(enum.StrEnum):
     """Treatment modes for recognized comment task markers.
 
@@ -218,6 +241,7 @@ class CheckSettings:
         indent_style (IndentStyle): Indentation style used for generated and normalized docstring indentation.
         indent_width (int): Number of spaces per generated docstring indentation level, or the visual width of a tab.
         parallelism (float): Number or ratio of logical CPU cores to use for internal file-level parallelism.
+        source_context (SourceContext): Whether analyzed Python is a complete module or a standalone fragment.
         docstring_convention (DocstringConvention): Convention used to parse semantic docstring sections.
         docstring_blank_line_style (DocstringBlankLineStyle): Whitespace style used by PDF103 for blank docstring lines.
         docstring_blank_line_after_last_section (bool): Whether PDF108, PDF200, and PDF201 preserve one blank line after
@@ -277,6 +301,7 @@ class CheckSettings:
         fixable (StringList): Rule selectors eligible for automatic fixes.
         unfixable (StringList): Rule selectors ineligible for automatic fixes.
         extend_fixable (StringList): Additional fixable rule selectors.
+        extension (StringMap): Custom filename extensions mapped to supported source languages.
         include (StringList): Base glob patterns that identify format-eligible files.
         extend_include (StringList): Additional include glob patterns appended to `include`.
         exclude (StringList): Base glob patterns for files or directories to ignore.
@@ -294,6 +319,7 @@ class CheckSettings:
     indent_style: IndentStyle = IndentStyle.SPACE
     indent_width: int = 4
     parallelism: float = 0.0
+    source_context: SourceContext = SourceContext.MODULE
     docstring_convention: DocstringConvention = DocstringConvention.PEP257
     docstring_blank_line_style: DocstringBlankLineStyle = DocstringBlankLineStyle.BLANK
     docstring_blank_line_after_last_section: bool = False
@@ -339,6 +365,7 @@ class CheckSettings:
     fixable: StringList = DEFAULT_RULE_FIXABLE
     unfixable: StringList = ()
     extend_fixable: StringList = ()
+    extension: StringMap = ()
     include: StringList = DEFAULT_INCLUDE
     extend_include: StringList = ()
     exclude: StringList = DEFAULT_EXCLUDE
@@ -378,6 +405,7 @@ class CheckSettingsOverrides(TypedDict, total=False):
         indent_style (IndentStyle): Indentation style used for generated and normalized docstring indentation.
         indent_width (int): Number of spaces per generated docstring indentation level, or the visual width of a tab.
         parallelism (float): Number or ratio of logical CPU cores to use for internal file-level parallelism.
+        source_context (SourceContext): Whether analyzed Python is a complete module or a standalone fragment.
         docstring_convention (DocstringConvention): Convention used to parse semantic docstring sections.
         docstring_blank_line_style (DocstringBlankLineStyle): Whitespace style used by PDF103 for blank docstring lines.
         docstring_blank_line_after_last_section (bool): Whether PDF108, PDF200, and PDF201 preserve one blank line after
@@ -437,6 +465,7 @@ class CheckSettingsOverrides(TypedDict, total=False):
         fixable (StringList): Rule selectors eligible for automatic fixes.
         unfixable (StringList): Rule selectors ineligible for automatic fixes.
         extend_fixable (StringList): Additional fixable rule selectors.
+        extension (StringMap): Custom filename extensions mapped to supported source languages.
         include (StringList): Base glob patterns that identify format-eligible files.
         extend_include (StringList): Additional include glob patterns appended to `include`.
         exclude (StringList): Base glob patterns for files or directories to ignore.
@@ -454,6 +483,7 @@ class CheckSettingsOverrides(TypedDict, total=False):
     indent_style: IndentStyle
     indent_width: int
     parallelism: float
+    source_context: SourceContext
     docstring_convention: DocstringConvention
     docstring_blank_line_style: DocstringBlankLineStyle
     docstring_blank_line_after_last_section: bool
@@ -499,6 +529,7 @@ class CheckSettingsOverrides(TypedDict, total=False):
     fixable: StringList
     unfixable: StringList
     extend_fixable: StringList
+    extension: StringMap
     include: StringList
     extend_include: StringList
     exclude: StringList
@@ -651,6 +682,87 @@ def validate_docstring_placeholder_markers(value: object, context: str) -> Strin
     return markers
 
 
+def validate_extension_map(value: object, context: str) -> StringMap:
+    """Validate and normalize custom extension-to-language assignments.
+
+    Args:
+        value (object): Raw table or ordered key/value pairs from one configuration layer.
+        context (str): User-facing setting label included in validation errors.
+
+    Returns:
+        StringMap: Normalized assignments sorted by extension.
+
+    Raises:
+        settings_core.SettingsError: If the mapping shape, extension syntax, language, or uniqueness is invalid.
+    """
+    if isinstance(value, tuple):
+        for item in value:
+            if not isinstance(item, tuple) or len(item) != 2:
+                raise settings_core.SettingsError(f"{context} entries must be two-item extension/language pairs")
+        items = typing.cast("tuple[tuple[object, object], ...]", value)
+    elif isinstance(value, dict):
+        items = tuple(value.items())
+    else:
+        raise settings_core.SettingsError(f"{context} must be a table mapping extensions to source languages")
+
+    entries: dict[str, str] = {}
+    for raw_extension, raw_language in items:
+        if not isinstance(raw_extension, str):
+            raise settings_core.SettingsError(f"{context} keys must be strings")
+        extension = raw_extension.removeprefix(".")
+        if _EXTENSION_RE.fullmatch(extension) is None:
+            raise settings_core.SettingsError(f"{context} key {raw_extension!r} must contain one simple filename extension matching [A-Za-z0-9][A-Za-z0-9_-]*")
+        normalized = extension.lower()
+        if normalized in BUILTIN_EXTENSION_LANGUAGES:
+            raise settings_core.SettingsError(f"{context} must not configure built-in extension {raw_extension!r}")
+        if normalized in entries:
+            raise settings_core.SettingsError(f"{context} contains duplicate extension {raw_extension!r} after normalization")
+        if not isinstance(raw_language, str):
+            raise settings_core.SettingsError(f"{context}.{raw_extension} must be a string source language")
+        try:
+            language = SourceLanguage(raw_language)
+        except ValueError as error:
+            raise settings_core.SettingsError(f"{context}.{raw_extension} must be one of {{'python', 'markdown'}}") from error
+        entries[normalized] = language.value
+    return tuple(sorted(entries.items()))
+
+
+def source_language_for_path(path: str, extension: StringMap) -> SourceLanguage | None:
+    """Return the source language assigned to a path, if any.
+
+    Args:
+        path (str): Display or filesystem path whose final suffix selects its language.
+        extension (StringMap): Normalized custom extension assignments.
+
+    Returns:
+        SourceLanguage | None: Built-in or configured source language, Python for bare stdin, or None when unmapped.
+    """
+    if path == "-":
+        return SourceLanguage.PYTHON
+    suffix = pathlib.PurePath(path).suffix
+    if not suffix:
+        return None
+    normalized = suffix[1:].lower()
+    builtin = BUILTIN_EXTENSION_LANGUAGES.get(normalized)
+    if builtin is not None:
+        return builtin
+    return next((SourceLanguage(language) for configured_extension, language in extension if configured_extension == normalized), None)
+
+
+def unknown_source_language_error(path: str) -> str:
+    """Return the operational error for a selected path without a language mapping.
+
+    Args:
+        path (str): Selected display path whose suffix has no language assignment.
+
+    Returns:
+        str: Actionable per-file language-assignment error.
+    """
+    suffix = pathlib.PurePath(path).suffix
+    extension = suffix or "<none>"
+    return f"Cannot determine the source language for {path}: extension {extension!r} is not built in or mapped by the extension setting"
+
+
 def validate_per_file_settings(value: object, context: str) -> PerFileSettingsMap:
     """Validate and return per-file formatter setting overrides.
 
@@ -709,7 +821,7 @@ def validate_per_file_settings(value: object, context: str) -> PerFileSettingsMa
 
 
 def effective_profile_for_path(profile: settings_core.SettingsProfile[CheckSettings], path: str) -> settings_core.SettingsProfile[CheckSettings]:
-    """Return a settings profile after applying matching per-file formatter settings.
+    """Return a settings profile after applying language and per-file settings.
 
     Args:
         profile (settings_core.SettingsProfile[CheckSettings]): Base settings profile resolved for file and rule
@@ -718,8 +830,13 @@ def effective_profile_for_path(profile: settings_core.SettingsProfile[CheckSetti
 
     Returns:
         settings_core.SettingsProfile[CheckSettings]: Effective formatter settings profile for `path`, or the original
-            profile when no override applies.
+            profile when no language or per-file override applies.
     """
+    source_language = source_language_for_path(path, profile.settings.extension)
+    language_updates = {field: value for field, value in language_default_updates(source_language) if profile.priority_for_field(field) <= settings_core.CONFIG_FILE_SOURCE_PRIORITY}
+    if language_updates:
+        profile = dataclasses.replace(profile, settings=dataclasses.replace(profile.settings, **typing.cast("Any", language_updates)))
+
     if not profile.settings.per_file_settings:
         return profile
 
@@ -748,17 +865,44 @@ def effective_profile_for_path(profile: settings_core.SettingsProfile[CheckSetti
     )
 
 
-def analysis_settings_identity(profile: settings_core.SettingsProfile[CheckSettings]) -> tuple[tuple[str, object], ...]:
+def language_default_updates(source_language: SourceLanguage | None) -> tuple[tuple[str, object], ...]:
+    """Return automatic setting updates for a resolved source language.
+
+    Args:
+        source_language (SourceLanguage | None): Resolved source language, or None for an unmapped path.
+
+    Returns:
+        tuple[tuple[str, object], ...]: Field/value updates in stable settings order.
+    """
+    return _MARKDOWN_LANGUAGE_DEFAULTS if source_language is SourceLanguage.MARKDOWN else ()
+
+
+def apply_language_defaults(settings: CheckSettings, source_language: SourceLanguage | None) -> CheckSettings:
+    """Apply automatic language defaults directly to resolved settings.
+
+    Args:
+        settings (CheckSettings): Settings supplied to a direct formatting API.
+        source_language (SourceLanguage | None): Resolved source language, or None for an unmapped path.
+
+    Returns:
+        CheckSettings: Settings with language defaults applied.
+    """
+    updates = dict(language_default_updates(source_language))
+    return dataclasses.replace(settings, **typing.cast("Any", updates)) if updates else settings
+
+
+def analysis_settings_identity(profile: settings_core.SettingsProfile[CheckSettings], *, source_language: SourceLanguage = SourceLanguage.PYTHON) -> tuple[tuple[str, object], ...]:
     """Return effective setting names and values that determine clean analysis.
 
     Args:
         profile (settings_core.SettingsProfile[CheckSettings]): Effective profile after matching per-file settings are
             applied.
+        source_language (SourceLanguage): Resolved language used to interpret the selected source.
 
     Returns:
         tuple[tuple[str, object], ...]: Schema-ordered direct-analysis setting names and normalized effective values.
     """
-    return tuple((definition.field, getattr(profile.settings, definition.field)) for definition in DIRECT_ANALYSIS_DEFINITIONS)
+    return (("source_language", source_language), *(tuple((definition.field, getattr(profile.settings, definition.field)) for definition in DIRECT_ANALYSIS_DEFINITIONS)))
 
 
 def _definitions_by_key() -> dict[str, SettingDefinition[Any]]:
@@ -901,6 +1045,14 @@ SETTINGS_SCHEMA = SettingsSchema(
         ),
         CheckSettingDefinition(
             cache_identity_role=CacheIdentityRole.DIRECT_ANALYSIS_VALUE,
+            field="source_context",
+            value_type=SourceContext,
+            group=SettingsGroup.FORMATTING,
+            help="Treat source as a complete module or standalone fragment.",
+            documentation='Source semantics; use "module" for complete importable Python modules or "fragment" for examples that do not represent a complete module or callable API. Sources assigned to Markdown default to "fragment" after ordinary project configuration; matching per-file settings and inline, command-line, or in-process overrides can opt them into "module".',
+        ),
+        CheckSettingDefinition(
+            cache_identity_role=CacheIdentityRole.DIRECT_ANALYSIS_VALUE,
             field="docstring_convention",
             value_type=DocstringConvention,
             group=SettingsGroup.DOCSTRING_FORMATTING,
@@ -929,7 +1081,7 @@ SETTINGS_SCHEMA = SettingsSchema(
             value_type=DocstringMissingDocumentation,
             group=SettingsGroup.DOCSTRING_FORMATTING,
             help="When missing-documentation rules report missing documentation.",
-            documentation='When missing-documentation rules report missing documentation; one of "has-section", "non-summary-docstrings", or "all-docstrings".',
+            documentation='When missing-documentation rules report missing documentation; one of "has-section", "non-summary-docstrings", or "all-docstrings". Sources assigned to Markdown default to "has-section" after ordinary project configuration; matching per-file settings and inline, command-line, or in-process overrides can select another policy.',
         ),
         CheckSettingDefinition(
             cache_identity_role=CacheIdentityRole.DIRECT_ANALYSIS_VALUE,
@@ -1276,6 +1428,17 @@ SETTINGS_SCHEMA = SettingsSchema(
             validator=settings_core.validate_non_empty_string_list,
             cli={"metavar": "RULE"},
             documentation="Additional rule selectors eligible for automatic fixes.",
+        ),
+        CheckSettingDefinition(
+            cache_identity_role=CacheIdentityRole.APPLIED_CONFIGURATION,
+            field="extension",
+            value_type=StringMap,
+            group=SettingsGroup.FILE_SELECTION,
+            help="Map a custom filename extension to a source language.",
+            validator=validate_extension_map,
+            cli={"action": "append", "metavar": "EXT:LANGUAGE", "value_kind": SettingCLIValueKind.EXTENSION_MAP, "show_default": False},
+            documentation='Custom filename extensions mapped to "python" or "markdown". Extension keys are ASCII case-insensitive and may have one leading dot. This setting assigns languages but does not add files to directory discovery.',
+            example='[tool.pydocfmt.extension]\nrpy = "python"\nmdx = "markdown"',
         ),
         CheckSettingDefinition(
             cache_identity_role=CacheIdentityRole.DISCOVERY_ONLY,

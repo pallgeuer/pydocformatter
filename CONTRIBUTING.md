@@ -72,7 +72,7 @@ Repository configuration and automated tools are the source of truth for formatt
 - Keep type annotations and affected docstrings current when changing function signatures, dataclass fields, enum values, or class attributes.
 - Write concise docstrings that explain semantics rather than restating identifiers. Project docstrings use the configured Google convention.
 - Use sentence case for Markdown headings and table headers.
-- Do not run pydocfmt on Markdown files; it parses Python source only.
+- Run pydocfmt on Python and Markdown files so supported fenced Python blocks follow the same documentation conventions.
 
 Tests are module-level pytest functions. Use plain `assert`, fixtures, `pytest.raises`, `@pytest.mark.parametrize`, and `pytest-mock`; do not introduce `unittest.TestCase` classes.
 

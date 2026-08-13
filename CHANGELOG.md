@@ -15,15 +15,46 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## Unreleased
 
+### Added
+
+#### Markdown source
+
+- Added checking and formatting for supported `python`, `py`, and `python3` fenced blocks in Markdown, including indentation-aware reconstruction, first-line byte order marks, host-file diagnostics, `pydocfmt-skip`, file-atomic malformed-block handling, and structural rewrite validation. The default Markdown extension is `.md`.
+- Added the `source-context` setting and hard per-rule applicability metadata, with automatic fragment-oriented effective defaults for every source assigned to Markdown.
+- Added the `extension` setting and repeatable `--extension EXT:LANGUAGE` option for assigning custom filename extensions to Python or Markdown independently of file discovery.
+- Added PDF529 for module attribute documentation order and narrowed PDF528 to class attribute documentation order.
+
 ### Changed
+
+#### Rule catalog
+
+- Renamed PDF528 from `attribute-documentation-order` to `class-attribute-documentation-order` without an alias; use PDF529 or `module-attribute-documentation-order` for the former module behavior.
+- Recorded PDF528 as stable since 1.2.0 after its class-only semantic reassignment.
 
 #### Developer tooling
 
 - Updated the shared language-agnostic development tooling dependency and adopted its Git-aware Markdown path-selection API.
+- Updated the published and local pre-commit hooks to check `.py`, `.pyi`, `.pyw`, and `.md` files case-insensitively through `types_or`, retaining pre-commit 2.9.0 as the minimum version.
+
+#### Source selection
+
+- Selected custom filename extensions now require an explicit Python or Markdown assignment; mappings are language-only, so directory discovery still requires `include` or `extend-include`.
 
 #### Developer documentation
 
 - Standardized changelog categories as non-bulleted level-four headings with horizontal rules between top-level sections, condensed the historical v1.1.0 notes into external release outcomes, and added explicit structural and editorial checkpoints to the release runbook.
+
+### Fixed
+
+#### Markdown source
+
+- Kept generated blank fence-body lines free of trailing indentation, limited physical-line recognition to CR and LF forms, and documented the exact raw-line fence scope without claiming full CommonMark container parsing.
+- Reused the post-rewrite fence inventory and translated rule operational-error details to containing Markdown line numbers.
+- Applied automatic Markdown defaults in direct formatting APIs with an explicit opt-out, retained file-atomic rollback around otherwise best-effort rule fixes, and reconstructed multiple fence bodies in linear time.
+
+#### Configuration and rule metadata
+
+- Reported malformed programmatic extension mappings as settings errors and canonicalized source-context metadata so equivalent context sets validate and display identically.
 
 ---
 

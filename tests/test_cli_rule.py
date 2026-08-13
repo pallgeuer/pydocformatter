@@ -31,6 +31,7 @@ def test_pydocfmt_rule_prints_rule_json() -> None:
     assert output["url"] == "https://pallgeuer.github.io/pydocformatter/rules/summary-too-long/"
     assert output["fix"] == "Fix is not available."
     assert output["fix_availability"] == "Never"
+    assert output["source_contexts"] == ["module", "fragment"]
     assert output["status"] == {"Stable": {"since": "v1.1.0"}}
     assert output["explanation"].startswith("## What it does\n")
     assert "# summary-too-long (PDF203)" not in output["explanation"]
@@ -46,6 +47,14 @@ def test_pydocfmt_rule_prints_usually_fixable_rule_json() -> None:
     assert result.exit_code == 0
     assert output["fix"] == "Fix is usually available."
     assert output["fix_availability"] == "Usually"
+
+
+def test_pydocfmt_rule_prints_module_only_source_context_json() -> None:
+    result = cli_helpers.run_cli(pydocfmt_cli.main, ["pydocfmt", "rule", "--output-format", "json", "PDF602"])
+
+    output = json.loads(result.stdout)
+    assert result.exit_code == 0
+    assert output["source_contexts"] == ["module"]
 
 
 def test_pydocfmt_rule_prints_all_rules() -> None:
@@ -68,6 +77,7 @@ def test_pydocfmt_rule_prints_all_rules_json() -> None:
     assert tuple(rule["code"] for rule in output) == expected_codes
     assert all(rule["url"].startswith("https://pallgeuer.github.io/pydocformatter/rules/") for rule in output)
     assert all(rule["url"].endswith("/") for rule in output)
+    assert all(rule["source_contexts"] for rule in output)
 
 
 def test_pydocfmt_rule_rejects_missing_rule() -> None:

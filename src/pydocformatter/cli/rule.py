@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 
     # First-party imports
     from pydocformatter.rules.definition import RuleBase
-    from pydocformatter.rules.models import FixAvailability
+    from pydocformatter.rules.models import FixAvailability, SourceContext
 
 
 _DEFAULT_OUTPUT_FORMAT = "text"
@@ -63,6 +63,7 @@ class RuleMetadataOutput(TypedDict):
         message_formats (list[str]): Diagnostic message templates this rule can emit.
         fix (str): Human-readable automatic-fix availability.
         fix_availability (FixAvailability): Machine-readable automatic-fix availability.
+        source_contexts (list[SourceContext]): Source contexts in which the rule is applicable.
         explanation (str): Long-form rule explanation from the adjacent Markdown documentation.
         preview (bool): Whether the rule is preview-only in Ruff-compatible output.
         status (dict[str, RuleStatusMetadata]): Stable status metadata keyed by status name.
@@ -77,6 +78,7 @@ class RuleMetadataOutput(TypedDict):
     message_formats: list[str]
     fix: str
     fix_availability: FixAvailability
+    source_contexts: list[SourceContext]
     explanation: str
     preview: bool
     status: dict[str, RuleStatusMetadata]
@@ -166,6 +168,7 @@ def rule_json(rule_class: type[RuleBase]) -> RuleMetadataOutput:
         message_formats=[rule.message],
         fix=rule_documentation.rule_fix_text(rule),
         fix_availability=rule.fix_availability,
+        source_contexts=list(rule.source_contexts),
         explanation=rule_documentation.rule_explanation_body(rule_class),
         preview=False,
         status={"Stable": {"since": f"v{rule.stable_since}"}},

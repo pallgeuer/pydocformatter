@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Any, TypedDict
 # First-party imports
 import pydocformatter.settings as settings_core
 from pydocformatter.cli import global_args, settings_check
-from pydocformatter.settings import MultiStringMap, PerFileSettingsMap, StringList
+from pydocformatter.settings import MultiStringMap, PerFileSettingsMap, StringList, StringMap
 from pydocformatter.utils import argparser
 
 
@@ -140,6 +140,8 @@ def value_type_name(value_type: object) -> str:
         return "str"
     if value_type == StringList:
         return "list[str]"
+    if value_type == StringMap:
+        return "dict[str, str]"
     if value_type == MultiStringMap:
         return "dict[str, list[str]]"
     if value_type == PerFileSettingsMap:

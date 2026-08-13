@@ -6,6 +6,7 @@ Attributes:
     StrEnumT (TypeVar): String enum type accepted by enum parsing and formatting helpers.
     SettingValueT (TypeVar): Validated setting value type returned by schema validators.
     StringList (TypeAlias): Repeated string setting values from TOML or comma-separated CLI input.
+    StringMap (TypeAlias): Ordered mapping representation for string keys and values.
     MultiStringMap (TypeAlias): Ordered mapping representation for glob-pattern keys whose values are rule-selector or
         string lists.
     PerFileSettingsMap (TypeAlias): Ordered mapping representation for glob-pattern keys whose values are field-keyed
@@ -62,6 +63,7 @@ StrEnumT = TypeVar("StrEnumT", bound=enum.StrEnum)
 SettingValueT = TypeVar("SettingValueT")
 
 StringList: TypeAlias = tuple[str, ...]
+StringMap: TypeAlias = tuple[tuple[str, str], ...]
 MultiStringMap: TypeAlias = tuple[tuple[str, StringList], ...]
 PerFileSettingsMap: TypeAlias = tuple[tuple[str, tuple[tuple[str, object], ...]], ...]
 SettingValidator: TypeAlias = Callable[[Any, str], SettingValueT]
@@ -388,11 +390,13 @@ class SettingCLIValueKind(enum.StrEnum):
         RAW: Use argparse's parsed value directly.
         COMMA_LIST: Split repeated CLI values on commas and return a tuple.
         TOML_MAP: Parse repeated CLI values as TOML inline tables and merge them.
+        EXTENSION_MAP: Parse repeated extension-to-language pairs.
     """
 
     RAW = "raw"
     COMMA_LIST = "comma-list"
     TOML_MAP = "toml-map"
+    EXTENSION_MAP = "extension-map"
 
 
 class SettingCLIOptions(TypedDict, total=False):
@@ -768,6 +772,14 @@ class SettingsSchema(Generic[SettingsT]):
                             else:
                                 merged[pattern] = selectors
                     values[definition.field] = merged
+                elif definition.cli.value_kind == SettingCLIValueKind.EXTENSION_MAP:
+                    pairs: list[tuple[str, str]] = []
+                    for group in value:
+                        extension, separator, language = group.partition(":")
+                        if not separator or not extension or not language:
+                            raise SettingsError(f"{definition.cli.flags[-1]} values must use EXT:LANGUAGE")
+                        pairs.append((extension, language))
+                    values[definition.field] = tuple(pairs)
                 else:
                     raise AssertionError(f"Unknown CLI value kind: {definition.cli.value_kind}")
         return values
@@ -829,6 +841,8 @@ def format_value(value: Any, value_type: type[Any] | GenericAlias) -> str:
         return _format_string(value.value)
     if value_type_ == StringList:
         return _format_string_list(value)
+    if value_type_ == StringMap:
+        return _format_string_map(value)
     if value_type_ == MultiStringMap:
         return _format_multi_string_map(value)
     if value_type_ == PerFileSettingsMap:
@@ -851,6 +865,11 @@ def _format_inline_table(value: Any, entry_formatter: Callable[[Any, Any], str])
 def _format_multi_string_map(value: Any) -> str:
     """Format a string-keyed multi-string mapping as a TOML inline table."""
     return _format_inline_table(value, lambda pattern, selectors: f"{_format_string(pattern)} = {_format_string_list(selectors)}")
+
+
+def _format_string_map(value: Any) -> str:
+    """Format a string-keyed string mapping as a TOML inline table."""
+    return _format_inline_table(value, lambda key, item: f"{key} = {_format_string(item)}")
 
 
 def _format_per_file_settings_map(value: Any) -> str:

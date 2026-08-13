@@ -8,6 +8,8 @@ Rule must by default be explicitly selected, unless it is removed from `require-
 
 Rule is incompatible with `PDF520`.
 
+Rule applies only when `source-context` is `module`.
+
 ## What it does
 Checks for public module attributes documented in module docstring attribute entries when public module attribute documentation must use attached docstrings.
 

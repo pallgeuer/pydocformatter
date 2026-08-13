@@ -23,7 +23,6 @@
 - Use `uv sync --locked --no-default-groups --group dev` to create the complete locked development environment.
 - Use pytest for running tests. Pytest uses pytest-xdist multiprocessing by default; pass `-n 0` for serial debugging or focused runs where worker startup is slower.
 - Use `uv run ty check` for type checking, `uv run ruff ...` for code formatting/linting, and `uv run pydocfmt check --fix` to format docstrings/comments.
-- Do not run pydocfmt on Markdown files; it only parses Python source and will fail on Markdown.
 - Use `uv run la-dev-markdown-tables` to format Markdown tables and `uv run la-dev-markdown-tables --check` to verify them.
 - Use `uv run pre-commit run --all-files` for the potentially mutating complete fix stage and `uv run pre-commit run --all-files --hook-stage manual` for the non-mutating complete check used by CI.
 - For documentation changes, run `uv run python tools/docs/generate_zensical.py` followed by `uv run zensical build --strict -f zensical.generated.toml`.

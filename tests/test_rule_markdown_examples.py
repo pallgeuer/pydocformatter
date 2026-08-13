@@ -13,6 +13,7 @@ import libcst as cst
 import pytest
 
 # First-party imports
+import pydocformatter.rules.models as rule_models
 import pydocformatter.rules.runner as rule_runner
 import pydocformatter.rules.collection as rule_collection
 import pydocformatter.rules.documentation as rule_documentation
@@ -26,7 +27,6 @@ from tests import markdown_example_helpers, markdown_table_helpers
 
 if TYPE_CHECKING:
     # First-party imports
-    import pydocformatter.rules.models as rule_models
     from pydocformatter.rules.definition import RuleBase
 
 
@@ -79,7 +79,7 @@ def _assert_clean_example_has_no_hidden_fix_changes(executed: markdown_example_h
 
     module = cst.parse_module(executed.example.input_source)
     selected_rule_by_code = {selected_rule.rule.code: selected_rule for selected_rule in executed.selection.for_path(executed.path)}
-    errors: list[str] = []
+    errors: list[rule_runner.RuleOperationalError] = []
     pass_result = rule_runner._run_fix_pass(
         module,
         path=executed.path,
@@ -154,6 +154,8 @@ def test_rule_markdown_preambles_match_metadata() -> None:
             expected.append(_REQUIRE_EXPLICIT_NOTICE)
         if rule_class.meta.incompatible_with:
             expected.append(_expected_incompatibility_notice(rule_class.meta))
+        if rule_class.meta.source_contexts == (rule_models.SourceContext.MODULE,):
+            expected.append("Rule applies only when `source-context` is `module`.")
 
         assert paragraphs == tuple(expected), f"{rule_code}: unexpected rule Markdown preamble"
 

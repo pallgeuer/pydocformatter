@@ -4,7 +4,8 @@ This document specifies how `pydocfmt` selects files for processing.
 
 ## Defaults
 
-- `include = ["*.py", "*.pyi", "*.pyw"]`
+- `extension = {}`
+- `include = ["*.py", "*.pyi", "*.pyw", "*.md"]`
 - `extend-include = []`
 - `exclude = [".bzr", ".direnv", ".eggs", ".git", ".git-rewrite", ".hg", ".mypy_cache", ".nox", ".pants.d", ".pydocfmt_cache", ".pytype", ".ruff_cache", ".svn", ".tox", ".venv", "__pypackages__", "_build", "buck-out", "dist", "node_modules", "venv"]`
 - `extend-exclude = []`
@@ -13,11 +14,31 @@ This document specifies how `pydocfmt` selects files for processing.
 
 ## Configuration layout
 
-General configuration loading, source priority, and path-pattern bases are specified in [Settings specification](settings_spec.md). File selection consumes the resolved `include`, `extend-include`, `exclude`, `extend-exclude`, `respect-gitignore`, and `force-exclude` settings for each evaluated path.
+General configuration loading, source priority, and path-pattern bases are specified in [Settings specification](settings_spec.md). File selection consumes the resolved `extension`, `include`, `extend-include`, `exclude`, `extend-exclude`, `respect-gitignore`, and `force-exclude` settings for each evaluated path.
 
 Auto-discovered configuration is hierarchical: the single closest config file applies to the file or directory being evaluated, and parent config files are not merged into child config files. During traversal, a parent directory exclude can still prune a child directory before that child directory's config is entered.
 
 `--show-settings` displays settings resolved for the current working directory. The `respect-gitignore`, `cache`, and `cache-dir` values used for run-level file-selection behavior are also resolved from the current working directory, not separately from each traversed path.
+
+## Source language assignment
+
+Discovery and language assignment are separate. `include` and `extend-include` determine which files directory traversal discovers; `extension` determines how an accepted custom filename suffix is interpreted. A mapping never adds an include pattern, and an include pattern never implies a language.
+
+The fixed built-in assignments are `.py`, `.pyi`, and `.pyw` to Python and `.md` to Markdown. Bare `-` standard input is Python. The custom map is empty by default, but can be set to something like:
+
+```toml
+[tool.pydocfmt.extension]
+rpy = "python"
+mdx = "markdown"
+```
+
+Every path assigned to Markdown receives the same language-aware `source-context` and missing-documentation defaults, including custom extensions. Language assignment therefore controls both fenced-block dispatch and those path-effective defaults; it still does not control discovery. The [Settings specification](settings_spec.md#source-priority) defines their precedence and per-file overrides.
+
+Configured keys describe one final filename extension. One leading dot is optional, and ASCII case is normalized; the matching path suffix is also compared case-insensitively. Keys must otherwise match `[A-Za-z0-9][A-Za-z0-9_-]*`. Empty, compound, path-like, and glob-like keys are invalid. Built-in extensions cannot be configured or overridden. Values must be exactly lowercase `python` or `markdown`, and keys that collide after normalization are invalid even when their values agree.
+
+The highest-priority source that supplies `extension` replaces the complete lower-priority custom map. Repeated `--extension EXT:LANGUAGE` options collectively form the command-line map. Inline `--config 'extension = {}'` can clear a lower-priority map.
+
+Explicit files bypass include matching but still require a language assignment. `--stdin-filename` uses its final suffix and path-specific settings the same way. An accepted file without a built-in or configured language produces a per-file operational error, is not parsed or modified, and does not prevent other selected files from being processed. `--show-files` reports both the accepted discovery decision and the missing-language error, then exits unsuccessfully.
 
 ## File selection algorithm
 
@@ -109,6 +130,7 @@ pydocfmt intentionally uses Ruff-style file-selection settings where they map to
 - `extend-exclude`
 - `respect-gitignore`
 - `force-exclude`
+- `extension`
 
 Settings outside this list are not part of the Ruff compatibility surface. Per-file-ignore pattern bases follow the same source-base rules as file-selection patterns, but per-file ignores are specified in the [Rule selection specification](rule_selection_spec.md) because they affect rule selection after a file has already been selected.
 
@@ -122,3 +144,5 @@ Settings outside this list are not part of the Ruff compatibility surface. Per-f
   pydocformatter exposes `--extend-include` as a dedicated CLI option. Ruff supports `extend-include` in configuration but does not expose a `ruff check --extend-include` option.
 - **D5: list layering.**
   pydocformatter uses the same highest-precedence-wins rule for all list settings. In particular, CLI `--extend-exclude` replaces configured `extend-exclude` instead of accumulating with it. This intentionally differs from Ruff's CLI `--extend-exclude` behavior.
+- **D6: extension assignment and discovery.**
+  pydocformatter follows Ruff's extension-to-language concept and `--extension EXT:LANGUAGE` spelling, but deliberately keeps assignment separate from discovery. A custom mapping requires `include` or `extend-include` only when directory traversal should discover matching files.

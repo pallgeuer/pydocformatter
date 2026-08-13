@@ -2,6 +2,8 @@
 
 pydocformatter is designed to run in the same places as other Python quality tools, namely local terminals, Git pre-commit, and CI.
 
+The published hooks check the built-in Python and Markdown filename forms case-insensitively with `types_or: [python, pyi, markdown]` and `files: (?i)\.(?:py|pyi|pyw|md)$`. This combination requires pre-commit 2.9.0 or newer.
+
 ## Git pre-commit
 
 Use `pydocfmt-check` when commits should fail on findings:
@@ -23,6 +25,33 @@ repos:
     hooks:
       - id: pydocfmt-fix
 ```
+
+## Custom extensions
+
+A project that maps extra extensions must override the hook's `files` regex so pre-commit passes those filenames to pydocfmt. If [identify](https://github.com/pre-commit/identify) already classifies every extra extension as Python or Markdown, changing `files` is sufficient:
+
+```yaml
+- id: pydocfmt-check
+  files: (?i)\.(?:py|pyi|pyw|md|rpy|mdx)$
+```
+
+If identify does not assign an applicable language type, override `types_or` as well. Use a broad file type and let `files` be the actual extension filter:
+
+```yaml
+- id: pydocfmt-check
+  types_or: [file]
+  files: (?i)\.(?:py|pyi|pyw|md|rpy|mdx)$
+```
+
+These hook overrides affect only which explicit paths pre-commit supplies. Configure pydocfmt's language assignment separately:
+
+```toml
+[tool.pydocfmt.extension]
+rpy = "python"
+mdx = "markdown"
+```
+
+An explicit pre-commit path bypasses pydocfmt's include patterns. Add `extend-include = ["*.rpy", "*.mdx"]` under `[tool.pydocfmt]` only when direct `pydocfmt check DIRECTORY` discovery should find the custom extensions. Every extension assigned to Markdown receives the automatic fragment-oriented Markdown defaults without another per-file pattern.
 
 ## GitHub Actions
 

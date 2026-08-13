@@ -6,6 +6,8 @@ Rule must by default be explicitly selected, unless it is removed from `require-
 
 Rule is incompatible with `PDF524` and `PDF525`.
 
+Rule applies only when `source-context` is `module`.
+
 ## What it does
 Checks for attached docstrings on private module attributes.
 

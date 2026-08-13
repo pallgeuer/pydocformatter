@@ -16,7 +16,7 @@ class Client:
     """Class docstring."""
 
     def close(self):
-        """Method docstring."""
+        """Close the client."""
 ```
 
 PDF rules also inventory module attributes, class attributes, and `self.<name>` instance attributes assigned inside `__init__`. Adjacent attribute docstrings collected by common documentation tools are treated as documentation attached to those inventory entries. Supported forms include same-line docstrings, next-line docstrings, annotations without values, multi-target assignments, and tuple-unpacked assignments:

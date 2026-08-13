@@ -6,7 +6,7 @@ import pytest
 
 # First-party imports
 from pydocformatter import formatter, rules_selection
-from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention, DocstringMissingDocumentation
+from pydocformatter.cli.settings_check import CheckSettings, DocstringConvention, DocstringMissingDocumentation, SourceLanguage
 from pydocformatter.rules.definitions.PDF.PDF510_missing_public_module_attribute_documentation import PDF510MissingPublicModuleAttributeDocumentation
 from pydocformatter.source_path import SourcePathContext
 
@@ -158,7 +158,9 @@ def test_module_visibility_uses_precomputed_path_context_when_package_markers_ch
     settings = CheckSettings(select=("PDF510",), docstring_convention=DocstringConvention.GOOGLE)
 
     selection = rules_selection.select_rules(settings)
-    result = formatter._format_source_plan(source, str(module), settings=settings, execution_plan=selection.execution_plan_for_path(str(module)), fix=True, source_path=source_path)
+    result = formatter._format_source_plan(
+        source, str(module), settings=settings, source_language=SourceLanguage.PYTHON, execution_plan=selection.execution_plan_for_path(str(module)), fix=True, source_path=source_path
+    )
     fresh_result = formatter.format_source(source, str(module), settings=settings, rule_selection=rules_selection.select_rules(settings), fix=True)
 
     assert source_path.public

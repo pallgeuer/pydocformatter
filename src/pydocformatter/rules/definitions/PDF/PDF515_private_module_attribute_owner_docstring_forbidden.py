@@ -13,7 +13,7 @@ from pydocformatter.rules.codes import RuleCode
 from pydocformatter.rules.definition import RuleBase
 from pydocformatter.rules.definition_helpers import attribute_documentation, docstring_conventions
 from pydocformatter.rules.definitions.PDF.PDF import PDF
-from pydocformatter.rules.models import FixAvailability, RuleCacheBehavior, RuleCheckKind, RuleMetadata
+from pydocformatter.rules.models import MODULE_SOURCE_CONTEXTS, FixAvailability, RuleCacheBehavior, RuleCheckKind, RuleMetadata
 
 
 if TYPE_CHECKING:
@@ -40,6 +40,7 @@ class PDF515PrivateModuleAttributeOwnerDocstringForbidden(RuleBase):
         incompatible_with=(RuleCode("PDF524"), RuleCode("PDF525")),
         check_kind=RuleCheckKind.STANDARD,
         cache_behavior=RuleCacheBehavior.FILE_LOCAL,
+        source_contexts=MODULE_SOURCE_CONTEXTS,
     )
 
     @classmethod

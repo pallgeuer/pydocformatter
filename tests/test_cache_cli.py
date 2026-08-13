@@ -114,6 +114,64 @@ def test_stdin_modes_are_equivalent_and_never_cached(tmp_path: Path, mode: tuple
     assert not cache.exists()
 
 
+def test_markdown_clean_proof_is_reused_and_source_changes_invalidate_it(tmp_path: Path) -> None:
+    target = tmp_path / "example.md"
+    cache = tmp_path / "cache"
+    clean_source = "```python\nvalue = 1\n```\n"
+    target.write_text(clean_source, encoding="utf-8")
+    argv = ["pydocfmt", "check", "--isolated", "--cache-dir", str(cache), "--cache-stats", "--select", "PDF001", str(target)]
+
+    cold = cli_helpers.run_cli(pydocfmt_cli.main, argv, cwd=tmp_path)
+    warm = cli_helpers.run_cli(pydocfmt_cli.main, argv, cwd=tmp_path)
+    module_override = cli_helpers.run_cli(pydocfmt_cli.main, [*argv[:-1], "--source-context", "module", str(target)], cwd=tmp_path)
+    target.write_text("```python\ndef example():\n    '''Return an example.'''\n```\n", encoding="utf-8")
+    changed = cli_helpers.run_cli(pydocfmt_cli.main, argv, cwd=tmp_path)
+
+    assert cold.exit_code == warm.exit_code == module_override.exit_code == 0
+    assert "misses=1" in cold.stderr
+    assert "hits=1" in warm.stderr
+    assert "misses=1" in module_override.stderr
+    assert "hits=0" in module_override.stderr
+    assert changed.exit_code == 1
+    assert "metadata-rejected=1" in changed.stderr
+    assert "PDF001" in changed.stdout
+
+
+def test_custom_extension_language_change_cannot_reuse_incompatible_clean_proof(tmp_path: Path) -> None:
+    target = tmp_path / "example.src"
+    cache = tmp_path / "cache"
+    target.write_text("value = 1\n", encoding="utf-8")
+    base = ["pydocfmt", "check", "--isolated", "--cache-dir", str(cache), "--cache-stats", "--ignore", "ALL"]
+
+    python_cold = cli_helpers.run_cli(pydocfmt_cli.main, [*base, "--extension", "src:python", str(target)], cwd=tmp_path)
+    python_warm = cli_helpers.run_cli(pydocfmt_cli.main, [*base, "--extension", "src:python", str(target)], cwd=tmp_path)
+    markdown_after_remap = cli_helpers.run_cli(pydocfmt_cli.main, [*base, "--extension", "src:markdown", str(target)], cwd=tmp_path)
+    after_removal = cli_helpers.run_cli(pydocfmt_cli.main, [*base, str(target)], cwd=tmp_path)
+
+    assert python_cold.exit_code == python_warm.exit_code == markdown_after_remap.exit_code == 0
+    assert after_removal.exit_code == 1
+    assert "misses=1" in python_cold.stderr
+    assert "hits=1" in python_warm.stderr
+    assert "misses=1" in markdown_after_remap.stderr
+    assert "hits=0" in markdown_after_remap.stderr
+    assert "uncacheable=1" in after_removal.stderr
+    assert "Cannot determine the source language" in after_removal.stdout
+
+
+def test_unrelated_custom_extension_change_preserves_compatible_clean_proof(tmp_path: Path) -> None:
+    target = tmp_path / "example.src"
+    cache = tmp_path / "cache"
+    target.write_text("value = 1\n", encoding="utf-8")
+    base = ["pydocfmt", "check", "--isolated", "--cache-dir", str(cache), "--cache-stats", "--ignore", "ALL"]
+
+    cold = cli_helpers.run_cli(pydocfmt_cli.main, [*base, "--extension", "src:python", str(target)], cwd=tmp_path)
+    changed_unrelated_mapping = cli_helpers.run_cli(pydocfmt_cli.main, [*base, "--extension", "src:python", "--extension", "mdx:markdown", str(target)], cwd=tmp_path)
+
+    assert cold.exit_code == changed_unrelated_mapping.exit_code == 0
+    assert "misses=1" in cold.stderr
+    assert "hits=1" in changed_unrelated_mapping.stderr
+
+
 def test_nested_profiles_per_file_settings_and_ignores_retain_cli_parity(tmp_path: Path) -> None:
     nested = tmp_path / "nested"
     nested.mkdir()

@@ -4,6 +4,8 @@ Fix is not available.
 
 Rule must by default be explicitly selected, unless it is removed from `require-explicit`.
 
+Rule applies only when `source-context` is `module`.
+
 ## What it does
 Checks for private package initializer files that are missing a module docstring.
 

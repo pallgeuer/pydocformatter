@@ -37,7 +37,7 @@ import pydocformatter.rules.registration as rule_registration
 from pydocformatter import file_selection, formatter, rules_selection
 from pydocformatter.cli import settings_check
 from pydocformatter.cli.global_args import GlobalArgs
-from pydocformatter.cli.settings_check import CheckSettings, DocstringBlankLineStyle, DocstringConvention, DocstringMissingDocumentation, IndentStyle, LineEnding
+from pydocformatter.cli.settings_check import CheckSettings, DocstringBlankLineStyle, DocstringConvention, DocstringMissingDocumentation, IndentStyle, LineEnding, SourceLanguage
 from pydocformatter.formatter import FormatterResult
 from pydocformatter.rules import suppressions
 from pydocformatter.rules.codes import RuleCode
@@ -88,6 +88,7 @@ def disk_request(path: str, *, fix: bool, write: bool, collect_clean_snapshot: b
     return formatter.DiskFormatRequest(
         path=path,
         settings=CheckSettings(),
+        source_language=SourceLanguage.PYTHON,
         execution_plan=rule_selection.execution_plan_for_path(path),
         source_path=SourcePathContext.for_path(path),
         fix=fix,
@@ -100,7 +101,7 @@ def _patch_disk_formatter(mocker: MockerFixture, side_effect: Callable[..., Form
     """Patch the evidence-producing disk formatter around a result-only test fake."""
 
     def adapter(request: formatter.DiskFormatRequest) -> formatter.DiskFormatResult:
-        rule_selection = rules_selection.RuleSelection(rules=request.execution_plan.selected_rules, per_file_ignores=(), errors=(), collection=request.execution_plan.collection)
+        rule_selection = rules_selection.RuleSelection(candidate_rules=request.execution_plan.selected_rules, per_file_ignores=(), errors=(), collection=request.execution_plan.collection)
         result = side_effect(request.path, file=None, settings=request.settings, rule_selection=rule_selection, fix=request.fix, write=request.write)
         return formatter.DiskFormatResult(result=result, clean_snapshot=None)
 
@@ -110,7 +111,7 @@ def _patch_disk_formatter(mocker: MockerFixture, side_effect: Callable[..., Form
 def isolated_rule_selection(*categories: type[rule_base.RuleCategoryBase], fixable: bool = True, fixable_by_code: dict[RuleCode, bool] | None = None) -> rules_selection.RuleSelection:
     collection = rule_collection.RuleCollection(categories)
     return rules_selection.RuleSelection(
-        rules=tuple(
+        candidate_rules=tuple(
             rules_selection.SelectedRule(
                 rule=rule_class.meta, fixable=fixable_by_code.get(rule_class.meta.code, fixable) if fixable_by_code is not None else fixable, enabled_priority=0, enabled_specificity=0
             )
@@ -183,6 +184,7 @@ def test_stream_formatter_requires_open_file_and_cannot_write() -> None:
     signature = inspect.signature(formatter.format_stream)
 
     assert signature.parameters["file"].default is inspect.Parameter.empty
+    assert signature.parameters["apply_language_defaults"].default is True
     assert "write" not in signature.parameters
 
 
@@ -190,6 +192,7 @@ def test_rule_source_formatter_requires_precomputed_rule_selection() -> None:
     signature = inspect.signature(formatter.format_source)
 
     assert signature.parameters["rule_selection"].default is inspect.Parameter.empty
+    assert signature.parameters["apply_language_defaults"].default is True
 
 
 def test_max_fix_iterations_is_thirty() -> None:
@@ -664,7 +667,7 @@ def test_rule_runner_fails_closed_when_initial_source_alignment_is_unprovable() 
     assert result.fixed_findings == ()
     assert result.unfixed_findings == ()
     assert len(result.errors) == 1
-    assert result.errors[0].startswith("a.py: Exact source could not be aligned safely with LibCST rendering:")
+    assert result.errors[0].render().startswith("a.py: Exact source could not be aligned safely with LibCST rendering:")
 
 
 def test_formatter_right_biases_duplicate_omitted_footer_trivia() -> None:
@@ -709,8 +712,8 @@ def test_rule_runner_rolls_back_when_post_fix_source_alignment_is_unprovable(moc
         raise rule_runner._SourceAlignmentError("forced post-fix mismatch")
 
     def run_fix_pass_with_prior_error(module: cst.Module, **kwargs: typing.Any) -> rule_runner._FixPassResult:
-        errors = typing.cast("list[str]", kwargs["errors"])
-        errors.append("a.py: earlier automatic fix failed")
+        errors = typing.cast("list[rule_runner.RuleOperationalError]", kwargs["errors"])
+        errors.append(rule_runner.RuleOperationalError("a.py: earlier automatic fix failed"))
         return original_run_fix_pass(module, **kwargs)
 
     mocker.patch.object(rule_runner, "_module_source_seed_for_parsed_source", side_effect=fail_parsed_source_seed)
@@ -734,7 +737,7 @@ def test_rule_runner_rolls_back_when_post_fix_source_alignment_is_unprovable(moc
     assert not result.source_changed
     assert result.fixed_findings == ()
     assert result.unfixed_findings == (RuleFinding(rule=TST001InsertLeadingLine.meta, line_numbers=(1,), instance_fixable=None),)
-    assert result.errors == ("a.py: earlier automatic fix failed", "a.py: Exact source could not be aligned safely with LibCST rendering: forced post-fix mismatch")
+    assert tuple(error.render() for error in result.errors) == ("a.py: earlier automatic fix failed", "a.py: Exact source could not be aligned safely with LibCST rendering: forced post-fix mismatch")
 
 
 def test_rule_runner_retains_exact_source_after_seeded_fix_replaces_module(mocker: MockerFixture) -> None:
@@ -937,9 +940,7 @@ def test_rule_source_formatter_runs_fix_pass_when_precheck_finds_fixable_finding
     assert fix_calls == []
 
 
-def test_rule_source_formatter_discards_precheck_errors_when_falling_back() -> None:
-    fix_calls: list[str] = []
-
+def test_rule_source_formatter_applies_unrelated_fixes_when_precheck_fails() -> None:
     class TST(rule_base.RuleCategoryBase):
         meta = rule_models.RuleCategoryMetadata(prefix="TST", name="test", url=None)
 
@@ -961,15 +962,30 @@ def test_rule_source_formatter_discards_precheck_errors_when_falling_back() -> N
             del cls, context
             raise RuntimeError("broken check")
 
+    @rule_registration.register_rule_to(TST)
+    class TST002InsertLeadingLine(rule_base.RuleBase):
+        meta = rule_models.RuleMetadata(
+            code=rule_codes.RuleCode("TST002"),
+            name="insert-leading-line",
+            message="Insert leading line",
+            fix_availability=rule_models.FixAvailability.ALWAYS,
+            stable_since="1.0.0",
+            setting_effects=(),
+            incompatible_with=(),
+            check_kind=rule_models.RuleCheckKind.STANDARD,
+        )
+
+        violations = classmethod(insert_leading_line_violations)
+
     settings = CheckSettings()
     result = formatter.format_source("x = 1\n", "a.py", settings=settings, rule_selection=isolated_rule_selection(TST), fix=True)
 
-    assert result.new_source == "x = 1\n"
-    assert not result.modified
-    assert result.fixed_findings == collections.Counter()
+    assert result.new_source == "\nx = 1\n"
+    assert result.modified
+    assert result.fixed_findings == collections.Counter({TST002InsertLeadingLine.meta: 1})
     assert result.unfixed_findings == ()
-    assert result.errors == ("a.py: TST001 automatic fix failed: broken check", "a.py: TST001 check failed: broken check")
-    assert fix_calls == []
+    assert result.errors[-1] == "a.py: TST001 check failed: broken check"
+    assert all(error == "a.py: TST001 automatic fix failed: broken check" for error in result.errors[:-1])
 
 
 def test_rule_fix_pass_same_module_noop_skips_source_comparison(mocker: MockerFixture) -> None:
@@ -1004,7 +1020,7 @@ def test_rule_fix_pass_same_module_noop_skips_source_comparison(mocker: MockerFi
     settings = CheckSettings()
     selection = isolated_rule_selection(TST)
     selected_rule_by_code = {selected_rule.rule.code: selected_rule for selected_rule in selection.for_path("a.py")}
-    errors: list[str] = []
+    errors: list[rule_runner.RuleOperationalError] = []
     source_seed = rule_runner._module_source_seed(module, source="x = 1\n")
     mocker.patch.object(cst.Module, "code", new=property(_raise_code_access))
     pass_result = rule_runner._run_fix_pass(
@@ -1064,7 +1080,7 @@ def test_rule_fix_pass_rejects_same_source_reported_fix(mocker: MockerFixture) -
     settings = CheckSettings()
     selection = isolated_rule_selection(TST)
     selected_rule_by_code = {selected_rule.rule.code: selected_rule for selected_rule in selection.for_path("a.py")}
-    errors: list[str] = []
+    errors: list[rule_runner.RuleOperationalError] = []
     mocker.patch.object(cst.Module, "code", new=property(_count_code_access))
     pass_result = rule_runner._run_fix_pass(
         module,
@@ -1083,7 +1099,7 @@ def test_rule_fix_pass_rejects_same_source_reported_fix(mocker: MockerFixture) -
     assert result_module is module
     assert findings == ()
     assert not changed
-    assert errors == ["a.py: TST001 automatic fix must change source if and only if it reports fixed findings"]
+    assert [error.render() for error in errors] == ["a.py: TST001 automatic fix must change source if and only if it reports fixed findings"]
     assert len(code_accesses) >= 1
 
 
@@ -1112,7 +1128,7 @@ def test_rule_fix_pass_does_not_apply_suppressed_violations() -> None:
     settings = CheckSettings()
     selection = isolated_rule_selection(TST)
     selected_rule_by_code = {selected_rule.rule.code: selected_rule for selected_rule in selection.for_path("a.py")}
-    errors: list[str] = []
+    errors: list[rule_runner.RuleOperationalError] = []
 
     pass_result = rule_runner._run_fix_pass(
         module,
@@ -1160,7 +1176,7 @@ def test_rule_check_pass_rejects_finding_outside_source() -> None:
     settings = CheckSettings()
     selection = isolated_rule_selection(TST)
     selected_rule_by_code = {selected_rule.rule.code: selected_rule for selected_rule in selection.for_path("a.py")}
-    errors: list[str] = []
+    errors: list[rule_runner.RuleOperationalError] = []
 
     findings = rule_runner._run_check_pass(
         module,
@@ -1174,7 +1190,7 @@ def test_rule_check_pass_rejects_finding_outside_source() -> None:
     )
 
     assert findings == ()
-    assert errors == ["a.py: TST001 check returned a finding outside the source line range"]
+    assert [error.render() for error in errors] == ["a.py: TST001 check returned a finding outside the source line range"]
 
 
 def test_rule_fix_pass_rejects_violation_fixability_mismatch() -> None:
@@ -1221,7 +1237,7 @@ def test_rule_fix_pass_rejects_violation_fixability_mismatch() -> None:
     settings = CheckSettings()
     selection = isolated_rule_selection(TST)
     selected_rule_by_code = {selected_rule.rule.code: selected_rule for selected_rule in selection.for_path("a.py")}
-    errors: list[str] = []
+    errors: list[rule_runner.RuleOperationalError] = []
 
     pass_result = rule_runner._run_fix_pass(
         module,
@@ -1240,7 +1256,7 @@ def test_rule_fix_pass_rejects_violation_fixability_mismatch() -> None:
     assert result_module is module
     assert findings == ()
     assert not changed
-    assert errors == [
+    assert [error.render() for error in errors] == [
         "a.py: TST001 automatic fix returned a violation whose fix does not match finding fixability",
         "a.py: TST002 automatic fix returned a violation whose fix does not match finding fixability",
     ]
@@ -1273,7 +1289,7 @@ def test_rule_fix_pass_rejects_mismatched_source_change_targets() -> None:
     settings = CheckSettings()
     selection = isolated_rule_selection(TST)
     selected_rule_by_code = {selected_rule.rule.code: selected_rule for selected_rule in selection.for_path("a.py")}
-    errors: list[str] = []
+    errors: list[rule_runner.RuleOperationalError] = []
 
     pass_result = rule_runner._run_fix_pass(
         module,
@@ -1292,7 +1308,7 @@ def test_rule_fix_pass_rejects_mismatched_source_change_targets() -> None:
     assert result_module is module
     assert findings == ()
     assert not changed
-    assert errors == ["a.py: TST001 automatic fix returned source changes whose line targets do not match the finding"]
+    assert [error.render() for error in errors] == ["a.py: TST001 automatic fix returned source changes whose line targets do not match the finding"]
 
 
 def test_rule_check_pass_reuses_position_metadata_across_categories(mocker: MockerFixture) -> None:
@@ -1355,7 +1371,7 @@ def test_rule_check_pass_reuses_position_metadata_across_categories(mocker: Mock
     settings = CheckSettings()
     selection = isolated_rule_selection(TST, TSW)
     selected_rule_by_code = {selected_rule.rule.code: selected_rule for selected_rule in selection.for_path("a.py")}
-    errors: list[str] = []
+    errors: list[rule_runner.RuleOperationalError] = []
     mocker.patch.object(cst_metadata.MetadataWrapper, "resolve", autospec=True, side_effect=_count_position_resolve)
     findings = rule_runner._run_check_pass(
         module,
@@ -1408,7 +1424,7 @@ def test_rule_check_pass_reports_position_metadata_errors_as_category_preparatio
     settings = CheckSettings()
     selection = isolated_rule_selection(TST)
     selected_rule_by_code = {selected_rule.rule.code: selected_rule for selected_rule in selection.for_path("a.py")}
-    errors: list[str] = []
+    errors: list[rule_runner.RuleOperationalError] = []
     mocker.patch.object(cst_metadata.MetadataWrapper, "resolve", autospec=True, side_effect=_raise_position_resolve)
     findings = rule_runner._run_check_pass(
         module,
@@ -1422,7 +1438,7 @@ def test_rule_check_pass_reports_position_metadata_errors_as_category_preparatio
     )
 
     assert findings == ()
-    assert errors == ["a.py: TST category preparation failed: position metadata failed"]
+    assert [error.render() for error in errors] == ["a.py: TST category preparation failed: position metadata failed"]
 
 
 def test_rule_fix_pass_reuses_position_metadata_across_unchanged_categories(mocker: MockerFixture) -> None:
@@ -1485,7 +1501,7 @@ def test_rule_fix_pass_reuses_position_metadata_across_unchanged_categories(mock
     settings = CheckSettings()
     selection = isolated_rule_selection(TST, TSW)
     selected_rule_by_code = {selected_rule.rule.code: selected_rule for selected_rule in selection.for_path("a.py")}
-    errors: list[str] = []
+    errors: list[rule_runner.RuleOperationalError] = []
     mocker.patch.object(cst_metadata.MetadataWrapper, "resolve", autospec=True, side_effect=_count_position_resolve)
     pass_result = rule_runner._run_fix_pass(
         module,
@@ -1517,7 +1533,9 @@ def test_rule_checks_fixes_and_rebuilt_contexts_reuse_one_source_path(mocker: Mo
     category_context = mocker.spy(rule_runner, "_category_context")
 
     selection = rules_selection.select_rules(settings)
-    result = formatter._format_source_plan('"""Summary"""\n', "a.py", settings=settings, execution_plan=selection.execution_plan_for_path("a.py"), fix=True, source_path=source_path)
+    result = formatter._format_source_plan(
+        '"""Summary"""\n', "a.py", settings=settings, source_language=SourceLanguage.PYTHON, execution_plan=selection.execution_plan_for_path("a.py"), fix=True, source_path=source_path
+    )
 
     assert result.new_source == '"""Summary."""\n'
     assert category_context.call_count >= 3
@@ -1633,7 +1651,7 @@ def test_rule_fix_pass_reports_position_metadata_errors_as_category_preparation(
     settings = CheckSettings()
     selection = isolated_rule_selection(TST)
     selected_rule_by_code = {selected_rule.rule.code: selected_rule for selected_rule in selection.for_path("a.py")}
-    errors: list[str] = []
+    errors: list[rule_runner.RuleOperationalError] = []
     mocker.patch.object(cst_metadata.MetadataWrapper, "resolve", autospec=True, side_effect=_raise_position_resolve)
     pass_result = rule_runner._run_fix_pass(
         module,
@@ -1652,7 +1670,7 @@ def test_rule_fix_pass_reports_position_metadata_errors_as_category_preparation(
     assert result_module is module
     assert findings == ()
     assert not changed
-    assert errors == ["a.py: TST category preparation failed: position metadata failed"]
+    assert [error.render() for error in errors] == ["a.py: TST category preparation failed: position metadata failed"]
 
 
 def test_rule_fix_pass_refreshes_position_metadata_after_changed_module(mocker: MockerFixture) -> None:
@@ -1724,7 +1742,7 @@ def test_rule_fix_pass_refreshes_position_metadata_after_changed_module(mocker: 
     settings = CheckSettings()
     selection = isolated_rule_selection(TST, TSW)
     selected_rule_by_code = {selected_rule.rule.code: selected_rule for selected_rule in selection.for_path("a.py")}
-    errors: list[str] = []
+    errors: list[rule_runner.RuleOperationalError] = []
     mocker.patch.object(cst_metadata.MetadataWrapper, "resolve", autospec=True, side_effect=_count_position_resolve)
     pass_result = rule_runner._run_fix_pass(
         module,
@@ -2315,8 +2333,10 @@ def test_disk_formatter_delegates_to_resolved_source_plan(mocker: MockerFixture)
         target.write_text("x = 1\n", encoding="utf-8")
         called_args: list[tuple[str, str, bool]] = []
 
-        def fake_format_source(source: str, path: str, *, settings: CheckSettings, execution_plan: rules_selection.RuleExecutionPlan, fix: bool, source_path: SourcePathContext) -> FormatterResult:
-            del settings, execution_plan, source_path
+        def fake_format_source(
+            source: str, path: str, *, settings: CheckSettings, source_language: SourceLanguage, execution_plan: rules_selection.RuleExecutionPlan, fix: bool, source_path: SourcePathContext
+        ) -> FormatterResult:
+            del settings, source_language, execution_plan, source_path
             called_args.append((source, path, fix))
             return FormatterResult(path=path, old_source=source, new_source=source, modified=False, fixed_findings=collections.Counter(), unfixed_findings=(), errors=())
 
@@ -2335,8 +2355,10 @@ def test_disk_formatter_writes_modified_fix_result(mocker: MockerFixture) -> Non
         target = root / "a.py"
         target.write_text("x = 1\n", encoding="utf-8")
 
-        def fake_format_source(source: str, path: str, *, settings: CheckSettings, execution_plan: rules_selection.RuleExecutionPlan, fix: bool, source_path: SourcePathContext) -> FormatterResult:
-            del source, settings, execution_plan, fix, source_path
+        def fake_format_source(
+            source: str, path: str, *, settings: CheckSettings, source_language: SourceLanguage, execution_plan: rules_selection.RuleExecutionPlan, fix: bool, source_path: SourcePathContext
+        ) -> FormatterResult:
+            del source, settings, source_language, execution_plan, fix, source_path
             return FormatterResult(path=path, old_source="x = 1\n", new_source="x = 2\n", modified=True, fixed_findings=collections.Counter({PDF101_RULE: 1}), unfixed_findings=(), errors=())
 
         mocker.patch("pydocformatter.formatter._format_source_plan", side_effect=fake_format_source, autospec=True)
@@ -2354,8 +2376,10 @@ def test_disk_formatter_can_skip_modified_fix_write(mocker: MockerFixture) -> No
         target = root / "a.py"
         target.write_text("x = 1\n", encoding="utf-8")
 
-        def fake_format_source(source: str, path: str, *, settings: CheckSettings, execution_plan: rules_selection.RuleExecutionPlan, fix: bool, source_path: SourcePathContext) -> FormatterResult:
-            del source, settings, execution_plan, fix, source_path
+        def fake_format_source(
+            source: str, path: str, *, settings: CheckSettings, source_language: SourceLanguage, execution_plan: rules_selection.RuleExecutionPlan, fix: bool, source_path: SourcePathContext
+        ) -> FormatterResult:
+            del source, settings, source_language, execution_plan, fix, source_path
             return FormatterResult(path=path, old_source="x = 1\n", new_source="x = 2\n", modified=True, fixed_findings=collections.Counter({PDF101_RULE: 1}), unfixed_findings=(), errors=())
 
         mocker.patch("pydocformatter.formatter._format_source_plan", side_effect=fake_format_source, autospec=True)
@@ -2386,8 +2410,10 @@ def test_disk_formatter_formats_each_received_path_without_deduplicating(mocker:
         target.write_text("x = 1\n", encoding="utf-8")
         called_paths: list[str] = []
 
-        def fake_format_source(source: str, path: str, *, settings: CheckSettings, execution_plan: rules_selection.RuleExecutionPlan, fix: bool, source_path: SourcePathContext) -> FormatterResult:
-            del source, settings, execution_plan, fix, source_path
+        def fake_format_source(
+            source: str, path: str, *, settings: CheckSettings, source_language: SourceLanguage, execution_plan: rules_selection.RuleExecutionPlan, fix: bool, source_path: SourcePathContext
+        ) -> FormatterResult:
+            del source, settings, source_language, execution_plan, fix, source_path
             called_paths.append(path)
             return FormatterResult(path=path, old_source="", new_source="", modified=False, fixed_findings=collections.Counter(), unfixed_findings=(), errors=())
 
@@ -2420,7 +2446,9 @@ def test_check_formatter_applies_per_file_settings_without_reselecting_rules(moc
         _patch_disk_formatter(mocker, fake_format_file)
         check_command.format_selected_files((selected_file,), rule_selections={profile.key(): rule_selection}, use_stdin=False, fix=False, write=False, parallelism=1)
 
-    assert calls == [(100, rule_selection)]
+    assert len(calls) == 1
+    assert calls[0][0] == 100
+    assert calls[0][1].rules == rule_selection.rules
 
 
 @pytest.mark.isolated_cwd

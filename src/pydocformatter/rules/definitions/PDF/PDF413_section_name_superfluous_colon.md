@@ -117,7 +117,7 @@ def value():
 
 When PDF405 is selected together with PDF413, the formatter converges this kind of malformed section into a full NumPy section. PDF413 removes the colon first, which exposes the section name to a later fix pass; PDF405 then inserts the dashed underline:
 
-```python
+```python pydocfmt-skip
 def related():
     """Return related references.
 
@@ -128,7 +128,7 @@ def related():
 
 becomes:
 
-```python
+```python pydocfmt-skip
 def related():
     """Return related references.
 

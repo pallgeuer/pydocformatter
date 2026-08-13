@@ -61,7 +61,27 @@ def test_pydocfmt_config_prints_all_json() -> None:
     assert output["line-length"]["default"] == "88"
     assert output["docstring-convention"]["default"] == '"pep257"'
     assert output["select"]["value_type"] == "list[str]"
+    assert output["extension"]["default"] == "{}"
+    assert output["extension"]["value_type"] == "dict[str, str]"
     assert output["per-file-ignores"]["value_type"] == "dict[str, list[str]]"
+
+
+def test_pydocfmt_config_describes_custom_extension_mapping() -> None:
+    result = cli_helpers.run_cli(pydocfmt_cli.main, ["pydocfmt", "config", "extension"])
+
+    assert result.exit_code == 0
+    assert "Default value: {}" in result.stdout
+    assert "Type: dict[str, str]" in result.stdout
+    assert '[tool.pydocfmt.extension]\nrpy = "python"\nmdx = "markdown"' in result.stdout
+
+
+@pytest.mark.parametrize("setting", ["source-context", "docstring-missing-documentation"])
+def test_pydocfmt_config_describes_markdown_language_defaults(setting: str) -> None:
+    result = cli_helpers.run_cli(pydocfmt_cli.main, ["pydocfmt", "config", setting])
+
+    assert result.exit_code == 0
+    assert "Sources assigned to Markdown default to" in result.stdout
+    assert "matching per-file settings" in result.stdout
 
 
 def test_pydocfmt_config_rejects_unknown_option() -> None:

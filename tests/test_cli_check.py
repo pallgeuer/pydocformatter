@@ -114,7 +114,7 @@ def _patch_disk_formatter(mocker: MockerFixture, side_effect: Callable[..., Form
     """Patch the evidence-producing disk formatter around a result-only test fake."""
 
     def adapter(request: formatter.DiskFormatRequest) -> formatter.DiskFormatResult:
-        rule_selection = rules_selection.RuleSelection(rules=request.execution_plan.selected_rules, per_file_ignores=(), errors=(), collection=request.execution_plan.collection)
+        rule_selection = rules_selection.RuleSelection(candidate_rules=request.execution_plan.selected_rules, per_file_ignores=(), errors=(), collection=request.execution_plan.collection)
         result = side_effect(request.path, file=None, settings=request.settings, rule_selection=rule_selection, fix=request.fix, write=request.write)
         return formatter.DiskFormatResult(result=result, clean_snapshot=None)
 
@@ -205,7 +205,7 @@ def test_pydocfmt_multiple_globs_before_positional_path_after_separator(mocker: 
     with _make_sample_tree() as td:
         root = Path(td)
 
-        argv = ["pydocfmt", "check", "--show-files", "--include", "*.py,*.txt", "--exclude", "skip.py", "--", str(root)]
+        argv = ["pydocfmt", "check", "--show-files", "--include", "*.py,*.txt", "--extension", "txt:python", "--exclude", "skip.py", "--", str(root)]
         format_file = mocker.patch("pydocformatter.formatter.format_disk_file", autospec=True)
         result = cli_helpers.run_cli(pydocfmt_cli.main, argv)
 
@@ -380,7 +380,11 @@ def test_rule_cli_settings_are_applied(mocker: MockerFixture) -> None:
             "--extend-per-file-ignores",
             '{"generated/*.py" = ["docstring-reflow"]}',
         ]
-        mocker.patch("pydocformatter.rules_selection.select_rules", return_value=mocker.Mock(errors=()), autospec=True)
+        mocker.patch(
+            "pydocformatter.rules_selection.select_rules",
+            return_value=rules_selection.RuleSelection(candidate_rules=(), per_file_ignores=(), errors=(), collection=rule_collection.RuleCollection(())),
+            autospec=True,
+        )
         _patch_disk_formatter(mocker, fake_format)
         result = cli_helpers.run_cli(pydocfmt_cli.main, argv)
 
@@ -505,6 +509,8 @@ def test_pydocfmt_check_help_ignores_invalid_config() -> None:
     assert "--output-file FILE" in output
     assert "--diff" in output
     assert "--stdin-filename FILENAME" in output
+    assert "Python or Markdown files and directories" in output
+    assert "source-language handling" in output
     assert "--config CONFIG" in output
     assert "--line-length LENGTH" in output
     assert "--indent-width WIDTH" in output
@@ -529,6 +535,110 @@ def test_pydocfmt_check_show_settings_prints_resolved_settings() -> None:
     assert 'line-ending = "lf"' in output
     assert 'convention = "pep257"' in output
     assert "respect-gitignore = false" in output
+
+
+def test_pydocfmt_check_show_settings_prints_normalized_extension_map() -> None:
+    result = cli_helpers.run_cli(pydocfmt_cli.main, ["pydocfmt", "check", "--isolated", "--show-settings", "--extension", "RPY:python", "--extension", ".mdx:markdown"])
+
+    assert result.exit_code == 0
+    assert 'extension = {mdx = "markdown", rpy = "python"}' in result.stdout
+
+
+@pytest.mark.parametrize(
+    ("config", "message"),
+    [
+        pytest.param('[tool.pydocfmt.extension]\npy = "python"\n', "must not configure built-in extension", id="builtin"),
+        pytest.param('[tool.pydocfmt.extension]\nmdx = "text"\n', "must be one of", id="language"),
+    ],
+)
+def test_pydocfmt_check_rejects_invalid_extension_configuration(tmp_path: Path, config: str, message: str) -> None:
+    (tmp_path / "pyproject.toml").write_text(config, encoding="utf-8")
+
+    result = cli_helpers.run_cli(pydocfmt_cli.main, ["pydocfmt", "check", "--show-settings"], cwd=tmp_path)
+
+    assert result.exit_code == 2
+    assert "Configuration error" in result.stderr
+    assert message in result.stderr
+
+
+def test_pydocfmt_check_discovers_and_fixes_markdown_python_fences() -> None:
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        target = root / "example.md"
+        target.write_text("# Example\n\n```python\ndef example():\n    '''Return an example.'''\n```\n", encoding="utf-8")
+        (root / "pyproject.toml").write_text('[tool.pydocfmt]\nselect = ["PDF001"]\nrespect-gitignore = false\n', encoding="utf-8")
+        result = cli_helpers.run_cli(pydocfmt_cli.main, ["pydocfmt", "check", "--fix", "--no-cache"], cwd=root)
+        fixed = target.read_text(encoding="utf-8")
+
+    assert result.exit_code == 0
+    assert fixed == '# Example\n\n```python\ndef example():\n    """Return an example."""\n```\n'
+
+
+@pytest.mark.parametrize(("extension", "extension_table"), [("md", ""), ("mdx", '[tool.pydocfmt.extension]\nmdx = "markdown"\n')])
+def test_markdown_language_defaults_suppress_module_only_rules_for_builtin_and_custom_extensions(tmp_path: Path, extension: str, extension_table: str) -> None:
+    target = tmp_path / f"example.{extension}"
+    target.write_text("```python\ndef undocumented():\n    return None\n```\n", encoding="utf-8")
+    (tmp_path / "pyproject.toml").write_text(
+        f'[tool.pydocfmt]\nselect = ["PDF602", "PDF608"]\nsource-context = "module"\ndocstring-missing-documentation = "all-docstrings"\n\n{extension_table}', encoding="utf-8"
+    )
+
+    result = cli_helpers.run_cli(pydocfmt_cli.main, ["pydocfmt", "check", "--no-cache", str(target)], cwd=tmp_path)
+
+    assert result.exit_code == 0
+    assert result.stdout == "All checks passed!\n"
+
+
+def test_command_line_source_context_can_opt_markdown_into_complete_module_rules(tmp_path: Path) -> None:
+    target = tmp_path / "example.md"
+    target.write_text("```python\ndef undocumented():\n    return None\n```\n", encoding="utf-8")
+    argv = [
+        "pydocfmt",
+        "check",
+        "--isolated",
+        "--no-cache",
+        "--select",
+        "PDF602",
+        "--extend-select",
+        "PDF608",
+        "--source-context",
+        "module",
+        "--docstring-missing-documentation",
+        "all-docstrings",
+        str(target),
+    ]
+
+    result = cli_helpers.run_cli(pydocfmt_cli.main, argv)
+
+    assert result.exit_code == 1
+    assert "PDF602" in result.stdout
+    assert "PDF608" in result.stdout
+
+
+def test_pydocfmt_check_fixes_explicit_markdown_path() -> None:
+    with tempfile.TemporaryDirectory() as td:
+        target = Path(td) / "example.md"
+        target.write_text("```python\ndef example():\n    '''Return an example.'''\n```\n", encoding="utf-8")
+        argv = ["pydocfmt", "check", "--isolated", "--no-cache", "--fix", "--select", "PDF001", str(target)]
+
+        result = cli_helpers.run_cli(pydocfmt_cli.main, argv)
+
+        assert result.exit_code == 0
+        assert target.read_text(encoding="utf-8") == '```python\ndef example():\n    """Return an example."""\n```\n'
+
+
+def test_pydocfmt_check_fixes_markdown_files_with_parallel_workers() -> None:
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        source = "```python\ndef example():\n    '''Return an example.'''\n```\n"
+        targets = (root / "first.md", root / "second.md")
+        for target in targets:
+            target.write_text(source, encoding="utf-8")
+        argv = ["pydocfmt", "check", "--isolated", "--no-cache", "--fix", "--parallelism", "2", "--select", "PDF001", str(root)]
+
+        result = cli_helpers.run_cli(pydocfmt_cli.main, argv)
+
+        assert result.exit_code == 0
+        assert all('"""Return an example."""' in target.read_text(encoding="utf-8") for target in targets)
 
 
 @pytest.mark.parametrize(
@@ -996,6 +1106,24 @@ def test_format_selected_files_runs_real_process_pool_for_disk_files() -> None:
     assert [result.errors for result in batch.results] == [(), ()]
 
 
+def test_format_selected_files_process_pool_dispatches_custom_markdown_extensions() -> None:
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        first = root / "a.mdx"
+        second = root / "b.mdx"
+        source = "```python\ndef example():\n    '''Return an example.'''\n```\n"
+        first.write_text(source, encoding="utf-8")
+        second.write_text(source, encoding="utf-8")
+        profile = _profile(CheckSettings(parallelism=2.0, extension=(("mdx", "markdown"),), select=("PDF001",)))
+        selected_files = (file_selection.SelectedFile(path=str(first), profile=profile), file_selection.SelectedFile(path=str(second), profile=profile))
+        rule_selections = {profile.key(): rules_selection.select_rules(profile.settings, profile=profile)}
+
+        batch = check_command.format_selected_files(selected_files, rule_selections=rule_selections, use_stdin=False, fix=False, write=True, parallelism=2.0)
+
+    assert [result.errors for result in batch.results] == [(), ()]
+    assert [[finding.rule.code.tag for finding in result.unfixed_findings] for result in batch.results] == [["PDF001"], ["PDF001"]]
+
+
 def test_format_selected_files_keeps_single_disk_file_sequential(mocker: MockerFixture) -> None:
     profile = _profile(CheckSettings(parallelism=2.0))
     selected_files = (file_selection.SelectedFile(path="a.py", profile=profile),)
@@ -1097,8 +1225,9 @@ def test_pydocfmt_clean_diff_output_file_writes_success_message() -> None:
 def test_pydocfmt_diff_stdin_uses_stdin_filename_in_diff_headers(mocker: MockerFixture) -> None:
     source = "x = 1\n"
 
-    def fake_format(path: str, *, file: TextIO, settings: CheckSettings, rule_selection: RuleSelection, fix: bool) -> FormatterResult:
+    def fake_format(path: str, *, file: TextIO, settings: CheckSettings, rule_selection: RuleSelection, fix: bool, apply_language_defaults: bool) -> FormatterResult:
         del settings, rule_selection, fix
+        assert not apply_language_defaults
         assert file.read() == source
         return FormatterResult(path=path, old_source=source, new_source="x = 2\n", modified=True, fixed_findings=collections.Counter({PDF101_RULE: 1}), unfixed_findings=(), errors=())
 
@@ -1111,12 +1240,176 @@ def test_pydocfmt_diff_stdin_uses_stdin_filename_in_diff_headers(mocker: MockerF
     assert "+++ virtual.py" in result.stdout
 
 
+def test_pydocfmt_named_markdown_stdin_uses_fenced_source_handling() -> None:
+    source = "```python\ndef example():\n    '''Return an example.'''\n```\n"
+    expected = source.replace("'''Return an example.'''", '"""Return an example."""')
+    argv = ["pydocfmt", "check", "--isolated", "--no-cache", "--fix", "--select", "PDF001", "--stdin-filename", "virtual.md", "-"]
+
+    result = cli_helpers.run_cli(pydocfmt_cli.main, argv, stdin=source)
+
+    assert result.exit_code == 0
+    assert result.stdout == expected
+    assert "virtual.md" in result.stderr
+
+
+def test_pydocfmt_named_markdown_stdin_honors_explicit_module_context() -> None:
+    source = "```python\ndef undocumented():\n    return None\n```\n"
+    argv = [
+        "pydocfmt",
+        "check",
+        "--isolated",
+        "--no-cache",
+        "--select",
+        "PDF602",
+        "--extend-select",
+        "PDF608",
+        "--source-context",
+        "module",
+        "--docstring-missing-documentation",
+        "all-docstrings",
+        "--stdin-filename",
+        "virtual.md",
+        "-",
+    ]
+
+    result = cli_helpers.run_cli(pydocfmt_cli.main, argv, stdin=source)
+
+    assert result.exit_code == 1
+    assert "PDF602" in result.stdout
+    assert "PDF608" in result.stdout
+
+
+def test_pydocfmt_named_stdin_uses_custom_markdown_extension() -> None:
+    source = "```python\ndef example():\n    '''Return an example.'''\n```\n"
+    expected = source.replace("'''Return an example.'''", '"""Return an example."""')
+    argv = ["pydocfmt", "check", "--isolated", "--no-cache", "--fix", "--select", "PDF001", "--extension", "mdx:markdown", "--stdin-filename", "virtual.mdx", "-"]
+
+    result = cli_helpers.run_cli(pydocfmt_cli.main, argv, stdin=source)
+
+    assert result.exit_code == 0
+    assert result.stdout == expected
+    assert "virtual.mdx" in result.stderr
+
+
+def test_pydocfmt_named_stdin_uses_custom_python_extension() -> None:
+    source = "def example():\n    '''Return an example.'''\n"
+    expected = source.replace("'''Return an example.'''", '"""Return an example."""')
+    argv = ["pydocfmt", "check", "--isolated", "--no-cache", "--fix", "--select", "PDF001", "--extension", "rpy:python", "--stdin-filename", "virtual.rpy", "-"]
+
+    result = cli_helpers.run_cli(pydocfmt_cli.main, argv, stdin=source)
+
+    assert result.exit_code == 0
+    assert result.stdout == expected
+    assert "virtual.rpy" in result.stderr
+
+
+def test_pydocfmt_named_stdin_rejects_unmapped_extension() -> None:
+    result = cli_helpers.run_cli(pydocfmt_cli.main, ["pydocfmt", "check", "--isolated", "--no-cache", "--stdin-filename", "virtual.txt", "-"], stdin="not Python\n")
+
+    assert result.exit_code == 1
+    assert "Cannot determine the source language for virtual.txt" in result.stdout
+    assert "extension '.txt'" in result.stdout
+
+
+@pytest.mark.parametrize(
+    ("extension", "language", "source", "expected"),
+    [
+        pytest.param("rpy", "python", "def example():\n    '''Return an example.'''\n", 'def example():\n    """Return an example."""\n', id="python"),
+        pytest.param("mdx", "markdown", "```python\ndef example():\n    '''Return an example.'''\n```\n", '```python\ndef example():\n    """Return an example."""\n```\n', id="markdown"),
+    ],
+)
+def test_pydocfmt_explicit_custom_extensions_dispatch_by_configured_language(tmp_path: Path, extension: str, language: str, source: str, expected: str) -> None:
+    target = tmp_path / f"example.{extension}"
+    target.write_text(source, encoding="utf-8")
+    argv = ["pydocfmt", "check", "--isolated", "--no-cache", "--fix", "--select", "PDF001", "--extension", f"{extension}:{language}", str(target)]
+
+    result = cli_helpers.run_cli(pydocfmt_cli.main, argv)
+
+    assert result.exit_code == 0
+    assert target.read_text(encoding="utf-8") == expected
+
+
+def test_custom_extension_assignment_is_separate_from_directory_discovery(tmp_path: Path) -> None:
+    target = tmp_path / "example.mdx"
+    target.write_text("```python\nvalue = 1\n```\n", encoding="utf-8")
+    base = ["pydocfmt", "check", "--isolated", "--show-files", "--extension", "mdx:markdown"]
+
+    mapping_only = cli_helpers.run_cli(pydocfmt_cli.main, [*base, str(tmp_path)])
+    discovered = cli_helpers.run_cli(pydocfmt_cli.main, [*base, "--extend-include", "*.mdx", str(tmp_path)])
+
+    assert mapping_only.exit_code == 0
+    assert mapping_only.stdout.splitlines() == [f"{target} IGNORED: does not match include patterns"]
+    assert discovered.exit_code == 0
+    assert discovered.stdout.splitlines() == [f"{target} INCLUDED"]
+
+
+@pytest.mark.parametrize(
+    ("extension", "language", "source", "expected"),
+    [
+        pytest.param("rpy", "python", "def example():\n    '''Return an example.'''\n", 'def example():\n    """Return an example."""\n', id="python"),
+        pytest.param("mdx", "markdown", "```python\ndef example():\n    '''Return an example.'''\n```\n", '```python\ndef example():\n    """Return an example."""\n```\n', id="markdown"),
+    ],
+)
+def test_pydocfmt_directory_discovery_formats_mapped_custom_extensions(tmp_path: Path, extension: str, language: str, source: str, expected: str) -> None:
+    target = tmp_path / f"example.{extension}"
+    target.write_text(source, encoding="utf-8")
+    argv = ["pydocfmt", "check", "--isolated", "--no-cache", "--fix", "--select", "PDF001", "--extension", f"{extension}:{language}", "--extend-include", f"*.{extension}", str(tmp_path)]
+
+    result = cli_helpers.run_cli(pydocfmt_cli.main, argv)
+
+    assert result.exit_code == 0
+    assert target.read_text(encoding="utf-8") == expected
+
+
+def test_show_files_reports_included_extension_without_language_mapping(tmp_path: Path) -> None:
+    target = tmp_path / "example.mdx"
+    target.write_text("```python\nvalue = 1\n```\n", encoding="utf-8")
+
+    result = cli_helpers.run_cli(pydocfmt_cli.main, ["pydocfmt", "check", "--isolated", "--show-files", "--extend-include", "*.mdx", str(tmp_path)])
+
+    assert result.exit_code == 1
+    assert f"{target} INCLUDED" in result.stdout
+    assert "Cannot determine the source language" in result.stdout
+    assert "extension '.mdx'" in result.stdout
+
+
+def test_unknown_explicit_extension_does_not_block_or_modify_mapped_files(tmp_path: Path) -> None:
+    unknown = tmp_path / "unknown.txt"
+    python = tmp_path / "example.py"
+    unknown.write_text("leave unchanged\n", encoding="utf-8")
+    python.write_text("def example():\n    '''Return an example.'''\n", encoding="utf-8")
+    argv = ["pydocfmt", "check", "--isolated", "--no-cache", "--fix", "--select", "PDF001", str(unknown), str(python)]
+
+    result = cli_helpers.run_cli(pydocfmt_cli.main, argv)
+
+    assert result.exit_code == 1
+    assert "Cannot determine the source language" in result.stdout
+    assert unknown.read_text(encoding="utf-8") == "leave unchanged\n"
+    assert python.read_text(encoding="utf-8") == 'def example():\n    """Return an example."""\n'
+
+
+def test_pydocfmt_markdown_diff_previews_without_writing() -> None:
+    with tempfile.TemporaryDirectory() as td:
+        target = Path(td) / "example.md"
+        source = "```python\ndef example():\n    '''Return an example.'''\n```\n"
+        target.write_text(source, encoding="utf-8")
+        argv = ["pydocfmt", "check", "--isolated", "--no-cache", "--diff", "--select", "PDF001", str(target)]
+
+        result = cli_helpers.run_cli(pydocfmt_cli.main, argv)
+
+        assert result.exit_code == 1
+        assert target.read_text(encoding="utf-8") == source
+        assert "-    '''Return an example.'''" in result.stdout
+        assert '+    """Return an example."""' in result.stdout
+
+
 def test_pydocfmt_stdin_filename_sets_display_path_and_ignores_paths(mocker: MockerFixture) -> None:
     source = 'def foo():\n    """This is a very long single-line docstring that should be reflowed by the formatter due to line length."""\n    pass\n'
     called_paths: list[str] = []
 
-    def fake_format(path: str, *, file: TextIO, settings: CheckSettings, rule_selection: RuleSelection, fix: bool) -> FormatterResult:
+    def fake_format(path: str, *, file: TextIO, settings: CheckSettings, rule_selection: RuleSelection, fix: bool, apply_language_defaults: bool) -> FormatterResult:
         del settings, rule_selection, fix
+        assert not apply_language_defaults
         called_paths.append(path)
         assert file.read() == source
         return FormatterResult(path=path, old_source=source, new_source=source, modified=False, fixed_findings=collections.Counter(), unfixed_findings=(), errors=())
@@ -1168,8 +1461,9 @@ def test_pydocfmt_fix_stdin_writes_formatted_source_to_stdout(mocker: MockerFixt
     source = 'def foo():\n    """Does something.\n\nArgs:\n    x (int): some parameter.\n    """\n    pass\n'
     formatted_source = 'def foo():\n    """Does something.\n\n    Args:\n        x (int): some parameter.\n    """\n    pass\n'
 
-    def fake_format(path: str, *, file: TextIO, settings: CheckSettings, rule_selection: RuleSelection, fix: bool) -> FormatterResult:
+    def fake_format(path: str, *, file: TextIO, settings: CheckSettings, rule_selection: RuleSelection, fix: bool, apply_language_defaults: bool) -> FormatterResult:
         del path, settings, rule_selection
+        assert not apply_language_defaults
         assert fix
         assert file.read() == source
         return FormatterResult(path="-", old_source=source, new_source=formatted_source, modified=True, fixed_findings=collections.Counter({PDF101_RULE: 1}), unfixed_findings=(), errors=())
@@ -1190,8 +1484,9 @@ def test_pydocfmt_fix_stdin_with_output_file_writes_diagnostics_to_file(mocker: 
         source = 'def foo():\n    """Does something."""\n    pass\n'
         formatted_source = 'def foo():\n    """Does something better."""\n    pass\n'
 
-        def fake_format(path: str, *, file: TextIO, settings: CheckSettings, rule_selection: RuleSelection, fix: bool) -> FormatterResult:
+        def fake_format(path: str, *, file: TextIO, settings: CheckSettings, rule_selection: RuleSelection, fix: bool, apply_language_defaults: bool) -> FormatterResult:
             del path, settings, rule_selection
+            assert not apply_language_defaults
             assert fix
             assert file.read() == source
             return FormatterResult(path="-", old_source=source, new_source=formatted_source, modified=True, fixed_findings=collections.Counter({PDF101_RULE: 1}), unfixed_findings=(), errors=())

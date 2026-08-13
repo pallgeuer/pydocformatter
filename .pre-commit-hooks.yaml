@@ -1,17 +1,19 @@
 - id: pydocfmt-check
   name: pydocfmt (check)
-  description: 'Check Python docstrings and comments with pydocfmt'
+  description: 'Check Python docstrings and comments in Python and Markdown files with pydocfmt'
   entry: pydocfmt check
   language: python
-  types: [python]
-  minimum_pre_commit_version: '0.15.0'
+  types_or: [python, pyi, markdown]
+  files: (?i)\.(?:py|pyi|pyw|md)$
+  minimum_pre_commit_version: '2.9.0'
   additional_dependencies: []
 
 - id: pydocfmt-fix
   name: pydocfmt (fix)
-  description: 'Format and check Python docstrings and comments with pydocfmt'
+  description: 'Format and check Python docstrings and comments in Python and Markdown files with pydocfmt'
   entry: pydocfmt check --fix
   language: python
-  types: [python]
-  minimum_pre_commit_version: '0.15.0'
+  types_or: [python, pyi, markdown]
+  files: (?i)\.(?:py|pyi|pyw|md)$
+  minimum_pre_commit_version: '2.9.0'
   additional_dependencies: []

@@ -26,7 +26,7 @@ import pydocformatter.cache.fingerprint as cache_fingerprint
 from pydocformatter import file_selection, formatter, rules_selection
 from pydocformatter.cache.models import CacheStats, CleanProof
 from pydocformatter.cli import settings_check
-from pydocformatter.cli.settings_check import CheckSettings, OutputFormat
+from pydocformatter.cli.settings_check import CheckSettings, OutputFormat, SourceLanguage
 from pydocformatter.rules.models import RuleCacheBehavior
 from pydocformatter.settings import ARGUMENT_SOURCE_PRIORITY, SettingsProfile
 from pydocformatter.source_path import SourcePathContext, SourcePathContextBuilder
@@ -78,6 +78,7 @@ def _disk_request(path: Path, settings: CheckSettings, selection: rules_selectio
     return formatter.DiskFormatRequest(
         path=str(path),
         settings=settings,
+        source_language=SourceLanguage.PYTHON,
         execution_plan=selection.execution_plan_for_path(str(path)),
         source_path=SourcePathContext.for_path(str(path)),
         fix=fix,
@@ -1123,9 +1124,19 @@ def test_process_pool_receives_only_lean_worker_requests(tmp_path: Path) -> None
         executor_factory=typing.cast("check_command._ExecutorFactory", ImmediateExecutor),
     )
 
-    assert tuple(field.name for field in dataclasses.fields(formatter.DiskFormatRequest)) == ("path", "settings", "execution_plan", "source_path", "fix", "write", "collect_clean_snapshot")
+    assert tuple(field.name for field in dataclasses.fields(formatter.DiskFormatRequest)) == (
+        "path",
+        "settings",
+        "source_language",
+        "execution_plan",
+        "source_path",
+        "fix",
+        "write",
+        "collect_clean_snapshot",
+    )
     assert tuple(request.path for request in received) == tuple(str(target) for target in targets)
     assert all(request.settings is settings for request in received)
+    assert all(request.source_language is SourceLanguage.PYTHON for request in received)
     assert all(not request.collect_clean_snapshot for request in received)
     assert all(not request.execution_plan.collection.categories or request.execution_plan.collection is selection.collection for request in received)
     assert tuple(result.path for result in batch.results) == tuple(str(target) for target in targets)
@@ -1139,7 +1150,7 @@ def test_uncacheable_selected_rule_bypasses_lookup_population_and_cache_only_fin
     profile = _profile(settings, tmp_path)
     selection = rules_selection.select_rules(settings, profile=profile)
     uncacheable_rule = dataclasses.replace(selection.rules[0].rule, cache_behavior=RuleCacheBehavior.UNCACHEABLE)
-    uncacheable_selection = dataclasses.replace(selection, rules=(dataclasses.replace(selection.rules[0], rule=uncacheable_rule),))
+    uncacheable_selection = dataclasses.replace(selection, candidate_rules=(dataclasses.replace(selection.rules[0], rule=uncacheable_rule),))
     selected_file = file_selection.SelectedFile(path=str(target), profile=profile)
     engine_fingerprint = mocker.patch("pydocformatter.cache.fingerprint.engine_fingerprint", side_effect=AssertionError("fully uncacheable runs must not construct an engine key"), autospec=True)
     analysis_fingerprint = mocker.patch("pydocformatter.cache.fingerprint.analysis_fingerprint", side_effect=AssertionError("uncacheable files must not construct an analysis key"), autospec=True)

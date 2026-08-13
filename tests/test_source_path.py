@@ -15,7 +15,7 @@ import pytest
 # First-party imports
 import pydocformatter.cache.fingerprint as cache_fingerprint
 from pydocformatter import formatter, rules_selection, source_path
-from pydocformatter.cli.settings_check import CheckSettings
+from pydocformatter.cli.settings_check import CheckSettings, SourceLanguage
 from pydocformatter.rules.definition_helpers import missing_documentation
 from pydocformatter.source_path import SourcePathContext, SourcePathContextBuilder
 
@@ -180,7 +180,9 @@ def test_path_sensitive_rules_match_with_implicit_and_precomputed_context(tmp_pa
     context = SourcePathContext.for_path(str(target))
 
     implicit = formatter.format_source("", str(target), settings=settings, rule_selection=selection, fix=False)
-    precomputed = formatter._format_source_plan("", str(target), settings=settings, execution_plan=selection.execution_plan_for_path(str(target)), fix=False, source_path=context)
+    precomputed = formatter._format_source_plan(
+        "", str(target), settings=settings, source_language=SourceLanguage.PYTHON, execution_plan=selection.execution_plan_for_path(str(target)), fix=False, source_path=context
+    )
 
     assert implicit == precomputed
     assert tuple(finding.rule.code.tag for finding in implicit.unfixed_findings) == ("PDF602",)

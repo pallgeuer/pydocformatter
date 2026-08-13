@@ -152,10 +152,10 @@ def rule_fix_result(rule_class: type[RuleBase], context: RuleContext) -> DirectR
     fixable_violations = tuple(violation for violation in validated_rule_violations(rule_class, context) if violation.fix is not None)
     if not fixable_violations:
         return DirectRuleFixOutcome(module=context.module, source=context.source)
-    errors: list[str] = []
+    errors: list[rule_runner.RuleOperationalError] = []
     changes = rule_runner._planned_source_changes_for_violations(rule_class, fixable_violations, path=context.path, source_line_count=len(context.source_lines), errors=errors)
     if errors or changes is None:
-        raise AssertionError("; ".join(errors) or "Direct rule test source-fix validation failed")
+        raise AssertionError("; ".join(error.render() for error in errors) or "Direct rule test source-fix validation failed")
     applied_changes = rule_edits.apply_context_source_changes(context, changes)
     return DirectRuleFixOutcome(module=applied_changes.module, source=applied_changes.source, fixed_findings=tuple(violation.finding for violation in fixable_violations))
 
@@ -173,10 +173,10 @@ def validated_rule_violations(rule_class: type[RuleBase], context: RuleContext) 
     Raises:
         AssertionError: Raised when runner validation reports malformed violations.
     """
-    errors: list[str] = []
+    errors: list[rule_runner.RuleOperationalError] = []
     violations = rule_runner._validated_rule_violations(
         rule_class, rule_class.violations(context), path=context.path, operation="direct rule test", source_line_count=len(context.source_lines), errors=errors
     )
     if errors:
-        raise AssertionError("; ".join(errors))
+        raise AssertionError("; ".join(error.render() for error in errors))
     return violations

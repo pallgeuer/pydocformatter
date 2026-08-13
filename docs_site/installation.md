@@ -77,10 +77,14 @@ repos:
         name: pydocfmt (check)
         entry: uv run pydocfmt check --force-exclude
         language: system
-        types: [python]
+        types_or: [python, pyi, markdown]
+        files: (?i)\.(?:py|pyi|pyw|md)$
       # - id: pydocfmt-fix
       #   name: pydocfmt (fix)
       #   entry: uv run pydocfmt check --fix --force-exclude
       #   language: system
-      #   types: [python]
+      #   types_or: [python, pyi, markdown]
+      #   files: (?i)\.(?:py|pyi|pyw|md)$
 ```
+
+The `types_or` filter retains files that identify recognizes as Python or Markdown, while the case-insensitive filename filter admits the built-in `.py`, `.pyi`, `.pyw`, and `.md` forms. Local hooks using `types_or` require pre-commit 2.9.0 or newer. Projects that configure custom extensions must override the hook filename filter; see [Integrations](integrations.md#custom-extensions) for the required `types_or` handling.

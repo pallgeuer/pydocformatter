@@ -44,9 +44,10 @@ Rule classes register with their category through `@register_rule_to(PDF)`. Rule
 - `setting_effects`: Immutable metadata mapping resolved setting fields and triggering values to `Ignored` or `Disabled` selection effects.
 - `incompatible_with`: An immutable tuple of `RuleCode` values for rules that cannot be selected together with this rule.
 - `check_kind`: A `RuleCheckKind` value used to distinguish standard source-check rules from suppression-audit rules during rule collection and execution ordering.
+- `source_contexts`: A non-empty immutable tuple of unique `SourceContext` values declaring whether the rule is semantically applicable to complete modules, standalone fragments, or both. Valid input is normalized to enum declaration order, so equivalent context sets have identical metadata and display output regardless of caller order.
 - `allows_directive_self_suppression`: Whether a local bracket selector may suppress a finding reported on its own directive line. This is false by default and enabled only for representation policies whose finding is about that selector.
 
-`RuleBase` rejects subclasses without `meta`, or with non-`RuleMetadata` metadata, at class definition time. `RuleMetadata` rejects non-`RuleCode` codes, non-`FixAvailability` fix availability values, non-`RuleCheckKind` check kinds, non-Boolean self-suppression capabilities, invalid or empty names, empty messages or stable versions, malformed setting-effect records, malformed incompatibility tuples, and duplicate incompatible codes. Collection construction rejects duplicate names across the complete catalog and exact rule codes that would also act as broad selectors for another collected rule. Category registration rejects rules whose code prefix differs from the category prefix and rejects duplicate rule codes from different classes.
+`RuleBase` rejects subclasses without `meta`, or with non-`RuleMetadata` metadata, at class definition time. `RuleMetadata` rejects non-`RuleCode` codes, non-`FixAvailability` fix availability values, non-`RuleCheckKind` check kinds, empty, duplicate, or invalid source-context tuples, non-Boolean self-suppression capabilities, invalid or empty names, empty messages or stable versions, malformed setting-effect records, malformed incompatibility tuples, and duplicate incompatible codes. It canonicalizes valid source-context tuples before collection validation and public display. Collection construction rejects duplicate names across the complete catalog, exact rule codes that would also act as broad selectors for another collected rule, and mutually incompatible rules with different source-context applicability. Category registration rejects rules whose code prefix differs from the category prefix and rejects duplicate rule codes from different classes.
 
 ## Rule codes
 
@@ -154,6 +155,25 @@ After normal `select` and `ignore` precedence is resolved, each selected rule's 
 - Setting effects do not change effective fixability.
 - A metadata field name that is not present on `CheckSettings` is a programming error identifying the rule and unknown field.
 
+## Source-context applicability
+
+After selector resolution and setting effects, pydocfmt removes rules whose `source_contexts` metadata does not contain the effective `source-context`. Applicability is a semantic constraint rather than a preference: exact code or canonical-name selection cannot restore an inapplicable rule.
+
+Rules support both `module` and `fragment` by default. Complete-module ownership, public/private module identity, and policies requiring documentation for definitions in a real module make some rules inapplicable to fragments.
+
+The following exhaustive list identifies the built-in module-only rules:
+
+- PDF510, PDF511, PDF513, PDF515, PDF517, PDF520, PDF521, PDF524, PDF525, PDF529
+- PDF600, PDF601, PDF602, PDF603, PDF604, PDF605, PDF606, PDF607, PDF608, PDF609, PDF610, PDF611, PDF612, PDF613, PDF614, PDF615
+
+Some rules that could plausibly require a complete module remain applicable to fragments.
+
+The following non-exhaustive list highlights built-in rules that remain applicable to fragments:
+
+- PDF528, PDF616, PDF716, PDF717, PDF718, PDF719
+
+A class defined in an example has a coherent local attribute inventory, while checks concerning existing documentation, signatures, and declarations do not require the fragment to be an importable module.
+
 ## Global rule selection
 
 Defaults:
@@ -233,7 +253,7 @@ Examples:
 
 ## Per-file settings boundary
 
-Per-file settings are specified in [Settings specification](settings_spec.md). They are intentionally outside rule selection: they apply after global rule selection, do not re-run selector resolution, and cannot change which rules are active. `pydocfmt check --show-rules` therefore remains global/cwd-oriented and does not apply path-specific per-file setting overrides.
+Language-aware Markdown defaults and per-file settings are specified in [Settings specification](settings_spec.md). They apply after global selector resolution and do not re-run selector matching, setting effects, explicit-selection gates, or incompatibility resolution. The effective path-specific `source-context` applies hard source-context metadata to the globally resolved candidate rules before per-file ignores, so it can remove inapplicable rules or retain module-only rules that were filtered from the global display context. `pydocfmt check --show-rules` remains global/cwd-oriented and does not apply path-specific language defaults or per-file setting overrides.
 
 ## CLI list options
 

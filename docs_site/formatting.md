@@ -10,7 +10,7 @@ The formatter targets docstrings and comments, and does not replace the use of a
 
 ## Scope
 
-pydocformatter can rewrite safely mapped docstring literals, standalone comments, trailing comments, directive comments, blank lines, quote placement, indentation, section spacing, and supported documentation entries.
+pydocformatter can rewrite safely mapped docstring literals, standalone comments, trailing comments, directive comments, blank lines, quote placement, indentation, section spacing, and supported documentation entries. In Markdown it applies the same rules within supported fenced Python blocks while preserving surrounding text and other fences. Add `pydocfmt-skip` after a supported fence language for an intentionally malformed or deliberately nonconforming example. See [Markdown source](reference/markdown-source.md) for the complete contract.
 
 Rules that cannot safely rewrite a finding still report diagnostics. The [Rules](rules.md) page shows fix availability for each rule.
 
@@ -33,7 +33,7 @@ indent-width = 4
 
 Start with a docstring that needs summary cleanup, description wrapping, and argument description normalization:
 
-```python
+```python pydocfmt-skip
 def describe_metric(name: str, value: float) -> str:
     """return a normalized metric label
 

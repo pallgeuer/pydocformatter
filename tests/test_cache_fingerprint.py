@@ -43,6 +43,7 @@ _ALTERNATE_DIRECT_ANALYSIS_VALUES = {
     "line_ending": settings_check.LineEnding.LF,
     "indent_style": settings_check.IndentStyle.TAB,
     "indent_width": 2,
+    "source_context": settings_check.SourceContext.FRAGMENT,
     "docstring_convention": settings_check.DocstringConvention.GOOGLE,
     "docstring_blank_line_style": settings_check.DocstringBlankLineStyle.ALIGNED,
     "docstring_blank_line_after_last_section": True,
@@ -84,6 +85,7 @@ _ALTERNATE_EXCLUDED_VALUES = {
     "cache": False,
     "cache_dir": "alternate-cache",
     "parallelism": 2.0,
+    "extension": (("rpy", "python"),),
     "include": ("*.pyw",),
     "extend_include": ("*.pyw",),
     "exclude": ("build",),
@@ -193,15 +195,23 @@ def test_analysis_settings_encoding_names_every_direct_field_and_no_other_field(
     identity = settings_check.analysis_settings_identity(profile)
     encoded = cache_fingerprint.canonical_bytes(identity)
     direct_fields = tuple(field for field, _ in identity)
-    expected_direct_fields = tuple(definition.field for definition in settings_check.DIRECT_ANALYSIS_DEFINITIONS)
+    expected_direct_fields = ("source_language", *(definition.field for definition in settings_check.DIRECT_ANALYSIS_DEFINITIONS))
 
     assert direct_fields == expected_direct_fields
-    assert set(_ALTERNATE_DIRECT_ANALYSIS_VALUES) == set(expected_direct_fields)
+    assert set(_ALTERNATE_DIRECT_ANALYSIS_VALUES) == set(expected_direct_fields) - {"source_language"}
     for field in dataclasses.fields(settings_check.CheckSettings):
         if field.name in expected_direct_fields:
             assert json.dumps(field.name).encode() in encoded
         else:
             assert json.dumps(field.name).encode() not in encoded
+
+
+def test_resolved_source_language_changes_analysis_settings_key(tmp_path: Path) -> None:
+    profile = _loaded_profile(tmp_path)
+    python_identity = settings_check.analysis_settings_identity(profile, source_language=settings_check.SourceLanguage.PYTHON)
+    markdown_identity = settings_check.analysis_settings_identity(profile, source_language=settings_check.SourceLanguage.MARKDOWN)
+
+    assert cache_fingerprint.analysis_settings_key(python_identity) != cache_fingerprint.analysis_settings_key(markdown_identity)
 
 
 @pytest.mark.parametrize(("field", "alternate"), _ALTERNATE_DIRECT_ANALYSIS_VALUES.items())

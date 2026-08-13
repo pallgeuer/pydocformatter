@@ -63,6 +63,7 @@ from pydocformatter.rules.models import RuleSettingEffect
 if TYPE_CHECKING:
     # First-party imports
     from pydocformatter.rules.definition import RuleBase, RuleCategoryBase
+    from pydocformatter.rules.models import RuleMetadata
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -81,6 +82,7 @@ DEVEL_DOCS_DIR = ROOT / "docs" / "devel"
 REFERENCE_DOCS = {
     pathlib.Path("docs/public/cache_spec.md"): pathlib.Path("reference/cache.md"),
     pathlib.Path("docs/public/file_selection_spec.md"): pathlib.Path("reference/file-selection.md"),
+    pathlib.Path("docs/public/markdown_spec.md"): pathlib.Path("reference/markdown-source.md"),
     pathlib.Path("docs/public/rule_selection_spec.md"): pathlib.Path("reference/rule-selection.md"),
     pathlib.Path("docs/public/rule_suppressions.md"): pathlib.Path("reference/rule-suppressions.md"),
     pathlib.Path("docs/public/settings_spec.md"): pathlib.Path("reference/settings-spec.md"),
@@ -411,6 +413,8 @@ def _write_rules_index(rule_pages: tuple[RulePage, ...]) -> None:
         "- `Convention opt-in`: Removed by every `docstring-convention` value. Ignored conventions can be restored by exact rule-code selection, while disabled conventions cannot.",
         "- `Setting-gated`: Default selection depends on a setting other than `docstring-convention`.",
         "",
+        "The `Source contexts` column shows whether a rule applies to complete Python modules, standalone fragments, or both. Context applicability is a hard semantic boundary; exact rule selection does not restore an inapplicable rule.",
+        "",
     ))
     page_by_code = {page.code: page for page in rule_pages}
     for category_class in rule_collection.RULE_COLLECTION.categories:
@@ -453,12 +457,12 @@ def _write_category_page(category_class: type[RuleCategoryBase], rule_pages: tup
 
 def _extend_rule_table(lines: list[str], rule_classes: tuple[type[RuleBase], ...], page_by_code: dict[str, RulePage], *, rule_link_prefix: str) -> None:
     """Append generated rule table rows."""
-    lines.extend(('<div class="pydocformatter-rule-table-wrapper" markdown="1">', "", "| Code | Name | Summary | Fix available | Enabled |", "| --- | --- | --- | --- | --- |"))
+    lines.extend(('<div class="pydocformatter-rule-table-wrapper" markdown="1">', "", "| Code | Name | Summary | Fix available | Enabled | Source contexts |", "| --- | --- | --- | --- | --- | --- |"))
     for rule_class in rule_classes:
         rule = rule_class.meta
         page = page_by_code[rule.code.tag]
         columns = [f"[`{rule.code}`]({rule_link_prefix}{page.slug}.md)", f"`{rule.name}`", _escape_table_cell(rule.message)]
-        columns.extend((rule.fix_availability.value, _enabled_text(rule_class)))
+        columns.extend((rule.fix_availability.value, _enabled_text(rule_class), _source_contexts_text(rule)))
         lines.append(f"| {' | '.join(columns)} |")
     lines.extend(("", "</div>"))
 
@@ -490,6 +494,7 @@ def _write_rule_page(rule_class: type[RuleBase], page: RulePage, *, previous_pag
         f'<span class="pydocformatter-badge">Added in {rule.stable_since}</span>',
         f'<span class="pydocformatter-badge">{rule.fix_availability.value} fix</span>',
         f'<span class="pydocformatter-badge">{_enabled_text(rule_class)}</span>',
+        f'<span class="pydocformatter-badge">{_source_contexts_text(rule)}</span>',
         "</div>",
         "",
         f"Part of the [{rule.code.prefix} rule category]({rule.code.prefix.lower()}.md).",
@@ -501,6 +506,12 @@ def _write_rule_page(rule_class: type[RuleBase], page: RulePage, *, previous_pag
         *_rule_nav_lines(previous_page=previous_page, next_page=next_page, position="bottom"),
     ]
     _write_generated_markdown(page.path, "\n".join(lines).rstrip() + "\n")
+
+
+def _source_contexts_text(rule: RuleMetadata) -> str:
+    """Return concise source-context applicability text for one rule."""
+    labels = {"module": "Module", "fragment": "Fragment"}
+    return " and ".join(labels[source_context.value] for source_context in rule.source_contexts)
 
 
 def _rule_nav_lines(*, previous_page: RulePage | None, next_page: RulePage | None, position: str = "top") -> tuple[str, ...]:
@@ -765,6 +776,7 @@ def _nav() -> list[Any]:
             "Reference": [
                 {"Persistent cache": "reference/cache.md"},
                 {"File selection": "reference/file-selection.md"},
+                {"Markdown source": "reference/markdown-source.md"},
                 {"Rule selection": "reference/rule-selection.md"},
                 {"Rule suppressions": "reference/rule-suppressions.md"},
                 {"Settings specification": "reference/settings-spec.md"},
@@ -999,6 +1011,8 @@ def _type_text(value_type: object) -> str:
     """Return compact public type text for a setting value."""
     if value_type is settings_core.StringList:
         return "list[str]"
+    if value_type is settings_core.StringMap:
+        return "dict[str, str]"
     if value_type is settings_core.MultiStringMap:
         return "dict[str, list[str]]"
     if value_type is settings_core.PerFileSettingsMap:

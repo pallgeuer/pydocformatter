@@ -2,6 +2,8 @@
 
 Fix is not available.
 
+Rule applies only when `source-context` is `module`.
+
 ## What it does
 Checks for public top-level classes that are missing docstrings.
 

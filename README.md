@@ -7,7 +7,7 @@
 [![Documentation](https://github.com/pallgeuer/pydocformatter/actions/workflows/build_deploy_docs.yml/badge.svg)](https://github.com/pallgeuer/pydocformatter/actions/workflows/build_deploy_docs.yml)
 [![License: GPL-3.0-or-later](https://img.shields.io/badge/license-GPL--3.0--or--later-blue.svg)](https://www.gnu.org/licenses/gpl-3.0.html)
 
-pydocformatter is a rule-based linter and source formatter for Python docstrings and comments. Its `pydocfmt` command reports precise rule findings, applies fixes when source changes are safe, and leaves ambiguous or content-creating decisions to the author.
+pydocformatter is a rule-based linter and source formatter for Python docstrings and comments, including those in fenced Python blocks in Markdown. Its `pydocfmt` command reports precise rule findings, applies fixes when source changes are safe, and leaves ambiguous or content-creating decisions to the author.
 
 pydocformatter handles documentation and comment source; it does not format ordinary Python expressions or statements. Use it alongside [Ruff](https://docs.astral.sh/ruff/) or another general Python formatter.
 
@@ -16,6 +16,7 @@ pydocformatter handles documentation and comment source; it does not format ordi
 - Reflows docstring and comment prose, normalizes source layout, and preserves supported structured regions such as doctests, code fences, directives, lists, tables, and block quotes.
 - Understands PEP 257, Google, NumPy, and reStructuredText docstring conventions, including semantic sections and documented parameters, returns, yields, exceptions, and attributes.
 - Formats standalone and trailing comments while protecting recognized type-checker, linter, formatter, security, and IDE directives.
+- Checks and formats supported `python`, `py`, and `python3` fenced blocks in Markdown while preserving surrounding text.
 - Selects independently documented PCF comment rules and PDF docstring rules, with per-rule diagnostics and explicit fix availability.
 - Uses Ruff-style configuration, file discovery, selectors, per-file ignores, fixability controls, source suppressions, and inspection commands.
 - Preserves evaluated docstring values for source-literal rewrites that require semantic equivalence, while content-formatting rules may intentionally change docstring whitespace, and avoids automatic changes when the intended source rewrite or missing documentation cannot be inferred safely.
@@ -59,7 +60,7 @@ See [Installation](https://pallgeuer.github.io/pydocformatter/installation/) for
 
 ## Quick start
 
-Run pydocformatter from a project root to check discovered Python files without changing them:
+Run pydocformatter from a project root to check discovered Python and Markdown files without changing them:
 
 ```bash
 uv run pydocfmt check
@@ -99,6 +100,18 @@ line-length = 88
 
 [tool.pydocfmt.docstring]
 convention = "google"
+```
+
+Sources assigned to Markdown automatically use `source-context = "fragment"` and `docstring-missing-documentation = "has-section"`. These language-aware defaults avoid complete-module and missing-definition assumptions while retaining checks for documentation that an example contains, and they apply to custom Markdown extensions too. Matching per-file settings can opt selected files into complete-module semantics. Add `pydocfmt-skip` after a supported fence language for an intentionally malformed or deliberately nonconforming block.
+
+By default, `.py`, `.pyi`, and `.pyw` select Python handling, while `.md` selects Markdown handling. Map an additional extension separately from directory discovery when a project needs one:
+
+```toml
+[tool.pydocfmt]
+extend-include = ["*.mdx"]
+
+[tool.pydocfmt.extension]
+mdx = "markdown"
 ```
 
 Inspect the resolved configuration, discovered files, and active rules before changing source:

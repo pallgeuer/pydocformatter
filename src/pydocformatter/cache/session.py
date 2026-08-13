@@ -5,6 +5,7 @@ from __future__ import annotations
 
 # Standard library imports
 import stat
+import typing
 import pathlib
 import dataclasses
 
@@ -17,7 +18,7 @@ import pydocformatter.cache.fingerprint as cache_fingerprint
 from pydocformatter import formatter
 from pydocformatter.cache.models import CacheStats
 from pydocformatter.cli import settings_check
-from pydocformatter.cli.settings_check import CheckSettings
+from pydocformatter.cli.settings_check import CheckSettings, SourceLanguage
 from pydocformatter.rules.models import RuleCacheBehavior
 from pydocformatter.rules_selection import RuleExecutionPlan
 from pydocformatter.source_path import SourcePathContext
@@ -31,6 +32,7 @@ class CacheCandidate:
         index (int): Original selected-file result index.
         path (str): Display and filesystem path.
         profile (settings_core.SettingsProfile[CheckSettings]): Effective settings profile for direct analysis.
+        source_language (SourceLanguage | None): Resolved source language, or None for an unmapped filename.
         execution_plan (RuleExecutionPlan): Final path-specific rule execution plan.
         source_path (SourcePathContext): Precomputed source-path semantics.
         selection_succeeded (bool): Whether rule selection completed without operational errors.
@@ -41,6 +43,7 @@ class CacheCandidate:
     index: int
     path: str
     profile: settings_core.SettingsProfile[CheckSettings]
+    source_language: SourceLanguage | None
     execution_plan: RuleExecutionPlan
     source_path: SourcePathContext
     selection_succeeded: bool
@@ -153,7 +156,10 @@ class CacheSession:
             policy_eligible = (False,) * len(candidates)
         else:
             policy_eligible = tuple(
-                candidate.selection_succeeded and all(selected.rule.cache_behavior is RuleCacheBehavior.FILE_LOCAL for selected in candidate.execution_plan.selected_rules) for candidate in candidates
+                candidate.source_language is not None
+                and candidate.selection_succeeded
+                and all(selected.rule.cache_behavior is RuleCacheBehavior.FILE_LOCAL for selected in candidate.execution_plan.selected_rules)
+                for candidate in candidates
             )
         if self._profile is not None and any(policy_eligible):
             preparation_errors += self._initialize_runtime()
@@ -164,7 +170,8 @@ class CacheSession:
             identity: cache_coordinator.CacheIdentity | None = None
             if eligible and runtime is not None:
                 try:
-                    settings_identity = settings_check.analysis_settings_identity(candidate.profile)
+                    source_language = typing.cast("SourceLanguage", candidate.source_language)
+                    settings_identity = settings_check.analysis_settings_identity(candidate.profile, source_language=source_language)
                     rule_identity = tuple(selected.rule.code.tag for selected in candidate.execution_plan.selected_rules)
                     semantic_identity = (settings_identity, rule_identity)
                 except (OSError, UnicodeError, TypeError, ValueError):
@@ -188,6 +195,7 @@ class CacheSession:
             format_request = formatter.DiskFormatRequest(
                 path=candidate.path,
                 settings=candidate.profile.settings,
+                source_language=candidate.source_language,
                 execution_plan=candidate.execution_plan,
                 source_path=candidate.source_path,
                 fix=candidate.fix,

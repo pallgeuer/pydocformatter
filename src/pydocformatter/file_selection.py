@@ -1,4 +1,4 @@
-"""File discovery and filtering for checkable Python sources.
+"""File discovery and filtering for checkable Python and Markdown sources.
 
 Attributes:
     STDIN_VIRTUAL_FILE (str): CLI path sentinel that requests formatting source text read from standard input instead of

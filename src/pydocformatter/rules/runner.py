@@ -26,7 +26,7 @@ import pydocformatter.rules.violations as rule_violations
 from pydocformatter.rules import line_targets, suppressions
 from pydocformatter.rules.definition import RuleCategoryContext, RuleContext
 from pydocformatter.rules.definition_helpers import directives, source_text
-from pydocformatter.rules.models import RuleCheckKind, RuleFinding
+from pydocformatter.rules.models import RuleCheckKind, RuleFinding, RuleMetadata
 
 
 if TYPE_CHECKING:
@@ -35,7 +35,6 @@ if TYPE_CHECKING:
     from pydocformatter.rules.codes import RuleCode
     from pydocformatter.rules.collection import RuleCollection
     from pydocformatter.rules.definition import RuleBase, RuleCategoryBase
-    from pydocformatter.rules.models import RuleMetadata
     from pydocformatter.rules_selection import RuleExecutionPlan, SelectedRule
     from pydocformatter.source_path import SourcePathContext
 
@@ -45,22 +44,64 @@ UTF8_BOM = "\ufeff"
 
 
 @dataclasses.dataclass(frozen=True)
+class RuleErrorLineDetails:
+    """One rule and its source-relative operational-error lines.
+
+    Attributes:
+        rule (RuleMetadata): Rule associated with the operational error.
+        line_numbers (tuple[int, ...]): Sorted one-based source-relative line numbers.
+    """
+
+    rule: RuleMetadata
+    line_numbers: tuple[int, ...]
+
+
+@dataclasses.dataclass(frozen=True)
+class RuleOperationalError:
+    """Structured operational error produced during rule execution.
+
+    Attributes:
+        message (str): Complete error text before optional rule-line details.
+        line_details (tuple[RuleErrorLineDetails, ...]): Rule lines that can be translated to a containing source.
+    """
+
+    message: str
+    line_details: tuple[RuleErrorLineDetails, ...] = ()
+
+    def render(self, *, line_offset: int = 0) -> str:
+        """Render the error with an optional containing-source line offset.
+
+        Args:
+            line_offset (int): Non-negative line offset applied to every structured line number.
+
+        Returns:
+            str: User-visible operational error text.
+        """
+        if not self.line_details:
+            return self.message
+        details = ", ".join(f"{detail.rule.code} lines {', '.join(str(line + line_offset) for line in detail.line_numbers) or 'unknown'}" for detail in self.line_details)
+        return f"{self.message}; likely rules and lines: {details}"
+
+
+@dataclasses.dataclass(frozen=True)
 class RuleRunResult:
     """Result of running selected rules against one parsed module.
 
     Attributes:
         source (str): Exact final source before any LibCST rendering normalization.
+        initial_findings (tuple[RuleFinding, ...]): Findings from the initial source before any fixes are applied.
         fixed_findings (tuple[RuleFinding, ...]): Findings fixed during the run.
         unfixed_findings (tuple[RuleFinding, ...]): Findings still present after checking the final module.
         source_changed (bool): Whether the exact final source differs from the initial source.
-        errors (tuple[str, ...]): Operational errors raised by rule preparation, checking, or fixing.
+        errors (tuple[RuleOperationalError, ...]): Operational errors raised by rule preparation, checking, or fixing.
     """
 
     source: str
+    initial_findings: tuple[RuleFinding, ...]
     fixed_findings: tuple[RuleFinding, ...]
     unfixed_findings: tuple[RuleFinding, ...]
     source_changed: bool
-    errors: tuple[str, ...]
+    errors: tuple[RuleOperationalError, ...]
 
 
 @dataclasses.dataclass(frozen=True)
@@ -126,7 +167,7 @@ def run_rule_plan(
     Returns:
         RuleRunResult: Final source, findings, change state, and operational errors.
     """
-    errors: list[str] = []
+    errors: list[RuleOperationalError] = []
     selected_rules = execution_plan.selected_rules
     selected_rule_by_code = {selected_rule.rule.code: selected_rule for selected_rule in selected_rules}
     fixed_findings: list[RuleFinding] = []
@@ -140,10 +181,12 @@ def run_rule_plan(
         try:
             source_seed = _module_source_seed(module, source=initial_source)
         except _SourceAlignmentError as error:
-            return RuleRunResult(source=initial_source, fixed_findings=(), unfixed_findings=(), source_changed=False, errors=(_source_alignment_error(path, error),))
+            return RuleRunResult(
+                source=initial_source, initial_findings=(), fixed_findings=(), unfixed_findings=(), source_changed=False, errors=(RuleOperationalError(_source_alignment_error(path, error)),)
+            )
     initial_source_seed = source_seed
 
-    def run_check_pass(check_module: cst.Module, check_errors: list[str], *, check_source_seed: _ModuleSourceSeed) -> tuple[RuleFinding, ...]:
+    def run_check_pass(check_module: cst.Module, check_errors: list[RuleOperationalError], *, check_source_seed: _ModuleSourceSeed) -> tuple[RuleFinding, ...]:
         return _run_check_pass(
             check_module,
             path=path,
@@ -157,10 +200,10 @@ def run_rule_plan(
         )
 
     if fix:
-        precheck_errors: list[str] = []
+        precheck_errors: list[RuleOperationalError] = []
         precheck_findings = run_check_pass(module, precheck_errors, check_source_seed=source_seed)
         if not precheck_errors and not any(finding.fixable for finding in precheck_findings):
-            return RuleRunResult(source=source_seed.source, fixed_findings=(), unfixed_findings=precheck_findings, source_changed=False, errors=())
+            return RuleRunResult(source=source_seed.source, initial_findings=precheck_findings, fixed_findings=(), unfixed_findings=precheck_findings, source_changed=False, errors=())
 
         source_iterations = {source_seed.source: (0, 0)}
         for iteration in range(1, MAX_FIX_ITERATIONS + 1):
@@ -178,7 +221,12 @@ def run_rule_plan(
                 )
             except _SourceAlignmentError as error:
                 return RuleRunResult(
-                    source=initial_source_seed.source, fixed_findings=(), unfixed_findings=precheck_findings, source_changed=False, errors=(*errors, _source_alignment_error(path, error))
+                    source=initial_source_seed.source,
+                    initial_findings=precheck_findings,
+                    fixed_findings=(),
+                    unfixed_findings=precheck_findings,
+                    source_changed=False,
+                    errors=(*errors, RuleOperationalError(_source_alignment_error(path, error))),
                 )
             source_seed = pass_result.source_seed
             module = source_seed.module
@@ -196,6 +244,7 @@ def run_rule_plan(
             reached_iteration_limit = True
 
     unfixed_findings = run_check_pass(module, errors, check_source_seed=source_seed)
+    initial_findings = precheck_findings if fix else unfixed_findings
 
     if repeated_source_iterations is not None and any(finding.fixable for finding in unfixed_findings):
         errors.append(
@@ -211,7 +260,12 @@ def run_rule_plan(
         errors.append(_fix_iteration_limit_error(path, last_iteration_findings=last_iteration_findings, unfixed_findings=unfixed_findings))
 
     return RuleRunResult(
-        source=source_seed.source, fixed_findings=tuple(fixed_findings), unfixed_findings=unfixed_findings, source_changed=source_seed.source != initial_source_seed.source, errors=tuple(errors)
+        source=source_seed.source,
+        initial_findings=initial_findings,
+        fixed_findings=tuple(fixed_findings),
+        unfixed_findings=unfixed_findings,
+        source_changed=source_seed.source != initial_source_seed.source,
+        errors=tuple(errors),
     )
 
 
@@ -223,7 +277,7 @@ def _run_fix_pass(
     line_ending: str,
     execution_plan: RuleExecutionPlan,
     selected_rule_by_code: dict[RuleCode, SelectedRule],
-    errors: list[str],
+    errors: list[RuleOperationalError],
     source_path: SourcePathContext,
     source_seed: _ModuleSourceSeed | None = None,
 ) -> _FixPassResult:
@@ -276,14 +330,14 @@ def _run_fix_pass(
                 context = _rule_context(prepared_category)
                 reported_violations = rule_class.violations(context)
             except Exception as error:
-                errors.append(f"{path}: {rule_class.meta.code} automatic fix failed: {error}")
+                errors.append(RuleOperationalError(f"{path}: {rule_class.meta.code} automatic fix failed: {error}"))
                 continue
 
             validated_violations = _validated_rule_violations(rule_class, reported_violations, path=path, operation="automatic fix", source_line_count=source_line_count, errors=errors)
             if not validated_violations:
                 continue
             if pass_context is None:
-                errors.append(f"{path}: {rule_class.meta.code} automatic fix lost source context")
+                errors.append(RuleOperationalError(f"{path}: {rule_class.meta.code} automatic fix lost source context"))
                 continue
             unsuppressed_violations = pass_context.suppression_index.filter_violations(
                 validated_violations, active_category_prefix=prepared_category.prefix, authorized_expression_ranges=prepared_category.suppression_expression_ranges
@@ -297,13 +351,13 @@ def _run_fix_pass(
             try:
                 applied_changes = rule_edits.apply_context_source_changes(prepared_category.context, planned_changes)
             except Exception as error:
-                errors.append(f"{path}: {rule_class.meta.code} automatic fix failed: {error}")
+                errors.append(RuleOperationalError(f"{path}: {rule_class.meta.code} automatic fix failed: {error}"))
                 continue
             fixed_source_seed = _module_source_seed_for_parsed_source(applied_changes.module, applied_changes.source)
             fixed_findings = tuple(violation.finding for violation in fixable_violations)
             result_changed = applied_changes.source != prepared_category.context.source
             if result_changed != bool(fixed_findings):
-                errors.append(f"{path}: {rule_class.meta.code} automatic fix must change source if and only if it reports fixed findings")
+                errors.append(RuleOperationalError(f"{path}: {rule_class.meta.code} automatic fix must change source if and only if it reports fixed findings"))
                 continue
             if result_changed:
                 current_source_seed = fixed_source_seed
@@ -322,7 +376,7 @@ def _run_check_pass(
     line_ending: str,
     execution_plan: RuleExecutionPlan,
     selected_rule_by_code: dict[RuleCode, SelectedRule],
-    errors: list[str],
+    errors: list[RuleOperationalError],
     source_path: SourcePathContext,
     source_seed: _ModuleSourceSeed | None = None,
 ) -> tuple[RuleFinding, ...]:
@@ -358,11 +412,11 @@ def _run_check_pass(
                 context = _rule_context(prepared_category)
                 reported_violations = rule_class.violations(context)
             except Exception as error:
-                errors.append(f"{path}: {rule_class.meta.code} check failed: {error}")
+                errors.append(RuleOperationalError(f"{path}: {rule_class.meta.code} check failed: {error}"))
                 continue
             validated_violations = _validated_rule_violations(rule_class, reported_violations, path=path, operation="check", source_line_count=source_line_count, errors=errors)
             if pass_context is None:
-                errors.append(f"{path}: {rule_class.meta.code} check lost source context")
+                errors.append(RuleOperationalError(f"{path}: {rule_class.meta.code} check lost source context"))
                 continue
             suppression_result = pass_context.suppression_index.filter_violations(
                 validated_violations, active_category_prefix=prepared_category.prefix, authorized_expression_ranges=prepared_category.suppression_expression_ranges
@@ -392,7 +446,7 @@ def _prepare_category(
     settings: CheckSettings,
     line_ending: str,
     rule_collection: RuleCollection,
-    errors: list[str],
+    errors: list[RuleOperationalError],
     source_seed: _ModuleSourceSeed | None = None,
     source_path: SourcePathContext,
 ) -> tuple[_PreparedCategory | None, _ModulePassContext | None]:
@@ -406,7 +460,7 @@ def _prepare_category(
             context=context, data=data, prefix=category_class.meta.prefix, suppression_expression_ranges=frozenset(category_class.suppression_expression_ranges(data))
         ), current_pass_context
     except Exception as error:
-        errors.append(f"{path}: {category_class.meta.prefix} category preparation failed: {error}")
+        errors.append(RuleOperationalError(f"{path}: {category_class.meta.prefix} category preparation failed: {error}"))
         return None, current_pass_context
 
 
@@ -499,50 +553,52 @@ def _rule_context(prepared_category: _PreparedCategory) -> RuleContext:
     )
 
 
-def _validated_rule_violations(rule_class: type[RuleBase], violations: object, *, path: str, operation: str, source_line_count: int, errors: list[str]) -> tuple[rule_violations.RuleViolation, ...]:
+def _validated_rule_violations(
+    rule_class: type[RuleBase], violations: object, *, path: str, operation: str, source_line_count: int, errors: list[RuleOperationalError]
+) -> tuple[rule_violations.RuleViolation, ...]:
     """Validate violations returned by a rule hook or synthesized by the runner."""
     if not isinstance(violations, tuple):
-        errors.append(f"{path}: {rule_class.meta.code} {operation} returned non-tuple violations")
+        errors.append(RuleOperationalError(f"{path}: {rule_class.meta.code} {operation} returned non-tuple violations"))
         return ()
     validated_violations: list[rule_violations.RuleViolation] = []
     for violation in violations:
         if not isinstance(violation, rule_violations.RuleViolation) or violation.finding.rule != rule_class.meta:
-            errors.append(f"{path}: {rule_class.meta.code} {operation} returned a violation for a different rule or an invalid violation")
+            errors.append(RuleOperationalError(f"{path}: {rule_class.meta.code} {operation} returned a violation for a different rule or an invalid violation"))
             return ()
         validated_violations.append(violation)
     validated = tuple(validated_violations)
     try:
         finding_fixabilities = tuple(violation.finding.fixable for violation in validated)
     except ValueError as error:
-        errors.append(f"{path}: {rule_class.meta.code} {operation} returned a finding with unresolved fixability: {error}")
+        errors.append(RuleOperationalError(f"{path}: {rule_class.meta.code} {operation} returned a finding with unresolved fixability: {error}"))
         return ()
     # Rule hooks can only hit this by bypassing RuleViolation construction; keep the runner boundary hardened.
     if not all((violation.fix is not None) == fixable for violation, fixable in zip(validated, finding_fixabilities, strict=True)):
-        errors.append(f"{path}: {rule_class.meta.code} {operation} returned a violation whose fix does not match finding fixability")
+        errors.append(RuleOperationalError(f"{path}: {rule_class.meta.code} {operation} returned a violation whose fix does not match finding fixability"))
         return ()
     invalid_findings = tuple(violation.finding for violation in validated if _finding_has_line_outside_source(violation.finding, source_line_count=source_line_count))
     if invalid_findings:
-        errors.append(f"{path}: {rule_class.meta.code} {operation} returned a finding outside the source line range")
+        errors.append(RuleOperationalError(f"{path}: {rule_class.meta.code} {operation} returned a finding outside the source line range"))
         return ()
     return validated
 
 
 def _planned_source_changes_for_violations(
-    rule_class: type[RuleBase], violations: tuple[rule_violations.RuleViolation, ...], *, path: str, source_line_count: int, errors: list[str]
+    rule_class: type[RuleBase], violations: tuple[rule_violations.RuleViolation, ...], *, path: str, source_line_count: int, errors: list[RuleOperationalError]
 ) -> tuple[rule_edits.PlannedSourceChange, ...] | None:
     """Build and validate source changes for unsuppressed fixable violations."""
     planned_changes: list[rule_edits.PlannedSourceChange] = []
     for violation in violations:
         if violation.fix is None:
-            errors.append(f"{path}: {rule_class.meta.code} automatic fix returned a fixable violation without a source fix")
+            errors.append(RuleOperationalError(f"{path}: {rule_class.meta.code} automatic fix returned a fixable violation without a source fix"))
             return None
         try:
             violation_changes = violation.fix.planned_changes()
         except Exception as error:
-            errors.append(f"{path}: {rule_class.meta.code} automatic fix failed: {error}")
+            errors.append(RuleOperationalError(f"{path}: {rule_class.meta.code} automatic fix failed: {error}"))
             return None
         if not _violation_fix_changes_are_valid(violation, violation_changes, source_line_count=source_line_count):
-            errors.append(f"{path}: {rule_class.meta.code} automatic fix returned source changes whose line targets do not match the finding")
+            errors.append(RuleOperationalError(f"{path}: {rule_class.meta.code} automatic fix returned source changes whose line targets do not match the finding"))
             return None
         planned_changes.extend(violation_changes)
     return tuple(planned_changes)
@@ -593,23 +649,28 @@ def _apply_effective_fixability(finding: RuleFinding, *, selected_rule: Selected
     return finding if selected_rule.fixable else dataclasses.replace(finding, instance_fixable=False)
 
 
-def _fix_iteration_limit_error(path: str, *, last_iteration_findings: tuple[RuleFinding, ...], unfixed_findings: tuple[RuleFinding, ...]) -> str:
+def _fix_iteration_limit_error(path: str, *, last_iteration_findings: tuple[RuleFinding, ...], unfixed_findings: tuple[RuleFinding, ...]) -> RuleOperationalError:
     """Return an operational error describing likely non-converging rules."""
-    likely_rules = _likely_finding_details(last_iteration_findings, unfixed_findings=unfixed_findings)
-    return f"{path}: Automatic fixes did not converge after {MAX_FIX_ITERATIONS} iterations; likely rules and lines: {likely_rules}"
+    return RuleOperationalError(
+        f"{path}: Automatic fixes did not converge after {MAX_FIX_ITERATIONS} iterations", line_details=_likely_finding_details(last_iteration_findings, unfixed_findings=unfixed_findings)
+    )
 
 
-def _fix_repeated_source_error(path: str, *, first_iteration: int, repeated_iteration: int, last_iteration_findings: tuple[RuleFinding, ...], unfixed_findings: tuple[RuleFinding, ...]) -> str:
+def _fix_repeated_source_error(
+    path: str, *, first_iteration: int, repeated_iteration: int, last_iteration_findings: tuple[RuleFinding, ...], unfixed_findings: tuple[RuleFinding, ...]
+) -> RuleOperationalError:
     """Return an operational error describing a repeated automatic-fix source state."""
-    likely_rules = _likely_finding_details(last_iteration_findings, unfixed_findings=unfixed_findings)
     cycle_length = repeated_iteration - first_iteration
-    return f"{path}: Automatic fixes repeated a source state after {repeated_iteration} iterations (cycle length {cycle_length}); likely rules and lines: {likely_rules}"
+    return RuleOperationalError(
+        f"{path}: Automatic fixes repeated a source state after {repeated_iteration} iterations (cycle length {cycle_length})",
+        line_details=_likely_finding_details(last_iteration_findings, unfixed_findings=unfixed_findings),
+    )
 
 
-def _likely_finding_details(last_iteration_findings: tuple[RuleFinding, ...], *, unfixed_findings: tuple[RuleFinding, ...]) -> str:
-    """Return sorted rule and line details for likely non-converging findings."""
+def _likely_finding_details(last_iteration_findings: tuple[RuleFinding, ...], *, unfixed_findings: tuple[RuleFinding, ...]) -> tuple[RuleErrorLineDetails, ...]:
+    """Return structured rule and line details for likely non-converging findings."""
     likely_findings = last_iteration_findings + tuple(finding for finding in unfixed_findings if finding.fixable)
     details: dict[RuleMetadata, set[int]] = collections.defaultdict(set)
     for finding in likely_findings:
         details[finding.rule].update(finding.line_numbers)
-    return ", ".join(f"{rule.code} lines {', '.join(map(str, sorted(lines))) or 'unknown'}" for rule, lines in sorted(details.items())) if details else "unknown"
+    return tuple(RuleErrorLineDetails(rule=rule, line_numbers=tuple(sorted(lines))) for rule, lines in sorted(details.items()))

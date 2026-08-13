@@ -1,4 +1,11 @@
-"""Shared rule metadata and diagnostic models."""
+"""Shared rule metadata and diagnostic models.
+
+Attributes:
+    ALL_SOURCE_CONTEXTS (tuple[SourceContext, ...]): Complete applicability tuple used as the default for rules that
+        support modules and fragments.
+    MODULE_SOURCE_CONTEXTS (tuple[SourceContext, ...]): Restricted applicability tuple used by rules that require
+        complete-module semantics.
+"""
 
 # Future imports
 from __future__ import annotations
@@ -44,6 +51,22 @@ class FixAvailability(enum.StrEnum):
     USUALLY = "Usually"
     SOMETIMES = "Sometimes"
     NEVER = "Never"
+
+
+class SourceContext(enum.StrEnum):
+    """Semantic contexts in which source can be analyzed.
+
+    Attributes:
+        MODULE: Treat the source as a complete importable Python module.
+        FRAGMENT: Treat the source as a standalone Python fragment without complete module or API inventory semantics.
+    """
+
+    MODULE = "module"
+    FRAGMENT = "fragment"
+
+
+ALL_SOURCE_CONTEXTS = tuple(SourceContext)
+MODULE_SOURCE_CONTEXTS = (SourceContext.MODULE,)
 
 
 class RuleCheckKind(enum.StrEnum):
@@ -144,6 +167,8 @@ class RuleMetadata:
         incompatible_with (tuple[RuleCode, ...]): Rule codes that cannot be selected together with this rule.
         check_kind (RuleCheckKind): Check-pass phase used to run the rule.
         cache_behavior (RuleCacheBehavior): Declared dependency behavior for persistent caching.
+        source_contexts (tuple[SourceContext, ...]): Source contexts in which the rule is semantically applicable,
+            normalized to declaration order.
         allows_directive_self_suppression (bool): Whether a local bracket suppression may cover a finding on its own
             directive line.
     """
@@ -157,6 +182,7 @@ class RuleMetadata:
     incompatible_with: tuple[RuleCode, ...]
     check_kind: RuleCheckKind = dataclasses.field(kw_only=True)
     cache_behavior: RuleCacheBehavior = dataclasses.field(default=RuleCacheBehavior.UNCACHEABLE, kw_only=True)
+    source_contexts: tuple[SourceContext, ...] = dataclasses.field(default=ALL_SOURCE_CONTEXTS, kw_only=True)
     allows_directive_self_suppression: bool = dataclasses.field(default=False, kw_only=True)
 
     def __post_init__(self) -> None:
@@ -169,6 +195,15 @@ class RuleMetadata:
             raise TypeError(f"Expected RuleCheckKind, got {type(self.check_kind).__name__}")
         if not isinstance(self.cache_behavior, RuleCacheBehavior):
             raise TypeError(f"Expected RuleCacheBehavior, got {type(self.cache_behavior).__name__}")
+        if not isinstance(self.source_contexts, tuple):
+            raise TypeError(f"{self.code}: Source contexts must be a tuple")
+        if not self.source_contexts:
+            raise ValueError(f"{self.code}: Source contexts must not be empty")
+        if not all(isinstance(source_context, SourceContext) for source_context in self.source_contexts):
+            raise TypeError(f"{self.code}: Source contexts must contain SourceContext instances")
+        if len(set(self.source_contexts)) != len(self.source_contexts):
+            raise ValueError(f"{self.code}: Source contexts must not contain duplicates")
+        object.__setattr__(self, "source_contexts", tuple(source_context for source_context in SourceContext if source_context in self.source_contexts))
         if not isinstance(self.allows_directive_self_suppression, bool):
             raise TypeError(f"Expected bool for allows_directive_self_suppression, got {type(self.allows_directive_self_suppression).__name__}")
         if not self.name:

@@ -15,7 +15,7 @@ import pydocformatter.rules.collection as rule_collection
 from pydocformatter.cli.settings_check import DEFAULT_REQUIRE_EXPLICIT
 from pydocformatter.rules.codes import ALL_RULE_SELECTOR_TAG, RuleCode, RuleSelector
 from pydocformatter.rules.collection import RuleCollection, RuleSelectorResolutionKind
-from pydocformatter.rules.models import FixAvailability, RuleMetadata, RuleSettingEffect
+from pydocformatter.rules.models import FixAvailability, RuleMetadata, RuleSettingEffect, SourceContext
 from pydocformatter.utils import misc
 from pydocformatter.utils.globs import BaseRelativeGlobMatcher
 
@@ -118,44 +118,78 @@ class RuleSelection:
     """Effective rule selection for a resolved settings object.
 
     Attributes:
-        rules (tuple[SelectedRule, ...]): Globally selected rules before per-file ignores are applied.
+        candidate_rules (tuple[SelectedRule, ...]): Canonical globally selected rules before source-context
+            applicability and per-file ignores are applied.
         per_file_ignores (tuple[PerFileRuleIgnore, ...]): Path-specific ignore entries resolved from settings.
         errors (tuple[str, ...]): Non-fatal rule-selection errors to report to the caller.
         collection (RuleCollection): Rule collection that supplied the selectable rule metadata.
+        source_context (SourceContext): Global source context represented by `rules`.
     """
 
-    rules: tuple[SelectedRule, ...]
+    candidate_rules: tuple[SelectedRule, ...]
     per_file_ignores: tuple[PerFileRuleIgnore, ...]
     errors: tuple[str, ...]
     collection: RuleCollection
+    source_context: SourceContext = SourceContext.MODULE
+    _context_rules: tuple[tuple[SelectedRule, ...], ...] = dataclasses.field(init=False, repr=False, compare=False)
 
-    def for_path(self, path: str) -> tuple[SelectedRule, ...]:
+    def __post_init__(self) -> None:
+        """Precompute immutable source-context views from canonical candidates."""
+        object.__setattr__(self, "_context_rules", tuple(tuple(rule for rule in self.candidate_rules if source_context in rule.rule.source_contexts) for source_context in SourceContext))
+
+    @property
+    def rules(self) -> tuple[SelectedRule, ...]:
+        """Globally selected rules in the configured source context.
+
+        Returns:
+            tuple[SelectedRule, ...]: Canonical candidates applicable to the global context.
+        """
+        return self.rules_for_context(self.source_context)
+
+    def rules_for_context(self, source_context: SourceContext) -> tuple[SelectedRule, ...]:
+        """Return the precomputed selected-rule view for a source context.
+
+        Args:
+            source_context (SourceContext): Module or fragment applicability view.
+
+        Returns:
+            tuple[SelectedRule, ...]: Canonically selected rules applicable to the context.
+        """
+        return self._context_rules[tuple(SourceContext).index(source_context)]
+
+    def for_path(self, path: str, *, source_context: SourceContext | None = None) -> tuple[SelectedRule, ...]:
         """Return selected rules after applying per-file ignores to a path.
 
         Args:
             path (str): Source path whose per-file ignore patterns should be evaluated.
+            source_context (SourceContext | None): Effective source context, or the globally resolved context by
+                default.
 
         Returns:
             tuple[SelectedRule, ...]: Globally selected rules with path-specific ignored rules removed.
         """
+        effective_source_context = self.source_context if source_context is None else source_context
+        context_rules = self.rules_for_context(effective_source_context)
         ignored_rule_codes: set[RuleCode] = set()
         for ignore in self.per_file_ignores:
             if ignore.matches(path):
                 ignored_rule_codes.update(ignore.rule_codes)
         if not ignored_rule_codes:
-            return self.rules
-        return tuple(rule for rule in self.rules if rule.rule.code not in ignored_rule_codes)
+            return context_rules
+        return tuple(rule for rule in context_rules if rule.rule.code not in ignored_rule_codes)
 
-    def execution_plan_for_path(self, path: str) -> RuleExecutionPlan:
+    def execution_plan_for_path(self, path: str, *, source_context: SourceContext | None = None) -> RuleExecutionPlan:
         """Return the lean execution plan after applying per-file ignores.
 
         Args:
             path (str): Source path whose per-file ignore patterns should be evaluated.
+            source_context (SourceContext | None): Effective source context, or the globally resolved context by
+                default.
 
         Returns:
             RuleExecutionPlan: Rule collection and final path-specific rules.
         """
-        return RuleExecutionPlan(collection=self.collection, selected_rules=self.for_path(path))
+        return RuleExecutionPlan(collection=self.collection, selected_rules=self.for_path(path, source_context=source_context))
 
 
 def select_rules(
@@ -244,7 +278,7 @@ def select_rules(
         if rule_class.meta.code in enabled_strengths
     )
     per_file_ignores = _resolve_per_file_ignores(settings, collection=collection, errors=errors, field_bases=field_bases)
-    return RuleSelection(rules=selected_rules, per_file_ignores=per_file_ignores, errors=tuple(errors), collection=collection)
+    return RuleSelection(candidate_rules=selected_rules, per_file_ignores=per_file_ignores, errors=tuple(errors), collection=collection, source_context=settings.source_context)
 
 
 def _apply_setting_effects(settings: CheckSettings, *, enabled_strengths: dict[RuleCode, _SelectorStrength], collection: RuleCollection) -> dict[RuleCode, _SelectorStrength]:

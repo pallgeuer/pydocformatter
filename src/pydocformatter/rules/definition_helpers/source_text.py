@@ -16,6 +16,9 @@ from collections.abc import Mapping, Sequence
 import libcst as cst
 import libcst.metadata as cst_metadata
 
+# First-party imports
+from pydocformatter.utils import text
+
 
 LineBounds = tuple[tuple[int, int], ...]
 _PHYSICAL_WHITESPACE = " \t\f\r\n"
@@ -295,15 +298,9 @@ def source_lines(source: str) -> list[str]:
     if not source:
         return [""]
 
-    lines: list[str] = []
-    pending = ""
-    for split_line in source.splitlines(keepends=True):
-        pending += split_line
-        if split_line.endswith(("\r", "\n")):
-            lines.append(pending)
-            pending = ""
-    if pending or source.endswith(("\r", "\n")):
-        lines.append(pending)
+    lines = text.split_physical_lines(source, keepends=True)
+    if source.endswith(("\r", "\n")):
+        lines.append("")
     return lines
 
 
