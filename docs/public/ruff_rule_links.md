@@ -25,8 +25,12 @@ quote-style = "double"
 ignore = [
     "D",
     "DOC",
-    "E261", "E262", "E265", "E266", "E501",
-    "W505",
+    "too-few-spaces-before-inline-comment",
+    "no-space-after-inline-comment",
+    "no-space-after-block-comment",
+    "multiple-leading-hashes-for-block-comment",
+    "line-too-long",
+    "doc-line-too-long",
 ]
 task-tags = ["TODO", "FIXME", "XXX", "HACK", "BUG", "DEBUG", "NOTE", "OPTIMIZE", "REVIEW"]
 

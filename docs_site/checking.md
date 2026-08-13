@@ -54,8 +54,8 @@ Source suppressions silence specific findings when a rule should not apply to a 
 
 ```python
 def generated_value():
-    # pydocfmt: ignore[PDF300]
-    """return a generated value"""
+    # pydocfmt: ignore[summary-trailing-period]
+    """Return a generated value"""
 ```
 
 See [Rule suppressions](reference/rule-suppressions.md) for supported suppression forms.

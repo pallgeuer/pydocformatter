@@ -40,8 +40,8 @@ def describe_metric(name: str, value: float) -> str:
     This description explains how the metric name and numeric value are combined into stable text for reports that compare multiple runs.
 
     Args:
-        name: metric name
-        value: measured value
+        name (str): metric name
+        value (float): measured value
     """
 ```
 
@@ -55,7 +55,7 @@ def describe_metric(name: str, value: float) -> str:
     combined into stable text for reports that compare multiple runs.
 
     Args:
-        name: Metric name.
-        value: Measured value.
+        name (str): Metric name.
+        value (float): Measured value.
     """
 ```
