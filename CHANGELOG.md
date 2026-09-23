@@ -6,7 +6,8 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## Release diffs
 
-- **Unreleased:** <https://github.com/pallgeuer/pydocformatter/compare/v1.2.0...HEAD>
+- **Unreleased:** <https://github.com/pallgeuer/pydocformatter/compare/v1.2.1...HEAD>
+- **v1.2.1:** <https://github.com/pallgeuer/pydocformatter/compare/v1.2.0...v1.2.1>
 - **v1.2.0:** <https://github.com/pallgeuer/pydocformatter/compare/v1.1.0...v1.2.0>
 - **v1.1.0:** <https://github.com/pallgeuer/pydocformatter/compare/v1.0.0...v1.1.0>
 - **v1.0.0:** <https://github.com/pallgeuer/pydocformatter/compare/v0.2.0...v1.0.0>
@@ -16,19 +17,22 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## Unreleased
 
+None.
+
+---
+
+## v1.2.1
+
+Released 2026-09-23
+
+**Highlights:** Hardened output-file failure handling and expanded practical guidance for evaluating, adopting, and safely integrating pydocformatter.
+
 ### Changed
 
 #### Documentation
 
-- Clarified project positioning, safe-fix boundaries, intended users, the canonical demonstration, five-minute adoption and migration workflows, tool comparisons, common integrations, and CI exit behavior.
-- Documented public compatibility, rule-lifecycle and fix-safety guarantees, strengthened rule-proposal guidance, and made package evaluation and pre-commit discovery more direct.
-- Added a sourced tool comparison, an executable canonical demonstration with its complete diff, and manual VS Code and PyCharm check/fix workflows.
-- Published practical articles about safe docstring formatting and assigning documentation responsibilities in a Ruff-based toolchain.
-
-#### Release and test trust
-
-- Added concise release highlights, required their reuse as permanent GitHub release notes, and introduced an enforced branch-aware test-coverage floor.
-- Increased branch-aware coverage to 95.51% with behavior-focused cache ownership and recovery, configuration validation, and docstring rendering safety tests, retaining the 95% enforced floor as regression margin.
+- Expanded the project overview, five-minute adoption workflow, tool comparisons, canonical demonstration, editor integrations, and guidance for combining pydocformatter with Ruff or Black.
+- Documented the public compatibility surface, rule lifecycle, fix-safety guarantees, CI exit behavior, and contribution requirements for new rules and fixes.
 
 ### Fixed
 
@@ -36,9 +40,9 @@ All notable changes to this project are documented here. The format follows [Kee
 
 - Reported output-file write, flush, and close failures as status-2 output errors without an uncaught traceback.
 
-#### Release and test trust
+#### Packaging
 
-- Kept repository-only policy tests out of source distributions, removed vacuous coverage tests and incidental prose assertions, and avoided running the complete test suite twice in CI.
+- Kept repository-only policy tests out of source distributions.
 
 ---
 

@@ -11,7 +11,7 @@ Use `pydocfmt-check` for the recommended read-only hook that fails commits on fi
 ```yaml
 repos:
   - repo: https://github.com/pallgeuer/pydocformatter
-    rev: v1.2.0
+    rev: v1.2.1
     hooks:
       - id: pydocfmt-check
 ```
@@ -21,7 +21,7 @@ Use `pydocfmt-fix` instead in a local workflow where automatic edits are expecte
 ```yaml
 repos:
   - repo: https://github.com/pallgeuer/pydocformatter
-    rev: v1.2.0
+    rev: v1.2.1
     hooks:
       - id: pydocfmt-fix
 ```
