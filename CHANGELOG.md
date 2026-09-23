@@ -16,13 +16,37 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## Unreleased
 
-None.
+### Changed
+
+#### Documentation
+
+- Clarified project positioning, safe-fix boundaries, intended users, the canonical demonstration, five-minute adoption and migration workflows, tool comparisons, common integrations, and CI exit behavior.
+- Documented public compatibility, rule-lifecycle and fix-safety guarantees, strengthened rule-proposal guidance, and made package evaluation and pre-commit discovery more direct.
+- Added a sourced tool comparison, an executable canonical demonstration with its complete diff, and manual VS Code and PyCharm check/fix workflows.
+- Published practical articles about safe docstring formatting and assigning documentation responsibilities in a Ruff-based toolchain.
+
+#### Release and test trust
+
+- Added concise release highlights, required their reuse as permanent GitHub release notes, and introduced an enforced branch-aware test-coverage floor.
+- Increased branch-aware coverage to 95.51% with behavior-focused cache ownership and recovery, configuration validation, and docstring rendering safety tests, retaining the 95% enforced floor as regression margin.
+
+### Fixed
+
+#### Command-line reliability
+
+- Reported output-file write, flush, and close failures as status-2 output errors without an uncaught traceback.
+
+#### Release and test trust
+
+- Kept repository-only policy tests out of source distributions, removed vacuous coverage tests and incidental prose assertions, and avoided running the complete test suite twice in CI.
 
 ---
 
 ## v1.2.0
 
 Released 2026-08-14
+
+**Highlights:** Added safe, atomic checking and formatting of fenced Python in Markdown, explicit source-language extension mapping, and separate module-attribute documentation ordering.
 
 ### Added
 
@@ -62,6 +86,8 @@ Released 2026-08-14
 Released 2026-08-13
 
 **Compatibility warning:** This minor release intentionally includes a breaking reassignment of all PCF rule codes. Existing code-based selectors and suppressions must migrate using the table below because the previous codes are not retained as aliases; canonical rule-name selectors remain unchanged.
+
+**Highlights:** Added persistent clean-proof caching, canonical rule-name selection and suppression policies, broader semantic documentation checks, and substantial source-preservation, platform, and failure-recovery hardening.
 
 ### Added
 
@@ -169,6 +195,8 @@ Released 2026-08-13
 
 Released 2026-07-16
 
+**Highlights:** Rebuilt pydocformatter as a rule-based linter and formatter with 122 stable rules, a Ruff-style CLI and configuration model, structured docstring conventions, and conservative source fixes.
+
 ### Added
 
 #### Rule-based formatting
@@ -228,6 +256,8 @@ Released 2026-07-16
 ## v0.2.0
 
 Released 2026-05-01
+
+**Highlights:** Established the preliminary direct formatter for Python comments and docstrings that preceded the rule-based CLI.
 
 ### Added
 

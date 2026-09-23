@@ -454,7 +454,6 @@ class SettingDefinition(Generic[SettingValueT]):
         group (enum.StrEnum): Settings group used for CLI/help ordering.
         help (str): Short help text for CLI output.
         key (str): TOML key used for configuration.
-        available_in_cli (bool): Whether a dedicated CLI option should be registered.
         available_in_toml (bool): Whether the setting can be loaded from TOML.
         validator (SettingValidator[SettingValueT]): Validator that converts raw values to resolved values.
         cli (SettingCLIDefinition | None): Resolved CLI metadata, or None when unavailable in CLI.
@@ -467,7 +466,6 @@ class SettingDefinition(Generic[SettingValueT]):
     group: enum.StrEnum
     help: str
     key: str = ""
-    available_in_cli: bool = True
     available_in_toml: bool = True
     validator: SettingValidator[SettingValueT] = dataclasses.field(init=False)
     cli: SettingCLIDefinition | None = None
@@ -559,7 +557,6 @@ class SettingDefinition(Generic[SettingValueT]):
         object.__setattr__(self, "group", group)
         object.__setattr__(self, "help", help)
         object.__setattr__(self, "key", resolved_key)
-        object.__setattr__(self, "available_in_cli", available_in_cli)
         object.__setattr__(self, "available_in_toml", available_in_toml)
         object.__setattr__(self, "validator", resolved_validator)
         object.__setattr__(self, "cli", resolved_cli)
@@ -604,7 +601,6 @@ class SettingsSchema(Generic[SettingsT]):
         Raises:
             ValueError: If the TOML table path is empty or contains empty segments.
             TypeError: If a setting definition uses a group outside `group_type`.
-            AssertionError: If CLI availability and resolved CLI metadata disagree.
         """
         if not self.table_path or any(not key for key in self.table_path):
             raise ValueError("Settings schema table_path must contain non-empty path segments")
@@ -617,10 +613,6 @@ class SettingsSchema(Generic[SettingsT]):
         if invalid_definitions:
             invalid_fields = ", ".join(f"{definition.field}={definition.group!r}" for definition in invalid_definitions)
             raise TypeError(f"Settings definitions must belong to {self.group_type.__name__}: {invalid_fields}")
-        invalid_definitions = tuple(definition for definition in self.definitions if definition.available_in_cli != (definition.cli is not None))
-        if invalid_definitions:
-            invalid_fields = ", ".join(f"{definition.field}: {definition.available_in_cli}/{definition.cli is not None}" for definition in invalid_definitions)
-            raise AssertionError(f"Inconsistent settings definitions found in terms of CLI availability: {invalid_fields}")
 
     def load(self, *, global_values: GlobalArgs | None = None, args: argparse.Namespace | None = None, field_overrides: Mapping[str, Any] | None = None) -> SettingsT:
         """Resolve settings from defaults, config files, inline config, and optional CLI overrides.
@@ -707,7 +699,7 @@ class SettingsSchema(Generic[SettingsT]):
             for definition in self.definitions:
                 if definition.group == group:
                     handled_definitions.append(definition)
-                    if definition.available_in_cli:
+                    if definition.cli is not None:
                         _add_setting_argument(argument_group, definition, settings)
 
         if len(handled_definitions) != len(self.definitions):
@@ -731,7 +723,7 @@ class SettingsSchema(Generic[SettingsT]):
             definition = next(definition for definition in self.definitions if definition.field == field)
         except StopIteration:
             raise KeyError(field) from None
-        if not definition.available_in_cli:
+        if definition.cli is None:
             raise ValueError(f"Setting {field!r} is not available on the CLI")
         _add_setting_argument(parser, definition, settings)
 
@@ -751,7 +743,7 @@ class SettingsSchema(Generic[SettingsT]):
         """
         values: dict[str, Any] = {}
         for definition in self.definitions:
-            if definition.available_in_cli:
+            if definition.cli is not None:
                 value = getattr(args, definition.field, None)
                 if value is None:
                     continue

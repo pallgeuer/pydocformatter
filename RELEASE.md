@@ -111,7 +111,8 @@ test -s "$DRAFT_RELEASE_NOTES"
 ```
 
 - Move the relevant `Unreleased` material under `## v<VERSION>` and add `Released YYYY-MM-DD` using `RELEASE_DATE`.
-- Put breaking changes and their replacements where users will see them clearly.
+- Put breaking changes and their replacements where users will see them clearly, before the release highlights.
+- Add exactly one concise `**Highlights:**` paragraph after the release date and any compatibility warning. Summarize the main user outcomes and reason to upgrade without duplicating the categorized details or implementation history.
 - Keep the standard `Added`, `Changed`, `Fixed`, and `Removed` categories only where they contain useful entries.
 - Within those standard categories, organize outcomes beneath short general level-four category headings rather than category bullets, and preserve horizontal rules between the introduction, release diffs, `Unreleased`, and every released-version section.
 - Set the new `## Unreleased` section to `None.`. The next user- or developer-relevant change replaces `None.` with the appropriate category and entry.
@@ -128,7 +129,7 @@ printf 'Draft lines: %s\nCandidate lines: %s\n' "$(wc -l < "$DRAFT_RELEASE_NOTES
 git diff -- CHANGELOG.md
 ```
 
-**Required editorial checkpoint:** Record a concise audit confirming that duplicate and superseded entries were combined, maintainer-only implementation churn and test-only work were removed, all material user-facing outcomes and migrations remain, and the final notes read as one coherent external release summary. Merely moving `Unreleased`, changing headings, or preserving every development bullet does not satisfy this section. A substantial release will normally become materially shorter, although clarity and complete user-facing coverage take precedence over a line-count target.
+**Required editorial checkpoint:** Record a concise audit confirming that the Highlights paragraph accurately summarizes the main user outcomes, duplicate and superseded entries were combined, maintainer-only implementation churn and test-only work were removed, all material user-facing outcomes and migrations remain, and the final notes read as one coherent external release summary. Merely moving `Unreleased`, changing headings, or preserving every development bullet does not satisfy this section. A substantial release will normally become materially shorter, although clarity and complete user-facing coverage take precedence over a line-count target.
 
 `RELEASE_DATE` is the intended publication date. If publication moves to another day, update the changelog date on `main`, rerun the affected release checks, commit and push the correction, and wait for its workflows before tagging.
 
@@ -392,10 +393,11 @@ Create a non-draft, non-prerelease GitHub release from the already pushed tag. U
 
 ```bash
 gh release create "$TAG" "$SDIST" "$WHEEL" "$CHECKSUMS" --verify-tag --fail-on-no-commits --latest --title "pydocformatter ${TAG}" --notes-file "$RELEASE_NOTES"
-gh release view "$TAG" --json tagName,name,isDraft,isPrerelease,isImmutable,publishedAt,url,assets
+gh release view "$TAG" --json tagName,name,isDraft,isPrerelease,isImmutable,publishedAt,url,assets,body
+test "$(gh release view "$TAG" --json body --jq .body)" = "$(cat "$RELEASE_NOTES")"
 ```
 
-Confirm that the release targets `TAG`, is published as the latest stable release, contains the intended notes, and lists all three uploaded assets.
+Confirm that the release targets `TAG`, is published as the latest stable release, contains the exact changelog-derived notes, and lists all three uploaded assets.
 
 ## Verify the published release
 
@@ -403,7 +405,7 @@ Allow a short period for PyPI and GitHub Pages propagation, then verify all publ
 
 ### PyPI and installed CLI
 
-- The [PyPI project page](https://pypi.org/project/pydocformatter/) shows `VERSION`, the correct metadata and rendered README, and both distributions.
+- The [PyPI project page](https://pypi.org/project/pydocformatter/) shows `VERSION`, both distributions, and the intended metadata and rendered README. Review it as a first-time visitor: the first screen must explain the package, show the basic installation command and before/after example, and link to the documentation and source repository.
 - The wheel and source distribution filenames and hashes match the files that were published.
 - A fresh isolated installation reports the released version and passes a basic check:
 

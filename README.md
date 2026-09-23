@@ -3,13 +3,94 @@
 [![PyPI version](https://img.shields.io/pypi/v/pydocformatter.svg)](https://pypi.org/project/pydocformatter/)
 [![Python versions](https://img.shields.io/pypi/pyversions/pydocformatter.svg)](https://pypi.org/project/pydocformatter/)
 [![CI](https://github.com/pallgeuer/pydocformatter/actions/workflows/pre_commit_checks.yml/badge.svg)](https://github.com/pallgeuer/pydocformatter/actions/workflows/pre_commit_checks.yml)
+[![Coverage gate: >=95%](https://img.shields.io/badge/coverage%20gate-%3E%3D95%25-brightgreen.svg)](https://github.com/pallgeuer/pydocformatter/actions/workflows/pre_commit_checks.yml)
 [![Platform compatibility](https://github.com/pallgeuer/pydocformatter/actions/workflows/platform_compatibility.yml/badge.svg)](https://github.com/pallgeuer/pydocformatter/actions/workflows/platform_compatibility.yml)
 [![Documentation](https://github.com/pallgeuer/pydocformatter/actions/workflows/build_deploy_docs.yml/badge.svg)](https://github.com/pallgeuer/pydocformatter/actions/workflows/build_deploy_docs.yml)
 [![License: GPL-3.0-or-later](https://img.shields.io/badge/license-GPL--3.0--or--later-blue.svg)](https://www.gnu.org/licenses/gpl-3.0.html)
 
-pydocformatter is a rule-based linter and source formatter for Python docstrings and comments, including those in fenced Python blocks in Markdown. Its `pydocfmt` command reports precise rule findings, applies fixes when source changes are safe, and leaves ambiguous or content-creating decisions to the author.
+pydocformatter is a Ruff-like Python docstring formatter and docstring linter that also formats source comments, including those in fenced Python blocks in Markdown. Its `pydocfmt` command reports precise rule findings, applies fixes when source changes are safe, and leaves ambiguous or content-creating decisions to the author.
 
 pydocformatter handles documentation and comment source; it does not format ordinary Python expressions or statements. Use it alongside [Ruff](https://docs.astral.sh/ruff/) or another general Python formatter.
+
+## Try it
+
+Install the command, check the current repository without changing it, and preview safe fixes:
+
+```bash
+uv tool install pydocformatter
+pydocfmt check
+pydocfmt check --diff
+```
+
+Continue with the [documentation](https://pallgeuer.github.io/pydocformatter/) or inspect the [source repository](https://github.com/pallgeuer/pydocformatter).
+
+## Why pydocformatter?
+
+- It formats prose in docstrings and comments while preserving supported doctests, code fences, directives, lists, tables, and other structured regions.
+- It understands PEP 257, Google-style docstrings, NumPy-style docstrings, and reStructuredText conventions instead of treating every docstring as unstructured text.
+- It checks semantic relationships such as parameter, return, yield, exception, and attribute documentation with precise rule-level diagnostics.
+- It follows a conservative fix model: mechanically safe changes can be automated, while ambiguous rewrites and missing human-authored content remain findings for the author.
+
+## Who should use this?
+
+- Projects that already use Ruff, Black, pre-commit, or similar quality tools and want consistent docstrings and comments too.
+- Libraries and applications with substantial API documentation or prose embedded in source.
+- Teams that enforce a Google, NumPy, reStructuredText, or PEP 257 docstring convention and want formatting plus documentation-consistency checks.
+
+## Before and after
+
+This realistic Google-style function combines prose, structured parameter documentation, a protected reStructuredText code directive, and a long source comment. pydocformatter wraps the prose it can change safely, preserves the code example, and leaves the missing `default_role` documentation and overlong summary for the author.
+
+````pydocfmt-example
+[settings]
+line-length = 88
+docstring-convention = "google"
+
+[input]
+"""User configuration helpers."""
+
+
+def load_user(path, default_role):
+    """
+    Loads a user record from disk and returns normalized settings for the application with predictable defaults.
+
+    Args:
+        path: Path to the user configuration file.
+
+    Examples:
+        .. code-block:: python
+
+            record = load_user("settings-for-a-very-long-environment-name.toml", default_role="viewer")
+    """
+    # Keep the fallback role in the returned record so callers can handle incomplete configuration files consistently across environments.
+    return {"path": path, "role": default_role}
+
+[output]
+"""User configuration helpers."""
+
+
+def load_user(path, default_role):
+    """Loads a user record from disk and returns normalized settings for the application
+    with predictable defaults.
+
+    Args:
+        path: Path to the user configuration file.
+
+    Examples:
+        .. code-block:: python
+
+            record = load_user("settings-for-a-very-long-environment-name.toml", default_role="viewer")
+    """
+    # Keep the fallback role in the returned record so callers can handle incomplete
+    # configuration files consistently across environments.
+    return {"path": path, "role": default_role}
+
+[findings]
+PDF203: Lines 5-6: Docstring summary spans 2 lines and does not fit on one line
+PDF500: Line 4: Function parameter 'default_role' is missing docstring documentation
+````
+
+[`PDF101`](https://pallgeuer.github.io/pydocformatter/rules/docstring-reflow/) and [`PCF000`](https://pallgeuer.github.io/pydocformatter/rules/standalone-comment-formatting/) apply the safe wrapping changes. [`PDF203`](https://pallgeuer.github.io/pydocformatter/rules/summary-too-long/) and [`PDF500`](https://pallgeuer.github.io/pydocformatter/rules/missing-parameter-documentation/) remain as diagnostic-only findings for the author to resolve.
 
 ## What it does
 
@@ -28,12 +109,15 @@ The [documentation site](https://pallgeuer.github.io/pydocformatter/) is the com
 | Need                                                           | Resource                                                                                                                                                                                                                                                                                                                         |
 |----------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Install and complete a first run                               | [Tutorial](https://pallgeuer.github.io/pydocformatter/tutorial/) and [Installation](https://pallgeuer.github.io/pydocformatter/installation/)                                                                                                                                                                                    |
+| Compare tools and inspect a complete tested transformation     | [Comparison](https://pallgeuer.github.io/pydocformatter/comparison/) and [Demonstration](https://pallgeuer.github.io/pydocformatter/demonstration/)                                                                                                                                                                              |
+| Understand safe formatting and assign tool ownership           | [Why docstrings are hard to format safely](https://pallgeuer.github.io/pydocformatter/articles/why-docstrings-are-hard-to-format-safely/) and [Docstring formatting in a Ruff project](https://pallgeuer.github.io/pydocformatter/articles/docstring-formatting-in-a-ruff-project/)                                              |
 | Configure pydocfmt                                             | [Configuration](https://pallgeuer.github.io/pydocformatter/configuration/) and generated [Settings](https://pallgeuer.github.io/pydocformatter/settings/)                                                                                                                                                                        |
-| Configure Ruff alongside pydocformatter                        | [Ruff rule links](https://pallgeuer.github.io/pydocformatter/rules/ruff-rule-links/)                                                                                                                                                                                                                                             |
+| Configure the Ruff integration                                 | [Ruff rule links](https://pallgeuer.github.io/pydocformatter/rules/ruff-rule-links/)                                                                                                                                                                                                                                             |
 | Understand a rule or browse available rules                    | [Rules](https://pallgeuer.github.io/pydocformatter/rules/) or `pydocfmt rule RULE`                                                                                                                                                                                                                                               |
 | Choose or inspect active, ignored, per-file, and fixable rules | [Rule selection](https://pallgeuer.github.io/pydocformatter/reference/rule-selection/) and `pydocfmt check --show-rules`                                                                                                                                                                                                         |
 | Understand checking, fixing, suppressions, and file discovery  | [Checking](https://pallgeuer.github.io/pydocformatter/checking/), [Formatting](https://pallgeuer.github.io/pydocformatter/formatting/), [Rule suppressions](https://pallgeuer.github.io/pydocformatter/reference/rule-suppressions/), and [File selection](https://pallgeuer.github.io/pydocformatter/reference/file-selection/) |
 | Add pre-commit, CI, or editor workflows                        | [Integrations](https://pallgeuer.github.io/pydocformatter/integrations/)                                                                                                                                                                                                                                                         |
+| Understand compatibility, rule lifecycle, and fix guarantees   | [Versioning](https://pallgeuer.github.io/pydocformatter/versioning/)                                                                                                                                                                                                                                                             |
 | Resolve common questions                                       | [FAQ](https://pallgeuer.github.io/pydocformatter/faq/), `pydocfmt --help`, `pydocfmt check --help`, and `pydocfmt config SETTING`                                                                                                                                                                                                |
 | Report a bug or propose a change                               | [GitHub Issues](https://github.com/pallgeuer/pydocformatter/issues)                                                                                                                                                                                                                                                              |
 
@@ -125,53 +209,9 @@ uv run pydocfmt rule PDF101
 
 Use `uv run pydocfmt config` to list every setting, or pass a setting name such as `uv run pydocfmt config line-length` for focused help. The documentation table above links the full configuration, settings, rule-selection, and Ruff-compatibility references.
 
-## Examples
+## More examples
 
 In each example, `[settings]` or `Settings` (when present) shows the relevant pydocformatter settings used, including pertinent defaults. `[input]` or `Before` shows the original source, `[output]` or `After` shows the source after automatic fixes, and `[findings]` or `Findings` shows the diagnostics that remain afterward (not auto-fixable).
-
-### Reflow with human-authored documentation left to do
-
-This function has ordinary long prose and a partially documented Google-style signature. pydocformatter can reflow the prose, but it cannot decide how the summary should be shortened or invent documentation for `default_role`.
-
-```pydocfmt-example
-[settings]
-line-length = 88
-docstring-convention = "google"
-
-[input]
-"""User configuration helpers."""
-
-
-def load_user(path, default_role):
-    """Loads a user record from disk and returns normalized settings for the application with predictable defaults.
-
-    Args:
-        path: Path to the user configuration file.
-    """
-    # Keep the fallback role in the returned record so callers can handle incomplete configuration files consistently across environments.
-    return {"path": path, "role": default_role}
-
-[output]
-"""User configuration helpers."""
-
-
-def load_user(path, default_role):
-    """Loads a user record from disk and returns normalized settings for the application
-    with predictable defaults.
-
-    Args:
-        path: Path to the user configuration file.
-    """
-    # Keep the fallback role in the returned record so callers can handle incomplete
-    # configuration files consistently across environments.
-    return {"path": path, "role": default_role}
-
-[findings]
-PDF203: Lines 5-6: Docstring summary spans 2 lines and does not fit on one line
-PDF500: Line 4: Function parameter 'default_role' is missing docstring documentation
-```
-
-[`PDF101`](https://pallgeuer.github.io/pydocformatter/rules/docstring-reflow/) and [`PCF000`](https://pallgeuer.github.io/pydocformatter/rules/standalone-comment-formatting/) apply the safe wrapping changes. [`PDF203`](https://pallgeuer.github.io/pydocformatter/rules/summary-too-long/) and [`PDF500`](https://pallgeuer.github.io/pydocformatter/rules/missing-parameter-documentation/) remain as diagnostic-only findings for the author to resolve, including in particular that the docstring summary line now does not fit on one line, when in general it should.
 
 ### Trailing comments and stale suppressions
 

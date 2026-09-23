@@ -7,7 +7,8 @@ import subprocess
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-REPOSITORY_ONLY_SDIST_PATHS = frozenset({"RELEASE.md", "docs/devel/plans/.gitkeep"})
+REPOSITORY_ONLY_SDIST_PATHS = frozenset({"AGENTS.md", "CLAUDE.md", "RELEASE.md", "docs/devel/plans/.gitkeep"})
+REPOSITORY_ONLY_SDIST_PREFIXES = (".claude/", ".codex/", ".github/", "tests/repository/")
 
 
 def test_sdist_excludes_repository_only_files(tmp_path: pathlib.Path) -> None:
@@ -23,3 +24,4 @@ def test_sdist_excludes_repository_only_files(tmp_path: pathlib.Path) -> None:
         packaged_paths = frozenset(member.name.partition("/")[2] for member in archive.getmembers())
 
     assert packaged_paths.isdisjoint(REPOSITORY_ONLY_SDIST_PATHS)
+    assert not tuple(path for path in packaged_paths if path.startswith(REPOSITORY_ONLY_SDIST_PREFIXES))

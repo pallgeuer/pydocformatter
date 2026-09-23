@@ -16,7 +16,7 @@ Rules that cannot safely rewrite a finding still report diagnostics. The [Rules]
 
 ## Safety model
 
-Automatic fixes preserve evaluated docstring values where source rewriting would otherwise be ambiguous. pydocformatter skips fixes for docstrings that cannot be mapped back to source text safely, while still reporting the finding when the rule applies.
+Automatic fixes preserve evaluated docstring values where source rewriting would otherwise be ambiguous. pydocformatter skips fixes for docstrings that cannot be mapped back to source text safely, while still reporting the finding when the rule applies. [Why Python docstrings are harder to format safely](articles/why-docstrings-are-hard-to-format-safely.md) explains the different source, prose, structure, and authorship concerns behind this boundary.
 
 ## Line endings and indentation
 

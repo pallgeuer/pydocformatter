@@ -1,6 +1,6 @@
 [project]
 site_name = "pydocformatter"
-site_description = "A Python linter and code formatter targeted at docstrings and comments."
+site_description = "A Ruff-like linter and formatter for Python docstrings and comments."
 site_url = "https://pallgeuer.github.io/pydocformatter/"
 repo_url = "https://github.com/pallgeuer/pydocformatter"
 repo_name = "pallgeuer/pydocformatter"

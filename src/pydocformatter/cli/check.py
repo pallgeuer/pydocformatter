@@ -7,6 +7,7 @@ from __future__ import annotations
 import os
 import sys
 import math
+import typing
 import difflib
 import tomllib
 import argparse
@@ -84,7 +85,37 @@ class FormatBatchResult:
 
 
 class OutputError(Exception):
-    """Raised when an output stream cannot be opened or prepared."""
+    """Raised when a configured output stream cannot be used."""
+
+
+class _OutputErrorStream:
+    """Text stream that classifies write and flush failures as output errors."""
+
+    def __init__(self, output: TextIO) -> None:
+        """Initialize the checked stream.
+
+        Args:
+            output (TextIO): Open output stream receiving delegated writes and flushes.
+        """
+        self._output = output
+
+    def writable(self) -> bool:
+        """Return whether the delegated output stream accepts writes."""
+        return self._output.writable()
+
+    def write(self, text: str) -> int:
+        """Write text and classify operating-system failures."""
+        try:
+            return self._output.write(text)
+        except OSError as error:
+            raise OutputError(str(error)) from error
+
+    def flush(self) -> None:
+        """Flush pending output and classify operating-system failures."""
+        try:
+            self._output.flush()
+        except OSError as error:
+            raise OutputError(str(error)) from error
 
 
 def add_parser(subparsers: argparser.SubparserCollection) -> argparse.ArgumentParser:
@@ -333,7 +364,7 @@ def output_stream(output_file: str | None) -> Iterator[TextIO | None]:
         TextIO | None: Open output stream, or None to let `print` use stdout.
 
     Raises:
-        OutputError: If the output file or its direct parent cannot be created.
+        OutputError: If the output file cannot be opened, written, flushed, or closed.
     """
     if output_file is None:
         yield None
@@ -347,8 +378,17 @@ def output_stream(output_file: str | None) -> Iterator[TextIO | None]:
         output = open(output_file, "w", encoding="utf-8", newline="")  # ruff: ignore[open-file-with-context-handler]
     except OSError as error:
         raise OutputError(str(error)) from error
-    with output:
-        yield output
+    checked_output = typing.cast("TextIO", _OutputErrorStream(output))
+    try:
+        yield checked_output
+    except BaseException:
+        with contextlib.suppress(OSError):
+            output.close()
+        raise
+    try:
+        output.close()
+    except OSError as error:
+        raise OutputError(str(error)) from error
 
 
 def resolve_parallelism(parallelism: float) -> int:

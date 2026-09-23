@@ -23,6 +23,9 @@ pydocfmt check --fix
 ## Start here
 
 - [Tutorial](tutorial.md) for a first end-to-end run.
+- [Comparison](comparison.md) for a factual guide to related Python documentation and formatting tools.
+- [Demonstration](demonstration.md) for a tested end-to-end transformation, diagnostics, and complete diff.
+- [Articles](articles/why-docstrings-are-hard-to-format-safely.md) explaining safe docstring formatting and [tool ownership in a Ruff project](articles/docstring-formatting-in-a-ruff-project.md).
 - [Installation](installation.md) for pip, uv, pipx, and pre-commit setup.
 - [Checking](checking.md) for diagnostics, exit codes, diffs, suppressions, and file previews.
 - [Formatting](formatting.md) for automatic fixes and formatting scope.

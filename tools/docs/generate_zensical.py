@@ -768,6 +768,13 @@ def _nav() -> list[Any]:
     return [
         {"Overview": "index.md"},
         {"Tutorial": "tutorial.md"},
+        {"Evaluation": [{"Comparison": "comparison.md"}, {"Demonstration": "demonstration.md"}]},
+        {
+            "Articles": [
+                {"Why docstrings are hard to format safely": "articles/why-docstrings-are-hard-to-format-safely.md"},
+                {"Docstring formatting in a Ruff project": "articles/docstring-formatting-in-a-ruff-project.md"},
+            ]
+        },
         {"Installation": "installation.md"},
         {"Usage": [{"Checking": "checking.md"}, {"Formatting": "formatting.md"}, {"Configuration": "configuration.md"}, {"Integrations": "integrations.md"}]},
         {"Rules": [{"Overview": "rules.md"}, {"PCF: Comment rules": "rules/pcf.md"}, {"PDF: Docstring rules": "rules/pdf.md"}, {"Ruff rule links": "rules/ruff-rule-links.md"}]},

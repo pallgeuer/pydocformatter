@@ -61,19 +61,7 @@ def test_check_settings_schema_uses_generic_settings_definitions() -> None:
     assert all(isinstance(definition, SettingDefinition) for definition in pydocformatter_settings.SETTINGS_SCHEMA.definitions)
     assert "tags" not in tuple(field.name for field in dataclasses.fields(SettingDefinition))
     assert "render" not in tuple(field.name for field in dataclasses.fields(SettingDefinition))
-    assert tuple(field.name for field in dataclasses.fields(SettingDefinition)) == (
-        "field",
-        "value_type",
-        "group",
-        "help",
-        "key",
-        "available_in_cli",
-        "available_in_toml",
-        "validator",
-        "cli",
-        "documentation",
-        "example",
-    )
+    assert tuple(field.name for field in dataclasses.fields(SettingDefinition)) == ("field", "value_type", "group", "help", "key", "available_in_toml", "validator", "cli", "documentation", "example")
     assert tuple(field.name for field in dataclasses.fields(SettingsSchema)) == ("settings_type", "overrides_type", "group_type", "definitions", "table_path", "table_name", "post_validate")
     assert not next(field for field in dataclasses.fields(SettingsSchema) if field.name == "table_name").init
     assert pydocformatter_settings.SETTINGS_SCHEMA.table_name == "tool.pydocfmt"
@@ -155,7 +143,6 @@ def test_setting_definition_uses_explicit_key_for_default_cli_flags() -> None:
 def test_setting_definition_respects_explicit_no_cli() -> None:
     definition = SettingDefinition(field="force_exclude", value_type=bool, group=SettingsGroup.FORMATTING, help="Force excludes.", available_in_cli=False)
 
-    assert not definition.available_in_cli
     assert definition.cli is None
 
 
@@ -396,13 +383,11 @@ def test_settings_schema_add_arguments_adds_groups_in_order() -> None:
     pydocformatter_settings.SETTINGS_SCHEMA.add_arguments(parser, CheckSettings())
 
     help_text = parser.format_help()
-    rendered_groups = tuple(group for group in SettingsGroup if any(definition.group == group and definition.available_in_cli for definition in pydocformatter_settings.SETTINGS_SCHEMA.definitions))
+    rendered_groups = tuple(group for group in SettingsGroup if any(definition.group == group and definition.cli is not None for definition in pydocformatter_settings.SETTINGS_SCHEMA.definitions))
     group_positions = {group: help_text.index(f"\n{group.value}:\n") for group in rendered_groups}
     assert tuple(sorted(rendered_groups, key=group_positions.__getitem__)) == rendered_groups
     option_strings = set(re.findall(r"(?<![\w-])--?[A-Za-z][A-Za-z0-9-]*", help_text))
-    schema_option_strings = {
-        flag for definition in pydocformatter_settings.SETTINGS_SCHEMA.definitions if definition.available_in_cli for flag in typing.cast("SettingCLIDefinition", definition.cli).flags
-    }
+    schema_option_strings = {flag for definition in pydocformatter_settings.SETTINGS_SCHEMA.definitions if definition.cli is not None for flag in definition.cli.flags}
     assert schema_option_strings <= option_strings
 
 

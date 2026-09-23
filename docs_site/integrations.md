@@ -1,12 +1,12 @@
 # Integrations
 
-pydocformatter is designed to run in the same places as other Python quality tools, namely local terminals, Git pre-commit, and CI.
+pydocformatter is designed to run in the same places as other Python quality tools, namely local terminals, Git pre-commit, and CI. Complete the [five-minute tutorial](tutorial.md) before enabling enforcement in an existing repository.
 
 The published hooks check the built-in Python and Markdown filename forms case-insensitively with `types_or: [python, pyi, markdown]` and `files: (?i)\.(?:py|pyi|pyw|md)$`. This combination requires pre-commit 2.9.0 or newer.
 
 ## Git pre-commit
 
-Use `pydocfmt-check` when commits should fail on findings:
+Use `pydocfmt-check` for the recommended read-only hook that fails commits on findings:
 
 ```yaml
 repos:
@@ -16,7 +16,7 @@ repos:
       - id: pydocfmt-check
 ```
 
-Use the fixing hook in a local workflow where automatic edits are expected:
+Use `pydocfmt-fix` instead in a local workflow where automatic edits are expected:
 
 ```yaml
 repos:
@@ -82,6 +82,62 @@ jobs:
         run: uv run --no-sync pydocfmt check
 ```
 
+The final step is read-only and fails when findings remain. See [Exit codes and CI](checking.md#exit-codes-and-ci) for the exact status contract, diff previews, advisory runs, and fix-mode behavior.
+
 ## Editors
 
-Run pydocformatter through an editor task, save hook, or pre-commit integration. A dedicated editor protocol is not required for this workflow.
+Use explicit editor actions for the current file. The read-only action is the recommended default; invoke fixes deliberately so prose changes can be reviewed. pydocformatter does not currently expose a dedicated editor protocol or machine-readable diagnostic format.
+
+### Visual Studio Code
+
+Add these [process tasks](https://code.visualstudio.com/docs/editor/tasks) to `.vscode/tasks.json`. They use the documented [`${file}` and `${workspaceFolder}` variables](https://code.visualstudio.com/docs/reference/variables-reference) and respect project exclusions.
+
+<!-- vscode-tasks:start -->
+
+```json
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "pydocfmt: check current file",
+      "type": "process",
+      "command": "uv",
+      "args": ["run", "pydocfmt", "check", "--force-exclude", "${file}"],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "pydocfmt: fix current file",
+      "type": "process",
+      "command": "uv",
+      "args": ["run", "pydocfmt", "check", "--fix", "--force-exclude", "${file}"],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    }
+  ]
+}
+```
+
+<!-- vscode-tasks:end -->
+
+Run either action from **Terminal > Run Task** or bind it to a keyboard shortcut. The empty problem matcher is intentional because grouped pydocfmt diagnostics do not currently implement an editor protocol.
+
+### PyCharm
+
+Follow PyCharm's [External Tools](https://www.jetbrains.com/help/pycharm/configuring-third-party-tools.html) workflow and add these two local tools. Set **Program** to the absolute path reported by `command -v uv`.
+
+| Field                       | Check current file                                | Fix current file                                        |
+|-----------------------------|---------------------------------------------------|---------------------------------------------------------|
+| Name                        | `pydocfmt: check current file`                    | `pydocfmt: fix current file`                            |
+| Program                     | `PATH/TO/uv`                                      | `PATH/TO/uv`                                            |
+| Arguments                   | `run pydocfmt check --force-exclude "$FilePath$"` | `run pydocfmt check --fix --force-exclude "$FilePath$"` |
+| Working directory           | `$ProjectFileDir$`                                | `$ProjectFileDir$`                                      |
+| Synchronize after execution | Disabled                                          | Enabled                                                 |
+
+Run the actions from **Tools > External Tools** or assign shortcuts. PyCharm's [built-in macro reference](https://www.jetbrains.com/help/pycharm/built-in-macros.html) documents `$FilePath$` and `$ProjectFileDir$`.
+
+For a standalone pydocformatter installation, set the editor command or program to `pydocfmt` and remove the leading `uv run` arguments. These actions are intentionally manual rather than save-time fixers.

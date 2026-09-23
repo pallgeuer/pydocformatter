@@ -22,12 +22,34 @@ Diagnostics are grouped by file and include the rule code, affected line numbers
 pydocfmt check src --output-file pydocfmt.txt
 ```
 
-## Exit codes
+## Exit codes and CI
 
-The command exits with a non-zero status when findings are reported or operational errors occur. Use `--exit-zero` when pydocformatter should report findings without failing the calling process:
+`pydocfmt check` uses the following process statuses:
+
+| Status | Meaning                                                                                                                                                       |
+|--------|---------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `0`    | The command completed successfully with no remaining findings or processing errors. Fix mode may have changed files unless `--exit-non-zero-on-fix` was used. |
+| `1`    | Findings or run-time processing errors remain, `--diff` found changes to preview, or `--fix --exit-non-zero-on-fix` changed files.                            |
+| `2`    | The command could not start or complete its setup because of an invalid invocation, invalid configuration, file-selection failure, or output error.           |
+
+The default read-only command is therefore suitable for CI:
+
+```bash
+pydocfmt check
+```
+
+Use `--exit-zero` for an advisory run that should report status-`1` findings, processing errors, or preview changes without failing the caller:
 
 ```bash
 pydocfmt check --exit-zero
+```
+
+This option does not convert an invalid invocation or another status-`2` setup failure into success. It is mutually exclusive with `--exit-non-zero-on-fix`.
+
+Fix mode normally returns `0` after it changes files when no findings or processing errors remain. Use the following form when a local automation should fail after making changes so that the caller reruns or stages them explicitly:
+
+```bash
+pydocfmt check --fix --exit-non-zero-on-fix
 ```
 
 ## Diff preview
@@ -37,6 +59,8 @@ pydocfmt check --exit-zero
 ```bash
 pydocfmt check --diff
 ```
+
+It returns `1` when the diff is nonempty, even if applying those changes would resolve every finding. This makes `--diff` useful as a non-writing preview gate, while plain `pydocfmt check` remains the simplest enforcement command. See [Integrations](integrations.md) for copy-paste pre-commit and GitHub Actions configurations.
 
 ## Rule selection
 

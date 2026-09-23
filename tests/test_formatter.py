@@ -482,6 +482,35 @@ def test_output_stream_does_not_convert_body_os_errors() -> None:
             raise OSError("Body failed")
 
 
+def test_output_stream_converts_write_os_errors(mocker: MockerFixture) -> None:
+    output = mocker.MagicMock()
+    output.write.side_effect = OSError("Write failed")
+    mocker.patch("builtins.open", return_value=output)
+
+    with pytest.raises(check_command.OutputError, match="Write failed"), check_command.output_stream("errors.txt") as checked_output:
+        print("diagnostic", file=checked_output)
+
+
+def test_output_stream_converts_flush_os_errors(mocker: MockerFixture) -> None:
+    output = mocker.MagicMock()
+    output.flush.side_effect = OSError("Flush failed")
+    mocker.patch("builtins.open", return_value=output)
+
+    with check_command.output_stream("errors.txt") as checked_output:
+        assert checked_output is not None
+        with pytest.raises(check_command.OutputError, match="Flush failed"):
+            checked_output.flush()
+
+
+def test_output_stream_converts_close_os_errors(mocker: MockerFixture) -> None:
+    output = mocker.MagicMock()
+    output.close.side_effect = OSError("Close failed")
+    mocker.patch("builtins.open", return_value=output)
+
+    with pytest.raises(check_command.OutputError, match="Close failed"), check_command.output_stream("errors.txt"):
+        pass
+
+
 def test_rule_formatter_interface_is_noop_and_preserves_display_path(monkeypatch: pytest.MonkeyPatch) -> None:
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)

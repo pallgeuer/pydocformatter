@@ -80,6 +80,19 @@ Tests are module-level pytest functions. Use plain `assert`, fixtures, `pytest.r
 
 Read the [rule implementation specification](https://github.com/pallgeuer/pydocformatter/blob/main/docs/devel/rule_implementation_spec.md) before adding or changing a rule. It is the normative contract for rule identity, metadata, registration, execution, violations, source fixes, documentation, and tests.
 
+### Proposing rules and fixes
+
+A rule proposal should establish the problem and its safe boundary before implementation. Include:
+
+- Minimal positive examples and counterexamples, including valid source that must not produce a finding.
+- The applicable docstring conventions and source contexts, the proposed diagnostic, whether a fix is available, and whether the rule should be selected by default, require explicit selection, or be convention-gated.
+- Interactions with related pydocformatter and Ruff rules, including any overlap, conflict, or recommended selector changes.
+- The exact transformation boundary, cases that cannot be fixed safely, and why the fix is deterministic.
+- Coverage for idempotence, malformed or ambiguous input, suppressions, line endings, and migration from any behavior or identity being replaced.
+- Required rule documentation, settings-audit changes, compatibility implications, and a changelog entry.
+
+Formatting proposals must not infer missing prose or silently normalize syntax whose meaning is uncertain. Prefer a diagnostic-only rule when a safe source edit cannot be proven. A proposal that changes an existing diagnostic, formatted output, default selection, setting, rule code, or canonical name must explain how it fits the [versioning and compatibility policy](https://pallgeuer.github.io/pydocformatter/versioning/).
+
 A built-in rule normally has these matching files:
 
 ```text

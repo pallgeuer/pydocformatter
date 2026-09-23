@@ -7,12 +7,12 @@ name = "pydocformatter"
 dynamic = ["version"]
 authors = [{name = "Philipp Allgeuer"}]
 maintainers = [{name = "Philipp Allgeuer"}]
-description = "A Python linter and code formatter targeted at docstrings and comments."
+description = "A Ruff-like linter and formatter for Python docstrings and comments."
 readme = "README.md"
 license = "GPL-3.0-or-later"
 license-files = ["LICENSE.md"]
 requires-python = ">=3.11"
-keywords = ["linter", "formatter", "docstring", "comment", "python", "code quality"]
+keywords = ["linter", "formatter", "docstring", "comment", "python", "code quality", "docstring formatter", "docstring linter", "comment formatter", "Google-style docstrings", "NumPy-style docstrings", "Ruff integration", "pre-commit"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Environment :: Console",
@@ -96,6 +96,7 @@ exclude = [
     ".codex/",
     ".claude/",
     "/RELEASE.md",
+    "/tests/repository/",
     "/docs/devel/plans/.gitkeep",
 ]
 
@@ -114,6 +115,20 @@ la_dev_cwd_isolation_unmarked = "shared_guarded"
 la_dev_cwd_isolation_cleanup = "pytest_retained"
 tmp_path_retention_policy = "all"
 tmp_path_retention_count = 3
+
+#
+# coverage
+#
+
+[tool.coverage.run]
+branch = true
+source = ["pydocformatter"]
+
+[tool.coverage.report]
+fail_under = 95
+precision = 2
+show_missing = true
+skip_covered = true
 
 #
 # pydocfmt

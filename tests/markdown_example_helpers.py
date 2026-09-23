@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 # Standard library imports
+import re
 import dataclasses
 from typing import TYPE_CHECKING
 
@@ -38,6 +39,26 @@ class MarkdownExampleOutcome:
     settings: settings_check.CheckSettings
     selection: rules_selection.RuleSelection
     check_result: formatter.FormatterResult
+
+
+def marked_fence(markdown: str, marker: str, language: str) -> str:
+    """Extract the body of a uniquely marked fenced code block.
+
+    Args:
+        markdown (str): Markdown source containing the marked fence.
+        marker (str): Unique marker name surrounding the fence.
+        language (str): Expected fenced-code language.
+
+    Returns:
+        str: Fence body including its terminating newline.
+    """
+    pattern = rf"<!-- {re.escape(marker)}:start -->\n\n```{re.escape(language)}\n(?P<body>.*?)```\n\n<!-- {re.escape(marker)}:end -->"
+    match = re.search(pattern, markdown, flags=re.DOTALL)
+
+    assert match is not None, marker
+    body = match.group("body")
+    assert isinstance(body, str)
+    return body
 
 
 def execute_markdown_example(

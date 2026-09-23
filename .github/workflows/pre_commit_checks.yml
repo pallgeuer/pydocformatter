@@ -30,4 +30,28 @@ jobs:
         run: uv sync --locked --no-default-groups --group dev
 
       - name: Run pre-commit hooks
+        env:
+          SKIP: pytest
         run: uv run --no-sync pre-commit run --all-files --hook-stage manual --show-diff-on-failure
+
+  coverage:
+    name: Enforce branch-aware coverage
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Install uv and select Python
+        uses: astral-sh/setup-uv@v8.3.2
+        with:
+          enable-cache: true
+          cache-suffix: coverage
+          python-version: "3.11"
+
+      - name: Sync test dependencies
+        run: uv sync --locked --no-default-groups --group test
+
+      - name: Run branch-aware coverage gate
+        run: uv run --no-sync pytest -q --cov

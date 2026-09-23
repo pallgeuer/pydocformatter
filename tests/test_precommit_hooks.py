@@ -3,10 +3,12 @@
 # Standard library imports
 import re
 import pathlib
+import importlib.metadata
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / ".pre-commit-hooks.yaml"
+INSTALLATION = ROOT / "docs_site" / "installation.md"
 INTEGRATIONS = ROOT / "docs_site" / "integrations.md"
 SUPPORTED_FILENAMES = ("guide.md", "GUIDE.MD", "module.py", "MODULE.PY", "module.pyi", "MODULE.PYI", "module.pyw", "MODULE.PYW")
 UNSUPPORTED_FILENAMES = ("script", "build.gyp", "config.gypi", "module.pyt", "service.tac", "app.wsgi")
@@ -40,6 +42,26 @@ def test_published_hooks_use_types_or_with_default_python_and_markdown_filenames
 
 def test_published_hooks_require_types_or_capable_pre_commit() -> None:
     assert all(hook["minimum_pre_commit_version"] == "2.9.0" for hook in _hook_fields())
+
+
+def test_published_hooks_have_distinct_check_and_fix_entries() -> None:
+    check_hook, fix_hook = _hook_fields()
+
+    assert check_hook["entry"] == "pydocfmt check"
+    assert fix_hook["entry"] == "pydocfmt check --fix"
+
+
+def test_documented_hooks_use_the_current_release_and_canonical_repository() -> None:
+    expected_revision = f"rev: v{importlib.metadata.version('pydocformatter')}"
+
+    for path in (INSTALLATION, INTEGRATIONS):
+        guidance = path.read_text(encoding="utf-8")
+        assert "repo: https://github.com/pallgeuer/pydocformatter" in guidance
+        assert expected_revision in guidance
+        assert "id: pydocfmt-check" in guidance
+        assert "id: pydocfmt-fix" in guidance
+        assert "read-only" in guidance
+        assert "fix" in guidance
 
 
 def test_custom_extension_guidance_covers_pre_commit_and_direct_discovery() -> None:
