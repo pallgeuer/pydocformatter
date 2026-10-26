@@ -10,7 +10,6 @@ __pycache__/
 # Environments and caches
 .venv/
 .env
-.cache/
 .pydocfmt_cache/
 .pytest_cache/
 .ruff_cache/
@@ -29,7 +28,8 @@ Thumbs.db
 .coverage
 htmlcov/
 
-# Generated documentation
+# Generated documentation (Zensical build cache and output)
+/.cache/
 /.generated/
 /site/
 /zensical.generated.toml
